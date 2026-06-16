@@ -1,25 +1,25 @@
-# Ontology Coverage Report
+# 本体覆盖率报告
 
 [English](ontology-coverage.md) | [中文](ontology-coverage-zh.md)
 
-## Summary
+## 摘要
 
-| Metric | Value |
+| 指标 | 数量 |
 | --- | ---: |
-| Total subgraphs | 13 |
-| NodeClass definitions | 277 |
-| EdgeClass definitions | 144 |
-| InterfaceContract definitions | 30 |
-| StateMachine definitions | 21 |
-| GraphConstraint definitions | 38 |
-| YAML artifacts | 510 |
-| Orphan nodes | 0 |
-| Required-edge failures | 0 |
-| Constraint warnings/errors | 0 |
+| 本体子图 | 13 |
+| NodeClass | 277 |
+| EdgeClass | 144 |
+| InterfaceContract | 30 |
+| StateMachine | 21 |
+| GraphConstraint | 38 |
+| YAML artifact | 510 |
+| 孤立节点 | 0 |
+| required edge 失败 | 0 |
+| 约束 warning/error | 0 |
 
-## Per-Subgraph Coverage
+## 子图覆盖率
 
-| Subgraph | Nodes | Edges | Contracts | States | Constraints |
+| 子图 | 节点 | 边 | 契约 | 状态机 | 约束 |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | 00-meta-graph | 13 | 9 | 2 | 1 | 3 |
 | 01-agent-core-graph | 16 | 11 | 2 | 2 | 2 |
@@ -35,14 +35,14 @@
 | 11-environment-adapter-graph | 23 | 9 | 3 | 1 | 2 |
 | 12-engineering-validation-graph | 15 | 7 | 1 | 1 | 2 |
 
-## Key Graph Paths
+## 关键图路径
 
-Three precomputed conceptual paths are present:
+当前包含 3 条预置概念路径：
 
 1. Agent Execution Path
 2. Context Tool Discovery Path
 3. Retrieval Pipeline Path
 
-## Minimum Non-Degradable Set
+## 最小不可降级集合
 
-All minimum non-degradable concepts are represented, including agent core, context, memory, reasoning, tool/action, orchestration, runtime, safety/policy, protocol, SDK, environment, and validation concepts.
+Agent core、context、memory、reasoning、tool/action、orchestration、runtime、safety/policy、protocol、SDK、environment、validation 等核心概念均已覆盖。

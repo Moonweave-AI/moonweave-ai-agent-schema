@@ -1,51 +1,92 @@
 # Ontology Governance Rules
 
-## Naming
+[English](GOVERNANCE.md) | [中文](GOVERNANCE-zh.md)
 
-- Node IDs use `node.<snake_case>` format. Example: `node.tool_call`.
-- Edge IDs use `edge.<UPPER_SNAKE_CASE>` format. Example: `edge.INVOKES`.
-- Contract IDs use `contract.<snake_case>`. Example: `contract.invocable`.
-- State machine IDs use `state.<snake_case>`. Example: `state.tool_call_lifecycle`.
-- Constraint IDs use `constraint.<snake_case>`. Example: `constraint.tool_call_must_be_guarded`.
-- Evidence IDs use `evidence.<source>.<path>`. Example: `evidence.diagram.tool_plane.tool_call`.
+This document defines naming, structure, extension, lifecycle, and validation rules for `moonweave-ai-agent-schema`. The goal is to keep the ontology universal, maintainable, and verifiable instead of letting it degrade into a temporary mapping for a specific SDK, framework, or provider.
 
-## Artifact Types
+## 1. Naming
 
-Every YAML file must declare exactly one `artifact` type:
+| Artifact | Format | Example |
+| --- | --- | --- |
+| NodeClass | `node.<snake_case>` | `node.tool_call` |
+| EdgeClass | `edge.<UPPER_SNAKE_CASE>` | `edge.INVOKES` |
+| InterfaceContract | `contract.<snake_case>` | `contract.invocable` |
+| StateMachine | `state.<snake_case>` | `state.tool_call_lifecycle` |
+| GraphConstraint | `constraint.<snake_case>` | `constraint.tool_call_must_be_guarded` |
+| EvidenceRef | `evidence.<source>.<path>` | `evidence.diagram.tool_plane.tool_call` |
 
-- `NodeClass` — An ontology concept node.
-- `EdgeClass` — An ontology relationship type.
-- `InterfaceContract` — A typed interface that nodes may implement.
-- `StateMachine` — A lifecycle state machine with states and transitions.
-- `GraphConstraint` — A structural constraint on the graph.
-- `GraphView` — A visualization view definition.
-- `EvidenceRef` — A traceability link to a source.
+## 2. Artifact Types
 
-## Required Fields
+Each YAML file must declare exactly one `artifact` type:
 
-All `NodeClass` must have: `id`, `artifact`, `label`, `label_zh`, `description`.
-All `EdgeClass` must have: `id`, `artifact`, `predicate`, `source_domain`, `target_range`, `description`.
+- `NodeClass`: an ontology concept node.
+- `EdgeClass`: a directed relationship type between node classes.
+- `InterfaceContract`: an interface that node classes may implement.
+- `StateMachine`: a lifecycle model for a node or process.
+- `GraphConstraint`: a structural or engineering quality rule.
+- `GraphView`: a graph projection for documentation, visualization, or implementation.
+- `EvidenceRef`: a reference to papers, official documentation, source diagrams, or engineering evidence.
 
-## Vendor Neutrality
+## 3. Required Fields
 
-- No vendor name, product name, or specific SDK/framework name may appear as a node ID or edge predicate in the ontology backbone.
-- Concrete implementations are documented only in `references/non-normative-exemplars/`.
-- Pattern names must be generic: `tool_server` not a protocol-specific server name; `capability_manifest` not a protocol-specific card name.
+Every `NodeClass` must include:
 
-## Extension Rules
+- `id`
+- `artifact`
+- `label`
+- `label_zh`
+- `description`
 
-- New nodes must connect to at least one existing node via a defined edge.
-- Orphan nodes are flagged by `tools/check-orphan-nodes.mjs`.
-- New subgraphs require a `GraphView` definition.
+Every `EdgeClass` must include:
 
-## Lifecycle
+- `id`
+- `artifact`
+- `predicate`
+- `source_domain`
+- `target_range`
+- `description`
 
-Each artifact carries a `status` field: `active`, `deprecated`, or `removed`.
+## 4. Vendor Neutrality
+
+- The ontology backbone must not use vendor, product, SDK, or framework names as node IDs or edge predicates.
+- Concrete implementations belong only in `references/non-normative-exemplars/`.
+- Abstractions must remain generic: use `tool_server` instead of a protocol-specific server name; use `capability_manifest` instead of a protocol-specific card name.
+
+## 5. Extension Rules
+
+- New nodes must connect to at least one existing node through a defined edge.
+- New edges must define clear `source_domain` and `target_range` values.
+- New subgraphs must provide a `GraphView` or equivalent view definition.
+- New core concepts should include evidence references.
+- Orphan nodes are not allowed.
+
+## 6. Lifecycle
+
+Every artifact must carry a `status` field:
+
+- `active`: currently valid.
+- `deprecated`: discouraged but retained for compatibility.
+- `removed`: removed from the active ontology and retained only in history.
+
 Deprecated artifacts must remain for at least one version cycle before removal.
 
-## Constraint Enforcement
+## 7. Non-Degradable Constraints
 
-- Every `ToolCall` node must have at least one outgoing `GUARDED_BY` edge to a `PolicyContract`.
-- Every side-effecting `EnvironmentAction` must have a `REQUIRES_PERMISSION` path.
-- Every `MemoryWrite` operation must connect to a write policy.
-- Every `ProtocolEndpoint` must have an `AuthorizationScheme` or explicit `PublicEndpointPolicy`.
+The following rules are mandatory:
+
+- `ToolCall` must be guarded by a `PolicyContract`.
+- Side-effecting `EnvironmentAction` nodes must have a permission path.
+- Memory-write operations must connect to a write policy.
+- `ProtocolEndpoint` must have an authorization scheme or an explicit public endpoint policy.
+- SDK abstractions must not depend on concrete vendors.
+- A release must pass the full validation gate represented by `GraphValidator`.
+
+## 8. Local Validation
+
+```powershell
+node .\tools\validate-graph.mjs
+node .\tools\validate-constraints.mjs
+node .\tools\check-orphan-nodes.mjs
+node .\tools\check-required-edges.mjs
+node .\tools\check-visualization-framework.mjs
+```
