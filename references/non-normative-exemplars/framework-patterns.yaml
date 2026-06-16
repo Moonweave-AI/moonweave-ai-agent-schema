@@ -1,0 +1,124 @@
+# Non-normative framework workflow patterns
+schema_version: "1.0"
+kind: non_normative_exemplar
+scope: orchestration-graph
+provenance: [langgraph, crewai, microsoft_agent_framework]
+
+patterns:
+  - id: exemplar.stateful_graph_workflow
+    label: Stateful Graph Workflow
+    description: >
+      Directed graph of nodes with shared state reducer; each node reads/writes
+      typed state channels and conditional edges route execution.
+    maps_to:
+      nodes: [node.decision_loop, node.agent_state, node.task]
+      edges: [edge.UPDATES_STATE, edge.RUNS_DECISION_LOOP]
+    framework_instances:
+      - vendor: langgraph
+        construct: StateGraph with Annotated reducers
+      - vendor: microsoft_agent_framework
+        construct: Workflow graph with state bag
+
+  - id: exemplar.checkpoint_persistence
+    label: Checkpoint Persistence
+    description: >
+      Serialize graph state after each superstep for resume and time-travel debug.
+    maps_to:
+      nodes: [node.agent_state]
+      edges: [edge.UPDATES_STATE]
+    framework_instances:
+      - vendor: langgraph
+        construct: checkpointer (MemorySaver, SqliteSaver)
+      - vendor: microsoft_agent_framework
+        construct: session checkpoint store
+
+  - id: exemplar.human_in_the_loop_interrupt
+    label: Human-in-the-Loop Interrupt
+    description: >
+      Pause graph before sensitive node; inject human approval or edit; resume.
+    maps_to:
+      nodes: [node.feedback_signal, node.agent_boundary]
+      edges: [edge.RECEIVES_FEEDBACK, edge.BOUNDED_BY]
+    framework_instances:
+      - vendor: langgraph
+        construct: interrupt_before / Command(resume=)
+      - vendor: microsoft_agent_framework
+        construct: approval gate node
+
+  - id: exemplar.crew_role_pipeline
+    label: Crew Role Pipeline
+    description: >
+      Fixed or hierarchical sequence of role-specialized agents producing
+      chained artifacts (research → write → review).
+    maps_to:
+      nodes: [node.role, node.task, node.objective]
+      edges: [edge.HAS_ROLE, edge.DECOMPOSES_TO_TASK]
+    framework_instances:
+      - vendor: crewai
+        construct: Process.sequential / Process.hierarchical
+
+  - id: exemplar.tool_node_isolation
+    label: Tool Node Isolation
+    description: >
+      Dedicated graph node executing tool calls outside LLM node, feeding results
+      back via state update.
+    maps_to:
+      nodes: [node.capability, node.decision_loop]
+      edges: [edge.HAS_CAPABILITY]
+    framework_instances:
+      - vendor: langgraph
+        construct: ToolNode / tools_condition routing
+      - vendor: microsoft_agent_framework
+        construct: tool execution step
+
+  - id: exemplar.subgraph_composition
+    label: Subgraph Composition
+    description: >
+      Nested workflow graphs invoked as single node from parent orchestrator.
+    maps_to:
+      nodes: [node.task, node.agent]
+      edges: [edge.DECOMPOSES_TO_TASK]
+    framework_instances:
+      - vendor: langgraph
+        construct: subgraph add_node
+      - vendor: microsoft_agent_framework
+        construct: nested workflow reference
+
+  - id: exemplar.parallel_map_reduce
+    label: Parallel Map-Reduce
+    description: >
+      Fan-out identical task over collection; fan-in aggregate via reducer.
+    maps_to:
+      nodes: [node.task, node.feedback_signal]
+      edges: [edge.DECOMPOSES_TO_TASK, edge.RECEIVES_FEEDBACK]
+    framework_instances:
+      - vendor: langgraph
+        construct: Send API / map-reduce pattern
+      - vendor: crewai
+        construct: parallel async task execution
+
+  - id: exemplar.evaluator_optimizer_loop
+    label: Evaluator-Optimizer Loop
+    description: >
+      Generator produces draft; evaluator scores; loop until threshold or max iterations.
+    maps_to:
+      nodes: [node.feedback_signal, node.decision_loop, node.objective]
+      edges: [edge.RECEIVES_FEEDBACK, edge.PURSUES_GOAL]
+    framework_instances:
+      - vendor: langgraph
+        construct: conditional loop with quality gate
+      - vendor: crewai
+        construct: review task in crew pipeline
+
+  - id: exemplar.memory_saver_thread
+    label: Thread-Scoped Memory
+    description: >
+      Per-conversation thread id keys checkpoint and message history isolation.
+    maps_to:
+      nodes: [node.agent_identity, node.message_history]
+      edges: [edge.HAS_IDENTITY]
+    framework_instances:
+      - vendor: langgraph
+        construct: thread_id in configurable
+      - vendor: microsoft_agent_framework
+        construct: conversation session id
