@@ -13,6 +13,8 @@
 | StateMachine definitions | 21 |
 | GraphConstraint definitions | 38 |
 | YAML artifacts | 510 |
+| Intra-subgraph roots | 13 |
+| Subgraphs with non-flat internal levels | 13 |
 | Orphan nodes | 0 |
 | Required-edge failures | 0 |
 | Constraint warnings/errors | 0 |
@@ -46,3 +48,7 @@ Three precomputed conceptual paths are present:
 ## Minimum Non-Degradable Set
 
 All minimum non-degradable concepts are represented, including agent core, context, memory, reasoning, tool/action, orchestration, runtime, safety/policy, protocol, SDK, environment, and validation concepts.
+
+## Intra-Subgraph Hierarchy
+
+Every subgraph now has a local hierarchy model: one level-0 anchor, semantic groups, role labels, and parent links for all non-root nodes. This prevents SG internals from collapsing into a flat list and gives the visualization enough structure to render SG internals as layered architecture rather than peer-level node clouds.

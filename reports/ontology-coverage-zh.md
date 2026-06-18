@@ -13,6 +13,8 @@
 | StateMachine | 21 |
 | GraphConstraint | 38 |
 | YAML artifact | 510 |
+| SG 内根锚点 | 13 |
+| 具备非平铺内部层级的 SG | 13 |
 | 孤立节点 | 0 |
 | required edge 失败 | 0 |
 | 约束 warning/error | 0 |
@@ -46,3 +48,7 @@
 ## 最小不可降级集合
 
 Agent core、context、memory、reasoning、tool/action、orchestration、runtime、safety/policy、protocol、SDK、environment、validation 等核心概念均已覆盖。
+
+## SG 内层级
+
+每个 SG 都已经具备本地层级模型：一个 L0 根锚点、语义分组、节点角色，以及所有非根节点的父节点链接。这避免 SG 内部概念退化为平铺列表，也让可视化能够以层级架构图而不是同级节点云的方式呈现板块内部结构。

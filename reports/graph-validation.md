@@ -11,6 +11,8 @@ The ontology graph passes structural validation, constraint validation, orphan-n
 | NodeClass ID format | PASS |
 | EdgeClass ID format | PASS |
 | Required node fields | PASS |
+| Intra-subgraph hierarchy fields | PASS |
+| Intra-subgraph parent links | PASS |
 | Required edge fields | PASS |
 | Duplicate IDs | 0 |
 | Edge endpoint references | PASS |
@@ -23,6 +25,8 @@ The ontology graph passes structural validation, constraint validation, orphan-n
 ## Structural Validation
 
 - All `NodeClass` IDs follow the `node.*` naming convention.
+- All `NodeClass` definitions declare `intra_level`, `intra_group`, `intra_group_zh`, and `intra_role`.
+- Each subgraph has exactly one `intra_level: 0` root anchor, and every non-root node points to a same-subgraph parent at a lower level.
 - All `EdgeClass` IDs follow the `edge.*` naming convention.
 - All `source_domain` and `target_range` references resolve to defined nodes.
 - Cross-subgraph relationships have no dangling endpoints.
@@ -45,6 +49,7 @@ Key non-degradable constraints pass:
 | File | Result |
 | --- | --- |
 | `ontology.graph.json` | 277 nodes, 144 edges |
+| Intra-subgraph hierarchy | 13 roots, non-flat node levels in every SG |
 | `ontology.subgraphs.json` | 13 subgraphs |
 | `ontology.paths.json` | 3 paths |
 | `ontology.constraints.json` | 38 constraints |

@@ -8,7 +8,16 @@ import {
 const NODE_ID_PATTERN = /^node\.[a-z][a-z0-9_]*$/;
 const EDGE_ID_PATTERN = /^edge\.[a-zA-Z0-9_]*$/;
 
-const NODE_REQUIRED = ["id", "artifact", "label", "description"];
+const NODE_REQUIRED = [
+  "id",
+  "artifact",
+  "label",
+  "description",
+  "intra_level",
+  "intra_group",
+  "intra_group_zh",
+  "intra_role",
+];
 const EDGE_REQUIRED = [
   "id",
   "artifact",
@@ -26,6 +35,7 @@ function main() {
   const warnings = [];
   const seenNodeIds = new Set();
   const seenEdgeIds = new Set();
+  const nodesBySubgraph = new Map();
 
   for (const node of nodes) {
     for (const field of NODE_REQUIRED) {
@@ -46,6 +56,74 @@ function main() {
 
     if (node.artifact && node.artifact !== "NodeClass") {
       warnings.push(`Unexpected node artifact '${node.artifact}': ${node._file}`);
+    }
+
+    if (!Number.isInteger(node.intra_level) || node.intra_level < 0) {
+      errors.push(`Node '${node.id}' must declare non-negative integer intra_level: ${node._file}`);
+    }
+
+    for (const field of ["intra_group", "intra_group_zh", "intra_role"]) {
+      if (typeof node[field] !== "string" || !node[field].trim()) {
+        errors.push(`Node '${node.id}' must declare non-empty ${field}: ${node._file}`);
+      }
+    }
+
+    if (node.intra_level === 0 && node.parent_node) {
+      errors.push(`Root-level node '${node.id}' must not declare parent_node: ${node._file}`);
+    }
+
+    if (Number.isInteger(node.intra_level) && node.intra_level > 0) {
+      if (!node.parent_node) {
+        errors.push(`Non-root node '${node.id}' must declare parent_node: ${node._file}`);
+      } else {
+        const parent = nodeIndex.get(node.parent_node);
+        if (!parent) {
+          errors.push(`Node '${node.id}' parent_node '${node.parent_node}' is unknown: ${node._file}`);
+        } else {
+          if (parent.subgraph !== node.subgraph) {
+            errors.push(
+              `Node '${node.id}' parent_node '${node.parent_node}' is outside subgraph '${node.subgraph}': ${node._file}`,
+            );
+          }
+          if (
+            Number.isInteger(parent.intra_level) &&
+            Number.isInteger(node.intra_level) &&
+            parent.intra_level >= node.intra_level
+          ) {
+            errors.push(
+              `Node '${node.id}' parent_node '${node.parent_node}' must have lower intra_level than child: ${node._file}`,
+            );
+          }
+        }
+      }
+    }
+
+    const subgraphNodes = nodesBySubgraph.get(node.subgraph) ?? [];
+    subgraphNodes.push(node);
+    nodesBySubgraph.set(node.subgraph, subgraphNodes);
+  }
+
+  for (const [subgraph, subgraphNodes] of nodesBySubgraph) {
+    const roots = subgraphNodes.filter((node) => node.intra_level === 0);
+    if (roots.length !== 1) {
+      errors.push(
+        `Subgraph '${subgraph}' must declare exactly one intra_level 0 anchor; found ${roots.length}`,
+      );
+    }
+
+    const levels = [...new Set(subgraphNodes.map((node) => node.intra_level))]
+      .filter(Number.isInteger)
+      .sort((a, b) => a - b);
+    if (levels.length < 2) {
+      errors.push(`Subgraph '${subgraph}' must contain at least two intra-subgraph levels`);
+    }
+    for (let i = 0; i < levels.length; i += 1) {
+      if (levels[i] !== i) {
+        errors.push(
+          `Subgraph '${subgraph}' has non-contiguous intra_level sequence: ${levels.join(", ")}`,
+        );
+        break;
+      }
     }
   }
 

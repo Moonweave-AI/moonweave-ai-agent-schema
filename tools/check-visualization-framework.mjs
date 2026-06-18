@@ -100,6 +100,18 @@ function main() {
       html.includes("CLASS-BUNDLED INTERNAL FRAMEWORK") &&
       html.includes("node-relation-tags") &&
       html.includes("relationMembership"),
+    intraSubgraphHierarchyFramework: html.includes("intraLevel") &&
+      html.includes("intraGroup") &&
+      html.includes("parentKey") &&
+      html.includes("function hierarchyLayoutForBlock") &&
+      html.includes("function drawHierarchyScaffold") &&
+      html.includes("hierarchy-level-label") &&
+      html.includes("hierarchy-group-label") &&
+      html.includes("hierarchy-parent-link"),
+    hierarchyDetailsPanel: html.includes("function hierarchyDetailHtml") &&
+      html.includes("intraRole") &&
+      html.includes("parentKey") &&
+      html.includes("rootNode"),
     noStackedBottomLocalFlow: !html.includes("local-flow") &&
       !html.includes("drawLocalFlowEdges") &&
       !html.includes("localEdgePath"),
@@ -176,8 +188,30 @@ function main() {
       : [],
   );
   const graphPredicates = new Set(graph.edges.map((edge) => edge.predicate));
+  const nodesBySubgraph = new Map();
   for (const [name, ok] of Object.entries(requiredHtmlFeatures)) {
     if (!ok) failures.push(`Missing visualization feature: ${name}`);
+  }
+  for (const node of graph.nodes) {
+    if (!Number.isInteger(node.intra_level)) {
+      failures.push(`Graph JSON node missing intra_level: ${node.id}`);
+    }
+    for (const field of ["intra_group", "intra_group_zh", "intra_role"]) {
+      if (!node[field]) failures.push(`Graph JSON node missing ${field}: ${node.id}`);
+    }
+    const list = nodesBySubgraph.get(node.subgraph) ?? [];
+    list.push(node);
+    nodesBySubgraph.set(node.subgraph, list);
+  }
+  for (const [subgraph, list] of nodesBySubgraph) {
+    const roots = list.filter((node) => node.intra_level === 0);
+    const levels = new Set(list.map((node) => node.intra_level));
+    if (roots.length !== 1) {
+      failures.push(`Visualization data subgraph '${subgraph}' must have one level-0 root; found ${roots.length}`);
+    }
+    if (levels.size < 2) {
+      failures.push(`Visualization data subgraph '${subgraph}' has no internal hierarchy`);
+    }
   }
   for (const predicate of graphPredicates) {
     if (!mappedPredicates.has(predicate)) {
