@@ -7,6 +7,7 @@ import {
 
 const NODE_ID_PATTERN = /^node\.[a-z][a-z0-9_]*$/;
 const EDGE_ID_PATTERN = /^edge\.[a-zA-Z0-9_]*$/;
+const SLUG_PATTERN = /^[a-z][a-z0-9-]*$/;
 
 const NODE_REQUIRED = [
   "id",
@@ -14,6 +15,8 @@ const NODE_REQUIRED = [
   "label",
   "description",
   "intra_level",
+  "intra_axis",
+  "intra_axis_zh",
   "intra_group",
   "intra_group_zh",
   "intra_role",
@@ -62,9 +65,17 @@ function main() {
       errors.push(`Node '${node.id}' must declare non-negative integer intra_level: ${node._file}`);
     }
 
-    for (const field of ["intra_group", "intra_group_zh", "intra_role"]) {
+    for (const field of ["intra_axis", "intra_axis_zh", "intra_group", "intra_group_zh", "intra_role"]) {
       if (typeof node[field] !== "string" || !node[field].trim()) {
         errors.push(`Node '${node.id}' must declare non-empty ${field}: ${node._file}`);
+      } else if (/\?{3,}/.test(node[field])) {
+        errors.push(`Node '${node.id}' has likely broken encoding in ${field}: ${node._file}`);
+      }
+    }
+
+    for (const field of ["intra_axis", "intra_group"]) {
+      if (typeof node[field] === "string" && !SLUG_PATTERN.test(node[field])) {
+        errors.push(`Node '${node.id}' ${field} must be a lowercase slug: ${node._file}`);
       }
     }
 

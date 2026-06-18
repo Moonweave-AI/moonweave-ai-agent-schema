@@ -14,6 +14,7 @@
 | GraphConstraint definitions | 38 |
 | YAML artifacts | 510 |
 | Intra-subgraph roots | 13 |
+| Intra-subgraph semantic axes | 114 |
 | Subgraphs with non-flat internal levels | 13 |
 | Orphan nodes | 0 |
 | Required-edge failures | 0 |
@@ -51,4 +52,4 @@ All minimum non-degradable concepts are represented, including agent core, conte
 
 ## Intra-Subgraph Hierarchy
 
-Every subgraph now has a local hierarchy model: one level-0 anchor, semantic groups, role labels, and parent links for all non-root nodes. This prevents SG internals from collapsing into a flat list and gives the visualization enough structure to render SG internals as layered architecture rather than peer-level node clouds.
+Every subgraph now has a local hierarchy model: one level-0 anchor, semantic axis lanes, fine-grained groups, role labels, and parent links for all non-root nodes. This prevents SG internals from collapsing into a flat list and gives the visualization enough structure to render SG internals as layered architecture rather than peer-level node clouds.

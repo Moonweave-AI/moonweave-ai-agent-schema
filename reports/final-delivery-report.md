@@ -27,13 +27,14 @@
 | InterfaceContract definitions | 30 |
 | StateMachine definitions | 21 |
 | GraphConstraint definitions | 38 |
+| Intra-subgraph semantic axes | 114 |
 | Precomputed conceptual paths | 3 |
 
 ## Retained Validation Tools
 
 | Tool | Purpose |
 | --- | --- |
-| `validate-graph.mjs` | validates IDs, required fields, and endpoint references |
+| `validate-graph.mjs` | validates IDs, required fields, hierarchy axis/group fields, and endpoint references |
 | `validate-constraints.mjs` | executes the graph constraint suite |
 | `check-orphan-nodes.mjs` | detects disconnected node classes |
 | `check-required-edges.mjs` | verifies required relationship declarations |

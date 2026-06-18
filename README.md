@@ -32,7 +32,7 @@ The goal is to make agent development start from a rigorous, inspectable, and ex
 | --- | --- |
 | Graph-native | Define nodes, edges, constraints, and views first; tables are secondary exports |
 | Vendor-neutral | The ontology backbone does not depend on any provider, SDK, framework, or protocol implementation |
-| Intra-subgraph hierarchy | Every SG module has its own root anchor, semantic groups, node roles, and parent-child levels |
+| Intra-subgraph hierarchy | Every SG module has its own root anchor, level columns, semantic axis lanes, fine-grained groups, node roles, and parent-child links |
 | Engineering-ready | Runtime, tool invocation, policy, environment, SDK, and validation layers are first-class |
 | Evidence-traced | Core nodes and relations link back to diagrams, papers, official documents, and engineering references |
 | Constraint-enforced | The ontology is validated by executable quality gates, not only described in prose |
@@ -94,7 +94,7 @@ No local server is required. The page embeds the graph data and loads D3 from `v
 The visualization supports:
 
 - full graph browsing across all 13 ontology subgraphs
-- hierarchy-aware layout inside every SG, with level columns, semantic group lanes, and parent links
+- hierarchy-aware layout inside every SG, with level columns, semantic axis lanes, fine-grained groups, and parent links
 - class-bundled relation diagrams inside each subgraph
 - English/Chinese language switching
 - node, edge, and relation-class detail panels
@@ -117,7 +117,7 @@ These checks cover:
 
 - node and edge IDs
 - required fields
-- intra-subgraph hierarchy invariants: one root anchor per SG, same-subgraph parent links, and non-flat levels
+- intra-subgraph hierarchy invariants: one root anchor per SG, same-subgraph parent links, non-flat levels, semantic axes, and fine-grained groups
 - endpoint reference integrity
 - 38 graph constraints
 - orphan nodes
@@ -136,6 +136,7 @@ These checks cover:
 | StateMachine definitions | 21 |
 | GraphConstraint definitions | 38 |
 | Intra-subgraph roots | 13 |
+| Intra-subgraph semantic axes | 114 |
 | Orphan nodes | 0 |
 | Required-edge failures | 0 |
 

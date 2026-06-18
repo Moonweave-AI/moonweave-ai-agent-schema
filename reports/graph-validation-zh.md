@@ -12,6 +12,7 @@
 | EdgeClass ID 格式 | PASS |
 | 节点必填字段 | PASS |
 | SG 内层级字段 | PASS |
+| SG 内语义方向泳道 | 114 |
 | SG 内父子链接 | PASS |
 | 边必填字段 | PASS |
 | 重复 ID | 0 |
@@ -25,7 +26,7 @@
 ## 结构校验
 
 - 所有 `NodeClass` 均符合 `node.*` 命名规则。
-- 所有 `NodeClass` 均声明 `intra_level`、`intra_group`、`intra_group_zh` 和 `intra_role`。
+- 所有 `NodeClass` 均声明 `intra_level`、`intra_axis`、`intra_axis_zh`、`intra_group`、`intra_group_zh` 和 `intra_role`。
 - 每个 SG 都有且只有一个 `intra_level: 0` 根锚点，每个非根节点都指向同 SG 中更低层级的父节点。
 - 所有 `EdgeClass` 均符合 `edge.*` 命名规则。
 - 所有边的 `source_domain` 与 `target_range` 均能解析到已定义节点。
@@ -49,7 +50,7 @@
 | 文件 | 结果 |
 | --- | --- |
 | `ontology.graph.json` | 277 nodes, 144 edges |
-| SG 内层级 | 13 个根锚点，所有 SG 均为非平铺内部层级 |
+| SG 内层级 | 13 个根锚点，114 条语义方向泳道，所有 SG 均为非平铺内部层级 |
 | `ontology.subgraphs.json` | 13 subgraphs |
 | `ontology.paths.json` | 3 paths |
 | `ontology.constraints.json` | 38 constraints |

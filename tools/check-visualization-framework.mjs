@@ -101,10 +101,13 @@ function main() {
       html.includes("node-relation-tags") &&
       html.includes("relationMembership"),
     intraSubgraphHierarchyFramework: html.includes("intraLevel") &&
+      html.includes("intraAxis") &&
       html.includes("intraGroup") &&
       html.includes("parentKey") &&
       html.includes("function hierarchyLayoutForBlock") &&
       html.includes("function drawHierarchyScaffold") &&
+      html.includes("hierarchy-axis-box") &&
+      html.includes("hierarchy-axis-label") &&
       html.includes("hierarchy-level-label") &&
       html.includes("hierarchy-group-label") &&
       html.includes("hierarchy-parent-link"),
@@ -112,7 +115,9 @@ function main() {
       html.includes('intraGroup: n[6] || "ungrouped"') &&
       html.includes("intraGroupZh: n[7]") &&
       html.includes("intraRole: n[8]") &&
-      html.includes("parentKey: n[9] || null"),
+      html.includes("parentKey: n[9] || null") &&
+      html.includes("intraAxis: n[10]") &&
+      html.includes("intraAxisZh: n[11]"),
     hierarchyDetailsPanel: html.includes("function hierarchyDetailHtml") &&
       html.includes("intraRole") &&
       html.includes("parentKey") &&
@@ -201,8 +206,12 @@ function main() {
     if (!Number.isInteger(node.intra_level)) {
       failures.push(`Graph JSON node missing intra_level: ${node.id}`);
     }
-    for (const field of ["intra_group", "intra_group_zh", "intra_role"]) {
-      if (!node[field]) failures.push(`Graph JSON node missing ${field}: ${node.id}`);
+    for (const field of ["intra_axis", "intra_axis_zh", "intra_group", "intra_group_zh", "intra_role"]) {
+      if (!node[field]) {
+        failures.push(`Graph JSON node missing ${field}: ${node.id}`);
+      } else if (/\?{3,}/.test(node[field])) {
+        failures.push(`Graph JSON node has likely broken encoding in ${field}: ${node.id}`);
+      }
     }
     const list = nodesBySubgraph.get(node.subgraph) ?? [];
     list.push(node);

@@ -27,13 +27,14 @@
 | InterfaceContract | 30 |
 | StateMachine | 21 |
 | GraphConstraint | 38 |
+| SG 内语义方向泳道 | 114 |
 | 预置关键路径 | 3 |
 
 ## 保留的质量门禁工具
 
 | 工具 | 用途 |
 | --- | --- |
-| `validate-graph.mjs` | 校验 ID、必填字段和端点引用 |
+| `validate-graph.mjs` | 校验 ID、必填字段、层级方向/分组字段和端点引用 |
 | `validate-constraints.mjs` | 执行图约束套件 |
 | `check-orphan-nodes.mjs` | 检查孤立节点 |
 | `check-required-edges.mjs` | 检查必需关系声明 |
