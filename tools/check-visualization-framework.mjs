@@ -108,6 +108,11 @@ function main() {
       html.includes("hierarchy-level-label") &&
       html.includes("hierarchy-group-label") &&
       html.includes("hierarchy-parent-link"),
+    intraSubgraphHierarchyParser: html.includes("intraLevel: Number.isInteger(n[5])") &&
+      html.includes('intraGroup: n[6] || "ungrouped"') &&
+      html.includes("intraGroupZh: n[7]") &&
+      html.includes("intraRole: n[8]") &&
+      html.includes("parentKey: n[9] || null"),
     hierarchyDetailsPanel: html.includes("function hierarchyDetailHtml") &&
       html.includes("intraRole") &&
       html.includes("parentKey") &&
