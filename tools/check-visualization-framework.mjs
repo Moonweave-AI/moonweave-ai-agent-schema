@@ -122,6 +122,10 @@ function main() {
       html.includes("intraRole") &&
       html.includes("parentKey") &&
       html.includes("rootNode"),
+    detailPanelNodeIndexes: html.includes("const nodeByKey = new Map") &&
+      html.includes("const nodeById = new Map") &&
+      html.includes("nodeByKey.get(node.parentKey)") &&
+      html.includes("nodeById.get(node.parentKey)"),
     noStackedBottomLocalFlow: !html.includes("local-flow") &&
       !html.includes("drawLocalFlowEdges") &&
       !html.includes("localEdgePath"),
@@ -160,10 +164,18 @@ function main() {
       html.includes("function predicateLabel") &&
       html.includes("function predicateDescription") &&
       html.includes("const UI_TEXT") &&
-      html.includes("function nodeChineseDescription"),
+      html.includes("function nodeChineseDescription") &&
+      html.includes("descZh: n[12]") &&
+      html.includes("node.descZh || node.desc"),
     globalBusRouting: html.includes("function busRoute") &&
       html.includes("rowCorridorY") &&
       html.includes("pointsToPath"),
+    zoomScaledArrowMarkers: html.includes('markerUnits", "userSpaceOnUse"') &&
+      html.includes("function updateArrowMarkers") &&
+      html.includes("scaledArrowMarkerSize") &&
+      html.includes("base * Math.sqrt(safeK)") &&
+      !html.includes("base / Math.sqrt(safeK)") &&
+      html.includes("updateArrowMarkers(k)"),
     noSemanticZoomVisibilityChanges: html.includes("function applySemanticZoom") &&
       !html.includes("const overview =") &&
       !html.includes("const hubVis =") &&

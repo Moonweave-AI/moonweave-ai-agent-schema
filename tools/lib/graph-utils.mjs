@@ -191,6 +191,7 @@ export function formatNode(node) {
     subgraph: node.subgraph,
     artifact: node.artifact,
     description: node.description,
+    description_zh: node.description_zh,
     intra_level: node.intra_level,
     intra_axis: node.intra_axis,
     intra_axis_zh: node.intra_axis_zh,

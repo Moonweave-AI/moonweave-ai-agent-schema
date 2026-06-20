@@ -14,6 +14,7 @@ const NODE_REQUIRED = [
   "artifact",
   "label",
   "description",
+  "description_zh",
   "intra_level",
   "intra_axis",
   "intra_axis_zh",

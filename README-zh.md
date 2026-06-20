@@ -72,11 +72,13 @@ moonweave-ai-agent-schema/
 |   |-- vendor/d3.min.js
 |   `-- data/
 |-- tools/                            # 最小质量门禁工具集
+|   |-- build-visualization-data.mjs
 |   |-- validate-graph.mjs
 |   |-- validate-constraints.mjs
 |   |-- check-orphan-nodes.mjs
 |   |-- check-required-edges.mjs
 |   |-- check-visualization-framework.mjs
+|   |-- check-visualization-detail-contract.mjs
 |   `-- lib/
 `-- reports/                          # 英文报告与对应 -zh 中文版本
 ```
@@ -111,6 +113,7 @@ node .\tools\validate-constraints.mjs
 node .\tools\check-orphan-nodes.mjs
 node .\tools\check-required-edges.mjs
 node .\tools\check-visualization-framework.mjs
+node .\tools\check-visualization-detail-contract.mjs
 ```
 
 这些检查覆盖：
@@ -122,6 +125,8 @@ node .\tools\check-visualization-framework.mjs
 - 38 条图约束
 - 孤立节点
 - required edges
+- 必填的中英双语节点说明
+- 可视化详情面板数据契约：内嵌节点、父子层级、边端点、边类型中英双语标签、运行时详情索引
 - 可视化直开能力和关键交互逻辑
 
 ## 当前规模

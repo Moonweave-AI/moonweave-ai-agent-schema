@@ -72,11 +72,13 @@ moonweave-ai-agent-schema/
 |   |-- vendor/d3.min.js
 |   `-- data/
 |-- tools/                            # minimal validation gate toolchain
+|   |-- build-visualization-data.mjs
 |   |-- validate-graph.mjs
 |   |-- validate-constraints.mjs
 |   |-- check-orphan-nodes.mjs
 |   |-- check-required-edges.mjs
 |   |-- check-visualization-framework.mjs
+|   |-- check-visualization-detail-contract.mjs
 |   `-- lib/
 `-- reports/                          # English reports plus matching -zh versions
 ```
@@ -111,18 +113,21 @@ node .\tools\validate-constraints.mjs
 node .\tools\check-orphan-nodes.mjs
 node .\tools\check-required-edges.mjs
 node .\tools\check-visualization-framework.mjs
+node .\tools\check-visualization-detail-contract.mjs
 ```
 
 These checks cover:
 
 - node and edge IDs
 - required fields
+- required bilingual node descriptions
 - intra-subgraph hierarchy invariants: one root anchor per SG, same-subgraph parent links, non-flat levels, semantic axes, and fine-grained groups
 - endpoint reference integrity
 - 38 graph constraints
 - orphan nodes
 - required edges
 - direct-open visualization behavior and critical interaction logic
+- visualization detail-panel contract: embedded nodes, parent links, edge endpoints, predicate bilingual labels, and runtime detail indexes
 
 ## Current Scale
 
