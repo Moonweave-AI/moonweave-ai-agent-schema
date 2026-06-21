@@ -2,48 +2,65 @@
 
 ## Current Phase
 
-Phase 0/1/2/3/4 bootstrap is active: durable records, source catalog, evidence matrix, UI specification, schema v2 primitives, GraphView artifacts, workbench shell, previews, and new gates are in place.
+Final v2 release validation and push.
 
 ## Completed
 
-- Repository baseline checked: clean `main...origin/main`.
-- Existing plan order locked: research -> UI specification -> ontology/tooling/frontend execution.
-- Durable record files created:
-  - `reports/upgrade-worklog.md`
-  - `reports/context-handoff.md`
-  - `reports/decision-log.md`
-  - `reports/progress-board.md`
-  - `reports/risk-register.md`
-- Initial source catalog and evidence matrix created under `references/`.
-- Initial UI specification and upgrade plan reports created under `reports/`.
-- Initial diagram-as-code previews created under `reports/diagrams/`.
-- `graph.schema.json` now includes `SourceClaim` and `BenchmarkRef`.
-- Meta graph now has `node.source_claim` and `node.benchmark_ref`.
-- Seven GraphView YAML artifacts were added under `ontology/12-engineering-validation-graph/views/`.
-- `visualization/index.html` now includes the evidence workbench shell.
-- Four PNG previews were generated under `reports/previews/`.
-- Existing six validation gates passed after the ontology changes.
-- New six validation gates passed after the research/design additions.
+- Baseline bootstrap commit created: `36d9dc7 Bootstrap agent-schema v2 evidence workbench`.
+- Durable anti-forgetting records are present and updated.
+- `references/source-catalog.yaml` contains the approved/candidate source catalog.
+- `references/evidence-matrix.yaml` contains claim-level ontology mappings and resolved venue gap status.
+- `references/venue-coverage.yaml` covers the required 16 venues across 2022-2026 and is checked as 80 expanded checkpoints.
+- `graph.schema.json` includes v2 primitives for `SourceClaim`, `BenchmarkRef`, `EvidenceRef`, and `GraphView`.
+- Meta graph includes `source_claim` and `benchmark_ref` nodes.
+- Engineering validation views include research evidence, protocol flow, runtime trace, safety surface, evaluation coverage, UI flow, and workbench architecture.
+- `tools/build-visualization-data.mjs` embeds both ontology graph data and evidence workbench data into `visualization/index.html`.
+- `visualization/index.html` is a direct-open evidence workbench with source filters, claim lists, gap audit, claim-to-node highlighting, and node evidence backreferences.
+- Preview assets include desktop overview, evidence matrix, protocol flow, safety surface, evaluation coverage, mobile node detail, browser desktop capture, and browser mobile capture.
+- README, README-zh, source matrix, UI spec, and upgrade plan include the final gate set and v2 contracts.
 
-## In Progress
+## Validation Summary
 
-- Expand venue-by-venue paper coverage beyond the initial authoritative seed.
-- Add deeper graph overlays that use `references/evidence-matrix.yaml` directly at runtime.
-- Replace static preview drawings with browser-captured screenshots if Playwright is later introduced.
+The full final gate set passed on 2026-06-21:
 
-## Blockers
+```powershell
+node .\tools\validate-graph.mjs
+node .\tools\validate-constraints.mjs
+node .\tools\check-orphan-nodes.mjs
+node .\tools\check-required-edges.mjs
+node .\tools\check-visualization-framework.mjs
+node .\tools\check-visualization-detail-contract.mjs
+node .\tools\check-source-catalog.mjs
+node .\tools\check-evidence-coverage.mjs
+node .\tools\check-theme-coverage.mjs
+node .\tools\check-venue-coverage.mjs
+node .\tools\check-evidence-workbench-data.mjs
+node .\tools\check-diagram-exports.mjs
+node .\tools\check-i18n-encoding.mjs
+node .\tools\check-preview-screenshots.mjs
+```
 
-- Full "all papers across all venues" coverage remains an auditable ongoing matrix, not an unverifiable claim. The release gate requires explicit coverage records and gap notes.
+Output summary:
+
+- Graph: 279 nodes, 144 edge classes.
+- Constraints: 38 passed, 0 errors, 0 warnings.
+- Orphans: 0.
+- Required-edge failures: 0.
+- Visualization: 466 expanded edges; detail contract matches source graph.
+- Source catalog: 34 sources.
+- Evidence matrix: 35 claims.
+- Theme coverage: all 13 required themes covered.
+- Venue coverage: 16 venues x 5 years = 80 checkpoints.
+- Evidence workbench data: 175 supported ontology objects.
+- Preview assets: 8 PNG targets, including browser desktop and browser mobile captures from Edge headless.
+
+## Residual Risks
+
+- Browser-captured screenshots are implemented through local Chromium-family headless mode; Playwright remains optional and is not required for this static release.
+- Venue coverage is auditable and gate-enforced, but future 2026 proceedings should be reviewed when final proceedings pages change.
 
 ## Next Command
 
 ```powershell
-node .\tools\check-source-catalog.mjs
-node .\tools\check-evidence-coverage.mjs
-node .\tools\check-theme-coverage.mjs
-node .\tools\check-diagram-exports.mjs
-node .\tools\check-i18n-encoding.mjs
-node .\tools\check-preview-screenshots.mjs
-node .\tools\check-visualization-framework.mjs
-node .\tools\check-visualization-detail-contract.mjs
+node .\tools\validate-graph.mjs
 ```

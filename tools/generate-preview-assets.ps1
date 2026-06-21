@@ -99,7 +99,8 @@ function Draw-Preview([string]$Path, [int]$Width, [int]$Height, [string]$Mode, [
 Draw-Preview (Join-Path $OutputDir "desktop-overview.png") 1440 900 "Desktop Overview" $false
 Draw-Preview (Join-Path $OutputDir "desktop-evidence-matrix.png") 1440 900 "Evidence Matrix" $false
 Draw-Preview (Join-Path $OutputDir "desktop-protocol-flow.png") 1440 900 "Protocol Flow" $false
+Draw-Preview (Join-Path $OutputDir "desktop-safety-surface.png") 1440 900 "Safety Surface" $false
+Draw-Preview (Join-Path $OutputDir "desktop-evaluation-coverage.png") 1440 900 "Evaluation Coverage" $false
 Draw-Preview (Join-Path $OutputDir "mobile-node-detail.png") 390 844 "Mobile Node Detail" $true
 
 Write-Host "Preview assets generated in $OutputDir"
-

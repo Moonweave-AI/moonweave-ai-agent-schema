@@ -66,7 +66,7 @@ moonweave-ai-agent-schema/
 |-- ontology-manifest.yaml
 |-- graph.schema.json
 |-- ontology/                         # 13 ontology subgraphs, 512 YAML artifacts
-|-- references/                       # source catalog, evidence matrix, papers, source diagram extraction, exemplars
+|-- references/                       # source catalog, evidence matrix, venue coverage, papers, source diagram extraction, exemplars
 |-- visualization/                    # direct-open interactive ontology graph
 |   |-- index.html
 |   |-- src/
@@ -96,7 +96,7 @@ No local server is required. The page embeds the graph data and loads D3 from `v
 
 The visualization supports:
 
-- evidence workbench shell with source, claim, view, and gate panels
+- data-bound evidence workbench with source, claim, view, gap, and gate panels
 - full graph browsing across all 13 ontology subgraphs
 - hierarchy-aware layout inside every SG, with level columns, semantic axis lanes, fine-grained groups, and parent links
 - class-bundled relation diagrams inside each subgraph
@@ -119,6 +119,8 @@ node .\tools\check-visualization-detail-contract.mjs
 node .\tools\check-source-catalog.mjs
 node .\tools\check-evidence-coverage.mjs
 node .\tools\check-theme-coverage.mjs
+node .\tools\check-venue-coverage.mjs
+node .\tools\check-evidence-workbench-data.mjs
 node .\tools\check-diagram-exports.mjs
 node .\tools\check-i18n-encoding.mjs
 node .\tools\check-preview-screenshots.mjs
@@ -139,7 +141,9 @@ These checks cover:
 - source catalog completeness and approved/candidate source separation
 - claim-level evidence coverage over ontology nodes, edges, constraints, and planned views
 - required research theme coverage across the agent stack
-- diagram-as-code exports, UTF-8 integrity, and generated preview PNG assets
+- venue/year coverage across the required 2022-2026 conference scope
+- embedded evidence workbench data consistency with the YAML source of truth
+- diagram-as-code exports, UTF-8 integrity, generated preview PNG assets, and browser-captured desktop/mobile previews
 
 ## Current Scale
 
@@ -161,7 +165,7 @@ These checks cover:
 
 `references/` stores three kinds of material:
 
-- source catalog and evidence matrix: audited 2022-2026 source records and claim-level ontology mappings
+- source catalog, evidence matrix, and venue coverage: audited 2022-2026 source records, venue/year review checkpoints, and claim-level ontology mappings
 - normative evidence: source index, papers, graph evidence, and source diagram extraction
 - non-normative exemplars: SDK, framework, protocol, runtime, and safety patterns from real engineering systems
 

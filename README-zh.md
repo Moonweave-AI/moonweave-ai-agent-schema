@@ -119,6 +119,8 @@ node .\tools\check-visualization-detail-contract.mjs
 node .\tools\check-source-catalog.mjs
 node .\tools\check-evidence-coverage.mjs
 node .\tools\check-theme-coverage.mjs
+node .\tools\check-venue-coverage.mjs
+node .\tools\check-evidence-workbench-data.mjs
 node .\tools\check-diagram-exports.mjs
 node .\tools\check-i18n-encoding.mjs
 node .\tools\check-preview-screenshots.mjs

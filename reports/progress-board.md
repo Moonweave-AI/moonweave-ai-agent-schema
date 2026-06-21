@@ -16,7 +16,8 @@
 - [x] Add source catalog gate.
 - [x] Add evidence coverage gate.
 - [x] Add theme coverage gate.
-- [ ] Expand venue-by-venue paper coverage beyond the initial authoritative seed.
+- [x] Expand venue-by-venue paper coverage beyond the initial authoritative seed.
+- [x] Add venue coverage gate.
 
 ## Phase 2: UI Specification
 
@@ -26,7 +27,8 @@
 - [x] Add diagram export gate.
 - [x] Add preview image gate.
 - [x] Generate initial static preview PNGs.
-- [ ] Complete browser-captured visual QA after optional Playwright adoption.
+- [x] Generate final preview PNGs for overview, evidence, protocol, safety, evaluation, mobile detail, browser desktop, and browser mobile.
+- [x] Complete browser-captured visual QA through local Edge headless screenshots.
 
 ## Phase 3: Ontology v2 and Data Model
 
@@ -41,10 +43,19 @@
 - [x] Preserve direct-open D3 graph.
 - [x] Add responsive side/detail panels.
 - [x] Generate preview PNGs.
+- [x] Bind source/claim/gap data into the workbench from embedded evidence data.
+- [x] Add node detail evidence backreferences.
+
+## Phase 4.5: Venue and Workbench Data Gates
+
+- [x] Add `references/venue-coverage.yaml`.
+- [x] Add `tools/check-venue-coverage.mjs`.
+- [x] Add `tools/check-evidence-workbench-data.mjs`.
+- [x] Embed `evidence-data` into `visualization/index.html`.
 
 ## Phase 5: Final Validation
 
 - [x] Run old six gates.
-- [x] Run new six gates.
+- [x] Run new source/evidence/theme/venue/workbench/diagram/encoding/preview gates.
 - [x] Update README and README-zh.
 - [x] Final context handoff with residual risks.

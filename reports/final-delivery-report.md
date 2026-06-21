@@ -1,68 +1,34 @@
-# Final Delivery Report
+# agent-schema v2 Final Delivery Report
 
-[English](final-delivery-report.md) | [中文](final-delivery-report-zh.md)
+## Scope
 
-## Delivery Conclusion
+This release moves `agent-schema` from a prototype ontology visualization toward a release-ready v2 evidence workbench. The release target is a static, direct-open repository artifact with auditable research data, claim-level ontology evidence, gate-enforced coverage, and durable handoff records.
 
-`moonweave-ai-agent-schema` has been cleaned into a focused ontology engineering repository. It keeps the ontology artifacts, evidence references, direct-open visualization, source diagrams, bilingual documentation, and the minimal validation toolchain. One-off generators and temporary build utilities have been removed.
+## Delivered Artifacts
 
-## Delivered Scope
+- Research data: `references/source-catalog.yaml`, `references/evidence-matrix.yaml`, `references/venue-coverage.yaml`.
+- Ontology data model: `SourceClaim`, `BenchmarkRef`, expanded `EvidenceRef`, and expanded `GraphView`.
+- GraphView layer: research evidence, protocol flow, runtime trace, safety surface, evaluation coverage, UI flow, and workbench architecture.
+- Workbench UI: data-bound source filters, source list, claim list, gap list, claim-to-node highlighting, and node evidence backreferences.
+- Validation gates: old six gates plus source, evidence, theme, venue, evidence workbench data, diagram, encoding, and preview gates.
+- Reports: source matrix, UI spec, upgrade plan, worklog, handoff, decision log, progress board, risk register.
+- Preview assets: desktop overview, evidence matrix, protocol flow, safety surface, evaluation coverage, mobile node detail, browser desktop capture, and browser mobile capture.
 
-| Area | Status | Notes |
-| --- | --- | --- |
-| Root documentation | Delivered | README, governance rules, manifest, schema |
-| Ontology graph | Delivered | 13 subgraphs, 510 YAML artifacts |
-| References | Delivered | papers, evidence index, source diagram extraction, non-normative exemplars |
-| Visualization | Delivered | `visualization/index.html`, direct file open, no server required |
-| Validation gates | Delivered | 5 retained checkers plus shared library |
-| Source diagrams | Delivered | `Agent Structure Graph.pdf` and `.vsdx` |
+## Data Contract Status
 
-## Current Scale
+- `SourceCatalog`: implemented in `references/source-catalog.yaml`.
+- `EvidenceMatrix`: implemented in `references/evidence-matrix.yaml`.
+- `VenueCoverage`: implemented in `references/venue-coverage.yaml`.
+- `SourceClaim`: implemented in schema, meta graph, and evidence matrix claim records.
+- `BenchmarkRef`: implemented in schema and meta graph; benchmark claims can map to it as candidate/evaluation evidence.
+- `GraphView`: implemented as YAML artifacts under `ontology/12-engineering-validation-graph/views/`.
+- `VisualizationData`: implemented through embedded `data` and `evidence-data` JSON payloads in `visualization/index.html`.
 
-| Metric | Value |
-| --- | ---: |
-| Ontology YAML artifacts | 510 |
-| NodeClass definitions | 277 |
-| EdgeClass definitions | 144 |
-| InterfaceContract definitions | 30 |
-| StateMachine definitions | 21 |
-| GraphConstraint definitions | 38 |
-| Intra-subgraph semantic axes | 114 |
-| Precomputed conceptual paths | 3 |
+## Acceptance
 
-## Retained Validation Tools
+The release is acceptable only when the full gate set in README passes and local `HEAD` is pushed to the configured remote branch.
 
-| Tool | Purpose |
-| --- | --- |
-| `validate-graph.mjs` | validates IDs, required fields, hierarchy axis/group fields, and endpoint references |
-| `validate-constraints.mjs` | executes the graph constraint suite |
-| `check-orphan-nodes.mjs` | detects disconnected node classes |
-| `check-required-edges.mjs` | verifies required relationship declarations |
-| `check-visualization-framework.mjs` | checks direct-open visualization and critical interaction logic |
+## Residual Risks
 
-## Cleanup Result
-
-Removed:
-
-- `scripts/`
-- one-off ontology generation scripts
-- old graph extraction, graph build, render-check, and visualization embedding tools
-- local cache and temporary render artifacts
-
-Kept:
-
-- ontology source YAML
-- evidence and reference material
-- direct-open visualization
-- minimal validation gate toolchain
-- original PDF/VSDX source diagrams
-
-## Final Validation Status
-
-| Check | Result |
-| --- | --- |
-| Graph structure validation | PASS |
-| Constraint validation | 38/38 PASS |
-| Orphan node check | 0 orphan nodes |
-| Required edge check | 0 failures |
-| Visualization framework check | PASS |
+- Browser-captured screenshots are generated with the local Chromium-family browser available to `tools/check-preview-screenshots.mjs`; Playwright is not required.
+- Venue coverage must be maintained as 2026 proceedings and security papers change.

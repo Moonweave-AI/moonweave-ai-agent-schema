@@ -50,5 +50,59 @@ The first screen is an operational ontology workbench, not a landing page. The u
 - `reports/previews/desktop-overview.png`
 - `reports/previews/desktop-evidence-matrix.png`
 - `reports/previews/desktop-protocol-flow.png`
+- `reports/previews/desktop-safety-surface.png`
+- `reports/previews/desktop-evaluation-coverage.png`
 - `reports/previews/mobile-node-detail.png`
+- `reports/previews/browser-desktop-overview.png`
+- `reports/previews/browser-mobile-overview.png`
 
+## Data Sources
+
+- Ontology graph: embedded from `visualization/data/ontology.graph.json` into `<script id="data">`.
+- Evidence workbench: embedded from `references/source-catalog.yaml` and `references/evidence-matrix.yaml` into `<script id="evidence-data">`.
+- Venue coverage: validated by `references/venue-coverage.yaml`; summarized in reports, not rendered as a separate canvas layer in this batch.
+- Object support index: generated from claim `supports_nodes`, `supports_edges`, `supports_constraints`, `supports_views`, and `candidate_nodes`.
+
+## Component Contract
+
+- `research-workbench`: left operational rail; owns view switching, source tier filter, source status filter, gap toggle, source list, and KPI counts.
+- `evidence-audit`: right audit panel; owns selected source summary, claim list, gap list, and active claim context.
+- `coverage-strip`: bottom summary; owns research gate state and theme/source/claim coverage status.
+- `detail`: existing ontology detail panel; extended with evidence claims for selected nodes.
+- `canvas`: existing D3 graph; remains pan/zoom capable and receives claim-supported node highlights through `pathNodes`.
+
+## View Acceptance
+
+- Evidence Matrix: source list and claim list must be populated from `evidence-data`; clicking a claim highlights supported ontology nodes.
+- Ontology Map: existing graph layout remains visible; node detail shows evidence claims when available.
+- Protocol Flow: view button is present, protocol claims are discoverable through source/claim search, and protocol nodes remain highlighted from MCP/A2A claims.
+- Runtime View: runtime claims from official framework docs map to session, trace, checkpoint, approval, state, and API nodes.
+- Safety Surface: safety claims from AgentDojo, Progent, Fides, and HITL docs map to trust, taint, least privilege, allow/deny, and injection-defense nodes.
+- Evaluation Coverage: benchmark/evaluation claims map to release gate, coverage checker, benchmark candidate, trace replay, and runtime contract nodes.
+
+## State Machine
+
+- Default state: no filters, Evidence Matrix selected, all sources and claims visible.
+- Filtered state: tier/status filters reduce source and claim lists without mutating graph data.
+- Source selected: audit panel shows source summary and claim list for that source.
+- Claim selected: supported nodes are assigned to `pathNodes`, first supported node opens in detail, and the graph zooms to the supported set.
+- Gap overlay state: gap toggle shows resolved and informational gaps in addition to open gaps.
+- Empty state: source and claim lists show explicit empty messages and keep reset controls visible.
+
+## Export Behavior
+
+- Mermaid and DOT source diagrams are validated under `reports/diagrams/`.
+- SVG/PNG export entry points remain a UI requirement; current release verifies generated PNG previews and single-file direct-open graph behavior.
+- JSON export uses the embedded ontology graph and evidence workbench data as the stable browser-side source.
+
+## Responsive Behavior
+
+- Desktop keeps left workbench, center canvas, right audit, and bottom coverage visible together.
+- Mobile collapses the workbench into a top rail and keeps the audit panel as a bottom drawer with bounded height.
+- Text-heavy lists use fixed panel widths, small type, wrapping, and no horizontal overflow.
+
+## Final Gate Mapping
+
+- `check-evidence-workbench-data.mjs` blocks stale or missing browser evidence data.
+- `check-preview-screenshots.mjs` blocks missing overview, matrix, protocol, safety, evaluation, mobile, browser-desktop, or browser-mobile preview PNGs.
+- `check-venue-coverage.mjs` blocks missing venue/year research review checkpoints.

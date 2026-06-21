@@ -1,6 +1,6 @@
 # agent-schema Source Matrix
 
-This report summarizes the initial evidence base for the v2 upgrade. The durable machine-readable source of truth is `references/source-catalog.yaml`; claim-level mappings live in `references/evidence-matrix.yaml`.
+This report summarizes the evidence base for the v2 upgrade. The durable machine-readable source of truth is split across `references/source-catalog.yaml`, `references/evidence-matrix.yaml`, and `references/venue-coverage.yaml`.
 
 ## Coverage
 
@@ -27,9 +27,21 @@ This report summarizes the initial evidence base for the v2 upgrade. The durable
 - Tier C sources may inform examples only.
 - Unverified placeholder sources are blocked from normative evidence.
 
-## Known Gaps
+## Venue Coverage Gate
 
-- The current matrix is an authoritative seed, not a final exhaustive venue crawl.
-- The next research pass must add explicit included/excluded records for each named venue and year.
-- Planned v2 view ids in the evidence matrix still need matching `GraphView` artifacts.
+`references/venue-coverage.yaml` records the required 2022-2026 review scope for NeurIPS, ICLR, ICML, ACL, EMNLP, NAACL, COLING, WWW, CHI, UIST, SOSP, OSDI, USENIX Security, IEEE S&P, CCS, and NDSS. `tools/check-venue-coverage.mjs` expands the compact year arrays into 80 venue/year checkpoints and verifies:
 
+- every required venue/year has a reviewed entry
+- every entry records search queries, reviewed themes, included or excluded sources, and exclusion rationale
+- included source ids resolve to `source-catalog.yaml`
+- `gap.venue_exhaustive_index` is not high/blocking unless explicitly reopened
+
+## Exclusions
+
+Excluded papers and search bands are not treated as failed research. They are auditable decisions: a source is excluded when it does not support a named ontology node, edge, constraint, view, benchmark, protocol, runtime, safety, evaluation, or presentation claim.
+
+## Residual Gaps
+
+- Future releases should continue refining venue entries as new 2026 proceedings and agent safety papers become available.
+- Candidate sources can inform examples, but they still cannot support normative claims.
+- Browser-captured screenshots can replace the current generated PNG previews if a Playwright browser dependency is later accepted.
