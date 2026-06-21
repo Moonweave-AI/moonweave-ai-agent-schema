@@ -72,3 +72,4 @@
 - [x] Run new source/evidence/theme/venue/workbench/view-model/homepage/routing/browser/diagram/encoding/preview gates.
 - [x] Update README and README-zh.
 - [x] Final context handoff with residual risks.
+- [x] Push redesigned workbench release to `origin/main`.

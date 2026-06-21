@@ -2,7 +2,7 @@
 
 ## Current Phase
 
-Homepage presentation redesign complete. Final validation passed; commit and push are the remaining release actions.
+Homepage presentation redesign complete, committed, pushed, and verified on `origin/main`.
 
 ## Completed
 
@@ -21,6 +21,8 @@ Homepage presentation redesign complete. Final validation passed; commit and pus
 - Added gates: `check-workbench-view-model.mjs`, `check-homepage-redesign.mjs`, `check-view-routing.mjs`, and `check-browser-visual-regression.mjs`.
 - Updated README, README-zh, UI spec, upgrade plan, final delivery report, release notes, decision log, progress board, and risk register.
 - Preview assets now include 11 PNG targets, including redesigned desktop/mobile Evidence Atlas and graph explorer captures.
+- Release commit pushed: `781202190594031ba4223990898683eb234bcbf0` (`Redesign agent-schema evidence audit workbench`).
+- Remote verification passed: local `HEAD`, `origin/main`, and `git ls-remote origin refs/heads/main` all resolved to `781202190594031ba4223990898683eb234bcbf0` before this handoff record update.
 
 ## Validation Summary
 
