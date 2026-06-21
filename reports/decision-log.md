@@ -10,6 +10,8 @@
 6. Source catalog and evidence matrix are the durable truth for what was read, internalized, mapped, or excluded.
 7. Reports are part of the product, not temporary notes; every long-running handoff must update context, decisions, and progress.
 8. Preview assets are generated artifacts and must be verified as non-empty image files.
+9. The default visualization route is `Evidence Atlas`: `Source -> Claim -> Ontology Object -> Gap / Release Gate`.
+10. The old D3 full ontology canvas is preserved only as the secondary `Ontology Graph Explorer` drill-down route.
 
 ## Source Tier Policy
 
@@ -22,5 +24,6 @@
 - Workbench, not landing page.
 - Dense but scannable operational layout.
 - No decorative hero, no single-hue theme, no nested card walls.
-- Graph canvas remains central; evidence/audit surfaces become first-class.
-
+- Homepage is an evidence audit board, not a full ontology graph.
+- The first screen must expose Sources, Claims, Ontology Objects, and Gaps / Gates as the primary objects.
+- The graph canvas is secondary and must not appear on the default route.

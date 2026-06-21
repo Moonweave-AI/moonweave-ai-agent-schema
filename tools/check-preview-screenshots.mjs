@@ -15,6 +15,9 @@ const requiredPngs = [
   "reports/previews/mobile-node-detail.png",
   "reports/previews/browser-desktop-overview.png",
   "reports/previews/browser-mobile-overview.png",
+  "reports/previews/browser-redesign-desktop.png",
+  "reports/previews/browser-redesign-mobile.png",
+  "reports/previews/browser-graph-explorer.png",
 ];
 const html = readFileSync(join(ROOT, "visualization", "index.html"), "utf8");
 const failures = [];
@@ -92,7 +95,7 @@ for (const rel of requiredPngs) {
   if (!hasPngSignature(full)) failures.push(`Preview file is not a PNG: ${rel}`);
 }
 
-for (const snippet of ["research-workbench", "Evidence Matrix", "Protocol Flow", "Safety Surface", "Evaluation Coverage"]) {
+for (const snippet of ["audit-shell", 'data-route="evidence-atlas"', "Evidence Atlas", "Source -> Claim -> Ontology -> Gap", "Ontology Graph Explorer", "Safety Surface", "Evaluation Coverage"]) {
   if (!html.includes(snippet)) failures.push(`Visualization missing workbench snippet: ${snippet}`);
 }
 

@@ -2,48 +2,119 @@
 
 ## Product Shape
 
-The first screen is an operational ontology workbench, not a landing page. The user should immediately see evidence coverage, ontology structure, and audit details.
+The first screen is the **Evidence-to-Ontology Audit Workbench**, not the old full ontology canvas and not a landing page.
 
-## Layout
+Default audit path:
 
-- Top command bar: global search, language, theme, fit, source tier filter, year filter, export menu.
-- Left rail: view switcher with Evidence Matrix, Ontology Map, Protocol Flow, Runtime View, Safety Surface, Evaluation Coverage.
-- Center canvas: D3 graph remains the primary inspectable object.
-- Right audit panel: selected source, claim, node, edge, relation, gap, and validation status.
-- Bottom strip: theme coverage count, normative source count, candidate gap count, preview/export status.
+```text
+Source -> Claim -> Ontology Object -> Gap / Release Gate
+```
 
-## View Behavior
+The old D3 full graph is preserved as the secondary `Ontology Graph Explorer` route for drill-down after evidence selection. It is not the default homepage visual.
 
-- Evidence Matrix: rows are sources, columns are themes, cells show mapped claims and ontology impacts.
-- Ontology Map: existing SG hierarchy remains, with source-tier and gap overlays.
-- Protocol Flow: MCP/A2A/tool calling/handoff/state flow shown as a directed process.
-- Runtime View: session, run, turn, event, trace, checkpoint, approval, and recovery surfaces.
-- Safety Surface: trust boundary, prompt injection, taint, secret, least privilege, allow/deny decisions.
-- Evaluation Coverage: benchmark, scenario, metric, release gate, trace replay, and residual gaps.
+## Information Architecture
 
-## Interaction Rules
+- Top command bar: global search, language switch, route selector, fit action, export entry points, and current gate state.
+- Left navigator: coverage summary, route navigation, theme coverage, venue/year coverage, source tier, and gap state.
+- Center workspace: route-specific operational view. The default route is `Evidence Atlas`.
+- Right audit inspector: selected source, claim, ontology object, gap, source tier, supporting evidence, candidate evidence, and release impact.
+- Bottom status strip: research gate, theme count, venue checkpoints, supported object count, and preview status.
 
-- Search matches source ids, claims, node ids, labels, predicates, and themes.
-- Clicking a source highlights all supported nodes, edges, constraints, and views.
-- Clicking a node shows source claims, authority tier, unresolved gaps, and related benchmarks.
-- Filters can combine theme, source tier, year, and normative status.
-- Export menu must expose Mermaid, DOT, SVG, PNG, and JSON targets where available.
-- Mobile layout collapses the left rail to tabs and the audit panel to a bottom drawer.
+## Routes
+
+- `Evidence Atlas`: default homepage. Four fixed columns show Sources, Claims, Ontology Objects, and Gaps / Gates.
+- `System Blueprint`: C4-style layered blueprint for Agent Core, Context, Memory, Reasoning, Tool, Runtime, Safety, Protocol, and Evaluation.
+- `Protocol Flow`: swimlane/process view for MCP, A2A, tool calling, handoff, state flow, capability manifests, auth, streaming, and artifacts.
+- `Runtime Trace`: timeline view for session, run, turn, event, trace, checkpoint, approval, recovery, and replay.
+- `Safety Surface`: risk surface for trust boundary, taint, secret, least privilege, prompt injection, allow/deny, and audit.
+- `Evaluation Coverage`: matrix view for benchmark, scenario, metric, trace replay, release gate, and residual gap.
+- `Ontology Graph Explorer`: secondary D3 drill-down view. It inherits current selection/filter state but never replaces the default Evidence Atlas homepage.
+
+## Evidence Atlas Layout
+
+- Column 1, Sources: approved/exemplar/candidate sources with tier, status, year, summary, and theme tags.
+- Column 2, Claims: claim-level assertions mapped from selected sources, including normative status and ontology impact.
+- Column 3, Ontology Objects: supported nodes, edges, constraints, and views with object kind and bilingual label where available.
+- Column 4, Gaps / Gates: open gaps, resolved gaps when enabled, and release-blocking gates.
+- Right inspector: shows the selected path, approved evidence, candidate evidence, benchmark/view links, and release impact.
+
+## Interaction Contract
+
+- Opening `visualization/index.html` must show `Evidence Atlas` and the four evidence flow columns.
+- The default homepage must not show the old full ontology graph.
+- Selecting a source filters/highlights related claims, ontology objects, and gaps.
+- Selecting a claim shows supported ontology objects and updates the inspector with source tier, claim text, ontology impact, and normative status.
+- Selecting an ontology object shows approved evidence, candidate evidence, related gaps, benchmarks, and views.
+- Selecting a gap shows required action, affected objects, blocking status, and related gate.
+- Switching to `Ontology Graph Explorer` reveals the old D3 canvas with pan/zoom and inherited selection/focus.
+- Search matches source ids, titles, claims, node ids, labels, predicates, views, and themes.
+- Filters can combine theme, source tier, source status, year, and gap visibility.
+- Export entry points include Mermaid, DOT, JSON, SVG, and PNG where available.
 
 ## Visual Rules
 
-- Workbench density is high but ordered; avoid marketing hero sections.
+- Operational workbench styling: dense, scannable, and audit-focused.
+- No marketing hero, no decorative dotted canvas on the default route, and no giant unreadable graph thumbnails as the first visual.
+- Only local graph/process regions may use a subtle grid.
 - Cards use at most 8px radius.
 - Buttons prefer icons or compact icon+text with tooltips.
-- Palette uses neutral surfaces plus semantic colors for source tier, risk, and coverage.
-- Text cannot overlap or overflow controls on desktop or mobile.
+- Palette uses neutral surfaces plus semantic accents:
+  - Research/evidence: cyan
+  - Runtime: green
+  - Protocol: violet
+  - Safety: rose/red
+  - Evaluation: amber/lime
+  - Candidate/gap: yellow/red
+- Text must wrap inside controls and cards on desktop and 390px mobile viewports.
 
-## Empty and Error States
+## Data Sources
 
-- Empty filter: show "No sources match this filter" with reset action.
-- Missing evidence: show gap id, severity, and required action.
-- Broken export: show failing gate and exact file target.
-- Candidate source: show yellow status and block normative claim display.
+- Ontology graph: embedded from `visualization/data/ontology.graph.json` into `<script id="data">`.
+- Workbench data: embedded from `references/source-catalog.yaml`, `references/evidence-matrix.yaml`, and `references/venue-coverage.yaml` into `<script id="evidence-data">`.
+- `coverageMatrix`: theme x source/status/year/tier coverage rows.
+- `evidenceFlows`: source -> claim -> supported object -> gap/gate edges.
+- `objectSupportIndex`: node/edge/view/constraint -> claim/source backreference index.
+- `viewModels`: route-level lanes, legends, filters, notation, layout engine, and acceptance queries.
+- `homeSummary`: source count, claim count, normative coverage, candidate gaps, venue checkpoints, supported object count, and gate status.
+
+## Component Contract
+
+- `audit-shell`: owns route state and the default `data-route="evidence-atlas"` contract.
+- `coverage-navigator`: owns summary KPIs, route navigation, theme coverage, and coverage filters.
+- `audit-workspace`: owns route panes and renders the active view.
+- `evidence-flow-board`: owns the four Evidence Atlas columns.
+- `audit-inspector`: owns selected source/claim/object/gap audit details and release impact.
+- `audit-status-bar`: owns bottom gate/coverage state.
+- `canvas`: preserved D3 graph, mounted only inside `Ontology Graph Explorer`.
+- Legacy `research-workbench`, `evidence-audit`, and `coverage-strip`: hidden compatibility surfaces, not homepage structure.
+
+## State Machine
+
+- Default state: route `evidence-atlas`, no filters, source/claim/object/gap indexes loaded.
+- Filtered state: query/tier/status/year/theme filters reduce source and claim lists without mutating embedded data.
+- Source selected: claims and supported objects narrow to that source; inspector shows source summary.
+- Claim selected: object column shows supported ontology objects; inspector shows claim evidence and ontology impact.
+- Object selected: inspector shows approved/candidate evidence and related release implications.
+- Gap selected: inspector shows severity, blocking status, required action, and related gate.
+- Explorer state: route `ontology-graph-explorer`; D3 graph becomes visible and uses current path/focus.
+- Empty state: route panes show explicit empty messages and keep reset/search controls visible.
+
+## Route Acceptance
+
+- Evidence Atlas: four columns are visible, populated from `evidenceFlows`, and selectable.
+- System Blueprint: C4-style lanes and evidence-backed system components are visible.
+- Protocol Flow: MCP/A2A/tool/handoff/state lanes are visible and route selection works.
+- Runtime Trace: session/run/turn/event/checkpoint/approval/recovery lanes are visible.
+- Safety Surface: trust boundary, taint, privilege, allow/deny, and audit lanes are visible.
+- Evaluation Coverage: benchmark, scenario, metric, trace replay, and gate lanes are visible.
+- Ontology Graph Explorer: old D3 graph is visible only here and remains pan/zoom capable.
+
+## Responsive Behavior
+
+- Desktop: navigator, workspace, inspector, and bottom status are visible together.
+- Mobile: topbar becomes a vertical command stack; navigator, workspace, inspector, and status become a single-column audit flow.
+- Mobile inspector behaves as a bounded section/drawer below the active workspace.
+- Lists use fixed max heights with vertical scrolling; no horizontal overflow is allowed at 390px width.
 
 ## Preview Targets
 
@@ -55,54 +126,15 @@ The first screen is an operational ontology workbench, not a landing page. The u
 - `reports/previews/mobile-node-detail.png`
 - `reports/previews/browser-desktop-overview.png`
 - `reports/previews/browser-mobile-overview.png`
+- `reports/previews/browser-redesign-desktop.png`
+- `reports/previews/browser-redesign-mobile.png`
+- `reports/previews/browser-graph-explorer.png`
 
-## Data Sources
+## Gate Mapping
 
-- Ontology graph: embedded from `visualization/data/ontology.graph.json` into `<script id="data">`.
-- Evidence workbench: embedded from `references/source-catalog.yaml` and `references/evidence-matrix.yaml` into `<script id="evidence-data">`.
-- Venue coverage: validated by `references/venue-coverage.yaml`; summarized in reports, not rendered as a separate canvas layer in this batch.
-- Object support index: generated from claim `supports_nodes`, `supports_edges`, `supports_constraints`, `supports_views`, and `candidate_nodes`.
-
-## Component Contract
-
-- `research-workbench`: left operational rail; owns view switching, source tier filter, source status filter, gap toggle, source list, and KPI counts.
-- `evidence-audit`: right audit panel; owns selected source summary, claim list, gap list, and active claim context.
-- `coverage-strip`: bottom summary; owns research gate state and theme/source/claim coverage status.
-- `detail`: existing ontology detail panel; extended with evidence claims for selected nodes.
-- `canvas`: existing D3 graph; remains pan/zoom capable and receives claim-supported node highlights through `pathNodes`.
-
-## View Acceptance
-
-- Evidence Matrix: source list and claim list must be populated from `evidence-data`; clicking a claim highlights supported ontology nodes.
-- Ontology Map: existing graph layout remains visible; node detail shows evidence claims when available.
-- Protocol Flow: view button is present, protocol claims are discoverable through source/claim search, and protocol nodes remain highlighted from MCP/A2A claims.
-- Runtime View: runtime claims from official framework docs map to session, trace, checkpoint, approval, state, and API nodes.
-- Safety Surface: safety claims from AgentDojo, Progent, Fides, and HITL docs map to trust, taint, least privilege, allow/deny, and injection-defense nodes.
-- Evaluation Coverage: benchmark/evaluation claims map to release gate, coverage checker, benchmark candidate, trace replay, and runtime contract nodes.
-
-## State Machine
-
-- Default state: no filters, Evidence Matrix selected, all sources and claims visible.
-- Filtered state: tier/status filters reduce source and claim lists without mutating graph data.
-- Source selected: audit panel shows source summary and claim list for that source.
-- Claim selected: supported nodes are assigned to `pathNodes`, first supported node opens in detail, and the graph zooms to the supported set.
-- Gap overlay state: gap toggle shows resolved and informational gaps in addition to open gaps.
-- Empty state: source and claim lists show explicit empty messages and keep reset controls visible.
-
-## Export Behavior
-
-- Mermaid and DOT source diagrams are validated under `reports/diagrams/`.
-- SVG/PNG export entry points remain a UI requirement; current release verifies generated PNG previews and single-file direct-open graph behavior.
-- JSON export uses the embedded ontology graph and evidence workbench data as the stable browser-side source.
-
-## Responsive Behavior
-
-- Desktop keeps left workbench, center canvas, right audit, and bottom coverage visible together.
-- Mobile collapses the workbench into a top rail and keeps the audit panel as a bottom drawer with bounded height.
-- Text-heavy lists use fixed panel widths, small type, wrapping, and no horizontal overflow.
-
-## Final Gate Mapping
-
-- `check-evidence-workbench-data.mjs` blocks stale or missing browser evidence data.
-- `check-preview-screenshots.mjs` blocks missing overview, matrix, protocol, safety, evaluation, mobile, browser-desktop, or browser-mobile preview PNGs.
-- `check-venue-coverage.mjs` blocks missing venue/year research review checkpoints.
+- `check-homepage-redesign.mjs` blocks regressions where the default route is not Evidence Atlas or the homepage shows the old graph.
+- `check-workbench-view-model.mjs` blocks missing coverage matrix, evidence flows, object support indexes, route view models, legends, or acceptance queries.
+- `check-view-routing.mjs` blocks missing route buttons/panes and route state regressions.
+- `check-browser-visual-regression.mjs` blocks missing desktop/mobile Evidence Atlas and graph explorer screenshots.
+- `check-evidence-workbench-data.mjs` blocks stale or missing embedded source/claim/object data.
+- `check-preview-screenshots.mjs` blocks missing PNG preview assets and critical workbench snippets.

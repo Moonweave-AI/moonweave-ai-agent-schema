@@ -19,21 +19,23 @@
 
 The visualization is a static direct-open evidence workbench:
 
-- Left rail: views, source tier/status filters, gap toggle, source list, and KPI counts.
-- Center: existing D3 ontology graph with retained hierarchy and relation detail behavior.
-- Right audit rail: source claims, linked ontology nodes/edges/views, gaps, risks, and export targets.
-- Bottom: coverage summary, timeline, and gate status.
-- Node details: evidence claims are shown for supported ontology nodes.
-- Claim click: supported ontology nodes are highlighted through the existing graph path/focus mechanism.
+- Default route: `Evidence Atlas`, an audit board for `Source -> Claim -> Ontology Object -> Gap / Release Gate`.
+- Left navigator: coverage summary, route navigation, theme coverage, source tier/status filters, and gap state.
+- Center workspace: route-specific evidence views; the homepage is the four-column Evidence Flow Board.
+- Right audit inspector: selected source, claim, ontology object, gap, risks, and release impact.
+- Bottom status: research gate, theme count, venue checkpoints, and supported object count.
+- Secondary explorer: the existing D3 ontology graph is preserved only under `Ontology Graph Explorer`.
+- Browser data model: `coverageMatrix`, `evidenceFlows`, `objectSupportIndex`, `viewModels`, and `homeSummary` are embedded into `evidence-data`.
 
 ## Validation
 
-The old six gates remain mandatory. New gates cover source catalog completeness, evidence coverage, theme coverage, venue coverage, evidence workbench data consistency, diagram exports, encoding, and preview assets.
+The old six gates remain mandatory. New gates cover source catalog completeness, evidence coverage, theme coverage, venue coverage, evidence workbench data consistency, homepage redesign, workbench view model integrity, route switching, diagram exports, encoding, preview assets, and browser visual regression.
 
 ## Final Acceptance
 
 - `references/source-catalog.yaml`, `references/evidence-matrix.yaml`, and `references/venue-coverage.yaml` are the durable research source of truth.
 - Candidate or unresolved sources cannot support normative claims.
-- `visualization/index.html` opens directly from disk and includes both graph data and evidence workbench data.
-- Preview assets cover desktop overview, evidence matrix, protocol flow, safety surface, evaluation coverage, and mobile node detail.
-- Final release requires all 14 gates in README to pass before push.
+- `visualization/index.html` opens directly from disk and defaults to `Evidence Atlas`.
+- The old full ontology graph appears only after switching to `Ontology Graph Explorer`.
+- Preview assets cover desktop overview, evidence matrix, protocol flow, safety surface, evaluation coverage, mobile node detail, redesigned desktop/mobile Evidence Atlas, and graph explorer.
+- Final release requires the full gate set in README to pass before push.

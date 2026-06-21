@@ -34,6 +34,10 @@ if (data) {
   failIf(asArray(data.sources).length !== asArray(catalog.sources).length, "Embedded source count does not match source-catalog.yaml");
   failIf(asArray(data.claims).length !== asArray(matrix.claims).length, "Embedded claim count does not match evidence-matrix.yaml");
   failIf(asArray(data.themeCoverage).length < asArray(catalog.coverage_policy?.required_themes).length, "Theme coverage index is incomplete");
+  failIf(asArray(data.coverageMatrix).length < asArray(catalog.coverage_policy?.required_themes).length, "Coverage matrix is incomplete");
+  failIf(asArray(data.evidenceFlows).length !== asArray(matrix.claims).length, "Evidence flows must map every claim");
+  failIf(asArray(data.viewModels).length < 7, "View models are incomplete");
+  failIf(!data.homeSummary || data.homeSummary.route !== "evidence-atlas", "homeSummary must declare evidence-atlas as default route");
   failIf(Object.keys(data.objectSupport || {}).length < 25, "Object support index is too small");
   for (const claim of asArray(data.claims)) {
     failIf(!claim.source_title, `Claim ${claim.id} is missing source_title`);
@@ -43,9 +47,12 @@ if (data) {
 
 for (const requiredSnippet of [
   "function renderEvidenceWorkbench",
+  "function renderRedesignedWorkbench",
+  "function setAuditRoute",
   "function selectWorkbenchClaim",
   "function evidenceDetailHtmlForNode",
-  "data-workbench-view",
+  "data-view-route",
+  "data-flow-column=\"source\"",
   "data-source-tier",
 ]) {
   failIf(!html.includes(requiredSnippet), `Workbench binding snippet missing: ${requiredSnippet}`);

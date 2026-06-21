@@ -31,5 +31,21 @@ Append-only record for the comprehensive v2 upgrade.
 - Added `tools/check-evidence-workbench-data.mjs` to block stale or missing embedded evidence data.
 - Expanded preview generation and validation to include desktop safety surface, desktop evaluation coverage, browser desktop capture, and browser mobile capture assets.
 - Updated README, README-zh, source matrix, UI spec, upgrade plan, progress board, risk register, and context handoff.
-- Validation status before final commit: full 14-gate run passed.
-- Validation summary: 279 nodes, 144 edge classes, 466 expanded visualization edges, 38 constraints, 34 sources, 35 claims, 13 covered themes, 80 venue/year checkpoints, 175 evidence-supported objects, 8 preview PNGs.
+- Validation status before the previous final commit: the then-current 14-gate run passed.
+- Validation summary for that pass: 279 nodes, 144 edge classes, 466 expanded visualization edges, 38 constraints, 34 sources, 35 claims, 13 covered themes, 80 venue/year checkpoints, 175 evidence-supported objects, and the then-current 8 preview PNGs.
+
+## 2026-06-21 Homepage Redesign Pass
+
+- Phase: presentation model redesign.
+- Started by re-reading `context-handoff.md`, `decision-log.md`, `progress-board.md`, and `risk-register.md`.
+- User feedback: the first screen still looked like the old full ontology canvas; the redesign needed a fundamentally clearer presentation model, not a cosmetic panel overlay.
+- Locked the new homepage contract: `Evidence Atlas` is the default route and the audit path is `Source -> Claim -> Ontology Object -> Gap / Release Gate`.
+- Moved the old D3 full ontology graph into secondary `Ontology Graph Explorer`.
+- Extended `tools/build-visualization-data.mjs` with `coverageMatrix`, `evidenceFlows`, `objectSupportIndex`, `viewModels`, and `homeSummary`.
+- Rebuilt `visualization/index.html` as an audit workbench shell with coverage navigator, evidence flow board, audit inspector, bottom status, route panes, and mobile single-column behavior.
+- Added gates for homepage redesign, workbench view model integrity, route switching, and browser visual regression.
+- Updated UI spec, decision log, progress board, risk register, upgrade plan, README, README-zh, final delivery report, release notes, and context handoff.
+- Generated browser-captured preview assets: redesigned desktop Evidence Atlas, redesigned mobile Evidence Atlas, and graph explorer.
+- Validation status: full 18-gate run passed.
+- Validation summary: 279 nodes, 144 edge classes, 466 expanded edges, 38 constraints, 34 sources, 35 claims, 13 theme rows, 80 venue checkpoints, 175 supported objects, 7 workbench routes, 35 evidence flows, 11 preview PNGs, and 3 browser visual regression captures.
+- Next step: stage, commit, push, and verify remote `origin/main` matches local `HEAD`.

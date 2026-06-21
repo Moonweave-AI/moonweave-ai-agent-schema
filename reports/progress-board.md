@@ -53,9 +53,22 @@
 - [x] Add `tools/check-evidence-workbench-data.mjs`.
 - [x] Embed `evidence-data` into `visualization/index.html`.
 
+## Phase 4.6: Homepage Redesign and Presentation Model
+
+- [x] Replace the default homepage with `Evidence Atlas`.
+- [x] Move the old D3 full graph into secondary `Ontology Graph Explorer`.
+- [x] Add `coverageMatrix`, `evidenceFlows`, `objectSupportIndex`, `viewModels`, and `homeSummary` to embedded workbench data.
+- [x] Implement Source -> Claim -> Ontology Object -> Gap / Gate flow board.
+- [x] Implement System Blueprint, Protocol Flow, Runtime Trace, Safety Surface, and Evaluation Coverage route panes.
+- [x] Add `check-homepage-redesign.mjs`.
+- [x] Add `check-workbench-view-model.mjs`.
+- [x] Add `check-view-routing.mjs`.
+- [x] Add `check-browser-visual-regression.mjs`.
+- [x] Generate redesigned desktop, mobile, and graph explorer browser screenshots.
+
 ## Phase 5: Final Validation
 
 - [x] Run old six gates.
-- [x] Run new source/evidence/theme/venue/workbench/diagram/encoding/preview gates.
+- [x] Run new source/evidence/theme/venue/workbench/view-model/homepage/routing/browser/diagram/encoding/preview gates.
 - [x] Update README and README-zh.
 - [x] Final context handoff with residual risks.

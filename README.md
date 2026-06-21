@@ -67,7 +67,7 @@ moonweave-ai-agent-schema/
 |-- graph.schema.json
 |-- ontology/                         # 13 ontology subgraphs, 512 YAML artifacts
 |-- references/                       # source catalog, evidence matrix, venue coverage, papers, source diagram extraction, exemplars
-|-- visualization/                    # direct-open interactive ontology graph
+|-- visualization/                    # direct-open evidence audit workbench and graph explorer
 |   |-- index.html
 |   |-- src/
 |   |-- vendor/d3.min.js
@@ -92,12 +92,21 @@ Open this file directly in a browser:
 visualization/index.html
 ```
 
-No local server is required. The page embeds the graph data and loads D3 from `visualization/vendor/d3.min.js`.
+No local server is required. The page embeds the ontology graph and evidence workbench data, and loads D3 from `visualization/vendor/d3.min.js`.
+
+The default homepage is **Evidence Atlas**, an audit workbench organized as:
+
+```text
+Source -> Claim -> Ontology Object -> Gap / Release Gate
+```
+
+The full D3 ontology graph is preserved as the secondary `Ontology Graph Explorer` route for drill-down. It is no longer the default first visual.
 
 The visualization supports:
 
-- data-bound evidence workbench with source, claim, view, gap, and gate panels
-- full graph browsing across all 13 ontology subgraphs
+- data-bound Evidence Atlas with source, claim, ontology object, gap, and release gate columns
+- System Blueprint, Protocol Flow, Runtime Trace, Safety Surface, Evaluation Coverage, and Ontology Graph Explorer routes
+- full graph browsing across all 13 ontology subgraphs inside the secondary graph explorer
 - hierarchy-aware layout inside every SG, with level columns, semantic axis lanes, fine-grained groups, and parent links
 - class-bundled relation diagrams inside each subgraph
 - English/Chinese language switching
@@ -121,9 +130,13 @@ node .\tools\check-evidence-coverage.mjs
 node .\tools\check-theme-coverage.mjs
 node .\tools\check-venue-coverage.mjs
 node .\tools\check-evidence-workbench-data.mjs
+node .\tools\check-workbench-view-model.mjs
+node .\tools\check-homepage-redesign.mjs
+node .\tools\check-view-routing.mjs
 node .\tools\check-diagram-exports.mjs
 node .\tools\check-i18n-encoding.mjs
 node .\tools\check-preview-screenshots.mjs
+node .\tools\check-browser-visual-regression.mjs
 ```
 
 These checks cover:
@@ -143,7 +156,10 @@ These checks cover:
 - required research theme coverage across the agent stack
 - venue/year coverage across the required 2022-2026 conference scope
 - embedded evidence workbench data consistency with the YAML source of truth
-- diagram-as-code exports, UTF-8 integrity, generated preview PNG assets, and browser-captured desktop/mobile previews
+- workbench view model integrity across coverage matrix, evidence flows, object support indexes, route legends, and acceptance queries
+- default homepage redesign: Evidence Atlas must be the first route, and the old D3 graph must remain secondary
+- route switching for Evidence Atlas, System Blueprint, Protocol Flow, Runtime Trace, Safety Surface, Evaluation Coverage, and Ontology Graph Explorer
+- diagram-as-code exports, UTF-8 integrity, generated preview PNG assets, and browser-captured desktop/mobile/graph-explorer previews
 
 ## Current Scale
 

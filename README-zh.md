@@ -92,10 +92,20 @@ moonweave-ai-agent-schema/
 visualization/index.html
 ```
 
+默认首页已经改为 **Evidence Atlas / 证据审计台**，主路径是：
+
+```text
+Source -> Claim -> Ontology Object -> Gap / Release Gate
+```
+
+旧的 D3 全量本体图保留在二级 `Ontology Graph Explorer` 视图中，用于证据筛选后的 drill-down，不再作为打开页面后的第一主视觉。
+
 无需启动服务器。页面内嵌图数据，并使用本地 `visualization/vendor/d3.min.js`。
 
 可视化支持：
 
+- Evidence Atlas：Source / Claim / Ontology Object / Gap-Gate 四列证据审计台
+- System Blueprint、Protocol Flow、Runtime Trace、Safety Surface、Evaluation Coverage、Ontology Graph Explorer 主视图
 - evidence workbench 外壳，包含来源、主张、视图和门禁面板
 - 浏览 13 个本体子图的完整图结构
 - 每个 SG 内部按层级列、语义方向泳道、细分分组和父子链接展示，而不是节点平铺
@@ -121,9 +131,13 @@ node .\tools\check-evidence-coverage.mjs
 node .\tools\check-theme-coverage.mjs
 node .\tools\check-venue-coverage.mjs
 node .\tools\check-evidence-workbench-data.mjs
+node .\tools\check-workbench-view-model.mjs
+node .\tools\check-homepage-redesign.mjs
+node .\tools\check-view-routing.mjs
 node .\tools\check-diagram-exports.mjs
 node .\tools\check-i18n-encoding.mjs
 node .\tools\check-preview-screenshots.mjs
+node .\tools\check-browser-visual-regression.mjs
 ```
 
 这些检查覆盖：
@@ -141,6 +155,7 @@ node .\tools\check-preview-screenshots.mjs
 - source catalog 完整性与 approved/candidate 来源隔离
 - ontology 节点、边、约束和规划视图的 claim 级证据覆盖
 - 贯穿完整 Agent 栈的研究主题覆盖
+- Evidence Atlas 默认首页、Workbench view model、视图路由和浏览器视觉回归
 - diagram-as-code 导出、UTF-8 完整性和生成的预览 PNG 资产
 
 ## 当前规模
