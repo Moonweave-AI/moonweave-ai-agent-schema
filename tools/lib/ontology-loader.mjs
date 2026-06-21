@@ -52,6 +52,7 @@ export function loadOntologyArtifacts() {
   const constraints = [];
   const contracts = [];
   const states = [];
+  const views = [];
   const other = [];
 
   for (const filePath of files) {
@@ -81,13 +82,16 @@ export function loadOntologyArtifacts() {
       case "states":
         states.push(record);
         break;
+      case "views":
+        views.push(record);
+        break;
       default:
         other.push(record);
         break;
     }
   }
 
-  return { nodes, edges, constraints, contracts, states, other };
+  return { nodes, edges, constraints, contracts, states, views, other };
 }
 
 export function normalizeNodeIds(value) {

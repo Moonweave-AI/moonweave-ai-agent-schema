@@ -34,7 +34,7 @@ The goal is to make agent development start from a rigorous, inspectable, and ex
 | Vendor-neutral | The ontology backbone does not depend on any provider, SDK, framework, or protocol implementation |
 | Intra-subgraph hierarchy | Every SG module has its own root anchor, level columns, semantic axis lanes, fine-grained groups, node roles, and parent-child links |
 | Engineering-ready | Runtime, tool invocation, policy, environment, SDK, and validation layers are first-class |
-| Evidence-traced | Core nodes and relations link back to diagrams, papers, official documents, and engineering references |
+| Evidence-traced | Core nodes and relations link back to diagrams, papers, official documents, engineering references, and claim-level evidence matrix records |
 | Constraint-enforced | The ontology is validated by executable quality gates, not only described in prose |
 
 ## Ontology Map
@@ -65,10 +65,11 @@ moonweave-ai-agent-schema/
 |-- GOVERNANCE-zh.md
 |-- ontology-manifest.yaml
 |-- graph.schema.json
-|-- ontology/                         # 13 ontology subgraphs, 510 YAML artifacts
-|-- references/                       # evidence index, papers, source diagram extraction, exemplars
+|-- ontology/                         # 13 ontology subgraphs, 512 YAML artifacts
+|-- references/                       # source catalog, evidence matrix, papers, source diagram extraction, exemplars
 |-- visualization/                    # direct-open interactive ontology graph
 |   |-- index.html
+|   |-- src/
 |   |-- vendor/d3.min.js
 |   `-- data/
 |-- tools/                            # minimal validation gate toolchain
@@ -80,7 +81,7 @@ moonweave-ai-agent-schema/
 |   |-- check-visualization-framework.mjs
 |   |-- check-visualization-detail-contract.mjs
 |   `-- lib/
-`-- reports/                          # English reports plus matching -zh versions
+`-- reports/                          # reports, upgrade records, diagrams, and preview assets
 ```
 
 ## Visualization
@@ -95,6 +96,7 @@ No local server is required. The page embeds the graph data and loads D3 from `v
 
 The visualization supports:
 
+- evidence workbench shell with source, claim, view, and gate panels
 - full graph browsing across all 13 ontology subgraphs
 - hierarchy-aware layout inside every SG, with level columns, semantic axis lanes, fine-grained groups, and parent links
 - class-bundled relation diagrams inside each subgraph
@@ -114,6 +116,12 @@ node .\tools\check-orphan-nodes.mjs
 node .\tools\check-required-edges.mjs
 node .\tools\check-visualization-framework.mjs
 node .\tools\check-visualization-detail-contract.mjs
+node .\tools\check-source-catalog.mjs
+node .\tools\check-evidence-coverage.mjs
+node .\tools\check-theme-coverage.mjs
+node .\tools\check-diagram-exports.mjs
+node .\tools\check-i18n-encoding.mjs
+node .\tools\check-preview-screenshots.mjs
 ```
 
 These checks cover:
@@ -128,14 +136,18 @@ These checks cover:
 - required edges
 - direct-open visualization behavior and critical interaction logic
 - visualization detail-panel contract: embedded nodes, parent links, edge endpoints, predicate bilingual labels, and runtime detail indexes
+- source catalog completeness and approved/candidate source separation
+- claim-level evidence coverage over ontology nodes, edges, constraints, and planned views
+- required research theme coverage across the agent stack
+- diagram-as-code exports, UTF-8 integrity, and generated preview PNG assets
 
 ## Current Scale
 
 | Metric | Value |
 | --- | ---: |
 | Ontology subgraphs | 13 |
-| YAML artifacts | 510 |
-| NodeClass definitions | 277 |
+| YAML artifacts | 512 |
+| NodeClass definitions | 279 |
 | EdgeClass definitions | 144 |
 | InterfaceContract definitions | 30 |
 | StateMachine definitions | 21 |
@@ -147,9 +159,23 @@ These checks cover:
 
 ## Evidence and Exemplars
 
-`references/` stores two kinds of material:
+`references/` stores three kinds of material:
 
+- source catalog and evidence matrix: audited 2022-2026 source records and claim-level ontology mappings
 - normative evidence: source index, papers, graph evidence, and source diagram extraction
 - non-normative exemplars: SDK, framework, protocol, runtime, and safety patterns from real engineering systems
 
 Concrete implementations stay outside the ontology backbone so the schema remains universal.
+
+## Upgrade Records
+
+The v2 upgrade is tracked through durable handoff files to avoid context loss during long-running revisions:
+
+- `reports/upgrade-worklog.md`
+- `reports/context-handoff.md`
+- `reports/decision-log.md`
+- `reports/progress-board.md`
+- `reports/risk-register.md`
+- `reports/source-matrix.md`
+- `reports/ui-spec.md`
+- `reports/previews/*.png`

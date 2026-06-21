@@ -34,7 +34,7 @@
 | 厂商中立 | 本体主干不依赖任何提供商、SDK、框架或协议实现 |
 | 子图内层级 | 每个 SG 模块都拥有根锚点、层级列、语义方向泳道、细分分组、节点角色和父子链接 |
 | 工程可用 | 运行时、工具调用、安全策略、环境适配、SDK、校验门禁都是一等结构 |
-| 证据可追溯 | 核心节点与关系连接到源图、论文、官方资料和工程参考 |
+| 证据可追溯 | 核心节点与关系连接到源图、论文、官方资料、工程参考和 claim 级证据矩阵 |
 | 约束可执行 | 本体不是静态说明，而是能被质量门禁验证的工程资产 |
 
 ## 本体全景
@@ -65,10 +65,11 @@ moonweave-ai-agent-schema/
 |-- GOVERNANCE-zh.md
 |-- ontology-manifest.yaml
 |-- graph.schema.json
-|-- ontology/                         # 13 个本体子图，510 个 YAML artifact
-|-- references/                       # 证据索引、论文、源图抽取、非规范示例
+|-- ontology/                         # 13 个本体子图，512 个 YAML artifact
+|-- references/                       # source catalog、evidence matrix、论文、源图抽取、非规范示例
 |-- visualization/                    # 可直接打开的交互式本体图谱网页
 |   |-- index.html
+|   |-- src/
 |   |-- vendor/d3.min.js
 |   `-- data/
 |-- tools/                            # 最小质量门禁工具集
@@ -80,7 +81,7 @@ moonweave-ai-agent-schema/
 |   |-- check-visualization-framework.mjs
 |   |-- check-visualization-detail-contract.mjs
 |   `-- lib/
-`-- reports/                          # 英文报告与对应 -zh 中文版本
+`-- reports/                          # 交付报告、升级记录、图示和预览资产
 ```
 
 ## 可视化入口
@@ -95,6 +96,7 @@ visualization/index.html
 
 可视化支持：
 
+- evidence workbench 外壳，包含来源、主张、视图和门禁面板
 - 浏览 13 个本体子图的完整图结构
 - 每个 SG 内部按层级列、语义方向泳道、细分分组和父子链接展示，而不是节点平铺
 - 查看板块内关系类收束图
@@ -114,6 +116,12 @@ node .\tools\check-orphan-nodes.mjs
 node .\tools\check-required-edges.mjs
 node .\tools\check-visualization-framework.mjs
 node .\tools\check-visualization-detail-contract.mjs
+node .\tools\check-source-catalog.mjs
+node .\tools\check-evidence-coverage.mjs
+node .\tools\check-theme-coverage.mjs
+node .\tools\check-diagram-exports.mjs
+node .\tools\check-i18n-encoding.mjs
+node .\tools\check-preview-screenshots.mjs
 ```
 
 这些检查覆盖：
@@ -128,14 +136,18 @@ node .\tools\check-visualization-detail-contract.mjs
 - 必填的中英双语节点说明
 - 可视化详情面板数据契约：内嵌节点、父子层级、边端点、边类型中英双语标签、运行时详情索引
 - 可视化直开能力和关键交互逻辑
+- source catalog 完整性与 approved/candidate 来源隔离
+- ontology 节点、边、约束和规划视图的 claim 级证据覆盖
+- 贯穿完整 Agent 栈的研究主题覆盖
+- diagram-as-code 导出、UTF-8 完整性和生成的预览 PNG 资产
 
 ## 当前规模
 
 | 指标 | 数量 |
 | --- | ---: |
 | 本体子图 | 13 |
-| YAML artifact | 510 |
-| NodeClass | 277 |
+| YAML artifact | 512 |
+| NodeClass | 279 |
 | EdgeClass | 144 |
 | InterfaceContract | 30 |
 | StateMachine | 21 |
@@ -147,9 +159,23 @@ node .\tools\check-visualization-detail-contract.mjs
 
 ## 证据与示例
 
-`references/` 保留两类材料：
+`references/` 保留三类材料：
 
+- source catalog 与 evidence matrix：2022-2026 来源记录和 claim 级 ontology 映射
 - 规范证据：source index、papers、graph evidence、source diagram extraction
 - 非规范示例：真实工程中的 SDK、框架、协议、运行时、安全模式
 
 具体实现不进入本体主干，从而保证 schema 的通用性。
+
+## 升级记录
+
+v2 升级通过以下持久化文件记录，避免长任务中的上下文丢失：
+
+- `reports/upgrade-worklog.md`
+- `reports/context-handoff.md`
+- `reports/decision-log.md`
+- `reports/progress-board.md`
+- `reports/risk-register.md`
+- `reports/source-matrix.md`
+- `reports/ui-spec.md`
+- `reports/previews/*.png`
