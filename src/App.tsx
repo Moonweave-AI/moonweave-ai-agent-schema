@@ -1519,6 +1519,129 @@ function localizeModuleDefinition(module: Module, language: Exclude<Language, "e
   return language === "zh" ? `建模${scope}。` : `${scope}をモデル化します。`;
 }
 
+const classDefinitionOverrides: Record<Exclude<Language, "en">, Record<string, (label: string) => string>> = {
+  zh: {
+    AuthorityScope: (label) => `${label}限定参与者、工具、服务或运行时可访问、可执行和可授权的资源、操作与边界。`,
+    DataZone: (label) => `${label}按信任级别、可见性、保留策略和处理规则组织数据，避免上下文、记忆、工具输出和产物跨边界失控。`,
+    BoundaryCrossing: (label) => `${label}记录控制、数据、产物或权限跨越信任边界的转移，并要求保留来源、策略和审计上下文。`,
+    MCPAdapter: (label) => `${label}把 MCP 的客户端/服务器、工具、资源、提示、发现、授权、传输和能力元数据映射到适配层本体。`,
+    A2AAdapter: (label) => `${label}把远程智能体身份、任务生命周期、消息与产物交换、不透明执行边界和委派元数据映射到适配层。`,
+    ProtocolMessageMapping: (label) => `${label}把协议消息信封对齐到规范消息、产物、参与者和轨迹概念，同时避免协议字段污染核心层。`,
+    ProtocolTaskMapping: (label) => `${label}把协议任务生命周期状态对齐到目标、任务、工作项、产物和可观测轨迹事件。`,
+    ProtocolCapabilityMapping: (label) => `${label}把协议能力声明对齐到工具、资源、提示、参与者和权限表面。`,
+    ProtocolTrustMapping: (label) => `${label}把协议身份、认证、授权和不透明性元数据对齐到信任边界与权限范围。`,
+    RemoteAgentBoundary: (label) => `${label}标记委派到远程智能体时产生的不透明性、身份、权限和责任边界。`
+  },
+  ja: {
+    AuthorityScope: (label) => `${label}は、アクター、ツール、サービス、ランタイムがアクセス、実行、承認できる資源、操作、境界を定めます。`,
+    DataZone: (label) => `${label}は、信頼水準、可視性、保持方針、取り扱い規則ごとにデータを整理し、文脈、記憶、ツール出力、成果物の越境を制御します。`,
+    BoundaryCrossing: (label) => `${label}は、制御、データ、成果物、権限が信頼境界を越える移動を記録し、来歴、方針、監査文脈を保持します。`,
+    MCPAdapter: (label) => `${label}は、MCP のクライアント/サーバー、ツール、資源、プロンプト、発見、認可、転送、能力メタデータを適配層の本体へ写像します。`,
+    A2AAdapter: (label) => `${label}は、遠隔エージェントの識別子、タスクライフサイクル、メッセージと成果物交換、不透明な実行境界、委任メタデータを適配層へ写像します。`,
+    ProtocolMessageMapping: (label) => `${label}は、プロトコル固有のメッセージ包絡を標準のメッセージ、成果物、参加者、トレース概念に対応させます。`,
+    ProtocolTaskMapping: (label) => `${label}は、プロトコルのタスク状態を目標、タスク、作業項目、成果物、観測可能なトレースイベントに対応させます。`,
+    ProtocolCapabilityMapping: (label) => `${label}は、プロトコルの能力告知をツール、資源、プロンプト、参加者、権限表面に対応させます。`,
+    ProtocolTrustMapping: (label) => `${label}は、プロトコル上の識別、認証、認可、不透明性メタデータを信頼境界と権限範囲に対応させます。`,
+    RemoteAgentBoundary: (label) => `${label}は、遠隔エージェントへ委任するときに生じる不透明性、識別、権限、責任の境界を示します。`
+  }
+};
+
+function normalizeClassTerm(value: string): string {
+  return value.toLowerCase().replace(/[-_/]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function localizeClassIntent(klass: OntologyClass, module: Module, language: Exclude<Language, "en">): string {
+  const label = localizeClassLabel(klass, language);
+  const exact = classDefinitionOverrides[language][klass.id];
+  if (exact) {
+    return exact(label);
+  }
+
+  const lower = normalizeClassTerm(klass.label);
+  const moduleLabel = localizeEntityLabel({ id: module.id, label: module.label, kind: "module" }, language);
+  const classKind = localizeClassKind(klass.kind, language);
+  const zh = language === "zh";
+  const choose = (zhText: string, jaText: string) => (zh ? zhText : jaText);
+
+  if (lower.includes("plane")) {
+    return choose(`${label}组织一个顶层语义平面，用来区分运行、信息、记忆、编排、工具、安全、反馈或适配语义。`, `${label}は、実行、情報、記憶、編成、ツール、安全、フィードバック、適配の意味を分ける上位平面です。`);
+  }
+  if (lower.includes("adapter")) {
+    if (lower.includes("schema") || lower.includes("zod") || lower.includes("pydantic") || lower.includes("owl") || lower.includes("shacl") || lower.includes("shex")) {
+      return choose(`${label}把规范本体和模式产物转换为结构化、语言级或语义网 profile，并保留来源和转换警告。`, `${label}は、標準本体とスキーマ成果物を構造、言語、または意味ウェブのプロファイルへ変換し、来歴と変換警告を保持します。`);
+    }
+    if (lower.includes("bench") || lower.includes("world") || lower.includes("tau") || lower.includes("agency")) {
+      return choose(`${label}把基准任务、场景、评分量表、观察结果和压力轴映射到评估适配层，不改写核心本体。`, `${label}は、ベンチマークのタスク、シナリオ、採点規準、観測、負荷軸を評価適配層に写像し、核心本体を書き換えません。`);
+    }
+    if (lower.includes("xstate") || lower.includes("scxml") || lower.includes("statechart")) {
+      return choose(`${label}把运行生命周期映射到状态机、状态节点、转换、事件、守卫、动作和快照。`, `${label}は、実行ライフサイクルを状態機械、状態ノード、遷移、イベント、ガード、アクション、スナップショットに対応させます。`);
+    }
+    return choose(`${label}记录实现或框架特定字段到规范本体的映射，并阻止适配字段进入核心层。`, `${label}は、実装またはフレームワーク固有の項目を標準本体へ写像し、適配項目が核心層へ入ることを防ぎます。`);
+  }
+  if (lower.includes("authority scope")) {
+    return choose(`${label}把参与者或运行角色绑定到其被授权访问的资源、操作、工具和数据区域。`, `${label}は、参加者や実行ロールを、認可された資源、操作、ツール、データ領域に結びます。`);
+  }
+  if (lower.includes("capability")) {
+    return choose(`${label}描述可被发现、授权、调用或跨协议映射的能力、操作或暴露表面。`, `${label}は、発見、認可、呼び出し、またはプロトコル間写像が可能な能力、操作、公開面を表します。`);
+  }
+  if (lower.includes("actor") || lower.includes("agent") || lower.includes("worker") || lower.includes("orchestrator") || lower.includes("evaluator")) {
+    return choose(`${label}标识能行动、观察、授权、执行、检索或承担委派责任的运行参与者。`, `${label}は、行動、観測、認可、実行、検索、または委任責任を担う実行参加者を示します。`);
+  }
+  if (lower.includes("boundary") || lower.includes("crossing") || lower.includes("data zone")) {
+    return choose(`${label}描述信任、权限或数据处理边界，以及跨边界时必须记录的来源、策略和审计语义。`, `${label}は、信頼、権限、データ取り扱いの境界と、越境時に必要な来歴、方針、監査意味を表します。`);
+  }
+  if (lower.includes("permission") || lower.includes("authorization") || lower.includes("policy") || lower.includes("rule") || lower.includes("condition") || lower.includes("gate")) {
+    return choose(`${label}给出约束访问、路由、执行、披露或生命周期推进的授权条件与决策依据。`, `${label}は、アクセス、経路選択、実行、開示、ライフサイクル進行を制約する認可条件と判断根拠を与えます。`);
+  }
+  if (lower.includes("tool")) {
+    return choose(`${label}描述工具的身份、能力、参数、选择、调用、结果、警告、错误或副作用等可观测执行语义。`, `${label}は、ツールの識別、能力、引数、選択、呼び出し、結果、警告、エラー、副作用などの観測可能な実行意味を表します。`);
+  }
+  if (lower.includes("command") || lower.includes("sandbox") || lower.includes("network") || lower.includes("socket") || lower.includes("proxy") || lower.includes("request") || lower.includes("response")) {
+    return choose(`${label}记录命令、沙箱、网络或请求/响应路径上的受控执行、隔离和边界交互。`, `${label}は、コマンド、サンドボックス、ネットワーク、要求/応答経路における制御実行、隔離、境界相互作用を記録します。`);
+  }
+  if (lower.includes("task") || lower.includes("work item") || lower.includes("goal") || lower.includes("objective")) {
+    return choose(`${label}表达目标到任务、工作项、步骤、依赖、约束和完成准则的规划结构。`, `${label}は、目標からタスク、作業項目、手順、依存、制約、完了基準へ至る計画構造を表します。`);
+  }
+  if (lower.includes("delegation") || lower.includes("handoff") || lower.includes("subagent") || lower.includes("responsibility")) {
+    return choose(`${label}记录参与者之间责任、上下文、权限或结果所有权的转移。`, `${label}は、参加者間での責任、文脈、権限、結果所有権の移転を記録します。`);
+  }
+  if (lower.includes("route") || lower.includes("routing") || lower.includes("downstream")) {
+    return choose(`${label}根据状态、策略或观察结果选择下一步操作、分支、参与者或工具路径。`, `${label}は、状態、方針、観測結果に基づいて次の操作、分岐、参加者、ツール経路を選びます。`);
+  }
+  if (lower.includes("prompt chain") || lower.includes("chain stage") || lower.includes("parallel") || lower.includes("section") || lower.includes("vote") || lower.includes("synthesis") || lower.includes("aggregation")) {
+    return choose(`${label}描述提示链、并行、分段、投票或综合等组合机制，用于拆分工作、合并候选结果和形成产物。`, `${label}は、プロンプト連鎖、並列化、分割、投票、合成など、作業分割、候補統合、成果生成の機構を表します。`);
+  }
+  if (lower.includes("memory") || lower.includes("chunk") || lower.includes("context") || lower.includes("embedding") || lower.includes("vector") || lower.includes("index") || lower.includes("retrieval") || lower.includes("rank") || lower.includes("candidate") || lower.includes("summary")) {
+    return choose(`${label}描述记忆、分块、上下文组装、嵌入索引、检索候选、评分、重排或摘要压缩的语义。`, `${label}は、記憶、分割、文脈組み立て、埋め込み索引、検索候補、採点、再順位付け、要約圧縮の意味を表します。`);
+  }
+  if (lower.includes("message") || lower.includes("conversation") || lower.includes("prompt") || lower.includes("instruction") || lower.includes("few shot") || lower.includes("demonstration") || lower.includes("transcript")) {
+    return choose(`${label}记录可观测消息、指令、提示、示例、会话轮次或转录，而不要求保存隐藏思维链。`, `${label}は、観測可能なメッセージ、指示、プロンプト、例、会話ターン、転記を記録し、隠れた思考連鎖の保存を要求しません。`);
+  }
+  if (lower.includes("output") || lower.includes("disclosure") || lower.includes("redaction") || lower.includes("window") || lower.includes("limit") || lower.includes("sensitive")) {
+    return choose(`${label}控制输出的可见性、压缩、截断、脱敏、披露阶段和向下游传递的范围。`, `${label}は、出力の可視性、圧縮、切り詰め、秘匿、開示段階、下流への伝達範囲を制御します。`);
+  }
+  if (lower.includes("trace") || lower.includes("span") || lower.includes("checkpoint") || lower.includes("snapshot") || lower.includes("event") || lower.includes("session") || lower.includes("run") || lower.includes("lifecycle") || lower.includes("environment")) {
+    return choose(`${label}记录会话、运行、事件、轨迹、检查点、快照或状态差异等可审计运行证据。`, `${label}は、セッション、実行、イベント、トレース、チェックポイント、スナップショット、状態差分など監査可能な実行証拠を記録します。`);
+  }
+  if (lower.includes("artifact") || lower.includes("file") || lower.includes("directory") || lower.includes("database") || lower.includes("graph") || lower.includes("document") || lower.includes("source") || lower.includes("resource") || lower.includes("metadata")) {
+    return choose(`${label}标识智能体系统产生、消费、检索或引用的信息源、存储对象、文档、图元素、产物或元数据。`, `${label}は、エージェントシステムが生成、消費、検索、参照する情報源、保存対象、文書、グラフ要素、成果物、メタデータを示します。`);
+  }
+  if (lower.includes("evaluation") || lower.includes("metric") || lower.includes("score") || lower.includes("rubric") || lower.includes("benchmark") || lower.includes("scenario") || lower.includes("criterion") || lower.includes("review") || lower.includes("feedback") || lower.includes("critique") || lower.includes("optimization")) {
+    return choose(`${label}记录评估单元、评分规则、量表、反馈、审查、优化循环或基准观察，用于判断智能体行为质量。`, `${label}は、評価単位、採点規則、規準、フィードバック、レビュー、最適化ループ、ベンチマーク観測を記録し、エージェント行動の品質を判断します。`);
+  }
+  if (lower.includes("warning") || lower.includes("error") || lower.includes("diagnostic") || lower.includes("failure") || lower.includes("confidence") || lower.includes("risk") || lower.includes("signal") || lower.includes("injection") || lower.includes("scan") || lower.includes("finding")) {
+    return choose(`${label}捕获风险、不确定性、诊断、故障、注入迹象或置信度下降，并影响后续安全决策。`, `${label}は、リスク、不確実性、診断、失敗、注入兆候、信頼度低下を捕捉し、後続の安全判断に影響します。`);
+  }
+  if (lower.includes("log") || lower.includes("telemetry") || lower.includes("audit") || lower.includes("listener") || lower.includes("sink")) {
+    return choose(`${label}提供日志、遥测、审计或事件流基础设施，用于检查智能体行为。`, `${label}は、ログ、テレメトリ、監査、イベントストリーム基盤を提供し、エージェント行動を検査します。`);
+  }
+
+  return choose(
+    `${label}用于在${moduleLabel}中标识来源可追溯的${classKind}，并承载该模块内的概念边界、关系和验证语义。`,
+    `${label}は、${moduleLabel}で来歴を追跡できる${classKind}を示し、そのモジュール内の概念境界、関係、検証意味を担います。`
+  );
+}
+
 function localizeClassDefinition(item: DirectoryItem, language: Exclude<Language, "en">): string {
   const klass = ontology.classes.find((candidate) => candidate.id === item.id);
   const module = ontology.modules.find((candidate) => candidate.id === (klass?.module_id ?? item.module_id));
@@ -1527,18 +1650,7 @@ function localizeClassDefinition(item: DirectoryItem, language: Exclude<Language
     return item.definition;
   }
 
-  const label = localizeClassLabel(klass, language);
-  const moduleLabel = localizeEntityLabel({ id: module.id, label: module.label, kind: "module" }, language);
-  const classKind = localizeClassKind(klass.kind, language);
-  const scope = localizedModuleScope(module.id, language);
-
-  if (!scope) {
-    return item.definition;
-  }
-
-  return language === "zh"
-    ? `${label}表示${classKind}，位于${moduleLabel}，用于建模${scope}。`
-    : `${label}は${classKind}として${moduleLabel}に属し、${scope}を表すために使われます。`;
+  return localizeClassIntent(klass, module, language);
 }
 
 function localizeDefinition(item: DirectoryItem, language: Language): string {

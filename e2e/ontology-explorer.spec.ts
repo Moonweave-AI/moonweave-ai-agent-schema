@@ -55,4 +55,19 @@ test.describe("Moonweave ontology explorer", () => {
     await expect(page.locator(".entity-hero")).toContainText("边界跨越");
     await expect(page.locator(".entity-hero")).not.toContainText("定义该平面内部的一组相关类、关系和约束");
   });
+
+  test("shows concept-specific localized class explanations instead of class templates", async ({ page }) => {
+    await page.goto("/");
+    await page.setViewportSize({ width: 1360, height: 900 });
+
+    await page.getByRole("button", { name: "目录" }).click();
+    await page.getByRole("button", { name: "安全平面 平面" }).click();
+    await page.getByRole("button", { name: "信任边界模块 模块" }).click();
+    await page.getByRole("button", { name: /权限范围/ }).click();
+
+    await expect(page.getByRole("heading", { name: "权限范围" })).toBeVisible();
+    await expect(page.locator(".entity-hero")).toContainText("访问");
+    await expect(page.locator(".entity-hero")).toContainText("授权");
+    await expect(page.locator(".entity-hero")).not.toContainText("表示资源类，位于信任边界模块，用于建模");
+  });
 });

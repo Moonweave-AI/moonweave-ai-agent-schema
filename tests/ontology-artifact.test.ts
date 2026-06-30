@@ -136,6 +136,7 @@ describe("canonical agent ontology artifact", () => {
     const placeholderPatterns = [
       /agent-system class governed by its assigned module/i,
       /the module record defines scope/i,
+      /represents .+ as (an? )?.+ in the .+ module, used to model/i,
       /object property for .* links between agent-system classes/i,
       /object property linking (the )?.*Module/i,
       /data property for recording .* values on agent-system resources/i,
@@ -157,5 +158,25 @@ describe("canonical agent ontology artifact", () => {
       .map(([kind, id, definition]) => `${kind}:${id}:${definition}`);
 
     expect(placeholderDefinitions).toEqual([]);
+  });
+
+  it("uses concept-specific class explanations for core agent-system terms", () => {
+    const definitions = new Map(ontology.classes.map((klass) => [klass.id, klass.definition]));
+    const expectedConceptSignals = [
+      ["AuthorityScope", /authorization|permissions|access|operation/i],
+      ["DataZone", /data.*(handling|visibility|retention|classification|trust)/i],
+      ["BoundaryCrossing", /(crosses|movement|transfer).*(boundary|trust zone|authority|data)/i],
+      ["ToolCall", /(invocation|execute|runtime).*(tool|argument|result)/i],
+      ["TaskPlan", /(task|work item|goal).*(decomposition|dependenc|sequence)|(decomposition|dependenc|sequence).*(task|work item|goal)/i],
+      ["PromptChain", /(ordered|sequence|stage).*(prompt|decomposition|chain)/i],
+      ["MCPAdapter", /MCP.*(tool|resource|prompt|client|server)/i],
+      ["A2AAdapter", /(remote agent|agent-to-agent|opaque|delegation).*(task|message|artifact|identity)/i]
+    ] as const;
+
+    const weakDefinitions = expectedConceptSignals
+      .filter(([classId, pattern]) => !pattern.test(definitions.get(classId) ?? ""))
+      .map(([classId]) => `${classId}: ${definitions.get(classId) ?? "<missing>"}`);
+
+    expect(weakDefinitions).toEqual([]);
   });
 });
