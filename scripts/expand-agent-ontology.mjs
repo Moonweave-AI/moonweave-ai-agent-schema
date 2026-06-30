@@ -630,8 +630,12 @@ const moduleSpecs = [
 ];
 
 const safeSourceIds = (planeId, explicit = []) => [...new Set([...explicit, ...(sourceFallback[planeId] ?? [])])].slice(0, 4);
-const generatedClassDefinition = (module) =>
-  `agent-system class governed by its assigned module in ${module.plane_id}; the module record defines scope, source evidence, and downstream constraints`;
+const cleanModuleLabel = (label) => label.replace(/\s+Module$/i, " module");
+const cleanModuleScope = (module) => module.definition.replace(/^models\s+/i, "model ");
+const kindPhrase = (kind) => kind.replace(/_/g, " ");
+const classLabel = (id) => classById.get(id)?.label ?? id;
+const generatedClassDefinition = (module, label, kind) =>
+  `represents ${label} as a ${kindPhrase(kind)} in the ${cleanModuleLabel(module.label)}, used to ${cleanModuleScope(module)}.`;
 
 const classById = new Map(ontology.terms.map((term) => [term.id, { ...term }]));
 const generatedClassIds = new Set(moduleSpecs.flatMap((module) => module.generated.map(([id]) => id)));
@@ -640,13 +644,14 @@ const idToSourceIds = (id, planeId) => classById.get(id)?.source_ids ?? safeSour
 
 for (const module of moduleSpecs) {
   for (const [id, label] of module.generated) {
+    const kind = label.includes("adapter") ? "adapter_type" : label.includes("policy") || label.includes("rule") || label.includes("condition") ? "policy_type" : label.includes("event") || label.includes("run") || label.includes("call") || label.includes("review") || label.includes("execution") || label.includes("decision") ? "event_type" : label.includes("actor") || label.includes("agent") || label.includes("model") ? "actor_type" : label.includes("index") || label.includes("vector") ? "index_type" : label.includes("command") || label.includes("action") ? "action_type" : "resource_type";
     const generatedPayload = {
       id,
-      kind: label.includes("adapter") ? "adapter_type" : label.includes("policy") || label.includes("rule") || label.includes("condition") ? "policy_type" : label.includes("event") || label.includes("run") || label.includes("call") || label.includes("review") || label.includes("execution") || label.includes("decision") ? "event_type" : label.includes("actor") || label.includes("agent") || label.includes("model") ? "actor_type" : label.includes("index") || label.includes("vector") ? "index_type" : label.includes("command") || label.includes("action") ? "action_type" : "resource_type",
+      kind,
       plane_id: module.plane_id,
       module_id: module.id,
       label,
-      definition: generatedClassDefinition(module),
+      definition: generatedClassDefinition(module, label, kind),
       source_ids: safeSourceIds(module.plane_id, module.source_ids)
     };
     if (!classById.has(id)) {
@@ -710,12 +715,34 @@ const existingRelations = ontology.relations.map((relation) => ({
 }));
 
 const generatedObjectProperties = [];
+const objectPropertyDefinitions = new Map([
+  ["has_part", "links an agent-system whole to a component that is structurally included in it."],
+  ["is_part_of", "links an agent-system component back to the larger structure that contains it."],
+  ["precedes", "orders observable events when one event occurs before another in a run, task, or protocol flow."],
+  ["follows", "orders observable events when one event occurs after another in a run, task, or protocol flow."],
+  ["uses", "links an event or action to the resource, tool, model, memory item, or policy it consumes."],
+  ["generates", "links an event or action to the artifact, result, trace, warning, or resource it produces."],
+  ["observes", "links an actor or runtime surface to an event that it records or monitors."],
+  ["controls", "links an actor, policy, or runtime controller to the object whose behavior it constrains."],
+  ["authorizes", "links a permission or policy decision to the event it allows to proceed."],
+  ["blocks", "links a permission or policy decision to the event it prevents from executing."],
+  ["escalates", "links a safety, review, or runtime event to a higher-authority decision path."],
+  ["delegates", "links an actor or orchestrator to the agent, worker, or remote participant receiving responsibility."],
+  ["routes", "links a routing event to the downstream branch, handler, or operation selected for execution."],
+  ["invokes", "links an action event to the tool, function, service, or execution surface being called."],
+  ["returns", "links a tool or action event to the result, error, artifact, or warning returned to the runtime."],
+  ["retrieves", "links a retrieval event to the memory record, source chunk, or indexed resource it returns."],
+  ["ranks", "links a ranking event to the candidate set, result list, or scored resource it orders."],
+  ["summarizes", "links a compression or synthesis event to the shorter context, disclosure, or artifact it creates."],
+  ["indexes", "links an indexing process to the resource, chunk, vector, key, or pointer made searchable."],
+  ["maps_to", "links an adapter term to the external protocol, framework, benchmark, or export construct it represents."]
+]);
 for (const [id, label, family, domain, range, acyclic] of objectPropertySeeds) {
   generatedObjectProperties.push({
     id,
     label,
     family,
-    definition: `object property for ${label} links between agent-system classes`,
+    definition: objectPropertyDefinitions.get(id),
     domain,
     range,
     acyclic,
@@ -733,7 +760,7 @@ for (const module of moduleList) {
       id: `${modulePrefix}_contains`,
       label: `${module.label.toLowerCase()} contains`,
       family: "module_composition",
-      definition: `object property linking the ${module.label} to classes it contains`,
+      definition: `declares ${classLabel(first)} and sibling terms as members of the ${cleanModuleLabel(module.label)} scope.`,
       domain: module.id,
       range: first,
       acyclic: true,
@@ -743,7 +770,7 @@ for (const module of moduleList) {
       id: `${modulePrefix}_relates`,
       label: `${module.label.toLowerCase()} relates`,
       family: "module_relation",
-      definition: `object property linking two classes governed by the ${module.label}`,
+      definition: `connects ${classLabel(first)} to ${classLabel(second)} when both participate in ${cleanModuleScope(module)}.`,
       domain: first,
       range: second,
       acyclic: false,
@@ -753,7 +780,7 @@ for (const module of moduleList) {
       id: `${modulePrefix}_emits_event`,
       label: `${module.label.toLowerCase()} emits event`,
       family: "module_event",
-      definition: `object property linking ${module.label} operations to observable events`,
+      definition: `connects operations in the ${cleanModuleLabel(module.label)} to observable TraceEvent records.`,
       domain: first,
       range: "TraceEvent",
       acyclic: false,
@@ -790,10 +817,11 @@ const dataPropertySeeds = [
 
 const dataProperties = [];
 for (const [id, label, range] of dataPropertySeeds) {
+  const scalar = label.replace("has ", "");
   dataProperties.push({
     id,
     label,
-    definition: `data property for recording ${label.replace("has ", "")} values on agent-system resources, events, and policies`,
+    definition: `captures ${scalar} as a ${range} scalar on agent-system artifacts, resources, events, policies, or adapter records.`,
     domain: "any",
     range,
     source_ids: ["eng-ont-palantir-core-concepts", "eng-val-jsonschema-spec"]
@@ -806,7 +834,7 @@ for (const module of moduleList) {
     {
       id: `${prefix}_has_state`,
       label: `${module.label.toLowerCase()} has state`,
-      definition: `data property recording operational state for the ${module.label}`,
+      definition: `captures the lifecycle or operating state of terms in the ${cleanModuleLabel(module.label)}.`,
       domain: module.id,
       range: "string",
       source_ids: module.source_ids
@@ -814,7 +842,7 @@ for (const module of moduleList) {
     {
       id: `${prefix}_has_evidence_strength`,
       label: `${module.label.toLowerCase()} has evidence strength`,
-      definition: `data property recording evidence strength for claims in the ${module.label}`,
+      definition: `captures source-support strength for claims attached to the ${cleanModuleLabel(module.label)}.`,
       domain: module.id,
       range: "number",
       source_ids: module.source_ids
@@ -856,26 +884,39 @@ const controlledIndividuals = [
   ["AdapterDeepAgents", "adapter Deep Agents", "AdapterFamily"]
 ];
 
+const controlledIndividualDefinition = (label, classId) => {
+  const definitions = {
+    Status: `status value "${label}" used to classify the lifecycle position of sessions, runs, tasks, tools, or validation gates.`,
+    DecisionKind: `decision outcome "${label}" used by permission, policy, safety, or review flows.`,
+    RiskLevel: `risk level "${label}" used to rank safety, protocol, tool, network, or data-boundary exposure.`,
+    TransportKind: `transport option "${label}" used by protocol endpoints, streaming channels, and tool/resource exchange surfaces.`,
+    Visibility: `visibility value "${label}" used to scope whether an artifact, trace, memory item, or disclosure is public, user-visible, session-bound, or private.`,
+    AdapterFamily: `adapter family "${label}" used to map an external protocol, framework, benchmark, or runtime profile without redefining ontology core.`
+  };
+
+  return definitions[classId] ?? `enumerated value "${label}" used by ${classId} controlled vocabularies.`;
+};
+
 const individuals = [
   ...ontology.planes.map((plane) => ({
     id: `Individual_${plane.id.replace(/-/g, "_")}`,
     label: plane.label,
     class_id: "PlaneIndividual",
-    definition: `controlled individual representing the ${plane.label}`,
+    definition: `enumerates the ${plane.label} as a selectable ontology plane for navigation, export, and validation.`,
     source_ids: ["eng-ont-go-overview", "eng-ont-palantir-core-concepts"]
   })),
   ...moduleList.map((module) => ({
     id: `Individual_${module.id.replace(/-/g, "_")}`,
     label: module.label,
     class_id: "ModuleIndividual",
-    definition: `controlled individual representing the ${module.label}`,
+    definition: `enumerates the ${cleanModuleLabel(module.label)} for artifacts that ${cleanModuleScope(module)}.`,
     source_ids: module.source_ids
   })),
   ...controlledIndividuals.map(([id, label, classId]) => ({
     id,
     label,
     class_id: classId,
-    definition: `controlled vocabulary individual for ${classId}`,
+    definition: controlledIndividualDefinition(label, classId),
     source_ids: ["eng-ont-go-annotations", "eng-ont-palantir-core-concepts"]
   }))
 ].sort((a, b) => a.id.localeCompare(b.id));

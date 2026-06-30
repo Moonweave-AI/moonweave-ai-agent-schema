@@ -628,6 +628,108 @@ const entityLabelOverrides: Record<Language, Record<string, string>> = {
   }
 };
 
+const planeScopeOverrides: Record<Exclude<Language, "en">, Record<string, string>> = {
+  zh: {
+    "runtime-plane": "智能体系统、运行会话、参与者、模型、转录、可观察事件、检查点和执行状态",
+    "info-plane": "文本、指令、消息、命令输出、存储、索引、输出片段和披露表面",
+    "memory-plane": "文档摄入、分块、嵌入、检索、重排、排序融合和上下文组装",
+    "orchestration-plane": "目标、任务、计划、委派、子智能体、路由、闸门、提示链、并行、投票和综合",
+    "tool-plane": "工具注册、定义、发现、匹配、调用、执行、MCP 表面、工具结果和执行转录",
+    "safety-plane": "信任边界、权限提示、策略决策、沙箱、网络控制、注入防御、提交和脱敏闸门",
+    "feedback-plane": "警告、反馈、审核、日志、指标、优化循环、恢复事件和评测信号",
+    "adapter-plane": "MCP、A2A、框架、基准、状态机、模式导出和剖面映射"
+  },
+  ja: {
+    "runtime-plane": "エージェントシステム、実行セッション、参加者、モデル、トランスクリプト、観測可能イベント、チェックポイント、実行状態",
+    "info-plane": "テキスト、指示、メッセージ、コマンド出力、保存領域、索引、出力断片、開示面",
+    "memory-plane": "文書取り込み、チャンク化、埋め込み、検索、再ランキング、順位融合、文脈組み立て",
+    "orchestration-plane": "目標、タスク、計画、委任、サブエージェント、経路、ゲート、プロンプト連鎖、並列化、投票、統合",
+    "tool-plane": "ツール登録、定義、発見、照合、呼び出し、実行、MCP 面、ツール結果、実行トランスクリプト",
+    "safety-plane": "信頼境界、権限確認、ポリシー判断、サンドボックス、ネットワーク制御、注入防御、コミットと秘匿化ゲート",
+    "feedback-plane": "警告、フィードバック、レビュー、ログ、指標、最適化ループ、復旧イベント、評価信号",
+    "adapter-plane": "MCP、A2A、フレームワーク、ベンチマーク、状態機械、スキーマエクスポート、プロファイル写像"
+  }
+};
+
+const moduleScopeOverrides: Record<Exclude<Language, "en">, Record<string, string>> = {
+  zh: {
+    "runtime-system": "智能体系统边界、运行身份、所有权和全局执行包络",
+    "runtime-actors": "在运行时行动、观察、授权、生成、检索、排序或执行的参与者",
+    "runtime-observability": "转录、轨迹事件、快照、检查点和可审计记录",
+    "runtime-artifacts": "运行会话产生或消费的产物与交付物",
+    "info-container-command": "命令区域、执行容器、Shell 命令、进程输出和命令生命周期",
+    "info-output-disclosure": "输出分块、可见窗口、压缩、渐进披露和显示策略",
+    "info-storage-sources": "文件、数据库、图、文本语料、网络资源和资源元数据",
+    "info-messages-instructions": "消息、会话、历史、指令、系统提示和示例",
+    "info-indexing": "索引、嵌入、查找结构和轻量发现表面",
+    "memory-ingestion": "来源加载、记忆文件、文档准备和摄入事件",
+    "memory-chunking-situating": "分块、分块元数据、定位提示和文档内 grounding",
+    "memory-embedding-indexes": "用于检索记忆的向量索引和词法索引",
+    "memory-retrieval-ranking": "检索查询、候选集、评分、重排和排序融合",
+    "memory-context": "上下文窗口、上下文组装、摘要和偏好引导的记忆纳入",
+    "orchestration-task-planning": "任务、分解、工作项、计划和任务依赖",
+    "orchestration-actors-delegation": "编排者、工作者、子智能体、交接和责任转移",
+    "orchestration-routing-control": "闸门、路由、控制策略、分支和下游操作选择",
+    "orchestration-composition": "提示链、并行、分段、投票和综合模式",
+    "orchestration-evaluation": "评估器-优化器循环、审核事件、反馈事件和以思考作为工具的操作",
+    "tool-registry-definition": "工具注册表、工具定义、模式、描述符和能力元数据",
+    "tool-discovery-selection": "工具搜索、匹配、排序、选择和回退",
+    "tool-invocation-execution": "工具调用、程序化调用、执行请求、结果和转录",
+    "tool-mcp-transport": "MCP 客户端/服务器角色、会话表面、发现和传输级工具暴露",
+    "safety-trust-boundary": "信任边界、权限范围、数据区域和边界跨越",
+    "safety-permission-policy": "权限提示、策略规则、决策和授权结果",
+    "safety-sandbox-network": "沙箱、套接字、代理、网络调用和受控执行路径",
+    "safety-injection-defense": "模式扫描、注入签名、工具流风险和恶意指令传播",
+    "safety-commit-redaction": "提交闸门、脱敏、披露过滤和副作用审批",
+    "feedback-warning-error": "警告、错误、诊断和问题信号",
+    "feedback-review-optimization": "反馈、审核、恢复动作和优化循环",
+    "feedback-metrics-evaluation": "指标、评估运行、评分量表和基准观察",
+    "feedback-logging": "日志监听器、流、日志记录和可观测性通道",
+    "adapter-protocols": "MCP、A2A、FIPA、KQML 以及相关消息/能力协议的映射",
+    "adapter-frameworks": "图运行时、智能体 SDK、团队、工作流和子智能体系统的框架映射",
+    "adapter-benchmarks-statecharts": "基准、状态机和模式/导出映射",
+    "adapter-schema-export": "结构化模式、语义图和语言剖面映射"
+  },
+  ja: {
+    "runtime-system": "エージェントシステム境界、実行時アイデンティティ、所有関係、全体の実行包絡",
+    "runtime-actors": "実行時に行動、観測、認可、生成、検索、順位付け、実行を行う参加者",
+    "runtime-observability": "トランスクリプト、トレースイベント、スナップショット、チェックポイント、監査可能記録",
+    "runtime-artifacts": "実行セッションが生成または消費する成果物と納品物",
+    "info-container-command": "コマンド領域、実行コンテナ、シェルコマンド、プロセス出力、コマンドライフサイクル",
+    "info-output-disclosure": "出力チャンク、可視ウィンドウ、圧縮、段階的開示、表示ポリシー",
+    "info-storage-sources": "ファイル、データベース、グラフ、テキストコーパス、ネットワーク資源、資源メタデータ",
+    "info-messages-instructions": "メッセージ、会話、履歴、指示、システムプロンプト、例示",
+    "info-indexing": "索引、埋め込み、参照構造、軽量な発見面",
+    "memory-ingestion": "出典読み込み、記憶ファイル、文書準備、取り込みイベント",
+    "memory-chunking-situating": "チャンク化、チャンクメタデータ、位置付けプロンプト、文書内 grounding",
+    "memory-embedding-indexes": "記憶検索に使うベクトル索引と語彙索引",
+    "memory-retrieval-ranking": "検索クエリ、候補集合、スコアリング、再ランキング、順位融合",
+    "memory-context": "文脈ウィンドウ、文脈組み立て、要約、選好に基づく記憶取り込み",
+    "orchestration-task-planning": "タスク、分解、作業項目、計画、タスク依存関係",
+    "orchestration-actors-delegation": "オーケストレーター、ワーカー、サブエージェント、引き継ぎ、責任移転",
+    "orchestration-routing-control": "ゲート、経路、制御ポリシー、分岐、下流操作の選択",
+    "orchestration-composition": "プロンプト連鎖、並列化、分割、投票、統合パターン",
+    "orchestration-evaluation": "評価器-最適化器ループ、レビューイベント、フィードバックイベント、思考をツールとして扱う操作",
+    "tool-registry-definition": "ツール登録、ツール定義、スキーマ、記述子、能力メタデータ",
+    "tool-discovery-selection": "ツール検索、照合、順位付け、選択、フォールバック",
+    "tool-invocation-execution": "ツール呼び出し、プログラム的呼び出し、実行要求、結果、トランスクリプト",
+    "tool-mcp-transport": "MCP クライアント/サーバー役割、セッション面、発見、転送レベルのツール公開",
+    "safety-trust-boundary": "信頼境界、権限範囲、データ領域、境界越え",
+    "safety-permission-policy": "権限確認、ポリシールール、判断、認可結果",
+    "safety-sandbox-network": "サンドボックス、ソケット、プロキシ、ネットワーク呼び出し、制御された実行経路",
+    "safety-injection-defense": "パターンスキャン、注入シグネチャ、ツールストリームリスク、悪意ある指示の伝播",
+    "safety-commit-redaction": "コミットゲート、秘匿化、開示フィルタリング、副作用承認",
+    "feedback-warning-error": "警告、エラー、診断、問題信号",
+    "feedback-review-optimization": "フィードバック、レビュー、復旧アクション、最適化ループ",
+    "feedback-metrics-evaluation": "指標、評価実行、採点ルーブリック、ベンチマーク観測",
+    "feedback-logging": "ログリスナー、ストリーム、ログ記録、可観測性チャネル",
+    "adapter-protocols": "MCP、A2A、FIPA、KQML、および関連するメッセージ/能力プロトコルの写像",
+    "adapter-frameworks": "グラフランタイム、エージェント SDK、チーム、ワークフロー、サブエージェントシステムのフレームワーク写像",
+    "adapter-benchmarks-statecharts": "ベンチマーク、状態機械、スキーマ/エクスポート写像",
+    "adapter-schema-export": "構造スキーマ、意味グラフ、言語プロファイル写像"
+  }
+};
+
 const wordTranslations: Record<Exclude<Language, "en">, Record<string, string>> = {
   zh: {
     action: "动作",
@@ -1404,6 +1506,41 @@ function localizePropertyLabel(property: ObjectProperty | DataProperty, language
   return translatePhrase(property.label, language);
 }
 
+function localizedModuleScope(moduleId: string, language: Exclude<Language, "en">): string | undefined {
+  return moduleScopeOverrides[language][moduleId];
+}
+
+function localizeModuleDefinition(module: Module, language: Exclude<Language, "en">): string {
+  const scope = localizedModuleScope(module.id, language);
+  if (!scope) {
+    return module.definition;
+  }
+
+  return language === "zh" ? `建模${scope}。` : `${scope}をモデル化します。`;
+}
+
+function localizeClassDefinition(item: DirectoryItem, language: Exclude<Language, "en">): string {
+  const klass = ontology.classes.find((candidate) => candidate.id === item.id);
+  const module = ontology.modules.find((candidate) => candidate.id === (klass?.module_id ?? item.module_id));
+
+  if (!klass || !module) {
+    return item.definition;
+  }
+
+  const label = localizeClassLabel(klass, language);
+  const moduleLabel = localizeEntityLabel({ id: module.id, label: module.label, kind: "module" }, language);
+  const classKind = localizeClassKind(klass.kind, language);
+  const scope = localizedModuleScope(module.id, language);
+
+  if (!scope) {
+    return item.definition;
+  }
+
+  return language === "zh"
+    ? `${label}表示${classKind}，位于${moduleLabel}，用于建模${scope}。`
+    : `${label}は${classKind}として${moduleLabel}に属し、${scope}を表すために使われます。`;
+}
+
 function localizeDefinition(item: DirectoryItem, language: Language): string {
   if (language === "en") {
     return item.definition;
@@ -1415,18 +1552,20 @@ function localizeDefinition(item: DirectoryItem, language: Language): string {
   }
 
   if (item.kind === "plane") {
-    return language === "zh"
-      ? `${label}组织智能体系统中的一组正交运行语义。`
-      : `${label}はエージェントシステムの直交した実行意味を整理します。`;
+    const scope = planeScopeOverrides[language][item.id];
+    return scope
+      ? language === "zh"
+        ? `${label}组织${scope}。`
+        : `${label}は${scope}を整理します。`
+      : item.definition;
   }
 
   if (item.kind === "module") {
-    return language === "zh" ? `${label}定义该平面内部的一组相关类、关系和约束。` : `${label}は当該プレーン内の関連クラス、関係、制約を定義します。`;
+    const module = ontology.modules.find((candidate) => candidate.id === item.id);
+    return module ? localizeModuleDefinition(module, language) : item.definition;
   }
 
-  return language === "zh"
-    ? `${label}是智能体系统本体中的一个类，归属于对应模块并由来源证据支撑。`
-    : `${label}はエージェントシステム本体のクラスであり、対応モジュールと出典証拠に支えられています。`;
+  return localizeClassDefinition(item, language);
 }
 
 function localizeKind(kind: EntityKind, language: Language): string {

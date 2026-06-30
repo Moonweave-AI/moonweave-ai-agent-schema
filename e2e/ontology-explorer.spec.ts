@@ -40,4 +40,19 @@ test.describe("Moonweave ontology explorer", () => {
     const viewportWidth = await page.evaluate(() => window.innerWidth);
     expect(bodyWidth).toBeLessThanOrEqual(viewportWidth + 2);
   });
+
+  test("shows concrete localized module definitions instead of generic placeholders", async ({ page }) => {
+    await page.goto("/");
+    await page.setViewportSize({ width: 1360, height: 900 });
+
+    await page.getByRole("button", { name: "目录" }).click();
+    await page.getByRole("button", { name: "安全平面 平面" }).click();
+    await page.getByRole("button", { name: "信任边界模块 模块" }).click();
+
+    await expect(page.getByRole("heading", { name: "信任边界模块" })).toBeVisible();
+    await expect(page.locator(".entity-hero")).toContainText("权限范围");
+    await expect(page.locator(".entity-hero")).toContainText("数据区域");
+    await expect(page.locator(".entity-hero")).toContainText("边界跨越");
+    await expect(page.locator(".entity-hero")).not.toContainText("定义该平面内部的一组相关类、关系和约束");
+  });
 });

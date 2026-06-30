@@ -131,4 +131,31 @@ describe("canonical agent ontology artifact", () => {
     expect(metadataTerms.filter((term) => classIds.has(term))).toEqual([]);
     expect(JSON.stringify(ontology)).not.toContain("HiddenChainOfThought");
   });
+
+  it("uses concrete subject definitions instead of generation placeholders", () => {
+    const placeholderPatterns = [
+      /agent-system class governed by its assigned module/i,
+      /the module record defines scope/i,
+      /object property for .* links between agent-system classes/i,
+      /object property linking (the )?.*Module/i,
+      /data property for recording .* values on agent-system resources/i,
+      /data property recording .* for (claims in )?the .*Module/i,
+      /controlled individual representing the .*Module/i,
+      /controlled vocabulary individual for/i
+    ];
+
+    const definitionRows = [
+      ...ontology.modules.map((item) => ["module", item.id, item.definition]),
+      ...ontology.classes.map((item) => ["class", item.id, item.definition]),
+      ...ontology.object_properties.map((item) => ["object_property", item.id, item.definition]),
+      ...ontology.data_properties.map((item) => ["data_property", item.id, item.definition]),
+      ...ontology.individuals.map((item) => ["individual", item.id, item.definition])
+    ];
+
+    const placeholderDefinitions = definitionRows
+      .filter(([, , definition]) => placeholderPatterns.some((pattern) => pattern.test(definition)))
+      .map(([kind, id, definition]) => `${kind}:${id}:${definition}`);
+
+    expect(placeholderDefinitions).toEqual([]);
+  });
 });
