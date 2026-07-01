@@ -27,12 +27,12 @@ must consume.
 | domains | 1 |
 | planes | 8 |
 | modules | 37 |
-| classes | 484 |
-| object properties | 195 |
+| classes | 496 |
+| object properties | 213 |
 | data properties | 94 |
 | annotation properties | 12 |
 | individuals | 76 |
-| axioms | 411 |
+| axioms | 429 |
 | datatypes | 8 |
 | ontology partitions | 45 |
 

@@ -70,12 +70,12 @@ metadata around the artifact, not part of the agent runtime itself.
 | Domains | 1 |
 | Planes | 8 |
 | Modules | 37 |
-| Classes | 484 |
-| Object properties | 195 |
+| Classes | 496 |
+| Object properties | 213 |
 | Data properties | 94 |
 | Annotation properties | 12 |
 | Individuals | 76 |
-| Axioms | 411 |
+| Axioms | 429 |
 | Datatypes | 8 |
 | Ontology partitions | 45 |
 
@@ -86,7 +86,7 @@ Moonweave Agent Schema organizes agent systems through eight operational concern
 | Plane | Scope |
 |---|---|
 | Context Ingress & Staging Domain | Observable content becoming available to an agent step or model call: message and instruction envelopes, source references, content blocks, context windows, lightweight discovery pointers, disclosed output segments, and execution observations staged into context. |
-| Control & Orchestration Domain | Goals, tasks, plans, delegation, routes, gates, prompt chains, parallelization, voting, evaluator loops, and synthesis controls. |
+| Control & Orchestration Domain | Goals, objectives, task plans, delegation ownership, handoffs, agents-as-tools, context isolation, worker selection, routing targets, gates, orchestration topology, prompt chains, parallel composition, synthesis provenance, and bounded feedback/retry loops. |
 | Runtime State & Trace Domain | Runtime sessions, actors, environments, budgets, transcripts, trace events, checkpoints, snapshots, state diffs, and runtime artifacts. |
 | Interoperability & Adapter Domain | MCP, A2A, framework, benchmark, statechart, schema profile, semantic export, and graph-view mappings that must not redefine core terms. |
 | Capability & Resource Invocation Domain | Tool and capability registries, definitions, discovery, matching, invocation, execution, MCP transport, resources, prompts, results, and observable side effects. |

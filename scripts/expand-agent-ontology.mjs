@@ -341,7 +341,7 @@ const moduleSpecs = [
     plane_id: "orchestration-plane",
     label: "Task Planning Module",
     definition: "models tasks, decomposition, work items, plans, and task dependencies",
-    class_ids: ["OrchestrationPlane", "Task", "TaskDistribution"],
+    class_ids: ["Task"],
     generated: [
       ["Goal", "goal"],
       ["Objective", "objective"],
@@ -356,9 +356,9 @@ const moduleSpecs = [
   {
     id: "orchestration-actors-delegation",
     plane_id: "orchestration-plane",
-    label: "Actors And Delegation Module",
-    definition: "models orchestrators, workers, subagents, handoffs, and responsibility transfer",
-    class_ids: ["Orchestrator", "WorkerAgent", "Subagent", "Handoff"],
+    label: "Coordination Roles And Delegation Module",
+    definition: "models coordination roles, delegation contracts, handoffs, agents-as-tools, authority scope, context isolation, ownership, worker selection, and delegation budgets",
+    class_ids: ["Orchestrator", "WorkerAgent", "Subagent", "Handoff", "TaskDistribution"],
     generated: [
       ["DelegationEvent", "delegation event"],
       ["DelegationContract", "delegation contract"],
@@ -367,7 +367,17 @@ const moduleSpecs = [
       ["SubagentContext", "subagent context"],
       ["HandoffTarget", "handoff target"],
       ["ResponsibilityTransfer", "responsibility transfer"],
-      ["DelegationResult", "delegation result"]
+      ["DelegationResult", "delegation result"],
+      ["DelegationOwnership", "delegation ownership"],
+      ["AnswerOwnership", "answer ownership"],
+      ["ControlOwnership", "control ownership"],
+      ["AgentAsToolInvocation", "agent as tool invocation"],
+      ["ContextIsolation", "context isolation"],
+      ["DelegatedAuthority", "delegated authority"],
+      ["DelegationBudget", "delegation budget"],
+      ["WorkerSelection", "worker selection"],
+      ["WorkerAvailability", "worker availability"],
+      ["WorkerCapabilityMatch", "worker capability match"]
     ]
   },
   {
@@ -380,6 +390,7 @@ const moduleSpecs = [
       ["RoutingPolicy", "routing policy"],
       ["RoutingDecision", "routing decision"],
       ["BranchCondition", "branch condition"],
+      ["RoutingTarget", "routing target"],
       ["DownstreamOperation", "downstream operation"],
       ["GateCondition", "gate condition"],
       ["GateOutcome", "gate outcome"],
@@ -401,24 +412,25 @@ const moduleSpecs = [
       ["AggregationRule", "aggregation rule"],
       ["SynthesisPlan", "synthesis plan"],
       ["SynthesisInput", "synthesis input"],
-      ["SynthesisOutput", "synthesis output"]
+      ["SynthesisOutput", "synthesis output"],
+      ["OrchestrationTopology", "orchestration topology"]
     ]
   },
   {
     id: "orchestration-evaluation",
     plane_id: "orchestration-plane",
-    label: "Evaluation Loop Module",
-    definition: "models evaluator-optimizer loops, review events, feedback events, and think-as-tool operations",
+    label: "Control Feedback Loop Module",
+    definition: "models evaluator-optimizer control loops, review triggers, feedback routing, visible deliberation operations, revisions, and bounded stop or retry lineage",
     class_ids: ["EvaluatorOptimizer", "ThinkAsTool", "ReviewEvent", "FeedbackEvent"],
     generated: [
-      ["EvaluationCriterion", "evaluation criterion"],
       ["CritiqueArtifact", "critique artifact"],
       ["RevisionPlan", "revision plan"],
       ["ImprovementAttempt", "improvement attempt"],
       ["OptimizerState", "optimizer state"],
       ["ReflectionRecord", "reflection record"],
       ["FeedbackRouting", "feedback routing"],
-      ["ReviewAssignment", "review assignment"]
+      ["ReviewAssignment", "review assignment"],
+      ["StopRetryLineage", "stop retry lineage"]
     ]
   },
   {
@@ -624,7 +636,7 @@ const moduleSpecs = [
     plane_id: "feedback-plane",
     label: "Metrics And Evaluation Module",
     definition: "models metrics, evaluation runs, scoring rubrics, and benchmark observations",
-    class_ids: ["Metric", "EvaluationRun"],
+    class_ids: ["Metric", "EvaluationRun", "EvaluationCriterion"],
     generated: [
       ["Score", "score"],
       ["Rubric", "rubric"],
@@ -1408,16 +1420,284 @@ const exactGeneratedClassDefinitions = new Map([
     "stores a compressed or condensed representation of prior state, evidence, or conversation used to fit the context budget without storing hidden reasoning."
   ],
   [
+    "Goal",
+    "high-level user or system intent that motivates an agent workflow before it is decomposed into operational objectives, tasks, or success criteria."
+  ],
+  [
+    "Objective",
+    "operational and measurable target derived from a goal that can be assigned, checked, and traced through tasks, constraints, and completion criteria."
+  ],
+  [
+    "TaskDistribution",
+    "observable delegation event that assigns a task or work item to a worker, subagent, route, or tool while preserving assignment scope and responsibility evidence."
+  ],
+  [
+    "TaskPlan",
+    "organizes a goal into ordered tasks, work items, dependencies, constraints, and completion criteria that can be delegated and audited."
+  ],
+  [
+    "TaskStep",
+    "identifies one executable or reviewable step within a task plan, including ordering, dependency, owner, and completion evidence."
+  ],
+  [
+    "TaskDependency",
+    "states that one task, step, or work item depends on another result, condition, resource, or approval before it can proceed."
+  ],
+  [
+    "TaskConstraint",
+    "records a planning constraint such as deadline, budget, authority, capability, context, safety, or dependency limit that shapes task execution."
+  ],
+  [
+    "TaskCompletionCriterion",
+    "states the observable condition used to decide whether a task, step, or work item has been completed satisfactorily."
+  ],
+  [
+    "WorkItem",
+    "assignable unit of planned work derived from a task and scoped to an actor, tool, subagent, route, or artifact outcome."
+  ],
+  [
+    "Orchestrator",
+    "coordination role that decomposes goals, chooses workflow topology, delegates work, routes control, tracks ownership, and synthesizes results."
+  ],
+  [
+    "WorkerAgent",
+    "coordinated agent role that receives scoped work from an orchestrator and returns observable results, evidence, warnings, or completion status."
+  ],
+  [
+    "Subagent",
+    "worker agent operating under a coordinating role with bounded context, authority, tools, memory access, budget, and reporting obligations."
+  ],
+  [
+    "Handoff",
+    "control-transfer event that moves responsibility for a task, conversation, route, or runtime state to another agent actor or remote delegate."
+  ],
+  [
+    "HandoffTarget",
+    "actor, remote agent, route, or protocol endpoint that receives control or responsibility after a handoff."
+  ],
+  [
+    "ResponsibilityTransfer",
+    "records which responsibility changes owner during delegation or handoff, including task custody, control custody, answer ownership, and audit accountability."
+  ],
+  [
+    "DelegationContract",
+    "specifies delegated work, expected result, authority scope, visible context, budget, completion criteria, and ownership boundaries between delegator and delegatee."
+  ],
+  [
+    "DelegationEvent",
+    "observable event that initiates, updates, cancels, or completes delegated work under a delegation contract."
+  ],
+  [
+    "DelegationResult",
+    "observable result returned by a worker, subagent, tool-like agent, or remote delegate, including artifacts, status, warnings, and provenance."
+  ],
+  [
+    "WorkerPool",
+    "candidate set of workers, subagents, models, tools, or remote delegates available for selection by capability, load, cost, authority, and trust boundary."
+  ],
+  [
+    "SubagentRole",
+    "delegated role profile that defines a subagent's task specialty, authority, tool access, memory access, context scope, and reporting duty."
+  ],
+  [
+    "SubagentContext",
+    "scoped context package visible to a subagent, including allowed messages, sources, memory, task state, tool results, and exclusions."
+  ],
+  [
+    "DelegationOwnership",
+    "records the responsibility split between delegator and delegatee, including retained answer ownership, transferred control, authority scope, and result accountability."
+  ],
+  [
+    "AnswerOwnership",
+    "records which coordinating actor is accountable for the final response or artifact after delegation, handoff, review, or synthesis."
+  ],
+  [
+    "ControlOwnership",
+    "records which actor currently controls the next workflow step, including whether control is retained by a manager or transferred through handoff."
+  ],
+  [
+    "AgentAsToolInvocation",
+    "bounded invocation in which a managing agent calls another agent as a tool-like helper while retaining final answer ownership and workflow control."
+  ],
+  [
+    "ContextIsolation",
+    "bounds the messages, memory, tools, and source material visible to a worker or subagent during delegated work."
+  ],
+  [
+    "DelegatedAuthority",
+    "states the permissions, tools, memory surfaces, data zones, and operations a delegate may use on behalf of the orchestrator."
+  ],
+  [
+    "DelegationBudget",
+    "sets token, time, cost, retry, tool-call, or context limits that constrain delegated work and routing choices."
+  ],
+  [
+    "WorkerSelection",
+    "decision event that chooses a worker, subagent, model, tool, or route from a candidate pool using capability, availability, cost, safety, and context-fit evidence."
+  ],
+  [
+    "WorkerAvailability",
+    "records whether a worker or subagent can accept work, including load, lifecycle state, capability readiness, and fallback status."
+  ],
+  [
+    "WorkerCapabilityMatch",
+    "records the evidence that a worker, subagent, model, or tool matches the required task capability, modality, authority, or domain."
+  ],
+  [
+    "Route",
+    "control-flow edge or routing selection that sends work to a downstream actor, tool, branch, protocol, operation, or stop path."
+  ],
+  [
+    "RoutingPolicy",
+    "policy used by orchestration to choose a branch, worker, tool, protocol, retry, escalation, or stop path from current state and evidence."
+  ],
+  [
+    "RoutingDecision",
+    "observable decision event that applies routing policy to select a routing target and record why that target was chosen."
+  ],
+  [
+    "RoutingTarget",
+    "typed endpoint selected by a route, such as a worker, subagent, tool, branch, protocol adapter, operation handle, or stop path."
+  ],
+  [
+    "BranchCondition",
+    "condition over task state, trace evidence, policy, feedback, or capability match that determines which branch may run next."
+  ],
+  [
+    "DownstreamOperation",
+    "target operation handle that a route can invoke or continue, including a branch, actor action, tool path, protocol handoff, or stop path."
+  ],
+  [
+    "GateCondition",
+    "condition checked at a workflow gate to decide whether control may proceed, block, redirect, escalate, retry, or stop."
+  ],
+  [
+    "GateOutcome",
+    "observable result of a workflow gate, such as allowed, blocked, redirected, escalated, retried, or stopped."
+  ],
+  [
+    "RetryPolicy",
+    "policy bounding when an orchestration loop may retry work, including retry count, changed context, backoff, escalation, and failure conditions."
+  ],
+  [
+    "StopCondition",
+    "condition under which an orchestration loop must stop because success, failure, budget exhaustion, safety, or human decision has been reached."
+  ],
+  [
+    "PromptChain",
+    "ordered sequence of prompt or model-call stages used to decompose, transform, verify, or synthesize work while preserving stage provenance."
+  ],
+  [
+    "ChainStage",
+    "one ordered stage in a prompt chain with explicit input, output, dependency, guard, and handoff or routing context."
+  ],
+  [
+    "Parallelization",
+    "orchestration pattern that runs multiple branches, sections, workers, or candidate attempts concurrently under a shared control objective."
+  ],
+  [
+    "ParallelBranch",
+    "one branch in a parallelized workflow with its own assigned work, context slice, output, and merge expectations."
+  ],
+  [
+    "Sectioning",
+    "parallelization pattern that splits a larger artifact, task, or context into sections assigned to different workers or passes."
+  ],
+  [
+    "SectionAssignment",
+    "assignment record connecting a section of work to a worker, context slice, expected output, and synthesis role."
+  ],
+  [
+    "Voting",
+    "parallel evaluation pattern that compares multiple candidate outputs or decisions and selects or aggregates a result using a voting rule."
+  ],
+  [
+    "VoteBallot",
+    "record of a worker, evaluator, model, or rule casting a choice, score, preference, or rationale summary in a voting workflow."
+  ],
+  [
+    "AggregationRule",
+    "composition rule that governs how parallel outputs, votes, section results, or evidence fragments are merged into a synthesis."
+  ],
+  [
+    "Synthesis",
+    "observable event that combines worker outputs, retrieved evidence, tool results, votes, and feedback into a coherent artifact."
+  ],
+  [
+    "SynthesisPlan",
+    "plan describing which inputs, votes, sections, evidence, and precedence rules a synthesis step must combine."
+  ],
+  [
+    "SynthesisInput",
+    "worker output, retrieved evidence, tool result, vote, review signal, or artifact fragment consumed by a synthesis step."
+  ],
+  [
+    "SynthesisOutput",
+    "coherent artifact, answer, plan, summary, or decision produced by a synthesis step with provenance back to its inputs."
+  ],
+  [
+    "OrchestrationTopology",
+    "describes the coordination shape of a workflow, such as centralized manager-worker, hierarchical crew, graph route, parallel branch, or dynamic swarm."
+  ],
+  [
+    "EvaluatorOptimizer",
+    "control-loop role that reviews an output or attempt, emits feedback, and chooses whether revision, retry, escalation, or stop should occur."
+  ],
+  [
+    "ReviewEvent",
+    "observable control-loop event that requests or performs review of an output, state, plan, safety condition, evidence bundle, or completion claim."
+  ],
+  [
+    "FeedbackEvent",
+    "observable control-loop event that returns critique, warning, preference, correction, approval, or revision signal to a task, route, worker, or optimizer."
+  ],
+  [
+    "ThinkAsTool",
+    "visible deliberation or review operation exposed as a bounded tool-like step with explicit inputs, outputs, and audit metadata."
+  ],
+  [
+    "CritiqueArtifact",
+    "observable critique result produced by a review or evaluator step, including findings, requested changes, confidence, and provenance."
+  ],
+  [
+    "RevisionPlan",
+    "planned remediation path that states what to change, which prior attempt it revises, and which criterion or feedback triggered the revision."
+  ],
+  [
+    "ImprovementAttempt",
+    "bounded retry or revision attempt launched from feedback, review, gate outcome, or stop-retry lineage."
+  ],
+  [
+    "OptimizerState",
+    "runtime-visible state of an evaluator-optimizer loop, including current attempt, selected feedback, budget, stopping context, and candidate quality."
+  ],
+  [
+    "ReflectionRecord",
+    "observable review summary or rationale artifact used for improvement while excluding private reasoning transcripts."
+  ],
+  [
+    "FeedbackRouting",
+    "control decision that sends feedback to a task, worker, route, revision plan, gate, or optimizer loop."
+  ],
+  [
+    "ReviewAssignment",
+    "assigns review responsibility to a human, model, evaluator, policy gate, or worker and identifies the artifact or decision under review."
+  ],
+  [
+    "StopRetryLineage",
+    "links a review, failure, or gate outcome to the bounded retry, revision, stop, or rollback path chosen for an orchestration loop."
+  ],
+  [
+    "EvaluationCriterion",
+    "feedback-domain criterion that defines the scoring, success, benchmark, rubric, or metric condition used to assess agent behavior."
+  ],
+  [
     "AutomatedReview",
     "records a machine-produced review pass over a task, output, plan, trace, or artifact, including findings and confidence."
   ],
   [
     "HumanReview",
     "records review evidence supplied by a human actor, including approval, requested changes, blocking concerns, or quality judgment."
-  ],
-  [
-    "ReviewAssignment",
-    "assigns a review responsibility to an actor, evaluator, or policy gate and states the artifact or decision being reviewed."
   ],
   [
     "ReviewFinding",
@@ -1725,10 +2005,18 @@ const planeDefinitionOverrides = new Map([
       definition:
         "Context Ingress & Staging Domain is the operational concern domain for observable content becoming available to an agent step or model call. It models message and instruction envelopes, source references, content blocks, context windows, lightweight discovery pointers, disclosed output segments, and execution observations as they are selected, transformed, cited, suppressed, or staged into context."
     }
+  ],
+  [
+    "orchestration-plane",
+    {
+      label: "Control & Orchestration Domain",
+      definition:
+        "Control & Orchestration Domain is the operational concern domain for transforming goals into executable, delegated, routed, reviewed, and synthesized workflows. It models objectives, task plans, delegation ownership, handoffs, agents-as-tools, context isolation, worker selection, routing targets, gates, topology, prompt chains, parallel composition, synthesis provenance, and bounded feedback or retry loops."
+    }
   ]
 ]);
 
-const removedClassIds = new Set(["InfoPlane", "UserAgentMessage", "ToolMessage"]);
+const removedClassIds = new Set(["InfoPlane", "OrchestrationPlane", "UserAgentMessage", "ToolMessage"]);
 const ownership = (canonical_owner_plane, participating_planes = [], context_ingress_role) => ({
   canonical_owner_plane,
   participating_planes: [...new Set([canonical_owner_plane, ...participating_planes])],
@@ -1766,7 +2054,15 @@ const classOwnershipOverrides = new Map([
   ["DisclosureRule", ownership("safety-plane", ["info-plane", "feedback-plane"], "may suppress, redact, or release context-visible content")],
   ["ProgressiveDisclosure", ownership("safety-plane", ["info-plane", "feedback-plane"], "controls staged revelation of context or output content")],
   ["SuppressedOutput", ownership("safety-plane", ["info-plane", "feedback-plane"], "records withheld output that may be represented as suppressed context")],
-  ["ToolResultObservation", ownership("tool-plane", ["runtime-plane", "info-plane"], "may be converted into a tool observation message or context input")]
+  ["ToolResultObservation", ownership("tool-plane", ["runtime-plane", "info-plane"], "may be converted into a tool observation message or context input")],
+  ["EvaluationCriterion", ownership("feedback-plane", ["orchestration-plane", "adapter-plane"], "defines feedback and benchmark criteria consumed by orchestration control loops without owning their routing logic")],
+  ["Gate", ownership("orchestration-plane", ["safety-plane"], "controls workflow progression while safety gates own policy enforcement")],
+  ["GateCondition", ownership("orchestration-plane", ["safety-plane"], "checks workflow progression conditions that may reference safety or policy state")],
+  ["GateOutcome", ownership("orchestration-plane", ["safety-plane", "feedback-plane"], "returns a workflow outcome that may trigger safety escalation, retry, or review")],
+  ["ReviewEvent", ownership("orchestration-plane", ["feedback-plane", "safety-plane"], "routes review as a control-loop event while feedback evidence remains in the feedback domain")],
+  ["FeedbackEvent", ownership("orchestration-plane", ["feedback-plane"], "routes feedback into control flow while feedback records and metrics remain in the feedback domain")],
+  ["AgentAsToolInvocation", ownership("orchestration-plane", ["tool-plane", "runtime-plane"], "uses another agent through a tool-like invocation while retaining manager ownership")],
+  ["Handoff", ownership("orchestration-plane", ["runtime-plane", "adapter-plane"], "transfers control across agent roles or protocol boundaries")]
 ]);
 
 ontology.planes = ontology.planes.map((plane) => ({ ...plane, ...(planeDefinitionOverrides.get(plane.id) ?? {}) }));
@@ -1776,12 +2072,44 @@ const generatedClassIds = new Set(moduleSpecs.flatMap((module) => module.generat
 const generatedKindOverrides = new Map([
   ["RuntimeSession", "object_type"],
   ["RuntimeEnvironment", "object_type"],
-  ["RuntimeBudget", "policy_type"]
+  ["RuntimeBudget", "policy_type"],
+  ["AgentAsToolInvocation", "event_type"],
+  ["AnswerOwnership", "object_type"],
+  ["ControlOwnership", "object_type"],
+  ["ContextIsolation", "policy_type"],
+  ["DelegatedAuthority", "policy_type"],
+  ["DelegationBudget", "policy_type"],
+  ["DelegationOwnership", "object_type"],
+  ["DownstreamOperation", "action_type"],
+  ["EvaluationCriterion", "policy_type"],
+  ["OrchestrationTopology", "object_type"],
+  ["Route", "relation_type"],
+  ["RoutingTarget", "object_type"],
+  ["StopRetryLineage", "event_type"],
+  ["WorkerAvailability", "object_type"],
+  ["WorkerCapabilityMatch", "object_type"],
+  ["WorkerSelection", "event_type"]
 ]);
 const classKindOverrides = new Map([
   ["RuntimeSession", "object_type"],
   ["RuntimeEnvironment", "object_type"],
-  ["RuntimeBudget", "policy_type"]
+  ["RuntimeBudget", "policy_type"],
+  ["AgentAsToolInvocation", "event_type"],
+  ["AnswerOwnership", "object_type"],
+  ["ControlOwnership", "object_type"],
+  ["ContextIsolation", "policy_type"],
+  ["DelegatedAuthority", "policy_type"],
+  ["DelegationBudget", "policy_type"],
+  ["DelegationOwnership", "object_type"],
+  ["DownstreamOperation", "action_type"],
+  ["EvaluationCriterion", "policy_type"],
+  ["OrchestrationTopology", "object_type"],
+  ["Route", "relation_type"],
+  ["RoutingTarget", "object_type"],
+  ["StopRetryLineage", "event_type"],
+  ["WorkerAvailability", "object_type"],
+  ["WorkerCapabilityMatch", "object_type"],
+  ["WorkerSelection", "event_type"]
 ]);
 
 const inferredGeneratedKind = (id, label) => {
@@ -1866,6 +2194,24 @@ const objectPropertySeeds = [
   ["escalates", "escalates", "safety_flow", "event_type", "event_type", false],
   ["delegates", "delegates", "orchestration_flow", "actor_type", "actor_type", false],
   ["routes", "routes", "orchestration_flow", "event_type", "event_type", false],
+  ["decomposes_goal_into", "decomposes goal into", "orchestration_flow", "Goal", "Objective", true],
+  ["has_task_step", "has task step", "orchestration_flow", "TaskPlan", "TaskStep", true],
+  ["depends_on_task", "depends on task", "orchestration_flow", "TaskStep", "TaskStep", true],
+  ["assigns_work_item_to", "assigns work item to", "orchestration_flow", "TaskDistribution", "WorkerAgent", false],
+  ["retains_answer_ownership", "retains answer ownership", "orchestration_flow", "AgentAsToolInvocation", "AnswerOwnership", false],
+  ["transfers_control_to", "transfers control to", "orchestration_flow", "Handoff", "HandoffTarget", false],
+  ["uses_agent_as_tool", "uses agent as tool", "orchestration_flow", "Orchestrator", "AgentAsToolInvocation", false],
+  ["isolates_context_for", "isolates context for", "orchestration_flow", "ContextIsolation", "Subagent", false],
+  ["delegates_authority_scope", "delegates authority scope", "orchestration_flow", "DelegationContract", "DelegatedAuthority", false],
+  ["selects_worker_from_pool", "selects worker from pool", "orchestration_flow", "WorkerSelection", "WorkerPool", false],
+  ["routes_to_target", "routes to target", "orchestration_flow", "Route", "RoutingTarget", false],
+  ["has_control_topology", "has control topology", "orchestration_flow", "TaskPlan", "OrchestrationTopology", false],
+  ["constrained_by_budget", "constrained by budget", "orchestration_flow", "DelegationContract", "DelegationBudget", false],
+  ["synthesizes_from_input", "synthesizes from input", "orchestration_flow", "Synthesis", "SynthesisInput", false],
+  ["produces_synthesis_output", "produces synthesis output", "orchestration_flow", "Synthesis", "SynthesisOutput", false],
+  ["triggers_revision_attempt", "triggers revision attempt", "orchestration_flow", "FeedbackEvent", "ImprovementAttempt", false],
+  ["terminates_on_condition", "terminates on condition", "orchestration_flow", "StopRetryLineage", "StopCondition", false],
+  ["retries_from_attempt", "retries from attempt", "orchestration_flow", "StopRetryLineage", "ImprovementAttempt", false],
   ["invokes", "invokes", "tool_flow", "event_type", "object_type", false],
   ["returns", "returns", "tool_flow", "event_type", "resource_type", false],
   ["retrieves", "retrieves", "memory_flow", "event_type", "resource_type", false],
@@ -1949,6 +2295,24 @@ const objectPropertyDefinitions = new Map([
   ["escalates", "links a safety, review, or runtime event to a higher-authority decision path."],
   ["delegates", "links an actor or orchestrator to the agent, worker, or remote participant receiving responsibility."],
   ["routes", "links a routing event to the downstream branch, handler, or operation selected for execution."],
+  ["decomposes_goal_into", "links a high-level goal to the operational objective that makes the goal measurable, assignable, and traceable."],
+  ["has_task_step", "links a task plan to an ordered step that contributes to completion of the planned work."],
+  ["depends_on_task", "links a task step to another task step whose result, approval, resource, or state must exist before it can proceed."],
+  ["assigns_work_item_to", "links a task distribution event to the worker agent that receives the scoped work item."],
+  ["retains_answer_ownership", "links an agent-as-tool invocation to the ownership record showing the managing agent remains accountable for the final answer."],
+  ["transfers_control_to", "links a handoff event to the target actor, route, or endpoint that receives control of the next workflow step."],
+  ["uses_agent_as_tool", "links an orchestrator to a bounded invocation where another agent is called as a helper while manager control is retained."],
+  ["isolates_context_for", "links a context-isolation policy to the subagent whose visible messages, tools, memory, and sources are scoped by it."],
+  ["delegates_authority_scope", "links a delegation contract to the authority scope that specifies which tools, memory, data zones, and operations may be used."],
+  ["selects_worker_from_pool", "links a worker-selection decision to the candidate worker pool from which a subagent, model, tool, or delegate is chosen."],
+  ["routes_to_target", "links a route to the typed downstream target it selects, such as a worker, tool, branch, protocol adapter, operation, or stop path."],
+  ["has_control_topology", "links a task plan to the orchestration topology that structures manager-worker, hierarchical, graph, parallel, or dynamic coordination."],
+  ["constrained_by_budget", "links a delegation contract to the token, time, cost, retry, context, or tool-call budget governing delegated work."],
+  ["synthesizes_from_input", "links a synthesis event to the worker output, retrieved evidence, vote, tool result, or feedback input it consumes."],
+  ["produces_synthesis_output", "links a synthesis event to the coherent answer, artifact, summary, plan, or decision it produces."],
+  ["triggers_revision_attempt", "links feedback returned into a control loop to the bounded improvement attempt launched from that feedback."],
+  ["terminates_on_condition", "links stop-retry lineage to the stop condition that ended a loop, branch, retry sequence, or delegated attempt."],
+  ["retries_from_attempt", "links stop-retry lineage to the improvement attempt from which the next bounded retry or revision is derived."],
   ["invokes", "links an action event to the tool, function, service, or execution surface being called."],
   ["returns", "links a tool or action event to the result, error, artifact, or warning returned to the runtime."],
   ["retrieves", "links a retrieval event to the memory record, source chunk, or indexed resource it returns."],
@@ -1999,6 +2363,18 @@ const objectPropertyDefinitions = new Map([
   ["observed_as_context_input", "links execution output to the context-ingress event that makes it visible to a model call or agent step."],
   ["summarized_as_context_input", "links execution output to the summary that carries it forward under context budget limits."]
 ]);
+const objectPropertySourceIds = (family) => {
+  if (family === "orchestration_flow") {
+    return [
+      "lit-agent-conductor",
+      "lit-agent-orchestrationbench",
+      "eng-fw-openai-orchestration",
+      "eng-fw-langgraph-graph-api"
+    ];
+  }
+
+  return ["eng-ont-go-overview", "eng-ont-cidoc-crm", "eng-ont-palantir-core-concepts"];
+};
 for (const [id, label, family, domain, range, acyclic] of objectPropertySeeds) {
   generatedObjectProperties.push({
     id,
@@ -2008,7 +2384,7 @@ for (const [id, label, family, domain, range, acyclic] of objectPropertySeeds) {
     domain,
     range,
     acyclic,
-    source_ids: ["eng-ont-go-overview", "eng-ont-cidoc-crm", "eng-ont-palantir-core-concepts"]
+    source_ids: objectPropertySourceIds(family)
   });
 }
 
@@ -2305,5 +2681,12 @@ ontology.hygiene_gates = [
     "definition_language_alignment_check"
   ])
 ];
+
+ontology.artifact_metadata = {
+  ...ontology.artifact_metadata,
+  non_subject_metadata_terms: [
+    ...new Set([...(ontology.artifact_metadata.non_subject_metadata_terms ?? []), "OrchestrationPlane"])
+  ]
+};
 
 fs.writeFileSync(ontologyPath, `${JSON.stringify(ontology, null, 2)}\n`);
