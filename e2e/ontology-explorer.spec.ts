@@ -9,6 +9,7 @@ test.describe("Moonweave ontology explorer", () => {
     await expect(page.getByTestId("cytoscape-graph")).toBeVisible();
     await expect(page.getByTestId("cytoscape-graph")).toHaveAttribute("data-layout-engine", "fcose-force");
     await expect(page.getByTestId("cytoscape-graph")).toHaveAttribute("data-hover-relations", "predecessor");
+    await expect(page.getByTestId("cytoscape-graph")).toHaveAttribute("data-drag-layout", "continuous");
 
     const nodeCount = Number(await page.getByTestId("graph-count").getAttribute("data-node-count"));
     expect(nodeCount).toBeGreaterThan(0);
@@ -76,6 +77,18 @@ test.describe("Moonweave ontology explorer", () => {
     await expect(page.getByTestId("ontology-characteristics")).toContainText("包含类");
     await expect(page.getByTestId("ontology-characteristics")).toContainText("权限范围");
     await expect(page.locator(".catalog-section")).toHaveCount(0);
+  });
+
+  test("hides the graph surface when the selected ontology node has no visible relations", async ({ page }) => {
+    await page.goto("/");
+    await page.setViewportSize({ width: 1360, height: 900 });
+
+    await page.locator("#ontology-search").fill("ContextExclusion");
+    await page.getByRole("button", { name: /上下文排除|context exclusion/i }).click();
+
+    await expect(page.getByTestId("ontology-canvas")).toHaveCount(0);
+    await expect(page.getByTestId("graph-empty-state")).toBeVisible();
+    await expect(page.getByTestId("graph-empty-state")).toContainText(/没有可展示的下一级节点或关系|No visible child nodes or relations/i);
   });
 
   test("shows concept-specific localized class explanations instead of class templates", async ({ page }) => {

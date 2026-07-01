@@ -127,6 +127,9 @@ interface CytoscapeGraphModel {
   edgeCount: number;
 }
 
+type FcoseFixedNodeConstraint = Array<{ nodeId: string; position: cytoscape.Position }>;
+type FcoseQuality = "draft" | "default" | "proof";
+
 const cytoscapeThemeColors: Record<
   ThemeMode,
   {
@@ -296,6 +299,14 @@ function cytoscapeStyles(theme: ThemeMode): cytoscape.StylesheetJson {
       }
     },
     {
+      selector: "node.is-dragging",
+      style: {
+        "border-width": 4,
+        "border-color": colors.cyan,
+        "background-opacity": 1
+      }
+    },
+    {
       selector: "edge.edge-hierarchy",
       style: {
         "line-color": theme === "dark" ? colors.thread : "#c7cad2",
@@ -367,6 +378,8 @@ const uiText = {
     containsClasses: "包含类",
     relationPredicates: "关系谓词",
     literalFields: "字面量字段",
+    graphEmptyTitle: "没有可展示的图谱",
+    graphEmptyBody: "没有可展示的下一级节点或关系。该实体仍可在本体特征表中查看定义、来源和字段信息。",
     classCount: (count: number) => `${count} 个类`,
     selectedJsonName: "agent-ontology.json"
   },
@@ -423,6 +436,8 @@ const uiText = {
     containsClasses: "contains classes",
     relationPredicates: "relation predicates",
     literalFields: "literal fields",
+    graphEmptyTitle: "No visible graph",
+    graphEmptyBody: "No visible child nodes or relations. This entity can still be inspected through definitions, sources, and fields in the ontology characteristic table.",
     classCount: (count: number) => `${count} classes`,
     selectedJsonName: "agent-ontology.json"
   },
@@ -479,6 +494,8 @@ const uiText = {
     containsClasses: "含まれるクラス",
     relationPredicates: "関係述語",
     literalFields: "リテラル項目",
+    graphEmptyTitle: "表示できるグラフはありません",
+    graphEmptyBody: "表示できる子ノードまたは関係がありません。このエンティティの定義、出典、項目は本体特性表で確認できます。",
     classCount: (count: number) => `${count} クラス`,
     selectedJsonName: "agent-ontology.json"
   }
@@ -2423,8 +2440,15 @@ function App() {
   const graphElements = graphModel.elements;
   const graphExpansionKey = [...graphExpandedRefs].sort().join("|");
   const graphStyles = useMemo(() => cytoscapeStyles(theme), [theme]);
+  const hasVisibleGraph = graphModel.nodeCount > 1 && graphModel.edgeCount > 0;
 
   useEffect(() => {
+    if (!hasVisibleGraph) {
+      cytoscapeRef.current?.destroy();
+      cytoscapeRef.current = null;
+      return undefined;
+    }
+
     const container = cytoscapeContainerRef.current;
     if (!container) {
       return undefined;
@@ -2433,6 +2457,8 @@ function App() {
     cytoscapeRef.current?.destroy();
     container.dataset.layoutEngine = "fcose-force";
     container.dataset.hoverRelations = "predecessor";
+    container.dataset.dragLayout = "continuous";
+    container.dataset.crossingPolicy = "incremental-force-relaxation";
     const cy = cytoscape({
       container,
       elements: graphElements,
@@ -2452,29 +2478,49 @@ function App() {
     }
 
     let activeLayout: cytoscape.Layouts | undefined;
-    const runForceLayout = (options: { animate: boolean; fit: boolean; randomize: boolean }) => {
+    let dragLayoutFrame: number | undefined;
+    let lastDragLayoutAt = 0;
+    const runForceLayout = (options: {
+      animate: boolean;
+      fit: boolean;
+      randomize: boolean;
+      quality?: FcoseQuality;
+      fixedNodeConstraint?: FcoseFixedNodeConstraint;
+      live?: boolean;
+    }) => {
+      const live = options.live ?? false;
       activeLayout?.stop();
       activeLayout = cy.layout({
         name: "fcose",
-        quality: "proof",
+        quality: options.quality ?? "proof",
         randomize: options.randomize,
         animate: options.animate ? "end" : false,
-        animationDuration: options.animate ? 420 : 0,
+        animationDuration: options.animate ? (live ? 120 : 420) : 0,
         fit: options.fit,
         padding: 36,
         nodeDimensionsIncludeLabels: true,
         uniformNodeDimensions: false,
         packComponents: true,
-        nodeSeparation: 150,
-        nodeRepulsion: (node: cytoscape.NodeSingular) => (node.data("level") === 0 ? 46000 : 26000),
-        idealEdgeLength: (edge: cytoscape.EdgeSingular) => (edge.source().data("level") === 0 ? 210 : 145),
-        edgeElasticity: (edge: cytoscape.EdgeSingular) => (edge.source().data("level") === 0 ? 0.16 : 0.22),
+        nodeSeparation: live ? 130 : 180,
+        nodeRepulsion: (node: cytoscape.NodeSingular) => {
+          const level = Number(node.data("level") ?? 1);
+          return live ? (level === 0 ? 52000 : 34000) : (level === 0 ? 72000 : 42000);
+        },
+        idealEdgeLength: (edge: cytoscape.EdgeSingular) => {
+          const sourceLevel = Number(edge.source().data("level") ?? 1);
+          return live ? (sourceLevel === 0 ? 220 : 170) : (sourceLevel === 0 ? 260 : 195);
+        },
+        edgeElasticity: (edge: cytoscape.EdgeSingular) => {
+          const sourceLevel = Number(edge.source().data("level") ?? 1);
+          return live ? (sourceLevel === 0 ? 0.11 : 0.16) : (sourceLevel === 0 ? 0.08 : 0.12);
+        },
         nestingFactor: 0.12,
-        numIter: 3200,
-        gravity: 0.06,
-        gravityRange: 3.2,
-        initialEnergyOnIncremental: 0.32,
+        numIter: live ? 420 : 4600,
+        gravity: live ? 0.045 : 0.035,
+        gravityRange: 3.8,
+        initialEnergyOnIncremental: live ? 0.16 : 0.28,
         tile: true,
+        fixedNodeConstraint: options.fixedNodeConstraint,
         stop: () => {
           if (options.fit) {
             cy.fit(cy.elements(), 36);
@@ -2483,6 +2529,13 @@ function App() {
       } as unknown as cytoscape.LayoutOptions);
       activeLayout.run();
     };
+
+    const fixedConstraintForNode = (node: cytoscape.NodeSingular): FcoseFixedNodeConstraint => [
+      {
+        nodeId: node.id(),
+        position: { ...node.position() }
+      }
+    ];
 
     runForceLayout({ animate: false, fit: true, randomize: true });
 
@@ -2530,8 +2583,45 @@ function App() {
       clearHoverRelations();
     };
 
-    const onNodeDragFree = () => {
-      runForceLayout({ animate: true, fit: false, randomize: false });
+    const onNodeDrag = (event: cytoscape.EventObject) => {
+      const node = event.target as cytoscape.NodeSingular;
+      node.addClass("is-dragging");
+      if (dragLayoutFrame !== undefined) {
+        return;
+      }
+
+      dragLayoutFrame = window.requestAnimationFrame(() => {
+        dragLayoutFrame = undefined;
+        const now = performance.now();
+        if (now - lastDragLayoutAt < 96) {
+          return;
+        }
+
+        lastDragLayoutAt = now;
+        runForceLayout({
+          animate: false,
+          fit: false,
+          randomize: false,
+          fixedNodeConstraint: fixedConstraintForNode(node),
+          live: true
+        });
+      });
+    };
+
+    const onNodeDragFree = (event: cytoscape.EventObject) => {
+      const node = event.target as cytoscape.NodeSingular;
+      if (dragLayoutFrame !== undefined) {
+        window.cancelAnimationFrame(dragLayoutFrame);
+        dragLayoutFrame = undefined;
+      }
+
+      node.removeClass("is-dragging");
+      runForceLayout({
+        animate: true,
+        fit: false,
+        randomize: false,
+        fixedNodeConstraint: fixedConstraintForNode(node)
+      });
     };
 
     const resizeObserver = new ResizeObserver(() => {
@@ -2542,14 +2632,19 @@ function App() {
     cy.on("tap", "node", onNodeTap);
     cy.on("mouseover", "node", onNodeMouseOver);
     cy.on("mouseout", "node", onNodeMouseOut);
+    cy.on("drag", "node", onNodeDrag);
     cy.on("dragfree", "node", onNodeDragFree);
     resizeObserver.observe(container);
 
     return () => {
       resizeObserver.disconnect();
+      if (dragLayoutFrame !== undefined) {
+        window.cancelAnimationFrame(dragLayoutFrame);
+      }
       cy.off("tap", "node", onNodeTap);
       cy.off("mouseover", "node", onNodeMouseOver);
       cy.off("mouseout", "node", onNodeMouseOut);
+      cy.off("drag", "node", onNodeDrag);
       cy.off("dragfree", "node", onNodeDragFree);
       activeLayout?.stop();
       cy.destroy();
@@ -2557,7 +2652,7 @@ function App() {
         cytoscapeRef.current = null;
       }
     };
-  }, [graphElements, graphExpansionKey, graphStyles, selectedRef]);
+  }, [graphElements, graphExpansionKey, graphStyles, hasVisibleGraph, selectedRef]);
 
   const sourceIds = unique([
     ...selectedItem.source_ids,
@@ -2756,25 +2851,33 @@ function App() {
               </dl>
             </article>
 
-            <section className="viewer-canvas" data-testid="ontology-canvas" aria-label={copy.structure}>
-              <div className="section-heading">
-                <div>
-                  <p className="eyebrow">{copy.structure}</p>
-                  <h3>{copy.hierarchy}</h3>
+            {hasVisibleGraph ? (
+              <section className="viewer-canvas" data-testid="ontology-canvas" aria-label={copy.structure}>
+                <div className="section-heading">
+                  <div>
+                    <p className="eyebrow">{copy.structure}</p>
+                    <h3>{copy.hierarchy}</h3>
+                  </div>
+                  <span data-testid="graph-count" data-node-count={graphModel.nodeCount} data-edge-count={graphModel.edgeCount}>
+                    {copy.nodesEdges(graphModel.nodeCount, graphModel.edgeCount)}
+                  </span>
                 </div>
-                <span data-testid="graph-count" data-node-count={graphModel.nodeCount} data-edge-count={graphModel.edgeCount}>
-                  {copy.nodesEdges(graphModel.nodeCount, graphModel.edgeCount)}
-                </span>
-              </div>
-              <div
-                key={`${selectedRef}-${language}-${graphExpansionKey}-${leftCollapsed ? "left-closed" : "left-open"}`}
-                ref={cytoscapeContainerRef}
-                className="cytoscape-graph"
-                data-testid="cytoscape-graph"
-                role="application"
-                aria-label={copy.structure}
-              />
-            </section>
+                <div
+                  key={`${selectedRef}-${language}-${graphExpansionKey}-${leftCollapsed ? "left-closed" : "left-open"}`}
+                  ref={cytoscapeContainerRef}
+                  className="cytoscape-graph"
+                  data-testid="cytoscape-graph"
+                  role="application"
+                  aria-label={copy.structure}
+                />
+              </section>
+            ) : (
+              <section className="graph-empty-state" data-testid="graph-empty-state" aria-label={copy.graphEmptyTitle}>
+                <p className="eyebrow">{copy.structure}</p>
+                <h3>{copy.graphEmptyTitle}</h3>
+                <p>{copy.graphEmptyBody}</p>
+              </section>
+            )}
 
             <section className="ontology-characteristics" data-testid="ontology-characteristics" aria-label={copy.ontologicalCharacteristic}>
               <h3>{copy.ontologicalCharacteristic}</h3>
