@@ -21,8 +21,8 @@ const moduleSpecs = [
   {
     id: "runtime-system",
     plane_id: "runtime-plane",
-    label: "Runtime System Module",
-    definition: "models the agent system boundary, runtime identity, ownership, and global execution envelope",
+    label: "Runtime Session And Execution Envelope Module",
+    definition: "models bounded runtime sessions, execution attempts, outcomes, environments, budgets, and lifecycle transitions as the envelope in which agent activity actually occurs",
     class_ids: ["AgentSystem", "RuntimeSession", "RuntimeBudget", "Container", "ProcessHandle", "WorkingDirectory", "EnvironmentVariable"],
     generated: [
       ["RuntimeEnvironment", "runtime environment"],
@@ -38,8 +38,8 @@ const moduleSpecs = [
   {
     id: "runtime-actors",
     plane_id: "runtime-plane",
-    label: "Runtime Actors Module",
-    definition: "models participants that act, observe, authorize, generate, retrieve, rank, or execute inside the runtime",
+    label: "Runtime Actor And Authority Module",
+    definition: "models runtime actor identities, role bindings, capability bindings, authority scopes, local services, model-backed participants, human operators, and remote agent references",
     class_ids: ["AgentActor", "HumanOperator", "UserActor", "ModelActor", "GenerativeModel", "EmbeddingModel", "RerankerModel", "RemoteAgentReference"],
     generated: [
       ["DeveloperActor", "developer actor"],
@@ -55,12 +55,16 @@ const moduleSpecs = [
   {
     id: "runtime-observability",
     plane_id: "runtime-plane",
-    label: "Runtime Observability Module",
-    definition: "models transcripts, trace events, snapshots, checkpoints, and observable audit records",
+    label: "Runtime Trace And Checkpoint Module",
+    definition: "models raw ordered execution evidence: transcripts, trace records, spans, span events, trace links, checkpoint restore events, snapshots, state diffs, replay events, audit records, and retention policy",
     class_ids: ["AgentTranscript", "TraceEvent", "StateSnapshot", "Checkpoint", "CommandExecution"],
     generated: [
+      ["TraceRecord", "trace record"],
       ["TraceSpan", "trace span"],
       ["TraceLink", "trace link"],
+      ["TraceContext", "trace context"],
+      ["SpanAttribute", "span attribute"],
+      ["SpanStatus", "span status"],
       ["AuditRecord", "audit record"],
       ["StateDiff", "state diff"],
       ["CheckpointRestoreEvent", "checkpoint restore event"],
@@ -72,8 +76,8 @@ const moduleSpecs = [
   {
     id: "runtime-artifacts",
     plane_id: "runtime-plane",
-    label: "Runtime Artifacts Module",
-    definition: "models artifacts and deliverables produced or consumed by runtime sessions",
+    label: "Runtime Artifact Provenance Module",
+    definition: "models runtime artifacts as produced, consumed, derived, attributed, reviewed, exported, drafted, or finalized work products with execution provenance",
     class_ids: [],
     generated: [
       ["Artifact", "artifact"],
@@ -1384,6 +1388,178 @@ const exactGeneratedClassDefinitions = new Map([
     "records the observable closure of a runtime session, including final status, cleanup, artifacts, and remaining audit references."
   ],
   [
+    "AgentSystem",
+    "runtime arrangement that coordinates actors, models, tools, memory, policies, traces, sessions, and artifacts to perform bounded agent work."
+  ],
+  [
+    "RuntimeSession",
+    "bounded execution episode that groups attempts, actors, environment, budget, context, trace records, checkpoints, state, and artifacts under one session identity."
+  ],
+  [
+    "RuntimeBudget",
+    "runtime limit record for time, token, cost, retry, tool-call, context-window, or resource consumption constraints applied to an execution attempt or session."
+  ],
+  [
+    "AgentActor",
+    "runtime identity capable of acting, observing, invoking tools, receiving delegation, emitting trace events, and being accountable for session activity."
+  ],
+  [
+    "UserActor",
+    "human or client-side participant whose requests, feedback, approvals, corrections, or attachments enter the runtime as observable inputs."
+  ],
+  [
+    "DeveloperActor",
+    "runtime participant responsible for developer-level instructions, implementation constraints, environment setup, or review decisions."
+  ],
+  [
+    "HumanOperator",
+    "person who can approve, pause, resume, redirect, review, or supply missing information during a runtime session."
+  ],
+  [
+    "ModelActor",
+    "model-backed runtime participant that generates, embeds, ranks, evaluates, transforms, or classifies information while producing traceable spans and budget use."
+  ],
+  [
+    "GenerativeModel",
+    "model actor specialized for generating text, code, structured output, plans, summaries, or tool-call arguments within a traced runtime step."
+  ],
+  [
+    "EmbeddingModel",
+    "model actor specialized for producing vector or lexical representations used by retrieval, indexing, matching, or context-selection steps."
+  ],
+  [
+    "RerankerModel",
+    "model actor specialized for reordering retrieved candidates, tool options, source spans, or answer candidates using relevance evidence."
+  ],
+  [
+    "ReviewerActor",
+    "runtime participant that inspects outputs, trace evidence, artifacts, or policy-sensitive decisions and records review findings or approval state."
+  ],
+  [
+    "ToolServiceActor",
+    "runtime participant representing a callable service or tool endpoint that executes requests and returns observable results, warnings, errors, or artifacts."
+  ],
+  [
+    "SystemServiceActor",
+    "runtime participant representing an internal service such as scheduler, sandbox, storage, telemetry, or policy mediator used by the agent system."
+  ],
+  [
+    "ExternalServiceActor",
+    "runtime participant outside the controlled system that can receive requests, return results, or introduce trust-boundary and provenance obligations."
+  ],
+  [
+    "RemoteAgentReference",
+    "opaque reference to a remote agent participant whose identity, authority, task state, and artifacts are visible while its private tools, memory, and reasoning remain outside the local runtime."
+  ],
+  [
+    "ActorRoleBinding",
+    "assignment record that binds a runtime actor to a responsibility-bearing role so delegation, review, approval, and accountability remain traceable."
+  ],
+  [
+    "ActorCapabilityBinding",
+    "binding record that connects a runtime actor to callable, observable, retrieval, generation, or review capabilities together with allowed conditions of use."
+  ],
+  [
+    "ActorAuthorityScope",
+    "authority-scope record that bounds the operations, resources, tools, data zones, and trust boundaries a runtime actor may access."
+  ],
+  [
+    "AgentTranscript",
+    "ordered runtime transcript of messages, actions, tool calls, model outputs, policy decisions, warnings, and artifact references that were actually visible or emitted."
+  ],
+  [
+    "TraceRecord",
+    "trace container for one runtime workflow or session segment, grouping spans, trace context, links, ordered events, retention policy, and root-span identity."
+  ],
+  [
+    "TraceSpan",
+    "operation interval or unit of work inside a trace, with parent span, timing, status, attributes, contained events, and links to related spans."
+  ],
+  [
+    "TraceLink",
+    "non-parent causal or contextual association between spans, events, traces, attempts, or artifacts when ordinary parent-child trace structure is insufficient."
+  ],
+  [
+    "TraceContext",
+    "correlation context carrying trace identifiers, parent context, sampling state, propagation metadata, and boundary information for a trace record."
+  ],
+  [
+    "SpanAttribute",
+    "keyed attribute attached to a trace span to record operation name, model/tool identity, status detail, latency, token use, or other observable metadata."
+  ],
+  [
+    "SpanStatus",
+    "status record for a trace span, such as unset, ok, error, cancelled, blocked, retried, or degraded, with optional diagnostic context."
+  ],
+  [
+    "TraceEvent",
+    "observable runtime occurrence such as a message, action, tool call, state update, warning, policy decision, artifact update, or checkpoint event."
+  ],
+  [
+    "TraceRetentionPolicy",
+    "policy governing trace storage duration, sampling, redaction, visibility, export destination, deletion, privacy class, and no-retention modes."
+  ],
+  [
+    "AuditRecord",
+    "raw audit evidence attached to a runtime session or trace, preserving what happened and who or what was associated without performing feedback interpretation."
+  ],
+  [
+    "Checkpoint",
+    "saved continuation point that captures session state so a runtime can resume, branch, recover, inspect, or time travel from a known state."
+  ],
+  [
+    "StateSnapshot",
+    "captured runtime state for a session, actor, graph, tool, or statechart step, used for inspection, recovery, replay, or lifecycle transition."
+  ],
+  [
+    "StateDiff",
+    "difference record from one state snapshot to another, showing changed values, channels, artifacts, or lifecycle positions between two captured states."
+  ],
+  [
+    "CheckpointRestoreEvent",
+    "observable event that restores a runtime session, actor, graph, or workflow from a saved checkpoint and records restore provenance."
+  ],
+  [
+    "ReplayEvent",
+    "observable event that replays a trace, span, session segment, checkpoint, or artifact lineage for debugging, evaluation, reproduction, or review."
+  ],
+  [
+    "ObservableSummary",
+    "observable runtime summary that compresses prior events, state, transcript, or artifact evidence for context budget, review, or handoff without storing private reasoning transcripts."
+  ],
+  [
+    "Artifact",
+    "runtime work product with provenance, produced or consumed by attempts, events, actors, tools, or sessions and traceable through derivation, attribution, review, and export."
+  ],
+  [
+    "DraftArtifact",
+    "artifact lifecycle state representing an incomplete, tentative, or reviewable work product that may later be revised, finalized, or discarded."
+  ],
+  [
+    "FinalArtifact",
+    "artifact lifecycle state representing a completed or accepted work product with terminal provenance, review, and delivery evidence."
+  ],
+  [
+    "PatchArtifact",
+    "artifact form that represents a proposed or applied code, document, configuration, or data change together with source and execution provenance."
+  ],
+  [
+    "ReportArtifact",
+    "artifact form that summarizes findings, evaluations, evidence, decisions, or progress produced by a runtime session or review pass."
+  ],
+  [
+    "GraphArtifact",
+    "artifact form that serializes graph structure, topology, node-edge evidence, layout metadata, or ontology/trace graph projections."
+  ],
+  [
+    "SchemaArtifact",
+    "runtime-produced or runtime-consumed schema artifact, limited to the schema object used during execution and not redefining adapter export semantics."
+  ],
+  [
+    "ExportArtifact",
+    "artifact state or form prepared for transfer outside the runtime boundary, carrying export profile, visibility, provenance, and review metadata."
+  ],
+  [
     "EnvironmentVariable",
     "captures a runtime name-value configuration binding, including process environment settings that may affect command execution, tool behavior, or secret handling."
   ],
@@ -2013,6 +2189,14 @@ const planeDefinitionOverrides = new Map([
       definition:
         "Control & Orchestration Domain is the operational concern domain for transforming goals into executable, delegated, routed, reviewed, and synthesized workflows. It models objectives, task plans, delegation ownership, handoffs, agents-as-tools, context isolation, worker selection, routing targets, gates, topology, prompt chains, parallel composition, synthesis provenance, and bounded feedback or retry loops."
     }
+  ],
+  [
+    "runtime-plane",
+    {
+      label: "Runtime State & Trace Domain",
+      definition:
+        "Runtime State & Trace Domain is the operational concern domain for bounded execution episodes and raw runtime evidence. It models sessions, attempts, outcomes, actors, environments, budgets, trace records, spans, events, checkpoints, snapshots, state diffs, replay evidence, transcripts, retention policy, and artifact provenance so agent activity can be audited, recovered, replayed, and exported without storing hidden reasoning text."
+    }
   ]
 ]);
 
@@ -2055,6 +2239,18 @@ const classOwnershipOverrides = new Map([
   ["ProgressiveDisclosure", ownership("safety-plane", ["info-plane", "feedback-plane"], "controls staged revelation of context or output content")],
   ["SuppressedOutput", ownership("safety-plane", ["info-plane", "feedback-plane"], "records withheld output that may be represented as suppressed context")],
   ["ToolResultObservation", ownership("tool-plane", ["runtime-plane", "info-plane"], "may be converted into a tool observation message or context input")],
+  ["RuntimeBudget", ownership("runtime-plane", ["orchestration-plane", "tool-plane", "feedback-plane", "safety-plane"], "constrains attempts and sessions while routing, tools, metrics, and safety policies may reference it")],
+  ["RuntimeEnvironment", ownership("runtime-plane", ["tool-plane", "safety-plane", "adapter-plane"], "anchors actual execution without owning sandbox, protocol, or framework-specific runtime fields")],
+  ["ActorAuthorityScope", ownership("runtime-plane", ["safety-plane", "orchestration-plane"], "records runtime actor authority while safety owns policy enforcement")],
+  ["ActorCapabilityBinding", ownership("runtime-plane", ["tool-plane", "adapter-plane"], "binds runtime actors to capabilities without redefining tool or protocol capability catalogs")],
+  ["ActorRoleBinding", ownership("runtime-plane", ["orchestration-plane", "feedback-plane"], "assigns runtime accountability without redefining orchestration roles or review ownership")],
+  ["RemoteAgentReference", ownership("runtime-plane", ["adapter-plane", "safety-plane", "orchestration-plane"], "references opaque remote participants across protocol and trust boundaries")],
+  ["TraceRetentionPolicy", ownership("runtime-plane", ["safety-plane", "feedback-plane"], "governs raw trace retention while safety owns redaction and feedback owns interpreted telemetry")],
+  ["AuditRecord", ownership("runtime-plane", ["feedback-plane", "safety-plane"], "stores raw runtime audit evidence before interpretation, diagnostics, or disclosure decisions")],
+  ["ObservableSummary", ownership("runtime-plane", ["memory-plane", "info-plane", "feedback-plane"], "summarizes observable runtime evidence without becoming long-term memory or hidden reasoning")],
+  ["Checkpoint", ownership("runtime-plane", ["memory-plane", "adapter-plane"], "captures resumable session state without becoming long-term memory store semantics")],
+  ["StateSnapshot", ownership("runtime-plane", ["adapter-plane", "memory-plane"], "captures runtime state for recovery, replay, and statechart profiles")],
+  ["SchemaArtifact", ownership("runtime-plane", ["adapter-plane", "feedback-plane"], "represents runtime-produced schema artifacts without redefining export or validation profiles")],
   ["EvaluationCriterion", ownership("feedback-plane", ["orchestration-plane", "adapter-plane"], "defines feedback and benchmark criteria consumed by orchestration control loops without owning their routing logic")],
   ["Gate", ownership("orchestration-plane", ["safety-plane"], "controls workflow progression while safety gates own policy enforcement")],
   ["GateCondition", ownership("orchestration-plane", ["safety-plane"], "checks workflow progression conditions that may reference safety or policy state")],
@@ -2073,6 +2269,16 @@ const generatedKindOverrides = new Map([
   ["RuntimeSession", "object_type"],
   ["RuntimeEnvironment", "object_type"],
   ["RuntimeBudget", "policy_type"],
+  ["RunOutcome", "object_type"],
+  ["SessionLifecycle", "object_type"],
+  ["ActorAuthorityScope", "policy_type"],
+  ["ActorCapabilityBinding", "relation_type"],
+  ["ActorRoleBinding", "relation_type"],
+  ["TraceRecord", "object_type"],
+  ["TraceContext", "object_type"],
+  ["SpanAttribute", "resource_type"],
+  ["SpanStatus", "resource_type"],
+  ["TraceRetentionPolicy", "policy_type"],
   ["AgentAsToolInvocation", "event_type"],
   ["AnswerOwnership", "object_type"],
   ["ControlOwnership", "object_type"],
@@ -2094,6 +2300,16 @@ const classKindOverrides = new Map([
   ["RuntimeSession", "object_type"],
   ["RuntimeEnvironment", "object_type"],
   ["RuntimeBudget", "policy_type"],
+  ["RunOutcome", "object_type"],
+  ["SessionLifecycle", "object_type"],
+  ["ActorAuthorityScope", "policy_type"],
+  ["ActorCapabilityBinding", "relation_type"],
+  ["ActorRoleBinding", "relation_type"],
+  ["TraceRecord", "object_type"],
+  ["TraceContext", "object_type"],
+  ["SpanAttribute", "resource_type"],
+  ["SpanStatus", "resource_type"],
+  ["TraceRetentionPolicy", "policy_type"],
   ["AgentAsToolInvocation", "event_type"],
   ["AnswerOwnership", "object_type"],
   ["ControlOwnership", "object_type"],
@@ -2194,6 +2410,48 @@ const objectPropertySeeds = [
   ["escalates", "escalates", "safety_flow", "event_type", "event_type", false],
   ["delegates", "delegates", "orchestration_flow", "actor_type", "actor_type", false],
   ["routes", "routes", "orchestration_flow", "event_type", "event_type", false],
+  ["has_runtime_session", "has runtime session", "runtime_execution", "AgentSystem", "RuntimeSession", true],
+  ["has_run_attempt", "has run attempt", "runtime_execution", "RuntimeSession", "RunAttempt", true],
+  ["yields_run_outcome", "yields run outcome", "runtime_execution", "RunAttempt", "RunOutcome", true],
+  ["run_attempt_belongs_to_task", "run attempt belongs to task", "runtime_execution", "RunAttempt", "Task", false],
+  ["uses_runtime_environment", "uses runtime environment", "runtime_execution", "RunAttempt", "RuntimeEnvironment", false],
+  ["constrained_by_runtime_budget", "constrained by runtime budget", "runtime_execution", "RunAttempt", "RuntimeBudget", false],
+  ["opens_runtime_session", "opens runtime session", "runtime_execution", "SessionStartEvent", "RuntimeSession", true],
+  ["closes_runtime_session", "closes runtime session", "runtime_execution", "SessionEndEvent", "RuntimeSession", true],
+  ["pauses_with_snapshot", "pauses with snapshot", "runtime_execution", "SessionPauseEvent", "StateSnapshot", false],
+  ["resumes_from_checkpoint", "resumes from checkpoint", "runtime_execution", "SessionResumeEvent", "Checkpoint", false],
+  ["participates_in_session", "participates in session", "runtime_execution", "AgentActor", "RuntimeSession", false],
+  ["associated_with_attempt", "associated with attempt", "runtime_execution", "AgentActor", "RunAttempt", false],
+  ["has_actor_role_binding", "has actor role binding", "runtime_execution", "AgentActor", "ActorRoleBinding", false],
+  ["has_actor_authority_scope", "has actor authority scope", "runtime_execution", "AgentActor", "ActorAuthorityScope", false],
+  ["has_actor_capability_binding", "has actor capability binding", "runtime_execution", "AgentActor", "ActorCapabilityBinding", false],
+  ["remote_agent_crosses_trust_boundary", "remote agent crosses trust boundary", "runtime_execution", "RemoteAgentReference", "TrustBoundary", false],
+  ["session_has_trace", "session has trace", "runtime_execution", "RuntimeSession", "TraceRecord", true],
+  ["trace_contains_span", "trace contains span", "runtime_execution", "TraceRecord", "TraceSpan", true],
+  ["trace_has_context", "trace has context", "runtime_execution", "TraceRecord", "TraceContext", false],
+  ["span_contains_event", "span contains event", "runtime_execution", "TraceSpan", "TraceEvent", true],
+  ["span_has_parent_span", "span has parent span", "runtime_execution", "TraceSpan", "TraceSpan", true],
+  ["span_has_attribute", "span has attribute", "runtime_execution", "TraceSpan", "SpanAttribute", false],
+  ["span_has_status", "span has status", "runtime_execution", "TraceSpan", "SpanStatus", false],
+  ["trace_link_source_span", "trace link source span", "runtime_execution", "TraceLink", "TraceSpan", false],
+  ["trace_link_target_span", "trace link target span", "runtime_execution", "TraceLink", "TraceSpan", false],
+  ["trace_event_belongs_to_span", "trace event belongs to span", "runtime_execution", "TraceEvent", "TraceSpan", false],
+  ["trace_event_ordered_before", "trace event ordered before", "runtime_execution", "TraceEvent", "TraceEvent", true],
+  ["trace_event_caused_by", "trace event caused by", "runtime_execution", "TraceEvent", "TraceEvent", false],
+  ["checkpoint_captures_snapshot", "checkpoint captures snapshot", "runtime_execution", "Checkpoint", "StateSnapshot", true],
+  ["checkpoint_belongs_to_session", "checkpoint belongs to session", "runtime_execution", "Checkpoint", "RuntimeSession", false],
+  ["checkpoint_has_parent", "checkpoint has parent", "runtime_execution", "Checkpoint", "Checkpoint", true],
+  ["state_diff_from_snapshot", "state diff from snapshot", "runtime_execution", "StateDiff", "StateSnapshot", false],
+  ["state_diff_to_snapshot", "state diff to snapshot", "runtime_execution", "StateDiff", "StateSnapshot", false],
+  ["restore_event_restores_checkpoint", "restore event restores checkpoint", "runtime_execution", "CheckpointRestoreEvent", "Checkpoint", false],
+  ["replay_event_replays_trace", "replay event replays trace", "runtime_execution", "ReplayEvent", "TraceRecord", false],
+  ["artifact_produced_by_attempt", "artifact produced by attempt", "runtime_execution", "Artifact", "RunAttempt", false],
+  ["artifact_produced_by_event", "artifact produced by event", "runtime_execution", "Artifact", "TraceEvent", false],
+  ["artifact_consumed_by_attempt", "artifact consumed by attempt", "runtime_execution", "Artifact", "RunAttempt", false],
+  ["artifact_derived_from", "artifact derived from", "runtime_execution", "Artifact", "Artifact", true],
+  ["artifact_attributed_to_actor", "artifact attributed to actor", "runtime_execution", "Artifact", "AgentActor", false],
+  ["artifact_reviewed_by", "artifact reviewed by", "runtime_execution", "Artifact", "ReviewEvent", false],
+  ["artifact_exported_as", "artifact exported as", "runtime_execution", "Artifact", "ExportArtifact", false],
   ["decomposes_goal_into", "decomposes goal into", "orchestration_flow", "Goal", "Objective", true],
   ["has_task_step", "has task step", "orchestration_flow", "TaskPlan", "TaskStep", true],
   ["depends_on_task", "depends on task", "orchestration_flow", "TaskStep", "TaskStep", true],
@@ -2295,6 +2553,48 @@ const objectPropertyDefinitions = new Map([
   ["escalates", "links a safety, review, or runtime event to a higher-authority decision path."],
   ["delegates", "links an actor or orchestrator to the agent, worker, or remote participant receiving responsibility."],
   ["routes", "links a routing event to the downstream branch, handler, or operation selected for execution."],
+  ["has_runtime_session", "links an agent system to a bounded runtime session so actors, attempts, traces, checkpoints, and artifacts are grouped under one execution episode."],
+  ["has_run_attempt", "links a runtime session to an individual execution attempt, including retries and resumed attempts that occur inside the same session boundary."],
+  ["yields_run_outcome", "links a run attempt to its terminal outcome record so success, failure, cancellation, produced artifacts, and final state remain auditable."],
+  ["run_attempt_belongs_to_task", "links an execution attempt to the task or work item it realizes, keeping orchestration intent separate from observed runtime execution."],
+  ["uses_runtime_environment", "links an execution attempt to the concrete container, sandbox, working directory, model/tool availability, and configuration used at runtime."],
+  ["constrained_by_runtime_budget", "links an execution attempt to the token, time, cost, retry, tool-call, or context budget that bounded the run."],
+  ["opens_runtime_session", "links a session start event to the runtime session it opens with initial actor, environment, goal, and context state."],
+  ["closes_runtime_session", "links a session end event to the runtime session it closes, preserving terminal status, cleanup evidence, and artifact references."],
+  ["pauses_with_snapshot", "links a pause event to the state snapshot retained so the runtime can later resume or inspect the paused session."],
+  ["resumes_from_checkpoint", "links a session resume event to the checkpoint used to restore state, pending work, and execution context."],
+  ["participates_in_session", "links a runtime actor identity to the session in which it acts, observes, authorizes, generates, retrieves, ranks, reviews, or executes."],
+  ["associated_with_attempt", "links a runtime actor to the execution attempt for which it bears participation, responsibility, or provenance evidence."],
+  ["has_actor_role_binding", "links a runtime actor to the role assignment that explains its delegated responsibility, review duty, approval authority, or accountability."],
+  ["has_actor_authority_scope", "links a runtime actor to the authority scope bounding permitted tools, operations, resources, data zones, and boundaries."],
+  ["has_actor_capability_binding", "links a runtime actor to the callable, observable, generation, retrieval, ranking, or review capability it may use under stated conditions."],
+  ["remote_agent_crosses_trust_boundary", "links an opaque remote agent reference to the trust boundary crossed by task, message, artifact, or status exchange."],
+  ["session_has_trace", "links a runtime session to the trace record that contains its root span, spans, events, links, context, and retention policy."],
+  ["trace_contains_span", "links a trace record to an operation span so runtime work is represented as nested or related units of work."],
+  ["trace_has_context", "links a trace record to the propagation and correlation context that carries identifiers, sampling state, and boundary metadata."],
+  ["span_contains_event", "links a trace span to timestamped events such as model calls, tool calls, handoffs, warnings, state updates, or artifact updates."],
+  ["span_has_parent_span", "links a span to its parent span, forming the nested trace tree used to reconstruct execution order and causal containment."],
+  ["span_has_attribute", "links a trace span to keyed observable metadata such as operation name, model or tool identity, token use, latency, status detail, or boundary tag."],
+  ["span_has_status", "links a trace span to its status record so errors, cancellation, blocking, retry, or degraded execution can be inspected without reinterpretation."],
+  ["trace_link_source_span", "links a trace link object to the source span that participates in a non-parent causal or contextual relationship."],
+  ["trace_link_target_span", "links a trace link object to the target span reached by a non-parent causal or contextual relationship."],
+  ["trace_event_belongs_to_span", "links an observable runtime event to the span interval in which it occurred, preserving trace-local ordering and containment."],
+  ["trace_event_ordered_before", "orders two trace events when one occurred before the other within a span, session, run attempt, or replayable trace sequence."],
+  ["trace_event_caused_by", "links a trace event to the prior event that triggered, produced, or explains it, without collapsing causal evidence into narrative text."],
+  ["checkpoint_captures_snapshot", "links a checkpoint to the state snapshot it saved so resume, branch, time travel, or recovery can start from a known state."],
+  ["checkpoint_belongs_to_session", "links a checkpoint to the runtime session or thread boundary whose state it preserves."],
+  ["checkpoint_has_parent", "links a checkpoint to the prior checkpoint from which it was derived, enabling checkpoint lineage and branch reconstruction."],
+  ["state_diff_from_snapshot", "links a state diff to the source snapshot whose values, channels, artifacts, or lifecycle position are being compared."],
+  ["state_diff_to_snapshot", "links a state diff to the target snapshot that shows the resulting values, channels, artifacts, or lifecycle position after change."],
+  ["restore_event_restores_checkpoint", "links a checkpoint restore event to the checkpoint used to rehydrate state, pending writes, or interrupted work."],
+  ["replay_event_replays_trace", "links a replay event to the trace record replayed for debugging, evaluation, reproduction, review, or audit."],
+  ["artifact_produced_by_attempt", "links a runtime artifact to the run attempt that produced or finalized it."],
+  ["artifact_produced_by_event", "links a runtime artifact to the trace event that emitted, updated, or materialized it."],
+  ["artifact_consumed_by_attempt", "links a runtime artifact to the run attempt that read, transformed, cited, validated, or incorporated it."],
+  ["artifact_derived_from", "links a runtime artifact to an earlier artifact from which it was revised, summarized, patched, converted, or exported."],
+  ["artifact_attributed_to_actor", "links a runtime artifact to the actor responsible for creating, approving, modifying, or delivering it."],
+  ["artifact_reviewed_by", "links a runtime artifact to the review event that inspected, accepted, rejected, or requested changes to it."],
+  ["artifact_exported_as", "links a runtime artifact to the export artifact or delivery form prepared for a recipient, adapter, or trust boundary."],
   ["decomposes_goal_into", "links a high-level goal to the operational objective that makes the goal measurable, assignable, and traceable."],
   ["has_task_step", "links a task plan to an ordered step that contributes to completion of the planned work."],
   ["depends_on_task", "links a task step to another task step whose result, approval, resource, or state must exist before it can proceed."],
@@ -2364,6 +2664,16 @@ const objectPropertyDefinitions = new Map([
   ["summarized_as_context_input", "links execution output to the summary that carries it forward under context budget limits."]
 ]);
 const objectPropertySourceIds = (family) => {
+  if (family === "runtime_execution") {
+    return [
+      "eng-fw-openai-tracing",
+      "eng-fw-langgraph-docs",
+      "eng-ont-prov-o",
+      "eng-proto-a2a-spec",
+      "eng-state-xstate-docs"
+    ];
+  }
+
   if (family === "orchestration_flow") {
     return [
       "lit-agent-conductor",
