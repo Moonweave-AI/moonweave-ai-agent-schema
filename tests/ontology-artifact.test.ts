@@ -744,6 +744,152 @@ describe("canonical agent ontology artifact", () => {
     expect(localizedDefinitions).not.toMatch(/信任或安全边界|根据状态、策略、条件或观察结果选择下一步操作|任务规划|路由|基准任务/);
   });
 
+  it("models interoperability as a governed adapter membrane with directional mappings", () => {
+    const objectProperties = new Map(ontology.object_properties.map((property) => [property.id, property]));
+    const adapterPlane = ontology.planes.find((plane) => plane.id === "adapter-plane");
+    const expectedModules = new Map([
+      ["adapter-protocols", "Protocol Adapter Module"],
+      ["adapter-frameworks", "Framework Adapter Module"],
+      ["adapter-benchmarks", "Benchmark Adapter Module"],
+      ["adapter-statecharts", "Statechart Adapter Module"],
+      ["adapter-schema-export", "Schema And Export Adapter Module"],
+      ["adapter-mapping-infrastructure", "Adapter Mapping Infrastructure Module"]
+    ]);
+    const expectedClassModules = new Map([
+      ["ProtocolAdapter", "adapter-protocols"],
+      ["MCPAdapter", "adapter-protocols"],
+      ["A2AAdapter", "adapter-protocols"],
+      ["FIPAAdapter", "adapter-protocols"],
+      ["KQMLAdapter", "adapter-protocols"],
+      ["FrameworkAdapter", "adapter-frameworks"],
+      ["FrameworkHandoffMapping", "adapter-frameworks"],
+      ["FrameworkTraceMapping", "adapter-frameworks"],
+      ["BenchmarkAdapter", "adapter-benchmarks"],
+      ["SWEBenchAdapter", "adapter-benchmarks"],
+      ["OSWorldAdapter", "adapter-benchmarks"],
+      ["Tau2Adapter", "adapter-benchmarks"],
+      ["AppWorldAdapter", "adapter-benchmarks"],
+      ["TerminalBenchAdapter", "adapter-benchmarks"],
+      ["AgencyBenchAdapter", "adapter-benchmarks"],
+      ["StatechartAdapter", "adapter-statecharts"],
+      ["XStateAdapter", "adapter-statecharts"],
+      ["SCXMLAdapter", "adapter-statecharts"],
+      ["SchemaAdapter", "adapter-schema-export"],
+      ["JSONSchemaAdapter", "adapter-schema-export"],
+      ["ZodProfileAdapter", "adapter-schema-export"],
+      ["PydanticProfileAdapter", "adapter-schema-export"],
+      ["OWLExportAdapter", "adapter-schema-export"],
+      ["SHACLExportAdapter", "adapter-schema-export"],
+      ["ShExExportAdapter", "adapter-schema-export"],
+      ["GraphIRAdapter", "adapter-schema-export"],
+      ["FrontendViewAdapter", "adapter-schema-export"],
+      ["MappingRule", "adapter-mapping-infrastructure"],
+      ["ConversionWarning", "adapter-mapping-infrastructure"]
+    ]);
+    const expectedSources = new Map([
+      ["MCPAdapter", ["eng-proto-mcp-spec", "eng-proto-mcp-auth", "eng-proto-mcp-repo"]],
+      ["A2AAdapter", ["eng-proto-a2a-spec", "eng-proto-a2a-docs", "eng-proto-a2a-repo"]],
+      ["FIPAAdapter", ["eng-proto-fipa-acl", "eng-proto-fipa-act", "eng-proto-fipa-ip"]],
+      ["KQMLAdapter", ["lit-proto-kqml", "eng-proto-kqml-spec"]],
+      ["LangGraphAdapter", ["eng-fw-langgraph-docs", "eng-fw-langgraph-graph-api", "eng-fw-langgraph-repo"]],
+      ["OpenAIAgentsAdapter", ["eng-fw-openai-python-docs", "eng-fw-openai-handoffs", "eng-fw-openai-tracing"]],
+      ["CrewAIAdapter", ["eng-fw-crewai-docs", "eng-fw-crewai-agents", "eng-fw-crewai-flows"]],
+      ["DeepAgentsAdapter", ["eng-fw-deepagents-docs", "eng-fw-deepagents-js-docs", "eng-fw-deepagents-repo"]],
+      [
+        "MicrosoftAgentFrameworkAdapter",
+        ["eng-fw-microsoft-agent-framework-docs", "eng-fw-microsoft-agent-framework-repo", "eng-fw-microsoft-agent-framework-current"]
+      ],
+      ["LangChainAdapter", ["eng-fw-langchain-agents", "eng-fw-langchain-repo", "eng-fw-langgraph-docs"]],
+      ["SWEBenchAdapter", ["eng-bench-swebench-site", "eng-bench-swebench-repo", "lit-bench-swebench"]],
+      ["OSWorldAdapter", ["eng-bench-osworld-site", "eng-bench-osworld-repo", "lit-bench-osworld"]],
+      ["Tau2Adapter", ["eng-bench-tau2", "eng-bench-tau2-verified", "lit-bench-tau2"]],
+      ["AppWorldAdapter", ["eng-bench-appworld", "lit-bench-appworld"]],
+      ["TerminalBenchAdapter", ["eng-bench-terminal", "eng-bench-terminal-21", "lit-bench-terminal"]],
+      ["AgencyBenchAdapter", ["eng-bench-agencybench", "lit-bench-agencybench"]],
+      ["XStateAdapter", ["eng-state-xstate-docs", "eng-state-xstate-graph", "eng-state-scxml"]],
+      ["SCXMLAdapter", ["eng-state-scxml", "eng-state-xstate-scxml", "lit-state-harel"]],
+      ["JSONSchemaAdapter", ["eng-val-jsonschema-spec", "eng-val-jsonschema-ietf", "lit-val-jsonschema-ietf"]],
+      ["ZodProfileAdapter", ["eng-val-zod-docs", "eng-val-zod-json-schema", "eng-val-zod-release-430"]],
+      ["PydanticProfileAdapter", ["eng-val-pydantic-json-schema", "eng-val-pydantic-core"]],
+      ["OWLExportAdapter", ["eng-ont-owl", "lit-ont-owl-shacl-lessons"]],
+      ["SHACLExportAdapter", ["eng-val-shacl", "lit-val-shacl", "lit-ont-shacl-shex-survey"]],
+      ["ShExExportAdapter", ["eng-val-shex", "lit-ont-shacl-shex-survey"]]
+    ]);
+    const requiredAdapterRelations = [
+      ["maps_external_construct_to_canonical", "MappingRule", "any"],
+      ["maps_canonical_term_to_external_construct", "MappingRule", "any"],
+      ["emits_conversion_warning", "MappingRule", "ConversionWarning"],
+      ["maps_protocol_message_to_canonical_message", "ProtocolMessageMapping", "Message"],
+      ["maps_protocol_task_to_canonical_task", "ProtocolTaskMapping", "Task"],
+      ["maps_protocol_capability_to_canonical_capability", "ProtocolCapabilityMapping", "ToolCapability"],
+      ["maps_protocol_trust_to_trust_boundary", "ProtocolTrustMapping", "TrustBoundary"],
+      ["maps_framework_handoff_to_canonical_handoff", "FrameworkHandoffMapping", "Handoff"],
+      ["maps_framework_trace_to_trace_record", "FrameworkTraceMapping", "TraceRecord"],
+      ["maps_statechart_state_to_snapshot", "StatechartAdapter", "StateSnapshot"],
+      ["maps_benchmark_score_to_metric", "BenchmarkAdapter", "Metric"],
+      ["maps_schema_profile_to_schema_artifact", "SchemaAdapter", "SchemaArtifact"]
+    ] as const;
+
+    expect(classes.has("AdapterPlane")).toBe(false);
+    expect(adapterPlane?.module_ids).toEqual(expect.arrayContaining([...expectedModules.keys()]));
+    expect(adapterPlane?.module_ids).not.toContain("adapter-benchmarks-statecharts");
+
+    for (const [moduleId, label] of expectedModules) {
+      const module = modules.get(moduleId);
+      expect(module?.label).toBe(label);
+      expect(module?.definitions?.zh.length).toBeGreaterThan(24);
+      expect(module?.definitions?.ja.length).toBeGreaterThan(24);
+    }
+
+    for (const [classId, moduleId] of expectedClassModules) {
+      const klass = classes.get(classId);
+      expect(klass?.module_id).toBe(moduleId);
+      expect(klass?.plane_id).toBe("adapter-plane");
+      expect(klass?.definitions?.zh.length).toBeGreaterThan(24);
+      expect(klass?.definitions?.ja.length).toBeGreaterThan(24);
+    }
+
+    for (const [classId, sourceIds] of expectedSources) {
+      const klass = classes.get(classId);
+      expect(klass?.source_ids).toEqual(expect.arrayContaining(sourceIds));
+      expect(klass?.source_ids).not.toEqual(expect.arrayContaining(["eng-proto-mcp-spec", "eng-proto-a2a-docs", "eng-val-jsonschema-spec"]));
+    }
+
+    for (const [relationId, domain, range] of requiredAdapterRelations) {
+      const relation = objectProperties.get(relationId);
+      expect(relation?.family).toBe("adapter_mapping");
+      expect(relation?.domain).toBe(domain);
+      expect(relation?.range).toBe(range);
+      expect(relation?.definition).toMatch(/external|canonical|mapping|adapter|conversion/i);
+      expect(relation?.source_ids).toEqual(
+        expect.arrayContaining(["eng-proto-mcp-spec", "eng-proto-a2a-spec", "eng-state-xstate-docs", "eng-val-jsonschema-spec"])
+      );
+    }
+
+    expect(objectProperties.get("maps_to")?.definition).toMatch(/legacy summary|canonical terms/i);
+    expect(classes.get("FrameworkHandoffMapping")?.definition).toMatch(/framework-native.*handoff.*canonical Handoff/i);
+    expect(classes.get("FrameworkTraceMapping")?.definition).toMatch(/framework-native.*trace.*TraceRecord|TraceSpan|TraceEvent/i);
+    expect(classes.get("MappingRule")?.definition).toMatch(/directional.*external.*canonical|canonical.*external/i);
+    expect(classes.get("ConversionWarning")?.definition).toMatch(/loss|approximation|unsupported|ambiguity/i);
+    expect(classes.get("PydanticProfileAdapter")?.definition).toMatch(/Pydantic schema|BaseModel|TypeAdapter/i);
+    expect(classes.get("PydanticProfileAdapter")?.definition).not.toMatch(/Pydantic AI/i);
+
+    const localizedAdapterDefinitions = [
+      ontology.planes.find((plane) => plane.id === "adapter-plane")?.definitions?.zh,
+      modules.get("adapter-benchmarks")?.definitions?.zh,
+      modules.get("adapter-statecharts")?.definitions?.zh,
+      modules.get("adapter-mapping-infrastructure")?.definitions?.zh,
+      classes.get("XStateAdapter")?.definitions?.zh,
+      classes.get("SchemaAdapter")?.definitions?.zh,
+      classes.get("MappingRule")?.definitions?.zh,
+      classes.get("ConversionWarning")?.definitions?.zh,
+      classes.get("FrameworkTraceMapping")?.definitions?.zh
+    ].join("\n");
+
+    expect(localizedAdapterDefinitions).toMatch(/适配膜|映射方向|外部构造|规范术语|状态图|转换损失|不支持语义/);
+    expect(localizedAdapterDefinitions).not.toMatch(/基准与状态图适配器模块|所属平面：互操作适配域|证据源 \d+ 项|信任或安全边界|可审计运行证据/);
+  });
+
   it("renders entity definitions from the canonical artifact in the frontend", () => {
     const appSource = readFileSync(join(process.cwd(), "src", "App.tsx"), "utf8");
 
