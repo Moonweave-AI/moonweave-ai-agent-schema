@@ -678,6 +678,126 @@ const exactGeneratedClassDefinitions = new Map([
   [
     "RemoteAgentBoundary",
     "marks the opacity, identity, authority, and accountability boundary created when work is delegated to a remote agent."
+  ],
+  [
+    "RuntimeEnvironment",
+    "describes the concrete execution environment for a session, including container, sandbox, working directory, process settings, model/tool availability, and runtime configuration."
+  ],
+  [
+    "RunAttempt",
+    "records one individual execution attempt within a session or task, including retry lineage, invoked inputs, observed events, and attempt-level status."
+  ],
+  [
+    "RunOutcome",
+    "records the terminal result of a run attempt or session, including success, failure, cancellation, produced artifacts, and final observable state."
+  ],
+  [
+    "SessionLifecycle",
+    "defines the ordered lifecycle of a runtime session from start through pause, resume, checkpoint, completion, cancellation, or end."
+  ],
+  [
+    "SessionStartEvent",
+    "records the observable event that opens a runtime session and binds the session to initial actor, environment, goal, and context state."
+  ],
+  [
+    "SessionPauseEvent",
+    "records an observable transition where a session stops progressing while preserving resumable state and pending work."
+  ],
+  [
+    "SessionResumeEvent",
+    "records the observable transition that restores a paused session from retained state, checkpoint, or external continuation."
+  ],
+  [
+    "SessionEndEvent",
+    "records the observable closure of a runtime session, including final status, cleanup, artifacts, and remaining audit references."
+  ],
+  [
+    "EnvironmentVariable",
+    "captures a runtime name-value configuration binding, including process environment settings that may affect command execution, tool behavior, or secret handling."
+  ],
+  [
+    "IngestionRun",
+    "records one source-ingestion execution that loads, parses, deduplicates, annotates, or attaches documents for memory and retrieval use."
+  ],
+  [
+    "MCPSession",
+    "records the MCP client/server connection context in which capabilities, requests, responses, authorization, and transport metadata are exchanged."
+  ],
+  [
+    "ContextBudget",
+    "defines the token, window, cost, freshness, and priority limits used when deciding what information may enter a runtime context."
+  ],
+  [
+    "ContextExclusion",
+    "records information intentionally omitted, redacted, deferred, or blocked from context because of privacy, trust-boundary, relevance, or budget policy."
+  ],
+  [
+    "ContextRefreshEvent",
+    "records an observable update that replaces stale context, re-runs retrieval, or reorders context after new evidence or state changes."
+  ],
+  [
+    "ContextSlot",
+    "identifies a reserved position or segment in the context window, such as system instruction, task state, retrieved evidence, memory, or tool result."
+  ],
+  [
+    "ContextSource",
+    "identifies the origin of context content, such as a message, memory record, retrieval result, document chunk, tool result, or artifact."
+  ],
+  [
+    "ContextSummary",
+    "stores a compressed or condensed representation of prior state, evidence, or conversation used to fit the context budget without storing hidden reasoning."
+  ],
+  [
+    "AutomatedReview",
+    "records a machine-produced review pass over a task, output, plan, trace, or artifact, including findings and confidence."
+  ],
+  [
+    "HumanReview",
+    "records review evidence supplied by a human actor, including approval, requested changes, blocking concerns, or quality judgment."
+  ],
+  [
+    "ReviewAssignment",
+    "assigns a review responsibility to an actor, evaluator, or policy gate and states the artifact or decision being reviewed."
+  ],
+  [
+    "ReviewFinding",
+    "records a specific issue, observation, or recommendation discovered during human or automated review."
+  ],
+  [
+    "Correction",
+    "records a concrete change proposed or applied in response to feedback, diagnostics, failed validation, or review findings."
+  ],
+  [
+    "OptimizationTarget",
+    "states the measurable property an evaluator-optimizer loop is trying to improve, such as correctness, latency, cost, safety, or coverage."
+  ],
+  [
+    "LearningSignal",
+    "captures feedback or evidence that may update future policy, retrieval, tool choice, or orchestration behavior."
+  ],
+  [
+    "ConfidenceSignal",
+    "records an explicit confidence estimate or uncertainty signal attached to an observation, decision, answer, retrieval result, or review."
+  ],
+  [
+    "RiskSignal",
+    "records evidence that an action, output, tool result, boundary crossing, or instruction may be unsafe or policy-sensitive."
+  ],
+  [
+    "FailureMode",
+    "classifies a recurring way an agent run, tool invocation, retrieval, policy gate, or protocol interaction can fail."
+  ],
+  [
+    "RetryableError",
+    "identifies an error that may be retried under bounded policy because the failure is transient, recoverable, or externally caused."
+  ],
+  [
+    "ErrorListener",
+    "subscribes to runtime, sandbox, tool, protocol, or log events in order to detect and route errors for diagnosis."
+  ],
+  [
+    "StandardError",
+    "captures the stderr stream emitted by a command, process, sandbox, or tool execution as observable diagnostic output."
   ]
 ]);
 

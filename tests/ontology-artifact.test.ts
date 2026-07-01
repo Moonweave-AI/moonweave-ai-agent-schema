@@ -179,4 +179,29 @@ describe("canonical agent ontology artifact", () => {
 
     expect(weakDefinitions).toEqual([]);
   });
+
+  it("does not collapse runtime and context concepts into one repeated explanation", () => {
+    const definitions = new Map(ontology.classes.map((klass) => [klass.id, klass.definition]));
+    const conceptPatterns = [
+      ["RuntimeEnvironment", /(execution environment|container|sandbox|working directory|environment variable)/i],
+      ["RunAttempt", /(single|individual|one).*attempt|retry|invocation/i],
+      ["RunOutcome", /(success|failure|terminal|completion|result)/i],
+      ["SessionLifecycle", /(start|pause|resume|end).*session|session.*(start|pause|resume|end)/i],
+      ["ContextBudget", /(token|window|capacity|budget|limit)/i],
+      ["ContextExclusion", /(omit|exclude|redact|privacy|policy)/i],
+      ["ContextSlot", /(slot|position|reserved|segment).*context|context.*(slot|position|reserved|segment)/i],
+      ["ContextSource", /(origin|source|retrieval|memory|message|document)/i],
+      ["ContextSummary", /(condensed|summary|compress|prior state|context budget)/i],
+      ["EnvironmentVariable", /(name-value|configuration|secret|process environment|runtime setting)/i],
+      ["MCPSession", /(client|server|connection|capability|request|transport)/i]
+    ] as const;
+
+    const weakDefinitions = conceptPatterns
+      .filter(([classId, pattern]) => !pattern.test(definitions.get(classId) ?? ""))
+      .map(([classId]) => `${classId}: ${definitions.get(classId) ?? "<missing>"}`);
+    const runtimeContextDefinitions = conceptPatterns.map(([classId]) => definitions.get(classId));
+
+    expect(weakDefinitions).toEqual([]);
+    expect(new Set(runtimeContextDefinitions).size).toBe(runtimeContextDefinitions.length);
+  });
 });

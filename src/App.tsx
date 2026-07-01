@@ -1,13 +1,12 @@
 import cytoscape from "cytoscape";
 import cytoscapeFcose from "cytoscape-fcose";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties } from "react";
 import canonicalOntologyData from "../ontology/agent-ontology.json";
 
 type EntityKind = "domain" | "plane" | "module" | "class";
 type Maturity = "release" | "provisional" | "informative" | "mixed";
 type Language = "zh" | "en" | "ja";
-type FilterMode = "all" | "domain" | "adapter" | "trust";
 type ThemeMode = "dark" | "light";
 
 interface SourceBacked {
@@ -126,8 +125,6 @@ interface CytoscapeGraphModel {
   elements: cytoscape.ElementDefinition[];
   nodeCount: number;
   edgeCount: number;
-  fixedNodeConstraint: Array<{ nodeId: string; position: cytoscape.Position }>;
-  relativePlacementConstraint: FcoseRelativePlacementConstraint[];
 }
 
 const cytoscapeThemeColors: Record<
@@ -209,7 +206,7 @@ function cytoscapeStyles(theme: ThemeMode): cytoscape.StylesheetJson {
         "text-margin-y": 0,
         "text-outline-width": theme === "dark" ? 2 : 0,
         "text-outline-color": colors.bg,
-        "min-zoomed-font-size": 5,
+        "min-zoomed-font-size": 8,
         "overlay-opacity": 0,
         "transition-property": "border-width, background-opacity",
         "transition-duration": 160
@@ -218,8 +215,8 @@ function cytoscapeStyles(theme: ThemeMode): cytoscape.StylesheetJson {
     {
       selector: "node.is-root",
       style: {
-        width: 24,
-        height: 24,
+        width: 28,
+        height: 28,
         "font-size": 17,
         "border-width": 2.4,
         "background-opacity": 1,
@@ -248,24 +245,24 @@ function cytoscapeStyles(theme: ThemeMode): cytoscape.StylesheetJson {
     {
       selector: "edge",
       style: {
-        width: 2.15,
+        width: 2.55,
         "curve-style": "straight",
         "line-color": theme === "dark" ? colors.thread : "#c7cad2",
         "line-opacity": theme === "dark" ? 0.66 : 0.78,
         "target-arrow-color": theme === "dark" ? colors.thread : "#bfc2ca",
         "target-arrow-shape": "triangle",
         "arrow-scale": 1,
-        label: "data(label)",
+        label: "",
         color: colors.muted,
         "font-family": "Cascadia Code, JetBrains Mono, Consolas, monospace",
-        "font-size": 10.5,
+        "font-size": 11.5,
         "font-weight": "bold",
         "text-background-color": colors.bg,
         "text-background-opacity": theme === "dark" ? 0.62 : 0.72,
         "text-background-padding": "2px",
         "text-rotation": "autorotate",
         "text-margin-y": -5,
-        "min-zoomed-font-size": 6,
+        "min-zoomed-font-size": 8,
         "overlay-opacity": 0
       }
     },
@@ -276,6 +273,26 @@ function cytoscapeStyles(theme: ThemeMode): cytoscape.StylesheetJson {
         "line-color": colors.cyan,
         "target-arrow-color": colors.cyan,
         "line-opacity": theme === "dark" ? 0.76 : 0.82
+      }
+    },
+    {
+      selector: "edge.is-hover-edge",
+      style: {
+        label: "data(label)",
+        width: 3.3,
+        "line-opacity": 0.96,
+        "line-color": colors.cyan,
+        "target-arrow-color": colors.cyan,
+        color: colors.text,
+        "font-size": 12.5,
+        "text-background-opacity": theme === "dark" ? 0.84 : 0.9
+      }
+    },
+    {
+      selector: "node.is-hover-node",
+      style: {
+        "border-width": 3,
+        "background-opacity": 1
       }
     },
     {
@@ -341,6 +358,15 @@ const uiText = {
     axioms: "公理",
     individuals: "个体",
     adapterMapping: "适配映射",
+    browseDomains: "浏览智能体本体领域",
+    browseLogs: "浏览本体记录",
+    ontologicalCharacteristic: "本体特征",
+    metaInformation: "元信息",
+    instanceClassification: "实例分类",
+    hasPart: "组成部分",
+    containsClasses: "包含类",
+    relationPredicates: "关系谓词",
+    literalFields: "字面量字段",
     classCount: (count: number) => `${count} 个类`,
     selectedJsonName: "agent-ontology.json"
   },
@@ -388,6 +414,15 @@ const uiText = {
     axioms: "Axioms",
     individuals: "Individuals",
     adapterMapping: "Adapter Mapping",
+    browseDomains: "Browse agent ontology domains",
+    browseLogs: "Browse ontology logs",
+    ontologicalCharacteristic: "Ontological characteristic",
+    metaInformation: "Meta-information",
+    instanceClassification: "Instance classification",
+    hasPart: "has part",
+    containsClasses: "contains classes",
+    relationPredicates: "relation predicates",
+    literalFields: "literal fields",
     classCount: (count: number) => `${count} classes`,
     selectedJsonName: "agent-ontology.json"
   },
@@ -435,6 +470,15 @@ const uiText = {
     axioms: "公理",
     individuals: "個体",
     adapterMapping: "適配マッピング",
+    browseDomains: "エージェント本体領域を閲覧",
+    browseLogs: "本体ログを閲覧",
+    ontologicalCharacteristic: "本体特性",
+    metaInformation: "メタ情報",
+    instanceClassification: "インスタンス分類",
+    hasPart: "構成部分",
+    containsClasses: "含まれるクラス",
+    relationPredicates: "関係述語",
+    literalFields: "リテラル項目",
     classCount: (count: number) => `${count} クラス`,
     selectedJsonName: "agent-ontology.json"
   }
@@ -480,12 +524,6 @@ const kindLabels: Record<Language, Record<EntityKind, string>> = {
     module: "モジュール",
     class: "クラス"
   }
-};
-
-const filterLabels: Record<Language, Record<FilterMode, string>> = {
-  zh: { all: "全部", domain: "领域", adapter: "适配器", trust: "信任" },
-  en: { all: "All", domain: "Domains", adapter: "Adapters", trust: "Trust" },
-  ja: { all: "すべて", domain: "領域", adapter: "アダプタ", trust: "信頼" }
 };
 
 const metricLabels: Record<Language, Record<string, string>> = {
@@ -1753,23 +1791,6 @@ function localizePropertyEndpoint(value: string, language: Language): string {
   return translatePhrase(value, language);
 }
 
-function matchesFilter(item: DirectoryItem, filterMode: FilterMode): boolean {
-  if (filterMode === "all") {
-    return true;
-  }
-
-  const text = `${item.id} ${item.label} ${item.definition}`.toLowerCase();
-  if (filterMode === "domain") {
-    return item.kind !== "class" || item.plane_id !== "adapter-plane";
-  }
-
-  if (filterMode === "adapter") {
-    return item.plane_id === "adapter-plane" || text.includes("adapter") || text.includes("mcp") || text.includes("a2a");
-  }
-
-  return item.plane_id === "safety-plane" || /trust|boundary|permission|policy|sandbox|injection|safety/.test(text);
-}
-
 function maturityForPlane(planeId: string): Maturity {
   if (planeId === "adapter-plane") {
     return "provisional";
@@ -1996,9 +2017,7 @@ function downloadText(filename: string, text: string, type = "application/json")
 function App() {
   const [language, setLanguage] = useState<Language>("zh");
   const [theme, setTheme] = useState<ThemeMode>("dark");
-  const [filterMode, setFilterMode] = useState<FilterMode>("all");
-  const [leftCollapsed, setLeftCollapsed] = useState(true);
-  const [rightCollapsed, setRightCollapsed] = useState(true);
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [selectedRef, setSelectedRef] = useState(entityRef("domain", ontology.id));
   const [query, setQuery] = useState("");
   const [expandedRefs, setExpandedRefs] = useState<Set<string>>(
@@ -2024,7 +2043,7 @@ function App() {
   const classesByModule = useMemo(() => groupBy(ontology.classes, (klass) => klass.module_id), []);
   const selectedItem = itemByRef.get(selectedRef) ?? directoryItems[0];
   const normalizedQuery = query.trim().toLowerCase();
-  const filterActive = Boolean(normalizedQuery) || filterMode !== "all";
+  const filterActive = Boolean(normalizedQuery);
 
   const matchingRefs = useMemo(() => {
     if (!filterActive) {
@@ -2033,8 +2052,7 @@ function App() {
 
     const directMatches = directoryItems.filter((item) => {
       const text = `${item.label} ${item.id} ${item.definition}`.toLowerCase();
-      const queryMatch = normalizedQuery ? text.includes(normalizedQuery) : true;
-      return queryMatch && matchesFilter(item, filterMode);
+      return normalizedQuery ? text.includes(normalizedQuery) : true;
     });
     const refs = new Set<string>();
 
@@ -2048,7 +2066,7 @@ function App() {
     }
 
     return refs;
-  }, [directoryItems, filterActive, filterMode, itemByRef, normalizedQuery]);
+  }, [directoryItems, filterActive, itemByRef, normalizedQuery]);
 
   const selectedPlaneId = selectedItem.plane_id ?? (selectedItem.kind === "domain" ? undefined : selectedItem.id);
   const selectedModuleId = selectedItem.module_id ?? (selectedItem.kind === "module" ? selectedItem.id : undefined);
@@ -2205,7 +2223,7 @@ function App() {
           .filter((child): child is DirectoryItem => Boolean(child))
           .map((child, index) => ({
             item: child,
-            label: index === 0 ? relationLabel("contains-plane", language) : "",
+            label: relationLabel("contains-plane", language),
             className: "viewer-edge viewer-edge--hierarchy"
           }));
       }
@@ -2216,7 +2234,7 @@ function App() {
           .filter((child): child is DirectoryItem => Boolean(child))
           .map((child, index) => ({
             item: child,
-            label: index === 0 ? relationLabel("contains-module", language) : "",
+            label: relationLabel("contains-module", language),
             className: "viewer-edge viewer-edge--hierarchy"
           }));
       }
@@ -2227,7 +2245,7 @@ function App() {
           .filter((child): child is DirectoryItem => Boolean(child))
           .map((child, index) => ({
             item: child,
-            label: index === 0 ? relationLabel("declares-class", language) : "",
+            label: relationLabel("declares-class", language),
             className: "viewer-edge viewer-edge--hierarchy"
           }));
       }
@@ -2350,8 +2368,8 @@ function App() {
     for (const [ref, value] of graphNodeMeta.entries()) {
       const childCount = childCountByRef.get(ref) ?? childrenForItem(value.item).length;
       const expanded = graphExpandedRefs.has(ref);
-      const size = value.root ? 24 : value.level <= 1 ? 17 : 14;
-      const fontSize = value.root ? 17 : value.level <= 1 ? 15 : 13.5;
+      const size = value.root ? 28 : value.level <= 1 ? 20 : 16;
+      const fontSize = value.root ? 18 : value.level <= 1 ? 15.5 : 14;
       nodes.set(ref, {
         group: "nodes",
         position: value.position,
@@ -2384,37 +2402,10 @@ function App() {
       });
     }
 
-    const relativePlacementConstraint: FcoseRelativePlacementConstraint[] = [];
-    for (const edge of edges.values()) {
-      const data = edge.data as cytoscape.EdgeDataDefinition;
-      const source = graphNodeMeta.get(data.source);
-      const target = graphNodeMeta.get(data.target);
-      if (!source || !target) {
-        continue;
-      }
-
-      if (source.level === 0) {
-        continue;
-      }
-
-      const dx = target.position.x - source.position.x;
-      const dy = target.position.y - source.position.y;
-      const gap = target.level <= 1 ? 118 : 82;
-
-      if (Math.abs(dx) >= Math.abs(dy)) {
-        relativePlacementConstraint.push(dx >= 0 ? { left: data.source, right: data.target, gap } : { left: data.target, right: data.source, gap });
-        continue;
-      }
-
-      relativePlacementConstraint.push(dy >= 0 ? { top: data.source, bottom: data.target, gap } : { top: data.target, bottom: data.source, gap });
-    }
-
     return {
       elements: [...nodes.values(), ...edges.values()],
       nodeCount: nodes.size,
-      edgeCount: edges.size,
-      fixedNodeConstraint: [{ nodeId: rootItem.ref, position: { x: 0, y: 0 } }],
-      relativePlacementConstraint
+      edgeCount: edges.size
     } satisfies CytoscapeGraphModel;
   }, [
     classById,
@@ -2440,11 +2431,13 @@ function App() {
     }
 
     cytoscapeRef.current?.destroy();
+    container.dataset.layoutEngine = "fcose-force";
+    container.dataset.hoverRelations = "predecessor";
     const cy = cytoscape({
       container,
       elements: graphElements,
       style: graphStyles,
-      layout: { name: "preset", fit: true, padding: 28 },
+      layout: { name: "grid", fit: true, padding: 28 },
       minZoom: 0.16,
       maxZoom: 2.6,
       boxSelectionEnabled: false,
@@ -2458,33 +2451,40 @@ function App() {
       selectedNode.select();
     }
 
-    const layout = cy.layout({
-      name: "fcose",
-      quality: "proof",
-      randomize: false,
-      animate: false,
-      fit: true,
-      padding: 32,
-      nodeDimensionsIncludeLabels: true,
-      uniformNodeDimensions: false,
-      packComponents: false,
-      nodeSeparation: 118,
-      nodeRepulsion: (node: cytoscape.NodeSingular) => (node.data("level") === 0 ? 28000 : 17000),
-      idealEdgeLength: (edge: cytoscape.EdgeSingular) => (edge.source().data("level") === 0 ? 178 : 116),
-      edgeElasticity: (edge: cytoscape.EdgeSingular) => (edge.source().data("level") === 0 ? 0.18 : 0.24),
-      nestingFactor: 0.12,
-      numIter: 2400,
-      gravity: 0.045,
-      gravityRange: 2.2,
-      initialEnergyOnIncremental: 0.12,
-      tile: false,
-      fixedNodeConstraint: graphModel.fixedNodeConstraint,
-      relativePlacementConstraint: graphModel.relativePlacementConstraint,
-      stop: () => cy.fit(cy.elements(), 32)
-    } as unknown as cytoscape.LayoutOptions);
+    let activeLayout: cytoscape.Layouts | undefined;
+    const runForceLayout = (options: { animate: boolean; fit: boolean; randomize: boolean }) => {
+      activeLayout?.stop();
+      activeLayout = cy.layout({
+        name: "fcose",
+        quality: "proof",
+        randomize: options.randomize,
+        animate: options.animate ? "end" : false,
+        animationDuration: options.animate ? 420 : 0,
+        fit: options.fit,
+        padding: 36,
+        nodeDimensionsIncludeLabels: true,
+        uniformNodeDimensions: false,
+        packComponents: true,
+        nodeSeparation: 150,
+        nodeRepulsion: (node: cytoscape.NodeSingular) => (node.data("level") === 0 ? 46000 : 26000),
+        idealEdgeLength: (edge: cytoscape.EdgeSingular) => (edge.source().data("level") === 0 ? 210 : 145),
+        edgeElasticity: (edge: cytoscape.EdgeSingular) => (edge.source().data("level") === 0 ? 0.16 : 0.22),
+        nestingFactor: 0.12,
+        numIter: 3200,
+        gravity: 0.06,
+        gravityRange: 3.2,
+        initialEnergyOnIncremental: 0.32,
+        tile: true,
+        stop: () => {
+          if (options.fit) {
+            cy.fit(cy.elements(), 36);
+          }
+        }
+      } as unknown as cytoscape.LayoutOptions);
+      activeLayout.run();
+    };
 
-    layout.run();
-    cy.fit(cy.elements(), 28);
+    runForceLayout({ animate: false, fit: true, randomize: true });
 
     const onNodeTap = (event: cytoscape.EventObject) => {
       const node = event.target;
@@ -2512,17 +2512,46 @@ function App() {
       });
     };
 
+    const clearHoverRelations = () => {
+      cy.elements(".is-hover-node, .is-hover-edge").removeClass("is-hover-node is-hover-edge");
+    };
+
+    const onNodeMouseOver = (event: cytoscape.EventObject) => {
+      clearHoverRelations();
+      const node = event.target as cytoscape.NodeSingular;
+      const incomingEdges = node.incomers("edge");
+      const visibleEdges = incomingEdges.nonempty() ? incomingEdges : node.connectedEdges();
+      node.addClass("is-hover-node");
+      visibleEdges.addClass("is-hover-edge");
+      visibleEdges.connectedNodes().addClass("is-hover-node");
+    };
+
+    const onNodeMouseOut = () => {
+      clearHoverRelations();
+    };
+
+    const onNodeDragFree = () => {
+      runForceLayout({ animate: true, fit: false, randomize: false });
+    };
+
     const resizeObserver = new ResizeObserver(() => {
       cy.resize();
       cy.fit(cy.elements(), 28);
     });
 
     cy.on("tap", "node", onNodeTap);
+    cy.on("mouseover", "node", onNodeMouseOver);
+    cy.on("mouseout", "node", onNodeMouseOut);
+    cy.on("dragfree", "node", onNodeDragFree);
     resizeObserver.observe(container);
 
     return () => {
       resizeObserver.disconnect();
       cy.off("tap", "node", onNodeTap);
+      cy.off("mouseover", "node", onNodeMouseOver);
+      cy.off("mouseout", "node", onNodeMouseOut);
+      cy.off("dragfree", "node", onNodeDragFree);
+      activeLayout?.stop();
       cy.destroy();
       if (cytoscapeRef.current === cy) {
         cytoscapeRef.current = null;
@@ -2576,14 +2605,6 @@ function App() {
     downloadText(copy.selectedJsonName, JSON.stringify(ontology, null, 2));
   };
 
-  const renderClassRows = (classes: OntologyClass[]) =>
-    classes.slice(0, 18).map((klass) => (
-      <button key={klass.id} type="button" className="entity-row" onClick={() => selectRef(entityRef("class", klass.id))}>
-        <span>{localizeClassLabel(klass, language)}</span>
-        <small>{localizeClassKind(klass.kind, language)}</small>
-      </button>
-    ));
-
   return (
     <>
       <a className="skip-link" href="#viewer-content">
@@ -2600,20 +2621,43 @@ function App() {
               <h1>{copy.title}</h1>
             </div>
           </div>
-          <nav className="viewer-nav" aria-label={copy.viewer}>
-            <button type="button" className="is-active">
-              {copy.viewer}
-            </button>
-          </nav>
-          <div className="export-actions" aria-label={copy.downloadJson}>
-            <button type="button" onClick={exportOntology}>
+          <div className="global-actions" aria-label={copy.viewer}>
+            <div className="inline-switch" aria-label={copy.language}>
+              {(["zh", "en", "ja"] as Language[]).map((lang) => (
+                <button
+                  key={lang}
+                  type="button"
+                  data-testid={`language-${lang}`}
+                  className={language === lang ? "is-active" : ""}
+                  aria-pressed={language === lang}
+                  onClick={() => setLanguage(lang)}
+                >
+                  {lang.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <div className="inline-switch" aria-label={copy.theme}>
+              {(["dark", "light"] as ThemeMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  data-testid={`theme-${mode}`}
+                  className={theme === mode ? "is-active" : ""}
+                  aria-pressed={theme === mode}
+                  onClick={() => setTheme(mode)}
+                >
+                  {mode === "dark" ? copy.darkTheme : copy.lightTheme}
+                </button>
+              ))}
+            </div>
+            <button type="button" className="download-link" onClick={exportOntology}>
               JSON
             </button>
           </div>
         </header>
 
         <section
-          className={`viewer-grid ${leftCollapsed ? "is-left-collapsed" : ""} ${rightCollapsed ? "is-right-collapsed" : ""}`}
+          className={`viewer-grid ${leftCollapsed ? "is-left-collapsed" : ""}`}
           aria-label={copy.title}
         >
           <aside className={`directory-panel ${leftCollapsed ? "is-collapsed" : ""}`} aria-label={copy.search}>
@@ -2623,6 +2667,8 @@ function App() {
               </button>
             </div>
             <div className="directory-search">
+              <p className="panel-kicker">{copy.browseDomains}</p>
+              <h2>{localizeEntityLabel(directoryItems[0], language)}</h2>
               <label htmlFor="ontology-search">{copy.search}</label>
               <input
                 id="ontology-search"
@@ -2631,45 +2677,6 @@ function App() {
                 placeholder={copy.searchPlaceholder}
                 onChange={(event) => setQuery(event.target.value)}
               />
-              <div className="filter-group" aria-label={copy.filters}>
-                {(Object.keys(filterLabels[language]) as FilterMode[]).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    className={filterMode === mode ? "is-active" : ""}
-                    aria-pressed={filterMode === mode}
-                    onClick={() => setFilterMode(mode)}
-                  >
-                    {filterLabels[language][mode]}
-                  </button>
-                ))}
-              </div>
-              <div className="filter-group filter-group--language" aria-label={copy.language}>
-                {(["zh", "en", "ja"] as Language[]).map((lang) => (
-                  <button
-                    key={lang}
-                    type="button"
-                    className={language === lang ? "is-active" : ""}
-                    aria-pressed={language === lang}
-                    onClick={() => setLanguage(lang)}
-                  >
-                    {uiText[lang].languageName}
-                  </button>
-                ))}
-              </div>
-              <div className="filter-group filter-group--theme" aria-label={copy.theme}>
-                {(["dark", "light"] as ThemeMode[]).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    className={theme === mode ? "is-active" : ""}
-                    aria-pressed={theme === mode}
-                    onClick={() => setTheme(mode)}
-                  >
-                    {mode === "dark" ? copy.darkTheme : copy.lightTheme}
-                  </button>
-                ))}
-              </div>
             </div>
 
             <div className="tree-root" data-testid="ontology-directory">
@@ -2703,6 +2710,18 @@ function App() {
                   />
                 ))}
             </div>
+            <section className="sidebar-statistics" data-testid="left-statistics" aria-label={copy.ontologyMetrics}>
+              <p className="panel-kicker">{copy.browseLogs}</p>
+              <h2>{copy.ontologyMetrics}</h2>
+              <div className="metric-stack">
+                {Object.entries(ontology.ontology_metrics).map(([key, value]) => (
+                  <div key={key}>
+                    <span>{metricLabels[language][key] ?? translatePhrase(key, language)}</span>
+                    <strong>{value}</strong>
+                  </div>
+                ))}
+              </div>
+            </section>
           </aside>
 
           <section id="viewer-content" className="content-panel" aria-label={copy.entityDetail}>
@@ -2748,7 +2767,7 @@ function App() {
                 </span>
               </div>
               <div
-                key={`${selectedRef}-${language}-${graphExpansionKey}-${leftCollapsed ? "left-closed" : "left-open"}-${rightCollapsed ? "right-closed" : "right-open"}`}
+                key={`${selectedRef}-${language}-${graphExpansionKey}-${leftCollapsed ? "left-closed" : "left-open"}`}
                 ref={cytoscapeContainerRef}
                 className="cytoscape-graph"
                 data-testid="cytoscape-graph"
@@ -2757,127 +2776,128 @@ function App() {
               />
             </section>
 
-            <section className="entity-sections" aria-label={copy.entityDetail}>
-              {childModules.length > 0 ? (
-                <CatalogSection title={copy.modules} eyebrow={copy.planeContents}>
-                  {childModules.map((module) => (
-                    <button key={module.id} type="button" className="entity-row" onClick={() => selectRef(entityRef("module", module.id))}>
-                      <span>{localizeEntityLabel(itemByRef.get(entityRef("module", module.id)) ?? { id: module.id, label: module.label, kind: "module" }, language)}</span>
-                      <small>{copy.classCount(module.class_ids.length)}</small>
-                    </button>
-                  ))}
-                </CatalogSection>
-              ) : null}
+            <section className="ontology-characteristics" data-testid="ontology-characteristics" aria-label={copy.ontologicalCharacteristic}>
+              <h3>{copy.ontologicalCharacteristic}</h3>
+              <table>
+                <tbody>
+                  <tr>
+                    <th scope="row">{copy.instanceClassification}</th>
+                    <td>
+                      <button type="button" className="table-link" onClick={() => selectedItem.parent_ref && selectRef(selectedItem.parent_ref)}>
+                        {selectedModule
+                          ? localizeEntityLabel({ id: selectedModule.id, label: selectedModule.label, kind: "module" }, language)
+                          : localizeKind(selectedItem.kind, language)}
+                      </button>
+                      <span>{localizeKind(selectedItem.kind, language)}</span>
+                    </td>
+                  </tr>
 
-              {childClasses.length > 0 ? (
-                <CatalogSection title={copy.classes} eyebrow={copy.moduleContents}>
-                  {renderClassRows(childClasses)}
-                </CatalogSection>
-              ) : null}
+                  {childModules.length > 0 ? (
+                    <tr>
+                      <th scope="row">{copy.hasPart}</th>
+                      <td>
+                        <ul>
+                          {childModules.map((module) => (
+                            <li key={module.id}>
+                              <button type="button" className="table-link" onClick={() => selectRef(entityRef("module", module.id))}>
+                                {localizeEntityLabel(itemByRef.get(entityRef("module", module.id)) ?? { id: module.id, label: module.label, kind: "module" }, language)}
+                              </button>
+                              <span>{copy.classCount(module.class_ids.length)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </td>
+                    </tr>
+                  ) : null}
 
-              {relevantObjectProperties.length > 0 ? (
-                <CatalogSection title={copy.objectProperties} eyebrow={copy.relations}>
-                  {relevantObjectProperties.slice(0, 18).map((property) => (
-                    <div key={property.id} className="property-row">
-                      <strong>{localizePropertyLabel(property, language)}</strong>
-                      <span>{`${localizePropertyEndpoint(property.domain, language)} -> ${localizePropertyEndpoint(property.range, language)}`}</span>
-                      <small>{relationFamilyLabel(property.family, language)}</small>
-                    </div>
-                  ))}
-                </CatalogSection>
-              ) : null}
+                  {childClasses.length > 0 ? (
+                    <tr>
+                      <th scope="row">{copy.containsClasses}</th>
+                      <td>
+                        <ul>
+                          {childClasses.slice(0, 28).map((klass) => (
+                            <li key={klass.id}>
+                              <button type="button" className="table-link" onClick={() => selectRef(entityRef("class", klass.id))}>
+                                {localizeClassLabel(klass, language)}
+                              </button>
+                              <span>{localizeClassKind(klass.kind, language)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </td>
+                    </tr>
+                  ) : null}
 
-              {relevantDataProperties.length > 0 ? (
-                <CatalogSection title={copy.dataProperties} eyebrow={copy.scalarFields}>
-                  {relevantDataProperties.slice(0, 18).map((property) => (
-                    <div key={property.id} className="field-row">
-                      <span className="field-row__name">{localizePropertyLabel(property, language)}</span>
-                      <span className="field-row__owner">{localizePropertyEndpoint(property.domain, language)}</span>
-                      <small>{translatePhrase(property.range, language)}</small>
-                    </div>
-                  ))}
-                </CatalogSection>
-              ) : null}
+                  {relevantObjectProperties.length > 0 ? (
+                    <tr>
+                      <th scope="row">{copy.relationPredicates}</th>
+                      <td>
+                        <ul>
+                          {relevantObjectProperties.slice(0, 24).map((property) => (
+                            <li key={property.id}>
+                              <strong>{localizePropertyLabel(property, language)}</strong>
+                              <span>{`${localizePropertyEndpoint(property.domain, language)} -> ${localizePropertyEndpoint(property.range, language)}`}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </td>
+                    </tr>
+                  ) : null}
+
+                  {relevantDataProperties.length > 0 ? (
+                    <tr>
+                      <th scope="row">{copy.literalFields}</th>
+                      <td>
+                        <ul>
+                          {relevantDataProperties.slice(0, 24).map((property) => (
+                            <li key={property.id}>
+                              <strong>{localizePropertyLabel(property, language)}</strong>
+                              <span>{translatePhrase(property.range, language)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </td>
+                    </tr>
+                  ) : null}
+
+                  <tr>
+                    <th scope="row">{copy.metaInformation}</th>
+                    <td>
+                      <ul>
+                        <li>
+                          <strong>{copy.status}</strong>
+                          <span>{maturityLabels[language][selectedItem.maturity]}</span>
+                        </li>
+                        <li>
+                          <strong>{copy.sources}</strong>
+                          <span>{sourceIds.slice(0, 12).join(" / ")}</span>
+                        </li>
+                        {relevantAxioms.slice(0, 4).map((axiom) => (
+                          <li key={axiom.id}>
+                            <strong>{translatePhrase(axiom.type, language)}</strong>
+                            <span>{language === "en" ? axiom.statement : language === "zh" ? "该约束用于保持本体结构、证据和边界的一致性。" : "この制約は本体構造、証拠、境界の一貫性を保ちます。"}</span>
+                          </li>
+                        ))}
+                        {relevantAdapters.slice(0, 4).map((adapter) => (
+                          <li key={adapter.adapter}>
+                            <strong>{localizeAdapterName(adapter.adapter, language)}</strong>
+                            <span>{adapter.maps_to.slice(0, 6).map((id) => localizePropertyEndpoint(id, language)).join(" / ")}</span>
+                          </li>
+                        ))}
+                        {relevantIndividuals.slice(0, 4).map((individual) => (
+                          <li key={individual.id}>
+                            <strong>{copy.individuals}</strong>
+                            <span>{translatePhrase(individual.label, language)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </section>
           </section>
 
-          <aside className={`metadata-panel ${rightCollapsed ? "is-collapsed" : ""}`} data-testid="inspector-panel" aria-label={copy.ontologyMetrics}>
-            <div className="panel-control">
-              <button type="button" onClick={() => setRightCollapsed((value) => !value)} aria-expanded={!rightCollapsed}>
-                {rightCollapsed ? copy.openRight : copy.closeRight}
-              </button>
-            </div>
-            <section>
-              <p className="eyebrow">{copy.ontologyMetrics}</p>
-              <div className="metric-stack">
-                {Object.entries(ontology.ontology_metrics).map(([key, value]) => (
-                  <div key={key}>
-                    <span>{metricLabels[language][key] ?? translatePhrase(key, language)}</span>
-                    <strong>{value}</strong>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section>
-              <p className="eyebrow">{copy.maturity}</p>
-              <div className="legend">
-                {Object.entries(maturityLabels[language]).map(([key, label]) => (
-                  <span key={key} className={`legend__item legend__item--${key}`}>
-                    {label}
-                  </span>
-                ))}
-              </div>
-            </section>
-
-            <section>
-              <p className="eyebrow">{copy.evidence}</p>
-              <div className="source-list">
-                {sourceIds.slice(0, 18).map((sourceId) => (
-                  <span key={sourceId}>{sourceId}</span>
-                ))}
-              </div>
-            </section>
-
-            {relevantAxioms.length > 0 ? (
-              <section>
-                <p className="eyebrow">{copy.axioms}</p>
-                <div className="axiom-list">
-                  {relevantAxioms.slice(0, 10).map((axiom) => (
-                    <article key={axiom.id}>
-                      <strong>{translatePhrase(axiom.type, language)}</strong>
-                      <p>{language === "en" ? axiom.statement : language === "zh" ? "该约束用于保持本体结构、证据和边界的一致性。" : "この制約は本体構造、証拠、境界の一貫性を保ちます。"}</p>
-                    </article>
-                  ))}
-                </div>
-              </section>
-            ) : null}
-
-            {relevantIndividuals.length > 0 ? (
-              <section>
-                <p className="eyebrow">{copy.individuals}</p>
-                <div className="source-list">
-                  {relevantIndividuals.map((individual) => (
-                    <span key={individual.id}>{translatePhrase(individual.label, language)}</span>
-                  ))}
-                </div>
-              </section>
-            ) : null}
-
-            {relevantAdapters.length > 0 ? (
-              <section>
-                <p className="eyebrow">{copy.adapterMapping}</p>
-                <div className="adapter-list">
-                  {relevantAdapters.map((adapter) => (
-                    <article key={adapter.adapter}>
-                      <strong>{localizeAdapterName(adapter.adapter, language)}</strong>
-                      <p>{adapter.maps_to.slice(0, 8).map((id) => localizePropertyEndpoint(id, language)).join(" / ")}</p>
-                    </article>
-                  ))}
-                </div>
-              </section>
-            ) : null}
-          </aside>
         </section>
       </main>
     </>
@@ -3082,20 +3102,6 @@ function ModuleBranch({
           );
         })}
     </>
-  );
-}
-
-function CatalogSection({ eyebrow, title, children }: { eyebrow: string; title: string; children: ReactNode }) {
-  return (
-    <article className="catalog-section">
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">{eyebrow}</p>
-          <h3>{title}</h3>
-        </div>
-      </div>
-      <div className="catalog-list">{children}</div>
-    </article>
   );
 }
 
