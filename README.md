@@ -5,8 +5,7 @@
 
   <p>
     An evidence-bound ontology engineering framework for agent systems:
-    runtime, information, memory, orchestration, tools, safety, feedback, adapters,
-    schemas, and graph exploration.
+    context ingress, control orchestration, runtime traces, interoperability, capability invocation, trust and safety, observability, memory persistence, schemas, and graph exploration.
   </p>
 
   <p>
@@ -82,16 +81,18 @@ metadata around the artifact, not part of the agent runtime itself.
 
 ## Planes
 
+Moonweave Agent Schema organizes agent systems through eight operational concern planes. These planes describe the recurring lifecycle surfaces of an agent system: context ingress, control orchestration, runtime execution, interoperability adaptation, capability invocation, trust and safety mediation, observable feedback, and memory persistence.
+
 | Plane | Scope |
 |---|---|
-| Runtime Plane | Agent system, runtime session, actors, models, transcript, observable events, checkpoints, and execution state. |
-| Info Plane | Text, instructions, messages, command output, storage, information indexes, output chunks, and disclosure surfaces. |
-| Memory Plane | Document ingestion, chunking, embeddings, vector and lexical indexes, retrieval, reranking, rank fusion, and context assembly. |
-| Orchestration Plane | Goals, tasks, planning, delegation, subagents, routes, gates, prompt chains, parallelization, voting, synthesis, and evaluator loops. |
-| Tool Plane | Tool registries, definitions, discovery, matching, calls, execution, MCP surfaces, tool results, and execution transcripts. |
-| Safety Plane | Trust boundaries, permission prompts, allow/deny/escalate decisions, sandboxing, network control, injection defense, and commit/redaction gates. |
-| Feedback Plane | Warnings, feedback, review, logs, metrics, optimization loops, recovery events, and evaluation signals. |
-| Adapter Plane | MCP, A2A, framework, benchmark, statechart, schema export, and profile mappings that must not redefine core terms. |
+| Context Ingress Domain | Prompts, messages, instructions, documents, command output, source references, disclosure windows, storage inputs, and indexable context entering the agent system. |
+| Control & Orchestration Domain | Goals, tasks, plans, delegation, routes, gates, prompt chains, parallelization, voting, evaluator loops, and synthesis controls. |
+| Runtime State & Trace Domain | Runtime sessions, actors, environments, budgets, transcripts, trace events, checkpoints, snapshots, state diffs, and runtime artifacts. |
+| Interoperability & Adapter Domain | MCP, A2A, framework, benchmark, statechart, schema profile, semantic export, and graph-view mappings that must not redefine core terms. |
+| Capability & Resource Invocation Domain | Tool and capability registries, definitions, discovery, matching, invocation, execution, MCP transport, resources, prompts, results, and observable side effects. |
+| Trust, Policy & Safety Domain | Trust boundaries, authority scopes, permission prompts, policy decisions, sandboxing, network control, injection defense, commit gates, redaction, and audit disclosure. |
+| Observability & Feedback Domain | Warnings, errors, feedback, critique, review, metrics, benchmark observations, telemetry, audit logs, optimization loops, recovery, and diagnostics. |
+| Memory & Context Persistence Domain | Memory ingestion, files, documents, chunking, situating, embeddings, retrieval, ranking, context assembly, summaries, preferences, and persistence policy. |
 
 ## Layer Boundary
 

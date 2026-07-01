@@ -51,34 +51,18 @@ their subject matter:
 
 ## Agent System Planes
 
-| plane | scope |
-|---|---|
-| `runtime-plane` | agent system, runtime session, agent actors, models, transcript, and observable event stream |
-| `info-plane` | text, instructions, messages, command outputs, storage, indexes, progressive disclosure, and light index |
-| `memory-plane` | document ingestion, chunking, embedding, retrieval, reranking, rank fusion, and context construction |
-| `orchestration-plane` | task distribution, subagents, evaluators, gates, routes, prompt chains, parallelization, voting, and synthesis |
-| `tool-plane` | tool registry, MCP client/server, tool definitions, tool matching, tool calls, execution, and tool results |
-| `safety-plane` | trust boundaries, permission prompts, allow/deny/escalate decisions, sandboxing, network control, pattern scans, and commit gates |
-| `feedback-plane` | warnings, reviews, feedback, log listeners, metrics, optimization loops, and recovery events |
-| `adapter-plane` | protocol/framework/benchmark mappings that do not redefine core runtime terms |
+Moonweave Agent Schema organizes agent systems through eight operational concern planes. These planes describe the recurring lifecycle surfaces of an agent system: context ingress, control orchestration, runtime execution, interoperability adaptation, capability invocation, trust and safety mediation, observable feedback, and memory persistence.
 
-## Module Architecture
-
-Each plane is split into modules so the ontology behaves like a production
-ontology family rather than a flat node list. Classes belong to exactly one
-module, modules belong to one plane, and generated schemas must preserve this
-domain -> plane -> module -> class path.
-
-| plane | modules |
-|---|---|
-| `runtime-plane` | runtime system, runtime actors, runtime observability, runtime artifacts |
-| `info-plane` | container/command, output/disclosure, storage/sources, messages/instructions, information indexing |
-| `memory-plane` | memory ingestion, chunking/situating, embedding/index, retrieval/ranking, context assembly |
-| `orchestration-plane` | task planning, actors/delegation, routing/control, composition patterns, evaluation loop |
-| `tool-plane` | tool registry/definition, discovery/selection, invocation/execution, MCP transport |
-| `safety-plane` | trust boundary, permission/policy, sandbox/network, injection defense, commit/redaction |
-| `feedback-plane` | warning/error, review/optimization, metrics/evaluation, logging |
-| `adapter-plane` | protocol adapters, framework adapters, benchmark/statechart adapters, schema/export adapters |
+| plane id | operational concern domain | modules |
+|---|---|---|
+| `info-plane` | Context Ingress Domain | info-container-command, info-indexing, info-messages-instructions, info-output-disclosure, info-storage-sources |
+| `orchestration-plane` | Control & Orchestration Domain | orchestration-actors-delegation, orchestration-composition, orchestration-evaluation, orchestration-routing-control, orchestration-task-planning |
+| `runtime-plane` | Runtime State & Trace Domain | runtime-actors, runtime-artifacts, runtime-observability, runtime-system |
+| `adapter-plane` | Interoperability & Adapter Domain | adapter-benchmarks-statecharts, adapter-frameworks, adapter-protocols, adapter-schema-export |
+| `tool-plane` | Capability & Resource Invocation Domain | tool-discovery-selection, tool-invocation-execution, tool-mcp-transport, tool-registry-definition |
+| `safety-plane` | Trust, Policy & Safety Domain | safety-commit-redaction, safety-injection-defense, safety-permission-policy, safety-sandbox-network, safety-trust-boundary |
+| `feedback-plane` | Observability & Feedback Domain | feedback-logging, feedback-metrics-evaluation, feedback-review-optimization, feedback-warning-error |
+| `memory-plane` | Memory & Context Persistence Domain | memory-chunking-situating, memory-context, memory-embedding-indexes, memory-ingestion, memory-retrieval-ranking |
 
 ## Core Modeling Rules
 

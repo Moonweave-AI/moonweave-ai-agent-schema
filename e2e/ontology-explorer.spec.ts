@@ -72,7 +72,7 @@ test.describe("Moonweave ontology explorer", () => {
     await page.goto("/");
     await page.setViewportSize({ width: 1360, height: 900 });
 
-    await page.getByRole("button", { name: "安全平面 平面" }).click();
+    await page.getByRole("button", { name: "信任、策略与安全域 平面" }).click();
     await page.getByRole("button", { name: "信任边界模块 模块" }).click();
 
     await expect(page.getByRole("heading", { name: "信任边界模块" })).toBeVisible();
@@ -100,7 +100,7 @@ test.describe("Moonweave ontology explorer", () => {
     await page.goto("/");
     await page.setViewportSize({ width: 1360, height: 900 });
 
-    await page.getByRole("button", { name: "安全平面 平面" }).click();
+    await page.getByRole("button", { name: "信任、策略与安全域 平面" }).click();
     await page.getByRole("button", { name: "信任边界模块 模块" }).click();
 
     await expect(page.getByTestId("ontology-characteristics")).toBeVisible();
@@ -126,7 +126,7 @@ test.describe("Moonweave ontology explorer", () => {
     await page.goto("/");
     await page.setViewportSize({ width: 1360, height: 900 });
 
-    await page.getByRole("button", { name: "安全平面 平面" }).click();
+    await page.getByRole("button", { name: "信任、策略与安全域 平面" }).click();
     await page.getByRole("button", { name: "信任边界模块 模块" }).click();
     await page.getByRole("button", { name: /权限范围/ }).click();
 

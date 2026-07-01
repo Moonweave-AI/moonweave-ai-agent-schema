@@ -87,6 +87,16 @@ describe("canonical agent ontology artifact", () => {
   const livingMetadata = parseCsv(join(process.cwd(), "research", "living-source-metadata.csv"));
   const sourceRows = new Map(sourceRegistry.map((row) => [row.id, row]));
   const livingRows = new Map(livingMetadata.map((row) => [row.id, row]));
+  const expectedOperationalPlanes = [
+    ["info-plane", "Context Ingress Domain", "上下文输入域", "コンテキスト入力ドメイン"],
+    ["orchestration-plane", "Control & Orchestration Domain", "控制与编排域", "制御とオーケストレーションドメイン"],
+    ["runtime-plane", "Runtime State & Trace Domain", "运行状态与轨迹域", "実行状態とトレースドメイン"],
+    ["adapter-plane", "Interoperability & Adapter Domain", "互操作适配域", "相互運用とアダプタドメイン"],
+    ["tool-plane", "Capability & Resource Invocation Domain", "能力与资源调用域", "能力とリソース呼び出しドメイン"],
+    ["safety-plane", "Trust, Policy & Safety Domain", "信任、策略与安全域", "信頼、ポリシー、安全ドメイン"],
+    ["feedback-plane", "Observability & Feedback Domain", "可观测反馈域", "観測可能性とフィードバックドメイン"],
+    ["memory-plane", "Memory & Context Persistence Domain", "记忆与上下文持久化域", "記憶とコンテキスト永続化ドメイン"]
+  ] as const;
 
   it("stays at production ontology-family scale instead of a demo graph", () => {
     expect(ontology.ontology_metrics.domains).toBe(1);
@@ -107,6 +117,32 @@ describe("canonical agent ontology artifact", () => {
     expect(ontology.ontology_metrics.data_properties).toBe(ontology.data_properties.length);
     expect(ontology.ontology_metrics.individuals).toBe(ontology.individuals.length);
     expect(ontology.ontology_metrics.axioms).toBe(ontology.axioms.length);
+  });
+
+  it("names the first ontology layer as eight operational concern domains", () => {
+    const expectedSummaryEn =
+      "Moonweave Agent Schema organizes agent systems through eight operational concern planes. These planes describe the recurring lifecycle surfaces of an agent system: context ingress, control orchestration, runtime execution, interoperability adaptation, capability invocation, trust and safety mediation, observable feedback, and memory persistence.";
+    const expectedSummaryZh =
+      "Moonweave Agent Schema 通过八个运行关注域组织 agent 系统：上下文输入、控制编排、运行执行、互操作适配、能力调用、信任与安全治理、可观测反馈，以及记忆与上下文持久化。";
+    const docs = [
+      readFileSync(join(process.cwd(), "README.md"), "utf8"),
+      readFileSync(join(process.cwd(), "docs", "README.zh.md"), "utf8"),
+      readFileSync(join(process.cwd(), "docs", "README.ja.md"), "utf8")
+    ];
+
+    for (const [planeId, enLabel, zhLabel, jaLabel] of expectedOperationalPlanes) {
+      const plane = planes.get(planeId);
+      expect(plane?.label).toBe(enLabel);
+      expect(plane?.definitions?.en).toContain("Operational concern domain");
+      expect(plane?.definitions?.zh).toContain(zhLabel);
+      expect(plane?.definitions?.ja).toContain(jaLabel);
+    }
+
+    expect(docs[0]).toContain(expectedSummaryEn);
+    expect(docs[1]).toContain(expectedSummaryZh);
+    expect(docs[0]).not.toContain("| Runtime Plane |");
+    expect(docs[1]).not.toContain("| 运行平面 |");
+    expect(docs[2]).not.toContain("| 実行平面 |");
   });
 
   it("resolves plane/module/class references", () => {
