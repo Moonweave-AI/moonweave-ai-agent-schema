@@ -1412,4 +1412,131 @@ describe("canonical agent ontology artifact", () => {
     expect(weakDefinitions).toEqual([]);
     expect(new Set(runtimeContextDefinitions).size).toBe(runtimeContextDefinitions.length);
   });
+
+  it("models memory persistence as agentic memory lifecycle instead of only a RAG pipeline", () => {
+    const classIds = new Set(ontology.classes.map((klass) => klass.id));
+    const objectProperties = new Map(ontology.object_properties.map((property) => [property.id, property]));
+    const memoryModules = new Map(
+      ontology.modules.filter((module) => module.plane_id === "memory-plane").map((module) => [module.id, module])
+    );
+    const memoryDocs = [
+      readFileSync(join(process.cwd(), "README.md"), "utf8"),
+      readFileSync(join(process.cwd(), "docs", "README.zh.md"), "utf8"),
+      readFileSync(join(process.cwd(), "docs", "README.ja.md"), "utf8")
+    ].join("\n");
+    const appSource = readFileSync(join(process.cwd(), "src", "App.tsx"), "utf8");
+    const expectedModules = new Map([
+      ["memory-ingestion", "Memory Ingestion Module"],
+      ["memory-stores-scopes", "Memory Store, Scope And Typology Module"],
+      ["memory-chunking-situating", "Chunking And Situating Module"],
+      ["memory-embedding-indexes", "Embedding And Index Module"],
+      ["memory-retrieval-ranking", "Retrieval And Ranking Module"],
+      ["memory-context", "Context Assembly Module"],
+      ["memory-lifecycle", "Memory Lifecycle Operations Module"]
+    ]);
+    const requiredClasses = [
+      "MemoryRecord",
+      "WorkingMemory",
+      "ShortTermMemory",
+      "LongTermMemory",
+      "EpisodicMemory",
+      "SemanticMemory",
+      "ProceduralMemory",
+      "ExperienceMemory",
+      "ReflectiveMemory",
+      "CrossSessionMemory",
+      "MemoryWrite",
+      "MemoryUpdate",
+      "MemoryDelete",
+      "MemoryMerge",
+      "MemoryConsolidation",
+      "MemoryExpiration",
+      "MemoryValidation",
+      "MemorySupersession",
+      "MemoryReflection",
+      "MemoryRetentionPolicy"
+    ];
+    const expectedRelations = [
+      ["ingestion_run_loads_document", "IngestionRun", "Document", "memory_ingestion"],
+      ["ingestion_run_writes_to_memory_store", "IngestionRun", "MemoryStore", "memory_ingestion"],
+      ["memory_store_has_namespace", "MemoryStore", "MemoryNamespace", "memory_persistence"],
+      ["memory_record_belongs_to_namespace", "MemoryRecord", "MemoryNamespace", "memory_persistence"],
+      ["memory_write_creates_record", "MemoryWrite", "MemoryRecord", "memory_lifecycle"],
+      ["memory_update_updates_record", "MemoryUpdate", "MemoryRecord", "memory_lifecycle"],
+      ["memory_delete_removes_record", "MemoryDelete", "MemoryRecord", "memory_lifecycle"],
+      ["memory_consolidation_merges_records", "MemoryConsolidation", "MemoryRecord", "memory_lifecycle"],
+      ["memory_consolidation_produces_summary", "MemoryConsolidation", "ContextSummary", "memory_lifecycle"],
+      ["memory_expiration_expires_record", "MemoryExpiration", "MemoryRecord", "memory_lifecycle"],
+      ["memory_validation_evaluates_record", "MemoryValidation", "MemoryRecord", "memory_lifecycle"],
+      ["memory_reflection_produces_reflective_memory", "MemoryReflection", "ReflectiveMemory", "memory_lifecycle"],
+      ["chunk_derived_from_document", "Chunk", "Document", "memory_chunking"],
+      ["embedding_run_produces_vector", "EmbeddingRun", "EmbeddingVector", "memory_indexing"],
+      ["retrieval_query_searches_index", "RetrievalQuery", "IndexVersion", "memory_retrieval"],
+      ["retrieval_query_returns_candidate_set", "RetrievalQuery", "CandidateSet", "memory_retrieval"],
+      ["candidate_set_contains_chunk", "CandidateSet", "CandidateChunk", "memory_retrieval"],
+      ["top_k_selection_selects_retrieved_chunk", "TopKSelection", "RetrievedChunk", "memory_retrieval"],
+      ["context_assembly_includes_retrieved_chunk", "ContextAssembly", "RetrievedChunk", "memory_context"],
+      ["retrieved_chunk_fills_context_slot", "RetrievedChunk", "ContextSlot", "memory_context"],
+      ["memory_write_evaluated_by_policy_decision", "MemoryWrite", "PolicyDecision", "memory_security"],
+      ["memory_poisoning_signal_flags_memory_record", "MemoryPoisoningSignal", "MemoryRecord", "memory_security"],
+      ["retrieved_chunk_scanned_by_pattern_scan", "RetrievedChunk", "PatternScan", "memory_security"]
+    ] as const;
+    const riskyDefinitionPatterns = [
+      ["ChunkBoundary", /(offset|span|line|page|section|semantic boundary|overlap)/i, /(trust edge|authority|audit requirements)/i],
+      ["DenseVector", /dense.*(embedding|vector|representation)/i, /(sparse|lexical)/i],
+      ["EmbeddingRun", /(model|version).*(produces|emits).*(EmbeddingVector|vector)/i, /^embedding run records dense, sparse, or lexical/i],
+      ["LexicalScore", /(lexical|term|token|bm25|tf-idf).*(relevance|score|match)/i, /(benchmark|success condition|evaluation unit)/i],
+      ["CandidateSet", /(retrieval|query).*(candidate|chunk|rerank|selection)/i, /(tool.*registration|tool.*invocation|副作用|ツール)/i],
+      ["ContextAssembly", /(selects|orders).*(memory|message|retrieved|instruction|context)/i, /(tool.*registration|tool.*invocation|副作用|ツール)/i],
+      ["ContextOrderingRule", /(priority|freshness|recency|authority|source trust|retrieval rank|budget)/i, /(authorization prompt|请求动作|認可プロンプト)/i],
+      ["MemoryStore", /(read|write|update|delete|merge|compact|expire|retrieve|audit)/i, /chunk.*boundary/i],
+      ["MemoryNamespace", /(namespace|isolation|scope|cross-session|reuse|access)/i, /candidate ranking/i],
+      ["MemoryScope", /(visibility|read|write|reuse|session|user|task|tenant)/i, /candidate ranking/i]
+    ] as const;
+    const localizedMemoryDefinitions = [
+      ontology.planes.find((plane) => plane.id === "memory-plane")?.definitions?.zh,
+      ontology.planes.find((plane) => plane.id === "memory-plane")?.definitions?.ja,
+      ...ontology.modules
+        .filter((module) => module.plane_id === "memory-plane")
+        .flatMap((module) => [module.definitions?.zh, module.definitions?.ja]),
+      ...requiredClasses.flatMap((classId) => [classes.get(classId)?.definitions?.zh, classes.get(classId)?.definitions?.ja]),
+      ...["Chunk", "ChunkBoundary", "DenseVector", "EmbeddingRun", "LexicalScore", "CandidateSet", "ContextAssembly"].flatMap(
+        (classId) => [classes.get(classId)?.definitions?.zh, classes.get(classId)?.definitions?.ja]
+      )
+    ].join("\n");
+
+    expect(classes.get("MemoryPlane")).toBeUndefined();
+    expect([...memoryModules.keys()].sort()).toEqual([...expectedModules.keys()].sort());
+    for (const [moduleId, label] of expectedModules) {
+      expect(memoryModules.get(moduleId)?.label).toBe(label);
+      expect(memoryModules.get(moduleId)?.definition).toMatch(/memory|context/i);
+    }
+    for (const classId of requiredClasses) {
+      expect(classIds.has(classId)).toBe(true);
+      expect(classes.get(classId)?.definitions?.zh.length).toBeGreaterThan(12);
+      expect(classes.get(classId)?.definitions?.ja.length).toBeGreaterThan(12);
+    }
+    for (const [relationId, domain, range, family] of expectedRelations) {
+      expect(objectProperties.get(relationId)).toMatchObject({ domain, range, family });
+      expect(objectProperties.get(relationId)?.definition.length).toBeGreaterThan(50);
+    }
+    for (const [classId, requiredPattern, forbiddenPattern] of riskyDefinitionPatterns) {
+      const klass = classes.get(classId);
+      const combinedDefinition = `${klass?.definition}\n${klass?.definitions?.zh}\n${klass?.definitions?.ja}`;
+      expect(combinedDefinition).toMatch(requiredPattern);
+      expect(combinedDefinition).not.toMatch(forbiddenPattern);
+    }
+    expect(
+      [...objectProperties.keys()].filter((relationId) => /^memory_.*_(relates|emits_event)$/.test(relationId))
+    ).toEqual([]);
+    expect(localizedMemoryDefinitions).toMatch(/写入|更新|合并|过期|验证|反思|短期|長期|統合|検証|反省/);
+    expect(localizedMemoryDefinitions).not.toMatch(
+      /所属平面：|证据源 \d+ 项|出典 \d+ 件|工具的注册、发现、匹配|ツールの登録|基准任务|ベンチマークタスク|标识能够行动|行動、観測/
+    );
+    expect(memoryDocs).toContain("write");
+    expect(memoryDocs).toContain("更新");
+    expect(memoryDocs).toContain("更新");
+    expect(appSource).toContain("Memory Store, Scope And Typology Module");
+    expect(appSource).toContain("记忆生命周期操作模块");
+  });
 });
