@@ -611,6 +611,139 @@ describe("canonical agent ontology artifact", () => {
     expect(classesById.get("RuntimeEnvironment")?.definitions?.zh).toContain("具体执行环境");
   });
 
+  it("models runtime state and trace as an executable provenance graph", () => {
+    const objectProperties = new Map(ontology.object_properties.map((property) => [property.id, property]));
+    const expectedModules = new Map([
+      ["runtime-system", "Runtime Session And Execution Envelope Module"],
+      ["runtime-actors", "Runtime Actor And Authority Module"],
+      ["runtime-observability", "Runtime Trace And Checkpoint Module"],
+      ["runtime-artifacts", "Runtime Artifact Provenance Module"]
+    ]);
+    const expectedKinds = new Map([
+      ["RunOutcome", "object_type"],
+      ["SessionLifecycle", "object_type"],
+      ["ActorAuthorityScope", "policy_type"],
+      ["ActorCapabilityBinding", "relation_type"],
+      ["ActorRoleBinding", "relation_type"],
+      ["TraceRecord", "object_type"],
+      ["TraceRetentionPolicy", "policy_type"]
+    ]);
+    const requiredRuntimeClasses = [
+      "TraceRecord",
+      "SpanAttribute",
+      "SpanStatus",
+      "TraceContext",
+      "RuntimeSession",
+      "RunAttempt",
+      "RunOutcome",
+      "Checkpoint",
+      "StateSnapshot",
+      "StateDiff",
+      "Artifact",
+      "AgentActor"
+    ];
+    const requiredRuntimeRelations = [
+      ["has_runtime_session", "AgentSystem", "RuntimeSession"],
+      ["has_run_attempt", "RuntimeSession", "RunAttempt"],
+      ["yields_run_outcome", "RunAttempt", "RunOutcome"],
+      ["run_attempt_belongs_to_task", "RunAttempt", "Task"],
+      ["uses_runtime_environment", "RunAttempt", "RuntimeEnvironment"],
+      ["constrained_by_runtime_budget", "RunAttempt", "RuntimeBudget"],
+      ["opens_runtime_session", "SessionStartEvent", "RuntimeSession"],
+      ["closes_runtime_session", "SessionEndEvent", "RuntimeSession"],
+      ["pauses_with_snapshot", "SessionPauseEvent", "StateSnapshot"],
+      ["resumes_from_checkpoint", "SessionResumeEvent", "Checkpoint"],
+      ["participates_in_session", "AgentActor", "RuntimeSession"],
+      ["associated_with_attempt", "AgentActor", "RunAttempt"],
+      ["has_actor_role_binding", "AgentActor", "ActorRoleBinding"],
+      ["has_actor_authority_scope", "AgentActor", "ActorAuthorityScope"],
+      ["has_actor_capability_binding", "AgentActor", "ActorCapabilityBinding"],
+      ["remote_agent_crosses_trust_boundary", "RemoteAgentReference", "TrustBoundary"],
+      ["session_has_trace", "RuntimeSession", "TraceRecord"],
+      ["trace_contains_span", "TraceRecord", "TraceSpan"],
+      ["trace_has_context", "TraceRecord", "TraceContext"],
+      ["span_contains_event", "TraceSpan", "TraceEvent"],
+      ["span_has_parent_span", "TraceSpan", "TraceSpan"],
+      ["span_has_attribute", "TraceSpan", "SpanAttribute"],
+      ["span_has_status", "TraceSpan", "SpanStatus"],
+      ["trace_link_source_span", "TraceLink", "TraceSpan"],
+      ["trace_link_target_span", "TraceLink", "TraceSpan"],
+      ["trace_event_belongs_to_span", "TraceEvent", "TraceSpan"],
+      ["trace_event_ordered_before", "TraceEvent", "TraceEvent"],
+      ["trace_event_caused_by", "TraceEvent", "TraceEvent"],
+      ["checkpoint_captures_snapshot", "Checkpoint", "StateSnapshot"],
+      ["checkpoint_belongs_to_session", "Checkpoint", "RuntimeSession"],
+      ["checkpoint_has_parent", "Checkpoint", "Checkpoint"],
+      ["state_diff_from_snapshot", "StateDiff", "StateSnapshot"],
+      ["state_diff_to_snapshot", "StateDiff", "StateSnapshot"],
+      ["restore_event_restores_checkpoint", "CheckpointRestoreEvent", "Checkpoint"],
+      ["replay_event_replays_trace", "ReplayEvent", "TraceRecord"],
+      ["artifact_produced_by_attempt", "Artifact", "RunAttempt"],
+      ["artifact_produced_by_event", "Artifact", "TraceEvent"],
+      ["artifact_consumed_by_attempt", "Artifact", "RunAttempt"],
+      ["artifact_derived_from", "Artifact", "Artifact"],
+      ["artifact_attributed_to_actor", "Artifact", "AgentActor"],
+      ["artifact_reviewed_by", "Artifact", "ReviewEvent"],
+      ["artifact_exported_as", "Artifact", "ExportArtifact"]
+    ] as const;
+
+    for (const [moduleId, label] of expectedModules) {
+      const module = modules.get(moduleId);
+      expect(module?.label).toBe(label);
+      expect(module?.definitions?.zh.length).toBeGreaterThan(20);
+      expect(module?.definitions?.ja.length).toBeGreaterThan(20);
+    }
+
+    for (const [classId, kind] of expectedKinds) {
+      expect(classes.get(classId)?.kind).toBe(kind);
+    }
+
+    for (const classId of requiredRuntimeClasses) {
+      const klass = classes.get(classId);
+      expect(klass?.plane_id).toBe("runtime-plane");
+      expect(klass?.definitions?.en.length).toBeGreaterThan(40);
+      expect(klass?.definitions?.zh.length).toBeGreaterThan(20);
+      expect(klass?.definitions?.ja.length).toBeGreaterThan(20);
+    }
+
+    for (const [relationId, domain, range] of requiredRuntimeRelations) {
+      const relation = objectProperties.get(relationId);
+      expect(relation?.family).toBe("runtime_execution");
+      expect(relation?.domain).toBe(domain);
+      expect(relation?.range).toBe(range);
+      expect(relation?.definition.length).toBeGreaterThan(45);
+      expect(relation?.source_ids).toEqual(
+        expect.arrayContaining(["eng-fw-openai-tracing", "eng-fw-langgraph-docs", "eng-ont-prov-o"])
+      );
+    }
+
+    expect(classes.get("TraceRecord")?.definition).toMatch(/trace.*container|root.*trace|span/i);
+    expect(classes.get("TraceSpan")?.definition).toMatch(/operation interval|unit of work|parent/i);
+    expect(classes.get("TraceLink")?.definition).toMatch(/non-parent|causal|contextual/i);
+    expect(classes.get("TraceRetentionPolicy")?.definition).toMatch(/retention|redaction|sampling|privacy|deletion/i);
+    expect(classes.get("Checkpoint")?.definition).toMatch(/saved continuation point|resume|recover|time travel/i);
+    expect(classes.get("StateDiff")?.definition).toMatch(/from.*snapshot|to.*snapshot|difference/i);
+    expect(classes.get("Artifact")?.definition).toMatch(/provenance|produced|consumed|attributed|derived/i);
+    expect(classes.get("ObservableSummary")?.definition).toMatch(/observable runtime summary/i);
+    expect(classes.get("ObservableSummary")?.definition).not.toMatch(/hidden chain-of-thought/i);
+
+    const localizedDefinitions = [
+      ontology.planes.find((plane) => plane.id === "runtime-plane")?.definitions?.zh,
+      modules.get("runtime-system")?.definitions?.zh,
+      modules.get("runtime-observability")?.definitions?.zh,
+      modules.get("runtime-artifacts")?.definitions?.zh,
+      classes.get("Checkpoint")?.definitions?.zh,
+      classes.get("RunAttempt")?.definitions?.zh,
+      classes.get("TraceRetentionPolicy")?.definitions?.zh,
+      classes.get("TraceSpan")?.definitions?.zh,
+      classes.get("TraceLink")?.definitions?.zh,
+      classes.get("Artifact")?.definitions?.zh
+    ].join("\n");
+
+    expect(localizedDefinitions).toMatch(/运行会话|执行尝试|可观测追踪|检查点|快照|产物溯源/);
+    expect(localizedDefinitions).not.toMatch(/信任或安全边界|根据状态、策略、条件或观察结果选择下一步操作|任务规划|路由|基准任务/);
+  });
+
   it("renders entity definitions from the canonical artifact in the frontend", () => {
     const appSource = readFileSync(join(process.cwd(), "src", "App.tsx"), "utf8");
 
