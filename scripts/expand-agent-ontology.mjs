@@ -440,9 +440,9 @@ const moduleSpecs = [
   {
     id: "tool-registry-definition",
     plane_id: "tool-plane",
-    label: "Tool Registry And Definition Module",
-    definition: "models tool registries, definitions, schemas, descriptors, and capability metadata",
-    class_ids: ["ToolPlane", "Tool", "ToolRegistry", "ToolDefinition"],
+    label: "Capability Registry And Definition Module",
+    definition: "models tool, resource, prompt, API operation, and capability-surface registries, definitions, schemas, descriptors, versions, and permission declarations",
+    class_ids: ["Tool", "ToolRegistry", "ToolDefinition"],
     generated: [
       ["ToolName", "tool name"],
       ["ToolDescription", "tool description"],
@@ -451,14 +451,25 @@ const moduleSpecs = [
       ["ToolCapability", "tool capability"],
       ["ToolPermissionSpec", "tool permission spec"],
       ["ToolVersion", "tool version"],
-      ["ToolDeprecationNotice", "tool deprecation notice"]
+      ["ToolDeprecationNotice", "tool deprecation notice"],
+      ["CapabilitySurface", "capability surface"],
+      ["CapabilityDescriptor", "capability descriptor"],
+      ["APIOperation", "API operation"],
+      ["ResourceDefinition", "resource definition"],
+      ["PromptDefinition", "prompt definition"],
+      ["HostedTool", "hosted tool"],
+      ["LocalRuntimeTool", "local runtime tool"],
+      ["FunctionTool", "function tool"],
+      ["ComputerTool", "computer tool"],
+      ["ShellTool", "shell tool"],
+      ["HostedMCPTool", "hosted MCP tool"]
     ]
   },
   {
     id: "tool-discovery-selection",
     plane_id: "tool-plane",
-    label: "Tool Discovery And Selection Module",
-    definition: "models tool search, matching, ranking, selection, and fallback",
+    label: "Capability Discovery And Selection Module",
+    definition: "models tool, resource, prompt, and capability search, matching, ranking, selection, disambiguation, filtering, and fallback",
     class_ids: ["ToolSearch", "ToolMatch"],
     generated: [
       ["ToolSearchQuery", "tool search query"],
@@ -468,14 +479,20 @@ const moduleSpecs = [
       ["ToolRegexMatch", "tool regex match"],
       ["ToolSelectionDecision", "tool selection decision"],
       ["ToolFallback", "tool fallback"],
-      ["ToolDisambiguationPrompt", "tool disambiguation prompt"]
+      ["ToolDisambiguationPrompt", "tool disambiguation prompt"],
+      ["ResourceCandidate", "resource candidate"],
+      ["PromptCandidate", "prompt candidate"],
+      ["CapabilityCandidate", "capability candidate"],
+      ["ResourceSelectionDecision", "resource selection decision"],
+      ["PromptSelectionDecision", "prompt selection decision"],
+      ["CapabilitySelectionDecision", "capability selection decision"]
     ]
   },
   {
     id: "tool-invocation-execution",
     plane_id: "tool-plane",
-    label: "Tool Invocation And Execution Module",
-    definition: "models tool calls, programmatic calls, execution requests, results, and transcripts",
+    label: "Invocation And Execution Module",
+    definition: "models tool calls, resource reads, prompt retrieval and instantiation, programmatic calls, command execution requests, observable results, diagnostics, side effects, transcripts, and pre-execution safety checks",
     class_ids: [
       "ToolCall",
       "ToolResult",
@@ -496,14 +513,27 @@ const moduleSpecs = [
       ["ToolError", "tool error"],
       ["ToolWarning", "tool warning"],
       ["ToolSideEffect", "tool side effect"],
-      ["ToolResultObservation", "tool result observation"]
+      ["ToolResultObservation", "tool result observation"],
+      ["ResourceReadRequest", "resource read request"],
+      ["ResourceReadResult", "resource read result"],
+      ["ResourceSubscription", "resource subscription"],
+      ["ResourceTemplate", "resource template"],
+      ["PromptTemplate", "prompt template"],
+      ["PromptGetRequest", "prompt get request"],
+      ["PromptInstantiation", "prompt instantiation"],
+      ["ToolInvocationCandidate", "tool invocation candidate"],
+      ["PreExecutionSafetyCheck", "pre-execution safety check"],
+      ["UnsafeArgumentPattern", "unsafe argument pattern"],
+      ["ToolDescriptionTrust", "tool description trust"],
+      ["ToolApprovalGate", "tool approval gate"],
+      ["ConditionalToolEnabled", "conditional tool enabled"]
     ]
   },
   {
     id: "tool-mcp-transport",
     plane_id: "tool-plane",
-    label: "MCP Transport Module",
-    definition: "models MCP client/server roles, session surfaces, discovery, and transport-level tool exposure",
+    label: "MCP Protocol Surface Module",
+    definition: "models MCP client/server participants, sessions, transports, authorization, elicitation, roots, sampling, and server-exposed resources, prompts, tools, and capability metadata",
     class_ids: ["MCPClient", "MCPServer"],
     generated: [
       ["MCPSession", "MCP session"],
@@ -513,7 +543,11 @@ const moduleSpecs = [
       ["MCPElicitation", "MCP elicitation"],
       ["MCPAuthorization", "MCP authorization"],
       ["MCPTransport", "MCP transport"],
-      ["MCPServerCapability", "MCP server capability"]
+      ["MCPServerCapability", "MCP server capability"],
+      ["MCPResourceTemplateList", "MCP resource template list"],
+      ["MCPRootList", "MCP root list"],
+      ["MCPSamplingRequest", "MCP sampling request"],
+      ["AdditionalInput", "additional input"]
     ]
   },
   {
@@ -2348,6 +2382,206 @@ const exactGeneratedClassDefinitions = new Map([
   [
     "StandardError",
     "captures the stderr stream emitted by a command, process, sandbox, or tool execution as observable diagnostic output."
+  ],
+  [
+    "ToolRegistry",
+    "catalog resource that stores available tool definitions, capability descriptors, schemas, permissions, versions, discovery metadata, and protocol exposure records."
+  ],
+  [
+    "ToolDefinition",
+    "schema-like resource describing a tool's name, purpose, callable operation, argument schema, result schema, permission declaration, constraints, version, and deprecation state."
+  ],
+  [
+    "ToolCapability",
+    "advertised operation or capability surface of a tool, including its execution boundary, permission requirements, schema surface, and observable result type."
+  ],
+  [
+    "ToolPermissionSpec",
+    "tool-side permission declaration that states required scopes, approval behavior, protected resources, safety constraints, and policy hooks without replacing a policy decision."
+  ],
+  [
+    "CapabilitySurface",
+    "advertised surface that exposes tools, resources, prompts, API operations, hosted tools, local runtime tools, or agent-as-tool capabilities for discovery and invocation."
+  ],
+  [
+    "CapabilityDescriptor",
+    "machine-readable capability descriptor that records operation identity, schema surface, trust metadata, permission requirements, discovery labels, and protocol exposure for a tool, resource, prompt, or API operation."
+  ],
+  [
+    "APIOperation",
+    "external API operation action with method, endpoint, arguments schema, result schema, authentication requirements, side-effect expectations, and observable invocation result."
+  ],
+  [
+    "ResourceDefinition",
+    "resource definition that describes how a protocol or server exposes context/data for list, read, subscribe, and resource-template operations."
+  ],
+  [
+    "ResourceReadRequest",
+    "event request to read a named resource from a server or connector, including resource identity, access scope, authorization context, and expected representation."
+  ],
+  [
+    "ResourceReadResult",
+    "observable resource content and metadata returned by a resource read request, including representation, provenance, cache hints, warning state, and context-ingress eligibility."
+  ],
+  [
+    "ResourceSubscription",
+    "object describing an ongoing subscription to resource change notifications, including watched resource identity, update policy, delivery channel, and cancellation state."
+  ],
+  [
+    "ResourceTemplate",
+    "parameterized resource template that binds variables to resource URIs or selectors so related resources can be discovered and read safely."
+  ],
+  [
+    "PromptDefinition",
+    "prompt definition resource that describes a reusable prompt template and workflow pattern, expected arguments, output role, and applicability conditions exposed by a server or registry."
+  ],
+  [
+    "PromptTemplate",
+    "templated message or workflow pattern whose variables can be bound during prompt instantiation before being staged into a model call or agent step."
+  ],
+  [
+    "PromptGetRequest",
+    "event request to retrieve a prompt definition or template from a registry or protocol server before argument binding and context staging."
+  ],
+  [
+    "PromptInstantiation",
+    "event that instantiates a prompt template with arguments, caller context, authorization evidence, and resulting messages or workflow instructions."
+  ],
+  [
+    "HostedTool",
+    "object type for a hosted tool backed by an external service or provider-managed runtime whose execution surface is invoked through a registry or protocol connector."
+  ],
+  [
+    "LocalRuntimeTool",
+    "object type for a local runtime tool that executes through a process, shell, computer-control, code, browser, or container surface controlled by the host."
+  ],
+  [
+    "FunctionTool",
+    "object type for a function tool whose invocation is described by a callable name, schema for arguments, return schema, and host-side implementation."
+  ],
+  [
+    "ComputerTool",
+    "object type for a computer, browser, desktop UI, or screen-control tool that acts on an interactive environment and produces observable UI or environment state."
+  ],
+  [
+    "ShellTool",
+    "object type for a shell or command runtime tool that executes command lines, scripts, or process operations under sandbox and policy constraints."
+  ],
+  [
+    "HostedMCPTool",
+    "object type for an MCP-hosted tool exposed by a server to a client along with protocol metadata, authorization context, schema surface, and invocation constraints."
+  ],
+  [
+    "ToolCallPlan",
+    "planned invocation artifact that proposes a candidate tool action, constructed arguments, approval requirements, expected result handling, retry policy, and pre-execution safety context."
+  ],
+  [
+    "ToolInvocationCandidate",
+    "candidate tool invocation pre-execution record evaluated before execution, including selected tool, proposed arguments, interaction context, risk signals, and decision evidence."
+  ],
+  [
+    "PreExecutionSafetyCheck",
+    "pre-execution event that evaluates a candidate tool invocation for risk using context, available tools, argument patterns, policy, and trust-boundary evidence."
+  ],
+  [
+    "UnsafeArgumentPattern",
+    "resource describing an argument pattern, selector, command fragment, URI, data sink, or parameter combination that may make a tool invocation unsafe."
+  ],
+  [
+    "ToolDescriptionTrust",
+    "policy record stating whether a tool description, annotation, schema, or capability advertisement is trusted, untrusted, or constrained by trusted-server evidence."
+  ],
+  [
+    "ToolApprovalGate",
+    "approval policy gate for tool execution, resource access, prompt retrieval, or API operation that decides approval, denial, sandboxing, or escalation."
+  ],
+  [
+    "ConditionalToolEnabled",
+    "conditional tool enabled policy record describing when a tool becomes available to a model or actor based on task scope, actor authority, trust boundary, resource, and runtime state."
+  ],
+  [
+    "ResourceCandidate",
+    "resource candidate returned by discovery, filtering, or protocol listing before a resource selection decision chooses whether it may be read, subscribed, or staged."
+  ],
+  [
+    "PromptCandidate",
+    "prompt candidate returned by discovery, filtering, or protocol listing before a prompt selection decision chooses whether it may be retrieved or instantiated."
+  ],
+  [
+    "CapabilityCandidate",
+    "capability candidate representing a possible tool, resource, prompt, API operation, or hosted capability under consideration during discovery and selection."
+  ],
+  [
+    "ResourceSelectionDecision",
+    "selection event that chooses, rejects, or defers a resource candidate based on relevance, authorization, freshness, data zone, and context need."
+  ],
+  [
+    "PromptSelectionDecision",
+    "selection event that chooses, rejects, or defers a prompt candidate based on task fit, argument availability, authority, and workflow intent."
+  ],
+  [
+    "CapabilitySelectionDecision",
+    "selection event that chooses, rejects, or defers a capability candidate across tools, resources, prompts, and API operations."
+  ],
+  [
+    "ToolError",
+    "diagnostic resource describing an error, exception, timeout, validation failure, or execution failure associated with a tool call attempt."
+  ],
+  [
+    "ToolWarning",
+    "non-fatal warning or diagnostic resource attached to a tool result, argument validation, degraded execution, fallback, unsafe content signal, or partial response."
+  ],
+  [
+    "ToolSideEffect",
+    "tool-local record of an external state change or persistent effect produced or attempted by a tool execution before it is connected to commit approval, rollback, audit, and canonical safety SideEffect evidence."
+  ],
+  [
+    "MCPClient",
+    "protocol participant object that opens MCP sessions, discovers server capabilities, requests prompts or resources, invokes tools, and carries authorization context for an agent runtime."
+  ],
+  [
+    "MCPServer",
+    "protocol participant object that exposes tools, resources, prompts, templates, and capability metadata to MCP clients over a session and transport."
+  ],
+  [
+    "MCPResourceList",
+    "server-exposed list of resource definitions and resource templates available for read, subscribe, discovery, or context/data access operations."
+  ],
+  [
+    "MCPPromptList",
+    "server-exposed list of prompt definitions and prompt templates available for retrieval, argument binding, workflow staging, or guided interaction."
+  ],
+  [
+    "MCPToolList",
+    "server-exposed list of tool definitions and callable capability descriptors available for discovery, filtering, approval, and invocation by an MCP client."
+  ],
+  [
+    "MCPAuthorization",
+    "MCP-side authorization bridge recording consent, grant, protected resource, scope, or approval metadata for tool calls, resource reads, prompt requests, and related protocol actions."
+  ],
+  [
+    "MCPTransport",
+    "protocol channel and delivery surface used by MCP client/server sessions to exchange JSON-RPC messages, capability metadata, tool calls, resource reads, prompt requests, and elicitation traffic."
+  ],
+  [
+    "MCPServerCapability",
+    "capability metadata advertised by an MCP server, including supported tool, resource, prompt, sampling, roots, elicitation, authorization, and transport features."
+  ],
+  [
+    "MCPResourceTemplateList",
+    "server-exposed list of resource templates whose parameters can be bound to discover or read families of MCP resources."
+  ],
+  [
+    "MCPRootList",
+    "client-provided list of roots or workspace scopes that bound which files, directories, repositories, or resource regions an MCP server may access."
+  ],
+  [
+    "MCPSamplingRequest",
+    "protocol request in which an MCP server asks the client or host to perform model sampling under the client's policy, context, and authorization controls."
+  ],
+  [
+    "AdditionalInput",
+    "input requested through elicitation or an equivalent protocol interaction when a server needs user or client-provided information before continuing."
   ]
 ]);
 
@@ -2642,7 +2876,7 @@ const planeDefinitionOverrides = new Map([
   ]
 ]);
 
-const removedClassIds = new Set(["InfoPlane", "OrchestrationPlane", "AdapterPlane", "SafetyPlane", "UserAgentMessage", "ToolMessage"]);
+const removedClassIds = new Set(["InfoPlane", "OrchestrationPlane", "AdapterPlane", "SafetyPlane", "ToolPlane", "UserAgentMessage", "ToolMessage"]);
 const ownership = (canonical_owner_plane, participating_planes = [], context_ingress_role) => ({
   canonical_owner_plane,
   participating_planes: [...new Set([canonical_owner_plane, ...participating_planes])],
@@ -2782,6 +3016,43 @@ const generatedKindOverrides = new Map([
   ["WorkerAvailability", "object_type"],
   ["WorkerCapabilityMatch", "object_type"],
   ["WorkerSelection", "event_type"],
+  ["CapabilitySurface", "object_type"],
+  ["CapabilityDescriptor", "resource_type"],
+  ["APIOperation", "action_type"],
+  ["ResourceDefinition", "resource_type"],
+  ["ResourceReadRequest", "event_type"],
+  ["ResourceReadResult", "resource_type"],
+  ["ResourceSubscription", "object_type"],
+  ["ResourceTemplate", "resource_type"],
+  ["PromptDefinition", "resource_type"],
+  ["PromptTemplate", "resource_type"],
+  ["PromptGetRequest", "event_type"],
+  ["PromptInstantiation", "event_type"],
+  ["HostedTool", "object_type"],
+  ["LocalRuntimeTool", "object_type"],
+  ["FunctionTool", "object_type"],
+  ["ComputerTool", "object_type"],
+  ["ShellTool", "object_type"],
+  ["HostedMCPTool", "object_type"],
+  ["ToolCallPlan", "resource_type"],
+  ["ToolInvocationCandidate", "resource_type"],
+  ["PreExecutionSafetyCheck", "event_type"],
+  ["UnsafeArgumentPattern", "resource_type"],
+  ["ToolDescriptionTrust", "policy_type"],
+  ["ToolApprovalGate", "policy_type"],
+  ["ConditionalToolEnabled", "policy_type"],
+  ["ResourceCandidate", "resource_type"],
+  ["PromptCandidate", "resource_type"],
+  ["CapabilityCandidate", "resource_type"],
+  ["ResourceSelectionDecision", "event_type"],
+  ["PromptSelectionDecision", "event_type"],
+  ["CapabilitySelectionDecision", "event_type"],
+  ["MCPClient", "object_type"],
+  ["MCPServer", "object_type"],
+  ["MCPResourceTemplateList", "resource_type"],
+  ["MCPRootList", "resource_type"],
+  ["MCPSamplingRequest", "event_type"],
+  ["AdditionalInput", "resource_type"],
   ["ProtocolMessageMapping", "relation_type"],
   ["ProtocolTaskMapping", "relation_type"],
   ["ProtocolCapabilityMapping", "relation_type"],
@@ -2862,6 +3133,43 @@ const classKindOverrides = new Map([
   ["WorkerAvailability", "object_type"],
   ["WorkerCapabilityMatch", "object_type"],
   ["WorkerSelection", "event_type"],
+  ["CapabilitySurface", "object_type"],
+  ["CapabilityDescriptor", "resource_type"],
+  ["APIOperation", "action_type"],
+  ["ResourceDefinition", "resource_type"],
+  ["ResourceReadRequest", "event_type"],
+  ["ResourceReadResult", "resource_type"],
+  ["ResourceSubscription", "object_type"],
+  ["ResourceTemplate", "resource_type"],
+  ["PromptDefinition", "resource_type"],
+  ["PromptTemplate", "resource_type"],
+  ["PromptGetRequest", "event_type"],
+  ["PromptInstantiation", "event_type"],
+  ["HostedTool", "object_type"],
+  ["LocalRuntimeTool", "object_type"],
+  ["FunctionTool", "object_type"],
+  ["ComputerTool", "object_type"],
+  ["ShellTool", "object_type"],
+  ["HostedMCPTool", "object_type"],
+  ["ToolCallPlan", "resource_type"],
+  ["ToolInvocationCandidate", "resource_type"],
+  ["PreExecutionSafetyCheck", "event_type"],
+  ["UnsafeArgumentPattern", "resource_type"],
+  ["ToolDescriptionTrust", "policy_type"],
+  ["ToolApprovalGate", "policy_type"],
+  ["ConditionalToolEnabled", "policy_type"],
+  ["ResourceCandidate", "resource_type"],
+  ["PromptCandidate", "resource_type"],
+  ["CapabilityCandidate", "resource_type"],
+  ["ResourceSelectionDecision", "event_type"],
+  ["PromptSelectionDecision", "event_type"],
+  ["CapabilitySelectionDecision", "event_type"],
+  ["MCPClient", "object_type"],
+  ["MCPServer", "object_type"],
+  ["MCPResourceTemplateList", "resource_type"],
+  ["MCPRootList", "resource_type"],
+  ["MCPSamplingRequest", "event_type"],
+  ["AdditionalInput", "resource_type"],
   ["ProtocolMessageMapping", "relation_type"],
   ["ProtocolTaskMapping", "relation_type"],
   ["ProtocolCapabilityMapping", "relation_type"],
@@ -2996,6 +3304,46 @@ const objectPropertySeeds = [
   ["escalates", "escalates", "safety_flow", "event_type", "event_type", false],
   ["delegates", "delegates", "orchestration_flow", "actor_type", "actor_type", false],
   ["routes", "routes", "orchestration_flow", "event_type", "event_type", false],
+  ["tool_registry_registers_tool_definition", "tool registry registers tool definition", "registry_definition", "ToolRegistry", "ToolDefinition", true],
+  ["tool_definition_defines_tool", "tool definition defines tool", "registry_definition", "ToolDefinition", "Tool", true],
+  ["tool_definition_has_argument_schema", "tool definition has argument schema", "schema_conformance", "ToolDefinition", "ToolArgumentSchema", true],
+  ["tool_definition_has_result_schema", "tool definition has result schema", "schema_conformance", "ToolDefinition", "ToolResultSchema", true],
+  ["tool_definition_declares_permission", "tool definition declares permission", "permission_bridge", "ToolDefinition", "ToolPermissionSpec", false],
+  ["tool_definition_has_version", "tool definition has version", "registry_definition", "ToolDefinition", "ToolVersion", false],
+  ["tool_definition_deprecated_by", "tool definition deprecated by", "registry_definition", "ToolDefinition", "ToolDeprecationNotice", false],
+  ["capability_surface_advertises_descriptor", "capability surface advertises descriptor", "capability_surface", "CapabilitySurface", "CapabilityDescriptor", false],
+  ["capability_descriptor_describes_api_operation", "capability descriptor describes API operation", "capability_surface", "CapabilityDescriptor", "APIOperation", false],
+  ["tool_search_produces_candidate_set", "tool search produces candidate set", "discovery_selection", "ToolSearch", "ToolCandidateSet", false],
+  ["tool_candidate_set_contains_candidate", "tool candidate set contains candidate", "discovery_selection", "ToolCandidateSet", "ToolCandidate", true],
+  ["tool_candidate_ranked_by_match", "tool candidate ranked by match", "discovery_selection", "ToolCandidate", "ToolMatch", false],
+  ["tool_selection_decision_selects_tool", "tool selection decision selects tool", "discovery_selection", "ToolSelectionDecision", "Tool", false],
+  ["tool_selection_decision_rejects_candidate", "tool selection decision rejects candidate", "discovery_selection", "ToolSelectionDecision", "ToolCandidate", false],
+  ["tool_fallback_replaces_tool", "tool fallback replaces tool", "discovery_selection", "ToolFallback", "Tool", false],
+  ["tool_call_uses_argument", "tool call uses argument", "invocation_execution", "ToolCall", "ToolArgument", false],
+  ["tool_argument_conforms_to_schema", "tool argument conforms to schema", "schema_conformance", "ToolArgument", "ToolArgumentSchema", false],
+  ["tool_call_has_attempt", "tool call has attempt", "invocation_execution", "ToolCall", "ToolCallAttempt", true],
+  ["tool_call_retry_retries_attempt", "tool call retry retries attempt", "invocation_execution", "ToolCallRetry", "ToolCallAttempt", false],
+  ["tool_result_conforms_to_schema", "tool result conforms to schema", "schema_conformance", "ToolResult", "ToolResultSchema", false],
+  ["tool_error_caused_by_attempt", "tool error caused by attempt", "invocation_execution", "ToolError", "ToolCallAttempt", false],
+  ["tool_warning_attached_to_result", "tool warning attached to result", "invocation_execution", "ToolWarning", "ToolResult", false],
+  ["tool_call_emits_trace_event", "tool call emits trace event", "runtime_execution", "ToolCall", "TraceEvent", false],
+  ["tool_call_attempt_belongs_to_trace_span", "tool call attempt belongs to trace span", "runtime_execution", "ToolCallAttempt", "TraceSpan", false],
+  ["tool_result_observation_enters_context", "tool result observation enters context", "context_ingress", "ToolResultObservation", "ContextPackage", false],
+  ["mcp_server_exposes_tool_list", "MCP server exposes tool list", "mcp_surface", "MCPServer", "MCPToolList", false],
+  ["mcp_server_exposes_resource_list", "MCP server exposes resource list", "mcp_surface", "MCPServer", "MCPResourceList", false],
+  ["mcp_server_exposes_prompt_list", "MCP server exposes prompt list", "mcp_surface", "MCPServer", "MCPPromptList", false],
+  ["mcp_resource_list_contains_resource_definition", "MCP resource list contains resource definition", "mcp_surface", "MCPResourceList", "ResourceDefinition", true],
+  ["mcp_prompt_list_contains_prompt_definition", "MCP prompt list contains prompt definition", "mcp_surface", "MCPPromptList", "PromptDefinition", true],
+  ["mcp_client_opens_session", "MCP client opens session", "mcp_surface", "MCPClient", "MCPSession", false],
+  ["mcp_session_uses_transport", "MCP session uses transport", "mcp_surface", "MCPSession", "MCPTransport", false],
+  ["mcp_authorization_authorizes_tool_call", "MCP authorization authorizes tool call", "permission_bridge", "MCPAuthorization", "ToolCall", false],
+  ["mcp_authorization_authorizes_resource_read", "MCP authorization authorizes resource read", "permission_bridge", "MCPAuthorization", "ResourceReadRequest", false],
+  ["mcp_authorization_authorizes_prompt_get", "MCP authorization authorizes prompt get", "permission_bridge", "MCPAuthorization", "PromptGetRequest", false],
+  ["mcp_elicitation_requests_additional_input", "MCP elicitation requests additional input", "mcp_surface", "MCPElicitation", "AdditionalInput", false],
+  ["tool_invocation_candidate_checked_by_safety_check", "tool invocation candidate checked by safety check", "permission_bridge", "ToolInvocationCandidate", "PreExecutionSafetyCheck", false],
+  ["tool_description_trust_bounds_tool_definition", "tool description trust bounds tool definition", "permission_bridge", "ToolDescriptionTrust", "ToolDefinition", false],
+  ["tool_side_effect_requires_commit_gate", "tool side effect requires commit gate", "commit_control", "ToolSideEffect", "CommitGate", false],
+  ["tool_side_effect_materializes_side_effect", "tool side effect materializes side effect", "commit_control", "ToolSideEffect", "SideEffect", false],
   ["has_runtime_session", "has runtime session", "runtime_execution", "AgentSystem", "RuntimeSession", true],
   ["has_run_attempt", "has run attempt", "runtime_execution", "RuntimeSession", "RunAttempt", true],
   ["yields_run_outcome", "yields run outcome", "runtime_execution", "RunAttempt", "RunOutcome", true],
@@ -3190,6 +3538,46 @@ const objectPropertyDefinitions = new Map([
   ["escalates", "links a safety, review, or runtime event to a higher-authority decision path."],
   ["delegates", "links an actor or orchestrator to the agent, worker, or remote participant receiving responsibility."],
   ["routes", "links a routing event to the downstream branch, handler, or operation selected for execution."],
+  ["tool_registry_registers_tool_definition", "declares that a tool registry contains or registers a specific tool definition available for discovery, filtering, and invocation."],
+  ["tool_definition_defines_tool", "links a schema-like tool definition to the callable tool object whose identity, arguments, result, permissions, and constraints it describes."],
+  ["tool_definition_has_argument_schema", "links a tool definition to the argument schema used to validate constructed arguments before invocation."],
+  ["tool_definition_has_result_schema", "links a tool definition to the result schema used to interpret observable tool output, errors, warnings, and artifacts."],
+  ["tool_definition_declares_permission", "links a tool definition to the tool-side permission declaration that states required scopes, approvals, protected resources, and safety hooks."],
+  ["tool_definition_has_version", "links a tool definition to its version record so clients can distinguish compatible schema, behavior, and deprecation state."],
+  ["tool_definition_deprecated_by", "links a tool definition to the deprecation notice that explains replacement, removal, risk, or migration guidance."],
+  ["capability_surface_advertises_descriptor", "advertises a capability descriptor from a capability surface so tools, resources, prompts, and API operations can be discovered without flattening them into one type."],
+  ["capability_descriptor_describes_api_operation", "connects a capability descriptor to the API operation it describes, including endpoint, method, arguments, result, authorization, and side-effect metadata."],
+  ["tool_search_produces_candidate_set", "records that a tool search operation produces a bounded candidate set rather than exposing every available tool or capability to the model."],
+  ["tool_candidate_set_contains_candidate", "contains an individual tool candidate inside the candidate set returned by search, filtering, or protocol discovery."],
+  ["tool_candidate_ranked_by_match", "links a candidate tool to matching or ranking evidence such as embedding similarity, regex match, policy filter, or task fit score."],
+  ["tool_selection_decision_selects_tool", "records which tool was selected by a tool selection decision after candidate ranking, disambiguation, policy filtering, or fallback."],
+  ["tool_selection_decision_rejects_candidate", "records a tool candidate rejected by selection because of poor fit, missing permission, unsafe arguments, policy failure, or lower rank."],
+  ["tool_fallback_replaces_tool", "connects a fallback choice to the tool it replaces when the original tool is unavailable, unsafe, deprecated, or unsuitable."],
+  ["tool_call_uses_argument", "links a tool call to the structured argument object supplied to the invocation and validated against the tool definition."],
+  ["tool_argument_conforms_to_schema", "records schema conformance between a constructed tool argument and the argument schema declared by the tool definition."],
+  ["tool_call_has_attempt", "links a tool call to one concrete execution attempt so retries, failures, latency, side effects, and trace evidence remain separable."],
+  ["tool_call_retry_retries_attempt", "connects a retry event to the previous tool call attempt that it retries, including retry cause and bounded retry policy."],
+  ["tool_result_conforms_to_schema", "records schema conformance between an observable tool result and the result schema declared by the tool definition."],
+  ["tool_error_caused_by_attempt", "connects a tool error diagnostic to the tool call attempt that produced the failure, timeout, validation error, or exception."],
+  ["tool_warning_attached_to_result", "links a non-fatal warning or diagnostic to a tool result so degraded execution or partial response evidence is not lost."],
+  ["tool_call_emits_trace_event", "records the observable trace event emitted by a tool call, preserving timing, actor, selected tool, arguments, result, and policy evidence."],
+  ["tool_call_attempt_belongs_to_trace_span", "links a concrete tool call attempt to the trace span that bounds its duration, retries, attributes, and status."],
+  ["tool_result_observation_enters_context", "links a tool result observation to the context package that stages the observation for a later model call or agent step."],
+  ["mcp_server_exposes_tool_list", "exposes the server-side MCP tool list from an MCP server so clients can discover callable tool definitions and capability descriptors."],
+  ["mcp_server_exposes_resource_list", "exposes the server-side MCP resource list from an MCP server so clients can discover readable or subscribable context/data resources."],
+  ["mcp_server_exposes_prompt_list", "exposes the server-side MCP prompt list from an MCP server so clients can retrieve reusable prompt definitions and templates."],
+  ["mcp_resource_list_contains_resource_definition", "contains a resource definition in an MCP resource list, preserving the distinction between resource discovery and resource read results."],
+  ["mcp_prompt_list_contains_prompt_definition", "contains a prompt definition in an MCP prompt list, preserving the distinction between prompt discovery and instantiated prompt messages."],
+  ["mcp_client_opens_session", "links an MCP client to the session it opens with a server for capability discovery, authorization, tool calls, resource reads, prompts, and elicitation."],
+  ["mcp_session_uses_transport", "links an MCP session to the transport channel used to exchange protocol messages, requests, responses, and capability metadata."],
+  ["mcp_authorization_authorizes_tool_call", "authorizes an MCP tool call using protocol-side consent, grant, approval, scope, protected resource, or host policy metadata."],
+  ["mcp_authorization_authorizes_resource_read", "authorizes an MCP resource read request using protocol-side consent, grant, approval, scope, protected resource, or host policy metadata."],
+  ["mcp_authorization_authorizes_prompt_get", "authorizes an MCP prompt retrieval request using protocol-side consent, grant, approval, scope, protected resource, or host policy metadata."],
+  ["mcp_elicitation_requests_additional_input", "records that MCP elicitation requests additional input from a user or client before the server can continue a protocol interaction."],
+  ["tool_invocation_candidate_checked_by_safety_check", "checks a candidate tool invocation with a pre-execution safety check before the call can proceed to execution or approval."],
+  ["tool_description_trust_bounds_tool_definition", "links tool-description trust evidence to the tool definition whose annotation, description, schema, or server origin constrains safe use."],
+  ["tool_side_effect_requires_commit_gate", "links a tool-local side effect record to the commit gate that must approve, deny, sandbox, or roll back persistent external change."],
+  ["tool_side_effect_materializes_side_effect", "connects a tool-local side effect record to the canonical safety side effect used for audit, approval, rollback, and disclosure policy."],
   ["has_runtime_session", "links an agent system to a bounded runtime session so actors, attempts, traces, checkpoints, and artifacts are grouped under one execution episode."],
   ["has_run_attempt", "links a runtime session to an individual execution attempt, including retries and resumed attempts that occur inside the same session boundary."],
   ["yields_run_outcome", "links a run attempt to its terminal outcome record so success, failure, cancellation, produced artifacts, and final state remain auditable."],
@@ -3406,6 +3794,25 @@ const objectPropertySourceIds = (family) => {
       "eng-state-xstate-docs",
       "eng-val-jsonschema-spec",
       "eng-ont-fibo-ontology-guide"
+    ];
+  }
+
+  if (["registry_definition", "capability_surface", "schema_conformance", "discovery_selection", "invocation_execution", "mcp_surface", "permission_bridge"].includes(family)) {
+    return [
+      "eng-proto-mcp-spec",
+      "eng-fw-openai-python-docs",
+      "eng-fw-openai-tools",
+      "lit-mech-tool-use-evolution",
+      "lit-agent-toolsafe"
+    ];
+  }
+
+  if (family === "context_ingress") {
+    return [
+      "eng-proto-mcp-spec",
+      "eng-fw-openai-tracing",
+      "lit-mech-compass",
+      "eng-fw-openai-tools"
     ];
   }
 

@@ -121,9 +121,9 @@ describe("canonical agent ontology artifact", () => {
 
   it("names the first ontology layer as eight operational concern domains", () => {
     const expectedSummaryEn =
-      "Moonweave Agent Schema organizes agent systems through eight operational concern planes. These planes describe the recurring lifecycle surfaces of an agent system: context ingress and staging, control orchestration, runtime execution, interoperability adaptation, capability invocation, trust and safety mediation, observable feedback, and memory persistence.";
+      "Moonweave Agent Schema organizes agent systems through eight operational concern planes. These planes describe the recurring lifecycle surfaces of an agent system: context ingress and staging, control orchestration, runtime execution, interoperability adaptation, capability and resource invocation, trust and safety mediation, observable feedback, and memory persistence.";
     const expectedSummaryZh =
-      "Moonweave Agent Schema 通过八个运行关注域组织 agent 系统：上下文摄入与暂存、控制编排、运行执行、互操作适配、能力调用、信任与安全治理、可观测反馈，以及记忆与上下文持久化。";
+      "Moonweave Agent Schema 通过八个运行关注域组织 agent 系统：上下文摄入与暂存、控制编排、运行执行、互操作适配、能力与资源调用、信任与安全治理、可观测反馈，以及记忆与上下文持久化。";
     const docs = [
       readFileSync(join(process.cwd(), "README.md"), "utf8"),
       readFileSync(join(process.cwd(), "docs", "README.zh.md"), "utf8"),

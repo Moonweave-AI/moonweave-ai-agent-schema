@@ -27,12 +27,12 @@ must consume.
 | domains | 1 |
 | planes | 8 |
 | modules | 39 |
-| classes | 512 |
-| object properties | 301 |
+| classes | 545 |
+| object properties | 341 |
 | data properties | 98 |
 | annotation properties | 12 |
 | individuals | 78 |
-| axioms | 527 |
+| axioms | 567 |
 | datatypes | 8 |
 | ontology partitions | 47 |
 
@@ -51,7 +51,7 @@ their subject matter:
 
 ## Agent System Planes
 
-Moonweave Agent Schema organizes agent systems through eight operational concern planes. These planes describe the recurring lifecycle surfaces of an agent system: context ingress and staging, control orchestration, runtime execution, interoperability adaptation, capability invocation, trust and safety mediation, observable feedback, and memory persistence.
+Moonweave Agent Schema organizes agent systems through eight operational concern planes. These planes describe the recurring lifecycle surfaces of an agent system: context ingress and staging, control orchestration, runtime execution, interoperability adaptation, capability and resource invocation, trust and safety mediation, observable feedback, and memory persistence.
 
 | plane id | operational concern domain | modules |
 |---|---|---|

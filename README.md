@@ -5,7 +5,7 @@
 
   <p>
     An evidence-bound ontology engineering framework for agent systems:
-    context ingress, control orchestration, runtime traces, interoperability, capability invocation, trust and safety, observability, memory persistence, schemas, and graph exploration.
+    context ingress, control orchestration, runtime traces, interoperability, capability and resource invocation, trust and safety, observability, memory persistence, schemas, and graph exploration.
   </p>
 
   <p>
@@ -70,18 +70,18 @@ metadata around the artifact, not part of the agent runtime itself.
 | Domains | 1 |
 | Planes | 8 |
 | Modules | 39 |
-| Classes | 512 |
-| Object properties | 301 |
+| Classes | 545 |
+| Object properties | 341 |
 | Data properties | 98 |
 | Annotation properties | 12 |
 | Individuals | 78 |
-| Axioms | 527 |
+| Axioms | 567 |
 | Datatypes | 8 |
 | Ontology partitions | 47 |
 
 ## Planes
 
-Moonweave Agent Schema organizes agent systems through eight operational concern planes. These planes describe the recurring lifecycle surfaces of an agent system: context ingress and staging, control orchestration, runtime execution, interoperability adaptation, capability invocation, trust and safety mediation, observable feedback, and memory persistence.
+Moonweave Agent Schema organizes agent systems through eight operational concern planes. These planes describe the recurring lifecycle surfaces of an agent system: context ingress and staging, control orchestration, runtime execution, interoperability adaptation, capability and resource invocation, trust and safety mediation, observable feedback, and memory persistence.
 
 | Plane | Scope |
 |---|---|
@@ -89,7 +89,7 @@ Moonweave Agent Schema organizes agent systems through eight operational concern
 | Control & Orchestration Domain | Goals, objectives, task plans, delegation ownership, handoffs, agents-as-tools, context isolation, worker selection, routing targets, gates, orchestration topology, prompt chains, parallel composition, synthesis provenance, and bounded feedback/retry loops. |
 | Runtime State & Trace Domain | Runtime execution envelopes and raw provenance evidence: sessions, run attempts, outcomes, actor authority bindings, trace/span/event structure, checkpoints, snapshots, state diffs, replay and restore events, and artifact production, consumption, and derivation lineage. |
 | Interoperability & Adapter Domain | Adapter membrane for protocol, framework, benchmark, statechart, schema/export, language profile, Graph IR, and frontend projections, with directional mapping rules, source/version provenance, conversion warnings, and core-pollution controls. |
-| Capability & Resource Invocation Domain | Tool and capability registries, definitions, discovery, matching, invocation, execution, MCP transport, resources, prompts, results, and observable side effects. |
+| Capability & Resource Invocation Domain | Capability registries, tool/resource/prompt/API definitions, discovery and selection, schema conformance, tool execution, resource reads, prompt instantiation, MCP protocol surfaces, authorization bridges, diagnostics, trace/context handoff, and auditable side effects. |
 | Trust, Policy & Safety Domain | Auditable safety propagation across trust boundaries, authority scopes, permission prompts, policy decisions, sandbox and network controls, source-sink injection defense, memory poisoning signals, side-effect commit gates, redaction, and audit disclosure. |
 | Observability & Feedback Domain | Warnings, errors, feedback, critique, review, metrics, benchmark observations, telemetry, audit logs, optimization loops, recovery, and diagnostics. |
 | Memory & Context Persistence Domain | Memory ingestion, files, documents, chunking, situating, embeddings, retrieval, ranking, context assembly, summaries, preferences, and persistence policy. |
