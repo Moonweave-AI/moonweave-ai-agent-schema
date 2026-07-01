@@ -9,7 +9,7 @@ const curatedDefinitions = definitionLedger.definitions ?? {};
 const sourceFallback = {
   "runtime-plane": ["eng-fw-openai-python-docs", "eng-fw-langgraph-docs", "eng-fw-openai-tracing"],
   "info-plane": ["lit-mech-compass", "eng-fw-deepagents-js-docs", "eng-proto-mcp-spec"],
-  "memory-plane": ["lit-mech-compass", "lit-mas-generative-agents", "eng-fw-langchain-agents"],
+  "memory-plane": ["lit-agent-agemem", "eng-fw-langgraph-docs", "eng-fw-deepagents-js-docs", "lit-mas-generative-agents"],
   "orchestration-plane": ["lit-agent-conductor", "eng-fw-langgraph-docs", "eng-fw-crewai-docs"],
   "tool-plane": ["eng-proto-mcp-spec", "eng-fw-openai-python-docs", "lit-mech-tool-use-evolution"],
   "safety-plane": ["lit-agent-safeagent", "eng-security-mcp-nsa-2026", "eng-fw-openai-guardrails"],
@@ -232,11 +232,9 @@ const moduleSpecs = [
     id: "memory-ingestion",
     plane_id: "memory-plane",
     label: "Memory Ingestion Module",
-    definition: "models source loading, memory files, document preparation, and ingestion events",
+    definition: "models source loading, document preparation, attachment, metadata, deduplication, and ingestion events that make external or internal material eligible for memory use",
+    source_ids: ["lit-mech-compass", "eng-fw-deepagents-js-docs", "eng-fw-langgraph-docs", "lit-mas-generative-agents"],
     class_ids: [
-      "MemoryPlane",
-      "MemoryStore",
-      "MemoryFile",
       "Document",
       "StorageArea",
       "Resource",
@@ -256,17 +254,44 @@ const moduleSpecs = [
       ["DocumentLoader", "document loader"],
       ["DocumentMetadata", "document metadata"],
       ["SourceAttachment", "source attachment"],
-      ["MemoryNamespace", "memory namespace"],
-      ["MemoryScope", "memory scope"],
       ["IngestionPolicy", "ingestion policy"],
       ["DeduplicationEvent", "deduplication event"]
+    ]
+  },
+  {
+    id: "memory-stores-scopes",
+    plane_id: "memory-plane",
+    label: "Memory Store, Scope And Typology Module",
+    definition:
+      "models persistent and session-scoped memory stores, namespaces, access scopes, memory records, retention policy, and memory type taxonomy across working, short-term, long-term, episodic, semantic, procedural, reflective, preference, task, session, and cross-session memory",
+    source_ids: ["lit-agent-agemem", "eng-fw-langgraph-docs", "eng-fw-deepagents-js-docs", "lit-mas-generative-agents"],
+    class_ids: ["MemoryStore", "MemoryFile", "MemoryPreference", "PreferenceMemory"],
+    generated: [
+      ["MemoryRecord", "memory record"],
+      ["MemoryItem", "memory item"],
+      ["MemoryNamespace", "memory namespace"],
+      ["MemoryScope", "memory scope"],
+      ["WorkingMemory", "working memory"],
+      ["ShortTermMemory", "short-term memory"],
+      ["LongTermMemory", "long-term memory"],
+      ["EpisodicMemory", "episodic memory"],
+      ["SemanticMemory", "semantic memory"],
+      ["ProceduralMemory", "procedural memory"],
+      ["ExperienceMemory", "experience memory"],
+      ["ReflectiveMemory", "reflective memory"],
+      ["TaskMemory", "task memory"],
+      ["SessionMemory", "session memory"],
+      ["CrossSessionMemory", "cross-session memory"],
+      ["MemoryRetentionPolicy", "memory retention policy"]
     ]
   },
   {
     id: "memory-chunking-situating",
     plane_id: "memory-plane",
     label: "Chunking And Situating Module",
-    definition: "models chunking, chunk metadata, situating prompts, and document-local grounding",
+    definition:
+      "models memory-oriented chunking, chunk metadata, situating prompts, and document-local grounding used before retrieval and context assembly",
+    source_ids: ["lit-mech-compass", "eng-fw-langchain-agents", "eng-fw-deepagents-js-docs", "lit-agent-memexrl"],
     class_ids: ["Chunk", "ChunkingRun", "SituatingPromptRun"],
     generated: [
       ["ChunkBoundary", "chunk boundary"],
@@ -284,6 +309,7 @@ const moduleSpecs = [
     plane_id: "memory-plane",
     label: "Embedding And Index Module",
     definition: "models vector and lexical indexes used to retrieve memory",
+    source_ids: ["lit-mech-compass", "eng-fw-langchain-agents", "lit-agent-magma", "lit-agent-memexrl"],
     class_ids: [
       "VectorDatabase",
       "VectorIndex",
@@ -310,7 +336,9 @@ const moduleSpecs = [
     id: "memory-retrieval-ranking",
     plane_id: "memory-plane",
     label: "Retrieval And Ranking Module",
-    definition: "models retrieval queries, candidate sets, scoring, reranking, and rank fusion",
+    definition:
+      "models memory retrieval queries, candidate sets, scoring, reranking, rank fusion, and selection decisions before context inclusion",
+    source_ids: ["lit-mech-compass", "eng-fw-langchain-agents", "lit-agent-magma", "lit-agent-ama-bench"],
     class_ids: ["RetrievalQuery", "RetrievedChunk", "RankFusion"],
     generated: [
       ["CandidateSet", "candidate set"],
@@ -328,7 +356,8 @@ const moduleSpecs = [
     plane_id: "memory-plane",
     label: "Context Assembly Module",
     definition: "models context windows, context assembly, summaries, and preference-guided memory inclusion",
-    class_ids: ["ContextWindow", "ContextAssembly", "MemoryPreference"],
+    source_ids: ["lit-mech-compass", "eng-fw-deepagents-js-docs", "lit-mas-generative-agents", "lit-agent-memory-as-action"],
+    class_ids: ["ContextWindow", "ContextAssembly"],
     generated: [
       ["ContextSlot", "context slot"],
       ["ContextBudget", "context budget"],
@@ -336,8 +365,33 @@ const moduleSpecs = [
       ["ContextSource", "context source"],
       ["ContextOrderingRule", "context ordering rule"],
       ["ContextExclusion", "context exclusion"],
-      ["PreferenceMemory", "preference memory"],
       ["ContextRefreshEvent", "context refresh event"]
+    ]
+  },
+  {
+    id: "memory-lifecycle",
+    plane_id: "memory-plane",
+    label: "Memory Lifecycle Operations Module",
+    definition:
+      "models agentic memory operations that write, update, delete, discard, merge, consolidate, compact, expire, validate, supersede, reflect on, and audit memory records before they influence future context or behavior",
+    source_ids: ["lit-agent-agemem", "lit-agent-mempo", "lit-agent-memory-as-action", "lit-agent-asb"],
+    class_ids: [],
+    generated: [
+      ["MemoryWrite", "memory write"],
+      ["MemoryUpdate", "memory update"],
+      ["MemoryDelete", "memory delete"],
+      ["MemoryDiscard", "memory discard"],
+      ["MemoryMerge", "memory merge"],
+      ["MemoryConsolidation", "memory consolidation"],
+      ["MemoryCompaction", "memory compaction"],
+      ["MemoryEviction", "memory eviction"],
+      ["MemoryDecay", "memory decay"],
+      ["MemoryExpiration", "memory expiration"],
+      ["MemoryValidation", "memory validation"],
+      ["MemoryConflict", "memory conflict"],
+      ["MemorySupersession", "memory supersession"],
+      ["MemoryReflection", "memory reflection"],
+      ["MemoryAuditEvent", "memory audit event"]
     ]
   },
   {
@@ -2033,7 +2087,335 @@ const exactGeneratedClassDefinitions = new Map([
   ],
   [
     "IngestionRun",
-    "records one source-ingestion execution that loads, parses, deduplicates, annotates, or attaches documents for memory and retrieval use."
+    "observable ingestion event that loads, parses, normalizes, deduplicates, annotates, or attaches source material before it can become a memory record, chunk, or retrieval candidate."
+  ],
+  [
+    "Document",
+    "memory source artifact loaded or attached for parsing, metadata capture, chunking, indexing, citation, or later retrieval."
+  ],
+  [
+    "DocumentLoader",
+    "loader or connector that obtains a document from a file, database, graph, network source, tool output, memory file, or attachment under access and trust controls."
+  ],
+  [
+    "DocumentMetadata",
+    "metadata record describing a document's source, version, checksum, author, timestamp, format, permissions, trust zone, and parsing state for memory use."
+  ],
+  [
+    "SourceAttachment",
+    "attached source object or reference carried into ingestion with provenance, location, checksum, and trust-boundary metadata."
+  ],
+  [
+    "IngestionPolicy",
+    "policy that decides which sources may be loaded, parsed, deduplicated, attached, stored, excluded, or sent for safety review before memory persistence."
+  ],
+  [
+    "DeduplicationEvent",
+    "observable ingestion event that detects duplicate or near-duplicate source material and links the retained record to the suppressed duplicate evidence."
+  ],
+  [
+    "MemoryStore",
+    "storage anchor that supports reading, writing, updating, deleting, merging, compacting, expiring, retrieving, and auditing memory records across session or long-term scopes."
+  ],
+  [
+    "MemoryFile",
+    "file-backed persistent memory resource that preserves project conventions, user preferences, notes, plans, or cross-session context outside the immediate prompt window."
+  ],
+  [
+    "MemoryRecord",
+    "persistent or session-scoped memory entry with content, provenance, type, namespace, scope, retention state, confidence, and lifecycle history."
+  ],
+  [
+    "MemoryItem",
+    "addressable memory unit that may be stored as text, summary, vector-backed chunk, experience, preference, procedure, or reflection."
+  ],
+  [
+    "MemoryNamespace",
+    "isolation and lookup boundary that separates memory records by user, task, project, tenant, agent, thread, or cross-session reuse context."
+  ],
+  [
+    "MemoryScope",
+    "policy boundary that states where memory may be read, written, updated, reused, disclosed, or forgotten across session, user, task, tenant, and trust contexts."
+  ],
+  [
+    "WorkingMemory",
+    "transient memory surface used during an active reasoning or execution step to hold current task state, scratch state, selected evidence, and pending actions without implying long-term persistence."
+  ],
+  [
+    "ShortTermMemory",
+    "thread- or session-level memory retained across nearby steps in a run so state can be resumed, checked, or summarized before it becomes long-term memory."
+  ],
+  [
+    "LongTermMemory",
+    "durable memory retained across sessions or threads for future tasks, usually governed by namespace, retention, validation, and user or project scope."
+  ],
+  [
+    "EpisodicMemory",
+    "memory record of an observed episode, interaction, event sequence, decision, or experience that can later support retrieval, reflection, evaluation, or planning."
+  ],
+  [
+    "SemanticMemory",
+    "memory record that stores generalized facts, concepts, user knowledge, project conventions, or world knowledge independent of one specific episode."
+  ],
+  [
+    "ProceduralMemory",
+    "memory record that stores reusable procedures, skills, workflows, tool-use patterns, or policy routines for future action selection."
+  ],
+  [
+    "ExperienceMemory",
+    "memory record distilled from prior agent-environment trajectories, tool outcomes, failures, corrections, or successes for future adaptation."
+  ],
+  [
+    "ReflectiveMemory",
+    "higher-level memory produced by reflection or consolidation over observations, episodes, feedback, and outcomes to guide future planning or behavior."
+  ],
+  [
+    "TaskMemory",
+    "task-scoped memory that preserves decisions, constraints, intermediate artifacts, dependencies, and lessons for a particular goal or work item."
+  ],
+  [
+    "SessionMemory",
+    "memory retained within a runtime session or thread boundary, including state needed for continuity, checkpointing, and context refresh."
+  ],
+  [
+    "CrossSessionMemory",
+    "memory retained beyond one session so preferences, experience, project knowledge, or procedures can be reused in later conversations or runs."
+  ],
+  [
+    "MemoryRetentionPolicy",
+    "policy that governs how long memory records, summaries, indexes, and traces may be retained, refreshed, compacted, expired, deleted, or disclosed."
+  ],
+  [
+    "MemoryPreference",
+    "stored preference statement that records user, task, project, or policy guidance and influences future retrieval, summarization, context inclusion, or behavior."
+  ],
+  [
+    "PreferenceMemory",
+    "long-lived memory record for stable preferences or standing instructions, scoped by source, confidence, freshness, and supersession so it can guide context assembly without becoming hidden reasoning."
+  ],
+  [
+    "Chunk",
+    "bounded segment of a document, output, message, or memory item with source span, boundary, provenance, and retrieval metadata used for indexing and context assembly."
+  ],
+  [
+    "ChunkingRun",
+    "observable event that divides a document, output, or memory item into retrievable chunks with boundary, overlap, span, and provenance metadata."
+  ],
+  [
+    "SituatingPromptRun",
+    "observable event that adds document-local or task-local context to a chunk so retrieval can preserve section meaning, source purpose, and surrounding evidence."
+  ],
+  [
+    "ChunkBoundary",
+    "structural boundary for a chunk, such as byte offset, token span, line range, page range, section break, semantic boundary, or overlap boundary."
+  ],
+  [
+    "ChunkOverlap",
+    "overlap span shared between adjacent chunks to preserve local continuity during retrieval and context assembly."
+  ],
+  [
+    "ChunkProvenance",
+    "provenance record linking a chunk to its document, source span, version, checksum, ingestion run, and transformation history."
+  ],
+  [
+    "SituatedChunk",
+    "chunk augmented with local document context, section explanation, source purpose, or task-relevant grounding note before indexing."
+  ],
+  [
+    "ChunkContextNote",
+    "short note attached to a chunk that explains its local section, surrounding context, or reason for retrieval relevance."
+  ],
+  [
+    "ChunkQualitySignal",
+    "quality signal for a chunk such as extraction confidence, parsing completeness, duplication status, staleness, toxicity, or retrieval usefulness."
+  ],
+  [
+    "ChunkCompression",
+    "compression artifact that shortens a chunk or local span while preserving source anchors and retrieval-relevant meaning; it is distinct from a whole-context summary."
+  ],
+  [
+    "ChunkReference",
+    "reference from a chunk or retrieved chunk to the exact source span, anchor, line range, page range, offset, or document version it came from."
+  ],
+  [
+    "EmbeddingVector",
+    "vector representation produced from a chunk, document span, memory record, or query for similarity search, ranking, clustering, or index construction."
+  ],
+  [
+    "DenseVector",
+    "dense embedding vector representation produced by an embedding model for semantic similarity search over memory records, chunks, or context candidates."
+  ],
+  [
+    "SparseVector",
+    "sparse vector representation such as weighted token, term, or feature dimensions used for lexical or hybrid retrieval over memory records and chunks."
+  ],
+  [
+    "EmbeddingRun",
+    "observable event in which a specific embedding model and version encodes a chunk, document span, memory record, or query and produces an EmbeddingVector."
+  ],
+  [
+    "IndexBuildRun",
+    "observable event that builds or refreshes an index from memory records, chunks, embeddings, lexical features, or graph links and emits an IndexVersion."
+  ],
+  [
+    "IndexVersion",
+    "versioned snapshot of an index with build provenance, source coverage, embedding model, lexical configuration, shard layout, and validity period."
+  ],
+  [
+    "IndexShard",
+    "partition of a vector, lexical, hybrid, or graph index used to scale retrieval while preserving index-version provenance."
+  ],
+  [
+    "HybridIndex",
+    "retrieval index that combines dense semantic vectors, sparse lexical features, or graph/context signals before scoring or rank fusion."
+  ],
+  [
+    "TfIdfIndex",
+    "lexical index that represents documents, chunks, or memory records through term frequency and inverse document frequency weights."
+  ],
+  [
+    "VectorDatabase",
+    "storage and query surface for vector indexes, embeddings, metadata filters, and nearest-neighbor retrieval over memory records or chunks."
+  ],
+  [
+    "VectorIndex",
+    "index structure that organizes embedding vectors and metadata so retrieval queries can return similar memory records, chunks, or context candidates."
+  ],
+  [
+    "RetrievalQuery",
+    "observable retrieval event that searches a memory store, namespace, index version, or candidate source using query content, filters, budget, and ranking configuration."
+  ],
+  [
+    "RetrievedChunk",
+    "chunk returned by retrieval with score, rank, source provenance, index version, and context-inclusion metadata."
+  ],
+  [
+    "RankFusion",
+    "ranking event that combines candidate lists or scores from multiple indexes, models, filters, or retrieval methods into a single ordering."
+  ],
+  [
+    "CandidateSet",
+    "bounded set of retrieval candidates produced for a query before filtering, scoring, reranking, top-k selection, or context inclusion."
+  ],
+  [
+    "CandidateChunk",
+    "candidate chunk considered during retrieval and ranking, carrying source provenance, match evidence, score slots, and selection state."
+  ],
+  [
+    "SimilarityScore",
+    "semantic similarity score between a query and candidate memory record or chunk, usually derived from embedding distance or vector similarity."
+  ],
+  [
+    "LexicalScore",
+    "lexical relevance score based on token, term, BM25, TF-IDF, or exact-match evidence between a query and candidate chunk or memory record."
+  ],
+  [
+    "RerankScore",
+    "score assigned by a reranker model or secondary scoring method after initial retrieval candidate generation."
+  ],
+  [
+    "TopKSelection",
+    "selection decision that chooses the highest-ranked retrieved chunks or memory records under k, budget, diversity, freshness, and policy constraints."
+  ],
+  [
+    "RetrievalFilter",
+    "filter applied to retrieval by namespace, memory type, source, time range, trust zone, permission, freshness, task scope, or exclusion policy."
+  ],
+  [
+    "RetrievalTrace",
+    "trace record that explains query text, filters, index versions, candidate construction, scores, rank fusion, exclusions, and top-k selection."
+  ],
+  [
+    "ContextWindow",
+    "bounded visible set of instructions, messages, retrieved chunks, memory records, summaries, tool results, and artifacts available to one model call or agent step."
+  ],
+  [
+    "ContextAssembly",
+    "observable event that selects, orders, budgets, summarizes, includes, or excludes memory records, messages, retrieved chunks, runtime observations, and instructions for a runtime context."
+  ],
+  [
+    "ContextOrderingRule",
+    "rule that orders context by priority, recency, freshness, authority, source trust, retrieval rank, task relevance, message role, and budget pressure."
+  ],
+  [
+    "ContextSlot",
+    "reserved position or segment in a context window for system instruction, task state, retrieved evidence, memory record, summary, tool result, or artifact."
+  ],
+  [
+    "ContextSource",
+    "origin descriptor for context content, such as message, memory record, retrieval result, document chunk, tool result, trace observation, or artifact."
+  ],
+  [
+    "ContextSummary",
+    "compressed representation of prior state, evidence, conversation, retrieved material, or memory records used to fit a context budget without storing hidden reasoning."
+  ],
+  [
+    "ContextExclusion",
+    "exclusion decision for information intentionally omitted, redacted, deferred, or blocked from context because of privacy, trust boundary, relevance, safety, or budget policy."
+  ],
+  [
+    "ContextRefreshEvent",
+    "observable update that reruns retrieval, replaces stale memory, recomputes summaries, or reorders context after new evidence, feedback, or state changes."
+  ],
+  [
+    "MemoryWrite",
+    "observable operation that proposes or commits a new memory record from a message, tool result, trace event, experience, preference, summary, or reflection."
+  ],
+  [
+    "MemoryUpdate",
+    "observable operation that revises an existing memory record's content, confidence, scope, provenance, retention state, or links."
+  ],
+  [
+    "MemoryDelete",
+    "observable operation that removes a memory record or makes it unavailable under deletion, privacy, retention, or user-request policy."
+  ],
+  [
+    "MemoryDiscard",
+    "observable operation that rejects a candidate memory before persistence because it is irrelevant, unsafe, duplicate, stale, low-confidence, or out of scope."
+  ],
+  [
+    "MemoryMerge",
+    "observable operation that combines related memory records while preserving provenance, conflicts, source links, and superseded record lineage."
+  ],
+  [
+    "MemoryConsolidation",
+    "observable operation that distills multiple observations, episodes, records, or feedback items into a summary, semantic memory, reflective memory, or procedure."
+  ],
+  [
+    "MemoryCompaction",
+    "operation that compresses memory content or history to reduce storage and context cost while preserving source anchors and retrieval utility."
+  ],
+  [
+    "MemoryEviction",
+    "operation that removes or deprioritizes memory from an active store, cache, or context candidate pool due to capacity, staleness, or policy."
+  ],
+  [
+    "MemoryDecay",
+    "process that lowers freshness, priority, confidence, or retrieval weight of a memory record over time or after contradictory evidence."
+  ],
+  [
+    "MemoryExpiration",
+    "event that marks a memory record, summary, index entry, or retention window as expired under time, scope, consent, or policy constraints."
+  ],
+  [
+    "MemoryValidation",
+    "review or policy operation that checks a memory record for provenance, safety, trust boundary, freshness, conflict, poisoning, or user approval before reuse."
+  ],
+  [
+    "MemoryConflict",
+    "record of contradiction between memory records, source evidence, preferences, policies, or current user instructions that requires resolution or supersession."
+  ],
+  [
+    "MemorySupersession",
+    "event that replaces an older memory record with a newer or higher-authority record while retaining lineage and audit evidence."
+  ],
+  [
+    "MemoryReflection",
+    "event that derives higher-level lessons, preferences, plans, or behavior guidance from observations, episodes, feedback, or outcomes."
+  ],
+  [
+    "MemoryAuditEvent",
+    "observable audit event that records who read, wrote, updated, validated, deleted, exported, or reused a memory record."
   ],
   [
     "MCPSession",
@@ -2045,23 +2427,23 @@ const exactGeneratedClassDefinitions = new Map([
   ],
   [
     "ContextExclusion",
-    "records information intentionally omitted, redacted, deferred, or blocked from context because of privacy, trust-boundary, relevance, or budget policy."
+    "exclusion decision for information intentionally omitted, redacted, deferred, or blocked from context because of privacy, trust boundary, relevance, safety, or budget policy."
   ],
   [
     "ContextRefreshEvent",
-    "records an observable update that replaces stale context, re-runs retrieval, or reorders context after new evidence or state changes."
+    "observable update that reruns retrieval, replaces stale memory, recomputes summaries, or reorders context after new evidence, feedback, or state changes."
   ],
   [
     "ContextSlot",
-    "identifies a reserved position or segment in the context window, such as system instruction, task state, retrieved evidence, memory, or tool result."
+    "reserved position or segment in a context window for system instruction, task state, retrieved evidence, memory record, summary, tool result, or artifact."
   ],
   [
     "ContextSource",
-    "identifies the origin of context content, such as a message, memory record, retrieval result, document chunk, tool result, or artifact."
+    "origin descriptor for context content, such as message, memory record, retrieval result, document chunk, tool result, trace observation, or artifact."
   ],
   [
     "ContextSummary",
-    "stores a compressed or condensed representation of prior state, evidence, or conversation used to fit the context budget without storing hidden reasoning."
+    "compressed representation of prior state, evidence, conversation, retrieved material, or memory records used to fit a context budget without storing hidden reasoning."
   ],
   [
     "Goal",
@@ -3001,10 +3383,18 @@ const planeDefinitionOverrides = new Map([
       definition:
         "Observability & Feedback Domain is the operational concern domain for deriving diagnostic, review, metric, telemetry, audit, recovery, and learning signals from observable runtime evidence. It separates raw trace evidence from interpreted feedback, keeps benchmark-specific semantics in adapters, and records how feedback returns to orchestration, memory, tool selection, policy, and optimization loops."
     }
+  ],
+  [
+    "memory-plane",
+    {
+      label: "Memory & Context Persistence Domain",
+      definition:
+        "Memory & Context Persistence Domain is the operational concern domain for agentic memory stores, scoped memory records, context assembly, retrieval pipelines, and memory lifecycle operations. It covers ingestion, memory typology, chunking, embedding, indexing, retrieval, ranking, context inclusion, summarization, preference memory, and the write-update-delete-merge-consolidate-expire-validate loop that lets persistent memory influence future behavior under provenance and safety controls."
+    }
   ]
 ]);
 
-const removedClassIds = new Set(["InfoPlane", "OrchestrationPlane", "AdapterPlane", "SafetyPlane", "FeedbackPlane", "ToolPlane", "UserAgentMessage", "ToolMessage"]);
+const removedClassIds = new Set(["InfoPlane", "OrchestrationPlane", "AdapterPlane", "SafetyPlane", "FeedbackPlane", "ToolPlane", "MemoryPlane", "UserAgentMessage", "ToolMessage"]);
 const ownership = (canonical_owner_plane, participating_planes = [], context_ingress_role) => ({
   canonical_owner_plane,
   participating_planes: [...new Set([canonical_owner_plane, ...participating_planes])],
@@ -3263,6 +3653,38 @@ const generatedKindOverrides = new Map([
   ["LogListener", "object_type"],
   ["ErrorListener", "object_type"],
   ["EventSink", "object_type"]
+  ,
+  ["MemoryNamespace", "object_type"],
+  ["MemoryScope", "policy_type"],
+  ["MemoryRecord", "resource_type"],
+  ["MemoryItem", "resource_type"],
+  ["WorkingMemory", "resource_type"],
+  ["ShortTermMemory", "resource_type"],
+  ["LongTermMemory", "resource_type"],
+  ["EpisodicMemory", "resource_type"],
+  ["SemanticMemory", "resource_type"],
+  ["ProceduralMemory", "resource_type"],
+  ["ExperienceMemory", "resource_type"],
+  ["ReflectiveMemory", "resource_type"],
+  ["TaskMemory", "resource_type"],
+  ["SessionMemory", "resource_type"],
+  ["CrossSessionMemory", "resource_type"],
+  ["MemoryRetentionPolicy", "policy_type"],
+  ["MemoryWrite", "event_type"],
+  ["MemoryUpdate", "event_type"],
+  ["MemoryDelete", "event_type"],
+  ["MemoryDiscard", "event_type"],
+  ["MemoryMerge", "event_type"],
+  ["MemoryConsolidation", "event_type"],
+  ["MemoryCompaction", "event_type"],
+  ["MemoryEviction", "event_type"],
+  ["MemoryDecay", "event_type"],
+  ["MemoryExpiration", "event_type"],
+  ["MemoryValidation", "event_type"],
+  ["MemoryConflict", "event_type"],
+  ["MemorySupersession", "event_type"],
+  ["MemoryReflection", "event_type"],
+  ["MemoryAuditEvent", "event_type"]
 ]);
 const classKindOverrides = new Map([
   ["RuntimeSession", "object_type"],
@@ -3413,6 +3835,38 @@ const classKindOverrides = new Map([
   ["LogListener", "object_type"],
   ["ErrorListener", "object_type"],
   ["EventSink", "object_type"]
+  ,
+  ["MemoryNamespace", "object_type"],
+  ["MemoryScope", "policy_type"],
+  ["MemoryRecord", "resource_type"],
+  ["MemoryItem", "resource_type"],
+  ["WorkingMemory", "resource_type"],
+  ["ShortTermMemory", "resource_type"],
+  ["LongTermMemory", "resource_type"],
+  ["EpisodicMemory", "resource_type"],
+  ["SemanticMemory", "resource_type"],
+  ["ProceduralMemory", "resource_type"],
+  ["ExperienceMemory", "resource_type"],
+  ["ReflectiveMemory", "resource_type"],
+  ["TaskMemory", "resource_type"],
+  ["SessionMemory", "resource_type"],
+  ["CrossSessionMemory", "resource_type"],
+  ["MemoryRetentionPolicy", "policy_type"],
+  ["MemoryWrite", "event_type"],
+  ["MemoryUpdate", "event_type"],
+  ["MemoryDelete", "event_type"],
+  ["MemoryDiscard", "event_type"],
+  ["MemoryMerge", "event_type"],
+  ["MemoryConsolidation", "event_type"],
+  ["MemoryCompaction", "event_type"],
+  ["MemoryEviction", "event_type"],
+  ["MemoryDecay", "event_type"],
+  ["MemoryExpiration", "event_type"],
+  ["MemoryValidation", "event_type"],
+  ["MemoryConflict", "event_type"],
+  ["MemorySupersession", "event_type"],
+  ["MemoryReflection", "event_type"],
+  ["MemoryAuditEvent", "event_type"]
 ]);
 
 const inferredGeneratedKind = (id, label) => {
@@ -3604,6 +4058,59 @@ const objectPropertySeeds = [
   ["ranks", "ranks", "memory_flow", "event_type", "resource_type", false],
   ["summarizes", "summarizes", "memory_flow", "event_type", "resource_type", false],
   ["indexes", "indexes", "information_flow", "index_type", "resource_type", false],
+  ["ingestion_run_loads_document", "ingestion run loads document", "memory_ingestion", "IngestionRun", "Document", false],
+  ["ingestion_run_writes_to_memory_store", "ingestion run writes to memory store", "memory_ingestion", "IngestionRun", "MemoryStore", false],
+  ["document_has_document_metadata", "document has document metadata", "memory_ingestion", "Document", "DocumentMetadata", false],
+  ["document_attached_from_source", "document attached from source", "memory_ingestion", "Document", "SourceAttachment", false],
+  ["memory_store_has_namespace", "memory store has namespace", "memory_persistence", "MemoryStore", "MemoryNamespace", true],
+  ["memory_store_governed_by_retention_policy", "memory store governed by retention policy", "memory_persistence", "MemoryStore", "MemoryRetentionPolicy", false],
+  ["memory_record_belongs_to_namespace", "memory record belongs to namespace", "memory_persistence", "MemoryRecord", "MemoryNamespace", false],
+  ["memory_record_has_scope", "memory record has scope", "memory_persistence", "MemoryRecord", "MemoryScope", false],
+  ["memory_file_materializes_record", "memory file materializes record", "memory_persistence", "MemoryFile", "MemoryRecord", false],
+  ["short_term_memory_materializes_record", "short-term memory materializes record", "memory_persistence", "ShortTermMemory", "MemoryRecord", false],
+  ["long_term_memory_materializes_record", "long-term memory materializes record", "memory_persistence", "LongTermMemory", "MemoryRecord", false],
+  ["chunk_derived_from_document", "chunk derived from document", "memory_chunking", "Chunk", "Document", false],
+  ["chunk_has_boundary", "chunk has boundary", "memory_chunking", "Chunk", "ChunkBoundary", false],
+  ["chunk_has_provenance", "chunk has provenance", "memory_chunking", "Chunk", "ChunkProvenance", false],
+  ["chunk_reference_targets_source_span", "chunk reference targets source span", "memory_chunking", "ChunkReference", "SourceSpan", false],
+  ["chunking_run_produces_chunk", "chunking run produces chunk", "memory_chunking", "ChunkingRun", "Chunk", false],
+  ["embedding_run_embeds_chunk", "embedding run embeds chunk", "memory_indexing", "EmbeddingRun", "Chunk", false],
+  ["embedding_run_produces_vector", "embedding run produces vector", "memory_indexing", "EmbeddingRun", "EmbeddingVector", false],
+  ["vector_index_contains_embedding", "vector index contains embedding", "memory_indexing", "VectorIndex", "EmbeddingVector", true],
+  ["index_build_run_produces_index_version", "index build run produces index version", "memory_indexing", "IndexBuildRun", "IndexVersion", false],
+  ["retrieval_query_searches_index", "retrieval query searches index", "memory_retrieval", "RetrievalQuery", "IndexVersion", false],
+  ["retrieval_query_returns_candidate_set", "retrieval query returns candidate set", "memory_retrieval", "RetrievalQuery", "CandidateSet", false],
+  ["candidate_set_contains_chunk", "candidate set contains chunk", "memory_retrieval", "CandidateSet", "CandidateChunk", true],
+  ["candidate_chunk_scored_by_similarity", "candidate chunk scored by similarity", "memory_retrieval", "CandidateChunk", "SimilarityScore", false],
+  ["candidate_chunk_scored_by_lexical", "candidate chunk scored by lexical", "memory_retrieval", "CandidateChunk", "LexicalScore", false],
+  ["rank_fusion_combines_candidate_set", "rank fusion combines candidate set", "memory_retrieval", "RankFusion", "CandidateSet", false],
+  ["top_k_selection_selects_retrieved_chunk", "top-k selection selects retrieved chunk", "memory_retrieval", "TopKSelection", "RetrievedChunk", false],
+  ["context_assembly_includes_retrieved_chunk", "context assembly includes retrieved chunk", "memory_context", "ContextAssembly", "RetrievedChunk", false],
+  ["context_assembly_uses_budget", "context assembly uses budget", "memory_context", "ContextAssembly", "ContextBudget", false],
+  ["context_assembly_applies_ordering_rule", "context assembly applies ordering rule", "memory_context", "ContextAssembly", "ContextOrderingRule", false],
+  ["retrieved_chunk_fills_context_slot", "retrieved chunk fills context slot", "memory_context", "RetrievedChunk", "ContextSlot", false],
+  ["context_exclusion_excludes_chunk", "context exclusion excludes chunk", "memory_context", "ContextExclusion", "Chunk", false],
+  ["memory_write_creates_record", "memory write creates record", "memory_lifecycle", "MemoryWrite", "MemoryRecord", false],
+  ["memory_update_updates_record", "memory update updates record", "memory_lifecycle", "MemoryUpdate", "MemoryRecord", false],
+  ["memory_delete_removes_record", "memory delete removes record", "memory_lifecycle", "MemoryDelete", "MemoryRecord", false],
+  ["memory_discard_rejects_item", "memory discard rejects item", "memory_lifecycle", "MemoryDiscard", "MemoryItem", false],
+  ["memory_merge_combines_records", "memory merge combines records", "memory_lifecycle", "MemoryMerge", "MemoryRecord", false],
+  ["memory_consolidation_merges_records", "memory consolidation merges records", "memory_lifecycle", "MemoryConsolidation", "MemoryRecord", false],
+  ["memory_consolidation_produces_summary", "memory consolidation produces summary", "memory_lifecycle", "MemoryConsolidation", "ContextSummary", false],
+  ["memory_compaction_compacts_record", "memory compaction compacts record", "memory_lifecycle", "MemoryCompaction", "MemoryRecord", false],
+  ["memory_eviction_evicts_record", "memory eviction evicts record", "memory_lifecycle", "MemoryEviction", "MemoryRecord", false],
+  ["memory_decay_lowers_record_priority", "memory decay lowers record priority", "memory_lifecycle", "MemoryDecay", "MemoryRecord", false],
+  ["memory_expiration_expires_record", "memory expiration expires record", "memory_lifecycle", "MemoryExpiration", "MemoryRecord", false],
+  ["memory_validation_evaluates_record", "memory validation evaluates record", "memory_lifecycle", "MemoryValidation", "MemoryRecord", false],
+  ["memory_conflict_flags_record", "memory conflict flags record", "memory_lifecycle", "MemoryConflict", "MemoryRecord", false],
+  ["memory_supersession_replaces_record", "memory supersession replaces record", "memory_lifecycle", "MemorySupersession", "MemoryRecord", false],
+  ["memory_reflection_produces_reflective_memory", "memory reflection produces reflective memory", "memory_lifecycle", "MemoryReflection", "ReflectiveMemory", false],
+  ["memory_audit_event_records_memory_operation", "memory audit event records memory operation", "memory_lifecycle", "MemoryAuditEvent", "MemoryRecord", false],
+  ["memory_write_evaluated_by_policy_decision", "memory write evaluated by policy decision", "memory_security", "MemoryWrite", "PolicyDecision", false],
+  ["memory_update_crosses_trust_boundary", "memory update crosses trust boundary", "memory_security", "MemoryUpdate", "TrustBoundary", false],
+  ["memory_record_belongs_to_data_zone", "memory record belongs to data zone", "memory_security", "MemoryRecord", "DataZone", false],
+  ["retrieved_chunk_scanned_by_pattern_scan", "retrieved chunk scanned by pattern scan", "memory_security", "RetrievedChunk", "PatternScan", false],
+  ["memory_poisoning_signal_flags_memory_record", "memory poisoning signal flags memory record", "memory_security", "MemoryPoisoningSignal", "MemoryRecord", false],
   ["maps_to", "maps to", "adapter_mapping", "adapter_type", "any", false],
   ["maps_external_construct_to_canonical", "maps external construct to canonical", "adapter_mapping", "MappingRule", "any", false],
   ["maps_canonical_term_to_external_construct", "maps canonical term to external construct", "adapter_mapping", "MappingRule", "any", false],
@@ -3746,7 +4253,21 @@ const skippedModuleGeneratedPropertyIds = new Set([
   "feedback_review_optimization_emits_event",
   "feedback_review_optimization_relates",
   "feedback_warning_error_emits_event",
-  "feedback_warning_error_relates"
+  "feedback_warning_error_relates",
+  "memory_chunking_situating_emits_event",
+  "memory_chunking_situating_relates",
+  "memory_context_emits_event",
+  "memory_context_relates",
+  "memory_embedding_indexes_emits_event",
+  "memory_embedding_indexes_relates",
+  "memory_ingestion_emits_event",
+  "memory_ingestion_relates",
+  "memory_lifecycle_emits_event",
+  "memory_lifecycle_relates",
+  "memory_retrieval_ranking_emits_event",
+  "memory_retrieval_ranking_relates",
+  "memory_stores_scopes_emits_event",
+  "memory_stores_scopes_relates"
 ]);
 const obsoleteRelationIds = new Set([
   "adapter_benchmarks_statecharts_contains",
@@ -3895,6 +4416,59 @@ const objectPropertyDefinitions = new Map([
   ["ranks", "links a ranking event to the candidate set, result list, or scored resource it orders."],
   ["summarizes", "links a compression or synthesis event to the shorter context, disclosure, or artifact it creates."],
   ["indexes", "links an indexing process to the resource, chunk, vector, key, or pointer made searchable."],
+  ["ingestion_run_loads_document", "records that an ingestion run loaded, parsed, or normalized a document before it became available for memory storage, chunking, indexing, or citation."],
+  ["ingestion_run_writes_to_memory_store", "records that an ingestion run wrote accepted source material into a memory store under ingestion policy, provenance, and deduplication controls."],
+  ["document_has_document_metadata", "links a memory document to metadata describing source, version, checksum, format, author, timestamp, trust zone, and parsing state."],
+  ["document_attached_from_source", "links a memory document to the attached source reference or object that supplied its content, provenance, and trust-boundary evidence."],
+  ["memory_store_has_namespace", "links a memory store to the namespace that separates records by user, task, project, tenant, thread, or cross-session reuse context."],
+  ["memory_store_governed_by_retention_policy", "links a memory store to retention policy controlling refresh, compaction, expiration, deletion, disclosure, and audit behavior."],
+  ["memory_record_belongs_to_namespace", "links a memory record to the namespace that controls lookup, isolation, reuse, and cross-session visibility."],
+  ["memory_record_has_scope", "links a memory record to the scope that states where it may be read, written, updated, reused, disclosed, or forgotten."],
+  ["memory_file_materializes_record", "records that a file-backed memory surface materializes a durable memory record such as a convention, note, plan, or preference."],
+  ["short_term_memory_materializes_record", "links short-term memory to a session or thread record retained for nearby steps, summaries, checkpoints, or continuity."],
+  ["long_term_memory_materializes_record", "links long-term memory to a durable record retained beyond one run under namespace, validation, retention, and scope controls."],
+  ["chunk_derived_from_document", "links a chunk to the document or memory source from which it was segmented, preserving source lineage for retrieval and citation."],
+  ["chunk_has_boundary", "links a chunk to its structural boundary such as offset, token span, line range, page range, section break, semantic boundary, or overlap."],
+  ["chunk_has_provenance", "links a chunk to provenance evidence covering source version, checksum, ingestion run, transformation history, and document span."],
+  ["chunk_reference_targets_source_span", "links a chunk reference to the exact source span, anchor, line range, page range, offset, or document version it cites."],
+  ["chunking_run_produces_chunk", "records that a chunking run produced a retrievable chunk with boundary, overlap, provenance, and situating metadata."],
+  ["embedding_run_embeds_chunk", "records that an embedding run encoded a particular chunk or memory span using a specific embedding model and version."],
+  ["embedding_run_produces_vector", "records that an embedding run produced an embedding vector used for similarity search, indexing, clustering, or ranking."],
+  ["vector_index_contains_embedding", "links a vector index to the embedding vector it stores or makes searchable while preserving index-version provenance."],
+  ["index_build_run_produces_index_version", "records that an index build or refresh event emitted a specific versioned index snapshot."],
+  ["retrieval_query_searches_index", "links a retrieval query to the index version it searched, making retrieval provenance and stale-index diagnosis explicit."],
+  ["retrieval_query_returns_candidate_set", "records that a retrieval query produced a bounded candidate set before filtering, scoring, reranking, or context inclusion."],
+  ["candidate_set_contains_chunk", "links a retrieval candidate set to an individual candidate chunk considered for scoring, filtering, or selection."],
+  ["candidate_chunk_scored_by_similarity", "links a candidate chunk to semantic similarity evidence such as embedding distance or vector similarity score."],
+  ["candidate_chunk_scored_by_lexical", "links a candidate chunk to lexical relevance evidence such as token, term, BM25, TF-IDF, or exact-match score."],
+  ["rank_fusion_combines_candidate_set", "links a rank-fusion event to candidate sets or scored lists combined from multiple retrievers, indexes, or scoring methods."],
+  ["top_k_selection_selects_retrieved_chunk", "links a top-k selection decision to the retrieved chunk accepted under rank, diversity, freshness, budget, and policy constraints."],
+  ["context_assembly_includes_retrieved_chunk", "records that context assembly included a retrieved chunk in the runtime-visible context for a model call or agent step."],
+  ["context_assembly_uses_budget", "links context assembly to the token, cost, freshness, priority, or window budget that constrained inclusion decisions."],
+  ["context_assembly_applies_ordering_rule", "links context assembly to the ordering rule that placed messages, memory, summaries, instructions, and tool results in context."],
+  ["retrieved_chunk_fills_context_slot", "links a retrieved chunk to the context slot it occupies, so evidence placement remains auditable."],
+  ["context_exclusion_excludes_chunk", "records that a context exclusion deliberately omitted, redacted, deferred, or blocked a chunk from visible context."],
+  ["memory_write_creates_record", "records that a memory write operation proposed or committed a new memory record from message, trace, tool, preference, summary, or reflection evidence."],
+  ["memory_update_updates_record", "records that a memory update revised a memory record's content, confidence, scope, provenance, retention state, or links."],
+  ["memory_delete_removes_record", "records that a memory delete operation removed or disabled a memory record under privacy, retention, or user-request policy."],
+  ["memory_discard_rejects_item", "records that a candidate memory item was rejected before persistence because it was irrelevant, unsafe, duplicate, stale, low confidence, or out of scope."],
+  ["memory_merge_combines_records", "records that a memory merge combined related memory records while preserving provenance, conflict evidence, and supersession lineage."],
+  ["memory_consolidation_merges_records", "links memory consolidation to the records it distills into a summary, semantic memory, reflective memory, or procedure."],
+  ["memory_consolidation_produces_summary", "records that memory consolidation produced a context summary from observations, episodes, records, feedback, or outcomes."],
+  ["memory_compaction_compacts_record", "records that memory compaction shortened or folded a memory record while preserving source anchors and retrieval utility."],
+  ["memory_eviction_evicts_record", "records that memory eviction removed or deprioritized a record from an active store, cache, or candidate pool because of capacity, staleness, or policy."],
+  ["memory_decay_lowers_record_priority", "records that memory decay lowered a record's freshness, priority, confidence, or retrieval weight over time or after contradictory evidence."],
+  ["memory_expiration_expires_record", "records that a memory record, summary, index entry, or retention window expired under time, consent, scope, or retention policy."],
+  ["memory_validation_evaluates_record", "links memory validation to the memory record checked for provenance, safety, trust boundary, freshness, conflict, poisoning, or approval."],
+  ["memory_conflict_flags_record", "links a memory conflict to the record whose claim, preference, policy, source, or instruction contradicts another active memory or current context."],
+  ["memory_supersession_replaces_record", "records that a newer or higher-authority memory record superseded an older record while preserving lineage and audit evidence."],
+  ["memory_reflection_produces_reflective_memory", "records that a reflection event produced higher-level reflective memory from observations, episodes, feedback, or outcomes."],
+  ["memory_audit_event_records_memory_operation", "links a memory audit event to the memory record read, written, updated, validated, deleted, exported, or reused."],
+  ["memory_write_evaluated_by_policy_decision", "links a memory write to the policy decision that allowed, denied, escalated, sandboxed, or constrained persistence."],
+  ["memory_update_crosses_trust_boundary", "records that a memory update crosses or relies on a trust boundary, such as external content entering persistent memory."],
+  ["memory_record_belongs_to_data_zone", "links a memory record to the data zone governing its trust level, retention, visibility, and allowed reuse."],
+  ["retrieved_chunk_scanned_by_pattern_scan", "links a retrieved chunk to the safety scan that checked it for prompt injection, taint, poisoning, or policy-sensitive content before reuse."],
+  ["memory_poisoning_signal_flags_memory_record", "links a memory poisoning signal to the specific memory record suspected of carrying adversarial or unsafe persistent influence."],
   [
     "maps_to",
     "legacy summary relation linking adapter family records to canonical terms; precise directional mapping is represented by maps_external_construct_to_canonical and maps_canonical_term_to_external_construct."
@@ -4125,6 +4699,36 @@ const objectPropertySourceIds = (family) => {
       "lit-mech-reflexion",
       "lit-mech-self-refine",
       "eng-fw-openai-guardrails"
+    ];
+  }
+
+  if (
+    [
+      "memory_ingestion",
+      "memory_persistence",
+      "memory_lifecycle",
+      "memory_chunking",
+      "memory_indexing",
+      "memory_retrieval",
+      "memory_context"
+    ].includes(family)
+  ) {
+    return [
+      "lit-agent-agemem",
+      "eng-fw-langgraph-docs",
+      "eng-fw-deepagents-js-docs",
+      "lit-mas-generative-agents",
+      "lit-mech-compass"
+    ];
+  }
+
+  if (family === "memory_security") {
+    return [
+      "lit-agent-asb",
+      "lit-agent-safeagent",
+      "eng-fw-openai-guardrails",
+      "eng-fw-langgraph-docs",
+      "lit-agent-agemem"
     ];
   }
 
@@ -4498,7 +5102,7 @@ ontology.hygiene_gates = [
 ontology.artifact_metadata = {
   ...ontology.artifact_metadata,
   non_subject_metadata_terms: [
-    ...new Set([...(ontology.artifact_metadata.non_subject_metadata_terms ?? []), "OrchestrationPlane"])
+    ...new Set([...(ontology.artifact_metadata.non_subject_metadata_terms ?? []), "OrchestrationPlane", "MemoryPlane"])
   ]
 };
 

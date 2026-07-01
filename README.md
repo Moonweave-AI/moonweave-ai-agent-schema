@@ -69,15 +69,15 @@ metadata around the artifact, not part of the agent runtime itself.
 |---|---:|
 | Domains | 1 |
 | Planes | 8 |
-| Modules | 39 |
-| Classes | 544 |
-| Object properties | 376 |
-| Data properties | 98 |
+| Modules | 41 |
+| Classes | 572 |
+| Object properties | 421 |
+| Data properties | 102 |
 | Annotation properties | 12 |
-| Individuals | 78 |
-| Axioms | 602 |
+| Individuals | 80 |
+| Axioms | 657 |
 | Datatypes | 8 |
-| Ontology partitions | 47 |
+| Ontology partitions | 49 |
 
 ## Planes
 
@@ -92,7 +92,7 @@ Moonweave Agent Schema organizes agent systems through eight operational concern
 | Capability & Resource Invocation Domain | Capability registries, tool/resource/prompt/API definitions, discovery and selection, schema conformance, tool execution, resource reads, prompt instantiation, MCP protocol surfaces, authorization bridges, diagnostics, trace/context handoff, and auditable side effects. |
 | Trust, Policy & Safety Domain | Auditable safety propagation across trust boundaries, authority scopes, permission prompts, policy decisions, sandbox and network controls, source-sink injection defense, memory poisoning signals, side-effect commit gates, redaction, and audit disclosure. |
 | Observability & Feedback Domain | Diagnostic warnings and errors, the Telemetry, Audit And Export Pipeline Module, review findings, corrections, generic metrics and evaluation runs, recovery actions, learning signals, and explicit feedback-flow edges back to orchestration, memory, tool selection, policy, and optimization loops; benchmark-specific semantics remain adapter-owned. |
-| Memory & Context Persistence Domain | Memory ingestion, files, documents, chunking, situating, embeddings, retrieval, ranking, context assembly, summaries, preferences, and persistence policy. |
+| Memory & Context Persistence Domain | Scoped memory stores, memory records and typology, ingestion, chunking, embedding/indexing, retrieval/ranking, context assembly, summaries, preference memory, and lifecycle operations such as write, update, delete, merge, consolidation, expiration, validation, reflection, audit, and memory-poisoning controls. |
 
 ## Layer Boundary
 

@@ -114,8 +114,8 @@ test.describe("Moonweave ontology explorer", () => {
     await page.goto("/");
     await page.setViewportSize({ width: 1360, height: 900 });
 
-    await page.locator("#ontology-search").fill("ContextExclusion");
-    await page.getByRole("button", { name: /上下文排除|context exclusion/i }).click();
+    await page.locator("#ontology-search").fill("ChunkCompression");
+    await page.getByRole("button", { name: /分块压缩|chunk compression/i }).click();
 
     await expect(page.getByTestId("ontology-canvas")).toHaveCount(0);
     await expect(page.getByTestId("graph-empty-state")).toBeVisible();
