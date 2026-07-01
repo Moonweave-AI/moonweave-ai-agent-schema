@@ -10,7 +10,7 @@ test.describe("Moonweave ontology explorer", () => {
     await expect(page.getByTestId("cytoscape-graph")).toHaveAttribute("data-layout-engine", "fcose-force");
     await expect(page.getByTestId("cytoscape-graph")).toHaveAttribute("data-hover-relations", "predecessor");
     await expect(page.getByTestId("cytoscape-graph")).toHaveAttribute("data-drag-layout", "continuous-local-force");
-    await expect(page.getByTestId("cytoscape-graph")).toHaveAttribute("data-crossing-policy", "no-fit-during-drag");
+    await expect(page.getByTestId("cytoscape-graph")).toHaveAttribute("data-crossing-policy", "label-collision-and-crossing-relaxation");
     await expect(page.getByTestId("cytoscape-graph")).toHaveAttribute("data-pan-during-drag", "locked");
 
     const nodeCount = Number(await page.getByTestId("graph-count").getAttribute("data-node-count"));
@@ -39,6 +39,16 @@ test.describe("Moonweave ontology explorer", () => {
 
     await page.getByTestId("language-zh").click();
     await expect(page.getByRole("heading", { name: "本体查看器" })).toBeVisible();
+  });
+
+  test("keeps the domain directory floating while browsing the ontology", async ({ page }) => {
+    await page.goto("/");
+    await page.setViewportSize({ width: 1360, height: 900 });
+
+    const directory = page.locator(".directory-panel");
+    await expect(directory).toBeVisible();
+    await expect(directory).toHaveCSS("position", "sticky");
+    await expect(directory).toHaveCSS("z-index", "8");
   });
 
   test("keeps text inside the workbench at mobile widths", async ({ page }) => {

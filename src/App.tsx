@@ -203,14 +203,14 @@ function cytoscapeStyles(theme: ThemeMode): cytoscape.StylesheetJson {
         "font-weight": "bold",
         "line-height": 1.12,
         "text-wrap": "wrap",
-        "text-max-width": "220px",
+        "text-max-width": "260px",
         "text-valign": "center",
-        "text-halign": "right",
-        "text-margin-x": 10,
+        "text-halign": (node: cytoscape.NodeSingular) => node.data("labelHalign") as "left" | "right",
+        "text-margin-x": (node: cytoscape.NodeSingular) => Number(node.data("labelMarginX") ?? 14),
         "text-margin-y": 0,
         "text-outline-width": theme === "dark" ? 2 : 0,
         "text-outline-color": colors.bg,
-        "min-zoomed-font-size": 8,
+        "min-zoomed-font-size": 9,
         "overlay-opacity": 0,
         "transition-property": "border-width, background-opacity",
         "transition-duration": 160
@@ -223,8 +223,7 @@ function cytoscapeStyles(theme: ThemeMode): cytoscape.StylesheetJson {
         height: 28,
         "font-size": 17,
         "border-width": 2.4,
-        "background-opacity": 1,
-        "text-margin-x": 14
+        "background-opacity": 1
       }
     },
     {
@@ -249,17 +248,17 @@ function cytoscapeStyles(theme: ThemeMode): cytoscape.StylesheetJson {
     {
       selector: "edge",
       style: {
-        width: 2.55,
+        width: 3.05,
         "curve-style": "straight",
         "line-color": theme === "dark" ? colors.thread : "#c7cad2",
         "line-opacity": theme === "dark" ? 0.66 : 0.78,
         "target-arrow-color": theme === "dark" ? colors.thread : "#bfc2ca",
         "target-arrow-shape": "triangle",
-        "arrow-scale": 1,
+        "arrow-scale": 1.12,
         label: "",
         color: colors.muted,
         "font-family": "Cascadia Code, JetBrains Mono, Consolas, monospace",
-        "font-size": 11.5,
+        "font-size": 12,
         "font-weight": "bold",
         "text-background-color": colors.bg,
         "text-background-opacity": theme === "dark" ? 0.62 : 0.72,
@@ -2386,14 +2385,21 @@ function App() {
     for (const [ref, value] of graphNodeMeta.entries()) {
       const childCount = childCountByRef.get(ref) ?? childrenForItem(value.item).length;
       const expanded = graphExpandedRefs.has(ref);
-      const size = value.root ? 28 : value.level <= 1 ? 20 : 16;
-      const fontSize = value.root ? 18 : value.level <= 1 ? 15.5 : 14;
+      const size = value.root ? 36 : value.level <= 1 ? 27 : 21;
+      const fontSize = value.root ? 23 : value.level <= 1 ? 19 : 16;
+      const labelLength = localizeEntityLabel(value.item, language).length;
+      const labelOnLeft = !value.root && value.position.x < -24;
+      const collisionRadius = value.root
+        ? 88
+        : Math.min(118, Math.max(54, size + labelLength * (language === "en" ? 4.8 : 5.8)));
       nodes.set(ref, {
         group: "nodes",
         position: value.position,
         data: {
           id: ref,
           label: localizeEntityLabel(value.item, language),
+          labelHalign: labelOnLeft ? "left" : "right",
+          labelMarginX: labelOnLeft ? -14 : 14,
           eyebrow: localizeKind(value.item.kind, language),
           maturity: value.item.maturity,
           selectionRef: value.item.ref,
@@ -2405,6 +2411,7 @@ function App() {
           level: value.level,
           size,
           fontSize,
+          collisionRadius,
           accent: cytoscapeAccentForKind(value.item.kind, theme)
         },
         classes: [
@@ -2459,7 +2466,7 @@ function App() {
     container.dataset.layoutEngine = "fcose-force";
     container.dataset.hoverRelations = "predecessor";
     container.dataset.dragLayout = "continuous-local-force";
-    container.dataset.crossingPolicy = "no-fit-during-drag";
+    container.dataset.crossingPolicy = "label-collision-and-crossing-relaxation";
     container.dataset.panDuringDrag = "locked";
     const cy = cytoscape({
       container,
@@ -2497,18 +2504,18 @@ function App() {
         animate: options.animate ? "end" : false,
         animationDuration: options.animate ? 420 : 0,
         fit: options.fit,
-        padding: 36,
+        padding: 42,
         nodeDimensionsIncludeLabels: true,
         uniformNodeDimensions: false,
         packComponents: true,
-        nodeSeparation: 180,
+        nodeSeparation: 185,
         nodeRepulsion: (node: cytoscape.NodeSingular) => {
           const level = Number(node.data("level") ?? 1);
-          return level === 0 ? 72000 : 42000;
+          return level === 0 ? 76000 : 48000;
         },
         idealEdgeLength: (edge: cytoscape.EdgeSingular) => {
           const sourceLevel = Number(edge.source().data("level") ?? 1);
-          return sourceLevel === 0 ? 260 : 195;
+          return sourceLevel === 0 ? 250 : 190;
         },
         edgeElasticity: (edge: cytoscape.EdgeSingular) => {
           const sourceLevel = Number(edge.source().data("level") ?? 1);
@@ -2516,9 +2523,9 @@ function App() {
         },
         nestingFactor: 0.12,
         numIter: 4600,
-        gravity: 0.035,
-        gravityRange: 3.8,
-        initialEnergyOnIncremental: 0.28,
+        gravity: 0.04,
+        gravityRange: 3.6,
+        initialEnergyOnIncremental: 0.24,
         tile: true,
         stop: () => {
           if (options.fit) {
@@ -2536,7 +2543,8 @@ function App() {
           id: node.id(),
           x: position.x,
           y: position.y,
-          locked: lockedNode?.id() === node.id()
+          locked: lockedNode?.id() === node.id(),
+          collisionRadius: Number(node.data("collisionRadius") ?? 60)
         };
       });
 
@@ -2552,12 +2560,15 @@ function App() {
         edges: collectLiveEdges(),
         velocities: liveVelocities,
         options: {
-          idealEdgeLength: 190,
-          attraction: 0.055,
-          repulsion: 3200,
-          damping: 0.62,
-          maxStep: lockedNode ? 11 : 7,
-          minimumDistance: 22
+          idealEdgeLength: 225,
+          attraction: 0.042,
+          repulsion: 5200,
+          damping: 0.5,
+          maxStep: lockedNode ? 8 : 5,
+          minimumDistance: 26,
+          collisionRadius: 62,
+          collisionStrength: 1.05,
+          crossingStrength: 22
         }
       });
 
@@ -2583,15 +2594,15 @@ function App() {
       }
     };
 
-    const runSettleFrames = (remainingFrames: number) => {
+    const runSettleFrames = (remainingFrames: number, anchoredNode?: cytoscape.NodeSingular) => {
       if (remainingFrames <= 0) {
         settleFrame = undefined;
         return;
       }
 
       settleFrame = window.requestAnimationFrame(() => {
-        applyLiveRelaxationFrame();
-        runSettleFrames(remainingFrames - 1);
+        applyLiveRelaxationFrame(anchoredNode);
+        runSettleFrames(remainingFrames - 1, anchoredNode);
       });
     };
 
@@ -2660,7 +2671,7 @@ function App() {
       cancelDragFrames();
       node.removeClass("is-dragging");
       liveVelocities = {};
-      runSettleFrames(14);
+      runSettleFrames(14, node);
     };
 
     const resizeObserver = new ResizeObserver(() => {
