@@ -88,7 +88,7 @@ describe("canonical agent ontology artifact", () => {
   const sourceRows = new Map(sourceRegistry.map((row) => [row.id, row]));
   const livingRows = new Map(livingMetadata.map((row) => [row.id, row]));
   const expectedOperationalPlanes = [
-    ["info-plane", "Context Ingress Domain", "上下文输入域", "コンテキスト入力ドメイン"],
+    ["info-plane", "Context Ingress & Staging Domain", "上下文摄入与暂存域", "コンテキスト取り込みとステージングドメイン"],
     ["orchestration-plane", "Control & Orchestration Domain", "控制与编排域", "制御とオーケストレーションドメイン"],
     ["runtime-plane", "Runtime State & Trace Domain", "运行状态与轨迹域", "実行状態とトレースドメイン"],
     ["adapter-plane", "Interoperability & Adapter Domain", "互操作适配域", "相互運用とアダプタドメイン"],
@@ -133,7 +133,7 @@ describe("canonical agent ontology artifact", () => {
     for (const [planeId, enLabel, zhLabel, jaLabel] of expectedOperationalPlanes) {
       const plane = planes.get(planeId);
       expect(plane?.label).toBe(enLabel);
-      expect(plane?.definitions?.en).toContain("Operational concern domain");
+      expect(plane?.definitions?.en.toLowerCase()).toContain("operational concern domain");
       expect(plane?.definitions?.zh).toContain(zhLabel);
       expect(plane?.definitions?.ja).toContain(jaLabel);
     }
@@ -208,6 +208,116 @@ describe("canonical agent ontology artifact", () => {
       .map(([kind, id, definition]) => `${kind}:${id}:${definition}`);
 
     expect(placeholderDefinitions).toEqual([]);
+  });
+
+  it("models context ingress as staging artifacts with clean cross-plane ownership", () => {
+    const infoPlane = planes.get("info-plane");
+    const expectedInfoModules = new Map([
+      ["info-messages-instructions", "Message, Instruction & Prompt Envelope Module"],
+      ["info-storage-sources", "Source & Resource Reference Module"],
+      ["info-content-block-modality", "Content Block & Modality Module"],
+      ["info-indexing", "Lightweight Context Discovery Module"],
+      ["info-output-disclosure", "Context Windowing & Disclosure Module"],
+      ["info-container-command", "Execution Observation Ingress Module"]
+    ]);
+    const expectedIngressClasses = [
+      ["ContextIngressEvent", "info-container-command"],
+      ["ContextPackage", "info-messages-instructions"],
+      ["ContentBlock", "info-content-block-modality"],
+      ["SourceSpan", "info-storage-sources"],
+      ["InstructionAuthority", "info-messages-instructions"],
+      ["ContextSelectionDecision", "info-output-disclosure"],
+      ["CommandOutputObservation", "info-container-command"]
+    ] as const;
+    const movedOutClassIds = [
+      "Container",
+      "CommandExecution",
+      "ShellCommand",
+      "FileSystem",
+      "Database",
+      "GraphStore",
+      "Embedding",
+      "TextEmbedding",
+      "GraphEmbedding",
+      "IndexRefreshEvent",
+      "DisclosureRule"
+    ];
+    const objectProperties = new Map(ontology.object_properties.map((property) => [property.id, property]));
+    const expectedIngressRelations = [
+      "has_sender",
+      "has_receiver",
+      "has_content_block",
+      "has_source_reference",
+      "has_source_span",
+      "ingested_into_context",
+      "selected_for_context",
+      "has_visible_window",
+      "suppressed_by_rule",
+      "cites_source",
+      "produced_by_command_execution",
+      "has_stdout_chunk",
+      "has_stderr_chunk",
+      "has_exit_status",
+      "observed_as_context_input"
+    ];
+
+    expect(infoPlane?.label).toBe("Context Ingress & Staging Domain");
+    expect(infoPlane?.definitions?.en).toContain(
+      "observable content becoming available to an agent step or model call"
+    );
+    expect(infoPlane?.definitions?.zh).toContain("可观察内容如何进入某次 agent 步骤或模型调用可见上下文");
+    expect(infoPlane?.definitions?.ja).toContain("エージェントのステップまたはモデル呼び出し");
+    expect(infoPlane?.module_ids.sort()).toEqual([...expectedInfoModules.keys()].sort());
+
+    for (const [moduleId, label] of expectedInfoModules) {
+      expect(modules.get(moduleId)?.label).toBe(label);
+      expect(modules.get(moduleId)?.plane_id).toBe("info-plane");
+    }
+
+    for (const [classId, moduleId] of expectedIngressClasses) {
+      const klass = classes.get(classId);
+      expect(klass?.plane_id).toBe("info-plane");
+      expect(klass?.module_id).toBe(moduleId);
+      expect(klass?.definitions?.en.length).toBeGreaterThan(40);
+      expect(klass?.definitions?.zh.length).toBeGreaterThan(20);
+      expect(klass?.definitions?.ja.length).toBeGreaterThan(20);
+    }
+
+    for (const classId of movedOutClassIds) {
+      expect(classes.get(classId)?.plane_id).not.toBe("info-plane");
+    }
+
+    expect((classes.get("CommandExecution") as { canonical_owner_plane?: string })?.canonical_owner_plane).toBe(
+      "runtime-plane"
+    );
+    expect((classes.get("CommandExecution") as { participating_planes?: string[] })?.participating_planes).toEqual(
+      expect.arrayContaining(["info-plane", "tool-plane", "safety-plane"])
+    );
+    expect((classes.get("DisclosureRule") as { canonical_owner_plane?: string })?.canonical_owner_plane).toBe(
+      "safety-plane"
+    );
+    expect((classes.get("Embedding") as { canonical_owner_plane?: string })?.canonical_owner_plane).toBe(
+      "memory-plane"
+    );
+
+    expect(classes.get("SearchScore")?.definition).toContain("retrieved candidate");
+    expect(classes.get("SearchScore")?.definitions?.zh).toContain("检索候选");
+    expect(classes.get("SearchScore")?.definitions?.zh).not.toContain("基准任务");
+    expect(classes.get("CommandExecution")?.definitions?.zh).toContain("运行域");
+    expect(classes.get("OutputChunk")?.definitions?.zh).toContain("披露");
+    expect(classes.get("StandardError")?.definitions?.zh).toContain("诊断输出");
+
+    for (const relationId of expectedIngressRelations) {
+      expect(objectProperties.get(relationId)?.definition.length).toBeGreaterThan(30);
+    }
+
+    expect(ontology.hygiene_gates).toEqual(
+      expect.arrayContaining([
+        "definition_domain_consistency_check",
+        "definition_plane_leakage_check",
+        "definition_language_alignment_check"
+      ])
+    );
   });
 
   it("stores multilingual definitions in the canonical artifact instead of frontend templates", () => {
