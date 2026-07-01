@@ -3,6 +3,8 @@ import cytoscapeFcose from "cytoscape-fcose";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import canonicalOntologyData from "../ontology/agent-ontology.json";
+import { relaxLiveForceFrame } from "./lib/live-force";
+import type { LiveForceEdge, LiveForceNode, LiveForceVelocity } from "./lib/live-force";
 
 type EntityKind = "domain" | "plane" | "module" | "class";
 type Maturity = "release" | "provisional" | "informative" | "mixed";
@@ -127,7 +129,6 @@ interface CytoscapeGraphModel {
   edgeCount: number;
 }
 
-type FcoseFixedNodeConstraint = Array<{ nodeId: string; position: cytoscape.Position }>;
 type FcoseQuality = "draft" | "default" | "proof";
 
 const cytoscapeThemeColors: Record<
@@ -2457,8 +2458,9 @@ function App() {
     cytoscapeRef.current?.destroy();
     container.dataset.layoutEngine = "fcose-force";
     container.dataset.hoverRelations = "predecessor";
-    container.dataset.dragLayout = "continuous";
-    container.dataset.crossingPolicy = "incremental-force-relaxation";
+    container.dataset.dragLayout = "continuous-local-force";
+    container.dataset.crossingPolicy = "no-fit-during-drag";
+    container.dataset.panDuringDrag = "locked";
     const cy = cytoscape({
       container,
       elements: graphElements,
@@ -2479,48 +2481,45 @@ function App() {
 
     let activeLayout: cytoscape.Layouts | undefined;
     let dragLayoutFrame: number | undefined;
-    let lastDragLayoutAt = 0;
+    let settleFrame: number | undefined;
+    let liveVelocities: Record<string, LiveForceVelocity> = {};
     const runForceLayout = (options: {
       animate: boolean;
       fit: boolean;
       randomize: boolean;
       quality?: FcoseQuality;
-      fixedNodeConstraint?: FcoseFixedNodeConstraint;
-      live?: boolean;
     }) => {
-      const live = options.live ?? false;
       activeLayout?.stop();
       activeLayout = cy.layout({
         name: "fcose",
         quality: options.quality ?? "proof",
         randomize: options.randomize,
         animate: options.animate ? "end" : false,
-        animationDuration: options.animate ? (live ? 120 : 420) : 0,
+        animationDuration: options.animate ? 420 : 0,
         fit: options.fit,
         padding: 36,
         nodeDimensionsIncludeLabels: true,
         uniformNodeDimensions: false,
         packComponents: true,
-        nodeSeparation: live ? 130 : 180,
+        nodeSeparation: 180,
         nodeRepulsion: (node: cytoscape.NodeSingular) => {
           const level = Number(node.data("level") ?? 1);
-          return live ? (level === 0 ? 52000 : 34000) : (level === 0 ? 72000 : 42000);
+          return level === 0 ? 72000 : 42000;
         },
         idealEdgeLength: (edge: cytoscape.EdgeSingular) => {
           const sourceLevel = Number(edge.source().data("level") ?? 1);
-          return live ? (sourceLevel === 0 ? 220 : 170) : (sourceLevel === 0 ? 260 : 195);
+          return sourceLevel === 0 ? 260 : 195;
         },
         edgeElasticity: (edge: cytoscape.EdgeSingular) => {
           const sourceLevel = Number(edge.source().data("level") ?? 1);
-          return live ? (sourceLevel === 0 ? 0.11 : 0.16) : (sourceLevel === 0 ? 0.08 : 0.12);
+          return sourceLevel === 0 ? 0.08 : 0.12;
         },
         nestingFactor: 0.12,
-        numIter: live ? 420 : 4600,
-        gravity: live ? 0.045 : 0.035,
+        numIter: 4600,
+        gravity: 0.035,
         gravityRange: 3.8,
-        initialEnergyOnIncremental: live ? 0.16 : 0.28,
+        initialEnergyOnIncremental: 0.28,
         tile: true,
-        fixedNodeConstraint: options.fixedNodeConstraint,
         stop: () => {
           if (options.fit) {
             cy.fit(cy.elements(), 36);
@@ -2530,12 +2529,71 @@ function App() {
       activeLayout.run();
     };
 
-    const fixedConstraintForNode = (node: cytoscape.NodeSingular): FcoseFixedNodeConstraint => [
-      {
-        nodeId: node.id(),
-        position: { ...node.position() }
+    const collectLiveNodes = (lockedNode?: cytoscape.NodeSingular): LiveForceNode[] =>
+      cy.nodes().map((node) => {
+        const position = node.position();
+        return {
+          id: node.id(),
+          x: position.x,
+          y: position.y,
+          locked: lockedNode?.id() === node.id()
+        };
+      });
+
+    const collectLiveEdges = (): LiveForceEdge[] =>
+      cy.edges().map((edge) => ({
+        source: edge.source().id(),
+        target: edge.target().id()
+      }));
+
+    const applyLiveRelaxationFrame = (lockedNode?: cytoscape.NodeSingular) => {
+      const result = relaxLiveForceFrame({
+        nodes: collectLiveNodes(lockedNode),
+        edges: collectLiveEdges(),
+        velocities: liveVelocities,
+        options: {
+          idealEdgeLength: 190,
+          attraction: 0.055,
+          repulsion: 3200,
+          damping: 0.62,
+          maxStep: lockedNode ? 11 : 7,
+          minimumDistance: 22
+        }
+      });
+
+      liveVelocities = result.velocities;
+      for (const node of result.nodes) {
+        if (node.locked) {
+          continue;
+        }
+
+        cy.getElementById(node.id).position({ x: node.x, y: node.y });
       }
-    ];
+    };
+
+    const cancelDragFrames = () => {
+      if (dragLayoutFrame !== undefined) {
+        window.cancelAnimationFrame(dragLayoutFrame);
+        dragLayoutFrame = undefined;
+      }
+
+      if (settleFrame !== undefined) {
+        window.cancelAnimationFrame(settleFrame);
+        settleFrame = undefined;
+      }
+    };
+
+    const runSettleFrames = (remainingFrames: number) => {
+      if (remainingFrames <= 0) {
+        settleFrame = undefined;
+        return;
+      }
+
+      settleFrame = window.requestAnimationFrame(() => {
+        applyLiveRelaxationFrame();
+        runSettleFrames(remainingFrames - 1);
+      });
+    };
 
     runForceLayout({ animate: false, fit: true, randomize: true });
 
@@ -2585,6 +2643,7 @@ function App() {
 
     const onNodeDrag = (event: cytoscape.EventObject) => {
       const node = event.target as cytoscape.NodeSingular;
+      activeLayout?.stop();
       node.addClass("is-dragging");
       if (dragLayoutFrame !== undefined) {
         return;
@@ -2592,36 +2651,16 @@ function App() {
 
       dragLayoutFrame = window.requestAnimationFrame(() => {
         dragLayoutFrame = undefined;
-        const now = performance.now();
-        if (now - lastDragLayoutAt < 96) {
-          return;
-        }
-
-        lastDragLayoutAt = now;
-        runForceLayout({
-          animate: false,
-          fit: false,
-          randomize: false,
-          fixedNodeConstraint: fixedConstraintForNode(node),
-          live: true
-        });
+        applyLiveRelaxationFrame(node);
       });
     };
 
     const onNodeDragFree = (event: cytoscape.EventObject) => {
       const node = event.target as cytoscape.NodeSingular;
-      if (dragLayoutFrame !== undefined) {
-        window.cancelAnimationFrame(dragLayoutFrame);
-        dragLayoutFrame = undefined;
-      }
-
+      cancelDragFrames();
       node.removeClass("is-dragging");
-      runForceLayout({
-        animate: true,
-        fit: false,
-        randomize: false,
-        fixedNodeConstraint: fixedConstraintForNode(node)
-      });
+      liveVelocities = {};
+      runSettleFrames(14);
     };
 
     const resizeObserver = new ResizeObserver(() => {
@@ -2638,9 +2677,7 @@ function App() {
 
     return () => {
       resizeObserver.disconnect();
-      if (dragLayoutFrame !== undefined) {
-        window.cancelAnimationFrame(dragLayoutFrame);
-      }
+      cancelDragFrames();
       cy.off("tap", "node", onNodeTap);
       cy.off("mouseover", "node", onNodeMouseOver);
       cy.off("mouseout", "node", onNodeMouseOut);

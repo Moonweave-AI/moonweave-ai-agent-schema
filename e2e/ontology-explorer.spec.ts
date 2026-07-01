@@ -9,7 +9,9 @@ test.describe("Moonweave ontology explorer", () => {
     await expect(page.getByTestId("cytoscape-graph")).toBeVisible();
     await expect(page.getByTestId("cytoscape-graph")).toHaveAttribute("data-layout-engine", "fcose-force");
     await expect(page.getByTestId("cytoscape-graph")).toHaveAttribute("data-hover-relations", "predecessor");
-    await expect(page.getByTestId("cytoscape-graph")).toHaveAttribute("data-drag-layout", "continuous");
+    await expect(page.getByTestId("cytoscape-graph")).toHaveAttribute("data-drag-layout", "continuous-local-force");
+    await expect(page.getByTestId("cytoscape-graph")).toHaveAttribute("data-crossing-policy", "no-fit-during-drag");
+    await expect(page.getByTestId("cytoscape-graph")).toHaveAttribute("data-pan-during-drag", "locked");
 
     const nodeCount = Number(await page.getByTestId("graph-count").getAttribute("data-node-count"));
     expect(nodeCount).toBeGreaterThan(0);
