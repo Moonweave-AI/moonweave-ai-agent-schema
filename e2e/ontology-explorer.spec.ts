@@ -22,7 +22,7 @@ test.describe("Moonweave ontology explorer", () => {
     expect(nodeCount).toBeGreaterThan(0);
 
     await expect(page.getByTestId("left-statistics")).toContainText("本体统计");
-    await expect(page.getByTestId("left-statistics")).toContainText("413");
+    await expect(page.getByTestId("left-statistics")).toContainText(String(canonicalOntology.ontology_metrics.classes));
     await expect(page.getByTestId("inspector-panel")).toHaveCount(0);
   });
 

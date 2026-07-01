@@ -26,15 +26,15 @@ must consume.
 |---|---:|
 | domains | 1 |
 | planes | 8 |
-| modules | 36 |
-| classes | 413 |
-| object properties | 157 |
-| data properties | 92 |
+| modules | 37 |
+| classes | 484 |
+| object properties | 195 |
+| data properties | 94 |
 | annotation properties | 12 |
-| individuals | 75 |
-| axioms | 368 |
+| individuals | 76 |
+| axioms | 411 |
 | datatypes | 8 |
-| ontology partitions | 44 |
+| ontology partitions | 45 |
 
 ## Design References
 
@@ -51,11 +51,11 @@ their subject matter:
 
 ## Agent System Planes
 
-Moonweave Agent Schema organizes agent systems through eight operational concern planes. These planes describe the recurring lifecycle surfaces of an agent system: context ingress, control orchestration, runtime execution, interoperability adaptation, capability invocation, trust and safety mediation, observable feedback, and memory persistence.
+Moonweave Agent Schema organizes agent systems through eight operational concern planes. These planes describe the recurring lifecycle surfaces of an agent system: context ingress and staging, control orchestration, runtime execution, interoperability adaptation, capability invocation, trust and safety mediation, observable feedback, and memory persistence.
 
 | plane id | operational concern domain | modules |
 |---|---|---|
-| `info-plane` | Context Ingress Domain | info-container-command, info-indexing, info-messages-instructions, info-output-disclosure, info-storage-sources |
+| `info-plane` | Context Ingress & Staging Domain | info-container-command, info-content-block-modality, info-indexing, info-messages-instructions, info-output-disclosure, info-storage-sources |
 | `orchestration-plane` | Control & Orchestration Domain | orchestration-actors-delegation, orchestration-composition, orchestration-evaluation, orchestration-routing-control, orchestration-task-planning |
 | `runtime-plane` | Runtime State & Trace Domain | runtime-actors, runtime-artifacts, runtime-observability, runtime-system |
 | `adapter-plane` | Interoperability & Adapter Domain | adapter-benchmarks-statecharts, adapter-frameworks, adapter-protocols, adapter-schema-export |

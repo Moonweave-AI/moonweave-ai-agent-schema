@@ -69,23 +69,23 @@ metadata around the artifact, not part of the agent runtime itself.
 |---|---:|
 | Domains | 1 |
 | Planes | 8 |
-| Modules | 36 |
-| Classes | 413 |
-| Object properties | 157 |
-| Data properties | 92 |
+| Modules | 37 |
+| Classes | 484 |
+| Object properties | 195 |
+| Data properties | 94 |
 | Annotation properties | 12 |
-| Individuals | 75 |
-| Axioms | 368 |
+| Individuals | 76 |
+| Axioms | 411 |
 | Datatypes | 8 |
-| Ontology partitions | 44 |
+| Ontology partitions | 45 |
 
 ## Planes
 
-Moonweave Agent Schema organizes agent systems through eight operational concern planes. These planes describe the recurring lifecycle surfaces of an agent system: context ingress, control orchestration, runtime execution, interoperability adaptation, capability invocation, trust and safety mediation, observable feedback, and memory persistence.
+Moonweave Agent Schema organizes agent systems through eight operational concern planes. These planes describe the recurring lifecycle surfaces of an agent system: context ingress and staging, control orchestration, runtime execution, interoperability adaptation, capability invocation, trust and safety mediation, observable feedback, and memory persistence.
 
 | Plane | Scope |
 |---|---|
-| Context Ingress Domain | Prompts, messages, instructions, documents, command output, source references, disclosure windows, storage inputs, and indexable context entering the agent system. |
+| Context Ingress & Staging Domain | Observable content becoming available to an agent step or model call: message and instruction envelopes, source references, content blocks, context windows, lightweight discovery pointers, disclosed output segments, and execution observations staged into context. |
 | Control & Orchestration Domain | Goals, tasks, plans, delegation, routes, gates, prompt chains, parallelization, voting, evaluator loops, and synthesis controls. |
 | Runtime State & Trace Domain | Runtime sessions, actors, environments, budgets, transcripts, trace events, checkpoints, snapshots, state diffs, and runtime artifacts. |
 | Interoperability & Adapter Domain | MCP, A2A, framework, benchmark, statechart, schema profile, semantic export, and graph-view mappings that must not redefine core terms. |

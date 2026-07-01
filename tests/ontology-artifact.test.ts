@@ -121,9 +121,9 @@ describe("canonical agent ontology artifact", () => {
 
   it("names the first ontology layer as eight operational concern domains", () => {
     const expectedSummaryEn =
-      "Moonweave Agent Schema organizes agent systems through eight operational concern planes. These planes describe the recurring lifecycle surfaces of an agent system: context ingress, control orchestration, runtime execution, interoperability adaptation, capability invocation, trust and safety mediation, observable feedback, and memory persistence.";
+      "Moonweave Agent Schema organizes agent systems through eight operational concern planes. These planes describe the recurring lifecycle surfaces of an agent system: context ingress and staging, control orchestration, runtime execution, interoperability adaptation, capability invocation, trust and safety mediation, observable feedback, and memory persistence.";
     const expectedSummaryZh =
-      "Moonweave Agent Schema 通过八个运行关注域组织 agent 系统：上下文输入、控制编排、运行执行、互操作适配、能力调用、信任与安全治理、可观测反馈，以及记忆与上下文持久化。";
+      "Moonweave Agent Schema 通过八个运行关注域组织 agent 系统：上下文摄入与暂存、控制编排、运行执行、互操作适配、能力调用、信任与安全治理、可观测反馈，以及记忆与上下文持久化。";
     const docs = [
       readFileSync(join(process.cwd(), "README.md"), "utf8"),
       readFileSync(join(process.cwd(), "docs", "README.zh.md"), "utf8"),
@@ -376,6 +376,38 @@ describe("canonical agent ontology artifact", () => {
     expect(textEmbedding?.ja).not.toMatch(/ツールの識別|副作用|InformationIndexing|text埋め込み/);
   });
 
+  it("keeps context-ingress localized definitions specific instead of template generated", () => {
+    const staleDefinitionIds = ["InfoPlane", "ToolMessage", "UserAgentMessage"];
+    const forbiddenLocalizedTemplates = [
+      "该消息与指令术语",
+      "该窗口与披露术语",
+      "该执行相关术语",
+      "该来源引用术语",
+      "该轻量发现术语",
+      "该内容块术语",
+      "该术语是经过来源支撑",
+      "このメッセージと指示の用語",
+      "このウィンドウと開示の用語",
+      "この実行関連の用語",
+      "この出典参照の用語",
+      "この発見と検索の用語",
+      "この内容ブロックの用語",
+      "この用語は、出典に支えられた"
+    ];
+    const ledgerEntries = definitionLedger.definitions as Record<string, { definitions?: Record<string, string> }>;
+    const staleLedgerEntries = staleDefinitionIds.filter((id) => id in ledgerEntries);
+    const templateRows = ontology.classes
+      .filter((klass) =>
+        forbiddenLocalizedTemplates.some((phrase) =>
+          `${klass.definitions?.zh ?? ""} ${klass.definitions?.ja ?? ""}`.includes(phrase)
+        )
+      )
+      .map((klass) => `${klass.id}:${klass.definitions?.zh ?? ""}`);
+
+    expect(staleLedgerEntries).toEqual([]);
+    expect(templateRows).toEqual([]);
+  });
+
   it("keeps localized definitions free of generated glue and untranslated fallback labels", () => {
     const allowedTechnicalTokens = new Set([
       "MCP",
@@ -430,6 +462,7 @@ describe("canonical agent ontology artifact", () => {
       "string",
       "date-time",
       "source",
+      "agent",
       "ID",
       "IDs",
       "Agents",

@@ -41,6 +41,9 @@ interface OntologyClass extends SourceBacked, DefinitionBacked {
   plane_id: string;
   module_id: string;
   label: string;
+  canonical_owner_plane?: string;
+  participating_planes?: string[];
+  context_ingress_role?: string;
 }
 
 interface ObjectProperty extends SourceBacked, DefinitionBacked {
@@ -382,6 +385,9 @@ const uiText = {
     containsClasses: "包含类",
     relationPredicates: "关系谓词",
     literalFields: "字面量字段",
+    canonicalOwner: "规范归属域",
+    participatingPlanes: "参与域",
+    contextIngressRole: "上下文摄入角色",
     graphEmptyTitle: "没有可展示的图谱",
     graphEmptyBody: "没有可展示的下一级节点或关系。该实体仍可在本体特征表中查看定义、来源和字段信息。",
     classCount: (count: number) => `${count} 个类`,
@@ -440,6 +446,9 @@ const uiText = {
     containsClasses: "contains classes",
     relationPredicates: "relation predicates",
     literalFields: "literal fields",
+    canonicalOwner: "Canonical owner",
+    participatingPlanes: "Participating planes",
+    contextIngressRole: "Context ingress role",
     graphEmptyTitle: "No visible graph",
     graphEmptyBody: "No visible child nodes or relations. This entity can still be inspected through definitions, sources, and fields in the ontology characteristic table.",
     classCount: (count: number) => `${count} classes`,
@@ -498,6 +507,9 @@ const uiText = {
     containsClasses: "含まれるクラス",
     relationPredicates: "関係述語",
     literalFields: "リテラル項目",
+    canonicalOwner: "標準所有ドメイン",
+    participatingPlanes: "参加ドメイン",
+    contextIngressRole: "コンテキスト取り込み上の役割",
     graphEmptyTitle: "表示できるグラフはありません",
     graphEmptyBody: "表示できる子ノードまたは関係がありません。このエンティティの定義、出典、項目は本体特性表で確認できます。",
     classCount: (count: number) => `${count} クラス`,
@@ -593,7 +605,7 @@ const entityLabelOverrides: Record<Language, Record<string, string>> = {
   zh: {
     "agent-system-ontology": "智能体系统本体",
     "runtime-plane": "运行状态与轨迹域",
-    "info-plane": "上下文输入域",
+    "info-plane": "上下文摄入与暂存域",
     "memory-plane": "记忆与上下文持久化域",
     "orchestration-plane": "控制与编排域",
     "tool-plane": "能力与资源调用域",
@@ -604,11 +616,33 @@ const entityLabelOverrides: Record<Language, Record<string, string>> = {
     "runtime-actors": "运行参与者模块",
     "runtime-observability": "运行可观测性模块",
     "runtime-artifacts": "运行产物模块",
-    "info-container-command": "容器与命令模块",
-    "info-output-disclosure": "输出与披露模块",
-    "info-storage-sources": "存储与来源模块",
-    "info-messages-instructions": "消息与指令模块",
-    "info-indexing": "信息索引模块",
+    "info-container-command": "执行观测摄入模块",
+    "info-output-disclosure": "上下文窗口与披露模块",
+    "info-storage-sources": "来源与资源引用模块",
+    "info-messages-instructions": "消息、指令与提示包络模块",
+    "info-indexing": "轻量上下文发现模块",
+    "info-content-block-modality": "内容块与模态模块",
+    "ContextIngressEvent": "上下文摄入事件",
+    "ContextPackage": "上下文包",
+    "ContentBlock": "内容块",
+    "MessageContentBlock": "消息内容块",
+    "SourceReference": "来源引用",
+    "SourceSpan": "来源片段",
+    "SourceLocation": "来源位置",
+    "InstructionAuthority": "指令权威",
+    "InstructionConflict": "指令冲突",
+    "InstructionResolution": "指令解决结果",
+    "ToolResultMessage": "工具结果消息",
+    "ToolObservationMessage": "工具观测消息",
+    "UserMessage": "用户消息",
+    "DeveloperMessage": "开发者消息",
+    "ExternalAgentMessage": "外部智能体消息",
+    "SearchScore": "搜索评分",
+    "RetrievedContextCandidate": "检索上下文候选",
+    "ContextSelectionDecision": "上下文选择决策",
+    "CommandOutputObservation": "命令输出观测",
+    "StandardOutputChunk": "标准输出分块",
+    "StandardErrorChunk": "标准错误分块",
     "memory-ingestion": "记忆摄入模块",
     "memory-chunking-situating": "分块与定位模块",
     "memory-embedding-indexes": "嵌入与索引模块",
@@ -641,7 +675,7 @@ const entityLabelOverrides: Record<Language, Record<string, string>> = {
   ja: {
     "agent-system-ontology": "エージェントシステム本体",
     "runtime-plane": "実行状態とトレースドメイン",
-    "info-plane": "コンテキスト入力ドメイン",
+    "info-plane": "コンテキスト取り込みとステージングドメイン",
     "memory-plane": "記憶とコンテキスト永続化ドメイン",
     "orchestration-plane": "制御とオーケストレーションドメイン",
     "tool-plane": "能力とリソース呼び出しドメイン",
@@ -652,11 +686,33 @@ const entityLabelOverrides: Record<Language, Record<string, string>> = {
     "runtime-actors": "実行参加者モジュール",
     "runtime-observability": "実行可観測性モジュール",
     "runtime-artifacts": "実行成果物モジュール",
-    "info-container-command": "コンテナとコマンドモジュール",
-    "info-output-disclosure": "出力と開示モジュール",
-    "info-storage-sources": "保存と出典モジュール",
-    "info-messages-instructions": "メッセージと指示モジュール",
-    "info-indexing": "情報索引モジュール",
+    "info-container-command": "実行観測取り込みモジュール",
+    "info-output-disclosure": "コンテキストウィンドウと開示モジュール",
+    "info-storage-sources": "出典と資源参照モジュール",
+    "info-messages-instructions": "メッセージ、指示、プロンプト包絡モジュール",
+    "info-indexing": "軽量コンテキスト発見モジュール",
+    "info-content-block-modality": "内容ブロックとモダリティモジュール",
+    "ContextIngressEvent": "コンテキスト取り込みイベント",
+    "ContextPackage": "コンテキストパッケージ",
+    "ContentBlock": "内容ブロック",
+    "MessageContentBlock": "メッセージ内容ブロック",
+    "SourceReference": "出典参照",
+    "SourceSpan": "出典範囲",
+    "SourceLocation": "出典位置",
+    "InstructionAuthority": "指示権威",
+    "InstructionConflict": "指示衝突",
+    "InstructionResolution": "指示解決結果",
+    "ToolResultMessage": "ツール結果メッセージ",
+    "ToolObservationMessage": "ツール観測メッセージ",
+    "UserMessage": "ユーザーメッセージ",
+    "DeveloperMessage": "開発者メッセージ",
+    "ExternalAgentMessage": "外部エージェントメッセージ",
+    "SearchScore": "検索スコア",
+    "RetrievedContextCandidate": "検索コンテキスト候補",
+    "ContextSelectionDecision": "コンテキスト選択判断",
+    "CommandOutputObservation": "コマンド出力観測",
+    "StandardOutputChunk": "標準出力チャンク",
+    "StandardErrorChunk": "標準エラーチャンク",
     "memory-ingestion": "記憶取り込みモジュール",
     "memory-chunking-situating": "分割と位置付けモジュール",
     "memory-embedding-indexes": "埋め込みと索引モジュール",
@@ -1502,6 +1558,40 @@ function localizeClassKind(kind: string, language: Language): string {
   };
 
   return labels[language][kind] ?? translatePhrase(kind, language);
+}
+
+function localizeContextIngressRole(role: string, language: Language): string {
+  if (language === "en") {
+    return role;
+  }
+
+  if (role.includes("observable command output")) {
+    return language === "zh"
+      ? "产生可观察命令输出、退出状态和轨迹证据，可被暂存进上下文。"
+      : "観測可能なコマンド出力、終了状態、トレース証拠を生成し、コンテキストへステージングできます。";
+  }
+
+  if (role.includes("retrieval") || role.includes("index")) {
+    return language === "zh"
+      ? "支持检索或索引过程，帮助选择哪些候选证据进入上下文。"
+      : "検索または索引処理を支え、どの候補証拠をコンテキストへ入れるかの選択を助けます。";
+  }
+
+  if (role.includes("suppress") || role.includes("redact") || role.includes("release") || role.includes("revelation")) {
+    return language === "zh"
+      ? "控制内容的抑制、脱敏、披露或跨边界释放。"
+      : "内容の抑制、秘匿化、開示、境界越しの解放を制御します。";
+  }
+
+  if (role.includes("referenced")) {
+    return language === "zh"
+      ? "作为上下文摄入中的引用背景，帮助解释来源、路径或执行环境。"
+      : "コンテキスト取り込みで参照背景となり、出典、経路、実行環境の解釈を助けます。";
+  }
+
+  return language === "zh"
+    ? "该术语通过跨域关系参与上下文摄入，但不改变其规范归属域。"
+    : "この用語は領域横断関係を通じてコンテキスト取り込みに参加しますが、標準所有ドメインは変更しません。";
 }
 
 function localizeAdapterName(adapter: string, language: Language): string {
@@ -2759,6 +2849,24 @@ function App() {
                           <strong>{copy.sources}</strong>
                           <span>{sourceIds.slice(0, 12).join(" / ")}</span>
                         </li>
+                        {selectedClass?.canonical_owner_plane ? (
+                          <li>
+                            <strong>{copy.canonicalOwner}</strong>
+                            <span>{localizePropertyEndpoint(selectedClass.canonical_owner_plane, language)}</span>
+                          </li>
+                        ) : null}
+                        {selectedClass?.participating_planes?.length ? (
+                          <li>
+                            <strong>{copy.participatingPlanes}</strong>
+                            <span>{selectedClass.participating_planes.map((planeId) => localizePropertyEndpoint(planeId, language)).join(" / ")}</span>
+                          </li>
+                        ) : null}
+                        {selectedClass?.context_ingress_role ? (
+                          <li>
+                            <strong>{copy.contextIngressRole}</strong>
+                            <span>{localizeContextIngressRole(selectedClass.context_ingress_role, language)}</span>
+                          </li>
+                        ) : null}
                         {relevantAxioms.slice(0, 4).map((axiom) => (
                           <li key={axiom.id}>
                             <strong>{translatePhrase(axiom.type, language)}</strong>
