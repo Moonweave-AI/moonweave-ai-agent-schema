@@ -1074,6 +1074,138 @@ describe("canonical agent ontology artifact", () => {
     expect(localizedSafetyDefinitionsJa).not.toMatch(/所属平面：|证据源 \d+ 项|工具的注册、发现、匹配|会话、运行、事件、轨迹/);
   });
 
+  it("models capability and resource invocation beyond tool calls", () => {
+    const classes = new Map(ontology.classes.map((klass) => [klass.id, klass]));
+    const modules = new Map(ontology.modules.map((module) => [module.id, module]));
+    const objectProperties = new Map(ontology.object_properties.map((property) => [property.id, property]));
+
+    expect(classes.has("ToolPlane")).toBe(false);
+    expect(modules.get("tool-mcp-transport")?.label).toBe("MCP Protocol Surface Module");
+    expect(modules.get("tool-mcp-transport")?.definition).toMatch(/client\/server|resources|prompts|tools|elicitation|authorization/i);
+
+    const expectedCapabilityClasses = [
+      ["CapabilitySurface", "object_type", /advertised surface.*tools.*resources.*prompts.*API/i],
+      ["CapabilityDescriptor", "resource_type", /machine-readable.*capability.*operation.*schema.*trust/i],
+      ["APIOperation", "action_type", /external API.*operation.*method.*endpoint.*arguments.*result/i],
+      ["ResourceDefinition", "resource_type", /resource.*definition.*read.*subscribe.*template/i],
+      ["ResourceReadRequest", "event_type", /request.*read.*resource/i],
+      ["ResourceReadResult", "resource_type", /observable.*resource.*content.*metadata/i],
+      ["ResourceSubscription", "object_type", /subscription.*resource.*change/i],
+      ["ResourceTemplate", "resource_type", /parameterized.*resource.*template/i],
+      ["PromptDefinition", "resource_type", /prompt.*definition.*template.*workflow/i],
+      ["PromptTemplate", "resource_type", /templated.*message.*workflow/i],
+      ["PromptGetRequest", "event_type", /request.*prompt.*definition/i],
+      ["PromptInstantiation", "event_type", /instantiates.*prompt.*arguments/i],
+      ["HostedTool", "object_type", /hosted.*tool.*external service/i],
+      ["LocalRuntimeTool", "object_type", /local.*runtime.*tool.*process|shell|computer/i],
+      ["FunctionTool", "object_type", /function.*tool.*schema.*arguments/i],
+      ["ComputerTool", "object_type", /computer.*UI|desktop|browser/i],
+      ["ShellTool", "object_type", /shell.*command.*runtime/i],
+      ["HostedMCPTool", "object_type", /MCP.*hosted.*tool/i],
+      ["ToolInvocationCandidate", "resource_type", /candidate.*tool invocation.*pre-execution/i],
+      ["PreExecutionSafetyCheck", "event_type", /pre-execution.*tool.*risk/i],
+      ["UnsafeArgumentPattern", "resource_type", /argument.*pattern.*unsafe/i],
+      ["ToolDescriptionTrust", "policy_type", /tool description.*trusted.*server/i],
+      ["ToolApprovalGate", "policy_type", /approval.*tool.*execution/i],
+      ["ConditionalToolEnabled", "policy_type", /conditional.*tool.*enabled/i]
+    ] as const;
+
+    const weakCapabilityClasses = expectedCapabilityClasses
+      .filter(([classId, kind, pattern]) => classes.get(classId)?.kind !== kind || !pattern.test(classes.get(classId)?.definition ?? ""))
+      .map(([classId]) => `${classId}: ${classes.get(classId)?.kind ?? "<missing>"}:${classes.get(classId)?.definition ?? "<missing>"}`);
+    expect(weakCapabilityClasses).toEqual([]);
+
+    expect(classes.get("ToolCallPlan")?.kind).toBe("resource_type");
+    expect(classes.get("MCPClient")?.kind).toBe("object_type");
+    expect(classes.get("MCPServer")?.kind).toBe("object_type");
+    expect(classes.get("ToolError")?.definition).toMatch(/error|failure|exception|attempt/i);
+    expect(classes.get("ToolError")?.definition).not.toMatch(/callable external or hosted capability/i);
+    expect(classes.get("ToolWarning")?.definition).toMatch(/warning|diagnostic|degraded|non-fatal/i);
+    expect(classes.get("ToolWarning")?.definition).not.toMatch(/callable external or hosted capability/i);
+    expect(classes.get("ToolSideEffect")?.definition).toMatch(/external state change|persistent|commit|rollback/i);
+    expect(classes.get("ToolSideEffect")?.definition).not.toMatch(/callable external or hosted capability/i);
+    expect(classes.get("ToolPermissionSpec")?.definition).toMatch(/tool-side permission declaration|scope|approval|safety/i);
+    expect(classes.get("MCPPromptList")?.definition).toMatch(/server-exposed list.*prompt definitions|prompt templates/i);
+    expect(classes.get("MCPResourceList")?.definition).toMatch(/server-exposed list.*resource definitions|resource templates/i);
+
+    const expectedCapabilityRelations = [
+      ["tool_registry_registers_tool_definition", "ToolRegistry", "ToolDefinition", "registry_definition"],
+      ["tool_definition_defines_tool", "ToolDefinition", "Tool", "registry_definition"],
+      ["tool_definition_has_argument_schema", "ToolDefinition", "ToolArgumentSchema", "schema_conformance"],
+      ["tool_definition_has_result_schema", "ToolDefinition", "ToolResultSchema", "schema_conformance"],
+      ["tool_definition_declares_permission", "ToolDefinition", "ToolPermissionSpec", "permission_bridge"],
+      ["tool_definition_has_version", "ToolDefinition", "ToolVersion", "registry_definition"],
+      ["tool_definition_deprecated_by", "ToolDefinition", "ToolDeprecationNotice", "registry_definition"],
+      ["capability_surface_advertises_descriptor", "CapabilitySurface", "CapabilityDescriptor", "capability_surface"],
+      ["capability_descriptor_describes_api_operation", "CapabilityDescriptor", "APIOperation", "capability_surface"],
+      ["tool_search_produces_candidate_set", "ToolSearch", "ToolCandidateSet", "discovery_selection"],
+      ["tool_candidate_set_contains_candidate", "ToolCandidateSet", "ToolCandidate", "discovery_selection"],
+      ["tool_candidate_ranked_by_match", "ToolCandidate", "ToolMatch", "discovery_selection"],
+      ["tool_selection_decision_selects_tool", "ToolSelectionDecision", "Tool", "discovery_selection"],
+      ["tool_selection_decision_rejects_candidate", "ToolSelectionDecision", "ToolCandidate", "discovery_selection"],
+      ["tool_fallback_replaces_tool", "ToolFallback", "Tool", "discovery_selection"],
+      ["tool_call_uses_argument", "ToolCall", "ToolArgument", "invocation_execution"],
+      ["tool_argument_conforms_to_schema", "ToolArgument", "ToolArgumentSchema", "schema_conformance"],
+      ["tool_call_has_attempt", "ToolCall", "ToolCallAttempt", "invocation_execution"],
+      ["tool_call_retry_retries_attempt", "ToolCallRetry", "ToolCallAttempt", "invocation_execution"],
+      ["tool_result_conforms_to_schema", "ToolResult", "ToolResultSchema", "schema_conformance"],
+      ["tool_error_caused_by_attempt", "ToolError", "ToolCallAttempt", "invocation_execution"],
+      ["tool_warning_attached_to_result", "ToolWarning", "ToolResult", "invocation_execution"],
+      ["tool_call_emits_trace_event", "ToolCall", "TraceEvent", "runtime_execution"],
+      ["tool_call_attempt_belongs_to_trace_span", "ToolCallAttempt", "TraceSpan", "runtime_execution"],
+      ["tool_result_observation_enters_context", "ToolResultObservation", "ContextPackage", "context_ingress"],
+      ["mcp_server_exposes_tool_list", "MCPServer", "MCPToolList", "mcp_surface"],
+      ["mcp_server_exposes_resource_list", "MCPServer", "MCPResourceList", "mcp_surface"],
+      ["mcp_server_exposes_prompt_list", "MCPServer", "MCPPromptList", "mcp_surface"],
+      ["mcp_resource_list_contains_resource_definition", "MCPResourceList", "ResourceDefinition", "mcp_surface"],
+      ["mcp_prompt_list_contains_prompt_definition", "MCPPromptList", "PromptDefinition", "mcp_surface"],
+      ["mcp_client_opens_session", "MCPClient", "MCPSession", "mcp_surface"],
+      ["mcp_session_uses_transport", "MCPSession", "MCPTransport", "mcp_surface"],
+      ["mcp_authorization_authorizes_tool_call", "MCPAuthorization", "ToolCall", "permission_bridge"],
+      ["mcp_authorization_authorizes_resource_read", "MCPAuthorization", "ResourceReadRequest", "permission_bridge"],
+      ["mcp_authorization_authorizes_prompt_get", "MCPAuthorization", "PromptGetRequest", "permission_bridge"],
+      ["mcp_elicitation_requests_additional_input", "MCPElicitation", "AdditionalInput", "mcp_surface"],
+      ["tool_invocation_candidate_checked_by_safety_check", "ToolInvocationCandidate", "PreExecutionSafetyCheck", "permission_bridge"],
+      ["tool_description_trust_bounds_tool_definition", "ToolDescriptionTrust", "ToolDefinition", "permission_bridge"],
+      ["tool_side_effect_requires_commit_gate", "ToolSideEffect", "CommitGate", "commit_control"],
+      ["tool_side_effect_materializes_side_effect", "ToolSideEffect", "SideEffect", "commit_control"]
+    ] as const;
+
+    for (const [relationId, domain, range, family] of expectedCapabilityRelations) {
+      const relation = objectProperties.get(relationId);
+      expect([relation?.domain, relation?.range, relation?.family]).toEqual([domain, range, family]);
+      expect(relation?.definition).toMatch(/links|connects|records|authorizes|declares|advertises|exposes|contains|checks/i);
+    }
+
+    const localizedDefinitions = [
+      modules.get("tool-registry-definition")?.definitions?.zh,
+      modules.get("tool-discovery-selection")?.definitions?.zh,
+      modules.get("tool-invocation-execution")?.definitions?.zh,
+      modules.get("tool-mcp-transport")?.definitions?.zh,
+      classes.get("ToolRegistry")?.definitions?.zh,
+      classes.get("ToolError")?.definitions?.zh,
+      classes.get("ToolWarning")?.definitions?.zh,
+      classes.get("MCPClient")?.definitions?.zh,
+      classes.get("MCPServer")?.definitions?.zh,
+      classes.get("MCPTransport")?.definitions?.zh
+    ].join("\n");
+    const localizedDefinitionsJa = [
+      modules.get("tool-registry-definition")?.definitions?.ja,
+      modules.get("tool-discovery-selection")?.definitions?.ja,
+      modules.get("tool-invocation-execution")?.definitions?.ja,
+      modules.get("tool-mcp-transport")?.definitions?.ja,
+      classes.get("ToolRegistry")?.definitions?.ja,
+      classes.get("ToolError")?.definitions?.ja,
+      classes.get("ToolWarning")?.definitions?.ja,
+      classes.get("MCPClient")?.definitions?.ja,
+      classes.get("MCPServer")?.definitions?.ja,
+      classes.get("MCPTransport")?.definitions?.ja
+    ].join("\n");
+
+    expect(localizedDefinitions).not.toMatch(/\u6240\u5c5e\u5e73\u9762|\u8bc1\u636e\u6e90|\u9002\u914d\u5668\u7c7b|\u6388\u6743\u63d0\u793a.*\u7b56\u7565\u89c4\u5219/);
+    expect(localizedDefinitionsJa).not.toMatch(/\u6240\u5c5e\u5e73\u9762|\u51fa\u5178|\u30a2\u30c0\u30d7\u30bf\u985e|\u8a8d\u53ef\u30d7\u30ed\u30f3\u30d7.*\u30dd\u30ea\u30b7\u30fc\u898f\u5247/);
+  });
+
   it("renders entity definitions from the canonical artifact in the frontend", () => {
     const appSource = readFileSync(join(process.cwd(), "src", "App.tsx"), "utf8");
 
