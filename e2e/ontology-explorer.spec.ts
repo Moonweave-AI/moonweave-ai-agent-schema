@@ -1,4 +1,9 @@
+import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
+
+const canonicalOntology = JSON.parse(readFileSync(new URL("../ontology/agent-ontology.json", import.meta.url), "utf8"));
+const trustBoundaryModule = canonicalOntology.modules.find((item: { id: string }) => item.id === "safety-trust-boundary");
+const authorityScopeClass = canonicalOntology.classes.find((item: { id: string }) => item.id === "AuthorityScope");
 
 test.describe("Moonweave ontology explorer", () => {
   test("renders a non-empty ontology graph and inspector", async ({ page }) => {
@@ -71,10 +76,24 @@ test.describe("Moonweave ontology explorer", () => {
     await page.getByRole("button", { name: "信任边界模块 模块" }).click();
 
     await expect(page.getByRole("heading", { name: "信任边界模块" })).toBeVisible();
-    await expect(page.locator(".entity-hero")).toContainText("权限范围");
-    await expect(page.locator(".entity-hero")).toContainText("数据区域");
-    await expect(page.locator(".entity-hero")).toContainText("边界跨越");
+    await expect(page.locator(".entity-hero")).toContainText(trustBoundaryModule.definitions.zh);
     await expect(page.locator(".entity-hero")).not.toContainText("定义该平面内部的一组相关类、关系和约束");
+  });
+
+  test("reads multilingual entity definitions from canonical ontology JSON", async ({ page }) => {
+    await page.goto("/");
+    await page.setViewportSize({ width: 1360, height: 900 });
+
+    await page.getByTestId("language-en").click();
+    await page.locator("#ontology-search").fill("AuthorityScope");
+    await page.getByRole("button", { name: "authority scope Class", exact: true }).click();
+    await expect(page.locator(".entity-hero")).toContainText(authorityScopeClass.definitions.en);
+
+    await page.getByTestId("language-zh").click();
+    await expect(page.locator(".entity-hero")).toContainText(authorityScopeClass.definitions.zh);
+
+    await page.getByTestId("language-ja").click();
+    await expect(page.locator(".entity-hero")).toContainText(authorityScopeClass.definitions.ja);
   });
 
   test("uses a FIBO-like single-column ontology characteristic table", async ({ page }) => {

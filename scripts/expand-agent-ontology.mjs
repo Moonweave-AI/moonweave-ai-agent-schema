@@ -2,6 +2,9 @@ import fs from "node:fs";
 
 const ontologyPath = "ontology/agent-ontology.json";
 const ontology = JSON.parse(fs.readFileSync(ontologyPath, "utf8"));
+const definitionLedgerPath = "ontology/agent-ontology-definitions.json";
+const definitionLedger = JSON.parse(fs.readFileSync(definitionLedgerPath, "utf8"));
+const curatedDefinitions = definitionLedger.definitions ?? {};
 
 const sourceFallback = {
   "runtime-plane": ["eng-fw-openai-python-docs", "eng-fw-langgraph-docs", "eng-fw-openai-tracing"],
@@ -638,6 +641,32 @@ const normalizedTerm = (value) => value.toLowerCase().replace(/[-_/]+/g, " ").re
 const moduleSubject = (module) => module.definition.replace(/^models\s+/i, "").replace(/\.$/, "");
 const moduleName = (module) => cleanModuleLabel(module.label);
 
+const definitionsFor = (kind, item) => {
+  const ledgerEntry = curatedDefinitions[item.id];
+  if (!ledgerEntry?.definitions) {
+    throw new Error(`Missing curated definitions for ${kind}:${item.id}`);
+  }
+
+  const definitions = ledgerEntry.definitions;
+  for (const language of ["en", "zh", "ja"]) {
+    if (typeof definitions[language] !== "string" || !definitions[language].trim()) {
+      throw new Error(`Missing ${language} curated definition for ${kind}:${item.id}`);
+    }
+  }
+
+  const canonicalEnglish = item.definition ?? item.statement;
+  if (definitions.en !== canonicalEnglish) {
+    throw new Error(`Curated English definition is stale for ${kind}:${item.id}`);
+  }
+
+  return definitions;
+};
+
+const attachDefinitions = (kind, item) => ({
+  ...item,
+  definitions: definitionsFor(kind, item)
+});
+
 const exactGeneratedClassDefinitions = new Map([
   [
     "AuthorityScope",
@@ -1059,12 +1088,40 @@ const generatedClassDefinition = (module, id, label, kind) => {
 
 const classById = new Map(ontology.terms.map((term) => [term.id, { ...term }]));
 const generatedClassIds = new Set(moduleSpecs.flatMap((module) => module.generated.map(([id]) => id)));
+const generatedKindOverrides = new Map([
+  ["RuntimeSession", "object_type"],
+  ["RuntimeEnvironment", "object_type"],
+  ["RuntimeBudget", "policy_type"]
+]);
+const classKindOverrides = new Map([
+  ["RuntimeSession", "object_type"],
+  ["RuntimeEnvironment", "object_type"],
+  ["RuntimeBudget", "policy_type"]
+]);
+
+const inferredGeneratedKind = (id, label) => {
+  const override = generatedKindOverrides.get(id);
+  if (override) {
+    return override;
+  }
+
+  const terms = new Set(label.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+  const hasAny = (...values) => values.some((value) => terms.has(value));
+
+  if (hasAny("adapter")) return "adapter_type";
+  if (hasAny("policy", "rule", "condition")) return "policy_type";
+  if (hasAny("event", "run", "call", "review", "execution", "decision", "attempt", "outcome")) return "event_type";
+  if (hasAny("actor", "agent", "model")) return "actor_type";
+  if (hasAny("index", "vector")) return "index_type";
+  if (hasAny("command", "action")) return "action_type";
+  return "resource_type";
+};
 
 const idToSourceIds = (id, planeId) => classById.get(id)?.source_ids ?? safeSourceIds(planeId);
 
 for (const module of moduleSpecs) {
   for (const [id, label] of module.generated) {
-    const kind = label.includes("adapter") ? "adapter_type" : label.includes("policy") || label.includes("rule") || label.includes("condition") ? "policy_type" : label.includes("event") || label.includes("run") || label.includes("call") || label.includes("review") || label.includes("execution") || label.includes("decision") ? "event_type" : label.includes("actor") || label.includes("agent") || label.includes("model") ? "actor_type" : label.includes("index") || label.includes("vector") ? "index_type" : label.includes("command") || label.includes("action") ? "action_type" : "resource_type";
+    const kind = inferredGeneratedKind(id, label);
     const generatedPayload = {
       id,
       kind,
@@ -1089,7 +1146,12 @@ for (const module of moduleSpecs) {
   }
 }
 
-const classes = [...classById.values()].sort((a, b) => a.id.localeCompare(b.id));
+const classes = [...classById.values()]
+  .map((item) => ({
+    ...item,
+    kind: classKindOverrides.get(item.id) ?? item.kind
+  }))
+  .sort((a, b) => a.id.localeCompare(b.id));
 
 const moduleList = moduleSpecs.map((module) => ({
   id: module.id,
@@ -1409,14 +1471,16 @@ axioms.push(
   }
 );
 
-ontology.modules = moduleList;
-ontology.classes = classes;
-ontology.terms = classes;
-ontology.object_properties = objectProperties;
-ontology.relations = objectProperties;
-ontology.data_properties = dataProperties.sort((a, b) => a.id.localeCompare(b.id));
-ontology.individuals = individuals;
-ontology.axioms = axioms.sort((a, b) => a.id.localeCompare(b.id));
+ontology.definition = "Canonical domain for the agent-system ontology family.";
+ontology.source_ids = [...new Set(ontology.design_references.flatMap((reference) => reference.source_ids ?? []))].sort();
+ontology.modules = moduleList.map((item) => attachDefinitions("module", item));
+ontology.classes = classes.map((item) => attachDefinitions("class", item));
+ontology.terms = ontology.classes;
+ontology.object_properties = objectProperties.map((item) => attachDefinitions("object_property", item));
+ontology.relations = ontology.object_properties;
+ontology.data_properties = dataProperties.sort((a, b) => a.id.localeCompare(b.id)).map((item) => attachDefinitions("data_property", item));
+ontology.individuals = individuals.map((item) => attachDefinitions("individual", item));
+ontology.axioms = axioms.sort((a, b) => a.id.localeCompare(b.id)).map((item) => attachDefinitions("axiom", item));
 
 for (const plane of ontology.planes) {
   const moduleClassIds = moduleList
@@ -1425,6 +1489,8 @@ for (const plane of ontology.planes) {
   plane.module_ids = moduleList.filter((module) => module.plane_id === plane.id).map((module) => module.id).sort();
   plane.term_ids = [...new Set([...plane.term_ids, ...moduleClassIds])].filter((id) => classById.has(id)).sort();
 }
+ontology.planes = ontology.planes.map((item) => attachDefinitions("plane", { ...item, source_ids: safeSourceIds(item.id, item.source_ids) }));
+ontology.definitions = attachDefinitions("ontology", ontology).definitions;
 
 ontology.ontology_metrics = {
   domains: 1,
@@ -1448,7 +1514,8 @@ ontology.hygiene_gates = [
     "every object property has id, family, label, definition, domain, range, and source_ids",
     "every data property has id, label, definition, domain, range, and source_ids",
     "every individual has id, label, class_id, definition, and source_ids",
-    "every axiom has id, type, statement, and source_ids"
+    "every axiom has id, type, statement, and source_ids",
+    "every ontology entity has canonical definitions.en, definitions.zh, and definitions.ja"
   ])
 ];
 

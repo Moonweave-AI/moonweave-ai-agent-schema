@@ -10,65 +10,66 @@ type EntityKind = "domain" | "plane" | "module" | "class";
 type Maturity = "release" | "provisional" | "informative" | "mixed";
 type Language = "zh" | "en" | "ja";
 type ThemeMode = "dark" | "light";
+type LocalizedDefinitions = Partial<Record<Language, string>>;
 
 interface SourceBacked {
   source_ids?: string[];
 }
 
-interface Plane extends SourceBacked {
+interface DefinitionBacked {
+  definition: string;
+  definitions?: LocalizedDefinitions;
+}
+
+interface Plane extends SourceBacked, DefinitionBacked {
   id: string;
   label: string;
-  definition: string;
   term_ids: string[];
   module_ids: string[];
 }
 
-interface Module extends SourceBacked {
+interface Module extends SourceBacked, DefinitionBacked {
   id: string;
   plane_id: string;
   label: string;
-  definition: string;
   class_ids: string[];
 }
 
-interface OntologyClass extends SourceBacked {
+interface OntologyClass extends SourceBacked, DefinitionBacked {
   id: string;
   kind: string;
   plane_id: string;
   module_id: string;
   label: string;
-  definition: string;
 }
 
-interface ObjectProperty extends SourceBacked {
+interface ObjectProperty extends SourceBacked, DefinitionBacked {
   id: string;
   label: string;
   family: string;
-  definition: string;
   domain: string;
   range: string;
   acyclic: boolean;
 }
 
-interface DataProperty extends SourceBacked {
+interface DataProperty extends SourceBacked, DefinitionBacked {
   id: string;
   label: string;
-  definition: string;
   domain: string;
   range: string;
 }
 
-interface Individual extends SourceBacked {
+interface Individual extends SourceBacked, DefinitionBacked {
   id: string;
   label: string;
   class_id: string;
-  definition: string;
 }
 
 interface Axiom extends SourceBacked {
   id: string;
   type: string;
   statement: string;
+  definitions?: LocalizedDefinitions;
 }
 
 interface AdapterMapping extends SourceBacked {
@@ -79,6 +80,8 @@ interface AdapterMapping extends SourceBacked {
 interface AgentOntology {
   id: string;
   label: string;
+  definition: string;
+  definitions?: LocalizedDefinitions;
   status: string;
   artifact_metadata: {
     base_iri: string;
@@ -102,6 +105,7 @@ interface DirectoryItem {
   kind: EntityKind;
   label: string;
   definition: string;
+  definitions?: LocalizedDefinitions;
   maturity: Maturity;
   source_ids: string[];
   parent_ref?: string;
@@ -680,108 +684,6 @@ const entityLabelOverrides: Record<Language, Record<string, string>> = {
     "adapter-frameworks": "フレームワーク適配モジュール",
     "adapter-benchmarks-statecharts": "ベンチマークと状態図適配モジュール",
     "adapter-schema-export": "スキーマとエクスポート適配モジュール"
-  }
-};
-
-const planeScopeOverrides: Record<Exclude<Language, "en">, Record<string, string>> = {
-  zh: {
-    "runtime-plane": "智能体系统、运行会话、参与者、模型、转录、可观察事件、检查点和执行状态",
-    "info-plane": "文本、指令、消息、命令输出、存储、索引、输出片段和披露表面",
-    "memory-plane": "文档摄入、分块、嵌入、检索、重排、排序融合和上下文组装",
-    "orchestration-plane": "目标、任务、计划、委派、子智能体、路由、闸门、提示链、并行、投票和综合",
-    "tool-plane": "工具注册、定义、发现、匹配、调用、执行、MCP 表面、工具结果和执行转录",
-    "safety-plane": "信任边界、权限提示、策略决策、沙箱、网络控制、注入防御、提交和脱敏闸门",
-    "feedback-plane": "警告、反馈、审核、日志、指标、优化循环、恢复事件和评测信号",
-    "adapter-plane": "MCP、A2A、框架、基准、状态机、模式导出和剖面映射"
-  },
-  ja: {
-    "runtime-plane": "エージェントシステム、実行セッション、参加者、モデル、トランスクリプト、観測可能イベント、チェックポイント、実行状態",
-    "info-plane": "テキスト、指示、メッセージ、コマンド出力、保存領域、索引、出力断片、開示面",
-    "memory-plane": "文書取り込み、チャンク化、埋め込み、検索、再ランキング、順位融合、文脈組み立て",
-    "orchestration-plane": "目標、タスク、計画、委任、サブエージェント、経路、ゲート、プロンプト連鎖、並列化、投票、統合",
-    "tool-plane": "ツール登録、定義、発見、照合、呼び出し、実行、MCP 面、ツール結果、実行トランスクリプト",
-    "safety-plane": "信頼境界、権限確認、ポリシー判断、サンドボックス、ネットワーク制御、注入防御、コミットと秘匿化ゲート",
-    "feedback-plane": "警告、フィードバック、レビュー、ログ、指標、最適化ループ、復旧イベント、評価信号",
-    "adapter-plane": "MCP、A2A、フレームワーク、ベンチマーク、状態機械、スキーマエクスポート、プロファイル写像"
-  }
-};
-
-const moduleScopeOverrides: Record<Exclude<Language, "en">, Record<string, string>> = {
-  zh: {
-    "runtime-system": "智能体系统边界、运行身份、所有权和全局执行包络",
-    "runtime-actors": "在运行时行动、观察、授权、生成、检索、排序或执行的参与者",
-    "runtime-observability": "转录、轨迹事件、快照、检查点和可审计记录",
-    "runtime-artifacts": "运行会话产生或消费的产物与交付物",
-    "info-container-command": "命令区域、执行容器、Shell 命令、进程输出和命令生命周期",
-    "info-output-disclosure": "输出分块、可见窗口、压缩、渐进披露和显示策略",
-    "info-storage-sources": "文件、数据库、图、文本语料、网络资源和资源元数据",
-    "info-messages-instructions": "消息、会话、历史、指令、系统提示和示例",
-    "info-indexing": "索引、嵌入、查找结构和轻量发现表面",
-    "memory-ingestion": "来源加载、记忆文件、文档准备和摄入事件",
-    "memory-chunking-situating": "分块、分块元数据、定位提示和文档内 grounding",
-    "memory-embedding-indexes": "用于检索记忆的向量索引和词法索引",
-    "memory-retrieval-ranking": "检索查询、候选集、评分、重排和排序融合",
-    "memory-context": "上下文窗口、上下文组装、摘要和偏好引导的记忆纳入",
-    "orchestration-task-planning": "任务、分解、工作项、计划和任务依赖",
-    "orchestration-actors-delegation": "编排者、工作者、子智能体、交接和责任转移",
-    "orchestration-routing-control": "闸门、路由、控制策略、分支和下游操作选择",
-    "orchestration-composition": "提示链、并行、分段、投票和综合模式",
-    "orchestration-evaluation": "评估器-优化器循环、审核事件、反馈事件和以思考作为工具的操作",
-    "tool-registry-definition": "工具注册表、工具定义、模式、描述符和能力元数据",
-    "tool-discovery-selection": "工具搜索、匹配、排序、选择和回退",
-    "tool-invocation-execution": "工具调用、程序化调用、执行请求、结果和转录",
-    "tool-mcp-transport": "MCP 客户端/服务器角色、会话表面、发现和传输级工具暴露",
-    "safety-trust-boundary": "信任边界、权限范围、数据区域和边界跨越",
-    "safety-permission-policy": "权限提示、策略规则、决策和授权结果",
-    "safety-sandbox-network": "沙箱、套接字、代理、网络调用和受控执行路径",
-    "safety-injection-defense": "模式扫描、注入签名、工具流风险和恶意指令传播",
-    "safety-commit-redaction": "提交闸门、脱敏、披露过滤和副作用审批",
-    "feedback-warning-error": "警告、错误、诊断和问题信号",
-    "feedback-review-optimization": "反馈、审核、恢复动作和优化循环",
-    "feedback-metrics-evaluation": "指标、评估运行、评分量表和基准观察",
-    "feedback-logging": "日志监听器、流、日志记录和可观测性通道",
-    "adapter-protocols": "MCP、A2A、FIPA、KQML 以及相关消息/能力协议的映射",
-    "adapter-frameworks": "图运行时、智能体 SDK、团队、工作流和子智能体系统的框架映射",
-    "adapter-benchmarks-statecharts": "基准、状态机和模式/导出映射",
-    "adapter-schema-export": "结构化模式、语义图和语言剖面映射"
-  },
-  ja: {
-    "runtime-system": "エージェントシステム境界、実行時アイデンティティ、所有関係、全体の実行包絡",
-    "runtime-actors": "実行時に行動、観測、認可、生成、検索、順位付け、実行を行う参加者",
-    "runtime-observability": "トランスクリプト、トレースイベント、スナップショット、チェックポイント、監査可能記録",
-    "runtime-artifacts": "実行セッションが生成または消費する成果物と納品物",
-    "info-container-command": "コマンド領域、実行コンテナ、シェルコマンド、プロセス出力、コマンドライフサイクル",
-    "info-output-disclosure": "出力チャンク、可視ウィンドウ、圧縮、段階的開示、表示ポリシー",
-    "info-storage-sources": "ファイル、データベース、グラフ、テキストコーパス、ネットワーク資源、資源メタデータ",
-    "info-messages-instructions": "メッセージ、会話、履歴、指示、システムプロンプト、例示",
-    "info-indexing": "索引、埋め込み、参照構造、軽量な発見面",
-    "memory-ingestion": "出典読み込み、記憶ファイル、文書準備、取り込みイベント",
-    "memory-chunking-situating": "チャンク化、チャンクメタデータ、位置付けプロンプト、文書内 grounding",
-    "memory-embedding-indexes": "記憶検索に使うベクトル索引と語彙索引",
-    "memory-retrieval-ranking": "検索クエリ、候補集合、スコアリング、再ランキング、順位融合",
-    "memory-context": "文脈ウィンドウ、文脈組み立て、要約、選好に基づく記憶取り込み",
-    "orchestration-task-planning": "タスク、分解、作業項目、計画、タスク依存関係",
-    "orchestration-actors-delegation": "オーケストレーター、ワーカー、サブエージェント、引き継ぎ、責任移転",
-    "orchestration-routing-control": "ゲート、経路、制御ポリシー、分岐、下流操作の選択",
-    "orchestration-composition": "プロンプト連鎖、並列化、分割、投票、統合パターン",
-    "orchestration-evaluation": "評価器-最適化器ループ、レビューイベント、フィードバックイベント、思考をツールとして扱う操作",
-    "tool-registry-definition": "ツール登録、ツール定義、スキーマ、記述子、能力メタデータ",
-    "tool-discovery-selection": "ツール検索、照合、順位付け、選択、フォールバック",
-    "tool-invocation-execution": "ツール呼び出し、プログラム的呼び出し、実行要求、結果、トランスクリプト",
-    "tool-mcp-transport": "MCP クライアント/サーバー役割、セッション面、発見、転送レベルのツール公開",
-    "safety-trust-boundary": "信頼境界、権限範囲、データ領域、境界越え",
-    "safety-permission-policy": "権限確認、ポリシールール、判断、認可結果",
-    "safety-sandbox-network": "サンドボックス、ソケット、プロキシ、ネットワーク呼び出し、制御された実行経路",
-    "safety-injection-defense": "パターンスキャン、注入シグネチャ、ツールストリームリスク、悪意ある指示の伝播",
-    "safety-commit-redaction": "コミットゲート、秘匿化、開示フィルタリング、副作用承認",
-    "feedback-warning-error": "警告、エラー、診断、問題信号",
-    "feedback-review-optimization": "フィードバック、レビュー、復旧アクション、最適化ループ",
-    "feedback-metrics-evaluation": "指標、評価実行、採点ルーブリック、ベンチマーク観測",
-    "feedback-logging": "ログリスナー、ストリーム、ログ記録、可観測性チャネル",
-    "adapter-protocols": "MCP、A2A、FIPA、KQML、および関連するメッセージ/能力プロトコルの写像",
-    "adapter-frameworks": "グラフランタイム、エージェント SDK、チーム、ワークフロー、サブエージェントシステムのフレームワーク写像",
-    "adapter-benchmarks-statecharts": "ベンチマーク、状態機械、スキーマ/エクスポート写像",
-    "adapter-schema-export": "構造スキーマ、意味グラフ、言語プロファイル写像"
   }
 };
 
@@ -1561,178 +1463,8 @@ function localizePropertyLabel(property: ObjectProperty | DataProperty, language
   return translatePhrase(property.label, language);
 }
 
-function localizedModuleScope(moduleId: string, language: Exclude<Language, "en">): string | undefined {
-  return moduleScopeOverrides[language][moduleId];
-}
-
-function localizeModuleDefinition(module: Module, language: Exclude<Language, "en">): string {
-  const scope = localizedModuleScope(module.id, language);
-  if (!scope) {
-    return module.definition;
-  }
-
-  return language === "zh" ? `建模${scope}。` : `${scope}をモデル化します。`;
-}
-
-const classDefinitionOverrides: Record<Exclude<Language, "en">, Record<string, (label: string) => string>> = {
-  zh: {
-    AuthorityScope: (label) => `${label}限定参与者、工具、服务或运行时可访问、可执行和可授权的资源、操作与边界。`,
-    DataZone: (label) => `${label}按信任级别、可见性、保留策略和处理规则组织数据，避免上下文、记忆、工具输出和产物跨边界失控。`,
-    BoundaryCrossing: (label) => `${label}记录控制、数据、产物或权限跨越信任边界的转移，并要求保留来源、策略和审计上下文。`,
-    MCPAdapter: (label) => `${label}把 MCP 的客户端/服务器、工具、资源、提示、发现、授权、传输和能力元数据映射到适配层本体。`,
-    A2AAdapter: (label) => `${label}把远程智能体身份、任务生命周期、消息与产物交换、不透明执行边界和委派元数据映射到适配层。`,
-    ProtocolMessageMapping: (label) => `${label}把协议消息信封对齐到规范消息、产物、参与者和轨迹概念，同时避免协议字段污染核心层。`,
-    ProtocolTaskMapping: (label) => `${label}把协议任务生命周期状态对齐到目标、任务、工作项、产物和可观测轨迹事件。`,
-    ProtocolCapabilityMapping: (label) => `${label}把协议能力声明对齐到工具、资源、提示、参与者和权限表面。`,
-    ProtocolTrustMapping: (label) => `${label}把协议身份、认证、授权和不透明性元数据对齐到信任边界与权限范围。`,
-    RemoteAgentBoundary: (label) => `${label}标记委派到远程智能体时产生的不透明性、身份、权限和责任边界。`
-  },
-  ja: {
-    AuthorityScope: (label) => `${label}は、アクター、ツール、サービス、ランタイムがアクセス、実行、承認できる資源、操作、境界を定めます。`,
-    DataZone: (label) => `${label}は、信頼水準、可視性、保持方針、取り扱い規則ごとにデータを整理し、文脈、記憶、ツール出力、成果物の越境を制御します。`,
-    BoundaryCrossing: (label) => `${label}は、制御、データ、成果物、権限が信頼境界を越える移動を記録し、来歴、方針、監査文脈を保持します。`,
-    MCPAdapter: (label) => `${label}は、MCP のクライアント/サーバー、ツール、資源、プロンプト、発見、認可、転送、能力メタデータを適配層の本体へ写像します。`,
-    A2AAdapter: (label) => `${label}は、遠隔エージェントの識別子、タスクライフサイクル、メッセージと成果物交換、不透明な実行境界、委任メタデータを適配層へ写像します。`,
-    ProtocolMessageMapping: (label) => `${label}は、プロトコル固有のメッセージ包絡を標準のメッセージ、成果物、参加者、トレース概念に対応させます。`,
-    ProtocolTaskMapping: (label) => `${label}は、プロトコルのタスク状態を目標、タスク、作業項目、成果物、観測可能なトレースイベントに対応させます。`,
-    ProtocolCapabilityMapping: (label) => `${label}は、プロトコルの能力告知をツール、資源、プロンプト、参加者、権限表面に対応させます。`,
-    ProtocolTrustMapping: (label) => `${label}は、プロトコル上の識別、認証、認可、不透明性メタデータを信頼境界と権限範囲に対応させます。`,
-    RemoteAgentBoundary: (label) => `${label}は、遠隔エージェントへ委任するときに生じる不透明性、識別、権限、責任の境界を示します。`
-  }
-};
-
-function normalizeClassTerm(value: string): string {
-  return value.toLowerCase().replace(/[-_/]+/g, " ").replace(/\s+/g, " ").trim();
-}
-
-function localizeClassIntent(klass: OntologyClass, module: Module, language: Exclude<Language, "en">): string {
-  const label = localizeClassLabel(klass, language);
-  const exact = classDefinitionOverrides[language][klass.id];
-  if (exact) {
-    return exact(label);
-  }
-
-  const lower = normalizeClassTerm(klass.label);
-  const moduleLabel = localizeEntityLabel({ id: module.id, label: module.label, kind: "module" }, language);
-  const classKind = localizeClassKind(klass.kind, language);
-  const zh = language === "zh";
-  const choose = (zhText: string, jaText: string) => (zh ? zhText : jaText);
-
-  if (lower.includes("plane")) {
-    return choose(`${label}组织一个顶层语义平面，用来区分运行、信息、记忆、编排、工具、安全、反馈或适配语义。`, `${label}は、実行、情報、記憶、編成、ツール、安全、フィードバック、適配の意味を分ける上位平面です。`);
-  }
-  if (lower.includes("adapter")) {
-    if (lower.includes("schema") || lower.includes("zod") || lower.includes("pydantic") || lower.includes("owl") || lower.includes("shacl") || lower.includes("shex")) {
-      return choose(`${label}把规范本体和模式产物转换为结构化、语言级或语义网 profile，并保留来源和转换警告。`, `${label}は、標準本体とスキーマ成果物を構造、言語、または意味ウェブのプロファイルへ変換し、来歴と変換警告を保持します。`);
-    }
-    if (lower.includes("bench") || lower.includes("world") || lower.includes("tau") || lower.includes("agency")) {
-      return choose(`${label}把基准任务、场景、评分量表、观察结果和压力轴映射到评估适配层，不改写核心本体。`, `${label}は、ベンチマークのタスク、シナリオ、採点規準、観測、負荷軸を評価適配層に写像し、核心本体を書き換えません。`);
-    }
-    if (lower.includes("xstate") || lower.includes("scxml") || lower.includes("statechart")) {
-      return choose(`${label}把运行生命周期映射到状态机、状态节点、转换、事件、守卫、动作和快照。`, `${label}は、実行ライフサイクルを状態機械、状態ノード、遷移、イベント、ガード、アクション、スナップショットに対応させます。`);
-    }
-    return choose(`${label}记录实现或框架特定字段到规范本体的映射，并阻止适配字段进入核心层。`, `${label}は、実装またはフレームワーク固有の項目を標準本体へ写像し、適配項目が核心層へ入ることを防ぎます。`);
-  }
-  if (lower.includes("authority scope")) {
-    return choose(`${label}把参与者或运行角色绑定到其被授权访问的资源、操作、工具和数据区域。`, `${label}は、参加者や実行ロールを、認可された資源、操作、ツール、データ領域に結びます。`);
-  }
-  if (lower.includes("capability")) {
-    return choose(`${label}描述可被发现、授权、调用或跨协议映射的能力、操作或暴露表面。`, `${label}は、発見、認可、呼び出し、またはプロトコル間写像が可能な能力、操作、公開面を表します。`);
-  }
-  if (lower.includes("actor") || lower.includes("agent") || lower.includes("worker") || lower.includes("orchestrator") || lower.includes("evaluator")) {
-    return choose(`${label}标识能行动、观察、授权、执行、检索或承担委派责任的运行参与者。`, `${label}は、行動、観測、認可、実行、検索、または委任責任を担う実行参加者を示します。`);
-  }
-  if (lower.includes("boundary") || lower.includes("crossing") || lower.includes("data zone")) {
-    return choose(`${label}描述信任、权限或数据处理边界，以及跨边界时必须记录的来源、策略和审计语义。`, `${label}は、信頼、権限、データ取り扱いの境界と、越境時に必要な来歴、方針、監査意味を表します。`);
-  }
-  if (lower.includes("permission") || lower.includes("authorization") || lower.includes("policy") || lower.includes("rule") || lower.includes("condition") || lower.includes("gate")) {
-    return choose(`${label}给出约束访问、路由、执行、披露或生命周期推进的授权条件与决策依据。`, `${label}は、アクセス、経路選択、実行、開示、ライフサイクル進行を制約する認可条件と判断根拠を与えます。`);
-  }
-  if (lower.includes("tool")) {
-    return choose(`${label}描述工具的身份、能力、参数、选择、调用、结果、警告、错误或副作用等可观测执行语义。`, `${label}は、ツールの識別、能力、引数、選択、呼び出し、結果、警告、エラー、副作用などの観測可能な実行意味を表します。`);
-  }
-  if (lower.includes("command") || lower.includes("sandbox") || lower.includes("network") || lower.includes("socket") || lower.includes("proxy") || lower.includes("request") || lower.includes("response")) {
-    return choose(`${label}记录命令、沙箱、网络或请求/响应路径上的受控执行、隔离和边界交互。`, `${label}は、コマンド、サンドボックス、ネットワーク、要求/応答経路における制御実行、隔離、境界相互作用を記録します。`);
-  }
-  if (lower.includes("task") || lower.includes("work item") || lower.includes("goal") || lower.includes("objective")) {
-    return choose(`${label}表达目标到任务、工作项、步骤、依赖、约束和完成准则的规划结构。`, `${label}は、目標からタスク、作業項目、手順、依存、制約、完了基準へ至る計画構造を表します。`);
-  }
-  if (lower.includes("delegation") || lower.includes("handoff") || lower.includes("subagent") || lower.includes("responsibility")) {
-    return choose(`${label}记录参与者之间责任、上下文、权限或结果所有权的转移。`, `${label}は、参加者間での責任、文脈、権限、結果所有権の移転を記録します。`);
-  }
-  if (lower.includes("route") || lower.includes("routing") || lower.includes("downstream")) {
-    return choose(`${label}根据状态、策略或观察结果选择下一步操作、分支、参与者或工具路径。`, `${label}は、状態、方針、観測結果に基づいて次の操作、分岐、参加者、ツール経路を選びます。`);
-  }
-  if (lower.includes("prompt chain") || lower.includes("chain stage") || lower.includes("parallel") || lower.includes("section") || lower.includes("vote") || lower.includes("synthesis") || lower.includes("aggregation")) {
-    return choose(`${label}描述提示链、并行、分段、投票或综合等组合机制，用于拆分工作、合并候选结果和形成产物。`, `${label}は、プロンプト連鎖、並列化、分割、投票、合成など、作業分割、候補統合、成果生成の機構を表します。`);
-  }
-  if (lower.includes("memory") || lower.includes("chunk") || lower.includes("context") || lower.includes("embedding") || lower.includes("vector") || lower.includes("index") || lower.includes("retrieval") || lower.includes("rank") || lower.includes("candidate") || lower.includes("summary")) {
-    return choose(`${label}描述记忆、分块、上下文组装、嵌入索引、检索候选、评分、重排或摘要压缩的语义。`, `${label}は、記憶、分割、文脈組み立て、埋め込み索引、検索候補、採点、再順位付け、要約圧縮の意味を表します。`);
-  }
-  if (lower.includes("message") || lower.includes("conversation") || lower.includes("prompt") || lower.includes("instruction") || lower.includes("few shot") || lower.includes("demonstration") || lower.includes("transcript")) {
-    return choose(`${label}记录可观测消息、指令、提示、示例、会话轮次或转录，而不要求保存隐藏思维链。`, `${label}は、観測可能なメッセージ、指示、プロンプト、例、会話ターン、転記を記録し、隠れた思考連鎖の保存を要求しません。`);
-  }
-  if (lower.includes("output") || lower.includes("disclosure") || lower.includes("redaction") || lower.includes("window") || lower.includes("limit") || lower.includes("sensitive")) {
-    return choose(`${label}控制输出的可见性、压缩、截断、脱敏、披露阶段和向下游传递的范围。`, `${label}は、出力の可視性、圧縮、切り詰め、秘匿、開示段階、下流への伝達範囲を制御します。`);
-  }
-  if (lower.includes("trace") || lower.includes("span") || lower.includes("checkpoint") || lower.includes("snapshot") || lower.includes("event") || lower.includes("session") || lower.includes("run") || lower.includes("lifecycle") || lower.includes("environment")) {
-    return choose(`${label}记录会话、运行、事件、轨迹、检查点、快照或状态差异等可审计运行证据。`, `${label}は、セッション、実行、イベント、トレース、チェックポイント、スナップショット、状態差分など監査可能な実行証拠を記録します。`);
-  }
-  if (lower.includes("artifact") || lower.includes("file") || lower.includes("directory") || lower.includes("database") || lower.includes("graph") || lower.includes("document") || lower.includes("source") || lower.includes("resource") || lower.includes("metadata")) {
-    return choose(`${label}标识智能体系统产生、消费、检索或引用的信息源、存储对象、文档、图元素、产物或元数据。`, `${label}は、エージェントシステムが生成、消費、検索、参照する情報源、保存対象、文書、グラフ要素、成果物、メタデータを示します。`);
-  }
-  if (lower.includes("evaluation") || lower.includes("metric") || lower.includes("score") || lower.includes("rubric") || lower.includes("benchmark") || lower.includes("scenario") || lower.includes("criterion") || lower.includes("review") || lower.includes("feedback") || lower.includes("critique") || lower.includes("optimization")) {
-    return choose(`${label}记录评估单元、评分规则、量表、反馈、审查、优化循环或基准观察，用于判断智能体行为质量。`, `${label}は、評価単位、採点規則、規準、フィードバック、レビュー、最適化ループ、ベンチマーク観測を記録し、エージェント行動の品質を判断します。`);
-  }
-  if (lower.includes("warning") || lower.includes("error") || lower.includes("diagnostic") || lower.includes("failure") || lower.includes("confidence") || lower.includes("risk") || lower.includes("signal") || lower.includes("injection") || lower.includes("scan") || lower.includes("finding")) {
-    return choose(`${label}捕获风险、不确定性、诊断、故障、注入迹象或置信度下降，并影响后续安全决策。`, `${label}は、リスク、不確実性、診断、失敗、注入兆候、信頼度低下を捕捉し、後続の安全判断に影響します。`);
-  }
-  if (lower.includes("log") || lower.includes("telemetry") || lower.includes("audit") || lower.includes("listener") || lower.includes("sink")) {
-    return choose(`${label}提供日志、遥测、审计或事件流基础设施，用于检查智能体行为。`, `${label}は、ログ、テレメトリ、監査、イベントストリーム基盤を提供し、エージェント行動を検査します。`);
-  }
-
-  return choose(
-    `${label}用于在${moduleLabel}中标识来源可追溯的${classKind}，并承载该模块内的概念边界、关系和验证语义。`,
-    `${label}は、${moduleLabel}で来歴を追跡できる${classKind}を示し、そのモジュール内の概念境界、関係、検証意味を担います。`
-  );
-}
-
-function localizeClassDefinition(item: DirectoryItem, language: Exclude<Language, "en">): string {
-  const klass = ontology.classes.find((candidate) => candidate.id === item.id);
-  const module = ontology.modules.find((candidate) => candidate.id === (klass?.module_id ?? item.module_id));
-
-  if (!klass || !module) {
-    return item.definition;
-  }
-
-  return localizeClassIntent(klass, module, language);
-}
-
-function localizeDefinition(item: DirectoryItem, language: Language): string {
-  if (language === "en") {
-    return item.definition;
-  }
-
-  const label = localizeEntityLabel(item, language);
-  if (item.kind === "domain") {
-    return language === "zh" ? "智能体系统本体族的规范化领域。" : "エージェントシステム本体群の規範領域。";
-  }
-
-  if (item.kind === "plane") {
-    const scope = planeScopeOverrides[language][item.id];
-    return scope
-      ? language === "zh"
-        ? `${label}组织${scope}。`
-        : `${label}は${scope}を整理します。`
-      : item.definition;
-  }
-
-  if (item.kind === "module") {
-    const module = ontology.modules.find((candidate) => candidate.id === item.id);
-    return module ? localizeModuleDefinition(module, language) : item.definition;
-  }
-
-  return localizeClassDefinition(item, language);
+function definitionForLanguage(item: Pick<DirectoryItem, "definition" | "definitions">, language: Language): string {
+  return item.definitions?.[language]?.trim() || item.definition;
 }
 
 function localizeKind(kind: EntityKind, language: Language): string {
@@ -1975,7 +1707,8 @@ function buildDirectoryItems(): DirectoryItem[] {
     id: ontology.id,
     kind: "domain",
     label: ontology.label,
-    definition: "Canonical domain for the agent-system ontology family.",
+    definition: ontology.definition,
+    definitions: ontology.definitions,
     maturity: "release",
     source_ids: ontology.planes.flatMap((plane) => planeSourceIds(plane.id))
   };
@@ -1986,6 +1719,7 @@ function buildDirectoryItems(): DirectoryItem[] {
     kind: "plane" as const,
     label: plane.label,
     definition: plane.definition,
+    definitions: plane.definitions,
     maturity: maturityForPlane(plane.id),
     source_ids: planeSourceIds(plane.id),
     parent_ref: domainItem.ref,
@@ -1998,6 +1732,7 @@ function buildDirectoryItems(): DirectoryItem[] {
     kind: "module" as const,
     label: module.label,
     definition: module.definition,
+    definitions: module.definitions,
     maturity: maturityForPlane(module.plane_id),
     source_ids: sourceIdsOf(module),
     parent_ref: entityRef("plane", module.plane_id),
@@ -2011,6 +1746,7 @@ function buildDirectoryItems(): DirectoryItem[] {
     kind: "class" as const,
     label: klass.label,
     definition: klass.definition,
+    definitions: klass.definitions,
     maturity: maturityForClass(klass),
     source_ids: sourceIdsOf(klass),
     parent_ref: entityRef("module", klass.module_id),
@@ -2881,7 +2617,7 @@ function App() {
               <div>
                 <p className="eyebrow">{localizeKind(selectedItem.kind, language)}</p>
                 <h2>{localizeEntityLabel(selectedItem, language)}</h2>
-                <p>{localizeDefinition(selectedItem, language)}</p>
+                <p>{definitionForLanguage(selectedItem, language)}</p>
               </div>
               <dl className="summary-metrics">
                 <div>

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import ontology from "../ontology/agent-ontology.json";
+import definitionLedger from "../ontology/agent-ontology-definitions.json";
 
 function parseCsvLine(line: string): string[] {
   const cells: string[] = [];
@@ -63,6 +64,19 @@ function collectSourceIds(value: unknown, ids = new Set<string>()): Set<string> 
   }
 
   return ids;
+}
+
+function collectDefinitionRows(): Array<readonly [string, string, { definition?: string; definitions?: Record<string, string> }]> {
+  return [
+    ["ontology", ontology.id, ontology],
+    ...ontology.planes.map((item) => ["plane", item.id, item] as const),
+    ...ontology.modules.map((item) => ["module", item.id, item] as const),
+    ...ontology.classes.map((item) => ["class", item.id, item] as const),
+    ...ontology.object_properties.map((item) => ["object_property", item.id, item] as const),
+    ...ontology.data_properties.map((item) => ["data_property", item.id, item] as const),
+    ...ontology.individuals.map((item) => ["individual", item.id, item] as const),
+    ...ontology.axioms.map((item) => ["axiom", item.id, item] as const)
+  ];
 }
 
 describe("canonical agent ontology artifact", () => {
@@ -158,6 +172,178 @@ describe("canonical agent ontology artifact", () => {
       .map(([kind, id, definition]) => `${kind}:${id}:${definition}`);
 
     expect(placeholderDefinitions).toEqual([]);
+  });
+
+  it("stores multilingual definitions in the canonical artifact instead of frontend templates", () => {
+    const invalidRows = collectDefinitionRows()
+      .filter(([, , item]) => {
+        const definitions = item.definitions;
+        return (
+          !definitions ||
+          definitions.en !== (item.definition ?? ("statement" in item ? item.statement : undefined)) ||
+          !definitions.en?.trim() ||
+          !definitions.zh?.trim() ||
+          !definitions.ja?.trim()
+        );
+      })
+      .map(([kind, id]) => `${kind}:${id}`);
+
+    expect(invalidRows).toEqual([]);
+  });
+
+  it("takes every multilingual definition from the explicit curated definition ledger", () => {
+    const ledgerEntries = definitionLedger.definitions as Record<string, { definitions?: Record<string, string>; review_status?: string }>;
+    const mismatches = collectDefinitionRows()
+      .filter(([, id, item]) => {
+        const ledgerEntry = ledgerEntries[id];
+        return (
+          ledgerEntry?.review_status !== "curated" ||
+          ledgerEntry.definitions?.en !== item.definitions?.en ||
+          ledgerEntry.definitions?.zh !== item.definitions?.zh ||
+          ledgerEntry.definitions?.ja !== item.definitions?.ja
+        );
+      })
+      .map(([kind, id]) => `${kind}:${id}`);
+
+    expect(mismatches).toEqual([]);
+  });
+
+  it("uses hand-reviewed definitions for text document and text embedding terms", () => {
+    const classDefinitions = new Map(ontology.classes.map((klass) => [klass.id, klass.definitions]));
+    const textDocument = classDefinitions.get("TextDocument");
+    const textEmbedding = classDefinitions.get("TextEmbedding");
+
+    expect(textDocument?.zh).toContain("文本文档");
+    expect(textDocument?.zh).toContain("文本型信息源");
+    expect(textDocument?.zh).not.toMatch(/text文档|Storage|Sources|InformationIndexing/);
+    expect(textDocument?.ja).toContain("テキスト文書");
+    expect(textDocument?.ja).toContain("テキスト情報源");
+    expect(textDocument?.ja).not.toMatch(/text文書|Storage|Sources|InformationIndexing/);
+
+    expect(textEmbedding?.zh).toContain("文本嵌入");
+    expect(textEmbedding?.zh).toContain("稠密");
+    expect(textEmbedding?.zh).toContain("检索");
+    expect(textEmbedding?.zh).not.toMatch(/工具身份|工具.*副作用|InformationIndexing|text嵌入/);
+    expect(textEmbedding?.ja).toContain("テキスト埋め込み");
+    expect(textEmbedding?.ja).toContain("密");
+    expect(textEmbedding?.ja).toContain("検索");
+    expect(textEmbedding?.ja).not.toMatch(/ツールの識別|副作用|InformationIndexing|text埋め込み/);
+  });
+
+  it("keeps localized definitions free of generated glue and untranslated fallback labels", () => {
+    const allowedTechnicalTokens = new Set([
+      "MCP",
+      "A2A",
+      "FIPA",
+      "KQML",
+      "JSON",
+      "Schema",
+      "SCXML",
+      "OWL",
+      "RDF",
+      "SHACL",
+      "ShEx",
+      "Zod",
+      "Pydantic",
+      "SWE",
+      "OSWorld",
+      "tau2",
+      "AppWorld",
+      "Terminal",
+      "AgencyBench",
+      "API",
+      "HTTP",
+      "SOCKS",
+      "UDP",
+      "SSH",
+      "TCP",
+      "TF",
+      "IDF",
+      "Top",
+      "LangGraph",
+      "CrewAI",
+      "Deep",
+      "DeepAgents",
+      "OpenAI",
+      "Microsoft",
+      "IR",
+      "XState",
+      "SWEbench",
+      "TerminalBench",
+      "Top-K",
+      "SDK",
+      "TypeScript",
+      "TF-IDF",
+      "UML",
+      "ELK",
+      "Dagre",
+      "Ajv",
+      "URI",
+      "integer",
+      "number",
+      "string",
+      "date-time",
+      "source",
+      "ID",
+      "IDs",
+      "Agents",
+      "WebSocket"
+    ]);
+    const forbiddenGlue = [
+      "InformationIndexing",
+      "Storage",
+      "Sources",
+      "object_type",
+      "event_type",
+      "resource_type",
+      "adapter_type",
+      "policy_type",
+      "action_type",
+      "index_type",
+      "relation_type",
+      "actor_type",
+      "contains",
+      "relates",
+      "emits",
+      "hasevidence",
+      "has状态",
+      "has成本",
+      "界定该术语",
+      "声明本体中的结构约束",
+      "表示该术语在智能体系统中的规范语义"
+    ];
+
+    const badRows = collectDefinitionRows().flatMap(([kind, id, item]) =>
+      (["zh", "ja"] as const).flatMap((language) => {
+        const text = item.definitions?.[language] ?? "";
+        const unexpectedTokens = [...new Set(text.match(/[A-Za-z][A-Za-z0-9+-]*/g) ?? [])].filter(
+          (token) => !allowedTechnicalTokens.has(token)
+        );
+        const glueHit = forbiddenGlue.find((phrase) => text.includes(phrase));
+
+        return unexpectedTokens.length > 0 || glueHit
+          ? [`${kind}:${id}:${language}:${unexpectedTokens.join(",")}:${glueHit ?? ""}`]
+          : [];
+      })
+    );
+
+    expect(badRows).toEqual([]);
+  });
+
+  it("keeps runtime sessions and environments as bounded runtime objects, not events", () => {
+    const classesById = new Map(ontology.classes.map((klass) => [klass.id, klass]));
+
+    expect(classesById.get("RuntimeSession")?.kind).toBe("object_type");
+    expect(classesById.get("RuntimeEnvironment")?.kind).toBe("object_type");
+    expect(classesById.get("RuntimeSession")?.definitions?.zh).toContain("有边界的执行片段");
+    expect(classesById.get("RuntimeEnvironment")?.definitions?.zh).toContain("具体执行环境");
+  });
+
+  it("renders entity definitions from the canonical artifact in the frontend", () => {
+    const appSource = readFileSync(join(process.cwd(), "src", "App.tsx"), "utf8");
+
+    expect(appSource).toContain("definitionForLanguage(selectedItem, language)");
+    expect(appSource).not.toContain("<p>{localizeDefinition(selectedItem, language)}</p>");
   });
 
   it("uses concept-specific class explanations for core agent-system terms", () => {
