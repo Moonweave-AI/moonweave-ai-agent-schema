@@ -320,6 +320,99 @@ describe("canonical agent ontology artifact", () => {
     );
   });
 
+  it("models control and orchestration as workflow semantics instead of a term directory", () => {
+    const classIds = new Set(ontology.classes.map((klass) => klass.id));
+    const objectProperties = new Map(ontology.object_properties.map((property) => [property.id, property]));
+    const orchestrationModules = new Map(
+      ontology.modules.filter((module) => module.plane_id === "orchestration-plane").map((module) => [module.id, module])
+    );
+    const expectedModules = new Map([
+      ["orchestration-task-planning", "Task Planning Module"],
+      ["orchestration-actors-delegation", "Coordination Roles And Delegation Module"],
+      ["orchestration-routing-control", "Routing And Control Module"],
+      ["orchestration-composition", "Composition Patterns Module"],
+      ["orchestration-evaluation", "Control Feedback Loop Module"]
+    ]);
+    const requiredClasses = [
+      "AgentAsToolInvocation",
+      "AnswerOwnership",
+      "ControlOwnership",
+      "DelegatedAuthority",
+      "DelegationBudget",
+      "DelegationOwnership",
+      "ContextIsolation",
+      "RoutingTarget",
+      "WorkerSelection",
+      "WorkerCapabilityMatch",
+      "WorkerAvailability",
+      "OrchestrationTopology",
+      "StopRetryLineage"
+    ];
+    const requiredRelations = [
+      "decomposes_goal_into",
+      "has_task_step",
+      "depends_on_task",
+      "assigns_work_item_to",
+      "retains_answer_ownership",
+      "transfers_control_to",
+      "uses_agent_as_tool",
+      "isolates_context_for",
+      "delegates_authority_scope",
+      "selects_worker_from_pool",
+      "routes_to_target",
+      "has_control_topology",
+      "constrained_by_budget",
+      "synthesizes_from_input",
+      "produces_synthesis_output",
+      "triggers_revision_attempt",
+      "terminates_on_condition",
+      "retries_from_attempt"
+    ];
+
+    for (const [moduleId, label] of expectedModules) {
+      expect(orchestrationModules.get(moduleId)?.label).toBe(label);
+    }
+
+    expect(classIds.has("OrchestrationPlane")).toBe(false);
+    expect(classes.get("TaskDistribution")?.module_id).toBe("orchestration-actors-delegation");
+    expect(classes.get("EvaluationCriterion")?.plane_id).toBe("feedback-plane");
+    expect(classes.get("Route")?.kind).not.toBe("action_type");
+
+    for (const classId of requiredClasses) {
+      expect(classes.get(classId)?.plane_id).toBe("orchestration-plane");
+      expect(classes.get(classId)?.definitions?.en.length).toBeGreaterThan(40);
+      expect(classes.get(classId)?.definitions?.zh.length).toBeGreaterThan(20);
+      expect(classes.get(classId)?.definitions?.ja.length).toBeGreaterThan(20);
+    }
+
+    for (const relationId of requiredRelations) {
+      expect(objectProperties.get(relationId)?.family).toBe("orchestration_flow");
+      expect(objectProperties.get(relationId)?.definition.length).toBeGreaterThan(40);
+    }
+
+    expect(classes.get("Goal")?.definition).toMatch(/high-level.*intent/i);
+    expect(classes.get("Objective")?.definition).toMatch(/measurable|assignable|operational/i);
+    expect(classes.get("GateOutcome")?.definition).toMatch(/allowed|blocked|redirected|escalated|retried|stopped/i);
+    expect(classes.get("DownstreamOperation")?.definition).toMatch(/target|operation handle/i);
+    expect(classes.get("AggregationRule")?.definition).toMatch(/voting|synthesis|merge/i);
+    expect(classes.get("ThinkAsTool")?.definition).toMatch(/observable|tool-like/i);
+    expect(classes.get("ThinkAsTool")?.definition).not.toMatch(/hidden chain-of-thought/i);
+
+    const localizedDefinitions = [
+      classes.get("TaskDistribution")?.definitions?.zh,
+      classes.get("Route")?.definitions?.zh,
+      classes.get("GateOutcome")?.definitions?.zh,
+      classes.get("DownstreamOperation")?.definitions?.zh,
+      classes.get("AggregationRule")?.definitions?.zh,
+      classes.get("ThinkAsTool")?.definitions?.zh,
+      classes.get("ReviewEvent")?.definitions?.zh,
+      classes.get("FeedbackEvent")?.definitions?.zh
+    ].join("\n");
+
+    expect(localizedDefinitions).not.toMatch(/工具的注册、发现、匹配、参数、调用、执行结果|运行参与者及其角色边界|基准任务、场景、评分规则/);
+    expect(localizedDefinitions).toMatch(/委派|路由|闸门|聚合|反馈|审查/);
+  });
+
   it("stores multilingual definitions in the canonical artifact instead of frontend templates", () => {
     const invalidRows = collectDefinitionRows()
       .filter(([, , item]) => {
