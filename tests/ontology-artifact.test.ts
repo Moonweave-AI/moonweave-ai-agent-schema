@@ -890,6 +890,190 @@ describe("canonical agent ontology artifact", () => {
     expect(localizedAdapterDefinitions).not.toMatch(/基准与状态图适配器模块|所属平面：互操作适配域|证据源 \d+ 项|信任或安全边界|可审计运行证据/);
   });
 
+  it("models trust policy and safety as an auditable propagation graph", () => {
+    const objectProperties = new Map(ontology.object_properties.map((property) => [property.id, property]));
+    const classIds = new Set(ontology.classes.map((klass) => klass.id));
+    const safetyPlane = ontology.planes.find((plane) => plane.id === "safety-plane");
+    const safetyModules = new Map(
+      ontology.modules.filter((module) => module.plane_id === "safety-plane").map((module) => [module.id, module])
+    );
+    const expectedModules = new Map([
+      ["safety-trust-boundary", "Trust Boundary Module"],
+      ["safety-permission-policy", "Permission And Policy Module"],
+      ["safety-sandbox-network", "Sandbox And Network Module"],
+      ["safety-injection-defense", "Injection Defense Module"],
+      ["safety-commit-redaction", "Commit And Redaction Module"]
+    ]);
+    const expectedKinds = new Map([
+      ["TrustBoundary", "object_type"],
+      ["RemoteAgentBoundary", "object_type"],
+      ["BoundaryCrossing", "event_type"],
+      ["AuthorityScope", "policy_type"],
+      ["PermissionScope", "policy_type"],
+      ["AuthorizationGrant", "policy_type"],
+      ["CapabilityGrant", "policy_type"],
+      ["PolicyDecision", "policy_type"],
+      ["TaintedSource", "resource_type"],
+      ["TaintedSpan", "resource_type"],
+      ["TaintPropagation", "relation_type"],
+      ["SourceSinkFlow", "relation_type"],
+      ["MemoryPoisoningSignal", "event_type"],
+      ["PersistentContextRisk", "event_type"],
+      ["CommitApproval", "policy_type"],
+      ["CommitDenial", "policy_type"],
+      ["SideEffect", "event_type"],
+      ["SensitiveSpan", "resource_type"]
+    ]);
+    const requiredInjectionClasses = [
+      "TaintedSource",
+      "TaintedSpan",
+      "TaintPropagation",
+      "SourceSinkFlow",
+      "UntrustedInstructionCandidate",
+      "InstructionConflict",
+      "TrustedInstructionOverride",
+      "RiskSource",
+      "RiskSink",
+      "MemoryPoisoningSignal",
+      "PersistentContextRisk",
+      "PoisonedRetrievedChunk",
+      "PoisonedToolDescription",
+      "ToolSchemaPoisoning",
+      "ResourceContentPoisoning"
+    ];
+    const requiredSafetyRelations = [
+      ["crosses_trust_boundary", "BoundaryCrossing", "TrustBoundary", "trust_boundary"],
+      ["boundary_crossing_has_source_actor", "BoundaryCrossing", "AgentActor", "safety_propagation"],
+      ["boundary_crossing_has_target_actor", "BoundaryCrossing", "AgentActor", "safety_propagation"],
+      ["boundary_crossing_has_source_zone", "BoundaryCrossing", "DataZone", "safety_propagation"],
+      ["boundary_crossing_has_target_zone", "BoundaryCrossing", "DataZone", "safety_propagation"],
+      ["boundary_crossing_authorized_by", "BoundaryCrossing", "PolicyDecision", "safety_propagation"],
+      ["boundary_crossing_recorded_by_trace_event", "BoundaryCrossing", "TraceEvent", "safety_propagation"],
+      ["source_reference_belongs_to_data_zone", "SourceReference", "DataZone", "safety_propagation"],
+      ["context_window_crosses_trust_boundary", "VisibleContextWindow", "TrustBoundary", "safety_propagation"],
+      ["message_scanned_by_pattern_scan", "Message", "PatternScan", "safety_propagation"],
+      ["instruction_flagged_as_prompt_injection", "Instruction", "PromptInjectionSignal", "safety_propagation"],
+      ["tool_result_flagged_as_tool_stream_injection", "ToolResult", "ToolStreamInjectionSignal", "safety_propagation"],
+      ["tool_call_requires_permission_scope", "ToolCall", "PermissionScope", "permission_flow"],
+      ["tool_call_evaluated_by_policy_decision", "ToolCall", "PolicyDecision", "permission_flow"],
+      ["tool_call_executes_in_sandbox", "ToolCall", "Sandbox", "permission_flow"],
+      ["tool_result_scanned_by_pattern_scan", "ToolResult", "PatternScan", "safety_propagation"],
+      ["mcp_authorization_maps_to_authorization_grant", "MCPAuthorization", "AuthorizationGrant", "permission_flow"],
+      ["commit_request_evaluated_by_commit_gate", "CommitRequest", "CommitGate", "commit_control"],
+      ["commit_gate_emits_policy_decision", "CommitGate", "PolicyDecision", "commit_control"],
+      ["commit_approval_authorizes_side_effect", "CommitApproval", "SideEffect", "commit_control"],
+      ["commit_denial_blocks_side_effect", "CommitDenial", "SideEffect", "commit_control"],
+      ["side_effect_produced_by_tool_call", "SideEffect", "ToolCall", "commit_control"],
+      ["side_effect_produced_by_sandbox_command", "SideEffect", "SandboxCommand", "commit_control"],
+      ["side_effect_produced_by_network_call", "SideEffect", "NetworkCall", "commit_control"],
+      ["side_effect_has_rollback_action", "SideEffect", "Action", "commit_control"],
+      ["output_segment_has_sensitive_span", "OutputSegment", "SensitiveSpan", "disclosure_control"],
+      ["disclosure_filter_suppresses_output_window", "DisclosureFilter", "OutputWindow", "disclosure_control"],
+      ["redaction_applies_to_sensitive_span", "Redaction", "SensitiveSpan", "disclosure_control"],
+      ["audit_disclosure_records_disclosure_filter", "AuditDisclosure", "DisclosureFilter", "disclosure_control"]
+    ] as const;
+
+    expect(classIds.has("SafetyPlane")).toBe(false);
+    expect(safetyPlane?.module_ids).toEqual(expect.arrayContaining([...expectedModules.keys()]));
+
+    for (const [moduleId, label] of expectedModules) {
+      const module = safetyModules.get(moduleId);
+      expect(module?.label).toBe(label);
+      expect(module?.definitions?.en.length).toBeGreaterThan(55);
+      expect(module?.definitions?.zh.length).toBeGreaterThan(24);
+      expect(module?.definitions?.ja.length).toBeGreaterThan(24);
+    }
+
+    for (const [classId, kind] of expectedKinds) {
+      expect(classes.get(classId)?.kind).toBe(kind);
+    }
+
+    for (const classId of requiredInjectionClasses) {
+      const klass = classes.get(classId);
+      expect(klass?.plane_id).toBe("safety-plane");
+      expect(klass?.module_id).toBe("safety-injection-defense");
+      expect(klass?.definitions?.en.length).toBeGreaterThan(50);
+      expect(klass?.definitions?.zh.length).toBeGreaterThan(24);
+      expect(klass?.definitions?.ja.length).toBeGreaterThan(24);
+    }
+
+    for (const [relationId, domain, range, family] of requiredSafetyRelations) {
+      const relation = objectProperties.get(relationId);
+      expect(relation?.domain).toBe(domain);
+      expect(relation?.range).toBe(range);
+      expect(relation?.family).toBe(family);
+      expect(relation?.definition.length).toBeGreaterThan(55);
+      expect(relation?.definitions?.zh.length).toBeGreaterThan(24);
+      expect(relation?.definitions?.ja.length).toBeGreaterThan(24);
+      expect(relation?.source_ids).toEqual(
+        expect.arrayContaining(["lit-agent-safeagent", "eng-fw-openai-guardrails", "eng-security-mcp-nsa-2026"])
+      );
+    }
+
+    expect(classes.get("RemoteAgentBoundary")?.definition).toMatch(
+      /(opacity|identity|authority|accountability).*(trust boundary|boundary)/i
+    );
+    expect(classes.get("BoundaryCrossing")?.definition).toMatch(
+      /source actor.*target actor.*source zone.*target zone.*direction.*authority basis.*policy decision.*trace/i
+    );
+    expect(classes.get("PolicyCondition")?.definition).toMatch(/subject actor|requested operation|protected resource|policy basis/i);
+    expect(classes.get("PolicyException")?.definition).toMatch(/exception scope|expiration|revocation|audit reason/i);
+    expect(classes.get("PromptInjectionSignal")?.definition).toMatch(/override trusted instructions|manipulate/i);
+    expect(classes.get("ToolStreamInjectionSignal")?.definition).toMatch(/streamed tool output|tool result.*inject/i);
+    expect(classes.get("MaliciousToolOutput")?.definition).toMatch(/untrusted instructions|exfiltration|policy-bypass/i);
+    expect(classes.get("MaliciousToolOutput")?.definition).not.toMatch(/callable external or hosted capability/i);
+    expect(objectProperties.get("authorizes")?.definition).toMatch(/legacy summary|use .*authorizes.*specific/i);
+    expect(objectProperties.get("blocks")?.definition).toMatch(/legacy summary|use .*blocks.*specific/i);
+
+    const localizedSafetyDefinitions = [
+      safetyPlane?.definitions?.zh,
+      ...[...safetyModules.values()].map((module) => module.definitions?.zh),
+      ...[
+        "TrustBoundary",
+        "BoundaryCrossing",
+        "PolicyDecision",
+        "PermissionScope",
+        "Sandbox",
+        "PromptInjectionSignal",
+        "TaintPropagation",
+        "SourceSinkFlow",
+        "MemoryPoisoningSignal",
+        "CommitApproval",
+        "CommitDenial",
+        "Redaction",
+        "AuditDisclosure"
+      ].map((classId) => classes.get(classId)?.definitions?.zh),
+      ...requiredSafetyRelations.map(([relationId]) => objectProperties.get(relationId)?.definitions?.zh)
+    ].join("\n");
+    const localizedSafetyDefinitionsJa = [
+      safetyPlane?.definitions?.ja,
+      ...[...safetyModules.values()].map((module) => module.definitions?.ja),
+      ...[
+        "TrustBoundary",
+        "BoundaryCrossing",
+        "PolicyDecision",
+        "PermissionScope",
+        "Sandbox",
+        "PromptInjectionSignal",
+        "TaintPropagation",
+        "SourceSinkFlow",
+        "MemoryPoisoningSignal",
+        "CommitApproval",
+        "CommitDenial",
+        "Redaction",
+        "AuditDisclosure"
+      ].map((classId) => classes.get(classId)?.definitions?.ja),
+      ...requiredSafetyRelations.map(([relationId]) => objectProperties.get(relationId)?.definitions?.ja)
+    ].join("\n");
+
+    expect(localizedSafetyDefinitions).toMatch(/信任边界|策略决策|沙箱|注入|污点|来源|接收方|脱敏|副作用|审计/);
+    expect(localizedSafetyDefinitionsJa).toMatch(/信頼境界|ポリシー判断|サンドボックス|注入|汚染|送信元|受信先|秘匿|副作用|監査/);
+    expect(localizedSafetyDefinitions).not.toMatch(
+      /所属平面：|证据源 \d+ 项|信頼、ポリシー、安全ドメイン|工具的注册、发现、匹配|会话、运行、事件、轨迹|根据状态、策略、条件|可审计运行证据/
+    );
+    expect(localizedSafetyDefinitionsJa).not.toMatch(/所属平面：|证据源 \d+ 项|工具的注册、发现、匹配|会话、运行、事件、轨迹/);
+  });
+
   it("renders entity definitions from the canonical artifact in the frontend", () => {
     const appSource = readFileSync(join(process.cwd(), "src", "App.tsx"), "utf8");
 
