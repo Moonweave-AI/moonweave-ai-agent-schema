@@ -70,12 +70,12 @@ metadata around the artifact, not part of the agent runtime itself.
 | Domains | 1 |
 | Planes | 8 |
 | Modules | 39 |
-| Classes | 499 |
-| Object properties | 273 |
+| Classes | 512 |
+| Object properties | 301 |
 | Data properties | 98 |
 | Annotation properties | 12 |
 | Individuals | 78 |
-| Axioms | 499 |
+| Axioms | 527 |
 | Datatypes | 8 |
 | Ontology partitions | 47 |
 
@@ -90,7 +90,7 @@ Moonweave Agent Schema organizes agent systems through eight operational concern
 | Runtime State & Trace Domain | Runtime execution envelopes and raw provenance evidence: sessions, run attempts, outcomes, actor authority bindings, trace/span/event structure, checkpoints, snapshots, state diffs, replay and restore events, and artifact production, consumption, and derivation lineage. |
 | Interoperability & Adapter Domain | Adapter membrane for protocol, framework, benchmark, statechart, schema/export, language profile, Graph IR, and frontend projections, with directional mapping rules, source/version provenance, conversion warnings, and core-pollution controls. |
 | Capability & Resource Invocation Domain | Tool and capability registries, definitions, discovery, matching, invocation, execution, MCP transport, resources, prompts, results, and observable side effects. |
-| Trust, Policy & Safety Domain | Trust boundaries, authority scopes, permission prompts, policy decisions, sandboxing, network control, injection defense, commit gates, redaction, and audit disclosure. |
+| Trust, Policy & Safety Domain | Auditable safety propagation across trust boundaries, authority scopes, permission prompts, policy decisions, sandbox and network controls, source-sink injection defense, memory poisoning signals, side-effect commit gates, redaction, and audit disclosure. |
 | Observability & Feedback Domain | Warnings, errors, feedback, critique, review, metrics, benchmark observations, telemetry, audit logs, optimization loops, recovery, and diagnostics. |
 | Memory & Context Persistence Domain | Memory ingestion, files, documents, chunking, situating, embeddings, retrieval, ranking, context assembly, summaries, preferences, and persistence policy. |
 

@@ -26,15 +26,15 @@ must consume.
 |---|---:|
 | domains | 1 |
 | planes | 8 |
-| modules | 37 |
-| classes | 500 |
-| object properties | 255 |
-| data properties | 94 |
+| modules | 39 |
+| classes | 512 |
+| object properties | 301 |
+| data properties | 98 |
 | annotation properties | 12 |
-| individuals | 76 |
-| axioms | 471 |
+| individuals | 78 |
+| axioms | 527 |
 | datatypes | 8 |
-| ontology partitions | 45 |
+| ontology partitions | 47 |
 
 ## Design References
 

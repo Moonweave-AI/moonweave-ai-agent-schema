@@ -520,8 +520,8 @@ const moduleSpecs = [
     id: "safety-trust-boundary",
     plane_id: "safety-plane",
     label: "Trust Boundary Module",
-    definition: "models trust boundaries, authority scopes, data zones, and boundary crossings",
-    class_ids: ["SafetyPlane", "TrustBoundary"],
+    definition: "models trust boundaries, authority scopes, data zones, and auditable boundary-crossing events",
+    class_ids: ["TrustBoundary"],
     generated: [
       ["AuthorityScope", "authority scope"],
       ["DataZone", "data zone"],
@@ -537,7 +537,7 @@ const moduleSpecs = [
     id: "safety-permission-policy",
     plane_id: "safety-plane",
     label: "Permission And Policy Module",
-    definition: "models permission prompts, policy rules, decisions, and authorization outcomes",
+    definition: "models permission prompts, policy rules, scoped authority, decisions, grants, exceptions, and authorization outcomes",
     class_ids: ["PermissionPrompt", "PolicyRule", "PolicyDecision", "AllowDecision", "DenyDecision", "EscalationDecision"],
     generated: [
       ["AuthorizationGrant", "authorization grant"],
@@ -554,7 +554,7 @@ const moduleSpecs = [
     id: "safety-sandbox-network",
     plane_id: "safety-plane",
     label: "Sandbox And Network Module",
-    definition: "models sandboxing, sockets, proxies, network calls, and controlled execution paths",
+    definition: "models sandbox execution boundaries, process and filesystem policy, network egress, sockets, proxies, and denied calls",
     class_ids: ["Sandbox", "SandboxCommand", "NetworkCall", "DomainSocket", "Socket", "Proxy", "SOCKSProxy", "HTTPProxy", "NetworkResource"],
     generated: [
       ["NetworkPolicy", "network policy"],
@@ -571,13 +571,28 @@ const moduleSpecs = [
     id: "safety-injection-defense",
     plane_id: "safety-plane",
     label: "Injection Defense Module",
-    definition: "models pattern scans, injection signatures, tool-stream risks, and malicious instruction propagation",
+    definition: "models injection detection, source-sink taint propagation, tool-stream risk, memory poisoning, and pre-execution risk signals",
     class_ids: ["PatternScan", "InjectionSignature"],
     generated: [
       ["PromptInjectionSignal", "prompt injection signal"],
       ["IndirectInjectionSignal", "indirect injection signal"],
       ["ToolStreamInjectionSignal", "tool stream injection signal"],
       ["MaliciousToolOutput", "malicious tool output"],
+      ["TaintedSource", "tainted source"],
+      ["TaintedSpan", "tainted span"],
+      ["TaintPropagation", "taint propagation"],
+      ["SourceSinkFlow", "source sink flow"],
+      ["UntrustedInstructionCandidate", "untrusted instruction candidate"],
+      ["InstructionConflict", "instruction conflict"],
+      ["TrustedInstructionOverride", "trusted instruction override"],
+      ["RiskSource", "risk source"],
+      ["RiskSink", "risk sink"],
+      ["MemoryPoisoningSignal", "memory poisoning signal"],
+      ["PersistentContextRisk", "persistent context risk"],
+      ["PoisonedRetrievedChunk", "poisoned retrieved chunk"],
+      ["PoisonedToolDescription", "poisoned tool description"],
+      ["ToolSchemaPoisoning", "tool schema poisoning"],
+      ["ResourceContentPoisoning", "resource content poisoning"],
       ["QuarantineAction", "quarantine action"],
       ["SanitizationAction", "sanitization action"],
       ["InjectionScanResult", "injection scan result"],
@@ -588,7 +603,7 @@ const moduleSpecs = [
     id: "safety-commit-redaction",
     plane_id: "safety-plane",
     label: "Commit And Redaction Module",
-    definition: "models commit gates, redaction, disclosure filtering, and side-effect approval",
+    definition: "models side-effect commit gates, approval and denial outcomes, rollback linkage, redaction, disclosure filtering, and audit disclosure",
     class_ids: ["CommitGate", "Redaction", "DisclosureRule", "ProgressiveDisclosure", "SuppressedOutput"],
     generated: [
       ["CommitRequest", "commit request"],
@@ -1340,15 +1355,279 @@ const exactGeneratedClassDefinitions = new Map([
   ],
   [
     "AuthorityScope",
-    "defines the authorization envelope for an actor, tool, service, or runtime by naming the permissions, operations, resources, and limits it may exercise."
+    "defines the canonical authorization envelope for an actor, tool, service, or runtime by naming permitted operations, protected resources, data zones, trust boundaries, expiry, and enforcement limits."
   ],
   [
     "DataZone",
     "groups data by trust, visibility, retention, and handling policy so that context, memory, tool output, and artifacts can carry boundary-aware controls."
   ],
   [
+    "TrustBoundary",
+    "defines a boundary where identity, authority, visibility, execution control, data handling, or accountability assumptions change and therefore must be explicit in safety decisions."
+  ],
+  [
     "BoundaryCrossing",
-    "captures a transfer of control, data, artifacts, or authority that crosses a trust boundary and therefore requires provenance, policy, and audit context."
+    "captures an observable transfer of control, data, artifact, message, or authority across a trust boundary, carrying source actor, target actor, source zone, target zone, direction, transferred object, authority basis, policy decision, protocol or tool context, and trace evidence."
+  ],
+  [
+    "PermissionPrompt",
+    "records a request for authority before an action proceeds, including requesting actor, operation, protected resource, scope, decision options, and approval channel."
+  ],
+  [
+    "PolicyRule",
+    "defines a safety or governance rule that can evaluate actor authority, requested operation, protected resource, data zone, trust boundary, runtime context, and enforcement action."
+  ],
+  [
+    "PolicyDecision",
+    "records the concrete allow, deny, escalate, redact, quarantine, sandbox, or approval-required outcome produced by evaluating a policy rule against a requested operation."
+  ],
+  [
+    "AllowDecision",
+    "records a policy decision that permits a bounded operation to proceed under stated scope, conditions, trace evidence, and expiry."
+  ],
+  [
+    "DenyDecision",
+    "records a policy decision that prevents an operation, tool call, network request, disclosure, or side effect from proceeding and preserves the denial reason."
+  ],
+  [
+    "EscalationDecision",
+    "records a policy decision that routes a request to a higher-authority reviewer, human approval, stricter sandbox, or additional verification path."
+  ],
+  [
+    "HumanApproval",
+    "records explicit human authorization or rejection for an action, permission request, side effect, disclosure, or policy exception with actor and trace provenance."
+  ],
+  [
+    "Sandbox",
+    "defines an isolated execution boundary that constrains process, filesystem, environment, network, credentials, and side effects for commands or tool calls."
+  ],
+  [
+    "SandboxCommand",
+    "records a command executed within a sandbox, including command text, arguments, working directory, environment exposure, policy constraints, output, and side effects."
+  ],
+  [
+    "NetworkCall",
+    "records an attempted or completed network operation with destination, protocol, method, credential scope, proxy route, data zone, policy decision, and trace evidence."
+  ],
+  [
+    "DomainSocket",
+    "records use of a local domain socket as a communication surface whose boundary, permission, credential, and sandbox implications must be explicit."
+  ],
+  [
+    "Socket",
+    "records a communication endpoint used by sandboxed processes, proxies, tools, or network calls and links it to protocol, route, policy, and trace evidence."
+  ],
+  [
+    "Proxy",
+    "represents a controlled proxy surface that mediates outbound or inbound traffic according to network policy, credential scope, logging, and data-zone constraints."
+  ],
+  [
+    "SOCKSProxy",
+    "represents a SOCKS proxy route used to mediate network egress while preserving policy, target, credential, and audit metadata."
+  ],
+  [
+    "HTTPProxy",
+    "represents an HTTP or HTTPS proxy route used to mediate requests and responses under egress policy, credential scope, and disclosure controls."
+  ],
+  [
+    "NetworkResource",
+    "identifies a network-originated resource or endpoint whose content, credentials, response data zone, and trust boundary affect agent safety decisions."
+  ],
+  [
+    "AuthorizationGrant",
+    "records an authorization result or credential-like grant issued after a policy decision, including grant scope, protected resource, subject actor, validity window, revocation state, and audit basis."
+  ],
+  [
+    "CapabilityGrant",
+    "records a grant for a specific tool, capability, resource surface, or operation so authorization can be checked at the point of invocation rather than inferred from actor identity alone."
+  ],
+  [
+    "PermissionScope",
+    "bounds a single permission request or response by naming the requested operation, protected resource, actor, data zone, trust boundary, duration, and allowed side effects."
+  ],
+  [
+    "PermissionResponse",
+    "records the response to a permission prompt, including allow, deny, escalate, conditionally allow, expiry, user or policy authority, and traceable rationale."
+  ],
+  [
+    "PolicyCondition",
+    "states a safety policy predicate over subject actor, requested operation, protected resource, data zone, trust boundary, policy basis, runtime state, and enforcement mode."
+  ],
+  [
+    "PolicyAction",
+    "describes the enforcement action chosen by a policy decision, such as allow, deny, redact, quarantine, require approval, route to sandbox, limit network egress, or escalate."
+  ],
+  [
+    "PolicyException",
+    "records a bounded exception to a policy rule with exception scope, authorized actor, protected resource, expiration, revocation condition, compensating control, and audit reason."
+  ],
+  [
+    "RemoteAgentBoundary",
+    "marks the opacity, identity, authority, and accountability trust boundary created when work, messages, tasks, or artifacts are delegated to or received from a remote agent."
+  ],
+  [
+    "NetworkPolicy",
+    "defines allowed and denied network egress or ingress conditions, including destination host, port, protocol, method, proxy route, credential scope, data zone, and denial reason."
+  ],
+  [
+    "FilesystemPolicy",
+    "defines filesystem read, write, execute, path, retention, and redaction constraints applied to sandbox commands, tool calls, side effects, and artifacts."
+  ],
+  [
+    "ProcessPolicy",
+    "defines process execution constraints such as command allowlist, argument limits, environment exposure, timeout, retry policy, resource limits, and sandbox escape handling."
+  ],
+  [
+    "OutboundRequest",
+    "records a boundary-crossing outbound request from a tool, sandbox, protocol adapter, or remote-agent interaction, including target endpoint, method, credential scope, data zone, and policy decision."
+  ],
+  [
+    "InboundResponse",
+    "records an inbound response returned across a boundary, including origin, response data zone, status, tool or protocol context, injection scan result, and disclosure handling."
+  ],
+  [
+    "ProxyRoute",
+    "records the controlled proxy path used for network traffic, including proxy kind, target endpoint, allowed protocol, credential boundary, egress policy, and trace evidence."
+  ],
+  [
+    "DeniedNetworkCall",
+    "records a network call blocked by policy or sandbox control, including requested destination, protected data zone, denial reason, policy decision, and trace event."
+  ],
+  [
+    "SandboxEscapeRisk",
+    "records evidence that a command, process, file operation, network route, or tool result may bypass or weaken the intended sandbox isolation boundary."
+  ],
+  [
+    "PromptInjectionSignal",
+    "records evidence that a message, source span, retrieved content, or tool result contains instructions attempting to override trusted instructions, manipulate tool arguments, exfiltrate data, or bypass policy."
+  ],
+  [
+    "IndirectInjectionSignal",
+    "records evidence that untrusted external content can influence agent behavior after retrieval, summarization, memory persistence, tool observation, or protocol translation."
+  ],
+  [
+    "ToolStreamInjectionSignal",
+    "records evidence that streamed tool output, tool result messages, logs, or remote artifacts attempt to inject instructions into later context, tool arguments, routing, or disclosure decisions."
+  ],
+  [
+    "MaliciousToolOutput",
+    "records tool, resource, sandbox, or remote-agent output that carries untrusted instructions, exfiltration cues, policy-bypass attempts, deceptive tool guidance, or prompt-injection content."
+  ],
+  [
+    "TaintedSource",
+    "identifies an untrusted or policy-sensitive source whose content must be tracked before it enters context, memory, a tool argument, a network request, or disclosed output."
+  ],
+  [
+    "TaintedSpan",
+    "identifies the exact span of message, source, retrieved chunk, tool result, or output segment that carries tainted content for downstream source-sink analysis."
+  ],
+  [
+    "TaintPropagation",
+    "reifies the propagation of taint from one source span, context package, memory item, tool result, or artifact to another observable object."
+  ],
+  [
+    "SourceSinkFlow",
+    "records a source-to-sink risk path from untrusted content to a protected sink such as tool arguments, network calls, memory writes, side effects, or disclosed output."
+  ],
+  [
+    "UntrustedInstructionCandidate",
+    "records an instruction-like text or structured directive from an untrusted source before it is accepted, ignored, quarantined, overridden, or escalated."
+  ],
+  [
+    "InstructionConflict",
+    "records a safety-relevant conflict between trusted instructions and untrusted or lower-authority instruction candidates, including affected scope and resolution."
+  ],
+  [
+    "TrustedInstructionOverride",
+    "records that a higher-authority instruction, policy, or approval overrides an untrusted or lower-authority instruction candidate for a bounded scope."
+  ],
+  [
+    "RiskSource",
+    "classifies the origin of a safety risk, such as external message, retrieved document, tool output, remote agent artifact, memory item, network response, or user-supplied file."
+  ],
+  [
+    "RiskSink",
+    "classifies the protected destination that tainted content may influence, such as tool invocation, credentialed request, filesystem write, memory update, network call, or final disclosure."
+  ],
+  [
+    "MemoryPoisoningSignal",
+    "records evidence that persistent memory, retrieved chunks, indexes, summaries, or long-term context may contain instructions or data intended to corrupt later agent behavior."
+  ],
+  [
+    "PersistentContextRisk",
+    "records a risk that unsafe, stale, adversarial, or over-authoritative content will persist across sessions, retrieval, summaries, checkpoints, or memory writes."
+  ],
+  [
+    "PoisonedRetrievedChunk",
+    "identifies a retrieved memory or document chunk that contains unsafe instructions, misleading metadata, tainted spans, or prompt-injection content."
+  ],
+  [
+    "PoisonedToolDescription",
+    "identifies a tool description, MCP tool list entry, capability advertisement, or help text that attempts to manipulate selection, arguments, permissions, or trust."
+  ],
+  [
+    "ToolSchemaPoisoning",
+    "records adversarial or unsafe changes to tool schema, argument descriptions, defaults, examples, or metadata that could alter tool selection or invocation."
+  ],
+  [
+    "ResourceContentPoisoning",
+    "records adversarial content in resources, files, web pages, protocol artifacts, or database rows that can later be retrieved into context or tool execution."
+  ],
+  [
+    "InjectionScanResult",
+    "records the result of scanning content for injection or taint risk, including matched signal, affected span, source, confidence, policy decision, and downstream sink if known."
+  ],
+  [
+    "DefenseFinding",
+    "records a safety finding emitted by injection defense or taint analysis before it is converted into feedback metrics, review findings, blocking errors, or policy decisions."
+  ],
+  [
+    "QuarantineAction",
+    "records an action that isolates content, tool output, retrieved memory, or artifact from normal context and execution flow until review or policy resolution."
+  ],
+  [
+    "SanitizationAction",
+    "records an action that removes, rewrites, masks, neutralizes, or narrows unsafe content before it can affect context, tool arguments, memory, or disclosure."
+  ],
+  [
+    "CommitGate",
+    "represents a side-effect gate that blocks or delays writes, external actions, network effects, commits, or disclosures until policy checks, approvals, or rollback controls are satisfied."
+  ],
+  [
+    "CommitRequest",
+    "records a request to perform a side effect such as file write, repository commit, network mutation, external API action, memory write, or disclosure release."
+  ],
+  [
+    "CommitApproval",
+    "records an approval outcome that authorizes a bounded side effect, including approver or policy authority, protected resource, scope, conditions, expiry, and trace evidence."
+  ],
+  [
+    "CommitDenial",
+    "records a denial outcome that blocks a requested side effect, including policy basis, denial reason, affected resource, actor, and audit trace."
+  ],
+  [
+    "SideEffect",
+    "records an externally visible or persistent effect produced by a tool call, sandbox command, network call, memory write, file write, commit, or protocol operation."
+  ],
+  [
+    "SensitiveSpan",
+    "identifies a span of output, source, message, trace, artifact, or memory content that requires redaction, suppression, masking, delayed disclosure, or restricted routing."
+  ],
+  [
+    "Redaction",
+    "records the operation that masks, removes, replaces, summarizes, or withholds sensitive content before it is shown, exported, stored, or sent across a boundary."
+  ],
+  [
+    "RedactionRule",
+    "defines a policy rule for detecting, masking, suppressing, summarizing, or replacing sensitive spans before content crosses an output or trust boundary."
+  ],
+  [
+    "DisclosureFilter",
+    "applies disclosure policy to output windows, context packages, artifacts, traces, or messages, deciding whether content is released, redacted, suppressed, or escalated."
+  ],
+  [
+    "AuditDisclosure",
+    "records the auditable disclosure decision for released, redacted, or suppressed content, including filter, policy, recipient boundary, sensitive span, and trace evidence."
   ],
   [
     "MCPAdapter",
@@ -1508,7 +1787,7 @@ const exactGeneratedClassDefinitions = new Map([
   ],
   [
     "RemoteAgentBoundary",
-    "marks the opacity, identity, authority, and accountability boundary created when work is delegated to a remote agent."
+    "marks the opacity, identity, authority, and accountability trust boundary created when work, messages, tasks, or artifacts are delegated to or received from a remote agent."
   ],
   [
     "RuntimeEnvironment",
@@ -2363,7 +2642,7 @@ const planeDefinitionOverrides = new Map([
   ]
 ]);
 
-const removedClassIds = new Set(["InfoPlane", "OrchestrationPlane", "AdapterPlane", "UserAgentMessage", "ToolMessage"]);
+const removedClassIds = new Set(["InfoPlane", "OrchestrationPlane", "AdapterPlane", "SafetyPlane", "UserAgentMessage", "ToolMessage"]);
 const ownership = (canonical_owner_plane, participating_planes = [], context_ingress_role) => ({
   canonical_owner_plane,
   participating_planes: [...new Set([canonical_owner_plane, ...participating_planes])],
@@ -2510,7 +2789,48 @@ const generatedKindOverrides = new Map([
   ["FrameworkHandoffMapping", "relation_type"],
   ["FrameworkTraceMapping", "relation_type"],
   ["MappingRule", "relation_type"],
-  ["ConversionWarning", "event_type"]
+  ["ConversionWarning", "event_type"],
+  ["TrustBoundary", "object_type"],
+  ["RemoteAgentBoundary", "object_type"],
+  ["ExternalBoundary", "object_type"],
+  ["InternalBoundary", "object_type"],
+  ["ToolBoundary", "object_type"],
+  ["NetworkBoundary", "object_type"],
+  ["BoundaryCrossing", "event_type"],
+  ["AuthorityScope", "policy_type"],
+  ["PermissionScope", "policy_type"],
+  ["AuthorizationGrant", "policy_type"],
+  ["CapabilityGrant", "policy_type"],
+  ["PermissionResponse", "policy_type"],
+  ["PolicyDecision", "policy_type"],
+  ["PolicyRule", "policy_type"],
+  ["PolicyCondition", "policy_type"],
+  ["PolicyAction", "policy_type"],
+  ["PolicyException", "policy_type"],
+  ["HumanApproval", "policy_type"],
+  ["NetworkPolicy", "policy_type"],
+  ["FilesystemPolicy", "policy_type"],
+  ["ProcessPolicy", "policy_type"],
+  ["OutboundRequest", "event_type"],
+  ["InboundResponse", "event_type"],
+  ["DeniedNetworkCall", "event_type"],
+  ["SandboxEscapeRisk", "event_type"],
+  ["PromptInjectionSignal", "event_type"],
+  ["IndirectInjectionSignal", "event_type"],
+  ["ToolStreamInjectionSignal", "event_type"],
+  ["MemoryPoisoningSignal", "event_type"],
+  ["PersistentContextRisk", "event_type"],
+  ["TaintPropagation", "relation_type"],
+  ["SourceSinkFlow", "relation_type"],
+  ["UntrustedInstructionCandidate", "resource_type"],
+  ["InstructionConflict", "event_type"],
+  ["TrustedInstructionOverride", "policy_type"],
+  ["RiskSource", "resource_type"],
+  ["RiskSink", "resource_type"],
+  ["CommitApproval", "policy_type"],
+  ["CommitDenial", "policy_type"],
+  ["SideEffect", "event_type"],
+  ["SensitiveSpan", "resource_type"]
 ]);
 const classKindOverrides = new Map([
   ["RuntimeSession", "object_type"],
@@ -2549,7 +2869,48 @@ const classKindOverrides = new Map([
   ["FrameworkHandoffMapping", "relation_type"],
   ["FrameworkTraceMapping", "relation_type"],
   ["MappingRule", "relation_type"],
-  ["ConversionWarning", "event_type"]
+  ["ConversionWarning", "event_type"],
+  ["TrustBoundary", "object_type"],
+  ["RemoteAgentBoundary", "object_type"],
+  ["ExternalBoundary", "object_type"],
+  ["InternalBoundary", "object_type"],
+  ["ToolBoundary", "object_type"],
+  ["NetworkBoundary", "object_type"],
+  ["BoundaryCrossing", "event_type"],
+  ["AuthorityScope", "policy_type"],
+  ["PermissionScope", "policy_type"],
+  ["AuthorizationGrant", "policy_type"],
+  ["CapabilityGrant", "policy_type"],
+  ["PermissionResponse", "policy_type"],
+  ["PolicyDecision", "policy_type"],
+  ["PolicyRule", "policy_type"],
+  ["PolicyCondition", "policy_type"],
+  ["PolicyAction", "policy_type"],
+  ["PolicyException", "policy_type"],
+  ["HumanApproval", "policy_type"],
+  ["NetworkPolicy", "policy_type"],
+  ["FilesystemPolicy", "policy_type"],
+  ["ProcessPolicy", "policy_type"],
+  ["OutboundRequest", "event_type"],
+  ["InboundResponse", "event_type"],
+  ["DeniedNetworkCall", "event_type"],
+  ["SandboxEscapeRisk", "event_type"],
+  ["PromptInjectionSignal", "event_type"],
+  ["IndirectInjectionSignal", "event_type"],
+  ["ToolStreamInjectionSignal", "event_type"],
+  ["MemoryPoisoningSignal", "event_type"],
+  ["PersistentContextRisk", "event_type"],
+  ["TaintPropagation", "relation_type"],
+  ["SourceSinkFlow", "relation_type"],
+  ["UntrustedInstructionCandidate", "resource_type"],
+  ["InstructionConflict", "event_type"],
+  ["TrustedInstructionOverride", "policy_type"],
+  ["RiskSource", "resource_type"],
+  ["RiskSink", "resource_type"],
+  ["CommitApproval", "policy_type"],
+  ["CommitDenial", "policy_type"],
+  ["SideEffect", "event_type"],
+  ["SensitiveSpan", "resource_type"]
 ]);
 
 const inferredGeneratedKind = (id, label) => {
@@ -2734,8 +3095,36 @@ const objectPropertySeeds = [
   ["has_checksum", "has checksum", "source_reference", "SourceReference", "SourceChecksum", false],
   ["has_version", "has version", "source_reference", "SourceReference", "SourceVersion", false],
   ["has_access_path", "has access path", "source_reference", "SourceReference", "AccessPath", false],
-  ["crosses_trust_boundary", "crosses trust boundary", "trust_boundary", "SourceReference", "TrustBoundaryReference", false],
+  ["crosses_trust_boundary", "crosses trust boundary", "trust_boundary", "BoundaryCrossing", "TrustBoundary", false],
   ["belongs_to_data_zone", "belongs to data zone", "trust_boundary", "SourceReference", "DataZoneReference", false],
+  ["boundary_crossing_has_source_actor", "boundary crossing has source actor", "safety_propagation", "BoundaryCrossing", "AgentActor", false],
+  ["boundary_crossing_has_target_actor", "boundary crossing has target actor", "safety_propagation", "BoundaryCrossing", "AgentActor", false],
+  ["boundary_crossing_has_source_zone", "boundary crossing has source zone", "safety_propagation", "BoundaryCrossing", "DataZone", false],
+  ["boundary_crossing_has_target_zone", "boundary crossing has target zone", "safety_propagation", "BoundaryCrossing", "DataZone", false],
+  ["boundary_crossing_authorized_by", "boundary crossing authorized by", "safety_propagation", "BoundaryCrossing", "PolicyDecision", false],
+  ["boundary_crossing_recorded_by_trace_event", "boundary crossing recorded by trace event", "safety_propagation", "BoundaryCrossing", "TraceEvent", false],
+  ["source_reference_belongs_to_data_zone", "source reference belongs to data zone", "safety_propagation", "SourceReference", "DataZone", false],
+  ["context_window_crosses_trust_boundary", "context window crosses trust boundary", "safety_propagation", "VisibleContextWindow", "TrustBoundary", false],
+  ["message_scanned_by_pattern_scan", "message scanned by pattern scan", "safety_propagation", "Message", "PatternScan", false],
+  ["instruction_flagged_as_prompt_injection", "instruction flagged as prompt injection", "safety_propagation", "Instruction", "PromptInjectionSignal", false],
+  ["tool_result_flagged_as_tool_stream_injection", "tool result flagged as tool stream injection", "safety_propagation", "ToolResult", "ToolStreamInjectionSignal", false],
+  ["tool_result_scanned_by_pattern_scan", "tool result scanned by pattern scan", "safety_propagation", "ToolResult", "PatternScan", false],
+  ["tool_call_requires_permission_scope", "tool call requires permission scope", "permission_flow", "ToolCall", "PermissionScope", false],
+  ["tool_call_evaluated_by_policy_decision", "tool call evaluated by policy decision", "permission_flow", "ToolCall", "PolicyDecision", false],
+  ["tool_call_executes_in_sandbox", "tool call executes in sandbox", "permission_flow", "ToolCall", "Sandbox", false],
+  ["mcp_authorization_maps_to_authorization_grant", "MCP authorization maps to authorization grant", "permission_flow", "MCPAuthorization", "AuthorizationGrant", false],
+  ["commit_request_evaluated_by_commit_gate", "commit request evaluated by commit gate", "commit_control", "CommitRequest", "CommitGate", false],
+  ["commit_gate_emits_policy_decision", "commit gate emits policy decision", "commit_control", "CommitGate", "PolicyDecision", false],
+  ["commit_approval_authorizes_side_effect", "commit approval authorizes side effect", "commit_control", "CommitApproval", "SideEffect", false],
+  ["commit_denial_blocks_side_effect", "commit denial blocks side effect", "commit_control", "CommitDenial", "SideEffect", false],
+  ["side_effect_produced_by_tool_call", "side effect produced by tool call", "commit_control", "SideEffect", "ToolCall", false],
+  ["side_effect_produced_by_sandbox_command", "side effect produced by sandbox command", "commit_control", "SideEffect", "SandboxCommand", false],
+  ["side_effect_produced_by_network_call", "side effect produced by network call", "commit_control", "SideEffect", "NetworkCall", false],
+  ["side_effect_has_rollback_action", "side effect has rollback action", "commit_control", "SideEffect", "RollbackAction", false],
+  ["output_segment_has_sensitive_span", "output segment has sensitive span", "disclosure_control", "OutputSegment", "SensitiveSpan", false],
+  ["disclosure_filter_suppresses_output_window", "disclosure filter suppresses output window", "disclosure_control", "DisclosureFilter", "OutputWindow", false],
+  ["redaction_applies_to_sensitive_span", "redaction applies to sensitive span", "disclosure_control", "Redaction", "SensitiveSpan", false],
+  ["audit_disclosure_records_disclosure_filter", "audit disclosure records disclosure filter", "disclosure_control", "AuditDisclosure", "DisclosureFilter", false],
   ["ingested_into_context", "ingested into context", "context_ingress", "ContextIngressEvent", "ContextPackage", false],
   ["selected_for_context", "selected for context", "context_ingress", "RetrievedContextCandidate", "ContextPackage", false],
   ["excluded_from_context", "excluded from context", "context_ingress", "ContextSelectionDecision", "SuppressedContext", false],
@@ -2796,8 +3185,8 @@ const objectPropertyDefinitions = new Map([
   ["generates", "links an event or action to the artifact, result, trace, warning, or resource it produces."],
   ["observes", "links an actor or runtime surface to an event that it records or monitors."],
   ["controls", "links an actor, policy, or runtime controller to the object whose behavior it constrains."],
-  ["authorizes", "links a permission or policy decision to the event it allows to proceed."],
-  ["blocks", "links a permission or policy decision to the event it prevents from executing."],
+  ["authorizes", "legacy summary relation for a policy or permission artifact allowing an event; use concrete authorizes relations such as commit_approval_authorizes_side_effect for specific safety audit edges."],
+  ["blocks", "legacy summary relation for a policy or permission artifact blocking an event; use concrete blocks relations such as commit_denial_blocks_side_effect for specific safety audit edges."],
   ["escalates", "links a safety, review, or runtime event to a higher-authority decision path."],
   ["delegates", "links an actor or orchestrator to the agent, worker, or remote participant receiving responsibility."],
   ["routes", "links a routing event to the downstream branch, handler, or operation selected for execution."],
@@ -2939,8 +3328,36 @@ const objectPropertyDefinitions = new Map([
   ["has_checksum", "links a source reference to a digest used to detect content drift after ingestion or context staging."],
   ["has_version", "links a source reference to the version, revision, snapshot, commit, or release that was cited."],
   ["has_access_path", "links a source reference to the permitted path or handle used to retrieve it under policy."],
-  ["crosses_trust_boundary", "links a source or context artifact to the trust boundary crossed by its retrieval, transport, disclosure, or execution path."],
+  ["crosses_trust_boundary", "links a boundary-crossing event to the trust boundary crossed by transferred data, control, artifact, message, or authority."],
   ["belongs_to_data_zone", "links a source or context artifact to the data zone governing its visibility, retention, and allowed use."],
+  ["boundary_crossing_has_source_actor", "links a boundary-crossing event to the actor, service, tool, user, or remote agent that sends, emits, delegates, or initiates the transfer."],
+  ["boundary_crossing_has_target_actor", "links a boundary-crossing event to the actor, service, tool, user, or remote agent that receives, interprets, executes, or stores the transferred object."],
+  ["boundary_crossing_has_source_zone", "links a boundary-crossing event to the source data zone whose trust, retention, visibility, or handling policy applies before transfer."],
+  ["boundary_crossing_has_target_zone", "links a boundary-crossing event to the destination data zone whose trust, retention, visibility, or handling policy applies after transfer."],
+  ["boundary_crossing_authorized_by", "links a boundary-crossing event to the policy decision that allowed, denied, escalated, sandboxed, or constrained that transfer."],
+  ["boundary_crossing_recorded_by_trace_event", "links a boundary-crossing event to the observable trace event that records timestamp, actor, request, policy, and result evidence."],
+  ["source_reference_belongs_to_data_zone", "links a source reference to the data zone that governs its classification, trust, retention, memory use, tool exposure, and disclosure routing."],
+  ["context_window_crosses_trust_boundary", "links a visible context window to the trust boundary it crosses when content from another actor, zone, tool, memory, or remote agent becomes visible."],
+  ["message_scanned_by_pattern_scan", "links a message envelope to the pattern scan that inspected its content blocks, instructions, attachments, or source references for injection and policy risk."],
+  ["instruction_flagged_as_prompt_injection", "links an instruction or instruction-like candidate to the prompt-injection signal that explains the attempted override, manipulation, exfiltration, or policy bypass."],
+  ["tool_result_flagged_as_tool_stream_injection", "links a tool result to the tool-stream injection signal that marks unsafe instructions, deceptive tool guidance, or exfiltration cues in returned output."],
+  ["tool_result_scanned_by_pattern_scan", "links a tool result to the scan that inspected logs, streamed chunks, artifacts, status text, or result messages before reuse in context or action selection."],
+  ["tool_call_requires_permission_scope", "links a tool call to the permission scope describing requested operation, protected resource, actor, data zone, trust boundary, duration, and side effects."],
+  ["tool_call_evaluated_by_policy_decision", "links a tool call to the policy decision that allowed, denied, escalated, sandboxed, or constrained execution before side effects occur."],
+  ["tool_call_executes_in_sandbox", "links a tool call to the sandbox boundary used to constrain process, filesystem, network, credential, and side-effect behavior during execution."],
+  ["mcp_authorization_maps_to_authorization_grant", "links MCP authorization metadata or flow output to the canonical authorization grant that records scope, actor, resource, expiry, and audit basis."],
+  ["commit_request_evaluated_by_commit_gate", "links a requested side effect to the commit gate that evaluates policy, approval, rollback, sandbox, and disclosure requirements before release."],
+  ["commit_gate_emits_policy_decision", "links a commit gate to the policy decision it emits so side-effect approval, denial, escalation, or conditional release is traceable."],
+  ["commit_approval_authorizes_side_effect", "links an approval outcome to the bounded side effect it authorizes, preserving scope, approver, policy basis, protected resource, and expiry."],
+  ["commit_denial_blocks_side_effect", "links a denial outcome to the side effect it blocks, preserving actor, requested operation, protected resource, policy basis, and audit reason."],
+  ["side_effect_produced_by_tool_call", "links a persistent or external side effect to the tool call that produced or attempted it, keeping tool execution distinct from commit authorization."],
+  ["side_effect_produced_by_sandbox_command", "links a persistent or external side effect to the sandbox command that produced or attempted it under execution policy."],
+  ["side_effect_produced_by_network_call", "links a persistent or external side effect to the network call that produced or attempted it under egress and credential policy."],
+  ["side_effect_has_rollback_action", "links a side effect to the rollback action that can compensate, revert, delete, revoke, or neutralize the effect after approval or failure."],
+  ["output_segment_has_sensitive_span", "links an output segment to the sensitive span requiring redaction, masking, suppression, delayed release, or restricted routing."],
+  ["disclosure_filter_suppresses_output_window", "links a disclosure filter to the output window it suppresses or limits because sensitive spans, policy, recipient boundary, or data-zone controls apply."],
+  ["redaction_applies_to_sensitive_span", "links a redaction operation to the sensitive span it masks, removes, replaces, summarizes, or withholds before disclosure."],
+  ["audit_disclosure_records_disclosure_filter", "links an audit disclosure record to the disclosure filter whose decision released, redacted, suppressed, or escalated content."],
   ["ingested_into_context", "links an observable context-ingress event to the context package made visible to a model call or agent step."],
   ["selected_for_context", "links a retrieved candidate, source span, message, or observation to the context package that includes it."],
   ["excluded_from_context", "links a selection decision to content that was intentionally omitted, suppressed, deferred, or blocked."],
@@ -2989,6 +3406,25 @@ const objectPropertySourceIds = (family) => {
       "eng-state-xstate-docs",
       "eng-val-jsonschema-spec",
       "eng-ont-fibo-ontology-guide"
+    ];
+  }
+
+  if (
+    [
+      "safety_flow",
+      "trust_boundary",
+      "safety_propagation",
+      "permission_flow",
+      "commit_control",
+      "disclosure_control"
+    ].includes(family)
+  ) {
+    return [
+      "lit-agent-safeagent",
+      "eng-fw-openai-guardrails",
+      "eng-security-mcp-nsa-2026",
+      "lit-agent-toolsafe",
+      "eng-fw-openai-tracing"
     ];
   }
 

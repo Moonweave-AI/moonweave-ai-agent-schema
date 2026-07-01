@@ -966,7 +966,7 @@ describe("canonical agent ontology artifact", () => {
       ["side_effect_produced_by_tool_call", "SideEffect", "ToolCall", "commit_control"],
       ["side_effect_produced_by_sandbox_command", "SideEffect", "SandboxCommand", "commit_control"],
       ["side_effect_produced_by_network_call", "SideEffect", "NetworkCall", "commit_control"],
-      ["side_effect_has_rollback_action", "SideEffect", "Action", "commit_control"],
+      ["side_effect_has_rollback_action", "SideEffect", "RollbackAction", "commit_control"],
       ["output_segment_has_sensitive_span", "OutputSegment", "SensitiveSpan", "disclosure_control"],
       ["disclosure_filter_suppresses_output_window", "DisclosureFilter", "OutputWindow", "disclosure_control"],
       ["redaction_applies_to_sensitive_span", "Redaction", "SensitiveSpan", "disclosure_control"],
