@@ -784,8 +784,10 @@ const entityLabelOverrides: Record<Language, Record<string, string>> = {
     "feedback-logging": "日志模块",
     "adapter-protocols": "协议适配模块",
     "adapter-frameworks": "框架适配模块",
-    "adapter-benchmarks-statecharts": "基准与状态图适配模块",
-    "adapter-schema-export": "模式与导出适配模块"
+    "adapter-benchmarks": "基准适配模块",
+    "adapter-statecharts": "状态图适配模块",
+    "adapter-schema-export": "模式与导出适配模块",
+    "adapter-mapping-infrastructure": "适配映射基础设施模块"
   },
   en: {},
   ja: {
@@ -968,10 +970,12 @@ const entityLabelOverrides: Record<Language, Record<string, string>> = {
     "feedback-review-optimization": "レビューと最適化モジュール",
     "feedback-metrics-evaluation": "指標と評価モジュール",
     "feedback-logging": "ログモジュール",
-    "adapter-protocols": "プロトコル適配モジュール",
-    "adapter-frameworks": "フレームワーク適配モジュール",
-    "adapter-benchmarks-statecharts": "ベンチマークと状態図適配モジュール",
-    "adapter-schema-export": "スキーマとエクスポート適配モジュール"
+    "adapter-protocols": "プロトコルアダプタモジュール",
+    "adapter-frameworks": "フレームワークアダプタモジュール",
+    "adapter-benchmarks": "ベンチマークアダプタモジュール",
+    "adapter-statecharts": "状態図アダプタモジュール",
+    "adapter-schema-export": "スキーマとエクスポートアダプタモジュール",
+    "adapter-mapping-infrastructure": "アダプタ写像基盤モジュール"
   }
 };
 

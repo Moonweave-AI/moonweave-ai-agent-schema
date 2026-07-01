@@ -58,7 +58,7 @@ Moonweave Agent Schema organizes agent systems through eight operational concern
 | `info-plane` | Context Ingress & Staging Domain | info-container-command, info-content-block-modality, info-indexing, info-messages-instructions, info-output-disclosure, info-storage-sources |
 | `orchestration-plane` | Control & Orchestration Domain | orchestration-actors-delegation, orchestration-composition, orchestration-evaluation, orchestration-routing-control, orchestration-task-planning |
 | `runtime-plane` | Runtime State & Trace Domain | runtime-actors, runtime-artifacts, runtime-observability, runtime-system |
-| `adapter-plane` | Interoperability & Adapter Domain | adapter-benchmarks-statecharts, adapter-frameworks, adapter-protocols, adapter-schema-export |
+| `adapter-plane` | Interoperability & Adapter Domain | adapter-benchmarks, adapter-frameworks, adapter-mapping-infrastructure, adapter-protocols, adapter-schema-export, adapter-statecharts |
 | `tool-plane` | Capability & Resource Invocation Domain | tool-discovery-selection, tool-invocation-execution, tool-mcp-transport, tool-registry-definition |
 | `safety-plane` | Trust, Policy & Safety Domain | safety-commit-redaction, safety-injection-defense, safety-permission-policy, safety-sandbox-network, safety-trust-boundary |
 | `feedback-plane` | Observability & Feedback Domain | feedback-logging, feedback-metrics-evaluation, feedback-review-optimization, feedback-warning-error |

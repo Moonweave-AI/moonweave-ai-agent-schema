@@ -14,7 +14,7 @@ const sourceFallback = {
   "tool-plane": ["eng-proto-mcp-spec", "eng-fw-openai-python-docs", "lit-mech-tool-use-evolution"],
   "safety-plane": ["lit-agent-safeagent", "eng-security-mcp-nsa-2026", "eng-fw-openai-guardrails"],
   "feedback-plane": ["lit-mech-reflexion", "lit-agent-conductor", "eng-fw-openai-tracing"],
-  "adapter-plane": ["eng-proto-mcp-spec", "eng-proto-a2a-docs", "eng-val-jsonschema-spec"]
+  "adapter-plane": ["eng-proto-mcp-spec", "eng-proto-a2a-spec", "eng-val-jsonschema-spec", "eng-ont-fibo-ontology-guide"]
 };
 
 const moduleSpecs = [
@@ -673,8 +673,9 @@ const moduleSpecs = [
     id: "adapter-protocols",
     plane_id: "adapter-plane",
     label: "Protocol Adapter Module",
-    definition: "models protocol mappings for MCP, A2A, FIPA, KQML, and related message/capability protocols",
-    class_ids: ["AdapterPlane", "ProtocolAdapter"],
+    definition: "models protocol adapter mappings for MCP, A2A, FIPA, KQML, and related message, task, capability, and trust constructs without redefining canonical agent-system terms",
+    source_ids: ["eng-proto-mcp-spec", "eng-proto-a2a-spec", "eng-proto-fipa-acl", "lit-proto-kqml"],
+    class_ids: ["ProtocolAdapter"],
     generated: [
       ["MCPAdapter", "MCP adapter"],
       ["A2AAdapter", "A2A adapter"],
@@ -690,7 +691,8 @@ const moduleSpecs = [
     id: "adapter-frameworks",
     plane_id: "adapter-plane",
     label: "Framework Adapter Module",
-    definition: "models framework mappings for graph runtimes, agent SDKs, crews, workflows, and subagent systems",
+    definition: "models Phase-1 seed framework mappings for graph runtimes, agent SDKs, crews, workflows, handoffs, traces, and subagent systems",
+    source_ids: ["eng-fw-langgraph-docs", "eng-fw-openai-python-docs", "eng-fw-crewai-docs", "eng-fw-deepagents-docs"],
     class_ids: ["FrameworkAdapter"],
     generated: [
       ["LangGraphAdapter", "LangGraph adapter"],
@@ -704,18 +706,29 @@ const moduleSpecs = [
     ]
   },
   {
-    id: "adapter-benchmarks-statecharts",
+    id: "adapter-benchmarks",
     plane_id: "adapter-plane",
-    label: "Benchmark And Statechart Adapter Module",
-    definition: "models benchmark, statechart, and schema/export mappings",
-    class_ids: ["BenchmarkAdapter", "StatechartAdapter", "SchemaAdapter", "MappingRule", "ConversionWarning"],
+    label: "Benchmark Adapter Module",
+    definition: "models evaluation benchmark mappings for tasks, environments, scoring rubrics, metrics, observations, user simulations, artifacts, and pressure axes without turning benchmark-specific fields into ontology core",
+    source_ids: ["eng-bench-swebench-site", "eng-bench-osworld-site", "eng-bench-tau2", "eng-bench-appworld"],
+    class_ids: ["BenchmarkAdapter"],
     generated: [
       ["SWEBenchAdapter", "SWE-bench adapter"],
       ["OSWorldAdapter", "OSWorld adapter"],
       ["Tau2Adapter", "tau2 adapter"],
       ["AppWorldAdapter", "AppWorld adapter"],
       ["TerminalBenchAdapter", "Terminal-Bench adapter"],
-      ["AgencyBenchAdapter", "AgencyBench adapter"],
+      ["AgencyBenchAdapter", "AgencyBench adapter"]
+    ]
+  },
+  {
+    id: "adapter-statecharts",
+    plane_id: "adapter-plane",
+    label: "Statechart Adapter Module",
+    definition: "models statechart and state-machine mappings from XState, SCXML, and formal statechart concepts to runtime lifecycle, snapshot, transition, guard, action, and path profiles",
+    source_ids: ["eng-state-xstate-docs", "eng-state-xstate-graph", "eng-state-scxml", "lit-state-harel"],
+    class_ids: ["StatechartAdapter"],
+    generated: [
       ["XStateAdapter", "XState adapter"],
       ["SCXMLAdapter", "SCXML adapter"]
     ]
@@ -725,7 +738,8 @@ const moduleSpecs = [
     plane_id: "adapter-plane",
     label: "Schema And Export Adapter Module",
     definition: "models structural schema, semantic graph, and language profile mappings",
-    class_ids: [],
+    source_ids: ["eng-val-jsonschema-spec", "eng-val-shacl", "eng-val-shex", "eng-ont-owl"],
+    class_ids: ["SchemaAdapter"],
     generated: [
       ["JSONSchemaAdapter", "JSON Schema adapter"],
       ["ZodProfileAdapter", "Zod profile adapter"],
@@ -736,6 +750,15 @@ const moduleSpecs = [
       ["GraphIRAdapter", "Graph IR adapter"],
       ["FrontendViewAdapter", "frontend view adapter"]
     ]
+  },
+  {
+    id: "adapter-mapping-infrastructure",
+    plane_id: "adapter-plane",
+    label: "Adapter Mapping Infrastructure Module",
+    definition: "models shared adapter mapping records, mapping direction, conversion warnings, unsupported semantics, loss notes, approximation evidence, and source-backed conversion governance across all adapter families",
+    source_ids: ["eng-ont-fibo-ontology-guide", "eng-val-jsonschema-spec", "eng-val-zod-json-schema", "eng-val-pydantic-json-schema"],
+    class_ids: ["MappingRule", "ConversionWarning"],
+    generated: []
   }
 ];
 
@@ -1334,6 +1357,138 @@ const exactGeneratedClassDefinitions = new Map([
   [
     "A2AAdapter",
     "maps agent-to-agent remote agent identity, task lifecycle, message and artifact exchange, opaque execution boundaries, and delegation metadata into adapter records."
+  ],
+  [
+    "ProtocolAdapter",
+    "adapter membrane component that maps protocol-native envelopes, messages, tasks, capabilities, identity, and trust metadata to canonical agent-system terms without importing protocol fields into core."
+  ],
+  [
+    "FIPAAdapter",
+    "maps FIPA ACL communicative acts, message parameters, interaction protocols, and agent-management constructs to canonical message, actor, conversation, route, and protocol mapping terms."
+  ],
+  [
+    "KQMLAdapter",
+    "maps KQML performatives, content-language metadata, conversation controls, sender and receiver roles, and message envelopes to canonical communication and routing terms."
+  ],
+  [
+    "FrameworkAdapter",
+    "phase-1 seed adapter family for aligning framework-native agents, graph runtimes, crews, workflows, handoffs, traces, tools, memory, and subagent constructs to canonical ontology anchors."
+  ],
+  [
+    "LangGraphAdapter",
+    "maps LangGraph graph runtime constructs such as nodes, edges, durable execution, checkpoints, state updates, streams, and graph API operations to canonical orchestration and runtime terms."
+  ],
+  [
+    "OpenAIAgentsAdapter",
+    "maps OpenAI Agents SDK constructs such as agents, tools, agents-as-tools, handoffs, guardrails, sessions, and tracing spans to canonical orchestration, tool, safety, and runtime terms."
+  ],
+  [
+    "CrewAIAdapter",
+    "maps CrewAI agents, tasks, crews, processes, flows, guardrails, memory, knowledge, and observability constructs to canonical actor, task, orchestration, memory, safety, and feedback terms."
+  ],
+  [
+    "DeepAgentsAdapter",
+    "maps Deep Agents planning, subagents, filesystem context, interrupts, long-term memory, MCP tools, and isolated subagent context to canonical orchestration, memory, tool, runtime, and adapter terms."
+  ],
+  [
+    "MicrosoftAgentFrameworkAdapter",
+    "maps Microsoft Agent Framework agent and workflow constructs, multi-agent coordination, runtime services, and integration surfaces to canonical actor, orchestration, tool, runtime, and adapter terms."
+  ],
+  [
+    "LangChainAdapter",
+    "maps LangChain agent-loop, middleware, tool, structured-output, context, and integration constructs to canonical task, tool, context, runtime, and adapter terms."
+  ],
+  [
+    "FrameworkHandoffMapping",
+    "directional mapping record that aligns a framework-native handoff construct with canonical Handoff, responsibility transfer, authority scope, visible context, and result ownership terms."
+  ],
+  [
+    "FrameworkTraceMapping",
+    "directional mapping record that aligns framework-native trace, span, run, checkpoint, or stream constructs with canonical TraceRecord, TraceSpan, TraceEvent, RuntimeSession, and artifact provenance terms."
+  ],
+  [
+    "BenchmarkAdapter",
+    "adapter family that maps benchmark tasks, scenarios, environments, scoring rubrics, metrics, observations, user simulations, artifacts, and pressure axes into evaluation profiles without changing ontology core."
+  ],
+  [
+    "SWEBenchAdapter",
+    "maps SWE-bench software-issue tasks, repository patches, tests, resolved status, leaderboard variants, and coding-agent artifacts to canonical task, artifact, run, and evaluation metric terms."
+  ],
+  [
+    "OSWorldAdapter",
+    "maps OSWorld computer-use environments, desktop tasks, execution observations, success checks, and environment pressure into canonical runtime, tool, artifact, and evaluation terms."
+  ],
+  [
+    "Tau2Adapter",
+    "maps tau2 conversational task environments, knowledge constraints, user-simulation conditions, task outcomes, and benchmark verification signals into canonical evaluation adapter terms."
+  ],
+  [
+    "AppWorldAdapter",
+    "maps AppWorld application and API tasks, controllable app state, state-based tests, tool/API calls, and benchmark observations into canonical task, tool, state, and evaluation terms."
+  ],
+  [
+    "TerminalBenchAdapter",
+    "maps Terminal-Bench shell tasks, container-like terminal execution, command artifacts, grading checks, and resource pressure into canonical runtime, command, artifact, and evaluation terms."
+  ],
+  [
+    "AgencyBenchAdapter",
+    "maps AgencyBench long-horizon tasks, tool-call pressure, context length, multi-step observations, and scoring evidence into canonical task, runtime, tool, and evaluation adapter terms."
+  ],
+  [
+    "StatechartAdapter",
+    "adapter family that maps state-machine and statechart constructs to runtime lifecycle profiles while keeping XState, SCXML, and formal statechart fields outside ontology core."
+  ],
+  [
+    "XStateAdapter",
+    "maps XState machines, actors, states, transitions, events, guards, actions, snapshots, graph paths, and model-based testing constructs to canonical runtime statechart profile terms."
+  ],
+  [
+    "SCXMLAdapter",
+    "maps SCXML state machines, states, transitions, events, executable content, datamodel elements, and interoperability semantics to canonical statechart profile and runtime lifecycle terms."
+  ],
+  [
+    "SchemaAdapter",
+    "adapter family that projects canonical ontology terms into structural schemas, semantic graph shapes, language profiles, Graph IR, and frontend views while preserving provenance and conversion warnings."
+  ],
+  [
+    "JSONSchemaAdapter",
+    "projects canonical structural contracts into JSON Schema Draft 2020-12 compatible schemas, separating JSON validation from semantic graph validation and recording conversion warnings."
+  ],
+  [
+    "ZodProfileAdapter",
+    "projects canonical schemas into Zod runtime schemas and JSON Schema exports while recording unrepresentable runtime features, input/output mode differences, and metadata registry effects."
+  ],
+  [
+    "PydanticProfileAdapter",
+    "projects canonical schemas into Pydantic schema profiles such as BaseModel and TypeAdapter JSON Schema output, separating Pydantic schema conversion from framework-specific agent runtime semantics."
+  ],
+  [
+    "OWLExportAdapter",
+    "projects canonical ontology terms into OWL/RDF export artifacts while keeping OWL axioms and semantic reasoning separate from the canonical structural JSON schema contract."
+  ],
+  [
+    "SHACLExportAdapter",
+    "projects canonical ontology terms into SHACL shapes and validation reports for RDF graph constraints, separate from JSON Schema structural validation."
+  ],
+  [
+    "ShExExportAdapter",
+    "projects canonical ontology terms into ShEx shape expressions for RDF graph validation, keeping ShEx semantics distinct from SHACL and JSON Schema outputs."
+  ],
+  [
+    "GraphIRAdapter",
+    "projects ontology planes, modules, classes, relations, provenance, and adapter mappings into the explorer Graph IR without changing canonical ontology semantics."
+  ],
+  [
+    "FrontendViewAdapter",
+    "projects canonical ontology and Graph IR records into frontend explorer views, filters, localized labels, and inspector panels without creating new ontology terms."
+  ],
+  [
+    "MappingRule",
+    "directional mapping artifact that records how an external construct maps to a canonical term or how a canonical term projects to an external construct, including source, version, scope, and loss notes."
+  ],
+  [
+    "ConversionWarning",
+    "conversion governance event that records mapping loss, approximation, unsupported semantics, ambiguity, non-round-trip behavior, or review requirements during adapter conversion."
   ],
   [
     "ProtocolMessageMapping",
@@ -2197,10 +2352,18 @@ const planeDefinitionOverrides = new Map([
       definition:
         "Runtime State & Trace Domain is the operational concern domain for bounded execution episodes and raw runtime evidence. It models sessions, attempts, outcomes, actors, environments, budgets, trace records, spans, events, checkpoints, snapshots, state diffs, replay evidence, transcripts, retention policy, and artifact provenance so agent activity can be audited, recovered, replayed, and exported without storing hidden reasoning text."
     }
+  ],
+  [
+    "adapter-plane",
+    {
+      label: "Interoperability & Adapter Domain",
+      definition:
+        "Interoperability & Adapter Domain is an operational concern domain that acts as the adapter membrane for external protocols, frameworks, benchmarks, statecharts, schema profiles, semantic exports, language profiles, Graph IR, and frontend views. It records directional mappings between external constructs and canonical ontology terms, preserves source and version provenance, surfaces conversion loss or unsupported semantics, and prevents adapter-specific fields from redefining ontology core."
+    }
   ]
 ]);
 
-const removedClassIds = new Set(["InfoPlane", "OrchestrationPlane", "UserAgentMessage", "ToolMessage"]);
+const removedClassIds = new Set(["InfoPlane", "OrchestrationPlane", "AdapterPlane", "UserAgentMessage", "ToolMessage"]);
 const ownership = (canonical_owner_plane, participating_planes = [], context_ingress_role) => ({
   canonical_owner_plane,
   participating_planes: [...new Set([canonical_owner_plane, ...participating_planes])],
@@ -2261,6 +2424,51 @@ const classOwnershipOverrides = new Map([
   ["Handoff", ownership("orchestration-plane", ["runtime-plane", "adapter-plane"], "transfers control across agent roles or protocol boundaries")]
 ]);
 
+const classSourceIdOverrides = new Map([
+  ["ProtocolAdapter", ["eng-proto-mcp-spec", "eng-proto-a2a-spec", "eng-proto-fipa-acl", "lit-proto-kqml"]],
+  ["MCPAdapter", ["eng-proto-mcp-spec", "eng-proto-mcp-auth", "eng-proto-mcp-repo", "eng-proto-mcp-changelog"]],
+  ["A2AAdapter", ["eng-proto-a2a-spec", "eng-proto-a2a-docs", "eng-proto-a2a-repo", "eng-proto-a2a-js"]],
+  ["FIPAAdapter", ["eng-proto-fipa-acl", "eng-proto-fipa-act", "eng-proto-fipa-ip", "eng-proto-fipa-agent-management"]],
+  ["KQMLAdapter", ["lit-proto-kqml", "eng-proto-kqml-spec"]],
+  ["ProtocolMessageMapping", ["eng-proto-mcp-spec", "eng-proto-a2a-spec", "eng-proto-fipa-acl", "lit-proto-kqml"]],
+  ["ProtocolTaskMapping", ["eng-proto-a2a-spec", "eng-proto-a2a-docs", "eng-proto-mcp-spec"]],
+  ["ProtocolCapabilityMapping", ["eng-proto-mcp-spec", "eng-proto-mcp-elicitation", "eng-proto-a2a-spec"]],
+  ["ProtocolTrustMapping", ["eng-proto-mcp-auth", "eng-proto-oauth-rfc9728", "eng-proto-a2a-spec"]],
+  ["FrameworkAdapter", ["eng-fw-langgraph-docs", "eng-fw-openai-python-docs", "eng-fw-crewai-docs", "eng-fw-deepagents-docs"]],
+  ["LangGraphAdapter", ["eng-fw-langgraph-docs", "eng-fw-langgraph-graph-api", "eng-fw-langgraph-repo", "eng-fw-langgraph-js"]],
+  ["OpenAIAgentsAdapter", ["eng-fw-openai-python-docs", "eng-fw-openai-handoffs", "eng-fw-openai-tracing", "eng-fw-openai-tools"]],
+  ["CrewAIAdapter", ["eng-fw-crewai-docs", "eng-fw-crewai-agents", "eng-fw-crewai-flows", "eng-fw-crewai-tasks"]],
+  ["DeepAgentsAdapter", ["eng-fw-deepagents-docs", "eng-fw-deepagents-js-docs", "eng-fw-deepagents-repo"]],
+  [
+    "MicrosoftAgentFrameworkAdapter",
+    ["eng-fw-microsoft-agent-framework-docs", "eng-fw-microsoft-agent-framework-repo", "eng-fw-microsoft-agent-framework-current"]
+  ],
+  ["LangChainAdapter", ["eng-fw-langchain-agents", "eng-fw-langchain-repo", "eng-fw-langgraph-docs"]],
+  ["FrameworkHandoffMapping", ["eng-fw-openai-handoffs", "eng-fw-openai-orchestration", "eng-fw-langgraph-docs", "eng-fw-crewai-flows"]],
+  ["FrameworkTraceMapping", ["eng-fw-openai-tracing", "eng-fw-langgraph-docs", "eng-fw-openai-python-docs"]],
+  ["BenchmarkAdapter", ["eng-bench-swebench-site", "eng-bench-osworld-site", "eng-bench-tau2", "eng-bench-appworld"]],
+  ["SWEBenchAdapter", ["eng-bench-swebench-site", "eng-bench-swebench-repo", "lit-bench-swebench"]],
+  ["OSWorldAdapter", ["eng-bench-osworld-site", "eng-bench-osworld-repo", "lit-bench-osworld", "eng-bench-osworld-v2"]],
+  ["Tau2Adapter", ["eng-bench-tau2", "eng-bench-tau2-verified", "lit-bench-tau2"]],
+  ["AppWorldAdapter", ["eng-bench-appworld", "lit-bench-appworld"]],
+  ["TerminalBenchAdapter", ["eng-bench-terminal", "eng-bench-terminal-21", "lit-bench-terminal"]],
+  ["AgencyBenchAdapter", ["eng-bench-agencybench", "lit-bench-agencybench"]],
+  ["StatechartAdapter", ["eng-state-xstate-docs", "eng-state-scxml", "lit-state-harel", "lit-state-stateflow"]],
+  ["XStateAdapter", ["eng-state-xstate-docs", "eng-state-xstate-graph", "eng-state-scxml", "eng-state-xstate-repo"]],
+  ["SCXMLAdapter", ["eng-state-scxml", "eng-state-xstate-scxml", "lit-state-harel"]],
+  ["SchemaAdapter", ["eng-val-jsonschema-spec", "eng-val-shacl", "eng-val-shex", "eng-ont-owl"]],
+  ["JSONSchemaAdapter", ["eng-val-jsonschema-spec", "eng-val-jsonschema-ietf", "lit-val-jsonschema-ietf", "eng-val-jsonschema-test-suite"]],
+  ["ZodProfileAdapter", ["eng-val-zod-docs", "eng-val-zod-json-schema", "eng-val-zod-release-430"]],
+  ["PydanticProfileAdapter", ["eng-val-pydantic-json-schema", "eng-val-pydantic-core"]],
+  ["OWLExportAdapter", ["eng-ont-owl", "lit-ont-owl-shacl-lessons"]],
+  ["SHACLExportAdapter", ["eng-val-shacl", "lit-val-shacl", "lit-ont-shacl-shex-survey", "eng-val-pyshacl"]],
+  ["ShExExportAdapter", ["eng-val-shex", "lit-ont-shacl-shex-survey"]],
+  ["GraphIRAdapter", ["eng-ont-fibo-viewer", "eng-ont-fibo-ontology-guide", "eng-val-jsonschema-spec"]],
+  ["FrontendViewAdapter", ["eng-ont-fibo-viewer", "eng-ont-fibo-ontology-guide", "eng-val-jsonschema-spec"]],
+  ["MappingRule", ["eng-ont-fibo-ontology-guide", "eng-val-jsonschema-spec", "eng-val-shacl", "eng-val-zod-json-schema"]],
+  ["ConversionWarning", ["eng-val-zod-json-schema", "eng-val-pydantic-json-schema", "eng-val-shacl", "eng-val-shex"]]
+]);
+
 ontology.planes = ontology.planes.map((plane) => ({ ...plane, ...(planeDefinitionOverrides.get(plane.id) ?? {}) }));
 
 const classById = new Map(ontology.terms.filter((term) => !removedClassIds.has(term.id)).map((term) => [term.id, { ...term }]));
@@ -2294,7 +2502,15 @@ const generatedKindOverrides = new Map([
   ["StopRetryLineage", "event_type"],
   ["WorkerAvailability", "object_type"],
   ["WorkerCapabilityMatch", "object_type"],
-  ["WorkerSelection", "event_type"]
+  ["WorkerSelection", "event_type"],
+  ["ProtocolMessageMapping", "relation_type"],
+  ["ProtocolTaskMapping", "relation_type"],
+  ["ProtocolCapabilityMapping", "relation_type"],
+  ["ProtocolTrustMapping", "relation_type"],
+  ["FrameworkHandoffMapping", "relation_type"],
+  ["FrameworkTraceMapping", "relation_type"],
+  ["MappingRule", "relation_type"],
+  ["ConversionWarning", "event_type"]
 ]);
 const classKindOverrides = new Map([
   ["RuntimeSession", "object_type"],
@@ -2325,7 +2541,15 @@ const classKindOverrides = new Map([
   ["StopRetryLineage", "event_type"],
   ["WorkerAvailability", "object_type"],
   ["WorkerCapabilityMatch", "object_type"],
-  ["WorkerSelection", "event_type"]
+  ["WorkerSelection", "event_type"],
+  ["ProtocolMessageMapping", "relation_type"],
+  ["ProtocolTaskMapping", "relation_type"],
+  ["ProtocolCapabilityMapping", "relation_type"],
+  ["ProtocolTrustMapping", "relation_type"],
+  ["FrameworkHandoffMapping", "relation_type"],
+  ["FrameworkTraceMapping", "relation_type"],
+  ["MappingRule", "relation_type"],
+  ["ConversionWarning", "event_type"]
 ]);
 
 const inferredGeneratedKind = (id, label) => {
@@ -2381,6 +2605,7 @@ const classes = [...classById.values()]
     return {
       ...item,
       ...(classOwnershipOverrides.get(item.id) ?? {}),
+      source_ids: classSourceIdOverrides.get(item.id) ?? item.source_ids,
       definition,
       kind: classKindOverrides.get(item.id) ?? item.kind
     };
@@ -2477,6 +2702,18 @@ const objectPropertySeeds = [
   ["summarizes", "summarizes", "memory_flow", "event_type", "resource_type", false],
   ["indexes", "indexes", "information_flow", "index_type", "resource_type", false],
   ["maps_to", "maps to", "adapter_mapping", "adapter_type", "any", false],
+  ["maps_external_construct_to_canonical", "maps external construct to canonical", "adapter_mapping", "MappingRule", "any", false],
+  ["maps_canonical_term_to_external_construct", "maps canonical term to external construct", "adapter_mapping", "MappingRule", "any", false],
+  ["emits_conversion_warning", "emits conversion warning", "adapter_mapping", "MappingRule", "ConversionWarning", false],
+  ["maps_protocol_message_to_canonical_message", "maps protocol message to canonical message", "adapter_mapping", "ProtocolMessageMapping", "Message", false],
+  ["maps_protocol_task_to_canonical_task", "maps protocol task to canonical task", "adapter_mapping", "ProtocolTaskMapping", "Task", false],
+  ["maps_protocol_capability_to_canonical_capability", "maps protocol capability to canonical capability", "adapter_mapping", "ProtocolCapabilityMapping", "ToolCapability", false],
+  ["maps_protocol_trust_to_trust_boundary", "maps protocol trust to trust boundary", "adapter_mapping", "ProtocolTrustMapping", "TrustBoundary", false],
+  ["maps_framework_handoff_to_canonical_handoff", "maps framework handoff to canonical handoff", "adapter_mapping", "FrameworkHandoffMapping", "Handoff", false],
+  ["maps_framework_trace_to_trace_record", "maps framework trace to trace record", "adapter_mapping", "FrameworkTraceMapping", "TraceRecord", false],
+  ["maps_statechart_state_to_snapshot", "maps statechart state to snapshot", "adapter_mapping", "StatechartAdapter", "StateSnapshot", false],
+  ["maps_benchmark_score_to_metric", "maps benchmark score to metric", "adapter_mapping", "BenchmarkAdapter", "Metric", false],
+  ["maps_schema_profile_to_schema_artifact", "maps schema profile to schema artifact", "adapter_mapping", "SchemaAdapter", "SchemaArtifact", false],
   ["has_sender", "has sender", "message_envelope", "Message", "MessageSender", false],
   ["has_receiver", "has receiver", "message_envelope", "Message", "MessageReceiver", false],
   ["has_role", "has role", "message_envelope", "Message", "MessageRole", false],
@@ -2527,11 +2764,22 @@ const regeneratedModulePropertyIds = new Set(
     return [`${prefix}_contains`, `${prefix}_relates`, `${prefix}_emits_event`];
   })
 );
-const existingRelations = ontology.relations.filter((relation) => !regeneratedModulePropertyIds.has(relation.id)).map((relation) => ({
+const obsoleteRelationIds = new Set([
+  "adapter_benchmarks_statecharts_contains",
+  "adapter_benchmarks_statecharts_relates",
+  "adapter_benchmarks_statecharts_emits_event"
+]);
+const existingRelationDefinitionOverrides = new Map([
+  [
+    "maps_external_term_to",
+    "legacy adapter summary relation that links an external protocol, framework, benchmark, statechart, or schema term to a canonical ontology term; use maps_external_construct_to_canonical for precise directional mapping records."
+  ]
+]);
+const existingRelations = ontology.relations.filter((relation) => !regeneratedModulePropertyIds.has(relation.id) && !obsoleteRelationIds.has(relation.id)).map((relation) => ({
   id: relation.id,
   label: relation.label,
   family: relation.family,
-  definition: relation.definition,
+  definition: existingRelationDefinitionOverrides.get(relation.id) ?? relation.definition,
   domain: relation.domain,
   range: relation.range,
   acyclic: Boolean(relation.acyclic),
@@ -2619,7 +2867,58 @@ const objectPropertyDefinitions = new Map([
   ["ranks", "links a ranking event to the candidate set, result list, or scored resource it orders."],
   ["summarizes", "links a compression or synthesis event to the shorter context, disclosure, or artifact it creates."],
   ["indexes", "links an indexing process to the resource, chunk, vector, key, or pointer made searchable."],
-  ["maps_to", "links an adapter term to the external protocol, framework, benchmark, or export construct it represents."],
+  [
+    "maps_to",
+    "legacy summary relation linking adapter family records to canonical terms; precise directional mapping is represented by maps_external_construct_to_canonical and maps_canonical_term_to_external_construct."
+  ],
+  [
+    "maps_external_construct_to_canonical",
+    "links a mapping rule from an external protocol, framework, benchmark, statechart, schema, export, or frontend construct to the canonical ontology term it aligns with."
+  ],
+  [
+    "maps_canonical_term_to_external_construct",
+    "links a mapping rule from a canonical ontology term to the external protocol, framework, benchmark, statechart, schema, export, or frontend construct it projects into."
+  ],
+  [
+    "emits_conversion_warning",
+    "links a mapping rule to the conversion warning emitted when an adapter mapping loses information, approximates semantics, encounters unsupported features, or requires review."
+  ],
+  [
+    "maps_protocol_message_to_canonical_message",
+    "links a protocol message mapping to the canonical Message term used for protocol-native envelopes, performatives, task messages, or tool-context messages."
+  ],
+  [
+    "maps_protocol_task_to_canonical_task",
+    "links a protocol task mapping to the canonical Task term used for protocol-native task lifecycle, delegation, or request records."
+  ],
+  [
+    "maps_protocol_capability_to_canonical_capability",
+    "links a protocol capability mapping to the canonical ToolCapability term used for external tool, resource, prompt, service, or agent capability advertisements."
+  ],
+  [
+    "maps_protocol_trust_to_trust_boundary",
+    "links a protocol trust mapping to the canonical TrustBoundary term used for identity, authorization, opacity, remote-agent, or protected-resource metadata."
+  ],
+  [
+    "maps_framework_handoff_to_canonical_handoff",
+    "links a framework handoff mapping to the canonical Handoff term used for framework-native handoff, delegation, responsibility transfer, and ownership semantics."
+  ],
+  [
+    "maps_framework_trace_to_trace_record",
+    "links a framework trace mapping to the canonical TraceRecord term used for framework-native runs, traces, spans, streams, checkpoints, and observable events."
+  ],
+  [
+    "maps_statechart_state_to_snapshot",
+    "links a statechart adapter to the canonical StateSnapshot term used when state-machine states, snapshots, or lifecycle positions are projected into runtime state profiles."
+  ],
+  [
+    "maps_benchmark_score_to_metric",
+    "links a benchmark adapter to the canonical Metric term used when benchmark scores, success rates, grading checks, rubrics, or pressure axes are represented as evaluation evidence."
+  ],
+  [
+    "maps_schema_profile_to_schema_artifact",
+    "links a schema adapter to the canonical SchemaArtifact term used for JSON Schema, OWL, SHACL, ShEx, Zod, Pydantic, Graph IR, or frontend projection outputs."
+  ],
   ["has_sender", "links a message envelope to the actor, service, user, tool, or remote agent that emitted it."],
   ["has_receiver", "links a message envelope to the actor, model call, user, tool, or remote agent intended to receive it."],
   ["has_role", "links a message envelope to the role under which the receiver should interpret it."],
@@ -2680,6 +2979,16 @@ const objectPropertySourceIds = (family) => {
       "lit-agent-orchestrationbench",
       "eng-fw-openai-orchestration",
       "eng-fw-langgraph-graph-api"
+    ];
+  }
+
+  if (family === "adapter_mapping") {
+    return [
+      "eng-proto-mcp-spec",
+      "eng-proto-a2a-spec",
+      "eng-state-xstate-docs",
+      "eng-val-jsonschema-spec",
+      "eng-ont-fibo-ontology-guide"
     ];
   }
 
@@ -2839,13 +3148,51 @@ const controlledIndividuals = [
 ];
 
 const controlledIndividualDefinition = (label, classId) => {
+  if (classId === "AdapterFamily") {
+    const adapterDefinitions = new Map([
+      [
+        "adapter MCP",
+        "enumerates the MCP adapter family for tool, resource, prompt, discovery, authorization, elicitation, JSON-RPC message, and client-server capability exchange mappings."
+      ],
+      [
+        "adapter A2A",
+        "enumerates the A2A adapter family for remote agent identity, task lifecycle, message exchange, artifact exchange, opacity boundaries, and delegation metadata mappings."
+      ],
+      [
+        "adapter FIPA",
+        "enumerates the FIPA adapter family for agent communication acts, interaction protocols, agent management, message parameters, and conversation semantics mappings."
+      ],
+      [
+        "adapter KQML",
+        "enumerates the KQML adapter family for speech-act style message performatives, content-language metadata, sender and receiver roles, conversation control, and routing mappings."
+      ],
+      [
+        "adapter LangGraph",
+        "enumerates the LangGraph adapter family for graph runtime nodes, edges, durable execution, state updates, checkpoints, streams, and graph API mappings."
+      ],
+      [
+        "adapter OpenAI Agents",
+        "enumerates the OpenAI Agents adapter family for agent SDK handoffs, tools, tracing spans, guardrails, sessions, and hosted tool mappings."
+      ],
+      [
+        "adapter CrewAI",
+        "enumerates the CrewAI adapter family for agent roles, crews, tasks, flows, processes, tool assignments, and multi-agent collaboration mappings."
+      ],
+      [
+        "adapter Deep Agents",
+        "enumerates the Deep Agents adapter family for subagents, planning tools, file-system state, context quarantine, interrupts, and long-running task mappings."
+      ]
+    ]);
+
+    return adapterDefinitions.get(label) ?? `adapter family "${label}" used to map an external protocol, framework, benchmark, or runtime profile without redefining ontology core.`;
+  }
+
   const definitions = {
     Status: `status value "${label}" used to classify the lifecycle position of sessions, runs, tasks, tools, or validation gates.`,
     DecisionKind: `decision outcome "${label}" used by permission, policy, safety, or review flows.`,
     RiskLevel: `risk level "${label}" used to rank safety, protocol, tool, network, or data-boundary exposure.`,
     TransportKind: `transport option "${label}" used by protocol endpoints, streaming channels, and tool/resource exchange surfaces.`,
-    Visibility: `visibility value "${label}" used to scope whether an artifact, trace, memory item, or disclosure is public, user-visible, session-bound, or private.`,
-    AdapterFamily: `adapter family "${label}" used to map an external protocol, framework, benchmark, or runtime profile without redefining ontology core.`
+    Visibility: `visibility value "${label}" used to scope whether an artifact, trace, memory item, or disclosure is public, user-visible, session-bound, or private.`
   };
 
   return definitions[classId] ?? `enumerated value "${label}" used by ${classId} controlled vocabularies.`;
