@@ -94,7 +94,7 @@ describe("canonical agent ontology artifact", () => {
     ["adapter-plane", "Interoperability & Adapter Domain", "互操作适配域", "相互運用とアダプタドメイン"],
     ["tool-plane", "Capability & Resource Invocation Domain", "能力与资源调用域", "能力とリソース呼び出しドメイン"],
     ["safety-plane", "Trust, Policy & Safety Domain", "信任、策略与安全域", "信頼、ポリシー、安全ドメイン"],
-    ["feedback-plane", "Observability & Feedback Domain", "可观测反馈域", "観測可能性とフィードバックドメイン"],
+    ["feedback-plane", "Observability & Feedback Domain", "可观测性与反馈域", "観測可能性とフィードバックドメイン"],
     ["memory-plane", "Memory & Context Persistence Domain", "记忆与上下文持久化域", "記憶とコンテキスト永続化ドメイン"]
   ] as const;
 
@@ -1204,6 +1204,161 @@ describe("canonical agent ontology artifact", () => {
 
     expect(localizedDefinitions).not.toMatch(/\u6240\u5c5e\u5e73\u9762|\u8bc1\u636e\u6e90|\u9002\u914d\u5668\u7c7b|\u6388\u6743\u63d0\u793a.*\u7b56\u7565\u89c4\u5219/);
     expect(localizedDefinitionsJa).not.toMatch(/\u6240\u5c5e\u5e73\u9762|\u51fa\u5178|\u30a2\u30c0\u30d7\u30bf\u985e|\u8a8d\u53ef\u30d7\u30ed\u30f3\u30d7.*\u30dd\u30ea\u30b7\u30fc\u898f\u5247/);
+  });
+
+  it("models observability and feedback as a semantic flow graph", () => {
+    const classes = new Map(ontology.classes.map((klass) => [klass.id, klass]));
+    const modules = new Map(ontology.modules.map((module) => [module.id, module]));
+    const objectProperties = new Map(ontology.object_properties.map((property) => [property.id, property]));
+    const docs = [
+      readFileSync(join(process.cwd(), "README.md"), "utf8"),
+      readFileSync(join(process.cwd(), "docs", "README.zh.md"), "utf8"),
+      readFileSync(join(process.cwd(), "docs", "README.ja.md"), "utf8"),
+      readFileSync(join(process.cwd(), "src", "App.tsx"), "utf8")
+    ].join("\n");
+
+    expect(classes.has("FeedbackPlane")).toBe(false);
+    expect(modules.get("feedback-logging")?.label).toBe("Telemetry, Audit And Export Pipeline Module");
+    expect(modules.get("feedback-logging")?.definition).toMatch(/logs.*telemetry.*audit.*trace exports.*sinks/i);
+    expect(modules.get("feedback-metrics-evaluation")?.definition).toMatch(/generic metrics.*evaluation runs.*rubrics.*scores/i);
+    expect(modules.get("feedback-metrics-evaluation")?.definition).toMatch(/benchmark-specific.*adapter/i);
+    expect(modules.get("feedback-metrics-evaluation")?.definition).not.toMatch(/pressure axes|leaderboard/i);
+
+    const expectedFeedbackClasses = [
+      ["EventSink", "object_type", /destination|consumer|receiver|export target/i],
+      ["LogRecord", "resource_type", /structured log record.*trace|span|event|diagnostic/i],
+      ["LogStream", "object_type", /ordered stream.*log records|telemetry/i],
+      ["AuditLog", "object_type", /reviewable.*collection|channel.*log records.*audit/i],
+      ["TelemetryEvent", "event_type", /instrumented signal.*derived from.*runtime trace/i],
+      ["TraceExport", "resource_type", /exported trace package|portable trace artifact/i],
+      ["DiagnosticMessage", "resource_type", /diagnostic output|debug message|explanation/i],
+      ["RiskSignal", "event_type", /safety bridge|policy-sensitive|trust boundary/i],
+      ["ConfidenceSignal", "resource_type", /confidence|uncertainty.*review|metric|observation/i],
+      ["ReviewFinding", "resource_type", /specific issue|observation|recommendation.*review/i],
+      ["Correction", "action_type", /change proposed or applied.*feedback|review finding/i],
+      ["LearningSignal", "resource_type", /feedback.*may update.*memory|routing|tool selection|policy/i],
+      ["RecoveryAction", "action_type", /feedback-triggered|failure-triggered.*repair|retry|reroute|stop/i],
+      ["RollbackAction", "action_type", /rollback.*side effect|state|artifact|unsafe/i],
+      ["EvaluationRun", "event_type", /assessment episode.*metric|rubric|score/i],
+      ["EvaluationScenario", "resource_type", /generic evaluation setup|scenario.*adapter-specific/i],
+      ["Metric", "resource_type", /measurable property.*run|task|tool|route/i],
+      ["Score", "resource_type", /numeric|ordinal.*metric.*evaluation/i],
+      ["Rubric", "resource_type", /generic scoring guide|criteria.*not benchmark-specific/i]
+    ] as const;
+
+    const weakFeedbackClasses = expectedFeedbackClasses
+      .filter(([classId, kind, pattern]) => classes.get(classId)?.kind !== kind || !pattern.test(classes.get(classId)?.definition ?? ""))
+      .map(([classId]) => `${classId}: ${classes.get(classId)?.kind ?? "<missing>"}:${classes.get(classId)?.definition ?? "<missing>"}`);
+    expect(weakFeedbackClasses).toEqual([]);
+
+    expect(objectProperties.has("feedback_logging_emits_event")).toBe(false);
+    expect(objectProperties.has("feedback_warning_error_emits_event")).toBe(false);
+
+    const expectedFeedbackRelations = [
+      ["trace_event_recorded_as_log_record", "TraceEvent", "LogRecord", "observability_pipeline"],
+      ["trace_span_exported_by_trace_export", "TraceSpan", "TraceExport", "observability_pipeline"],
+      ["trace_record_exported_as_trace_export", "TraceRecord", "TraceExport", "observability_pipeline"],
+      ["log_record_appended_to_audit_log", "LogRecord", "AuditLog", "observability_pipeline"],
+      ["log_stream_carries_log_record", "LogStream", "LogRecord", "observability_pipeline"],
+      ["log_subscription_registers_listener", "LogSubscription", "LogListener", "observability_pipeline"],
+      ["log_listener_subscribes_to_stream", "LogListener", "LogStream", "observability_pipeline"],
+      ["log_stream_delivered_to_event_sink", "LogStream", "EventSink", "observability_pipeline"],
+      ["telemetry_event_derived_from_trace_event", "TelemetryEvent", "TraceEvent", "observability_pipeline"],
+      ["telemetry_event_emitted_to_log_stream", "TelemetryEvent", "LogStream", "observability_pipeline"],
+      ["diagnostic_message_derived_from_log_record", "DiagnosticMessage", "LogRecord", "observability_pipeline"],
+      ["audit_log_summarizes_audit_record", "AuditLog", "AuditRecord", "observability_pipeline"],
+      ["trace_event_records_error_event", "TraceEvent", "ErrorEvent", "feedback_diagnostics"],
+      ["error_event_classified_by_failure_mode", "ErrorEvent", "FailureMode", "feedback_diagnostics"],
+      ["blocking_error_blocks_run_attempt", "BlockingError", "RunAttempt", "feedback_diagnostics"],
+      ["retryable_error_triggers_recovery_plan", "RetryableError", "RecoveryPlan", "feedback_diagnostics"],
+      ["warning_event_raises_warning", "WarningEvent", "Warning", "feedback_diagnostics"],
+      ["risk_signal_flags_policy_decision", "RiskSignal", "PolicyDecision", "safety_feedback_bridge"],
+      ["confidence_signal_qualifies_review_finding", "ConfidenceSignal", "ReviewFinding", "evaluation_feedback"],
+      ["review_produces_review_finding", "Review", "ReviewFinding", "feedback_flow"],
+      ["review_finding_about_artifact", "ReviewFinding", "Artifact", "feedback_flow"],
+      ["review_finding_about_trace_event", "ReviewFinding", "TraceEvent", "feedback_flow"],
+      ["feedback_derived_from_review_finding", "Feedback", "ReviewFinding", "feedback_flow"],
+      ["correction_applies_to_artifact", "Correction", "Artifact", "feedback_flow"],
+      ["correction_triggered_by_feedback", "Correction", "Feedback", "feedback_flow"],
+      ["optimization_loop_consumes_feedback", "OptimizationLoop", "Feedback", "feedback_flow"],
+      ["optimization_loop_consumes_metric", "OptimizationLoop", "Metric", "evaluation_feedback"],
+      ["learning_signal_derived_from_feedback", "LearningSignal", "Feedback", "feedback_flow"],
+      ["learning_signal_updates_memory_preference", "LearningSignal", "MemoryPreference", "feedback_flow"],
+      ["learning_signal_updates_routing_policy", "LearningSignal", "RoutingPolicy", "feedback_flow"],
+      ["learning_signal_updates_tool_selection", "LearningSignal", "ToolSelectionDecision", "feedback_flow"],
+      ["feedback_event_carries_feedback", "FeedbackEvent", "Feedback", "feedback_flow"],
+      ["feedback_event_targets_task", "FeedbackEvent", "Task", "feedback_flow"],
+      ["feedback_event_targets_route", "FeedbackEvent", "Route", "feedback_flow"],
+      ["feedback_event_targets_worker", "FeedbackEvent", "WorkerAgent", "feedback_flow"],
+      ["feedback_event_targets_optimization_loop", "FeedbackEvent", "OptimizationLoop", "feedback_flow"],
+      ["feedback_event_informs_policy_decision", "FeedbackEvent", "PolicyDecision", "safety_feedback_bridge"],
+      ["evaluation_run_uses_rubric", "EvaluationRun", "Rubric", "evaluation_feedback"],
+      ["evaluation_run_produces_score", "EvaluationRun", "Score", "evaluation_feedback"],
+      ["metric_measures_run_attempt", "Metric", "RunAttempt", "evaluation_feedback"],
+      ["metric_measures_tool_call", "Metric", "ToolCall", "evaluation_feedback"],
+      ["score_computed_for_metric", "Score", "Metric", "evaluation_feedback"],
+      ["success_criterion_evaluates_task", "SuccessCriterion", "Task", "evaluation_feedback"]
+    ] as const;
+
+    for (const [relationId, domain, range, family] of expectedFeedbackRelations) {
+      const relation = objectProperties.get(relationId);
+      expect([relation?.domain, relation?.range, relation?.family]).toEqual([domain, range, family]);
+      expect(relation?.definition.length).toBeGreaterThan(70);
+      expect(relation?.source_ids).toEqual(
+        expect.arrayContaining(["eng-fw-openai-tracing", "lit-mech-reflexion", "lit-mech-self-refine"])
+      );
+    }
+
+    expect(objectProperties.get("feeds_back_to")?.definition).toMatch(/legacy summary/i);
+    expect(objectProperties.get("maps_benchmark_score_to_metric")?.family).toBe("adapter_mapping");
+    expect(classes.get("BenchmarkAdapter")?.definition).toMatch(/benchmark.*pressure|leaderboard|environment/i);
+
+    const localizedDefinitions = [
+      ontology.planes.find((plane) => plane.id === "feedback-plane")?.definitions?.zh,
+      modules.get("feedback-warning-error")?.definitions?.zh,
+      modules.get("feedback-review-optimization")?.definitions?.zh,
+      modules.get("feedback-metrics-evaluation")?.definitions?.zh,
+      modules.get("feedback-logging")?.definitions?.zh,
+      ...[
+        "EventSink",
+        "TelemetryEvent",
+        "TraceExport",
+        "AuditLog",
+        "Feedback",
+        "ReviewFinding",
+        "LearningSignal",
+        "EvaluationRun",
+        "Metric",
+        "RiskSignal"
+      ].map((classId) => classes.get(classId)?.definitions?.zh)
+    ].join("\n");
+    const localizedDefinitionsJa = [
+      ontology.planes.find((plane) => plane.id === "feedback-plane")?.definitions?.ja,
+      modules.get("feedback-warning-error")?.definitions?.ja,
+      modules.get("feedback-review-optimization")?.definitions?.ja,
+      modules.get("feedback-metrics-evaluation")?.definitions?.ja,
+      modules.get("feedback-logging")?.definitions?.ja,
+      ...[
+        "EventSink",
+        "TelemetryEvent",
+        "TraceExport",
+        "AuditLog",
+        "Feedback",
+        "ReviewFinding",
+        "LearningSignal",
+        "EvaluationRun",
+        "Metric",
+        "RiskSignal"
+      ].map((classId) => classes.get(classId)?.definitions?.ja)
+    ].join("\n");
+
+    expect(docs).toContain("可观测性与反馈域");
+    expect(docs).toContain("Telemetry, Audit And Export Pipeline Module");
+    expect(docs).not.toContain("可观测反馈域");
+    expect(localizedDefinitions).toMatch(/遥测|日志|审计|诊断|反馈|审查|指标|评分|学习信号|恢复|安全/);
+    expect(localizedDefinitionsJa).toMatch(/テレメトリ|ログ|監査|診断|フィードバック|レビュー|指標|スコア|学習信号|復旧|安全/);
+    expect(localizedDefinitions).not.toMatch(/所属平面：|证据源 \d+ 项|工具的注册、发现、匹配|会话、运行、事件、轨迹|标识能够行动|任务规划/);
+    expect(localizedDefinitionsJa).not.toMatch(/所属平面：|出典 \d+ 件|ツールの登録|セッション、実行、イベント|行動、観測、認可|タスク計画/);
   });
 
   it("renders entity definitions from the canonical artifact in the frontend", () => {
