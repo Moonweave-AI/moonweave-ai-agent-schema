@@ -70,12 +70,12 @@ metadata around the artifact, not part of the agent runtime itself.
 | Domains | 1 |
 | Planes | 8 |
 | Modules | 39 |
-| Classes | 545 |
-| Object properties | 341 |
+| Classes | 544 |
+| Object properties | 376 |
 | Data properties | 98 |
 | Annotation properties | 12 |
 | Individuals | 78 |
-| Axioms | 567 |
+| Axioms | 602 |
 | Datatypes | 8 |
 | Ontology partitions | 47 |
 
@@ -91,7 +91,7 @@ Moonweave Agent Schema organizes agent systems through eight operational concern
 | Interoperability & Adapter Domain | Adapter membrane for protocol, framework, benchmark, statechart, schema/export, language profile, Graph IR, and frontend projections, with directional mapping rules, source/version provenance, conversion warnings, and core-pollution controls. |
 | Capability & Resource Invocation Domain | Capability registries, tool/resource/prompt/API definitions, discovery and selection, schema conformance, tool execution, resource reads, prompt instantiation, MCP protocol surfaces, authorization bridges, diagnostics, trace/context handoff, and auditable side effects. |
 | Trust, Policy & Safety Domain | Auditable safety propagation across trust boundaries, authority scopes, permission prompts, policy decisions, sandbox and network controls, source-sink injection defense, memory poisoning signals, side-effect commit gates, redaction, and audit disclosure. |
-| Observability & Feedback Domain | Warnings, errors, feedback, critique, review, metrics, benchmark observations, telemetry, audit logs, optimization loops, recovery, and diagnostics. |
+| Observability & Feedback Domain | Diagnostic warnings and errors, the Telemetry, Audit And Export Pipeline Module, review findings, corrections, generic metrics and evaluation runs, recovery actions, learning signals, and explicit feedback-flow edges back to orchestration, memory, tool selection, policy, and optimization loops; benchmark-specific semantics remain adapter-owned. |
 | Memory & Context Persistence Domain | Memory ingestion, files, documents, chunking, situating, embeddings, retrieval, ranking, context assembly, summaries, preferences, and persistence policy. |
 
 ## Layer Boundary

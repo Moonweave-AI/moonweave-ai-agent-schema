@@ -13,7 +13,7 @@ const sourceFallback = {
   "orchestration-plane": ["lit-agent-conductor", "eng-fw-langgraph-docs", "eng-fw-crewai-docs"],
   "tool-plane": ["eng-proto-mcp-spec", "eng-fw-openai-python-docs", "lit-mech-tool-use-evolution"],
   "safety-plane": ["lit-agent-safeagent", "eng-security-mcp-nsa-2026", "eng-fw-openai-guardrails"],
-  "feedback-plane": ["lit-mech-reflexion", "lit-agent-conductor", "eng-fw-openai-tracing"],
+  "feedback-plane": ["lit-mech-reflexion", "lit-mech-self-refine", "eng-fw-openai-tracing", "eng-fw-langsmith-docs"],
   "adapter-plane": ["eng-proto-mcp-spec", "eng-proto-a2a-spec", "eng-val-jsonschema-spec", "eng-ont-fibo-ontology-guide"]
 };
 
@@ -654,8 +654,8 @@ const moduleSpecs = [
     id: "feedback-warning-error",
     plane_id: "feedback-plane",
     label: "Warning And Error Module",
-    definition: "models warnings, errors, diagnostics, and issue signals",
-    class_ids: ["FeedbackPlane", "Warning", "ErrorStream"],
+    definition: "models warning records, error events, diagnostic messages, failure modes, risk bridge signals, and uncertainty evidence derived from observable runtime evidence",
+    class_ids: ["Warning", "ErrorStream"],
     generated: [
       ["ErrorEvent", "error event"],
       ["WarningEvent", "warning event"],
@@ -671,7 +671,7 @@ const moduleSpecs = [
     id: "feedback-review-optimization",
     plane_id: "feedback-plane",
     label: "Review And Optimization Module",
-    definition: "models feedback, review, recovery actions, and optimization loops",
+    definition: "models feedback evidence, human and automated review, review findings, corrections, learning signals, optimization loops, and feedback-triggered recovery paths",
     class_ids: ["Feedback", "Review", "RecoveryAction", "OptimizationLoop"],
     generated: [
       ["HumanReview", "human review"],
@@ -688,7 +688,7 @@ const moduleSpecs = [
     id: "feedback-metrics-evaluation",
     plane_id: "feedback-plane",
     label: "Metrics And Evaluation Module",
-    definition: "models metrics, evaluation runs, scoring rubrics, and benchmark observations",
+    definition: "models generic metrics, evaluation runs, rubrics, scores, success criteria, and evaluation evidence while benchmark-specific task conditions, stress dimensions, and public ranking semantics remain in the adapter layer",
     class_ids: ["Metric", "EvaluationRun", "EvaluationCriterion"],
     generated: [
       ["Score", "score"],
@@ -704,8 +704,8 @@ const moduleSpecs = [
   {
     id: "feedback-logging",
     plane_id: "feedback-plane",
-    label: "Logging Module",
-    definition: "models log listeners, streams, log records, and observability channels",
+    label: "Telemetry, Audit And Export Pipeline Module",
+    definition: "models logs, telemetry signals, audit logs, trace exports, listeners, subscriptions, streams, and event sinks as the observability pipeline derived from runtime trace evidence",
     class_ids: ["LogListener"],
     generated: [
       ["LogRecord", "log record"],
@@ -2333,23 +2333,47 @@ const exactGeneratedClassDefinitions = new Map([
   ],
   [
     "EvaluationCriterion",
-    "feedback-domain criterion that defines the scoring, success, benchmark, rubric, or metric condition used to assess agent behavior."
+    "generic feedback-domain criterion that defines the scoring, success, rubric, or metric condition used to assess agent behavior while benchmark-specific criteria remain adapter mappings."
+  ],
+  [
+    "Feedback",
+    "interpreted signal returned from review, diagnostics, metrics, user judgment, policy checks, or runtime evidence to improve, revise, block, approve, or reprioritize later work."
+  ],
+  [
+    "Review",
+    "bounded inspection record over a task, artifact, trace segment, plan, answer, tool result, or policy-sensitive decision that can produce findings, approvals, requested changes, or feedback."
   ],
   [
     "AutomatedReview",
-    "records a machine-produced review pass over a task, output, plan, trace, or artifact, including findings and confidence."
+    "machine-produced review pass over a task, output, plan, trace, or artifact that records findings, confidence, criteria, and provenance without replacing human approval when policy requires it."
   ],
   [
     "HumanReview",
-    "records review evidence supplied by a human actor, including approval, requested changes, blocking concerns, or quality judgment."
+    "review evidence supplied by a human actor, including approval, requested changes, blocking concerns, quality judgment, accountable reviewer identity, and reviewed object."
   ],
   [
     "ReviewFinding",
-    "records a specific issue, observation, or recommendation discovered during human or automated review."
+    "specific issue, observation, recommendation, defect, or approval note discovered during review and linked to the artifact, trace event, tool result, plan, or decision it concerns."
   ],
   [
     "Correction",
-    "records a concrete change proposed or applied in response to feedback, diagnostics, failed validation, or review findings."
+    "change proposed or applied to an artifact, plan, output, route, context assembly, or tool-use choice in response to feedback, diagnostics, failed validation, or review findings."
+  ],
+  [
+    "RecoveryAction",
+    "feedback-triggered or failure-triggered action such as repair, retry, reroute, stop, escalate, rollback, or resume that responds to a warning, denial, failed attempt, or review finding."
+  ],
+  [
+    "RecoveryPlan",
+    "plan that selects one or more recovery actions, links them to the failure or feedback evidence that triggered them, and bounds retry, rollback, escalation, or stop behavior."
+  ],
+  [
+    "RollbackAction",
+    "action that reverses, compensates, or invalidates an unsafe side effect, state transition, artifact revision, memory update, route choice, or external operation under audit control."
+  ],
+  [
+    "OptimizationLoop",
+    "bounded feedback loop that consumes feedback, metrics, scores, review findings, or learning signals to improve later routing, tool selection, prompts, policy thresholds, or task attempts."
   ],
   [
     "OptimizationTarget",
@@ -2357,15 +2381,15 @@ const exactGeneratedClassDefinitions = new Map([
   ],
   [
     "LearningSignal",
-    "captures feedback or evidence that may update future policy, retrieval, tool choice, or orchestration behavior."
+    "feedback-derived evidence that may update memory preferences, retrieval configuration, routing policy, tool selection, policy thresholds, or future orchestration behavior."
   ],
   [
     "ConfidenceSignal",
-    "records an explicit confidence estimate or uncertainty signal attached to an observation, decision, answer, retrieval result, or review."
+    "confidence or uncertainty evidence attached to an observation, review finding, metric, retrieval result, answer, route choice, or policy-relevant decision."
   ],
   [
     "RiskSignal",
-    "records evidence that an action, output, tool result, boundary crossing, or instruction may be unsafe or policy-sensitive."
+    "safety bridge signal recording evidence that an action, output, tool result, boundary crossing, instruction, or memory item may be policy-sensitive, unsafe, or trust-boundary relevant."
   ],
   [
     "FailureMode",
@@ -2376,8 +2400,104 @@ const exactGeneratedClassDefinitions = new Map([
     "identifies an error that may be retried under bounded policy because the failure is transient, recoverable, or externally caused."
   ],
   [
+    "BlockingError",
+    "failure condition that blocks or terminates a run attempt, tool invocation, policy-gated operation, or protocol exchange until recovery, escalation, rollback, or operator intervention occurs."
+  ],
+  [
+    "ErrorStream",
+    "ordered stream of error events, blocking failures, retryable failures, warning escalations, and diagnostic messages observed during runtime or protocol execution."
+  ],
+  [
     "ErrorListener",
     "subscribes to runtime, sandbox, tool, protocol, or log events in order to detect and route errors for diagnosis."
+  ],
+  [
+    "Warning",
+    "non-fatal observable warning that records degraded confidence, policy concern, risky context, partial execution, or recoverable runtime issue without claiming final failure."
+  ],
+  [
+    "ErrorEvent",
+    "observable event recording a failure, exception, timeout, validation error, blocked operation, or unrecoverable runtime condition with trace and diagnostic context."
+  ],
+  [
+    "WarningEvent",
+    "observable event that raises a warning from runtime, tool, policy, retrieval, review, or telemetry evidence while execution may continue under constraints."
+  ],
+  [
+    "DiagnosticMessage",
+    "diagnostic output, debug message, explanation, or remediation hint derived from logs, trace events, validation failures, warnings, or review findings."
+  ],
+  [
+    "Metric",
+    "measurable property of a run, task, tool call, route, artifact, policy decision, or feedback loop, expressed independently of benchmark-specific scoring schemes."
+  ],
+  [
+    "EvaluationRun",
+    "assessment episode that applies metrics, rubric criteria, success criteria, and scoring logic to observable agent behavior, run attempts, tasks, artifacts, or tool use."
+  ],
+  [
+    "EvaluationScenario",
+    "generic evaluation setup describing task conditions, inputs, constraints, and expected observations while adapter-specific benchmark scenario fields remain outside feedback core."
+  ],
+  [
+    "Score",
+    "numeric, ordinal, categorical, or pass-fail assessment value produced for a metric or rubric during an evaluation run."
+  ],
+  [
+    "Rubric",
+    "generic scoring guide that defines criteria, weights, thresholds, and interpretation rules for evaluation without embedding benchmark-specific leaderboard semantics."
+  ],
+  [
+    "SuccessCriterion",
+    "condition used to decide whether a task, run, artifact, recovery attempt, or evaluation objective is acceptable under the relevant rubric or policy."
+  ],
+  [
+    "CostMetric",
+    "metric dimension measuring token, compute, money, call-count, storage, or operational cost for a run, task, tool call, route, or evaluation episode."
+  ],
+  [
+    "LatencyMetric",
+    "metric dimension measuring elapsed time, step latency, tool-call duration, queue delay, or response timing for observable agent work."
+  ],
+  [
+    "SafetyMetric",
+    "metric dimension measuring policy compliance, risk exposure, unsafe output rate, boundary violations, or safety review outcomes without owning enforcement decisions."
+  ],
+  [
+    "RobustnessMetric",
+    "metric dimension measuring stability under retries, perturbations, long-horizon tasks, tool failures, context changes, or adversarial pressure."
+  ],
+  [
+    "LogRecord",
+    "structured log record derived from a trace, span, event, diagnostic message, warning, error, tool result, or audit-relevant observation."
+  ],
+  [
+    "LogStream",
+    "ordered stream of log records or telemetry items delivered from runtime, tool, protocol, sandbox, or feedback components to listeners or sinks."
+  ],
+  [
+    "AuditLog",
+    "reviewable collection or channel of log records, audit references, telemetry summaries, and disclosure-relevant evidence prepared for inspection, diagnostics, or export."
+  ],
+  [
+    "TelemetryEvent",
+    "instrumented signal derived from runtime trace evidence and emitted for collection, monitoring, diagnostics, metrics, or export without redefining the raw TraceEvent."
+  ],
+  [
+    "TraceExport",
+    "exported trace package or portable trace artifact containing selected trace records, spans, events, attributes, redaction state, and provenance for debugging or review."
+  ],
+  [
+    "LogSubscription",
+    "subscription that registers a listener for a log stream, telemetry channel, audit feed, or diagnostic event source under filtering and retention conditions."
+  ],
+  [
+    "LogListener",
+    "observer component that subscribes to log streams or telemetry channels and routes records to diagnostics, review, metrics, audit logs, or event sinks."
+  ],
+  [
+    "EventSink",
+    "destination, consumer, receiver, or export target that accepts log streams, telemetry events, audit records, or trace exports for storage, monitoring, review, or forwarding."
   ],
   [
     "StandardError",
@@ -2873,10 +2993,18 @@ const planeDefinitionOverrides = new Map([
       definition:
         "Interoperability & Adapter Domain is an operational concern domain that acts as the adapter membrane for external protocols, frameworks, benchmarks, statecharts, schema profiles, semantic exports, language profiles, Graph IR, and frontend views. It records directional mappings between external constructs and canonical ontology terms, preserves source and version provenance, surfaces conversion loss or unsupported semantics, and prevents adapter-specific fields from redefining ontology core."
     }
+  ],
+  [
+    "feedback-plane",
+    {
+      label: "Observability & Feedback Domain",
+      definition:
+        "Observability & Feedback Domain is the operational concern domain for deriving diagnostic, review, metric, telemetry, audit, recovery, and learning signals from observable runtime evidence. It separates raw trace evidence from interpreted feedback, keeps benchmark-specific semantics in adapters, and records how feedback returns to orchestration, memory, tool selection, policy, and optimization loops."
+    }
   ]
 ]);
 
-const removedClassIds = new Set(["InfoPlane", "OrchestrationPlane", "AdapterPlane", "SafetyPlane", "ToolPlane", "UserAgentMessage", "ToolMessage"]);
+const removedClassIds = new Set(["InfoPlane", "OrchestrationPlane", "AdapterPlane", "SafetyPlane", "FeedbackPlane", "ToolPlane", "UserAgentMessage", "ToolMessage"]);
 const ownership = (canonical_owner_plane, participating_planes = [], context_ingress_role) => ({
   canonical_owner_plane,
   participating_planes: [...new Set([canonical_owner_plane, ...participating_planes])],
@@ -3101,7 +3229,40 @@ const generatedKindOverrides = new Map([
   ["CommitApproval", "policy_type"],
   ["CommitDenial", "policy_type"],
   ["SideEffect", "event_type"],
-  ["SensitiveSpan", "resource_type"]
+  ["SensitiveSpan", "resource_type"],
+  ["DiagnosticMessage", "resource_type"],
+  ["ConfidenceSignal", "resource_type"],
+  ["RiskSignal", "event_type"],
+  ["Review", "event_type"],
+  ["HumanReview", "event_type"],
+  ["AutomatedReview", "event_type"],
+  ["ReviewFinding", "resource_type"],
+  ["Correction", "action_type"],
+  ["Feedback", "resource_type"],
+  ["LearningSignal", "resource_type"],
+  ["RecoveryAction", "action_type"],
+  ["RecoveryPlan", "resource_type"],
+  ["RollbackAction", "action_type"],
+  ["OptimizationLoop", "object_type"],
+  ["Metric", "resource_type"],
+  ["EvaluationRun", "event_type"],
+  ["EvaluationScenario", "resource_type"],
+  ["Score", "resource_type"],
+  ["Rubric", "resource_type"],
+  ["SuccessCriterion", "policy_type"],
+  ["CostMetric", "resource_type"],
+  ["LatencyMetric", "resource_type"],
+  ["SafetyMetric", "resource_type"],
+  ["RobustnessMetric", "resource_type"],
+  ["LogRecord", "resource_type"],
+  ["LogStream", "object_type"],
+  ["AuditLog", "object_type"],
+  ["TelemetryEvent", "event_type"],
+  ["TraceExport", "resource_type"],
+  ["LogSubscription", "object_type"],
+  ["LogListener", "object_type"],
+  ["ErrorListener", "object_type"],
+  ["EventSink", "object_type"]
 ]);
 const classKindOverrides = new Map([
   ["RuntimeSession", "object_type"],
@@ -3218,7 +3379,40 @@ const classKindOverrides = new Map([
   ["CommitApproval", "policy_type"],
   ["CommitDenial", "policy_type"],
   ["SideEffect", "event_type"],
-  ["SensitiveSpan", "resource_type"]
+  ["SensitiveSpan", "resource_type"],
+  ["DiagnosticMessage", "resource_type"],
+  ["ConfidenceSignal", "resource_type"],
+  ["RiskSignal", "event_type"],
+  ["Review", "event_type"],
+  ["HumanReview", "event_type"],
+  ["AutomatedReview", "event_type"],
+  ["ReviewFinding", "resource_type"],
+  ["Correction", "action_type"],
+  ["Feedback", "resource_type"],
+  ["LearningSignal", "resource_type"],
+  ["RecoveryAction", "action_type"],
+  ["RecoveryPlan", "resource_type"],
+  ["RollbackAction", "action_type"],
+  ["OptimizationLoop", "object_type"],
+  ["Metric", "resource_type"],
+  ["EvaluationRun", "event_type"],
+  ["EvaluationScenario", "resource_type"],
+  ["Score", "resource_type"],
+  ["Rubric", "resource_type"],
+  ["SuccessCriterion", "policy_type"],
+  ["CostMetric", "resource_type"],
+  ["LatencyMetric", "resource_type"],
+  ["SafetyMetric", "resource_type"],
+  ["RobustnessMetric", "resource_type"],
+  ["LogRecord", "resource_type"],
+  ["LogStream", "object_type"],
+  ["AuditLog", "object_type"],
+  ["TelemetryEvent", "event_type"],
+  ["TraceExport", "resource_type"],
+  ["LogSubscription", "object_type"],
+  ["LogListener", "object_type"],
+  ["ErrorListener", "object_type"],
+  ["EventSink", "object_type"]
 ]);
 
 const inferredGeneratedKind = (id, label) => {
@@ -3469,6 +3663,49 @@ const objectPropertySeeds = [
   ["side_effect_produced_by_sandbox_command", "side effect produced by sandbox command", "commit_control", "SideEffect", "SandboxCommand", false],
   ["side_effect_produced_by_network_call", "side effect produced by network call", "commit_control", "SideEffect", "NetworkCall", false],
   ["side_effect_has_rollback_action", "side effect has rollback action", "commit_control", "SideEffect", "RollbackAction", false],
+  ["trace_event_recorded_as_log_record", "trace event recorded as log record", "observability_pipeline", "TraceEvent", "LogRecord", false],
+  ["trace_span_exported_by_trace_export", "trace span exported by trace export", "observability_pipeline", "TraceSpan", "TraceExport", false],
+  ["trace_record_exported_as_trace_export", "trace record exported as trace export", "observability_pipeline", "TraceRecord", "TraceExport", false],
+  ["log_record_appended_to_audit_log", "log record appended to audit log", "observability_pipeline", "LogRecord", "AuditLog", false],
+  ["log_stream_carries_log_record", "log stream carries log record", "observability_pipeline", "LogStream", "LogRecord", false],
+  ["log_subscription_registers_listener", "log subscription registers listener", "observability_pipeline", "LogSubscription", "LogListener", false],
+  ["log_listener_subscribes_to_stream", "log listener subscribes to stream", "observability_pipeline", "LogListener", "LogStream", false],
+  ["log_stream_delivered_to_event_sink", "log stream delivered to event sink", "observability_pipeline", "LogStream", "EventSink", false],
+  ["telemetry_event_derived_from_trace_event", "telemetry event derived from trace event", "observability_pipeline", "TelemetryEvent", "TraceEvent", false],
+  ["telemetry_event_emitted_to_log_stream", "telemetry event emitted to log stream", "observability_pipeline", "TelemetryEvent", "LogStream", false],
+  ["diagnostic_message_derived_from_log_record", "diagnostic message derived from log record", "observability_pipeline", "DiagnosticMessage", "LogRecord", false],
+  ["audit_log_summarizes_audit_record", "audit log summarizes audit record", "observability_pipeline", "AuditLog", "AuditRecord", false],
+  ["trace_event_records_error_event", "trace event records error event", "feedback_diagnostics", "TraceEvent", "ErrorEvent", false],
+  ["error_event_classified_by_failure_mode", "error event classified by failure mode", "feedback_diagnostics", "ErrorEvent", "FailureMode", false],
+  ["blocking_error_blocks_run_attempt", "blocking error blocks run attempt", "feedback_diagnostics", "BlockingError", "RunAttempt", false],
+  ["retryable_error_triggers_recovery_plan", "retryable error triggers recovery plan", "feedback_diagnostics", "RetryableError", "RecoveryPlan", false],
+  ["warning_event_raises_warning", "warning event raises warning", "feedback_diagnostics", "WarningEvent", "Warning", false],
+  ["risk_signal_flags_policy_decision", "risk signal flags policy decision", "safety_feedback_bridge", "RiskSignal", "PolicyDecision", false],
+  ["confidence_signal_qualifies_review_finding", "confidence signal qualifies review finding", "evaluation_feedback", "ConfidenceSignal", "ReviewFinding", false],
+  ["review_produces_review_finding", "review produces review finding", "feedback_flow", "Review", "ReviewFinding", false],
+  ["review_finding_about_artifact", "review finding about artifact", "feedback_flow", "ReviewFinding", "Artifact", false],
+  ["review_finding_about_trace_event", "review finding about trace event", "feedback_flow", "ReviewFinding", "TraceEvent", false],
+  ["feedback_derived_from_review_finding", "feedback derived from review finding", "feedback_flow", "Feedback", "ReviewFinding", false],
+  ["correction_applies_to_artifact", "correction applies to artifact", "feedback_flow", "Correction", "Artifact", false],
+  ["correction_triggered_by_feedback", "correction triggered by feedback", "feedback_flow", "Correction", "Feedback", false],
+  ["optimization_loop_consumes_feedback", "optimization loop consumes feedback", "feedback_flow", "OptimizationLoop", "Feedback", false],
+  ["optimization_loop_consumes_metric", "optimization loop consumes metric", "evaluation_feedback", "OptimizationLoop", "Metric", false],
+  ["learning_signal_derived_from_feedback", "learning signal derived from feedback", "feedback_flow", "LearningSignal", "Feedback", false],
+  ["learning_signal_updates_memory_preference", "learning signal updates memory preference", "feedback_flow", "LearningSignal", "MemoryPreference", false],
+  ["learning_signal_updates_routing_policy", "learning signal updates routing policy", "feedback_flow", "LearningSignal", "RoutingPolicy", false],
+  ["learning_signal_updates_tool_selection", "learning signal updates tool selection", "feedback_flow", "LearningSignal", "ToolSelectionDecision", false],
+  ["feedback_event_carries_feedback", "feedback event carries feedback", "feedback_flow", "FeedbackEvent", "Feedback", false],
+  ["feedback_event_targets_task", "feedback event targets task", "feedback_flow", "FeedbackEvent", "Task", false],
+  ["feedback_event_targets_route", "feedback event targets route", "feedback_flow", "FeedbackEvent", "Route", false],
+  ["feedback_event_targets_worker", "feedback event targets worker", "feedback_flow", "FeedbackEvent", "WorkerAgent", false],
+  ["feedback_event_targets_optimization_loop", "feedback event targets optimization loop", "feedback_flow", "FeedbackEvent", "OptimizationLoop", false],
+  ["feedback_event_informs_policy_decision", "feedback event informs policy decision", "safety_feedback_bridge", "FeedbackEvent", "PolicyDecision", false],
+  ["evaluation_run_uses_rubric", "evaluation run uses rubric", "evaluation_feedback", "EvaluationRun", "Rubric", false],
+  ["evaluation_run_produces_score", "evaluation run produces score", "evaluation_feedback", "EvaluationRun", "Score", false],
+  ["metric_measures_run_attempt", "metric measures run attempt", "evaluation_feedback", "Metric", "RunAttempt", false],
+  ["metric_measures_tool_call", "metric measures tool call", "evaluation_feedback", "Metric", "ToolCall", false],
+  ["score_computed_for_metric", "score computed for metric", "evaluation_feedback", "Score", "Metric", false],
+  ["success_criterion_evaluates_task", "success criterion evaluates task", "evaluation_feedback", "SuccessCriterion", "Task", false],
   ["output_segment_has_sensitive_span", "output segment has sensitive span", "disclosure_control", "OutputSegment", "SensitiveSpan", false],
   ["disclosure_filter_suppresses_output_window", "disclosure filter suppresses output window", "disclosure_control", "DisclosureFilter", "OutputWindow", false],
   ["redaction_applies_to_sensitive_span", "redaction applies to sensitive span", "disclosure_control", "Redaction", "SensitiveSpan", false],
@@ -3501,6 +3738,16 @@ const regeneratedModulePropertyIds = new Set(
     return [`${prefix}_contains`, `${prefix}_relates`, `${prefix}_emits_event`];
   })
 );
+const skippedModuleGeneratedPropertyIds = new Set([
+  "feedback_logging_emits_event",
+  "feedback_logging_relates",
+  "feedback_metrics_evaluation_emits_event",
+  "feedback_metrics_evaluation_relates",
+  "feedback_review_optimization_emits_event",
+  "feedback_review_optimization_relates",
+  "feedback_warning_error_emits_event",
+  "feedback_warning_error_relates"
+]);
 const obsoleteRelationIds = new Set([
   "adapter_benchmarks_statecharts_contains",
   "adapter_benchmarks_statecharts_relates",
@@ -3510,6 +3757,10 @@ const existingRelationDefinitionOverrides = new Map([
   [
     "maps_external_term_to",
     "legacy adapter summary relation that links an external protocol, framework, benchmark, statechart, or schema term to a canonical ontology term; use maps_external_construct_to_canonical for precise directional mapping records."
+  ],
+  [
+    "feeds_back_to",
+    "legacy summary relation for feedback returning into a control loop; use precise feedback_event_targets_task, feedback_event_targets_route, feedback_event_targets_worker, feedback_event_targets_optimization_loop, learning_signal_updates_memory_preference, learning_signal_updates_routing_policy, or learning_signal_updates_tool_selection for typed feedback-flow edges."
   ]
 ]);
 const existingRelations = ontology.relations.filter((relation) => !regeneratedModulePropertyIds.has(relation.id) && !obsoleteRelationIds.has(relation.id)).map((relation) => ({
@@ -3742,6 +3993,49 @@ const objectPropertyDefinitions = new Map([
   ["side_effect_produced_by_sandbox_command", "links a persistent or external side effect to the sandbox command that produced or attempted it under execution policy."],
   ["side_effect_produced_by_network_call", "links a persistent or external side effect to the network call that produced or attempted it under egress and credential policy."],
   ["side_effect_has_rollback_action", "links a side effect to the rollback action that can compensate, revert, delete, revoke, or neutralize the effect after approval or failure."],
+  ["trace_event_recorded_as_log_record", "records that a raw runtime TraceEvent was transformed into a structured LogRecord for observability, diagnostics, audit, or export without replacing the original trace evidence."],
+  ["trace_span_exported_by_trace_export", "links a runtime TraceSpan to the TraceExport package that carries selected span data, attributes, redaction state, and provenance for review or debugging."],
+  ["trace_record_exported_as_trace_export", "links a TraceRecord to the TraceExport artifact that packages selected trace evidence for transport, inspection, retention, or semantic export."],
+  ["log_record_appended_to_audit_log", "appends a structured LogRecord to an AuditLog collection so the record becomes reviewable evidence with ordering, retention, and disclosure context."],
+  ["log_stream_carries_log_record", "connects an ordered LogStream to the LogRecord entries it carries from runtime, tool, protocol, sandbox, or feedback instrumentation."],
+  ["log_subscription_registers_listener", "records that a LogSubscription registers a LogListener to receive a filtered telemetry, diagnostic, audit, or log stream."],
+  ["log_listener_subscribes_to_stream", "connects a LogListener to the LogStream it observes so diagnostics, metrics, review, or audit pipelines can consume selected records."],
+  ["log_stream_delivered_to_event_sink", "delivers an ordered LogStream to an EventSink destination for storage, monitoring, forwarding, audit review, or external observability export."],
+  ["telemetry_event_derived_from_trace_event", "records that a TelemetryEvent is derived from raw runtime TraceEvent evidence rather than acting as a second source of runtime truth."],
+  ["telemetry_event_emitted_to_log_stream", "emits a derived TelemetryEvent into a LogStream so monitoring, metrics, diagnostics, audit, or export consumers can process it."],
+  ["diagnostic_message_derived_from_log_record", "derives a DiagnosticMessage from a LogRecord, preserving the log evidence behind a human-readable debug explanation or remediation hint."],
+  ["audit_log_summarizes_audit_record", "links an AuditLog collection to the runtime AuditRecord evidence it summarizes for review, diagnostics, disclosure, or governance reporting."],
+  ["trace_event_records_error_event", "records that a runtime TraceEvent contains or observes an ErrorEvent, keeping raw execution evidence separate from interpreted error classification."],
+  ["error_event_classified_by_failure_mode", "classifies an ErrorEvent with a recurring FailureMode so diagnostics, recovery plans, evaluation metrics, and future prevention can share the same failure taxonomy."],
+  ["blocking_error_blocks_run_attempt", "links a BlockingError to the RunAttempt it blocks or terminates so failure impact remains tied to a bounded execution attempt."],
+  ["retryable_error_triggers_recovery_plan", "connects a RetryableError to the RecoveryPlan selected to repair, retry, reroute, resume, or stop under bounded recovery policy."],
+  ["warning_event_raises_warning", "connects a WarningEvent to the Warning it raises so non-fatal risk, uncertainty, degraded confidence, or diagnostic evidence remains inspectable."],
+  ["risk_signal_flags_policy_decision", "links a safety bridge RiskSignal to the PolicyDecision it informs when warning or review evidence indicates policy-sensitive or unsafe behavior."],
+  ["confidence_signal_qualifies_review_finding", "attaches a ConfidenceSignal to a ReviewFinding so uncertainty, confidence, or evidential strength is explicit in review and evaluation flows."],
+  ["review_produces_review_finding", "records that a human or automated Review produced a ReviewFinding about an artifact, trace event, plan, tool result, or policy-sensitive decision."],
+  ["review_finding_about_artifact", "links a ReviewFinding to the Artifact it concerns so feedback, corrections, and acceptance decisions can target a concrete work product."],
+  ["review_finding_about_trace_event", "links a ReviewFinding to the TraceEvent it interprets, preserving the raw runtime evidence behind a review judgment."],
+  ["feedback_derived_from_review_finding", "derives Feedback from a ReviewFinding so critique, approval, requested changes, or reprioritization can be consumed by control and learning loops."],
+  ["correction_applies_to_artifact", "links a Correction action to the Artifact it changes, repairs, revises, replaces, or annotates in response to feedback or failed validation."],
+  ["correction_triggered_by_feedback", "records the Feedback that triggered a Correction so refinement and remediation can be traced back to the review or diagnostic evidence."],
+  ["optimization_loop_consumes_feedback", "connects an OptimizationLoop to Feedback it consumes when revising prompts, routes, tool choices, retries, policies, or future attempts."],
+  ["optimization_loop_consumes_metric", "connects an OptimizationLoop to a Metric it consumes when improving cost, latency, correctness, robustness, safety, or task success."],
+  ["learning_signal_derived_from_feedback", "derives a LearningSignal from Feedback so future memory, routing, tool selection, or policy behavior can change without storing hidden reasoning."],
+  ["learning_signal_updates_memory_preference", "records that a LearningSignal updates a MemoryPreference used for retrieval, persistence, summarization, or future context assembly."],
+  ["learning_signal_updates_routing_policy", "records that a LearningSignal updates a RoutingPolicy used by orchestration to choose routes, workers, retries, or stop paths."],
+  ["learning_signal_updates_tool_selection", "records that a LearningSignal updates a ToolSelectionDecision or its future selection criteria, fallback behavior, or ranking policy."],
+  ["feedback_event_carries_feedback", "connects an orchestration FeedbackEvent to the Feedback evidence it carries into a control loop, preserving the distinction between signal and routing event."],
+  ["feedback_event_targets_task", "targets a FeedbackEvent at the Task whose plan, priority, acceptance state, or retry path should change in response to feedback."],
+  ["feedback_event_targets_route", "targets a FeedbackEvent at the Route whose downstream branch, handler, stop path, or retry path should change in response to feedback."],
+  ["feedback_event_targets_worker", "targets a FeedbackEvent at the WorkerAgent whose assignment, review duty, retry work, or future selection should change in response to feedback."],
+  ["feedback_event_targets_optimization_loop", "targets a FeedbackEvent at the OptimizationLoop that will consume feedback, metrics, or review findings for bounded improvement."],
+  ["feedback_event_informs_policy_decision", "links a FeedbackEvent to the PolicyDecision it informs when feedback contains safety, risk, trust-boundary, or permission-relevant evidence."],
+  ["evaluation_run_uses_rubric", "connects an EvaluationRun to the Rubric that defines criteria, weights, thresholds, and interpretation rules for the assessment episode."],
+  ["evaluation_run_produces_score", "records the Score produced by an EvaluationRun for a metric, rubric criterion, success condition, or reviewed behavior."],
+  ["metric_measures_run_attempt", "links a Metric to the RunAttempt whose cost, latency, quality, safety, robustness, or outcome it measures."],
+  ["metric_measures_tool_call", "links a Metric to the ToolCall whose latency, result quality, failure rate, side effects, or safety behavior it measures."],
+  ["score_computed_for_metric", "connects a Score to the Metric for which the numeric, ordinal, categorical, or pass-fail value was computed."],
+  ["success_criterion_evaluates_task", "links a SuccessCriterion to the Task whose completion, acceptance, recovery, or evaluation outcome it helps judge."],
   ["output_segment_has_sensitive_span", "links an output segment to the sensitive span requiring redaction, masking, suppression, delayed release, or restricted routing."],
   ["disclosure_filter_suppresses_output_window", "links a disclosure filter to the output window it suppresses or limits because sensitive spans, policy, recipient boundary, or data-zone controls apply."],
   ["redaction_applies_to_sensitive_span", "links a redaction operation to the sensitive span it masks, removes, replaces, summarizes, or withholds before disclosure."],
@@ -3813,6 +4107,24 @@ const objectPropertySourceIds = (family) => {
       "eng-fw-openai-tracing",
       "lit-mech-compass",
       "eng-fw-openai-tools"
+    ];
+  }
+
+  if (
+    [
+      "observability_pipeline",
+      "feedback_diagnostics",
+      "feedback_flow",
+      "evaluation_feedback",
+      "safety_feedback_bridge"
+    ].includes(family)
+  ) {
+    return [
+      "eng-fw-openai-tracing",
+      "eng-fw-langsmith-docs",
+      "lit-mech-reflexion",
+      "lit-mech-self-refine",
+      "eng-fw-openai-guardrails"
     ];
   }
 
@@ -3891,7 +4203,8 @@ for (const module of moduleList) {
   generatedObjectProperties.push(
     ...(module.id.startsWith("info-")
       ? moduleGeneratedProperties.filter((property) => property.family !== "module_relation")
-      : moduleGeneratedProperties)
+      : moduleGeneratedProperties
+    ).filter((property) => !skippedModuleGeneratedPropertyIds.has(property.id))
   );
 }
 
