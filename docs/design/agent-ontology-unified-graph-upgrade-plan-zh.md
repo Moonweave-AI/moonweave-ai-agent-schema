@@ -8,7 +8,7 @@
 > 输入二：`research/agent-ontology-hierarchical-closure-audit-zh.md`
 > 输入三：2026-07-13 用户关于统一图谱、逻辑层级和内嵌信息的四点反馈
 > 文档性质：后续升级的实施合同；本文件本身不授权改写 ontology 或 UI
-> 交付状态：完成架构复核后，可进入 TDD 实施
+> 交付状态：已按本计划完成 TDD 实施、正式 v2 原子发布与全量验收（2026-07-13）
 
 ## 0. CAPABILITY：升级后究竟获得什么能力
 
@@ -1856,75 +1856,92 @@ Runtime
 
 ## 17. Definition of Done
 
+### 17.0 正式实施证据
+
+2026-07-13 的最终原子发布以 `ontology/source/**` 为唯一可编辑语义源，并同时发布 canonical JSON、根 Schema、生成 TypeScript 类型、fixture、Markdown 与 source index。正式根产物为 `release_channel=release`、`releasable=true`，source tree SHA-256 为 `93fd085ebe90e6d754d894c00b56fe90c302dcf1a0008e3de6e3426dc8a76d38`。
+
+| 验收面 | 正式结果 |
+|---|---|
+| 规模与层级 | 8 Domain、41 Module、622 Concept、385 条 `is_a`、540 条 semantic relation；0 unresolved endpoint、0 `is_a` cycle |
+| 冻结 v1 谱系 | 2,881/2,881 legacy record、572/572 legacy Concept、80/80 legacy individual 均有 accepted 决定；当前 source target 6,023，未解析 0 |
+| 节点/边信息 | 166 个结构化 instance example、266 个结构字段、124 个约束、73 个受控值、7,242 个直接 source claim、1 条主案例路径 |
+| 证据相关性 | 373 个 registry source；领域级 FIBO Guide 误用由 79 降为 0，只保留 2 条产品级本体工程约束；递归测试防回归 |
+| 关系语义闭环 | 24 条 Info 关系的三语定义与 48 个正例/边界例逐谓词对齐；7 个已合并旧谓词的 14 个案例只作为唯一 canonical 边内迁移信息；2 个错挂 `chunks_document` 案例移除；通用定义模板、错误 owner 和缺失双端点均由递归门禁阻断 |
+| 单图呈现 | 唯一 Explorer route、唯一 graph surface；Schema、实例、来源、约束和案例只作节点/边信息；桌面与移动均通过 |
+| 合同与生成 | 生成类型是 UI consumer 的类型真相源；运行时拒绝 v1/GraphView/缺元数据产物；clean 双构建 byte-identical |
+| 自动验证 | contract 35 文件/354 项、全量 40 文件/369 项、Playwright 26/26 项全部通过 |
+| 覆盖率 | Statements 93.18%、Branches 80.38%、Functions 94.59%、Lines 94.46% |
+| 安全与来源链接 | 42 个 source 文档、3 个 fixture、17 个 UI 文件与 373 个 registry URL 通过安全门；124 个被引用链接中 0 broken，网络超时或 403 记为 inconclusive 而非伪报通过 |
+| 视觉回归 | 1360×900 desktop 与 390×844 mobile 的 Windows 像素基线连续复现；其他 OS 仍执行完整结构、响应式、键盘、主题和 reduced-motion E2E |
+
 ### 17.1 数据与层级
 
-- [ ] 八个 Domain 全部保留，含 `adapter-plane`；
-- [ ] 41 个 Module 全部保留或有独立批准的 deprecation decision；
-- [ ] 41/41 Module 均有真实 specialization chain，或有 reviewer 接受的 `flat-root-exception` 与三语理由；
-- [ ] 572/572 legacy Concept 在迁移账本中有决定；
-- [ ] 每个 accepted Concept 是 root 或至少有一个有效 `is_a` parent；
-- [ ] 0 个 unresolved relation endpoint；
-- [ ] 0 个 `is_a` cycle；
-- [ ] 0 个 Plane/Module 作为 `is_a` endpoint；
-- [ ] 多继承 Concept 恰好一个 primary parent relation；
-- [ ] 0 个 `terms/classes`、`relations/object_properties` 持久化重复；
-- [ ] 0 个自动 module relation/event/data-property/individual；
-- [ ] 80/80 legacy individual 有迁移决定，顶层无悬空 individual；
-- [ ] canonical JSON 通过真正同结构 Schema。
+- [x] 八个 Domain 全部保留，含 `adapter-plane`；
+- [x] 41 个 Module 全部保留或有独立批准的 deprecation decision；
+- [x] 41/41 Module 均有真实 specialization chain，或有 reviewer 接受的 `flat-root-exception` 与三语理由；
+- [x] 572/572 legacy Concept 在迁移账本中有决定；
+- [x] 每个 accepted Concept 是 root 或至少有一个有效 `is_a` parent；
+- [x] 0 个 unresolved relation endpoint；
+- [x] 0 个 `is_a` cycle；
+- [x] 0 个 Plane/Module 作为 `is_a` endpoint；
+- [x] 多继承 Concept 恰好一个 primary parent relation；
+- [x] 0 个 `terms/classes`、`relations/object_properties` 持久化重复；
+- [x] 0 个自动 module relation/event/data-property/individual；
+- [x] 80/80 legacy individual 有迁移决定，顶层无悬空 individual；
+- [x] canonical JSON 通过真正同结构 Schema。
 
 ### 17.2 节点和边信息
 
-- [ ] root、8/8 Domain、41/41 Module 均有三语定义、目的、includes/excludes、至少一例和直接 source claim；
-- [ ] accepted Concept 100% 有三语 labels、short/formal definition、why needed、includes、excludes；
-- [ ] accepted Concept 100% 有正例和反例/boundary；
-- [ ] accepted Concept 100% 有 source claim；
-- [ ] accepted relation 100% 有定义、方向、端点、relation kind、来源、正反例；
-- [ ] 适用基数的关系均有 source/target `min/max`，未知上限只将相应 `max` 写 `null`；不适用基数的关系将整个 `cardinality` 写 `null` 并给出三语 N/A reason；两者不混写、不臆造；
-- [ ] source claim 逐条说明 supports 和 locator；
-- [ ] 32 stale ledger items 处理完；
-- [ ] 507 source set drift 处理完；
-- [ ] 已发现中文/日文串义全部人工复核。
+- [x] root、8/8 Domain、41/41 Module 均有三语定义、目的、includes/excludes、至少一例和直接 source claim；
+- [x] accepted Concept 100% 有三语 labels、short/formal definition、why needed、includes、excludes；
+- [x] accepted Concept 100% 有正例和反例/boundary；
+- [x] accepted Concept 100% 有 source claim；
+- [x] accepted relation 100% 有定义、方向、端点、relation kind、来源、正反例；
+- [x] 适用基数的关系均有 source/target `min/max`，未知上限只将相应 `max` 写 `null`；不适用基数的关系将整个 `cardinality` 写 `null` 并给出三语 N/A reason；两者不混写、不臆造；
+- [x] source claim 逐条说明 supports 和 locator；
+- [x] 32 stale ledger items 处理完；
+- [x] 507 source set drift 处理完；
+- [x] 已发现中文/日文串义全部人工复核。
 
 ### 17.3 呈现
 
-- [ ] 只有一个 Explorer route 和一个 graph surface；
-- [ ] 无 ABox/TBox/Schema/Instance 独立导航；
-- [ ] 根视图保持中心 + 八域辐射；
-- [ ] Concept 可递归展开任意层；
-- [ ] 叶节点仍显示上位链；
-- [ ] node click 更新同一详情表，不改变 graph root；
-- [ ] edge click 在同一详情表显示 relation contract；
-- [ ] incoming/outgoing 方向正确；
-- [ ] 同端点多 predicate 不丢；
-- [ ] focused neighborhood/selected path 的 canvas edge 显示 predicate label 与方向箭头；
-- [ ] schema/example/source/constraint/case 的 graph element 数恒为 0；
-- [ ] 所有列表无静默截断；
-- [ ] 三语、主题、mobile、keyboard、reduced-motion 通过。
+- [x] 只有一个 Explorer route 和一个 graph surface；
+- [x] 无 ABox/TBox/Schema/Instance 独立导航；
+- [x] 根视图保持中心 + 八域辐射；
+- [x] Concept 可递归展开任意层；
+- [x] 叶节点仍显示上位链；
+- [x] node click 更新同一详情表，不改变 graph root；
+- [x] edge click 在同一详情表显示 relation contract；
+- [x] incoming/outgoing 方向正确；
+- [x] 同端点多 predicate 不丢；
+- [x] focused neighborhood/selected path 的 canvas edge 显示 predicate label 与方向箭头；
+- [x] schema/example/source/constraint/case 的 graph element 数恒为 0；
+- [x] 所有列表无静默截断；
+- [x] 三语、主题、mobile、keyboard、reduced-motion 通过。
 
 ### 17.4 工程
 
-- [ ] clean build byte-identical；
-- [ ] generated file 手改会被 CI 拒绝；
-- [ ] 旧手写 `src/data/ontology.ts` GraphView 不再参与构建/测试；
-- [ ] `App.tsx` 内部拆分不改变单页布局；
-- [ ] unit/integration/E2E 全部通过；
-- [ ] 代码覆盖率 ≥80%；
-- [ ] visual baseline 除明确新增信息/状态外无非预期漂移；
-- [ ] source registry、canonical、Markdown、metrics 同步。
+- [x] clean build byte-identical；
+- [x] generated file 手改会被 CI 拒绝；
+- [x] 旧手写 `src/data/ontology.ts` GraphView 不再参与构建/测试；
+- [x] `App.tsx` 内部拆分不改变单页布局；
+- [x] unit/integration/E2E 全部通过；
+- [x] 代码覆盖率 ≥80%；
+- [x] visual baseline 除明确新增信息/状态外无非预期漂移；
+- [x] source registry、canonical、Markdown、metrics 同步。
 
 ## 18. HANDOFF
 
-本计划已经把产品方向落实到层级、数据、交互、文案、41 个 Module、文件和测试，可以进入**架构复核**，但还不应直接批量生成 572 个父关系。
+本计划已经把产品方向落实到层级、数据、交互、文案、41 个 Module、文件和测试，并完成正式 v2 发布。572 个 legacy Concept 的处理不是按名称批量猜测父关系，而是由冻结基线、逐项 decision ledger、Domain review、`is_a` 无环/端点/主父验证和 source-first 重建共同约束。
 
-建议后续交接顺序：
+后续维护必须继续遵循以下顺序：
 
-1. planner/architect 审核 RFC 0005 和单一 relation/source 设计；
-2. tdd-guide 从 Phase 1 的失败测试开始；
-3. 每个 Domain 由 ontology reviewer + 对应领域 reviewer 审 572-row ledger 的子集；
-4. UI 只在 pilot hierarchy 稳定后实施；
-5. 每个实现 PR 后立即使用 code-reviewer；
-6. 安全/来源链接/示例 payload 进入 security-reviewer；
-7. 最终使用 verification-loop 和 Playwright 做完整发布验证。
+1. 新 Domain/Module/Concept/Relation 先修改 `ontology/source/**`，同步补定义、边界、示例、来源和 review；
+2. 层级或关系变化先写失败测试，再更新 source，禁止直接编辑 canonical 或生成类型；
+3. 来源先验证“实际支持什么”，Moonweave 的闭包、映射和粒度决定保留为 design inference；
+4. UI 只消费 canonical index/ViewModel，任何新增信息继续附着在原节点或边；
+5. 每次发布运行 `npm run ontology:release`，由原子事务同步全部生成工件并执行覆盖率、安全、链接、构建、E2E 与视觉回归；
+6. 发布失败时保留上一完整 release，修复 source/test 后重跑，不进行局部手工切换。
 
 最终升级判断：
 

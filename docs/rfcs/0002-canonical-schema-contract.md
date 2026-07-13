@@ -22,6 +22,8 @@ The canonical structural contract should use JSON Schema Draft 2020-12 as the no
 
 Semantic validation remains separate through ontology/graph profiles such as OWL, SHACL, and ShEx.
 
+Structural and semantic validation responsibilities may differ internally, but all constraints presented to users remain attached to the corresponding canonical node or relation under “Structure and constraints”. No Schema node family or Schema navigation page is introduced.
+
 ## Non-Goals
 
 - Do not generate schema files.
@@ -31,6 +33,8 @@ Semantic validation remains separate through ontology/graph profiles such as OWL
 - Do not use benchmark fields as core schema fields.
 
 ## Required Schema Families
+
+The families below are information families within canonical node/relation records and their generated machine projections. They are not graph-node buckets, navigation roots, routes, tabs, or independently editable ontology products.
 
 | family | disposition | purpose | source proposals |
 |---|---|---|---|
@@ -49,10 +53,10 @@ Semantic validation remains separate through ontology/graph profiles such as OWL
 
 Future schema fields must follow these constraints:
 
-1. Every top-level artifact must carry stable ID, artifact type, provenance/source reference, and review status.
+1. The canonical root must carry a stable ID and closed `artifact_metadata` containing `artifact_kind`, contract/canonical version, release channel, releasability, generated/do-not-edit flags, deterministic source-tree fingerprint, generator version, and source paths. Canonical nodes and relations carry their own lifecycle and review records.
 2. Every canonical field, profile mapping, adapter mapping, and conversion warning must carry `source_ids`, normalized source/version metadata when the source is living, derivation note, and review status.
 3. Any field derived from a living doc/repo must cite a row in `research/living-source-metadata.csv` with `normalization_status=normalized`, or must remain draft/profile-only until checked.
-4. `TrustBoundary` must be a top-level artifact. Every cross-boundary relation must carry `trust_boundary_id`, source actor, target actor, direction, authority basis, and protocol/resource context when authority, remote execution, tool output, memory retrieval, or protocol metadata crosses actors or systems.
+4. `TrustBoundary` is a canonical Concept in `classes[]`, owned by `safety-trust-boundary`; it is not a parallel top-level artifact. Every cross-boundary relation must carry a `boundary_context` referencing that Concept and localized authority-basis and protocol/resource context. The relation endpoints remain the sole source/target identity and are not copied into `boundary_context`.
 5. Trace fields must capture observable events, not hidden chain-of-thought.
 6. Generated Zod/Pydantic profiles must record bidirectional conversion warnings: canonical-to-profile projection loss and imported-profile-to-canonical loss.
 7. OWL/SHACL/ShEx artifacts must not be folded into JSON object validation.
@@ -100,7 +104,7 @@ This RFC is accepted when:
 - Zod/Pydantic are generated profiles, not canonical truth.
 - OWL/SHACL/ShEx remain semantic profiles.
 - Semantic artifacts cannot be referenced as JSON object validators except through structural metadata links.
-- `TrustBoundary` exists as a top-level artifact and every cross-boundary relation references it through `trust_boundary_id`.
+- `TrustBoundary` exists as one canonical Concept and every cross-boundary relation references it through `boundary_context.trust_boundary_concept_id`.
 - Provenance metadata is mandatory for every field, profile mapping, adapter mapping, and conversion warning.
 - No field-level schema or profile-generation rule is finalized before living source metadata is checked.
 

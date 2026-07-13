@@ -1,0 +1,100 @@
+name: Ontology validation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "chore/**"
+      - "feat/**"
+
+permissions:
+  contents: read
+
+jobs:
+  source-first-validation:
+    name: ${{ matrix.os }} ontology source and release validation
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Validate ontology contracts
+        run: npm run ontology:validate
+
+      - name: Install Playwright Chromium
+        if: runner.os == 'Windows'
+        run: node node_modules/@playwright/test/cli.js install --with-deps chromium
+
+      - name: Verify migration, deterministic build, and generated release
+        run: npm run ontology:check
+
+      - name: Windows visual and interaction regression
+        if: runner.os == 'Windows'
+        run: npm run test:ontology-ui
+
+      - name: Upload Windows Playwright report on failure
+        if: failure() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ontology-playwright-report-windows
+          path: playwright-report
+          if-no-files-found: ignore
+
+      - name: Reject validation side effects
+        run: npm run worktree:check-clean
+
+  quality-gates:
+    name: Coverage, types, build, and explorer E2E
+    needs: source-first-validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Unit and integration coverage (80% minimum)
+        run: npm run test:coverage
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Production build
+        run: npm run build
+
+      - name: Install Playwright Chromium
+        run: node node_modules/@playwright/test/cli.js install --with-deps chromium
+
+      - name: Ontology explorer E2E
+        run: npm run test:ontology-ui
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ontology-playwright-report
+          path: playwright-report
+          if-no-files-found: ignore

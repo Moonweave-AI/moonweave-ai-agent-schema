@@ -1,92 +1,8921 @@
-# Agent System Ontology
+# Moonweave Agent Ontology
 
-Status: canonical Phase 1 ontology
-Date: 2026-06-30
-Canonical machine artifact: `ontology/agent-ontology.json`
-Base IRI: `https://moonweave.ai/ontology/agent-system/`
-Version IRI: `https://moonweave.ai/ontology/agent-system/20260630/`
+> generated: true
+> do_not_edit: true
+> generated_from: `ontology/source/**`
+> source_fingerprint: `93fd085ebe90e6d754d894c00b56fe90c302dcf1a0008e3de6e3426dc8a76d38`
+> generator_version: `moonweave-ontology-builder/2.0.0`
+> generated_at: `2026-07-13T00:00:00.000Z`
 
-## Purpose
+智能体系统本体是面向智能体运行、信息、记忆、编排、工具、安全、反馈和适配器语义的规范领域本体，用于把概念、关系、字段、公理与证据源组织为可验证的体系。
 
-This is the canonical ontology for an agent system. It models the entities,
-events, actions, policies, resources, and relations that appear inside an
-operating agent runtime.
+所有定义、结构约束、实例、正反例、来源、映射和治理信息都附着于下列同一概念层级中的节点或关系。
 
-Ontology-engineering concepts such as specification, domain, module, ontology,
-and class are intentionally not modeled as agent-system terms. They are only
-artifact metadata and governance constraints around this file.
+## 上下文摄入与暂存域
 
-## Current Ontology Scale
+上下文摄入与暂存域是描述可观察内容如何进入某次 agent 步骤或模型调用可见上下文的运行关注域。它建模消息与指令包络、来源引用、内容块、上下文窗口、轻量发现指针、已披露输出片段，以及执行观测在被选择、转换、引用、抑制或暂存进上下文时的语义。
 
-The canonical machine artifact is intentionally larger than a demo graph. It is
-the Phase 1 ontology family that downstream schema, Graph IR, adapters, and UI
-must consume.
+### 执行观测摄入模块
 
-| metric | value |
-|---|---:|
-| domains | 1 |
-| planes | 8 |
-| modules | 39 |
-| classes | 545 |
-| object properties | 341 |
-| data properties | 98 |
-| annotation properties | 12 |
-| individuals | 78 |
-| axioms | 567 |
-| datatypes | 8 |
-| ontology partitions | 47 |
+执行观测摄入模块只描述标准输出、标准错误、退出状态、工具结果和其他可观察执行输出如何成为上下文输入，不拥有命令执行或容器本身。
 
-## Design References
+- **上下文摄入事件** `ContextIngressEvent`
+  - 定义：上下文摄入事件记录消息、指令、来源片段、检索候选、工具观测、执行输出或摘要产物进入某次模型调用或智能体步骤可见上下文的可观察时刻。
+  - 为什么需要：上下文摄入事件为canonical 事实 ContextIngressEvent-makes_available-CommandOutputObservation（ContextIngressEvent makes_available CommandOutputObservation）提供明确端点并保持与 CommandOutputObservation 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的上下文摄入事件：上下文摄入事件记录消息、指令、来源片段、检索候选、工具观测、执行输出或摘要产物进入某次模型调用或智能体步骤可见上下文的可观察时刻。；该种差可由关系 ContextIngressEvent-makes_available-CommandOutputObservation 的端点角色检验。
+  - 不包含：
+  - 命令输出观测只是关系 ContextIngressEvent-makes_available-CommandOutputObservation 的另一端；相关联不表示它是上下文摄入事件。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
 
-The ontology borrows structure from mature ontology programs without importing
-their subject matter:
+- **执行观测** `ExecutionObservation`
+  - 定义：ExecutionObservation 是具有身份、观测时间、被观测执行引用、可见载荷和来源证据的信息对象；它只记录经允许可见的执行现象，不拥有命令或执行活动。
+  - 为什么需要：执行观测为canonical 事实 ExecutionObservation-observes-ExecutionResult（ExecutionObservation observes ExecutionResult）提供明确端点并保持与 ExecutionResult 的定义边界；节点字段 observation_id、observed_at 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的执行观测：ExecutionObservation 是具有身份、观测时间、被观测执行引用、可见载荷和来源证据的信息对象；它只记录经允许可见的执行现象，不拥有命令或执行活动。；该种差可由字段 observation_id、observed_at 检验。
+  - 不包含：
+  - 执行结果只是关系 ExecutionObservation-observes-ExecutionResult 的另一端；相关联不表示它是执行观测。
+  - 结构与约束：2 个字段，2 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+  - **命令输出观测** `CommandOutputObservation`
+    - 定义：命令输出观测记录作为上下文摄入证据的可观察命令输出，同时不拥有产生该输出的命令执行或容器。
+    - 直接上位：`ExecutionObservation`
+    - 为什么需要：命令输出观测为canonical 事实 CommandOutputObservation-has_exit_status_observation-ExitStatusObservation（CommandOutputObservation has_exit_status_observation ExitStatusObservation）提供明确端点并保持与 ExitStatusObservation 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的命令输出观测：命令输出观测记录作为上下文摄入证据的可观察命令输出，同时不拥有产生该输出的命令执行或容器。；该种差可由关系 CommandOutputObservation-has_exit_status_observation-ExitStatusObservation 的端点角色检验。
+    - 不包含：
+  - 退出状态观测虽与本概念同属 ExecutionObservation，但其定义为“退出状态观测表示退出状态被观察并暂存为智能体步骤上下文证据后的形式。”，不得替代命令输出观测。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **退出状态观测** `ExitStatusObservation`
+    - 定义：退出状态观测表示退出状态被观察并暂存为智能体步骤上下文证据后的形式。
+    - 直接上位：`ExecutionObservation`
+    - 为什么需要：退出状态观测为canonical 事实 CommandOutputObservation-has_exit_status_observation-ExitStatusObservation（CommandOutputObservation has_exit_status_observation ExitStatusObservation）提供明确端点并保持与 CommandOutputObservation 的定义边界；节点字段 exit_status 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的退出状态观测：退出状态观测表示退出状态被观察并暂存为智能体步骤上下文证据后的形式。；该种差可由字段 exit_status 检验。
+    - 不包含：
+  - 命令输出观测虽与本概念同属 ExecutionObservation，但其定义为“命令输出观测记录作为上下文摄入证据的可观察命令输出，同时不拥有产生该输出的命令执行或容器。”，不得替代退出状态观测。
+    - 结构与约束：1 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
 
-| reference | adopted pattern | AOEF consequence |
-|---|---|---|
-| FIBO | source/product discipline, stable IRIs, maturity, imports, hygiene gates | kept as artifact governance, not as agent terms |
-| Gene Ontology | orthogonal aspects plus DAG relations such as `is_a` and `part_of` | agent planes are orthogonal aspects; taxonomy/composition stay acyclic |
-| CIDOC CRM | event-centered modeling around persistent items and temporal entities | runtime history is modeled as events involving actors, tools, resources, and policies |
-| Palantir Ontology | operational object/link/action/function layer | terms are split into object types, event types, action types, policy types, and link types |
-| DBpedia/FOAF | stable URI identity and linked-data interoperability | every term can be exported with a stable IRI and optional external mapping |
+- **执行引用** `ExecutionReference`
+  - 定义：ExecutionReference 是具有引用标识、引用种类、目标系统与可见性约束的信息对象，用于指向与执行有关的对象而不复制目标对象或泄露其隐藏值。
+  - 为什么需要：执行引用为canonical 事实 EnvironmentBindingReference-is_a-ExecutionReference（EnvironmentBindingReference is_a ExecutionReference）提供明确端点并保持与 EnvironmentBindingReference 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的执行引用：ExecutionReference 是具有引用标识、引用种类、目标系统与可见性约束的信息对象，用于指向与执行有关的对象而不复制目标对象或泄露其隐藏值。；该种差可由关系 EnvironmentBindingReference-is_a-ExecutionReference 的端点角色检验。
+  - 不包含：
+  - 环境绑定引用只是关系 EnvironmentBindingReference-is_a-ExecutionReference 的另一端；相关联不表示它是执行引用。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **环境绑定引用** `EnvironmentBindingReference`
+    - 定义：环境绑定引用记录与观测执行输出相关的运行环境绑定，同时默认不暴露隐藏值或密钥值。
+    - 直接上位：`ExecutionReference`
+    - 为什么需要：环境绑定引用为canonical 事实 EnvironmentBindingReference-is_a-ExecutionReference（EnvironmentBindingReference is_a ExecutionReference）提供明确端点并保持与 ExecutionResultReference 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的环境绑定引用：环境绑定引用记录与观测执行输出相关的运行环境绑定，同时默认不暴露隐藏值或密钥值。；该种差可由关系 EnvironmentBindingReference-is_a-ExecutionReference 的端点角色检验。
+    - 不包含：
+  - 执行结果引用虽与本概念同属 ExecutionReference，但其定义为“执行结果引用指向其可观察输出或状态正在被暂存进上下文的运行结果或工具执行结果。”，不得替代环境绑定引用。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **执行结果引用** `ExecutionResultReference`
+    - 定义：执行结果引用指向其可观察输出或状态正在被暂存进上下文的运行结果或工具执行结果。
+    - 直接上位：`ExecutionReference`
+    - 为什么需要：执行结果引用为canonical 事实 CommandOutputObservation-references_execution_result-ExecutionResultReference（CommandOutputObservation references_execution_result ExecutionResultReference）提供明确端点并保持与 EnvironmentBindingReference 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的执行结果引用：执行结果引用指向其可观察输出或状态正在被暂存进上下文的运行结果或工具执行结果。；该种差可由关系 CommandOutputObservation-references_execution_result-ExecutionResultReference 的端点角色检验。
+    - 不包含：
+  - 环境绑定引用虽与本概念同属 ExecutionReference，但其定义为“环境绑定引用记录与观测执行输出相关的运行环境绑定，同时默认不暴露隐藏值或密钥值。”，不得替代执行结果引用。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **工作目录引用** `WorkingDirectoryReference`
+    - 定义：工作目录引用记录与观测执行输出相关的工作目录，而不把目录本身建模为上下文摄入产物。
+    - 直接上位：`ExecutionReference`
+    - 为什么需要：工作目录引用为canonical 事实 WorkingDirectoryReference-is_a-ExecutionReference（WorkingDirectoryReference is_a ExecutionReference）提供明确端点并保持与 EnvironmentBindingReference 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的工作目录引用：工作目录引用记录与观测执行输出相关的工作目录，而不把目录本身建模为上下文摄入产物。；该种差可由关系 WorkingDirectoryReference-is_a-ExecutionReference 的端点角色检验。
+    - 不包含：
+  - 环境绑定引用虽与本概念同属 ExecutionReference，但其定义为“环境绑定引用记录与观测执行输出相关的运行环境绑定，同时默认不暴露隐藏值或密钥值。”，不得替代工作目录引用。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
 
-## Agent System Planes
+- **标准错误流** `StandardError`
+  - 定义：标准错误记录命令、进程、沙箱或工具执行产生的诊断输出流，这些诊断输出可作为可观察证据进入上下文。
+  - 直接上位：`OutputStream`
+  - 为什么需要：标准错误流为canonical 事实 StandardErrorChunk-part_of-StandardError（StandardErrorChunk part_of StandardError）提供明确端点并保持与 StandardOutput 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的标准错误流：标准错误记录命令、进程、沙箱或工具执行产生的诊断输出流，这些诊断输出可作为可观察证据进入上下文。；该种差可由关系 StandardErrorChunk-part_of-StandardError 的端点角色检验。
+  - 不包含：
+  - 标准输出流虽与本概念同属 OutputStream，但其定义为“标准输出捕获命令、进程、沙箱或工具执行发出的标准输出流，作为可暂存进上下文的可观察输出。”，不得替代标准错误流。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
 
-Moonweave Agent Schema organizes agent systems through eight operational concern planes. These planes describe the recurring lifecycle surfaces of an agent system: context ingress and staging, control orchestration, runtime execution, interoperability adaptation, capability and resource invocation, trust and safety mediation, observable feedback, and memory persistence.
+- **标准错误分块** `StandardErrorChunk`
+  - 定义：标准错误分块表示带有顺序、诊断含义、来源片段、截断和上下文选择元数据的有边界标准错误片段。
+  - 直接上位：`OutputChunk`
+  - 为什么需要：标准错误分块为canonical 事实 StandardErrorChunk-part_of-StandardError（StandardErrorChunk part_of StandardError）提供明确端点并保持与 StandardOutputChunk 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的标准错误分块：标准错误分块表示带有顺序、诊断含义、来源片段、截断和上下文选择元数据的有边界标准错误片段。；该种差可由关系 StandardErrorChunk-part_of-StandardError 的端点角色检验。
+  - 不包含：
+  - 标准输出分块虽与本概念同属 OutputChunk，但其定义为“标准输出分块表示带有顺序、来源片段、截断和上下文选择元数据的有边界标准输出片段。”，不得替代标准错误分块。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
 
-| plane id | operational concern domain | modules |
-|---|---|---|
-| `info-plane` | Context Ingress & Staging Domain | info-container-command, info-content-block-modality, info-indexing, info-messages-instructions, info-output-disclosure, info-storage-sources |
-| `orchestration-plane` | Control & Orchestration Domain | orchestration-actors-delegation, orchestration-composition, orchestration-evaluation, orchestration-routing-control, orchestration-task-planning |
-| `runtime-plane` | Runtime State & Trace Domain | runtime-actors, runtime-artifacts, runtime-observability, runtime-system |
-| `adapter-plane` | Interoperability & Adapter Domain | adapter-benchmarks, adapter-frameworks, adapter-mapping-infrastructure, adapter-protocols, adapter-schema-export, adapter-statecharts |
-| `tool-plane` | Capability & Resource Invocation Domain | tool-discovery-selection, tool-invocation-execution, tool-mcp-transport, tool-registry-definition |
-| `safety-plane` | Trust, Policy & Safety Domain | safety-commit-redaction, safety-injection-defense, safety-permission-policy, safety-sandbox-network, safety-trust-boundary |
-| `feedback-plane` | Observability & Feedback Domain | feedback-logging, feedback-metrics-evaluation, feedback-review-optimization, feedback-warning-error |
-| `memory-plane` | Memory & Context Persistence Domain | memory-chunking-situating, memory-context, memory-embedding-indexes, memory-ingestion, memory-retrieval-ranking |
+- **标准输出流** `StandardOutput`
+  - 定义：标准输出捕获命令、进程、沙箱或工具执行发出的标准输出流，作为可暂存进上下文的可观察输出。
+  - 直接上位：`OutputStream`
+  - 为什么需要：标准输出流为canonical 事实 StandardOutputChunk-part_of-StandardOutput（StandardOutputChunk part_of StandardOutput）提供明确端点并保持与 StandardError 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的标准输出流：标准输出捕获命令、进程、沙箱或工具执行发出的标准输出流，作为可暂存进上下文的可观察输出。；该种差可由关系 StandardOutputChunk-part_of-StandardOutput 的端点角色检验。
+  - 不包含：
+  - 标准错误流虽与本概念同属 OutputStream，但其定义为“标准错误记录命令、进程、沙箱或工具执行产生的诊断输出流，这些诊断输出可作为可观察证据进入上下文。”，不得替代标准输出流。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
 
-## Core Modeling Rules
+- **标准输出分块** `StandardOutputChunk`
+  - 定义：标准输出分块表示带有顺序、来源片段、截断和上下文选择元数据的有边界标准输出片段。
+  - 直接上位：`OutputChunk`
+  - 为什么需要：标准输出分块为canonical 事实 StandardOutputChunk-part_of-StandardOutput（StandardOutputChunk part_of StandardOutput）提供明确端点并保持与 StandardErrorChunk 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的标准输出分块：标准输出分块表示带有顺序、来源片段、截断和上下文选择元数据的有边界标准输出片段。；该种差可由关系 StandardOutputChunk-part_of-StandardOutput 的端点角色检验。
+  - 不包含：
+  - 标准错误分块虽与本概念同属 OutputChunk，但其定义为“标准错误分块表示带有顺序、诊断含义、来源片段、截断和上下文选择元数据的有边界标准错误片段。”，不得替代标准输出分块。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
 
-1. Agent-system terms must describe agent runtime structure or behavior.
-2. Engineering metadata belongs to artifact metadata, not to ontology terms.
-3. Taxonomic and compositional relations form a DAG.
-4. Runtime, tool, memory, and orchestration flows may be cyclic and event-based.
-5. Hidden chain-of-thought is not a required term, field, fixture, or UI surface.
-6. Protocols, frameworks, and benchmarks are adapter mappings unless their term is broadly observable in agent systems.
-7. Every class has a kind, plane, module, label, definition, source IDs, and stable IRI suffix.
-8. Every object property has domain, range, family, source IDs, and acyclicity metadata where applicable.
-9. Every data property, controlled individual, and axiom has source IDs and validation-ready fields.
+### 内容块与模态模块
 
-## Phase 2 Handoff
+内容块与模态模块描述被暂存进上下文的有边界内容块、模态、编码、媒体类型、令牌计数和附件块。
 
-Phase 2 must generate schema and graph fixtures from
-`ontology/agent-ontology.json`:
+- **内容块** `ContentBlock`
+  - 定义：内容块表示带有模态、编码、来源引用、令牌预算和可见性元数据的有边界上下文内容单元。
+  - 为什么需要：内容块为canonical 事实 compressed_into_summary（ContentBlock compressed_into_summary ContextSummary）提供明确端点并保持与 ContextSummary 的定义边界；节点字段 modality、mime_type、block_id 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的内容块：内容块表示带有模态、编码、来源引用、令牌预算和可见性元数据的有边界上下文内容单元。；该种差可由字段 modality、mime_type、block_id 检验。
+  - 不包含：
+  - 上下文摘要只是关系 compressed_into_summary 的另一端；相关联不表示它是内容块。
+  - 结构与约束：5 个字段，2 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+  - **音频内容块** `AudioBlock`
+    - 定义：音频块表示带有模态和来源元数据、并暂存进上下文的音频内容或转写音频观测。
+    - 直接上位：`ContentBlock`
+    - 为什么需要：音频内容块为canonical 事实 AudioBlock-transcribed_as-TextBlock（AudioBlock transcribed_as TextBlock）提供明确端点并保持与 CodeBlock 的定义边界；节点字段 modality、block_id、mime_type 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的音频内容块：音频块表示带有模态和来源元数据、并暂存进上下文的音频内容或转写音频观测。；该种差可由字段 modality、block_id、mime_type 检验。
+    - 不包含：
+  - 代码内容块虽与本概念同属 ContentBlock，但其定义为“代码块表示暂存进上下文的源码、补丁、堆栈轨迹、壳层片段或可执行文本。”，不得替代音频内容块。
+    - 结构与约束：4 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **代码内容块** `CodeBlock`
+    - 定义：代码块表示暂存进上下文的源码、补丁、堆栈轨迹、壳层片段或可执行文本。
+    - 直接上位：`ContentBlock`
+    - 为什么需要：代码内容块为canonical 事实 CodeBlock-is_a-ContentBlock（CodeBlock is_a ContentBlock）提供明确端点并保持与 AudioBlock 的定义边界；节点字段 modality、block_id、mime_type 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的代码内容块：代码块表示暂存进上下文的源码、补丁、堆栈轨迹、壳层片段或可执行文本。；该种差可由字段 modality、block_id、mime_type 检验。
+    - 不包含：
+  - 音频内容块虽与本概念同属 ContentBlock，但其定义为“音频块表示带有模态和来源元数据、并暂存进上下文的音频内容或转写音频观测。”，不得替代代码内容块。
+    - 结构与约束：4 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **文件附件内容块** `FileAttachmentBlock`
+    - 定义：文件附件块表示对模型调用可见的附加文件或文件摘录，并记录摘要、媒体类型和访问引用。
+    - 直接上位：`ContentBlock`
+    - 为什么需要：文件附件内容块为canonical 事实 FileAttachmentBlock-references_source-SourceReference（FileAttachmentBlock references_source SourceReference）提供明确端点并保持与 AudioBlock 的定义边界；节点字段 modality、block_id、mime_type 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的文件附件内容块：文件附件块表示对模型调用可见的附加文件或文件摘录，并记录摘要、媒体类型和访问引用。；该种差可由字段 modality、block_id、mime_type 检验。
+    - 不包含：
+  - 音频内容块虽与本概念同属 ContentBlock，但其定义为“音频块表示带有模态和来源元数据、并暂存进上下文的音频内容或转写音频观测。”，不得替代文件附件内容块。
+    - 结构与约束：4 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **图像内容块** `ImageBlock`
+    - 定义：图像块表示带有来源和模态元数据、并暂存进上下文的图像内容或图像派生观测。
+    - 直接上位：`ContentBlock`
+    - 为什么需要：图像内容块为canonical 事实 ImageBlock-is_a-ContentBlock（ImageBlock is_a ContentBlock）提供明确端点并保持与 AudioBlock 的定义边界；节点字段 modality、block_id、mime_type 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的图像内容块：图像块表示带有来源和模态元数据、并暂存进上下文的图像内容或图像派生观测。；该种差可由字段 modality、block_id、mime_type 检验。
+    - 不包含：
+  - 音频内容块虽与本概念同属 ContentBlock，但其定义为“音频块表示带有模态和来源元数据、并暂存进上下文的音频内容或转写音频观测。”，不得替代图像内容块。
+    - 结构与约束：4 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **结构化数据内容块** `StructuredDataBlock`
+    - 定义：结构化数据块表示暂存进上下文的记录、模式、表格、图片段或其他结构化载荷。
+    - 直接上位：`ContentBlock`
+    - 为什么需要：结构化数据内容块为canonical 事实 StructuredDataBlock-is_a-ContentBlock（StructuredDataBlock is_a ContentBlock）提供明确端点并保持与 AudioBlock 的定义边界；节点字段 modality、block_id、mime_type 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的结构化数据内容块：结构化数据块表示暂存进上下文的记录、模式、表格、图片段或其他结构化载荷。；该种差可由字段 modality、block_id、mime_type 检验。
+    - 不包含：
+  - 音频内容块虽与本概念同属 ContentBlock，但其定义为“音频块表示带有模态和来源元数据、并暂存进上下文的音频内容或转写音频观测。”，不得替代结构化数据内容块。
+    - 结构与约束：4 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **表格内容块** `TableBlock`
+    - 定义：表格块表示暂存进上下文的行列内容，并保留单元格范围和来源锚点。
+    - 直接上位：`ContentBlock`
+    - 为什么需要：表格内容块为canonical 事实 TableBlock-is_a-ContentBlock（TableBlock is_a ContentBlock）提供明确端点并保持与 AudioBlock 的定义边界；节点字段 modality、block_id、mime_type 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的表格内容块：表格块表示暂存进上下文的行列内容，并保留单元格范围和来源锚点。；该种差可由字段 modality、block_id、mime_type 检验。
+    - 不包含：
+  - 音频内容块虽与本概念同属 ContentBlock，但其定义为“音频块表示带有模态和来源元数据、并暂存进上下文的音频内容或转写音频观测。”，不得替代表格内容块。
+    - 结构与约束：4 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **文本内容块** `TextBlock`
+    - 定义：文本块表示暂存进上下文的文本内容，包括自然语言、日志、摘录、摘要或提示片段。
+    - 直接上位：`ContentBlock`
+    - 为什么需要：文本内容块为canonical 事实 AudioBlock-transcribed_as-TextBlock（AudioBlock transcribed_as TextBlock）提供明确端点并保持与 AudioBlock 的定义边界；节点字段 modality、block_id、mime_type 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的文本内容块：文本块表示暂存进上下文的文本内容，包括自然语言、日志、摘录、摘要或提示片段。；该种差可由字段 modality、block_id、mime_type 检验。
+    - 不包含：
+  - 音频内容块虽与本概念同属 ContentBlock，但其定义为“音频块表示带有模态和来源元数据、并暂存进上下文的音频内容或转写音频观测。”，不得替代文本内容块。
+    - 结构与约束：4 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
 
-- `planes` become top-level graph and schema namespaces.
-- `modules` become graph groups and schema namespaces below each plane.
-- `classes` become class/action/event/policy/resource candidates.
-- `object_properties` become edge families and field-level relation constraints.
-- `data_properties` become structural scalar fields and validation constraints.
-- `individuals` become controlled vocabularies and sample enum values.
-- `axioms` become validation, lint, and semantic export checks.
-- `adapter_mappings` become profile/adapter conversion rules.
-- `hygiene_gates` become validation tests.
+- **消息内容关联** `MessageContentBlock`
+  - 定义：消息内容块把消息包络连接到一个或多个有类型内容块，使多模态内容可以被引用、过滤、预算或暂存。
+  - 为什么需要：消息内容关联为canonical 事实 MessageContentBlock-contains_block-ContentBlock（MessageContentBlock contains_block ContentBlock）提供明确端点并保持与 ContentBlock 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的消息内容关联：消息内容块把消息包络连接到一个或多个有类型内容块，使多模态内容可以被引用、过滤、预算或暂存。；该种差可由关系 MessageContentBlock-contains_block-ContentBlock 的端点角色检验。
+  - 不包含：
+  - 内容块只是关系 MessageContentBlock-contains_block-ContentBlock 的另一端；相关联不表示它是消息内容关联。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+### 轻量上下文发现模块
+
+轻量上下文发现模块描述轻量发现指针、检索查询、检索候选、候选排序、评分和索引版本引用如何用于选择上下文。
+
+- **候选排名观测** `CandidateRank`
+  - 定义：候选排名是特定发现运行中对候选顺序位置的观测质量，不是索引、结果或候选的子类；保留概念以承载方法与证据。
+  - 为什么需要：候选排名观测为canonical 事实 RetrievedCandidate-ranked_at-CandidateRank（RetrievedCandidate ranked_at CandidateRank）提供明确端点并保持与 RetrievedCandidate 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的候选排名观测：候选排名是特定发现运行中对候选顺序位置的观测质量，不是索引、结果或候选的子类；保留概念以承载方法与证据。；该种差可由关系 RetrievedCandidate-ranked_at-CandidateRank 的端点角色检验。
+  - 不包含：
+  - 检索候选只是关系 RetrievedCandidate-ranked_at-CandidateRank 的另一端；相关联不表示它是候选排名观测。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **发现索引** `DiscoveryIndex`
+  - 定义：DiscoveryIndex 是具有身份、构建或刷新时间、覆盖范围和版本引用的可查询信息制品，用于发现上下文候选；它不拥有 Memory 域持久索引的存储、分片或生命周期。
+  - 为什么需要：发现索引为canonical 事实 IndexPointer-references-DiscoveryIndex（IndexPointer references DiscoveryIndex）提供明确端点并保持与 IndexPointer 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的发现索引：DiscoveryIndex 是具有身份、构建或刷新时间、覆盖范围和版本引用的可查询信息制品，用于发现上下文候选；它不拥有 Memory 域持久索引的存储、分片或生命周期。；该种差可由关系 IndexPointer-references-DiscoveryIndex 的端点角色检验。
+  - 不包含：
+  - 索引指针只是关系 IndexPointer-references-DiscoveryIndex 的另一端；相关联不表示它是发现索引。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **轻量发现索引** `LightIndex`
+    - 定义：轻量索引表示用于发现候选上下文的轻量发现表面或指针集合，而不拥有完整索引系统。
+    - 直接上位：`DiscoveryIndex`
+    - 为什么需要：轻量发现索引为canonical 事实 LightIndex-exposes-DiscoverySurface（LightIndex exposes DiscoverySurface）提供明确端点并保持与 DiscoveryIndex 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的轻量发现索引：轻量索引表示用于发现候选上下文的轻量发现表面或指针集合，而不拥有完整索引系统。；该种差可由关系 LightIndex-exposes-DiscoverySurface 的端点角色检验。
+    - 不包含：
+  - 仅能识别为上位概念 DiscoveryIndex 的对象不在范围内；它尚未证明轻量发现索引的种差或关系端点 LightIndex-exposes-DiscoverySurface。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **发现结果** `DiscoveryResult`
+  - 定义：DiscoveryResult 是具有结果身份、产生它的查询或界面引用、来源引用、可选评分与选择状态的信息对象；结果尚不意味着已进入 ContextPackage。
+  - 为什么需要：发现结果为canonical 事实 LightweightRetrievalTrace-records-DiscoveryResult（LightweightRetrievalTrace records DiscoveryResult）提供明确端点并保持与 LightweightRetrievalTrace 的定义边界；节点字段 rank、result_id 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的发现结果：DiscoveryResult 是具有结果身份、产生它的查询或界面引用、来源引用、可选评分与选择状态的信息对象；结果尚不意味着已进入 ContextPackage。；该种差可由字段 rank、result_id 检验。
+  - 不包含：
+  - 轻量检索轨迹只是关系 LightweightRetrievalTrace-records-DiscoveryResult 的另一端；相关联不表示它是发现结果。
+  - 结构与约束：2 个字段，2 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+  - **检索候选** `RetrievedCandidate`
+    - 定义：检索候选表示系统决定是否纳入上下文包之前，由检索返回的候选内容。
+    - 直接上位：`DiscoveryResult`
+    - 为什么需要：检索候选为canonical 事实 RetrievedCandidate-ranked_at-CandidateRank（RetrievedCandidate ranked_at CandidateRank）提供明确端点并保持与 SearchResult 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的检索候选：检索候选表示系统决定是否纳入上下文包之前，由检索返回的候选内容。；该种差可由关系 RetrievedCandidate-ranked_at-CandidateRank 的端点角色检验。
+    - 不包含：
+  - 搜索结果虽与本概念同属 DiscoveryResult，但其定义为“搜索结果记录搜索或发现表面返回的候选项，包括来源引用、评分、排序和选择状态。”，不得替代检索候选。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+    - **检索上下文候选** `RetrievedContextCandidate`
+      - 定义：检索上下文候选表示专门针对某次模型调用或智能体步骤上下文包进行纳入评估的检索候选。
+      - 直接上位：`RetrievedCandidate`
+      - 为什么需要：检索上下文候选为canonical 事实 RetrievedContextCandidate-scored_by-RetrievalScore（RetrievedContextCandidate scored_by RetrievalScore）提供明确端点并保持与 RetrievedCandidate 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的检索上下文候选：检索上下文候选表示专门针对某次模型调用或智能体步骤上下文包进行纳入评估的检索候选。；该种差可由关系 RetrievedContextCandidate-scored_by-RetrievalScore 的端点角色检验。
+      - 不包含：
+  - 仅能识别为上位概念 RetrievedCandidate 的对象不在范围内；它尚未证明检索上下文候选的种差或关系端点 RetrievedContextCandidate-scored_by-RetrievalScore。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：3 项
+      - 直接来源主张：2 项
+  - **搜索结果** `SearchResult`
+    - 定义：搜索结果记录搜索或发现表面返回的候选项，包括来源引用、评分、排序和选择状态。
+    - 直接上位：`DiscoveryResult`
+    - 为什么需要：搜索结果为canonical 事实 SearchResult-scored_by-SearchScore（SearchResult scored_by SearchScore）提供明确端点并保持与 RetrievedCandidate 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的搜索结果：搜索结果记录搜索或发现表面返回的候选项，包括来源引用、评分、排序和选择状态。；该种差可由关系 SearchResult-scored_by-SearchScore 的端点角色检验。
+    - 不包含：
+  - 检索候选虽与本概念同属 DiscoveryResult，但其定义为“检索候选表示系统决定是否纳入上下文包之前，由检索返回的候选内容。”，不得替代搜索结果。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+
+- **发现评分** `DiscoveryScore`
+  - 定义：DiscoveryScore 是对发现结果在相关性、相似度、词法匹配或重排尺度上的观测质量，必须记录评分方法、尺度、方向、时间和被评分对象；它不是结果或索引。
+  - 为什么需要：发现评分为canonical 事实 RetrievalScore-is_a-DiscoveryScore（RetrievalScore is_a DiscoveryScore）提供明确端点并保持与 RetrievalScore 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的发现评分：DiscoveryScore 是对发现结果在相关性、相似度、词法匹配或重排尺度上的观测质量，必须记录评分方法、尺度、方向、时间和被评分对象；它不是结果或索引。；该种差可由关系 RetrievalScore-is_a-DiscoveryScore 的端点角色检验。
+  - 不包含：
+  - 检索评分只是关系 RetrievalScore-is_a-DiscoveryScore 的另一端；相关联不表示它是发现评分。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **检索评分** `RetrievalScore`
+    - 定义：检索评分记录附加在检索上下文候选上的相关性、置信度、相似度、词汇匹配或重排证据。
+    - 直接上位：`DiscoveryScore`
+    - 为什么需要：检索评分为canonical 事实 CandidateChunk-scored_by-RetrievalScore（CandidateChunk scored_by RetrievalScore）提供明确端点并保持与 SearchScore 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的检索评分：检索评分记录附加在检索上下文候选上的相关性、置信度、相似度、词汇匹配或重排证据。；该种差可由关系 CandidateChunk-scored_by-RetrievalScore 的端点角色检验。
+    - 不包含：
+  - 搜索评分虽与本概念同属 DiscoveryScore，但其定义为“搜索评分记录检索候选、搜索结果、索引命中或来源指针在上下文发现过程中的相关性、置信度或排序分数。”，不得替代检索评分。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **搜索评分** `SearchScore`
+    - 定义：搜索评分记录检索候选、搜索结果、索引命中或来源指针在上下文发现过程中的相关性、置信度或排序分数。
+    - 直接上位：`DiscoveryScore`
+    - 为什么需要：搜索评分为canonical 事实 SearchResult-scored_by-SearchScore（SearchResult scored_by SearchScore）提供明确端点并保持与 RetrievalScore 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的搜索评分：搜索评分记录检索候选、搜索结果、索引命中或来源指针在上下文发现过程中的相关性、置信度或排序分数。；该种差可由关系 SearchResult-scored_by-SearchScore 的端点角色检验。
+    - 不包含：
+  - 检索评分虽与本概念同属 DiscoveryScore，但其定义为“检索评分记录附加在检索上下文候选上的相关性、置信度、相似度、词汇匹配或重排证据。”，不得替代搜索评分。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **发现界面** `DiscoverySurface`
+  - 定义：发现表面标识用于发现上下文候选的轻量表面，例如搜索、文件列表、记忆命名空间、工具描述列表或协议资源列表。
+  - 为什么需要：发现界面为canonical 事实 LightIndex-exposes-DiscoverySurface（LightIndex exposes DiscoverySurface）提供明确端点并保持与 LightIndex 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的发现界面：发现表面标识用于发现上下文候选的轻量表面，例如搜索、文件列表、记忆命名空间、工具描述列表或协议资源列表。；该种差可由关系 LightIndex-exposes-DiscoverySurface 的端点角色检验。
+  - 不包含：
+  - 轻量发现索引只是关系 LightIndex-exposes-DiscoverySurface 的另一端；相关联不表示它是发现界面。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **索引指针** `IndexPointer`
+  - 定义：索引指针把上下文选择过程指向可能产生候选内容的索引条目、搜索表面或检索句柄。
+  - 为什么需要：索引指针为canonical 事实 IndexPointer-references-DiscoveryIndex（IndexPointer references DiscoveryIndex）提供明确端点并保持与 DiscoveryIndex 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的索引指针：索引指针把上下文选择过程指向可能产生候选内容的索引条目、搜索表面或检索句柄。；该种差可由关系 IndexPointer-references-DiscoveryIndex 的端点角色检验。
+  - 不包含：
+  - 发现索引只是关系 IndexPointer-references-DiscoveryIndex 的另一端；相关联不表示它是索引指针。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **索引版本引用** `IndexVersionReference`
+  - 定义：索引版本引用记录产生发现候选项的索引版本、快照、构建或配置。
+  - 为什么需要：索引版本引用为canonical 事实 IndexVersionReference-refers_to-IndexVersion（IndexVersionReference refers_to IndexVersion）提供明确端点并保持与 IndexVersion 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的索引版本引用：索引版本引用记录产生发现候选项的索引版本、快照、构建或配置。；该种差可由关系 IndexVersionReference-refers_to-IndexVersion 的端点角色检验。
+  - 不包含：
+  - 索引版本只是关系 IndexVersionReference-refers_to-IndexVersion 的另一端；相关联不表示它是索引版本引用。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **轻量检索轨迹** `LightweightRetrievalTrace`
+  - 定义：轻量检索轨迹记录一次轻量上下文发现过程中的查询、候选、评分、排序和来源引用证据。
+  - 为什么需要：轻量检索轨迹为canonical 事实 LightweightRetrievalTrace-records-DiscoveryResult（LightweightRetrievalTrace records DiscoveryResult）提供明确端点并保持与 DiscoveryResult 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的轻量检索轨迹：轻量检索轨迹记录一次轻量上下文发现过程中的查询、候选、评分、排序和来源引用证据。；该种差可由关系 LightweightRetrievalTrace-records-DiscoveryResult 的端点角色检验。
+  - 不包含：
+  - 发现结果只是关系 LightweightRetrievalTrace-records-DiscoveryResult 的另一端；相关联不表示它是轻量检索轨迹。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+### 消息、指令与提示包络模块
+
+消息、指令与提示包络模块描述消息包络、指令产物、提示模板、角色元数据、发送方、接收方、会话身份和指令冲突解决。
+
+- **上下文包** `ContextPackage`
+  - 定义：上下文包表示一次模型调用或智能体步骤实际可见的消息包络、指令、内容块、来源引用、检索候选、工具观测、引用、排除项和预算元数据。
+  - 为什么需要：上下文包为canonical 事实 ContextPackage-contains_candidate-RetrievedCandidate（ContextPackage contains_candidate RetrievedCandidate）提供明确端点并保持与 RetrievedCandidate 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的上下文包：上下文包表示一次模型调用或智能体步骤实际可见的消息包络、指令、内容块、来源引用、检索候选、工具观测、引用、排除项和预算元数据。；该种差可由关系 ContextPackage-contains_candidate-RetrievedCandidate 的端点角色检验。
+  - 不包含：
+  - 检索候选只是关系 ContextPackage-contains_candidate-RetrievedCandidate 的另一端；相关联不表示它是上下文包。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **会话结构元素** `ConversationElement`
+  - 定义：ConversationElement 是具有身份并参与会话结构组织的信息对象，其下位类分别覆盖完整会话、单个有序轮次和保留历史；它不规定发送角色或消息载荷。
+  - 为什么需要：会话结构元素为canonical 事实 Conversation-is_a-ConversationElement（Conversation is_a ConversationElement）提供明确端点并保持与 Conversation 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的会话结构元素：ConversationElement 是具有身份并参与会话结构组织的信息对象，其下位类分别覆盖完整会话、单个有序轮次和保留历史；它不规定发送角色或消息载荷。；该种差可由关系 Conversation-is_a-ConversationElement 的端点角色检验。
+  - 不包含：
+  - 会话只是关系 Conversation-is_a-ConversationElement 的另一端；相关联不表示它是会话结构元素。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **会话** `Conversation`
+    - 定义：会话聚合同一对话或线程身份下的有序消息轮次、指令、工具观测和上下文包。
+    - 直接上位：`ConversationElement`
+    - 为什么需要：会话为canonical 事实 Conversation-contains_turn-ConversationTurn（Conversation contains_turn ConversationTurn）提供明确端点并保持与 ConversationTurn 的定义边界；节点字段 conversation_id、thread_id 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的会话：会话聚合同一对话或线程身份下的有序消息轮次、指令、工具观测和上下文包。；该种差可由字段 conversation_id、thread_id 检验。
+    - 不包含：
+  - 会话轮次虽与本概念同属 ConversationElement，但其定义为“会话轮次标识对话中的一个有序交换位置，并把消息内容绑定到轮次编号、角色、发送方和回复关系。”，不得替代会话。
+    - 结构与约束：2 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **会话轮次** `ConversationTurn`
+    - 定义：会话轮次标识对话中的一个有序交换位置，并把消息内容绑定到轮次编号、角色、发送方和回复关系。
+    - 直接上位：`ConversationElement`
+    - 为什么需要：会话轮次为canonical 事实 ConversationTurn-contains_message-Message（ConversationTurn contains_message Message）提供明确端点并保持与 Conversation 的定义边界；节点字段 turn_index 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的会话轮次：会话轮次标识对话中的一个有序交换位置，并把消息内容绑定到轮次编号、角色、发送方和回复关系。；该种差可由字段 turn_index 检验。
+    - 不包含：
+  - 会话虽与本概念同属 ConversationElement，但其定义为“会话聚合同一对话或线程身份下的有序消息轮次、指令、工具观测和上下文包。”，不得替代会话轮次。
+    - 结构与约束：1 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **消息历史** `MessageHistory`
+    - 定义：消息历史保存可用于会话延续、回放、检索或上下文装配的可观察消息与轮次序列。
+    - 直接上位：`ConversationElement`
+    - 为什么需要：消息历史为canonical 事实 MessageHistory-contains_message-Message（MessageHistory contains_message Message）提供明确端点并保持与 Conversation 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的消息历史：消息历史保存可用于会话延续、回放、检索或上下文装配的可观察消息与轮次序列。；该种差可由关系 MessageHistory-contains_message-Message 的端点角色检验。
+    - 不包含：
+  - 会话虽与本概念同属 ConversationElement，但其定义为“会话聚合同一对话或线程身份下的有序消息轮次、指令、工具观测和上下文包。”，不得替代消息历史。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **少样本示例** `FewShotExample`
+  - 定义：少样本示例保存用于条件化行为的输入输出样例或演示模式，并作为可追溯上下文内容进入提示。
+  - 为什么需要：少样本示例为canonical 事实 ContextPackage-contains-FewShotExample（ContextPackage contains FewShotExample）提供明确端点并保持与 ContextPackage 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的少样本示例：少样本示例保存用于条件化行为的输入输出样例或演示模式，并作为可追溯上下文内容进入提示。；该种差可由关系 ContextPackage-contains-FewShotExample 的端点角色检验。
+  - 不包含：
+  - 上下文包只是关系 ContextPackage-contains-FewShotExample 的另一端；相关联不表示它是少样本示例。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **指令** `Instruction`
+  - 定义：指令记录约束智能体行为的规范性内容，并携带权威、作用域、优先级、来源和冲突解决元数据。
+  - 为什么需要：指令为canonical 事实 has_instruction_authority（Instruction has_instruction_authority InstructionAuthority）提供明确端点并保持与 InstructionAuthority 的定义边界；节点字段 priority 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的指令：指令记录约束智能体行为的规范性内容，并携带权威、作用域、优先级、来源和冲突解决元数据。；该种差可由字段 priority 检验。
+  - 不包含：
+  - 指令权威只是关系 has_instruction_authority 的另一端；相关联不表示它是指令。
+  - 结构与约束：1 个字段，0 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+  - **指令覆盖** `InstructionOverride`
+    - 定义：指令覆盖记录更高权威或更具体作用域的指令对另一条指令的授权替换或收窄。
+    - 直接上位：`Instruction`
+    - 为什么需要：指令覆盖为canonical 事实 InstructionOverride-overrides-Instruction（InstructionOverride overrides Instruction）提供明确端点并保持与 SystemPrompt 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的指令覆盖：指令覆盖记录更高权威或更具体作用域的指令对另一条指令的授权替换或收窄。；该种差可由关系 InstructionOverride-overrides-Instruction 的端点角色检验。
+    - 不包含：
+  - 系统提示指令虽与本概念同属 Instruction，但其定义为“系统提示捕获高权威的系统级指令内容，用于框定会话、任务或模型调用中的行为边界。”，不得替代指令覆盖。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **系统提示指令** `SystemPrompt`
+    - 定义：系统提示捕获高权威的系统级指令内容，用于框定会话、任务或模型调用中的行为边界。
+    - 直接上位：`Instruction`
+    - 为什么需要：系统提示指令为canonical 事实 SystemPrompt-is_a-Instruction（SystemPrompt is_a Instruction）提供明确端点并保持与 InstructionOverride 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的系统提示指令：系统提示捕获高权威的系统级指令内容，用于框定会话、任务或模型调用中的行为边界。；该种差可由关系 SystemPrompt-is_a-Instruction 的端点角色检验。
+    - 不包含：
+  - 指令覆盖虽与本概念同属 Instruction，但其定义为“指令覆盖记录更高权威或更具体作用域的指令对另一条指令的授权替换或收窄。”，不得替代系统提示指令。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+
+- **指令元数据** `InstructionMetadata`
+  - 定义：InstructionMetadata 是与一个或多个 Instruction 关联、具有自己的来源和有效时间的信息对象，用于解释指令何时、为何、对谁以及以何种优先级生效；它不是指令内容本身。
+  - 为什么需要：指令元数据为canonical 事实 InstructionApplicability-is_a-InstructionMetadata（InstructionApplicability is_a InstructionMetadata）提供明确端点并保持与 InstructionApplicability 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的指令元数据：InstructionMetadata 是与一个或多个 Instruction 关联、具有自己的来源和有效时间的信息对象，用于解释指令何时、为何、对谁以及以何种优先级生效；它不是指令内容本身。；该种差可由关系 InstructionApplicability-is_a-InstructionMetadata 的端点角色检验。
+  - 不包含：
+  - 指令适用性只是关系 InstructionApplicability-is_a-InstructionMetadata 的另一端；相关联不表示它是指令元数据。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **指令适用性** `InstructionApplicability`
+    - 定义：指令适用性说明某条指令在上下文包或智能体步骤中何时处于启用、停用、继承或受限状态。
+    - 直接上位：`InstructionMetadata`
+    - 为什么需要：指令适用性为canonical 事实 InstructionApplicability-is_a-InstructionMetadata（InstructionApplicability is_a InstructionMetadata）提供明确端点并保持与 InstructionAuthority 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的指令适用性：指令适用性说明某条指令在上下文包或智能体步骤中何时处于启用、停用、继承或受限状态。；该种差可由关系 InstructionApplicability-is_a-InstructionMetadata 的端点角色检验。
+    - 不包含：
+  - 指令权威虽与本概念同属 InstructionMetadata，但其定义为“指令权威说明指令的权威层级和来源，用于解决系统、开发者、用户、策略、检索内容或工具来源指令之间的冲突。”，不得替代指令适用性。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **指令权威** `InstructionAuthority`
+    - 定义：指令权威说明指令的权威层级和来源，用于解决系统、开发者、用户、策略、检索内容或工具来源指令之间的冲突。
+    - 直接上位：`InstructionMetadata`
+    - 为什么需要：指令权威为canonical 事实 has_instruction_authority（Instruction has_instruction_authority InstructionAuthority）提供明确端点并保持与 InstructionApplicability 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的指令权威：指令权威说明指令的权威层级和来源，用于解决系统、开发者、用户、策略、检索内容或工具来源指令之间的冲突。；该种差可由关系 has_instruction_authority 的端点角色检验。
+    - 不包含：
+  - 指令适用性虽与本概念同属 InstructionMetadata，但其定义为“指令适用性说明某条指令在上下文包或智能体步骤中何时处于启用、停用、继承或受限状态。”，不得替代指令权威。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **指令优先级** `InstructionPriority`
+    - 定义：指令优先级记录多个适用指令竞争控制某次模型调用或智能体步骤时采用的先后顺序。
+    - 直接上位：`InstructionMetadata`
+    - 为什么需要：指令优先级为canonical 事实 has_instruction_priority（Instruction has_instruction_priority InstructionPriority）提供明确端点并保持与 InstructionApplicability 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的指令优先级：指令优先级记录多个适用指令竞争控制某次模型调用或智能体步骤时采用的先后顺序。；该种差可由关系 has_instruction_priority 的端点角色检验。
+    - 不包含：
+  - 指令适用性虽与本概念同属 InstructionMetadata，但其定义为“指令适用性说明某条指令在上下文包或智能体步骤中何时处于启用、停用、继承或受限状态。”，不得替代指令优先级。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **指令来源** `InstructionProvenance`
+    - 定义：指令来源把指令连接到来源消息、策略、提示模板、检索产物、协议包络或人工批准记录。
+    - 直接上位：`InstructionMetadata`
+    - 为什么需要：指令来源为canonical 事实 InstructionProvenance-references_source-SourceReference（InstructionProvenance references_source SourceReference）提供明确端点并保持与 InstructionApplicability 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的指令来源：指令来源把指令连接到来源消息、策略、提示模板、检索产物、协议包络或人工批准记录。；该种差可由关系 InstructionProvenance-references_source-SourceReference 的端点角色检验。
+    - 不包含：
+  - 指令适用性虽与本概念同属 InstructionMetadata，但其定义为“指令适用性说明某条指令在上下文包或智能体步骤中何时处于启用、停用、继承或受限状态。”，不得替代指令来源。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **指令范围** `InstructionScope`
+    - 定义：指令作用域限定指令适用的位置，例如会话、任务、工具调用、检索文档、输出格式或信任边界。
+    - 直接上位：`InstructionMetadata`
+    - 为什么需要：指令范围为canonical 事实 has_instruction_scope（Instruction has_instruction_scope InstructionScope）提供明确端点并保持与 InstructionApplicability 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的指令范围：指令作用域限定指令适用的位置，例如会话、任务、工具调用、检索文档、输出格式或信任边界。；该种差可由关系 has_instruction_scope 的端点角色检验。
+    - 不包含：
+  - 指令适用性虽与本概念同属 InstructionMetadata，但其定义为“指令适用性说明某条指令在上下文包或智能体步骤中何时处于启用、停用、继承或受限状态。”，不得替代指令范围。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **指令解决结果** `InstructionResolution`
+  - 定义：指令解决记录冲突处理结果，包括遵循、覆盖、忽略、缩小或升级了哪一条指令。
+  - 为什么需要：指令解决结果为canonical 事实 InstructionResolution-resolves-InstructionConflict（InstructionResolution resolves InstructionConflict）提供明确端点并保持与 InstructionConflict 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的指令解决结果：指令解决记录冲突处理结果，包括遵循、覆盖、忽略、缩小或升级了哪一条指令。；该种差可由关系 InstructionResolution-resolves-InstructionConflict 的端点角色检验。
+  - 不包含：
+  - 指令冲突只是关系 InstructionResolution-resolves-InstructionConflict 的另一端；相关联不表示它是指令解决结果。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **消息** `Message`
+  - 定义：消息表示带有角色、发送方、接收方、内容块、会话身份、轮次顺序和协议包络的可观察通信单位。
+  - 为什么需要：消息为canonical 事实 message_scanned_by_pattern_scan（Message message_scanned_by_pattern_scan PatternScan）提供明确端点并保持与 PatternScan 的定义边界；节点字段 message_role、sender_id、message_id 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的消息：消息表示带有角色、发送方、接收方、内容块、会话身份、轮次顺序和协议包络的可观察通信单位。；该种差可由字段 message_role、sender_id、message_id 检验。
+  - 不包含：
+  - 模式扫描只是关系 message_scanned_by_pattern_scan 的另一端；相关联不表示它是消息。
+  - 结构与约束：8 个字段，4 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+  - **助手消息** `AssistantMessage`
+    - 定义：助手消息记录由助手产生的消息包络，可包含模型输出、工具调用意图、引用或对外披露的推理摘要。
+    - 直接上位：`Message`
+    - 为什么需要：助手消息为canonical 事实 AssistantMessage-is_a-Message（AssistantMessage is_a Message）提供明确端点并保持与 DeveloperMessage 的定义边界；节点字段 message_role、sender_id、receiver_id 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的助手消息：助手消息记录由助手产生的消息包络，可包含模型输出、工具调用意图、引用或对外披露的推理摘要。；该种差可由字段 message_role、sender_id、receiver_id 检验。
+    - 不包含：
+  - 开发者消息虽与本概念同属 Message，但其定义为“开发者消息记录由开发者发出的消息包络，用于提供低于系统权威且高于普通用户内容的实现约束、策略或任务框定。”，不得替代助手消息。
+    - 结构与约束：3 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **开发者消息** `DeveloperMessage`
+    - 定义：开发者消息记录由开发者发出的消息包络，用于提供低于系统权威且高于普通用户内容的实现约束、策略或任务框定。
+    - 直接上位：`Message`
+    - 为什么需要：开发者消息为canonical 事实 DeveloperMessage-is_a-Message（DeveloperMessage is_a Message）提供明确端点并保持与 AssistantMessage 的定义边界；节点字段 message_role、sender_id、receiver_id 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的开发者消息：开发者消息记录由开发者发出的消息包络，用于提供低于系统权威且高于普通用户内容的实现约束、策略或任务框定。；该种差可由字段 message_role、sender_id、receiver_id 检验。
+    - 不包含：
+  - 助手消息虽与本概念同属 Message，但其定义为“助手消息记录由助手产生的消息包络，可包含模型输出、工具调用意图、引用或对外披露的推理摘要。”，不得替代开发者消息。
+    - 结构与约束：3 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **外部智能体消息** `ExternalAgentMessage`
+    - 定义：外部智能体消息是一种跨互操作或信任边界交换的 Message，不是 Actor；修正旧 actor_type 并纳入消息层级。
+    - 直接上位：`Message`
+    - 为什么需要：外部智能体消息为canonical 事实 ExternalAgentMessage-is_a-Message（ExternalAgentMessage is_a Message）提供明确端点并保持与 AssistantMessage 的定义边界；节点字段 message_role、sender_id、receiver_id 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的外部智能体消息：外部智能体消息是一种跨互操作或信任边界交换的 Message，不是 Actor；修正旧 actor_type 并纳入消息层级。；该种差可由字段 message_role、sender_id、receiver_id 检验。
+    - 不包含：
+  - 助手消息虽与本概念同属 Message，但其定义为“助手消息记录由助手产生的消息包络，可包含模型输出、工具调用意图、引用或对外披露的推理摘要。”，不得替代外部智能体消息。
+    - 结构与约束：3 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **系统消息** `SystemMessage`
+    - 定义：系统消息记录由系统层发出的消息包络，用于承载高权威约束、指令或会话框架。
+    - 直接上位：`Message`
+    - 为什么需要：系统消息为canonical 事实 SystemMessage-is_a-Message（SystemMessage is_a Message）提供明确端点并保持与 AssistantMessage 的定义边界；节点字段 message_role、sender_id、receiver_id 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的系统消息：系统消息记录由系统层发出的消息包络，用于承载高权威约束、指令或会话框架。；该种差可由字段 message_role、sender_id、receiver_id 检验。
+    - 不包含：
+  - 助手消息虽与本概念同属 Message，但其定义为“助手消息记录由助手产生的消息包络，可包含模型输出、工具调用意图、引用或对外披露的推理摘要。”，不得替代系统消息。
+    - 结构与约束：3 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **工具观测消息** `ToolObservationMessage`
+    - 定义：工具观测消息表示由工具或环境交互产生、并对后续智能体推理或动作选择可见的观测。
+    - 直接上位：`Message`
+    - 为什么需要：工具观测消息为canonical 事实 ToolObservationMessage-is_a-Message（ToolObservationMessage is_a Message）提供明确端点并保持与 AssistantMessage 的定义边界；节点字段 message_role、sender_id、receiver_id 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的工具观测消息：工具观测消息表示由工具或环境交互产生、并对后续智能体推理或动作选择可见的观测。；该种差可由字段 message_role、sender_id、receiver_id 检验。
+    - 不包含：
+  - 助手消息虽与本概念同属 Message，但其定义为“助手消息记录由助手产生的消息包络，可包含模型输出、工具调用意图、引用或对外披露的推理摘要。”，不得替代工具观测消息。
+    - 结构与约束：3 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **工具结果消息** `ToolResultMessage`
+    - 定义：工具结果消息表示工具返回数据、警告、错误或产物内容被包装成消息并暂存进后续上下文的形式。
+    - 直接上位：`Message`
+    - 为什么需要：工具结果消息为canonical 事实 ToolResultMessage-references_tool_result-ToolResult（ToolResultMessage references_tool_result ToolResult）提供明确端点并保持与 AssistantMessage 的定义边界；节点字段 message_role、sender_id、receiver_id 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的工具结果消息：工具结果消息表示工具返回数据、警告、错误或产物内容被包装成消息并暂存进后续上下文的形式。；该种差可由字段 message_role、sender_id、receiver_id 检验。
+    - 不包含：
+  - 助手消息虽与本概念同属 Message，但其定义为“助手消息记录由助手产生的消息包络，可包含模型输出、工具调用意图、引用或对外披露的推理摘要。”，不得替代工具结果消息。
+    - 结构与约束：3 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **用户消息** `UserMessage`
+    - 定义：用户消息记录由用户发出的消息包络，用于把请求内容、约束、修正、附件或反馈引入上下文。
+    - 直接上位：`Message`
+    - 为什么需要：用户消息为canonical 事实 UserMessage-is_a-Message（UserMessage is_a Message）提供明确端点并保持与 AssistantMessage 的定义边界；节点字段 message_role、sender_id、receiver_id 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的用户消息：用户消息记录由用户发出的消息包络，用于把请求内容、约束、修正、附件或反馈引入上下文。；该种差可由字段 message_role、sender_id、receiver_id 检验。
+    - 不包含：
+  - 助手消息虽与本概念同属 Message，但其定义为“助手消息记录由助手产生的消息包络，可包含模型输出、工具调用意图、引用或对外披露的推理摘要。”，不得替代用户消息。
+    - 结构与约束：3 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+
+- **提示模板实例** `PromptTemplateInstance`
+  - 定义：提示模板实例记录一次已填充的提示模板，包括绑定、来源引用和用于上下文包的权威元数据。
+  - 为什么需要：提示模板实例为canonical 事实 PromptTemplateInstance-instantiates-PromptTemplate（PromptTemplateInstance instantiates PromptTemplate）提供明确端点并保持与 PromptTemplate 的定义边界；节点字段 variable_bindings 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的提示模板实例：提示模板实例记录一次已填充的提示模板，包括绑定、来源引用和用于上下文包的权威元数据。；该种差可由字段 variable_bindings 检验。
+  - 不包含：
+  - 提示模板只是关系 PromptTemplateInstance-instantiates-PromptTemplate 的另一端；相关联不表示它是提示模板实例。
+  - 结构与约束：1 个字段，0 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+
+- **协议包络** `ProtocolEnvelope`
+  - 定义：协议包络捕获消息外层的任务身份、发送方、接收方、产物引用和能力元数据，同时避免把适配器专有字段提升为核心术语。
+  - 为什么需要：协议包络为canonical 事实 ProtocolEnvelope-wraps-Message（ProtocolEnvelope wraps Message）提供明确端点并保持与 Message 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的协议包络：协议包络捕获消息外层的任务身份、发送方、接收方、产物引用和能力元数据，同时避免把适配器专有字段提升为核心术语。；该种差可由关系 ProtocolEnvelope-wraps-Message 的端点角色检验。
+  - 不包含：
+  - 消息只是关系 ProtocolEnvelope-wraps-Message 的另一端；相关联不表示它是协议包络。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+### 上下文窗口与披露模块
+
+上下文窗口与披露模块描述可见上下文窗口、已披露输出片段、选择决策、引用、截断、压缩和被抑制上下文片段。
+
+- **上下文选择决定** `ContextSelectionDecision`
+  - 定义：这是记录候选被纳入、延后、抑制或排除之结果与理由的决定信息，不把一次决定误作一般事件类型。
+  - 为什么需要：上下文选择决定为canonical 事实 ContextSelectionDecision-selects_window-OutputWindow（ContextSelectionDecision selects_window OutputWindow）提供明确端点并保持与 OutputWindow 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的上下文选择决定：这是记录候选被纳入、延后、抑制或排除之结果与理由的决定信息，不把一次决定误作一般事件类型。；该种差可由关系 ContextSelectionDecision-selects_window-OutputWindow 的端点角色检验。
+  - 不包含：
+  - 输出窗口只是关系 ContextSelectionDecision-selects_window-OutputWindow 的另一端；相关联不表示它是上下文选择决定。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **披露审计制品** `DisclosureArtifact`
+  - 定义：DisclosureArtifact 是具有身份、产生它的选择或披露活动、接收方、边界、策略依据和被处理内容引用的信息制品；它用于审计披露结果，而不等同于披露策略或活动。
+  - 为什么需要：披露审计制品为canonical 事实 DisclosedOutputSegment-is_a-DisclosureArtifact（DisclosedOutputSegment is_a DisclosureArtifact）提供明确端点并保持与 DisclosedOutputSegment 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的披露审计制品：DisclosureArtifact 是具有身份、产生它的选择或披露活动、接收方、边界、策略依据和被处理内容引用的信息制品；它用于审计披露结果，而不等同于披露策略或活动。；该种差可由关系 DisclosedOutputSegment-is_a-DisclosureArtifact 的端点角色检验。
+  - 不包含：
+  - 已披露输出片段只是关系 DisclosedOutputSegment-is_a-DisclosureArtifact 的另一端；相关联不表示它是披露审计制品。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **已披露输出片段** `DisclosedOutputSegment`
+    - 定义：已披露输出片段表示已经对接收方或下游上下文可见的输出段，并携带引用和边界元数据。
+    - 直接上位：`DisclosureArtifact`
+    - 为什么需要：已披露输出片段为canonical 事实 displayed_to_actor（DisclosedOutputSegment displayed_to_actor AgentActor）提供明确端点并保持与 SuppressedContext 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的已披露输出片段：已披露输出片段表示已经对接收方或下游上下文可见的输出段，并携带引用和边界元数据。；该种差可由关系 displayed_to_actor 的端点角色检验。
+    - 不包含：
+  - 已抑制上下文虽与本概念同属 DisclosureArtifact，但其定义为“被抑制上下文记录因策略、信任边界、相关性、隐私或预算限制而被有意排除在可见上下文之外的内容。”，不得替代已披露输出片段。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **已抑制上下文** `SuppressedContext`
+    - 定义：被抑制上下文记录因策略、信任边界、相关性、隐私或预算限制而被有意排除在可见上下文之外的内容。
+    - 直接上位：`DisclosureArtifact`
+    - 为什么需要：已抑制上下文为canonical 事实 suppressed_by_rule（SuppressedContext suppressed_by_rule DisclosureRule）提供明确端点并保持与 DisclosedOutputSegment 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的已抑制上下文：被抑制上下文记录因策略、信任边界、相关性、隐私或预算限制而被有意排除在可见上下文之外的内容。；该种差可由关系 suppressed_by_rule 的端点角色检验。
+    - 不包含：
+  - 已披露输出片段虽与本概念同属 DisclosureArtifact，但其定义为“已披露输出片段表示已经对接收方或下游上下文可见的输出段，并携带引用和边界元数据。”，不得替代已抑制上下文。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **已截断上下文片段** `TruncatedContextSpan`
+    - 定义：被截断上下文片段记录因上下文窗口、长度限制、摘要或输出裁剪决策而被移除或缩短的内容部分。
+    - 直接上位：`DisclosureArtifact`
+    - 为什么需要：已截断上下文片段为canonical 事实 TruncatedContextSpan-omitted_from-OutputWindow（TruncatedContextSpan omitted_from OutputWindow）提供明确端点并保持与 DisclosedOutputSegment 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的已截断上下文片段：被截断上下文片段记录因上下文窗口、长度限制、摘要或输出裁剪决策而被移除或缩短的内容部分。；该种差可由关系 TruncatedContextSpan-omitted_from-OutputWindow 的端点角色检验。
+    - 不包含：
+  - 已披露输出片段虽与本概念同属 DisclosureArtifact，但其定义为“已披露输出片段表示已经对接收方或下游上下文可见的输出段，并携带引用和边界元数据。”，不得替代已截断上下文片段。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **披露阶段活动** `DisclosureStage`
+  - 定义：披露阶段记录输出或上下文内容被显示、保留、升级、脱敏或跨边界释放的步骤。
+  - 为什么需要：披露阶段活动为canonical 事实 DisclosureStage-governed_by-ProgressiveDisclosure（DisclosureStage governed_by ProgressiveDisclosure）提供明确端点并保持与 ProgressiveDisclosure 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的披露阶段活动：披露阶段记录输出或上下文内容被显示、保留、升级、脱敏或跨边界释放的步骤。；该种差可由关系 DisclosureStage-governed_by-ProgressiveDisclosure 的端点角色检验。
+  - 不包含：
+  - 渐进式披露只是关系 DisclosureStage-governed_by-ProgressiveDisclosure 的另一端；相关联不表示它是披露阶段活动。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **输出信息** `OutputInformation`
+  - 定义：OutputInformation 是具有来源、产生者、顺序或范围以及可见性信息的输出相关信息根；其下位类可以是流集合、地址化片段、可见范围规范或证据引用，但不是产生输出的活动。
+  - 为什么需要：输出信息为canonical 事实 OutputCitation-is_a-OutputInformation（OutputCitation is_a OutputInformation）提供明确端点并保持与 OutputCitation 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的输出信息：OutputInformation 是具有来源、产生者、顺序或范围以及可见性信息的输出相关信息根；其下位类可以是流集合、地址化片段、可见范围规范或证据引用，但不是产生输出的活动。；该种差可由关系 OutputCitation-is_a-OutputInformation 的端点角色检验。
+  - 不包含：
+  - 输出引用只是关系 OutputCitation-is_a-OutputInformation 的另一端；相关联不表示它是输出信息。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **输出引用** `OutputCitation`
+    - 定义：输出引用把可见输出或已披露片段连接到支撑它的来源片段、检索候选、轨迹事件或产物。
+    - 直接上位：`OutputInformation`
+    - 为什么需要：输出引用为canonical 事实 cites_source（OutputCitation cites_source SourceSpan）提供明确端点并保持与 OutputSegment 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的输出引用：输出引用把可见输出或已披露片段连接到支撑它的来源片段、检索候选、轨迹事件或产物。；该种差可由关系 cites_source 的端点角色检验。
+    - 不包含：
+  - 输出片段虽与本概念同属 OutputInformation，但其定义为“输出片段记录输出流中可寻址的一段，并带有顺序、来源、可见性和可选引用元数据。”，不得替代输出引用。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **输出片段** `OutputSegment`
+    - 定义：输出片段记录输出流中可寻址的一段，并带有顺序、来源、可见性和可选引用元数据。
+    - 直接上位：`OutputInformation`
+    - 为什么需要：输出片段为canonical 事实 output_segment_has_sensitive_span（OutputSegment output_segment_has_sensitive_span SensitiveSpan）提供明确端点并保持与 OutputCitation 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的输出片段：输出片段记录输出流中可寻址的一段，并带有顺序、来源、可见性和可选引用元数据。；该种差可由关系 output_segment_has_sensitive_span 的端点角色检验。
+    - 不包含：
+  - 输出引用虽与本概念同属 OutputInformation，但其定义为“输出引用把可见输出或已披露片段连接到支撑它的来源片段、检索候选、轨迹事件或产物。”，不得替代输出片段。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+    - **输出分块** `OutputChunk`
+      - 定义：输出分块表示命令、工具、模型、进程或产物输出中有边界的一段，用于引用、截断、披露或在后续步骤中暂存进上下文。
+      - 直接上位：`OutputSegment`
+      - 为什么需要：输出分块为canonical 事实 OutputSegment-partitioned_into-OutputChunk（OutputSegment partitioned_into OutputChunk）提供明确端点并保持与 OutputSegment 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的输出分块：输出分块表示命令、工具、模型、进程或产物输出中有边界的一段，用于引用、截断、披露或在后续步骤中暂存进上下文。；该种差可由关系 OutputSegment-partitioned_into-OutputChunk 的端点角色检验。
+      - 不包含：
+  - 仅能识别为上位概念 OutputSegment 的对象不在范围内；它尚未证明输出分块的种差或关系端点 OutputSegment-partitioned_into-OutputChunk。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：2 项
+  - **输出流** `OutputStream`
+    - 定义：输出流记录模型、命令、进程或工具在窗口化与披露之前产生的有序输出片段序列。
+    - 直接上位：`OutputInformation`
+    - 为什么需要：输出流为canonical 事实 OutputStream-contains_segment-OutputSegment（OutputStream contains_segment OutputSegment）提供明确端点并保持与 OutputCitation 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的输出流：输出流记录模型、命令、进程或工具在窗口化与披露之前产生的有序输出片段序列。；该种差可由关系 OutputStream-contains_segment-OutputSegment 的端点角色检验。
+    - 不包含：
+  - 输出引用虽与本概念同属 OutputInformation，但其定义为“输出引用把可见输出或已披露片段连接到支撑它的来源片段、检索候选、轨迹事件或产物。”，不得替代输出流。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **输出窗口** `OutputWindow`
+    - 定义：输出窗口标识可被显示、引用、摘要或传入后续上下文的输出保留范围。
+    - 直接上位：`OutputInformation`
+    - 为什么需要：输出窗口为canonical 事实 OutputWindow-selects_from-OutputStream（OutputWindow selects_from OutputStream）提供明确端点并保持与 OutputCitation 的定义边界；节点字段 length_limit、window_id、unit 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的输出窗口：输出窗口标识可被显示、引用、摘要或传入后续上下文的输出保留范围。；该种差可由字段 length_limit、window_id、unit 检验。
+    - 不包含：
+  - 输出引用虽与本概念同属 OutputInformation，但其定义为“输出引用把可见输出或已披露片段连接到支撑它的来源片段、检索候选、轨迹事件或产物。”，不得替代输出窗口。
+    - 结构与约束：3 个字段，2 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+    - **首尾输出窗口** `HeadTailWindow`
+      - 定义：首尾窗口保留长输出的开头和结尾片段，使关键设置和终端证据在长度限制下仍可见。
+      - 直接上位：`OutputWindow`
+      - 为什么需要：首尾输出窗口为canonical 事实 HeadTailWindow-is_a-OutputWindow（HeadTailWindow is_a OutputWindow）提供明确端点并保持与 VisibleContextWindow 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的首尾输出窗口：首尾窗口保留长输出的开头和结尾片段，使关键设置和终端证据在长度限制下仍可见。；该种差可由关系 HeadTailWindow-is_a-OutputWindow 的端点角色检验。
+      - 不包含：
+  - 可见上下文窗口虽与本概念同属 OutputWindow，但其定义为“可见上下文窗口表示经过选择、截断、抑制和披露控制后，特定参与者、模型调用或智能体步骤可见的内容范围。”，不得替代首尾输出窗口。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：3 项
+      - 直接来源主张：2 项
+    - **可见上下文窗口** `VisibleContextWindow`
+      - 定义：可见上下文窗口表示经过选择、截断、抑制和披露控制后，特定参与者、模型调用或智能体步骤可见的内容范围。
+      - 直接上位：`OutputWindow`
+      - 为什么需要：可见上下文窗口为canonical 事实 context_window_crosses_trust_boundary（VisibleContextWindow context_window_crosses_trust_boundary TrustBoundary）提供明确端点并保持与 HeadTailWindow 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的可见上下文窗口：可见上下文窗口表示经过选择、截断、抑制和披露控制后，特定参与者、模型调用或智能体步骤可见的内容范围。；该种差可由关系 context_window_crosses_trust_boundary 的端点角色检验。
+      - 不包含：
+  - 首尾输出窗口虽与本概念同属 OutputWindow，但其定义为“首尾窗口保留长输出的开头和结尾片段，使关键设置和终端证据在长度限制下仍可见。”，不得替代可见上下文窗口。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：3 项
+      - 直接来源主张：2 项
+
+### 来源与资源引用模块
+
+来源与资源引用模块描述进入上下文的来源引用、片段、位置、锚点、摘要指纹、版本、访问路径与信任标注，而不拥有完整存储系统。
+
+- **访问路径** `AccessPath`
+  - 定义：访问路径描述在权限、策略和信任边界控制下可用于取回来源引用的路径或句柄。
+  - 为什么需要：访问路径为canonical 事实 SourceReference-accessed_via-AccessPath（SourceReference accessed_via AccessPath）提供明确端点并保持与 SourceReference 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的访问路径：访问路径描述在权限、策略和信任边界控制下可用于取回来源引用的路径或句柄。；该种差可由关系 SourceReference-accessed_via-AccessPath 的端点角色检验。
+  - 不包含：
+  - 来源引用只是关系 SourceReference-accessed_via-AccessPath 的另一端；相关联不表示它是访问路径。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **数据区引用** `DataZoneReference`
+  - 定义：数据区域引用把上下文产物指向管理其可见性、保留期限和处理策略的数据区域。
+  - 为什么需要：数据区引用为canonical 事实 DataZoneReference-refers_to-DataZone（DataZoneReference refers_to DataZone）提供明确端点并保持与 DataZone 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的数据区引用：数据区域引用把上下文产物指向管理其可见性、保留期限和处理策略的数据区域。；该种差可由关系 DataZoneReference-refers_to-DataZone 的端点角色检验。
+  - 不包含：
+  - 数据区只是关系 DataZoneReference-refers_to-DataZone 的另一端；相关联不表示它是数据区引用。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **资源描述符** `ResourceDescriptor`
+  - 定义：资源描述符概括暂存进上下文的来源或资源引用的身份、类型、溯源、位置、访问提示和信任元数据。
+  - 为什么需要：资源描述符为canonical 事实 SourceReference-described_by-ResourceDescriptor（SourceReference described_by ResourceDescriptor）提供明确端点并保持与 SourceReference 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的资源描述符：资源描述符概括暂存进上下文的来源或资源引用的身份、类型、溯源、位置、访问提示和信任元数据。；该种差可由关系 SourceReference-described_by-ResourceDescriptor 的端点角色检验。
+  - 不包含：
+  - 来源引用只是关系 SourceReference-described_by-ResourceDescriptor 的另一端；相关联不表示它是资源描述符。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **来源锚** `SourceAnchor`
+  - 定义：来源锚点提供可在分块、渲染、索引或文档修订后重新定位来源片段的稳定锚。
+  - 为什么需要：来源锚为canonical 事实 SourceAnchor-reidentifies-SourceSpan（SourceAnchor reidentifies SourceSpan）提供明确端点并保持与 SourceSpan 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的来源锚：来源锚点提供可在分块、渲染、索引或文档修订后重新定位来源片段的稳定锚。；该种差可由关系 SourceAnchor-reidentifies-SourceSpan 的端点角色检验。
+  - 不包含：
+  - 来源片段只是关系 SourceAnchor-reidentifies-SourceSpan 的另一端；相关联不表示它是来源锚。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **引用锚** `CitationAnchor`
+    - 定义：引用锚点把可见引用绑定到支撑消息、输出、摘要或产物声明的精确来源引用与来源片段。
+    - 直接上位：`SourceAnchor`
+    - 为什么需要：引用锚为canonical 事实 CitationAnchor-anchors-SourceSpan（CitationAnchor anchors SourceSpan）提供明确端点并保持与 SourceAnchor 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的引用锚：引用锚点把可见引用绑定到支撑消息、输出、摘要或产物声明的精确来源引用与来源片段。；该种差可由关系 CitationAnchor-anchors-SourceSpan 的端点角色检验。
+    - 不包含：
+  - 仅能识别为上位概念 SourceAnchor 的对象不在范围内；它尚未证明引用锚的种差或关系端点 CitationAnchor-anchors-SourceSpan。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **来源身份信息** `SourceIdentity`
+  - 定义：SourceIdentity 是与 SourceReference 关联、用于在位置相同但内容修订时判定具体来源状态的信息对象；它可由版本标识、内容摘要或特定校验和实现，并须声明算法或标识体系。
+  - 为什么需要：来源身份信息为canonical 事实 SourceReference-has_identity-SourceIdentity（SourceReference has_identity SourceIdentity）提供明确端点并保持与 SourceReference 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的来源身份信息：SourceIdentity 是与 SourceReference 关联、用于在位置相同但内容修订时判定具体来源状态的信息对象；它可由版本标识、内容摘要或特定校验和实现，并须声明算法或标识体系。；该种差可由关系 SourceReference-has_identity-SourceIdentity 的端点角色检验。
+  - 不包含：
+  - 来源引用只是关系 SourceReference-has_identity-SourceIdentity 的另一端；相关联不表示它是来源身份信息。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **内容摘要** `ContentDigest`
+    - 定义：内容摘要记录用于去重、完整性检查、缓存验证或引用稳定性的紧凑内容指纹。
+    - 直接上位：`SourceIdentity`
+    - 为什么需要：内容摘要为canonical 事实 ContentDigest-is_a-SourceIdentity（ContentDigest is_a SourceIdentity）提供明确端点并保持与 SourceVersion 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的内容摘要：内容摘要记录用于去重、完整性检查、缓存验证或引用稳定性的紧凑内容指纹。；该种差可由关系 ContentDigest-is_a-SourceIdentity 的端点角色检验。
+    - 不包含：
+  - 来源版本虽与本概念同属 SourceIdentity，但其定义为“来源版本记录与来源引用关联的版本、修订、时间戳、提交、快照或发布标识。”，不得替代内容摘要。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+    - **来源校验和** `SourceChecksum`
+      - 定义：来源校验和记录用于判断被引用材料在摄入或暂存后是否发生变化的摘要指纹。
+      - 直接上位：`ContentDigest`
+      - 为什么需要：来源校验和为canonical 事实 has_checksum（SourceReference has_checksum SourceChecksum）提供明确端点并保持与 ContentDigest 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的来源校验和：来源校验和记录用于判断被引用材料在摄入或暂存后是否发生变化的摘要指纹。；该种差可由关系 has_checksum 的端点角色检验。
+      - 不包含：
+  - 仅能识别为上位概念 ContentDigest 的对象不在范围内；它尚未证明来源校验和的种差或关系端点 has_checksum。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：2 项
+  - **来源版本** `SourceVersion`
+    - 定义：来源版本记录与来源引用关联的版本、修订、时间戳、提交、快照或发布标识。
+    - 直接上位：`SourceIdentity`
+    - 为什么需要：来源版本为canonical 事实 has_version（SourceReference has_version SourceVersion）提供明确端点并保持与 ContentDigest 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的来源版本：来源版本记录与来源引用关联的版本、修订、时间戳、提交、快照或发布标识。；该种差可由关系 has_version 的端点角色检验。
+    - 不包含：
+  - 内容摘要虽与本概念同属 SourceIdentity，但其定义为“内容摘要记录用于去重、完整性检查、缓存验证或引用稳定性的紧凑内容指纹。”，不得替代来源版本。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **来源位置** `SourceLocation`
+  - 定义：来源位置记录统一资源标识符、文件路径、数据库定位器、图标识、页码、行号、偏移或单元格引用等位置。
+  - 为什么需要：来源位置为canonical 事实 SourceReference-located_at-SourceLocation（SourceReference located_at SourceLocation）提供明确端点并保持与 SourceReference 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的来源位置：来源位置记录统一资源标识符、文件路径、数据库定位器、图标识、页码、行号、偏移或单元格引用等位置。；该种差可由关系 SourceReference-located_at-SourceLocation 的端点角色检验。
+  - 不包含：
+  - 来源引用只是关系 SourceReference-located_at-SourceLocation 的另一端；相关联不表示它是来源位置。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **来源单元格范围** `SourceCellRange`
+    - 定义：来源单元格范围记录表格、电子表格、笔记本或矩阵中的单元格范围，用于支撑上下文内容或引用。
+    - 直接上位：`SourceLocation`
+    - 为什么需要：来源单元格范围为canonical 事实 SourceCellRange-is_a-SourceLocation（SourceCellRange is_a SourceLocation）提供明确端点并保持与 SourceLineRange 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的来源单元格范围：来源单元格范围记录表格、电子表格、笔记本或矩阵中的单元格范围，用于支撑上下文内容或引用。；该种差可由关系 SourceCellRange-is_a-SourceLocation 的端点角色检验。
+    - 不包含：
+  - 来源行范围虽与本概念同属 SourceLocation，但其定义为“来源行范围记录代码、日志、终端输出、文档或文本文件中的行级片段边界。”，不得替代来源单元格范围。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **来源行范围** `SourceLineRange`
+    - 定义：来源行范围记录代码、日志、终端输出、文档或文本文件中的行级片段边界。
+    - 直接上位：`SourceLocation`
+    - 为什么需要：来源行范围为canonical 事实 SourceLineRange-is_a-SourceLocation（SourceLineRange is_a SourceLocation）提供明确端点并保持与 SourceCellRange 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的来源行范围：来源行范围记录代码、日志、终端输出、文档或文本文件中的行级片段边界。；该种差可由关系 SourceLineRange-is_a-SourceLocation 的端点角色检验。
+    - 不包含：
+  - 来源单元格范围虽与本概念同属 SourceLocation，但其定义为“来源单元格范围记录表格、电子表格、笔记本或矩阵中的单元格范围，用于支撑上下文内容或引用。”，不得替代来源行范围。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **来源偏移** `SourceOffset`
+    - 定义：来源偏移记录字节、字符、令牌或结构偏移，用于精确定位来源片段。
+    - 直接上位：`SourceLocation`
+    - 为什么需要：来源偏移为canonical 事实 SourceOffset-is_a-SourceLocation（SourceOffset is_a SourceLocation）提供明确端点并保持与 SourceCellRange 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的来源偏移：来源偏移记录字节、字符、令牌或结构偏移，用于精确定位来源片段。；该种差可由关系 SourceOffset-is_a-SourceLocation 的端点角色检验。
+    - 不包含：
+  - 来源单元格范围虽与本概念同属 SourceLocation，但其定义为“来源单元格范围记录表格、电子表格、笔记本或矩阵中的单元格范围，用于支撑上下文内容或引用。”，不得替代来源偏移。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **来源页范围** `SourcePageRange`
+    - 定义：来源页范围记录分页文档或渲染报告中的页级片段边界。
+    - 直接上位：`SourceLocation`
+    - 为什么需要：来源页范围为canonical 事实 SourcePageRange-is_a-SourceLocation（SourcePageRange is_a SourceLocation）提供明确端点并保持与 SourceCellRange 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的来源页范围：来源页范围记录分页文档或渲染报告中的页级片段边界。；该种差可由关系 SourcePageRange-is_a-SourceLocation 的端点角色检验。
+    - 不包含：
+  - 来源单元格范围虽与本概念同属 SourceLocation，但其定义为“来源单元格范围记录表格、电子表格、笔记本或矩阵中的单元格范围，用于支撑上下文内容或引用。”，不得替代来源页范围。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **来源片段** `SourceSpan`
+    - 定义：来源片段标识支撑内容块、检索候选、引用、摘要或已披露输出片段的精确来源范围。
+    - 直接上位：`SourceLocation`
+    - 为什么需要：来源片段为canonical 事实 chunk_reference_targets_source_span（ChunkReference chunk_reference_targets_source_span SourceSpan）提供明确端点并保持与 SourceCellRange 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的来源片段：来源片段标识支撑内容块、检索候选、引用、摘要或已披露输出片段的精确来源范围。；该种差可由关系 chunk_reference_targets_source_span 的端点角色检验。
+    - 不包含：
+  - 来源单元格范围虽与本概念同属 SourceLocation，但其定义为“来源单元格范围记录表格、电子表格、笔记本或矩阵中的单元格范围，用于支撑上下文内容或引用。”，不得替代来源片段。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **来源来历** `SourceProvenance`
+  - 定义：来源溯源把来源引用连接到获取、摄入、转换、信任边界和证据元数据。
+  - 为什么需要：来源来历为canonical 事实 SourceReference-has_provenance-SourceProvenance（SourceReference has_provenance SourceProvenance）提供明确端点并保持与 SourceReference 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的来源来历：来源溯源把来源引用连接到获取、摄入、转换、信任边界和证据元数据。；该种差可由关系 SourceReference-has_provenance-SourceProvenance 的端点角色检验。
+  - 不包含：
+  - 来源引用只是关系 SourceReference-has_provenance-SourceProvenance 的另一端；相关联不表示它是来源来历。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **来源引用** `SourceReference`
+  - 定义：来源引用用稳定引用标识被引用或可检索的来源对象，同时不把承载来源的存储系统归入上下文摄入域。
+  - 为什么需要：来源引用为canonical 事实 belongs_to_data_zone（SourceReference belongs_to_data_zone DataZoneReference）提供明确端点并保持与 DataZoneReference 的定义边界；节点字段 reference_id、uri、canonical_uri 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的来源引用：来源引用用稳定引用标识被引用或可检索的来源对象，同时不把承载来源的存储系统归入上下文摄入域。；该种差可由字段 reference_id、uri、canonical_uri 检验。
+  - 不包含：
+  - 数据区引用只是关系 belongs_to_data_zone 的另一端；相关联不表示它是来源引用。
+  - 结构与约束：3 个字段，2 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+  - **数据库行引用** `DatabaseRowReference`
+    - 定义：数据库行引用标识可支撑上下文内容的具体数据库行、查询结果或表格切片，同时不拥有数据库本身。
+    - 直接上位：`SourceReference`
+    - 为什么需要：数据库行引用为canonical 事实 DatabaseRowReference-is_a-SourceReference（DatabaseRowReference is_a SourceReference）提供明确端点并保持与 FileResourceReference 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的数据库行引用：数据库行引用标识可支撑上下文内容的具体数据库行、查询结果或表格切片，同时不拥有数据库本身。；该种差可由关系 DatabaseRowReference-is_a-SourceReference 的端点角色检验。
+    - 不包含：
+  - 文件资源引用虽与本概念同属 SourceReference，但其定义为“文件资源引用通过路径、统一资源标识符、版本、摘要或片段引用文件类资源，而不建模完整文件系统。”，不得替代数据库行引用。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **文件资源引用** `FileResourceReference`
+    - 定义：文件资源引用通过路径、统一资源标识符、版本、摘要或片段引用文件类资源，而不建模完整文件系统。
+    - 直接上位：`SourceReference`
+    - 为什么需要：文件资源引用为canonical 事实 FileResourceReference-is_a-SourceReference（FileResourceReference is_a SourceReference）提供明确端点并保持与 DatabaseRowReference 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的文件资源引用：文件资源引用通过路径、统一资源标识符、版本、摘要或片段引用文件类资源，而不建模完整文件系统。；该种差可由关系 FileResourceReference-is_a-SourceReference 的端点角色检验。
+    - 不包含：
+  - 数据库行引用虽与本概念同属 SourceReference，但其定义为“数据库行引用标识可支撑上下文内容的具体数据库行、查询结果或表格切片，同时不拥有数据库本身。”，不得替代文件资源引用。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **图节点引用** `GraphNodeReference`
+    - 定义：图节点引用标识可支撑上下文内容的图节点或图内局部身份，同时不拥有图存储。
+    - 直接上位：`SourceReference`
+    - 为什么需要：图节点引用为canonical 事实 GraphNodeReference-is_a-SourceReference（GraphNodeReference is_a SourceReference）提供明确端点并保持与 DatabaseRowReference 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的图节点引用：图节点引用标识可支撑上下文内容的图节点或图内局部身份，同时不拥有图存储。；该种差可由关系 GraphNodeReference-is_a-SourceReference 的端点角色检验。
+    - 不包含：
+  - 数据库行引用虽与本概念同属 SourceReference，但其定义为“数据库行引用标识可支撑上下文内容的具体数据库行、查询结果或表格切片，同时不拥有数据库本身。”，不得替代图节点引用。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **网络来源引用** `NetworkSourceReference`
+    - 定义：网络来源引用标识来自网络内容或端点派生内容的来源，并保留信任边界与访问路径元数据。
+    - 直接上位：`SourceReference`
+    - 为什么需要：网络来源引用为canonical 事实 NetworkSourceReference-is_a-SourceReference（NetworkSourceReference is_a SourceReference）提供明确端点并保持与 DatabaseRowReference 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的网络来源引用：网络来源引用标识来自网络内容或端点派生内容的来源，并保留信任边界与访问路径元数据。；该种差可由关系 NetworkSourceReference-is_a-SourceReference 的端点角色检验。
+    - 不包含：
+  - 数据库行引用虽与本概念同属 SourceReference，但其定义为“数据库行引用标识可支撑上下文内容的具体数据库行、查询结果或表格切片，同时不拥有数据库本身。”，不得替代网络来源引用。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **文本文档引用** `TextDocumentReference`
+    - 定义：文本文档引用把文本文档作为来源证据进行定位，同时把文档存储和摄入系统保留在上下文摄入域之外。
+    - 直接上位：`SourceReference`
+    - 为什么需要：文本文档引用为canonical 事实 TextDocumentReference-refers_to-TextDocument（TextDocumentReference refers_to TextDocument）提供明确端点并保持与 DatabaseRowReference 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的文本文档引用：文本文档引用把文本文档作为来源证据进行定位，同时把文档存储和摄入系统保留在上下文摄入域之外。；该种差可由关系 TextDocumentReference-refers_to-TextDocument 的端点角色检验。
+    - 不包含：
+  - 数据库行引用虽与本概念同属 SourceReference，但其定义为“数据库行引用标识可支撑上下文内容的具体数据库行、查询结果或表格切片，同时不拥有数据库本身。”，不得替代文本文档引用。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+
+- **文本文档** `TextDocument`
+  - 定义：文本文档表示可被智能体读取、索引、引用、切分或装配进上下文的文本型信息源，并保留来源、语料和检索关系。
+  - 为什么需要：文本文档为canonical 事实 TextDocumentReference-refers_to-TextDocument（TextDocumentReference refers_to TextDocument）提供明确端点并保持与 TextDocumentReference 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的文本文档：文本文档表示可被智能体读取、索引、引用、切分或装配进上下文的文本型信息源，并保留来源、语料和检索关系。；该种差可由关系 TextDocumentReference-refers_to-TextDocument 的端点角色检验。
+  - 不包含：
+  - 文本文档引用只是关系 TextDocumentReference-refers_to-TextDocument 的另一端；相关联不表示它是文本文档。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **信任边界引用** `TrustBoundaryReference`
+  - 定义：信任边界引用把上下文产物连接到其来源、传输、检索或披露路径跨越或依赖的信任边界。
+  - 为什么需要：信任边界引用为canonical 事实 TrustBoundaryReference-refers_to-TrustBoundary（TrustBoundaryReference refers_to TrustBoundary）提供明确端点并保持与 TrustBoundary 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的信任边界引用：信任边界引用把上下文产物连接到其来源、传输、检索或披露路径跨越或依赖的信任边界。；该种差可由关系 TrustBoundaryReference-refers_to-TrustBoundary 的端点角色检验。
+  - 不包含：
+  - 信任边界只是关系 TrustBoundaryReference-refers_to-TrustBoundary 的另一端；相关联不表示它是信任边界引用。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+## 控制与编排域
+
+控制与编排域是把目标转化为可执行、可委派、可路由、可审查和可综合工作流的运行关注域。它描述可操作目标、任务计划、委派归属、交接、智能体作为工具调用、上下文隔离、工作者选择、路由目标、闸门、拓扑、提示链、并行组合、综合来源，以及有边界的反馈或重试循环。
+
+### 协同角色与委派模块
+
+协同角色与委派模块属于控制与编排域，用于描述编排者、工作者、子智能体、交接、把智能体作为工具调用、上下文隔离、授权范围、责任归属、工作者选择和委派预算。
+
+- **上下文隔离** `ContextIsolation`
+  - 定义：上下文隔离限定工作者或子智能体在委派工作中可见的消息、记忆、工具和来源材料。
+  - 为什么需要：上下文隔离为canonical 事实 isolates_context_for（ContextIsolation isolates_context_for SubagentRole）提供明确端点并保持与 SubagentRole 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的上下文隔离：上下文隔离限定工作者或子智能体在委派工作中可见的消息、记忆、工具和来源材料。；该种差可由关系 isolates_context_for 的端点角色检验。
+  - 不包含：
+  - 子智能体角色只是关系 isolates_context_for 的另一端；相关联不表示它是上下文隔离。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **协调归属记录** `CoordinationOwnershipRecord`
+  - 定义：协调归属记录是在委派、移交或综合的某一时点，说明哪一主体拥有答案责任、下一步控制权或委派责任，并记录范围、有效期和转移来源的信息记录。
+  - 为什么需要：协调归属记录为canonical 事实 AnswerOwnership-is_a-CoordinationOwnershipRecord（AnswerOwnership is_a CoordinationOwnershipRecord）提供明确端点并保持与 AnswerOwnership 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的协调归属记录：协调归属记录是在委派、移交或综合的某一时点，说明哪一主体拥有答案责任、下一步控制权或委派责任，并记录范围、有效期和转移来源的信息记录。；该种差可由关系 AnswerOwnership-is_a-CoordinationOwnershipRecord 的端点角色检验。
+  - 不包含：
+  - 答案归属只是关系 AnswerOwnership-is_a-CoordinationOwnershipRecord 的另一端；相关联不表示它是协调归属记录。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **答案归属** `AnswerOwnership`
+    - 定义：答案归属记录在委派、交接、审查或综合之后，哪个协同参与者对最终答复或产物负责。
+    - 直接上位：`CoordinationOwnershipRecord`
+    - 为什么需要：答案归属为canonical 事实 retains_answer_ownership（AgentAsToolInvocation retains_answer_ownership AnswerOwnership）提供明确端点并保持与 ControlOwnership 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的答案归属：答案归属记录在委派、交接、审查或综合之后，哪个协同参与者对最终答复或产物负责。；该种差可由关系 retains_answer_ownership 的端点角色检验。
+    - 不包含：
+  - 控制归属虽与本概念同属 CoordinationOwnershipRecord，但其定义为“控制归属记录当前由哪个参与者控制下一步工作流，包括管理者保留控制或通过交接转移控制。”，不得替代答案归属。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **控制归属** `ControlOwnership`
+    - 定义：控制归属记录当前由哪个参与者控制下一步工作流，包括管理者保留控制或通过交接转移控制。
+    - 直接上位：`CoordinationOwnershipRecord`
+    - 为什么需要：控制归属为canonical 事实 ControlOwnership-is_a-CoordinationOwnershipRecord（ControlOwnership is_a CoordinationOwnershipRecord）提供明确端点并保持与 AnswerOwnership 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的控制归属：控制归属记录当前由哪个参与者控制下一步工作流，包括管理者保留控制或通过交接转移控制。；该种差可由关系 ControlOwnership-is_a-CoordinationOwnershipRecord 的端点角色检验。
+    - 不包含：
+  - 答案归属虽与本概念同属 CoordinationOwnershipRecord，但其定义为“答案归属记录在委派、交接、审查或综合之后，哪个协同参与者对最终答复或产物负责。”，不得替代控制归属。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **委派归属** `DelegationOwnership`
+    - 定义：委派归属记录委派方与受托方之间的责任拆分，包括保留的答案归属、转移的控制权、授权范围和结果责任。
+    - 直接上位：`CoordinationOwnershipRecord`
+    - 为什么需要：委派归属为canonical 事实 DelegationOwnership-is_a-CoordinationOwnershipRecord（DelegationOwnership is_a CoordinationOwnershipRecord）提供明确端点并保持与 AnswerOwnership 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的委派归属：委派归属记录委派方与受托方之间的责任拆分，包括保留的答案归属、转移的控制权、授权范围和结果责任。；该种差可由关系 DelegationOwnership-is_a-CoordinationOwnershipRecord 的端点角色检验。
+    - 不包含：
+  - 答案归属虽与本概念同属 CoordinationOwnershipRecord，但其定义为“答案归属记录在委派、交接、审查或综合之后，哪个协同参与者对最终答复或产物负责。”，不得替代委派归属。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **协调角色** `CoordinationRole`
+  - 定义：协调角色是在编排关系中规定一个参与主体承担何种分解、委派、执行、监督、汇总或汇报责任，并可通过 ActorRoleBinding 赋予主体的角色上位概念。
+  - 为什么需要：协调角色为canonical 事实 Orchestrator-is_a-CoordinationRole（Orchestrator is_a CoordinationRole）提供明确端点并保持与 Orchestrator 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的协调角色：协调角色是在编排关系中规定一个参与主体承担何种分解、委派、执行、监督、汇总或汇报责任，并可通过 ActorRoleBinding 赋予主体的角色上位概念。；该种差可由关系 Orchestrator-is_a-CoordinationRole 的端点角色检验。
+  - 不包含：
+  - 编排者角色只是关系 Orchestrator-is_a-CoordinationRole 的另一端；相关联不表示它是协调角色。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **编排者角色** `Orchestrator`
+    - 定义：编排者描述分解、委派、路由和综合职责，是可由不同 Actor 承担的协调角色，而非固定 Actor 子类。
+    - 直接上位：`CoordinationRole`
+    - 为什么需要：编排者角色为canonical 事实 delegates_to_subagent（Orchestrator delegates_to_subagent SubagentRole）提供明确端点并保持与 SubagentRole 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的编排者角色：编排者描述分解、委派、路由和综合职责，是可由不同 Actor 承担的协调角色，而非固定 Actor 子类。；该种差可由关系 delegates_to_subagent 的端点角色检验。
+    - 不包含：
+  - 子智能体角色虽与本概念同属 CoordinationRole，但其定义为“子智能体角色是以受限任务、权限、上下文和向上汇报为区分特征的一种协调角色。”，不得替代编排者角色。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **子智能体角色** `SubagentRole`
+    - 定义：子智能体角色是以受限任务、权限、上下文和向上汇报为区分特征的一种协调角色。
+    - 直接上位：`CoordinationRole`
+    - 为什么需要：子智能体角色为canonical 事实 delegates_to_subagent（Orchestrator delegates_to_subagent SubagentRole）提供明确端点并保持与 Orchestrator 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的子智能体角色：子智能体角色是以受限任务、权限、上下文和向上汇报为区分特征的一种协调角色。；该种差可由关系 delegates_to_subagent 的端点角色检验。
+    - 不包含：
+  - 编排者角色虽与本概念同属 CoordinationRole，但其定义为“编排者描述分解、委派、路由和综合职责，是可由不同 Actor 承担的协调角色，而非固定 Actor 子类。”，不得替代子智能体角色。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **工作者角色** `WorkerAgent`
+    - 定义：工作者表示接收范围化工作并返回证据的职责，可由 Agent、模型服务或工具服务承担，因此改为协调角色。
+    - 直接上位：`CoordinationRole`
+    - 为什么需要：工作者角色为canonical 事实 assigns_work_item_to（TaskDistribution assigns_work_item_to WorkerAgent）提供明确端点并保持与 Orchestrator 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的工作者角色：工作者表示接收范围化工作并返回证据的职责，可由 Agent、模型服务或工具服务承担，因此改为协调角色。；该种差可由关系 assigns_work_item_to 的端点角色检验。
+    - 不包含：
+  - 编排者角色虽与本概念同属 CoordinationRole，但其定义为“编排者描述分解、委派、路由和综合职责，是可由不同 Actor 承担的协调角色，而非固定 Actor 子类。”，不得替代工作者角色。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **受委派权限** `DelegatedAuthority`
+  - 定义：受委派权限说明受托方可代表编排者使用的权限、工具、记忆表面、数据区域和操作。
+  - 为什么需要：受委派权限为canonical 事实 DelegationContract-grants-DelegatedAuthority（DelegationContract grants DelegatedAuthority）提供明确端点并保持与 DelegationContract 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的受委派权限：受委派权限说明受托方可代表编排者使用的权限、工具、记忆表面、数据区域和操作。；该种差可由关系 DelegationContract-grants-DelegatedAuthority 的端点角色检验。
+  - 不包含：
+  - 委派契约只是关系 DelegationContract-grants-DelegatedAuthority 的另一端；相关联不表示它是受委派权限。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **委派预算** `DelegationBudget`
+  - 定义：委派预算设定令牌、时间、成本、重试、工具调用或上下文限制，用来约束委派工作和路由选择。
+  - 为什么需要：委派预算为canonical 事实 DelegationBudget-constrains-DelegationProcess（DelegationBudget constrains DelegationProcess）提供明确端点并保持与 DelegationProcess 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的委派预算：委派预算设定令牌、时间、成本、重试、工具调用或上下文限制，用来约束委派工作和路由选择。；该种差可由关系 DelegationBudget-constrains-DelegationProcess 的端点角色检验。
+  - 不包含：
+  - 委派过程只是关系 DelegationBudget-constrains-DelegationProcess 的另一端；相关联不表示它是委派预算。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **委派契约** `DelegationContract`
+  - 定义：委派契约规定委派工作、预期结果、授权范围、可见上下文、预算、完成准则以及委派方和受托方的归属边界。
+  - 为什么需要：委派契约为canonical 事实 constrained_by_budget（DelegationContract constrained_by_budget DelegationBudget）提供明确端点并保持与 DelegationBudget 的定义边界；节点字段 delegation_id、status、created_at 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的委派契约：委派契约规定委派工作、预期结果、授权范围、可见上下文、预算、完成准则以及委派方和受托方的归属边界。；该种差可由字段 delegation_id、status、created_at 检验。
+  - 不包含：
+  - 委派预算只是关系 constrained_by_budget 的另一端；相关联不表示它是委派契约。
+  - 结构与约束：7 个字段，3 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+
+- **委派事件** `DelegationEvent`
+  - 定义：委派事件是在委派契约下启动、更新、取消或完成委派工作的可观察事件。
+  - 为什么需要：委派事件为canonical 事实 DelegationEvent-changes-DelegationProcess（DelegationEvent changes DelegationProcess）提供明确端点并保持与 DelegationProcess 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的委派事件：委派事件是在委派契约下启动、更新、取消或完成委派工作的可观察事件。；该种差可由关系 DelegationEvent-changes-DelegationProcess 的端点角色检验。
+  - 不包含：
+  - 委派过程只是关系 DelegationEvent-changes-DelegationProcess 的另一端；相关联不表示它是委派事件。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **委派过程** `DelegationProcess`
+  - 定义：委派过程是委派者依据合同把有范围的工作、权限、上下文与预算交给代理角色执行，并接收可追踪结果而保持或转移明确归属的协调活动。
+  - 为什么需要：委派过程为canonical 事实 DelegationProcess-governed_by-DelegationContract（DelegationProcess governed_by DelegationContract）提供明确端点并保持与 DelegationContract 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的委派过程：委派过程是委派者依据合同把有范围的工作、权限、上下文与预算交给代理角色执行，并接收可追踪结果而保持或转移明确归属的协调活动。；该种差可由关系 DelegationProcess-governed_by-DelegationContract 的端点角色检验。
+  - 不包含：
+  - 委派契约只是关系 DelegationProcess-governed_by-DelegationContract 的另一端；相关联不表示它是委派过程。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **智能体作为工具调用** `AgentAsToolInvocation`
+    - 定义：智能体作为工具调用是管理者保留控制权和答案归属的一种有界委派过程。
+    - 直接上位：`DelegationProcess`
+    - 为什么需要：智能体作为工具调用为canonical 事实 retains_answer_ownership（AgentAsToolInvocation retains_answer_ownership AnswerOwnership）提供明确端点并保持与 TaskDistribution 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的智能体作为工具调用：智能体作为工具调用是管理者保留控制权和答案归属的一种有界委派过程。；该种差可由关系 retains_answer_ownership 的端点角色检验。
+    - 不包含：
+  - 任务分发虽与本概念同属 DelegationProcess，但其定义为“任务分发是把工作项分配给选定执行者并保留范围证据的一种委派过程。”，不得替代智能体作为工具调用。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **任务分发** `TaskDistribution`
+    - 定义：任务分发是把工作项分配给选定执行者并保留范围证据的一种委派过程。
+    - 直接上位：`DelegationProcess`
+    - 为什么需要：任务分发为canonical 事实 assigns_work_item_to（TaskDistribution assigns_work_item_to WorkerAgent）提供明确端点并保持与 AgentAsToolInvocation 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的任务分发：任务分发是把工作项分配给选定执行者并保留范围证据的一种委派过程。；该种差可由关系 assigns_work_item_to 的端点角色检验。
+    - 不包含：
+  - 智能体作为工具调用虽与本概念同属 DelegationProcess，但其定义为“智能体作为工具调用是管理者保留控制权和答案归属的一种有界委派过程。”，不得替代任务分发。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **委派结果** `DelegationResult`
+  - 定义：委派结果是工作者、子智能体、工具式智能体或远程受托方返回的可观察结果，包含产物、状态、警告和来源。
+  - 为什么需要：委派结果为canonical 事实 DelegationProcess-produces-DelegationResult（DelegationProcess produces DelegationResult）提供明确端点并保持与 DelegationProcess 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的委派结果：委派结果是工作者、子智能体、工具式智能体或远程受托方返回的可观察结果，包含产物、状态、警告和来源。；该种差可由关系 DelegationProcess-produces-DelegationResult 的端点角色检验。
+  - 不包含：
+  - 委派过程只是关系 DelegationProcess-produces-DelegationResult 的另一端；相关联不表示它是委派结果。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **控制移交** `Handoff`
+  - 定义：交接是控制转移事件，把任务、对话、路由或运行状态的责任移交给另一智能体参与者或远程受托方。
+  - 为什么需要：控制移交为canonical 事实 Handoff-causes-ResponsibilityTransfer（Handoff causes ResponsibilityTransfer）提供明确端点并保持与 ResponsibilityTransfer 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的控制移交：交接是控制转移事件，把任务、对话、路由或运行状态的责任移交给另一智能体参与者或远程受托方。；该种差可由关系 Handoff-causes-ResponsibilityTransfer 的端点角色检验。
+  - 不包含：
+  - 责任转移只是关系 Handoff-causes-ResponsibilityTransfer 的另一端；相关联不表示它是控制移交。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **移交目标** `HandoffTarget`
+  - 定义：交接目标是在交接后接收控制权或责任的参与者、远程智能体、路由或协议端点。
+  - 为什么需要：移交目标为canonical 事实 transfers_control_to（Handoff transfers_control_to HandoffTarget）提供明确端点并保持与 Handoff 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的移交目标：交接目标是在交接后接收控制权或责任的参与者、远程智能体、路由或协议端点。；该种差可由关系 transfers_control_to 的端点角色检验。
+  - 不包含：
+  - 控制移交只是关系 transfers_control_to 的另一端；相关联不表示它是移交目标。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **责任转移** `ResponsibilityTransfer`
+  - 定义：责任转移记录委派或交接期间哪些责任更换所有者，包括任务保管、控制保管、答案归属和审计责任。
+  - 为什么需要：责任转移为canonical 事实 Handoff-causes-ResponsibilityTransfer（Handoff causes ResponsibilityTransfer）提供明确端点并保持与 Handoff 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的责任转移：责任转移记录委派或交接期间哪些责任更换所有者，包括任务保管、控制保管、答案归属和审计责任。；该种差可由关系 Handoff-causes-ResponsibilityTransfer 的端点角色检验。
+  - 不包含：
+  - 控制移交只是关系 Handoff-causes-ResponsibilityTransfer 的另一端；相关联不表示它是责任转移。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **子智能体上下文** `SubagentContext`
+  - 定义：子智能体上下文是子智能体可见的受限上下文包，包含允许的消息、来源、记忆、任务状态、工具结果和排除项。
+  - 为什么需要：子智能体上下文为canonical 事实 DelegationContract-bounds-SubagentContext（DelegationContract bounds SubagentContext）提供明确端点并保持与 DelegationContract 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的子智能体上下文：子智能体上下文是子智能体可见的受限上下文包，包含允许的消息、来源、记忆、任务状态、工具结果和排除项。；该种差可由关系 DelegationContract-bounds-SubagentContext 的端点角色检验。
+  - 不包含：
+  - 委派契约只是关系 DelegationContract-bounds-SubagentContext 的另一端；相关联不表示它是子智能体上下文。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **工作者可用性** `WorkerAvailability`
+  - 定义：工作者可用性记录工作者或子智能体是否能接收工作，包括负载、生命周期状态、能力就绪情况和备选状态。
+  - 为什么需要：工作者可用性为canonical 事实 WorkerSelection-evaluates-WorkerAvailability（WorkerSelection evaluates WorkerAvailability）提供明确端点并保持与 WorkerSelection 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的工作者可用性：工作者可用性记录工作者或子智能体是否能接收工作，包括负载、生命周期状态、能力就绪情况和备选状态。；该种差可由关系 WorkerSelection-evaluates-WorkerAvailability 的端点角色检验。
+  - 不包含：
+  - 工作者选择只是关系 WorkerSelection-evaluates-WorkerAvailability 的另一端；相关联不表示它是工作者可用性。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **工作者能力匹配** `WorkerCapabilityMatch`
+  - 定义：工作者能力匹配记录工作者、子智能体、模型或工具与任务所需能力、模态、权限或领域相匹配的证据。
+  - 为什么需要：工作者能力匹配为canonical 事实 WorkerCapabilityMatch-justifies-WorkerSelection（WorkerCapabilityMatch justifies WorkerSelection）提供明确端点并保持与 WorkerSelection 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的工作者能力匹配：工作者能力匹配记录工作者、子智能体、模型或工具与任务所需能力、模态、权限或领域相匹配的证据。；该种差可由关系 WorkerCapabilityMatch-justifies-WorkerSelection 的端点角色检验。
+  - 不包含：
+  - 工作者选择只是关系 WorkerCapabilityMatch-justifies-WorkerSelection 的另一端；相关联不表示它是工作者能力匹配。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **工作者候选池** `WorkerPool`
+  - 定义：工作者池是可供选择的工作者、子智能体、模型、工具或远程受托方集合，可按能力、负载、成本、权限和信任边界筛选。
+  - 为什么需要：工作者候选池为canonical 事实 WorkerSelection-selects_from-WorkerPool（WorkerSelection selects_from WorkerPool）提供明确端点并保持与 WorkerSelection 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的工作者候选池：工作者池是可供选择的工作者、子智能体、模型、工具或远程受托方集合，可按能力、负载、成本、权限和信任边界筛选。；该种差可由关系 WorkerSelection-selects_from-WorkerPool 的端点角色检验。
+  - 不包含：
+  - 工作者选择只是关系 WorkerSelection-selects_from-WorkerPool 的另一端；相关联不表示它是工作者候选池。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **工作者选择** `WorkerSelection`
+  - 定义：工作者选择是决策事件，根据能力、可用性、成本、安全和上下文匹配证据，从候选池中选择工作者、子智能体、模型、工具或路由。
+  - 为什么需要：工作者选择为canonical 事实 WorkerSelection-evaluates-WorkerAvailability（WorkerSelection evaluates WorkerAvailability）提供明确端点并保持与 WorkerAvailability 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的工作者选择：工作者选择是决策事件，根据能力、可用性、成本、安全和上下文匹配证据，从候选池中选择工作者、子智能体、模型、工具或路由。；该种差可由关系 WorkerSelection-evaluates-WorkerAvailability 的端点角色检验。
+  - 不包含：
+  - 工作者可用性只是关系 WorkerSelection-evaluates-WorkerAvailability 的另一端；相关联不表示它是工作者选择。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+### 组合模式模块
+
+组合模式模块属于控制与编排域，描述提示链、并行、分段、投票、聚合或综合等任务分解与结果合成机制。
+
+- **聚合规则** `AggregationRule`
+  - 定义：聚合规则规定并行输出、投票、分段结果或证据片段如何被合并为综合结果。
+  - 为什么需要：聚合规则为canonical 事实 AggregationRule-governs-Synthesis（AggregationRule governs Synthesis）提供明确端点并保持与 Synthesis 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的聚合规则：聚合规则规定并行输出、投票、分段结果或证据片段如何被合并为综合结果。；该种差可由关系 AggregationRule-governs-Synthesis 的端点角色检验。
+  - 不包含：
+  - 综合活动只是关系 AggregationRule-governs-Synthesis 的另一端；相关联不表示它是聚合规则。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **组合部件** `CompositionPart`
+  - 定义：组合部件是属于某个编排拓扑或组合模式、具有局部输入输出、顺序或并发位置、分派范围和汇合责任的结构规约部件。
+  - 为什么需要：组合部件为canonical 事实 ChainStage-is_a-CompositionPart（ChainStage is_a CompositionPart）提供明确端点并保持与 ChainStage 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的组合部件：组合部件是属于某个编排拓扑或组合模式、具有局部输入输出、顺序或并发位置、分派范围和汇合责任的结构规约部件。；该种差可由关系 ChainStage-is_a-CompositionPart 的端点角色检验。
+  - 不包含：
+  - 链阶段只是关系 ChainStage-is_a-CompositionPart 的另一端；相关联不表示它是组合部件。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **链阶段** `ChainStage`
+    - 定义：链阶段是提示链中的一个有序阶段，具有明确输入、输出、依赖、守卫条件，以及交接或路由上下文。
+    - 直接上位：`CompositionPart`
+    - 为什么需要：链阶段为canonical 事实 PromptChain-contains_stage-ChainStage（PromptChain contains_stage ChainStage）提供明确端点并保持与 ParallelBranch 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的链阶段：链阶段是提示链中的一个有序阶段，具有明确输入、输出、依赖、守卫条件，以及交接或路由上下文。；该种差可由关系 PromptChain-contains_stage-ChainStage 的端点角色检验。
+    - 不包含：
+  - 并行分支虽与本概念同属 CompositionPart，但其定义为“并行分支是并行工作流中的一个分支，具有自己的分配工作、上下文切片、输出和合并预期。”，不得替代链阶段。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **并行分支** `ParallelBranch`
+    - 定义：并行分支是并行工作流中的一个分支，具有自己的分配工作、上下文切片、输出和合并预期。
+    - 直接上位：`CompositionPart`
+    - 为什么需要：并行分支为canonical 事实 Parallelization-contains_branch-ParallelBranch（Parallelization contains_branch ParallelBranch）提供明确端点并保持与 ChainStage 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的并行分支：并行分支是并行工作流中的一个分支，具有自己的分配工作、上下文切片、输出和合并预期。；该种差可由关系 Parallelization-contains_branch-ParallelBranch 的端点角色检验。
+    - 不包含：
+  - 链阶段虽与本概念同属 CompositionPart，但其定义为“链阶段是提示链中的一个有序阶段，具有明确输入、输出、依赖、守卫条件，以及交接或路由上下文。”，不得替代并行分支。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **分段分配** `SectionAssignment`
+    - 定义：分段分配记录某个工作分段与工作者、上下文切片、预期输出和综合角色之间的连接。
+    - 直接上位：`CompositionPart`
+    - 为什么需要：分段分配为canonical 事实 Sectioning-creates-SectionAssignment（Sectioning creates SectionAssignment）提供明确端点并保持与 ChainStage 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的分段分配：分段分配记录某个工作分段与工作者、上下文切片、预期输出和综合角色之间的连接。；该种差可由关系 Sectioning-creates-SectionAssignment 的端点角色检验。
+    - 不包含：
+  - 链阶段虽与本概念同属 CompositionPart，但其定义为“链阶段是提示链中的一个有序阶段，具有明确输入、输出、依赖、守卫条件，以及交接或路由上下文。”，不得替代分段分配。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **组合模式** `CompositionPattern`
+  - 定义：组合模式是描述阶段或分支的组织形态、顺序或并发约束、输入输出接口、汇合方式和失败策略，并可被编排拓扑采用的静态规约。
+  - 为什么需要：组合模式为canonical 事实 OrchestrationTopology-uses_pattern-CompositionPattern（OrchestrationTopology uses_pattern CompositionPattern）提供明确端点并保持与 OrchestrationTopology 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的组合模式：组合模式是描述阶段或分支的组织形态、顺序或并发约束、输入输出接口、汇合方式和失败策略，并可被编排拓扑采用的静态规约。；该种差可由关系 OrchestrationTopology-uses_pattern-CompositionPattern 的端点角色检验。
+  - 不包含：
+  - 编排拓扑只是关系 OrchestrationTopology-uses_pattern-CompositionPattern 的另一端；相关联不表示它是组合模式。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **并行化模式** `Parallelization`
+    - 定义：并行化是一种以多个分支并发执行和汇合为区分特征的组合模式。
+    - 直接上位：`CompositionPattern`
+    - 为什么需要：并行化模式为canonical 事实 Parallelization-contains_branch-ParallelBranch（Parallelization contains_branch ParallelBranch）提供明确端点并保持与 PromptChain 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的并行化模式：并行化是一种以多个分支并发执行和汇合为区分特征的组合模式。；该种差可由关系 Parallelization-contains_branch-ParallelBranch 的端点角色检验。
+    - 不包含：
+  - 提示链模式虽与本概念同属 CompositionPattern，但其定义为“提示链是一种以模型或提示阶段顺序串联为区分特征的组合模式。”，不得替代并行化模式。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **提示链模式** `PromptChain`
+    - 定义：提示链是一种以模型或提示阶段顺序串联为区分特征的组合模式。
+    - 直接上位：`CompositionPattern`
+    - 为什么需要：提示链模式为canonical 事实 PromptChain-contains_stage-ChainStage（PromptChain contains_stage ChainStage）提供明确端点并保持与 Parallelization 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的提示链模式：提示链是一种以模型或提示阶段顺序串联为区分特征的组合模式。；该种差可由关系 PromptChain-contains_stage-ChainStage 的端点角色检验。
+    - 不包含：
+  - 并行化模式虽与本概念同属 CompositionPattern，但其定义为“并行化是一种以多个分支并发执行和汇合为区分特征的组合模式。”，不得替代提示链模式。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **分段模式** `Sectioning`
+    - 定义：分段是一种以把较大工作或产物切分后独立处理为区分特征的组合模式。
+    - 直接上位：`CompositionPattern`
+    - 为什么需要：分段模式为canonical 事实 Sectioning-creates-SectionAssignment（Sectioning creates SectionAssignment）提供明确端点并保持与 Parallelization 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的分段模式：分段是一种以把较大工作或产物切分后独立处理为区分特征的组合模式。；该种差可由关系 Sectioning-creates-SectionAssignment 的端点角色检验。
+    - 不包含：
+  - 并行化模式虽与本概念同属 CompositionPattern，但其定义为“并行化是一种以多个分支并发执行和汇合为区分特征的组合模式。”，不得替代分段模式。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **投票模式** `Voting`
+    - 定义：投票是一种以收集多个候选判断并按规则选择或聚合为区分特征的组合模式。
+    - 直接上位：`CompositionPattern`
+    - 为什么需要：投票模式为canonical 事实 Voting-consumes-VoteBallot（Voting consumes VoteBallot）提供明确端点并保持与 Parallelization 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的投票模式：投票是一种以收集多个候选判断并按规则选择或聚合为区分特征的组合模式。；该种差可由关系 Voting-consumes-VoteBallot 的端点角色检验。
+    - 不包含：
+  - 并行化模式虽与本概念同属 CompositionPattern，但其定义为“并行化是一种以多个分支并发执行和汇合为区分特征的组合模式。”，不得替代投票模式。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **编排拓扑** `OrchestrationTopology`
+  - 定义：编排拓扑描述工作流的协同形态，例如中心化管理者与工作者、层级团队、图式路由、并行分支或动态群组。
+  - 为什么需要：编排拓扑为canonical 事实 OrchestrationTopology-uses_pattern-CompositionPattern（OrchestrationTopology uses_pattern CompositionPattern）提供明确端点并保持与 CompositionPattern 的定义边界；节点字段 topology_id、version、failure_policy 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的编排拓扑：编排拓扑描述工作流的协同形态，例如中心化管理者与工作者、层级团队、图式路由、并行分支或动态群组。；该种差可由字段 topology_id、version、failure_policy 检验。
+  - 不包含：
+  - 组合模式只是关系 OrchestrationTopology-uses_pattern-CompositionPattern 的另一端；相关联不表示它是编排拓扑。
+  - 结构与约束：3 个字段，2 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+
+- **综合活动** `Synthesis`
+  - 定义：旧定义明确它是合并输入并产生结果的可观察发生过程，因此重定型为活动，不按计划草案机械挂到 CompositionPattern。
+  - 为什么需要：综合活动为canonical 事实 Synthesis-produces-SynthesisOutput（Synthesis produces SynthesisOutput）提供明确端点并保持与 SynthesisOutput 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的综合活动：旧定义明确它是合并输入并产生结果的可观察发生过程，因此重定型为活动，不按计划草案机械挂到 CompositionPattern。；该种差可由关系 Synthesis-produces-SynthesisOutput 的端点角色检验。
+  - 不包含：
+  - 综合输出只是关系 Synthesis-produces-SynthesisOutput 的另一端；相关联不表示它是综合活动。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **综合输入** `SynthesisInput`
+  - 定义：综合输入是综合步骤消费的工作者输出、检索证据、工具结果、投票、审查信号或产物片段。
+  - 为什么需要：综合输入为canonical 事实 synthesizes_from_input（Synthesis synthesizes_from_input SynthesisInput）提供明确端点并保持与 Synthesis 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的综合输入：综合输入是综合步骤消费的工作者输出、检索证据、工具结果、投票、审查信号或产物片段。；该种差可由关系 synthesizes_from_input 的端点角色检验。
+  - 不包含：
+  - 综合活动只是关系 synthesizes_from_input 的另一端；相关联不表示它是综合输入。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **综合输出** `SynthesisOutput`
+  - 定义：综合输出是综合步骤产生的一致产物、答案、计划、摘要或决策，并能追溯到输入。
+  - 为什么需要：综合输出为canonical 事实 Synthesis-produces-SynthesisOutput（Synthesis produces SynthesisOutput）提供明确端点并保持与 Synthesis 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的综合输出：综合输出是综合步骤产生的一致产物、答案、计划、摘要或决策，并能追溯到输入。；该种差可由关系 Synthesis-produces-SynthesisOutput 的端点角色检验。
+  - 不包含：
+  - 综合活动只是关系 Synthesis-produces-SynthesisOutput 的另一端；相关联不表示它是综合输出。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **综合计划** `SynthesisPlan`
+  - 定义：综合计划描述综合步骤必须组合哪些输入、投票、分段、证据和优先规则。
+  - 为什么需要：综合计划为canonical 事实 SynthesisPlan-governs-Synthesis（SynthesisPlan governs Synthesis）提供明确端点并保持与 Synthesis 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的综合计划：综合计划描述综合步骤必须组合哪些输入、投票、分段、证据和优先规则。；该种差可由关系 SynthesisPlan-governs-Synthesis 的端点角色检验。
+  - 不包含：
+  - 综合活动只是关系 SynthesisPlan-governs-Synthesis 的另一端；相关联不表示它是综合计划。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **投票票据** `VoteBallot`
+  - 定义：投票票据记录工作者、评估者、模型或规则在投票工作流中给出的选择、分数、偏好或理由摘要。
+  - 为什么需要：投票票据为canonical 事实 Voting-consumes-VoteBallot（Voting consumes VoteBallot）提供明确端点并保持与 Voting 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的投票票据：投票票据记录工作者、评估者、模型或规则在投票工作流中给出的选择、分数、偏好或理由摘要。；该种差可由关系 Voting-consumes-VoteBallot 的端点角色检验。
+  - 不包含：
+  - 投票模式只是关系 Voting-consumes-VoteBallot 的另一端；相关联不表示它是投票票据。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+### 控制反馈循环模块
+
+控制反馈循环模块属于控制与编排域，用于描述审查触发、反馈路由、可见审议步骤、修订计划、改进尝试以及停止或重试的控制脉络，而不拥有基准评分本身。
+
+- **评估优化角色** `EvaluatorOptimizer`
+  - 定义：评估优化者描述审核产物并选择修订、重试、升级或停止的职责，是角色而不是循环或主体固定子类。
+  - 为什么需要：评估优化角色为canonical 事实 EvaluatorOptimizer-controls-ImprovementLoop（EvaluatorOptimizer controls ImprovementLoop）提供明确端点并保持与 ImprovementLoop 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的评估优化角色：评估优化者描述审核产物并选择修订、重试、升级或停止的职责，是角色而不是循环或主体固定子类。；该种差可由关系 EvaluatorOptimizer-controls-ImprovementLoop 的端点角色检验。
+  - 不包含：
+  - 改进循环只是关系 EvaluatorOptimizer-controls-ImprovementLoop 的另一端；相关联不表示它是评估优化角色。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **改进尝试** `ImprovementAttempt`
+  - 定义：改进尝试是由反馈、审查、闸门结果或停止重试脉络启动的有边界重试或修订尝试。
+  - 为什么需要：改进尝试为canonical 事实 ImprovementAttempt-updates-OptimizerState（ImprovementAttempt updates OptimizerState）提供明确端点并保持与 OptimizerState 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的改进尝试：改进尝试是由反馈、审查、闸门结果或停止重试脉络启动的有边界重试或修订尝试。；该种差可由关系 ImprovementAttempt-updates-OptimizerState 的端点角色检验。
+  - 不包含：
+  - 优化器状态只是关系 ImprovementAttempt-updates-OptimizerState 的另一端；相关联不表示它是改进尝试。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **改进循环** `ImprovementLoop`
+  - 定义：改进循环是接收被评对象、审核或反馈证据，形成修订计划并产生一个或多个新尝试，直至成功、失败、预算、安全或人工停止条件满足的有界控制活动。
+  - 为什么需要：改进循环为canonical 事实 ImprovementLoop-contains_attempt-ImprovementAttempt（ImprovementLoop contains_attempt ImprovementAttempt）提供明确端点并保持与 ImprovementAttempt 的定义边界；节点字段 loop_id、maximum_attempts、status 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的改进循环：改进循环是接收被评对象、审核或反馈证据，形成修订计划并产生一个或多个新尝试，直至成功、失败、预算、安全或人工停止条件满足的有界控制活动。；该种差可由字段 loop_id、maximum_attempts、status 检验。
+  - 不包含：
+  - 改进尝试只是关系 ImprovementLoop-contains_attempt-ImprovementAttempt 的另一端；相关联不表示它是改进循环。
+  - 结构与约束：5 个字段，3 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+
+- **优化器状态** `OptimizerState`
+  - 定义：优化者状态是评估优化循环的运行可见状态，包含当前尝试、选定反馈、预算、停止上下文和候选质量。
+  - 为什么需要：优化器状态为canonical 事实 ImprovementAttempt-updates-OptimizerState（ImprovementAttempt updates OptimizerState）提供明确端点并保持与 ImprovementAttempt 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的优化器状态：优化者状态是评估优化循环的运行可见状态，包含当前尝试、选定反馈、预算、停止上下文和候选质量。；该种差可由关系 ImprovementAttempt-updates-OptimizerState 的端点角色检验。
+  - 不包含：
+  - 改进尝试只是关系 ImprovementAttempt-updates-OptimizerState 的另一端；相关联不表示它是优化器状态。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **审核分派** `ReviewAssignment`
+  - 定义：审查分配把审查责任分配给人工、模型、评估者、策略闸门或工作者，并标识被审查的产物或决策。
+  - 为什么需要：审核分派为canonical 事实 ReviewAssignment-initiates-ReviewEvent（ReviewAssignment initiates ReviewEvent）提供明确端点并保持与 ReviewEvent 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的审核分派：审查分配把审查责任分配给人工、模型、评估者、策略闸门或工作者，并标识被审查的产物或决策。；该种差可由关系 ReviewAssignment-initiates-ReviewEvent 的端点角色检验。
+  - 不包含：
+  - 审核事件只是关系 ReviewAssignment-initiates-ReviewEvent 的另一端；相关联不表示它是审核分派。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **审核协调活动** `ReviewCoordination`
+  - 定义：审核协调活动是组织审核责任、触发审核事件、收集批评或反馈并把适用结果路由到任务、角色、修订计划、闸门或改进循环的协调活动。
+  - 为什么需要：审核协调活动为canonical 事实 FeedbackRouting-is_a-ReviewCoordination（FeedbackRouting is_a ReviewCoordination）提供明确端点并保持与 FeedbackRouting 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的审核协调活动：审核协调活动是组织审核责任、触发审核事件、收集批评或反馈并把适用结果路由到任务、角色、修订计划、闸门或改进循环的协调活动。；该种差可由关系 FeedbackRouting-is_a-ReviewCoordination 的端点角色检验。
+  - 不包含：
+  - 反馈路由只是关系 FeedbackRouting-is_a-ReviewCoordination 的另一端；相关联不表示它是审核协调活动。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **反馈路由** `FeedbackRouting`
+    - 定义：反馈路由是控制决策，把反馈发送到任务、工作者、路由、修订计划、闸门或优化循环。
+    - 直接上位：`ReviewCoordination`
+    - 为什么需要：反馈路由为canonical 事实 FeedbackRouting-selects-RevisionPlan（FeedbackRouting selects RevisionPlan）提供明确端点并保持与 ReviewCoordination 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的反馈路由：反馈路由是控制决策，把反馈发送到任务、工作者、路由、修订计划、闸门或优化循环。；该种差可由关系 FeedbackRouting-selects-RevisionPlan 的端点角色检验。
+    - 不包含：
+  - 仅能识别为上位概念 ReviewCoordination 的对象不在范围内；它尚未证明反馈路由的种差或关系端点 FeedbackRouting-selects-RevisionPlan。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **审核事件** `ReviewEvent`
+  - 定义：审查事件是可观察的控制循环事件，请求或执行对输出、状态、计划、安全条件、证据包或完成声明的审查。
+  - 为什么需要：审核事件为canonical 事实 ReviewEvent-produces-CritiqueArtifact（ReviewEvent produces CritiqueArtifact）提供明确端点并保持与 CritiqueArtifact 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的审核事件：审查事件是可观察的控制循环事件，请求或执行对输出、状态、计划、安全条件、证据包或完成声明的审查。；该种差可由关系 ReviewEvent-produces-CritiqueArtifact 的端点角色检验。
+  - 不包含：
+  - 批评产物只是关系 ReviewEvent-produces-CritiqueArtifact 的另一端；相关联不表示它是审核事件。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **修订信息产物** `RevisionArtifact`
+  - 定义：修订信息产物是审核或优化活动产生或使用、用于说明发现、改进依据、拟修改内容或停止/重试谱系，并能追溯到被评对象与来源证据的信息产物。
+  - 为什么需要：修订信息产物为canonical 事实 CritiqueArtifact-is_a-RevisionArtifact（CritiqueArtifact is_a RevisionArtifact）提供明确端点并保持与 CritiqueArtifact 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的修订信息产物：修订信息产物是审核或优化活动产生或使用、用于说明发现、改进依据、拟修改内容或停止/重试谱系，并能追溯到被评对象与来源证据的信息产物。；该种差可由关系 CritiqueArtifact-is_a-RevisionArtifact 的端点角色检验。
+  - 不包含：
+  - 批评产物只是关系 CritiqueArtifact-is_a-RevisionArtifact 的另一端；相关联不表示它是修订信息产物。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **批评产物** `CritiqueArtifact`
+    - 定义：批评产物是审查或评估步骤产生的可观察批评结果，包含发现、请求变更、置信度和来源。
+    - 直接上位：`RevisionArtifact`
+    - 为什么需要：批评产物为canonical 事实 ReviewEvent-produces-CritiqueArtifact（ReviewEvent produces CritiqueArtifact）提供明确端点并保持与 ReflectionRecord 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的批评产物：批评产物是审查或评估步骤产生的可观察批评结果，包含发现、请求变更、置信度和来源。；该种差可由关系 ReviewEvent-produces-CritiqueArtifact 的端点角色检验。
+    - 不包含：
+  - 反思记录虽与本概念同属 RevisionArtifact，但其定义为“反思记录是用于改进的可观察审查摘要或理由产物，不保存私有推理记录。”，不得替代批评产物。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **反思记录** `ReflectionRecord`
+    - 定义：反思记录是用于改进的可观察审查摘要或理由产物，不保存私有推理记录。
+    - 直接上位：`RevisionArtifact`
+    - 为什么需要：反思记录为canonical 事实 ThinkAsTool-produces-ReflectionRecord（ThinkAsTool produces ReflectionRecord）提供明确端点并保持与 CritiqueArtifact 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的反思记录：反思记录是用于改进的可观察审查摘要或理由产物，不保存私有推理记录。；该种差可由关系 ThinkAsTool-produces-ReflectionRecord 的端点角色检验。
+    - 不包含：
+  - 批评产物虽与本概念同属 RevisionArtifact，但其定义为“批评产物是审查或评估步骤产生的可观察批评结果，包含发现、请求变更、置信度和来源。”，不得替代反思记录。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **修订计划** `RevisionPlan`
+    - 定义：修订计划说明要改什么、修订哪一次先前尝试，以及由哪个准则或反馈触发。
+    - 直接上位：`RevisionArtifact`
+    - 为什么需要：修订计划为canonical 事实 RevisionPlan-governs-ImprovementAttempt（RevisionPlan governs ImprovementAttempt）提供明确端点并保持与 CritiqueArtifact 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的修订计划：修订计划说明要改什么、修订哪一次先前尝试，以及由哪个准则或反馈触发。；该种差可由关系 RevisionPlan-governs-ImprovementAttempt 的端点角色检验。
+    - 不包含：
+  - 批评产物虽与本概念同属 RevisionArtifact，但其定义为“批评产物是审查或评估步骤产生的可观察批评结果，包含发现、请求变更、置信度和来源。”，不得替代修订计划。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **停止重试脉络** `StopRetryLineage`
+    - 定义：停止重试脉络把审查、失败或闸门结果连接到编排循环选择的有边界重试、修订、停止或回滚路径。
+    - 直接上位：`RevisionArtifact`
+    - 为什么需要：停止重试脉络为canonical 事实 retries_from_attempt（StopRetryLineage retries_from_attempt ImprovementAttempt）提供明确端点并保持与 CritiqueArtifact 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的停止重试脉络：停止重试脉络把审查、失败或闸门结果连接到编排循环选择的有边界重试、修订、停止或回滚路径。；该种差可由关系 retries_from_attempt 的端点角色检验。
+    - 不包含：
+  - 批评产物虽与本概念同属 RevisionArtifact，但其定义为“批评产物是审查或评估步骤产生的可观察批评结果，包含发现、请求变更、置信度和来源。”，不得替代停止重试脉络。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **工具式审议** `ThinkAsTool`
+  - 定义：工具式审议是可见的审议或审查操作，以有边界的工具式步骤呈现，并具有明确输入、输出和审计元数据。
+  - 为什么需要：工具式审议为canonical 事实 ThinkAsTool-produces-ReflectionRecord（ThinkAsTool produces ReflectionRecord）提供明确端点并保持与 ReflectionRecord 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的工具式审议：工具式审议是可见的审议或审查操作，以有边界的工具式步骤呈现，并具有明确输入、输出和审计元数据。；该种差可由关系 ThinkAsTool-produces-ReflectionRecord 的端点角色检验。
+  - 不包含：
+  - 反思记录只是关系 ThinkAsTool-produces-ReflectionRecord 的另一端；相关联不表示它是工具式审议。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+### 路由与控制模块
+
+路由与控制模块属于控制与编排域，根据状态、策略、条件或观察结果选择下一步操作、分支、参与者、工具或停止路径。
+
+- **控制闸门能力** `ControlGate`
+  - 定义：控制闸门是在编排控制点读取一个或多个条件及证据、产生可审计结果并据此允许、阻止、改向、重试、升级或停止下游工作的控制能力上位概念。
+  - 为什么需要：控制闸门能力为canonical 事实 Gate-is_a-ControlGate（Gate is_a ControlGate）提供明确端点并保持与 Gate 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的控制闸门能力：控制闸门是在编排控制点读取一个或多个条件及证据、产生可审计结果并据此允许、阻止、改向、重试、升级或停止下游工作的控制能力上位概念。；该种差可由关系 Gate-is_a-ControlGate 的端点角色检验。
+  - 不包含：
+  - 控制闸门只是关系 Gate-is_a-ControlGate 的另一端；相关联不表示它是控制闸门能力。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **控制闸门** `Gate`
+    - 定义：Gate 是根据条件允许、阻止、改向或升级工作的具体控制闸门能力。
+    - 直接上位：`ControlGate`
+    - 为什么需要：控制闸门为canonical 事实 Gate-evaluates-GateCondition（Gate evaluates GateCondition）提供明确端点并保持与 ControlGate 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的控制闸门：Gate 是根据条件允许、阻止、改向或升级工作的具体控制闸门能力。；该种差可由关系 Gate-evaluates-GateCondition 的端点角色检验。
+    - 不包含：
+  - 仅能识别为上位概念 ControlGate 的对象不在范围内；它尚未证明控制闸门的种差或关系端点 Gate-evaluates-GateCondition。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **下游操作** `DownstreamOperation`
+  - 定义：下游操作是指向可继续执行的分支、工具、协议或停止路径的操作引用，不是一种路线或闸门。
+  - 为什么需要：下游操作为canonical 事实 GateOutcome-triggers-DownstreamOperation（GateOutcome triggers DownstreamOperation）提供明确端点并保持与 GateOutcome 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的下游操作：下游操作是指向可继续执行的分支、工具、协议或停止路径的操作引用，不是一种路线或闸门。；该种差可由关系 GateOutcome-triggers-DownstreamOperation 的端点角色检验。
+  - 不包含：
+  - 闸门结果只是关系 GateOutcome-triggers-DownstreamOperation 的另一端；相关联不表示它是下游操作。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **闸门结果** `GateOutcome`
+  - 定义：闸门结果是评估后产生的 allowed/blocked/redirected 等可观察状态，不是一种闸门。
+  - 为什么需要：闸门结果为canonical 事实 GateOutcome-triggers-DownstreamOperation（GateOutcome triggers DownstreamOperation）提供明确端点并保持与 DownstreamOperation 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的闸门结果：闸门结果是评估后产生的 allowed/blocked/redirected 等可观察状态，不是一种闸门。；该种差可由关系 GateOutcome-triggers-DownstreamOperation 的端点角色检验。
+  - 不包含：
+  - 下游操作只是关系 GateOutcome-triggers-DownstreamOperation 的另一端；相关联不表示它是闸门结果。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **路由决策** `RoutingDecision`
+  - 定义：路由决策是可观察决策事件，应用路由策略选择路由目标，并记录为何选择该目标。
+  - 为什么需要：路由决策为canonical 事实 RoutingDecision-applies-RoutingPolicy（RoutingDecision applies RoutingPolicy）提供明确端点并保持与 RoutingPolicy 的定义边界；节点字段 decision_id、decided_at、reason 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的路由决策：路由决策是可观察决策事件，应用路由策略选择路由目标，并记录为何选择该目标。；该种差可由字段 decision_id、decided_at、reason 检验。
+  - 不包含：
+  - 路由策略只是关系 RoutingDecision-applies-RoutingPolicy 的另一端；相关联不表示它是路由决策。
+  - 结构与约束：3 个字段，2 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+
+- **路由规约** `RoutingSpecification`
+  - 定义：路由规约是描述编排控制流可采用的路径、选择策略、适用条件、重试界限或终止条件，并可被路由决策应用的规范性信息。
+  - 为什么需要：路由规约为canonical 事实 RetryPolicy-is_a-RoutingSpecification（RetryPolicy is_a RoutingSpecification）提供明确端点并保持与 RetryPolicy 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的路由规约：路由规约是描述编排控制流可采用的路径、选择策略、适用条件、重试界限或终止条件，并可被路由决策应用的规范性信息。；该种差可由关系 RetryPolicy-is_a-RoutingSpecification 的端点角色检验。
+  - 不包含：
+  - 重试策略只是关系 RetryPolicy-is_a-RoutingSpecification 的另一端；相关联不表示它是路由规约。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **重试策略** `RetryPolicy`
+    - 定义：重试策略限定编排循环何时可重试工作，包括重试次数、变更上下文、退避、升级和失败条件。
+    - 直接上位：`RoutingSpecification`
+    - 为什么需要：重试策略为canonical 事实 RetryPolicy-creates_new-RunAttempt（RetryPolicy creates_new RunAttempt）提供明确端点并保持与 Route 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的重试策略：重试策略限定编排循环何时可重试工作，包括重试次数、变更上下文、退避、升级和失败条件。；该种差可由关系 RetryPolicy-creates_new-RunAttempt 的端点角色检验。
+    - 不包含：
+  - 路线虽与本概念同属 RoutingSpecification，但其定义为“路线是声明控制流从当前点到类型化目标的路由规约；实际选择发生在 RoutingDecision。”，不得替代重试策略。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **路线** `Route`
+    - 定义：路线是声明控制流从当前点到类型化目标的路由规约；实际选择发生在 RoutingDecision。
+    - 直接上位：`RoutingSpecification`
+    - 为什么需要：路线为canonical 事实 Route-points_to-RoutingTarget（Route points_to RoutingTarget）提供明确端点并保持与 RetryPolicy 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的路线：路线是声明控制流从当前点到类型化目标的路由规约；实际选择发生在 RoutingDecision。；该种差可由关系 Route-points_to-RoutingTarget 的端点角色检验。
+    - 不包含：
+  - 重试策略虽与本概念同属 RoutingSpecification，但其定义为“重试策略限定编排循环何时可重试工作，包括重试次数、变更上下文、退避、升级和失败条件。”，不得替代路线。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **路由条件** `RoutingCondition`
+    - 定义：路由条件是一种可依据任务状态、追踪证据、策略、预算、安全或人工决定求值，并据此允许分支、通过闸门或终止流程的路由规约。
+    - 直接上位：`RoutingSpecification`
+    - 为什么需要：路由条件为canonical 事实 RoutingCondition-is_a-RoutingSpecification（RoutingCondition is_a RoutingSpecification）提供明确端点并保持与 RetryPolicy 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的路由条件：路由条件是一种可依据任务状态、追踪证据、策略、预算、安全或人工决定求值，并据此允许分支、通过闸门或终止流程的路由规约。；该种差可由关系 RoutingCondition-is_a-RoutingSpecification 的端点角色检验。
+    - 不包含：
+  - 重试策略虽与本概念同属 RoutingSpecification，但其定义为“重试策略限定编排循环何时可重试工作，包括重试次数、变更上下文、退避、升级和失败条件。”，不得替代路由条件。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+    - **分支条件** `BranchCondition`
+      - 定义：分支条件根据任务状态、轨迹证据、策略、反馈或能力匹配来决定下一条可运行分支。
+      - 直接上位：`RoutingCondition`
+      - 为什么需要：分支条件为canonical 事实 RoutingPolicy-has_condition-BranchCondition（RoutingPolicy has_condition BranchCondition）提供明确端点并保持与 GateCondition 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的分支条件：分支条件根据任务状态、轨迹证据、策略、反馈或能力匹配来决定下一条可运行分支。；该种差可由关系 RoutingPolicy-has_condition-BranchCondition 的端点角色检验。
+      - 不包含：
+  - 闸门条件虽与本概念同属 RoutingCondition，但其定义为“闸门条件是在工作流闸门处检查的条件，用于决定控制是否继续、阻断、重定向、升级、重试或停止。”，不得替代分支条件。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：2 项
+    - **闸门条件** `GateCondition`
+      - 定义：闸门条件是在工作流闸门处检查的条件，用于决定控制是否继续、阻断、重定向、升级、重试或停止。
+      - 直接上位：`RoutingCondition`
+      - 为什么需要：闸门条件为canonical 事实 Gate-evaluates-GateCondition（Gate evaluates GateCondition）提供明确端点并保持与 BranchCondition 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的闸门条件：闸门条件是在工作流闸门处检查的条件，用于决定控制是否继续、阻断、重定向、升级、重试或停止。；该种差可由关系 Gate-evaluates-GateCondition 的端点角色检验。
+      - 不包含：
+  - 分支条件虽与本概念同属 RoutingCondition，但其定义为“分支条件根据任务状态、轨迹证据、策略、反馈或能力匹配来决定下一条可运行分支。”，不得替代闸门条件。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：2 项
+    - **停止条件** `StopCondition`
+      - 定义：停止条件说明编排循环必须停止的情形，例如成功、失败、预算耗尽、安全要求或人工决定已达成。
+      - 直接上位：`RoutingCondition`
+      - 为什么需要：停止条件为canonical 事实 StopCondition-terminates-RuntimeSession（StopCondition terminates RuntimeSession）提供明确端点并保持与 BranchCondition 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的停止条件：停止条件说明编排循环必须停止的情形，例如成功、失败、预算耗尽、安全要求或人工决定已达成。；该种差可由关系 StopCondition-terminates-RuntimeSession 的端点角色检验。
+      - 不包含：
+  - 分支条件虽与本概念同属 RoutingCondition，但其定义为“分支条件根据任务状态、轨迹证据、策略、反馈或能力匹配来决定下一条可运行分支。”，不得替代停止条件。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：2 项
+  - **路由策略** `RoutingPolicy`
+    - 定义：路由策略用于编排过程根据当前状态和证据选择分支、工作者、工具、协议、重试、升级或停止路径。
+    - 直接上位：`RoutingSpecification`
+    - 为什么需要：路由策略为canonical 事实 RoutingPolicy-has_condition-BranchCondition（RoutingPolicy has_condition BranchCondition）提供明确端点并保持与 RetryPolicy 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的路由策略：路由策略用于编排过程根据当前状态和证据选择分支、工作者、工具、协议、重试、升级或停止路径。；该种差可由关系 RoutingPolicy-has_condition-BranchCondition 的端点角色检验。
+    - 不包含：
+  - 重试策略虽与本概念同属 RoutingSpecification，但其定义为“重试策略限定编排循环何时可重试工作，包括重试次数、变更上下文、退避、升级和失败条件。”，不得替代路由策略。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **路由目标** `RoutingTarget`
+  - 定义：路由目标是路由选择的带类型端点，例如工作者、子智能体、工具、分支、协议适配器、操作句柄或停止路径。
+  - 为什么需要：路由目标为canonical 事实 Route-points_to-RoutingTarget（Route points_to RoutingTarget）提供明确端点并保持与 Route 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的路由目标：路由目标是路由选择的带类型端点，例如工作者、子智能体、工具、分支、协议适配器、操作句柄或停止路径。；该种差可由关系 Route-points_to-RoutingTarget 的端点角色检验。
+  - 不包含：
+  - 路线只是关系 Route-points_to-RoutingTarget 的另一端；相关联不表示它是路由目标。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+### 任务规划模块
+
+任务规划模块属于控制与编排域，表达目标、任务、计划、工作项、步骤、依赖、约束和完成准则，并支持可观测进度追踪。
+
+- **意图性实体** `IntentionalEntity`
+  - 定义：意图性实体是在编排规划中表达主体所希望达到的未来状态、行动承诺或可度量目标，并可被细化为工作规约的规范性信息实体。
+  - 为什么需要：意图性实体为canonical 事实 Goal-is_a-IntentionalEntity（Goal is_a IntentionalEntity）提供明确端点并保持与 Goal 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的意图性实体：意图性实体是在编排规划中表达主体所希望达到的未来状态、行动承诺或可度量目标，并可被细化为工作规约的规范性信息实体。；该种差可由关系 Goal-is_a-IntentionalEntity 的端点角色检验。
+  - 不包含：
+  - 目标只是关系 Goal-is_a-IntentionalEntity 的另一端；相关联不表示它是意图性实体。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **目标** `Goal`
+    - 定义：目标表示用户或系统希望达成的高层意图，是后续拆解为可操作目标、任务和完成准则的起点。
+    - 直接上位：`IntentionalEntity`
+    - 为什么需要：目标为canonical 事实 Goal-elaborated_by-TaskPlan（Goal elaborated_by TaskPlan）提供明确端点并保持与 Intent 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的目标：目标表示用户或系统希望达成的高层意图，是后续拆解为可操作目标、任务和完成准则的起点。；该种差可由关系 Goal-elaborated_by-TaskPlan 的端点角色检验。
+    - 不包含：
+  - 行动意图虽与本概念同属 IntentionalEntity，但其定义为“行动意图是一种由具名主体采纳、表达其愿意在一定范围和约束下为推进目标采取行动的意图性实体；它不等同于目标、计划或一次执行。”，不得替代目标。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **行动意图** `Intent`
+    - 定义：行动意图是一种由具名主体采纳、表达其愿意在一定范围和约束下为推进目标采取行动的意图性实体；它不等同于目标、计划或一次执行。
+    - 直接上位：`IntentionalEntity`
+    - 为什么需要：行动意图为canonical 事实 Intent-commits_to-Goal（Intent commits_to Goal）提供明确端点并保持与 Goal 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的行动意图：行动意图是一种由具名主体采纳、表达其愿意在一定范围和约束下为推进目标采取行动的意图性实体；它不等同于目标、计划或一次执行。；该种差可由关系 Intent-commits_to-Goal 的端点角色检验。
+    - 不包含：
+  - 目标虽与本概念同属 IntentionalEntity，但其定义为“目标表示用户或系统希望达成的高层意图，是后续拆解为可操作目标、任务和完成准则的起点。”，不得替代行动意图。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **可度量目标** `Objective`
+    - 定义：可操作目标是从目标中导出的可度量单元，可被分配、检查，并通过任务、约束和完成准则追踪。
+    - 直接上位：`IntentionalEntity`
+    - 为什么需要：可度量目标为canonical 事实 Objective-realized_by-TaskPlan（Objective realized_by TaskPlan）提供明确端点并保持与 Goal 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的可度量目标：可操作目标是从目标中导出的可度量单元，可被分配、检查，并通过任务、约束和完成准则追踪。；该种差可由关系 Objective-realized_by-TaskPlan 的端点角色检验。
+    - 不包含：
+  - 目标虽与本概念同属 IntentionalEntity，但其定义为“目标表示用户或系统希望达成的高层意图，是后续拆解为可操作目标、任务和完成准则的起点。”，不得替代可度量目标。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **任务条件** `TaskCondition`
+  - 定义：任务条件是可被计划或控制逻辑评估、用于限定任务是否可开始、如何执行或何时视为完成的条件规约，包括完成判据、约束和依赖。
+  - 为什么需要：任务条件为canonical 事实 TaskCompletionCriterion-is_a-TaskCondition（TaskCompletionCriterion is_a TaskCondition）提供明确端点并保持与 TaskCompletionCriterion 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的任务条件：任务条件是可被计划或控制逻辑评估、用于限定任务是否可开始、如何执行或何时视为完成的条件规约，包括完成判据、约束和依赖。；该种差可由关系 TaskCompletionCriterion-is_a-TaskCondition 的端点角色检验。
+  - 不包含：
+  - 任务完成判据只是关系 TaskCompletionCriterion-is_a-TaskCondition 的另一端；相关联不表示它是任务条件。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **任务完成判据** `TaskCompletionCriterion`
+    - 定义：任务完成准则说明判断任务、步骤或工作项是否令人满意地完成所需的可观察条件。
+    - 直接上位：`TaskCondition`
+    - 为什么需要：任务完成判据为canonical 事实 TaskCompletionCriterion-evaluates-RunOutcome（TaskCompletionCriterion evaluates RunOutcome）提供明确端点并保持与 TaskConstraint 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的任务完成判据：任务完成准则说明判断任务、步骤或工作项是否令人满意地完成所需的可观察条件。；该种差可由关系 TaskCompletionCriterion-evaluates-RunOutcome 的端点角色检验。
+    - 不包含：
+  - 任务约束虽与本概念同属 TaskCondition，但其定义为“任务约束记录影响任务执行的规划限制，例如期限、预算、权限、能力、上下文、安全或依赖限制。”，不得替代任务完成判据。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **任务约束** `TaskConstraint`
+    - 定义：任务约束记录影响任务执行的规划限制，例如期限、预算、权限、能力、上下文、安全或依赖限制。
+    - 直接上位：`TaskCondition`
+    - 为什么需要：任务约束为canonical 事实 Task-constrained_by-TaskConstraint（Task constrained_by TaskConstraint）提供明确端点并保持与 TaskCompletionCriterion 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的任务约束：任务约束记录影响任务执行的规划限制，例如期限、预算、权限、能力、上下文、安全或依赖限制。；该种差可由关系 Task-constrained_by-TaskConstraint 的端点角色检验。
+    - 不包含：
+  - 任务完成判据虽与本概念同属 TaskCondition，但其定义为“任务完成准则说明判断任务、步骤或工作项是否令人满意地完成所需的可观察条件。”，不得替代任务约束。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **任务依赖** `TaskDependency`
+    - 定义：任务依赖说明某个任务、步骤或工作项必须等待另一结果、条件、资源或批准后才能继续。
+    - 直接上位：`TaskCondition`
+    - 为什么需要：任务依赖为canonical 事实 TaskDependency-constrains-Task（TaskDependency constrains Task）提供明确端点并保持与 TaskCompletionCriterion 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的任务依赖：任务依赖说明某个任务、步骤或工作项必须等待另一结果、条件、资源或批准后才能继续。；该种差可由关系 TaskDependency-constrains-Task 的端点角色检验。
+    - 不包含：
+  - 任务完成判据虽与本概念同属 TaskCondition，但其定义为“任务完成准则说明判断任务、步骤或工作项是否令人满意地完成所需的可观察条件。”，不得替代任务依赖。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **工作规约** `WorkSpecification`
+  - 定义：工作规约是描述要完成的工作单元或结构，并规定范围、执行者要求、输入、预期产出与完成证据的规划规约；它与实际执行活动分离。
+  - 为什么需要：工作规约为canonical 事实 Task-is_a-WorkSpecification（Task is_a WorkSpecification）提供明确端点并保持与 Task 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的工作规约：工作规约是描述要完成的工作单元或结构，并规定范围、执行者要求、输入、预期产出与完成证据的规划规约；它与实际执行活动分离。；该种差可由关系 Task-is_a-WorkSpecification 的端点角色检验。
+  - 不包含：
+  - 任务只是关系 Task-is_a-WorkSpecification 的另一端；相关联不表示它是工作规约。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **任务** `Task`
+    - 定义：旧定义混合任务定义与执行实例；本次把 Task 收敛为可分派工作规约，实际一次执行由 RunAttempt 表示。
+    - 直接上位：`WorkSpecification`
+    - 为什么需要：任务为canonical 事实 Task-constrained_by-TaskConstraint（Task constrained_by TaskConstraint）提供明确端点并保持与 TaskPlan 的定义边界；节点字段 task_id、status、priority 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的任务：旧定义混合任务定义与执行实例；本次把 Task 收敛为可分派工作规约，实际一次执行由 RunAttempt 表示。；该种差可由字段 task_id、status、priority 检验。
+    - 不包含：
+  - 任务计划虽与本概念同属 WorkSpecification，但其定义为“任务计划把目标组织为有序任务、工作项、依赖、约束和完成准则，使委派与审计有明确结构。”，不得替代任务。
+    - 结构与约束：4 个字段，3 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **任务计划** `TaskPlan`
+    - 定义：任务计划把目标组织为有序任务、工作项、依赖、约束和完成准则，使委派与审计有明确结构。
+    - 直接上位：`WorkSpecification`
+    - 为什么需要：任务计划为canonical 事实 has_control_topology（TaskPlan has_control_topology OrchestrationTopology）提供明确端点并保持与 Task 的定义边界；节点字段 plan_id、version、status 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的任务计划：任务计划把目标组织为有序任务、工作项、依赖、约束和完成准则，使委派与审计有明确结构。；该种差可由字段 plan_id、version、status 检验。
+    - 不包含：
+  - 任务虽与本概念同属 WorkSpecification，但其定义为“旧定义混合任务定义与执行实例；本次把 Task 收敛为可分派工作规约，实际一次执行由 RunAttempt 表示。”，不得替代任务计划。
+    - 结构与约束：4 个字段，2 条约束
+    - 正反例与实例：4 项
+    - 直接来源主张：2 项
+  - **任务步骤** `TaskStep`
+    - 定义：任务步骤标识任务计划中一个可执行或可审查的步骤，包含顺序、依赖、负责人和完成证据。
+    - 直接上位：`WorkSpecification`
+    - 为什么需要：任务步骤为canonical 事实 TaskStep-invokes-ToolCall（TaskStep invokes ToolCall）提供明确端点并保持与 Task 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的任务步骤：任务步骤标识任务计划中一个可执行或可审查的步骤，包含顺序、依赖、负责人和完成证据。；该种差可由关系 TaskStep-invokes-ToolCall 的端点角色检验。
+    - 不包含：
+  - 任务虽与本概念同属 WorkSpecification，但其定义为“旧定义混合任务定义与执行实例；本次把 Task 收敛为可分派工作规约，实际一次执行由 RunAttempt 表示。”，不得替代任务步骤。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **工作项** `WorkItem`
+    - 定义：工作项是从任务中拆出的可分配工作单元，可限定到参与者、工具、子智能体、路由或产物结果。
+    - 直接上位：`WorkSpecification`
+    - 为什么需要：工作项为canonical 事实 TaskDistribution-assigns-WorkItem（TaskDistribution assigns WorkItem）提供明确端点并保持与 Task 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的工作项：工作项是从任务中拆出的可分配工作单元，可限定到参与者、工具、子智能体、路由或产物结果。；该种差可由关系 TaskDistribution-assigns-WorkItem 的端点角色检验。
+    - 不包含：
+  - 任务虽与本概念同属 WorkSpecification，但其定义为“旧定义混合任务定义与执行实例；本次把 Task 收敛为可分派工作规约，实际一次执行由 RunAttempt 表示。”，不得替代工作项。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+## 运行状态与轨迹域
+
+运行状态与轨迹域是面向有边界执行片段与原始运行证据的运行关注域。它刻画运行会话、执行尝试、执行结果、参与者、环境、预算、可观测追踪记录、跨度、事件、检查点、快照、状态差异、回放证据、转录、保留策略与产物溯源，使智能体活动能够被审计、恢复、回放和导出，同时不要求保存隐藏推理文本。
+
+### 运行参与者与权限模块
+
+运行参与者与权限模块刻画运行中的参与者身份、角色绑定、能力绑定、权限范围、本地服务、模型参与者、人工操作者和远程智能体引用，用来追踪谁实际参与了某次运行以及具有什么责任边界。
+
+- **运行参与主体** `Actor`
+  - 定义：运行参与主体是在智能体系统运行期间能够发起或接收行动、承担角色、持有能力或权限并被追踪记录识别的主体上位概念。
+  - 为什么需要：运行参与主体为canonical 事实 Actor-has_binding-ActorBinding（Actor has_binding ActorBinding）提供明确端点并保持与 ActorBinding 的定义边界；节点字段 actor_id、actor_kind、display_name 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的运行参与主体：运行参与主体是在智能体系统运行期间能够发起或接收行动、承担角色、持有能力或权限并被追踪记录识别的主体上位概念。；该种差可由字段 actor_id、actor_kind、display_name 检验。
+  - 不包含：
+  - 主体绑定记录只是关系 Actor-has_binding-ActorBinding 的另一端；相关联不表示它是运行参与主体。
+  - 结构与约束：3 个字段，2 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+  - **人类参与主体** `HumanActor`
+    - 定义：人类参与主体是一种由自然人承担、能够提出请求、执行操作、审核、批准或纠正系统工作的运行参与主体。
+    - 直接上位：`Actor`
+    - 为什么需要：人类参与主体为canonical 事实 HumanActor-may_review-AgentActor（HumanActor may_review AgentActor）提供明确端点并保持与 SoftwareActor 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的人类参与主体：人类参与主体是一种由自然人承担、能够提出请求、执行操作、审核、批准或纠正系统工作的运行参与主体。；该种差可由关系 HumanActor-may_review-AgentActor 的端点角色检验。
+    - 不包含：
+  - 软件参与主体虽与本概念同属 Actor，但其定义为“软件参与主体是一种由可执行软件、服务或智能体进程承担，能够接收输入、采取动作并留下可追踪身份的运行参与主体。”，不得替代人类参与主体。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+    - **开发者参与者** `DeveloperActor`
+      - 定义：开发者参与者负责开发者级指令、实现约束、环境设置或审查决策等运行期职责。
+      - 直接上位：`HumanActor`
+      - 为什么需要：开发者参与者为canonical 事实 DeveloperActor-is_a-HumanActor（DeveloperActor is_a HumanActor）提供明确端点并保持与 HumanOperator 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的开发者参与者：开发者参与者负责开发者级指令、实现约束、环境设置或审查决策等运行期职责。；该种差可由关系 DeveloperActor-is_a-HumanActor 的端点角色检验。
+      - 不包含：
+  - 人类操作员虽与本概念同属 HumanActor，但其定义为“人工操作者是在运行会话中可以批准、暂停、恢复、重定向、审查或补充缺失信息的人。”，不得替代开发者参与者。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：3 项
+      - 直接来源主张：2 项
+    - **人类操作员** `HumanOperator`
+      - 定义：人工操作者是在运行会话中可以批准、暂停、恢复、重定向、审查或补充缺失信息的人。
+      - 直接上位：`HumanActor`
+      - 为什么需要：人类操作员为canonical 事实 HumanOperator-is_a-HumanActor（HumanOperator is_a HumanActor）提供明确端点并保持与 DeveloperActor 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的人类操作员：人工操作者是在运行会话中可以批准、暂停、恢复、重定向、审查或补充缺失信息的人。；该种差可由关系 HumanOperator-is_a-HumanActor 的端点角色检验。
+      - 不包含：
+  - 开发者参与者虽与本概念同属 HumanActor，但其定义为“开发者参与者负责开发者级指令、实现约束、环境设置或审查决策等运行期职责。”，不得替代人类操作员。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：3 项
+      - 直接来源主张：2 项
+    - **审核者参与者** `ReviewerActor`
+      - 定义：审查参与者检查输出、追踪证据、产物或策略敏感决策，并记录审查发现或批准状态。
+      - 直接上位：`HumanActor`
+      - 为什么需要：审核者参与者为canonical 事实 Artifact-reviewed_by-ReviewerActor（Artifact reviewed_by ReviewerActor）提供明确端点并保持与 DeveloperActor 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的审核者参与者：审查参与者检查输出、追踪证据、产物或策略敏感决策，并记录审查发现或批准状态。；该种差可由关系 Artifact-reviewed_by-ReviewerActor 的端点角色检验。
+      - 不包含：
+  - 开发者参与者虽与本概念同属 HumanActor，但其定义为“开发者参与者负责开发者级指令、实现约束、环境设置或审查决策等运行期职责。”，不得替代审核者参与者。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：3 项
+      - 直接来源主张：2 项
+    - **用户参与者** `UserActor`
+      - 定义：用户参与者是其请求、反馈、批准、修正或附件以可观测输入进入运行期的人类或客户端参与者。
+      - 直接上位：`HumanActor`
+      - 为什么需要：用户参与者为canonical 事实 UserActor-is_a-HumanActor（UserActor is_a HumanActor）提供明确端点并保持与 DeveloperActor 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的用户参与者：用户参与者是其请求、反馈、批准、修正或附件以可观测输入进入运行期的人类或客户端参与者。；该种差可由关系 UserActor-is_a-HumanActor 的端点角色检验。
+      - 不包含：
+  - 开发者参与者虽与本概念同属 HumanActor，但其定义为“开发者参与者负责开发者级指令、实现约束、环境设置或审查决策等运行期职责。”，不得替代用户参与者。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：3 项
+      - 直接来源主张：2 项
+  - **软件参与主体** `SoftwareActor`
+    - 定义：软件参与主体是一种由可执行软件、服务或智能体进程承担，能够接收输入、采取动作并留下可追踪身份的运行参与主体。
+    - 直接上位：`Actor`
+    - 为什么需要：软件参与主体为canonical 事实 SoftwareActor-is_a-Actor（SoftwareActor is_a Actor）提供明确端点并保持与 HumanActor 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的软件参与主体：软件参与主体是一种由可执行软件、服务或智能体进程承担，能够接收输入、采取动作并留下可追踪身份的运行参与主体。；该种差可由关系 SoftwareActor-is_a-Actor 的端点角色检验。
+    - 不包含：
+  - 人类参与主体虽与本概念同属 Actor，但其定义为“人类参与主体是一种由自然人承担、能够提出请求、执行操作、审核、批准或纠正系统工作的运行参与主体。”，不得替代软件参与主体。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+    - **智能体参与者** `AgentActor`
+      - 定义：智能体参与者是能够行动、观察、调用工具、接收委派、发出追踪事件并对会话活动承担责任的运行身份。
+      - 直接上位：`SoftwareActor`
+      - 为什么需要：智能体参与者为canonical 事实 associated_with_attempt（AgentActor associated_with_attempt RunAttempt）提供明确端点并保持与 ExternalServiceActor 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的智能体参与者：智能体参与者是能够行动、观察、调用工具、接收委派、发出追踪事件并对会话活动承担责任的运行身份。；该种差可由关系 associated_with_attempt 的端点角色检验。
+      - 不包含：
+  - 外部服务参与者虽与本概念同属 SoftwareActor，但其定义为“外部服务参与者位于受控系统之外，可以接收请求、返回结果，并引入信任边界与溯源义务。”，不得替代智能体参与者。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：3 项
+      - 直接来源主张：2 项
+    - **外部服务参与者** `ExternalServiceActor`
+      - 定义：外部服务参与者位于受控系统之外，可以接收请求、返回结果，并引入信任边界与溯源义务。
+      - 直接上位：`SoftwareActor`
+      - 为什么需要：外部服务参与者为canonical 事实 ExternalServiceActor-is_a-SoftwareActor（ExternalServiceActor is_a SoftwareActor）提供明确端点并保持与 AgentActor 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的外部服务参与者：外部服务参与者位于受控系统之外，可以接收请求、返回结果，并引入信任边界与溯源义务。；该种差可由关系 ExternalServiceActor-is_a-SoftwareActor 的端点角色检验。
+      - 不包含：
+  - 智能体参与者虽与本概念同属 SoftwareActor，但其定义为“智能体参与者是能够行动、观察、调用工具、接收委派、发出追踪事件并对会话活动承担责任的运行身份。”，不得替代外部服务参与者。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：3 项
+      - 直接来源主张：2 项
+    - **模型参与者** `ModelActor`
+      - 定义：模型参与者是由模型支撑的运行参与者，可生成、嵌入、排序、评估、转换或分类信息，并产生可追踪的跨度和预算消耗记录。
+      - 直接上位：`SoftwareActor`
+      - 为什么需要：模型参与者为canonical 事实 ModelActor-uses-Model（ModelActor uses Model）提供明确端点并保持与 AgentActor 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的模型参与者：模型参与者是由模型支撑的运行参与者，可生成、嵌入、排序、评估、转换或分类信息，并产生可追踪的跨度和预算消耗记录。；该种差可由关系 ModelActor-uses-Model 的端点角色检验。
+      - 不包含：
+  - 智能体参与者虽与本概念同属 SoftwareActor，但其定义为“智能体参与者是能够行动、观察、调用工具、接收委派、发出追踪事件并对会话活动承担责任的运行身份。”，不得替代模型参与者。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：3 项
+      - 直接来源主张：2 项
+    - **系统服务参与者** `SystemServiceActor`
+      - 定义：系统服务参与者表示智能体系统使用的内部服务，例如调度器、沙箱、存储、遥测或策略中介。
+      - 直接上位：`SoftwareActor`
+      - 为什么需要：系统服务参与者为canonical 事实 SystemServiceActor-is_a-SoftwareActor（SystemServiceActor is_a SoftwareActor）提供明确端点并保持与 AgentActor 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的系统服务参与者：系统服务参与者表示智能体系统使用的内部服务，例如调度器、沙箱、存储、遥测或策略中介。；该种差可由关系 SystemServiceActor-is_a-SoftwareActor 的端点角色检验。
+      - 不包含：
+  - 智能体参与者虽与本概念同属 SoftwareActor，但其定义为“智能体参与者是能够行动、观察、调用工具、接收委派、发出追踪事件并对会话活动承担责任的运行身份。”，不得替代系统服务参与者。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：3 项
+      - 直接来源主张：2 项
+    - **工具服务参与者** `ToolServiceActor`
+      - 定义：工具服务参与者表示可调用服务或工具端点，负责执行请求并返回可观测结果、警告、错误或产物。
+      - 直接上位：`SoftwareActor`
+      - 为什么需要：工具服务参与者为canonical 事实 ToolServiceActor-is_a-SoftwareActor（ToolServiceActor is_a SoftwareActor）提供明确端点并保持与 AgentActor 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的工具服务参与者：工具服务参与者表示可调用服务或工具端点，负责执行请求并返回可观测结果、警告、错误或产物。；该种差可由关系 ToolServiceActor-is_a-SoftwareActor 的端点角色检验。
+      - 不包含：
+  - 智能体参与者虽与本概念同属 SoftwareActor，但其定义为“智能体参与者是能够行动、观察、调用工具、接收委派、发出追踪事件并对会话活动承担责任的运行身份。”，不得替代工具服务参与者。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：3 项
+      - 直接来源主张：2 项
+
+- **参与者权限范围** `ActorAuthorityScope`
+  - 定义：参与者权限范围记录运行参与者可访问的操作、资源、工具、数据区域和信任边界，是权限约束而不是参与者本身。
+  - 为什么需要：参与者权限范围为canonical 事实 ActorAuthorityScope-constrains-Actor（ActorAuthorityScope constrains Actor）提供明确端点并保持与 Actor 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的参与者权限范围：参与者权限范围记录运行参与者可访问的操作、资源、工具、数据区域和信任边界，是权限约束而不是参与者本身。；该种差可由关系 ActorAuthorityScope-constrains-Actor 的端点角色检验。
+  - 不包含：
+  - 运行参与主体只是关系 ActorAuthorityScope-constrains-Actor 的另一端；相关联不表示它是参与者权限范围。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **主体绑定记录** `ActorBinding`
+  - 定义：主体绑定记录是在确定范围与有效期内，把一个运行参与主体关联到所承担角色、可用能力或所授权限，并记录授予者、条件与来源的绑定信息。
+  - 为什么需要：主体绑定记录为canonical 事实 Actor-has_binding-ActorBinding（Actor has_binding ActorBinding）提供明确端点并保持与 Actor 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的主体绑定记录：主体绑定记录是在确定范围与有效期内，把一个运行参与主体关联到所承担角色、可用能力或所授权限，并记录授予者、条件与来源的绑定信息。；该种差可由关系 Actor-has_binding-ActorBinding 的端点角色检验。
+  - 不包含：
+  - 运行参与主体只是关系 Actor-has_binding-ActorBinding 的另一端；相关联不表示它是主体绑定记录。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **参与者能力绑定** `ActorCapabilityBinding`
+    - 定义：参与者能力绑定把运行参与者连接到可调用、可观测、检索、生成或审查能力，并同时记录允许使用这些能力的条件。
+    - 直接上位：`ActorBinding`
+    - 为什么需要：参与者能力绑定为canonical 事实 has_actor_capability_binding（AgentActor has_actor_capability_binding ActorCapabilityBinding）提供明确端点并保持与 ActorRoleBinding 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的参与者能力绑定：参与者能力绑定把运行参与者连接到可调用、可观测、检索、生成或审查能力，并同时记录允许使用这些能力的条件。；该种差可由关系 has_actor_capability_binding 的端点角色检验。
+    - 不包含：
+  - 参与者角色绑定虽与本概念同属 ActorBinding，但其定义为“参与者角色绑定把运行参与者绑定到承担责任的角色，使委派、审查、批准和问责保持可追踪。”，不得替代参与者能力绑定。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **参与者角色绑定** `ActorRoleBinding`
+    - 定义：参与者角色绑定把运行参与者绑定到承担责任的角色，使委派、审查、批准和问责保持可追踪。
+    - 直接上位：`ActorBinding`
+    - 为什么需要：参与者角色绑定为canonical 事实 has_actor_role_binding（AgentActor has_actor_role_binding ActorRoleBinding）提供明确端点并保持与 ActorCapabilityBinding 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的参与者角色绑定：参与者角色绑定把运行参与者绑定到承担责任的角色，使委派、审查、批准和问责保持可追踪。；该种差可由关系 has_actor_role_binding 的端点角色检验。
+    - 不包含：
+  - 参与者能力绑定虽与本概念同属 ActorBinding，但其定义为“参与者能力绑定把运行参与者连接到可调用、可观测、检索、生成或审查能力，并同时记录允许使用这些能力的条件。”，不得替代参与者角色绑定。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **运行模型** `Model`
+  - 定义：运行模型是具有可识别版本与能力边界、由软件主体调用以生成、嵌入、排序、评估或分类信息的模型实体。
+  - 为什么需要：运行模型为canonical 事实 ModelActor-uses-Model（ModelActor uses Model）提供明确端点并保持与 ModelActor 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的运行模型：运行模型是具有可识别版本与能力边界、由软件主体调用以生成、嵌入、排序、评估或分类信息的模型实体。；该种差可由关系 ModelActor-uses-Model 的端点角色检验。
+  - 不包含：
+  - 模型参与者只是关系 ModelActor-uses-Model 的另一端；相关联不表示它是运行模型。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **嵌入模型** `EmbeddingModel`
+    - 定义：嵌入模型是以生成检索或匹配表示为区分能力的一种模型。
+    - 直接上位：`Model`
+    - 为什么需要：嵌入模型为canonical 事实 embeds_chunk（EmbeddingModel embeds_chunk Embedding）提供明确端点并保持与 GenerativeModel 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的嵌入模型：嵌入模型是以生成检索或匹配表示为区分能力的一种模型。；该种差可由关系 embeds_chunk 的端点角色检验。
+    - 不包含：
+  - 生成模型虽与本概念同属 Model，但其定义为“生成模型是以产生文本、代码、结构化输出或调用参数为区分能力的一种模型。”，不得替代嵌入模型。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **生成模型** `GenerativeModel`
+    - 定义：生成模型是以产生文本、代码、结构化输出或调用参数为区分能力的一种模型。
+    - 直接上位：`Model`
+    - 为什么需要：生成模型为canonical 事实 GenerativeModel-is_a-Model（GenerativeModel is_a Model）提供明确端点并保持与 EmbeddingModel 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的生成模型：生成模型是以产生文本、代码、结构化输出或调用参数为区分能力的一种模型。；该种差可由关系 GenerativeModel-is_a-Model 的端点角色检验。
+    - 不包含：
+  - 嵌入模型虽与本概念同属 Model，但其定义为“嵌入模型是以生成检索或匹配表示为区分能力的一种模型。”，不得替代生成模型。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **重排序模型** `RerankerModel`
+    - 定义：重排序模型是以重新排列候选项为区分能力的一种模型。
+    - 直接上位：`Model`
+    - 为什么需要：重排序模型为canonical 事实 reranks_result（RerankerModel reranks_result RetrievedChunk）提供明确端点并保持与 EmbeddingModel 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的重排序模型：重排序模型是以重新排列候选项为区分能力的一种模型。；该种差可由关系 reranks_result 的端点角色检验。
+    - 不包含：
+  - 嵌入模型虽与本概念同属 Model，但其定义为“嵌入模型是以生成检索或匹配表示为区分能力的一种模型。”，不得替代重排序模型。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **远程智能体引用** `RemoteAgentReference`
+  - 定义：它是指向远程主体的引用信息，引用不是 AgentActor 的一种，也不宣称拥有远端内部状态。
+  - 为什么需要：远程智能体引用为canonical 事实 remote_agent_crosses_trust_boundary（RemoteAgentReference remote_agent_crosses_trust_boundary TrustBoundary）提供明确端点并保持与 TrustBoundary 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的远程智能体引用：它是指向远程主体的引用信息，引用不是 AgentActor 的一种，也不宣称拥有远端内部状态。；该种差可由关系 remote_agent_crosses_trust_boundary 的端点角色检验。
+  - 不包含：
+  - 信任边界只是关系 remote_agent_crosses_trust_boundary 的另一端；相关联不表示它是远程智能体引用。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+### 运行产物溯源模块
+
+运行产物溯源模块刻画运行中被产生、消费、派生、归因、审查、导出、起草或最终化的工作产物，并保留它们与执行尝试、事件、参与者和会话之间的溯源关系。
+
+- **运行产物** `Artifact`
+  - 定义：运行产物是带溯源的工作产品，由执行尝试、事件、参与者、工具或会话产生或消费，并可通过派生、归因、审查和导出关系追踪。
+  - 为什么需要：运行产物为canonical 事实 artifact_attributed_to_actor（Artifact artifact_attributed_to_actor AgentActor）提供明确端点并保持与 AgentActor 的定义边界；节点字段 status、artifact_id、version 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的运行产物：运行产物是带溯源的工作产品，由执行尝试、事件、参与者、工具或会话产生或消费，并可通过派生、归因、审查和导出关系追踪。；该种差可由字段 status、artifact_id、version 检验。
+  - 不包含：
+  - 智能体参与者只是关系 artifact_attributed_to_actor 的另一端；相关联不表示它是运行产物。
+  - 结构与约束：7 个字段，2 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+  - **导出产物** `ExportArtifact`
+    - 定义：导出产物表示准备转移到运行边界之外的产物状态或形式，并携带导出配置、可见性、溯源和审查元数据。
+    - 直接上位：`Artifact`
+    - 为什么需要：导出产物为canonical 事实 artifact_exported_as（Artifact artifact_exported_as ExportArtifact）提供明确端点并保持与 GraphArtifact 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的导出产物：导出产物表示准备转移到运行边界之外的产物状态或形式，并携带导出配置、可见性、溯源和审查元数据。；该种差可由关系 artifact_exported_as 的端点角色检验。
+    - 不包含：
+  - 图谱产物虽与本概念同属 Artifact，但其定义为“图谱产物序列化图结构、拓扑、节点边证据、布局元数据或本体与追踪图投影。”，不得替代导出产物。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **图谱产物** `GraphArtifact`
+    - 定义：图谱产物序列化图结构、拓扑、节点边证据、布局元数据或本体与追踪图投影。
+    - 直接上位：`Artifact`
+    - 为什么需要：图谱产物为canonical 事实 GraphArtifact-is_a-Artifact（GraphArtifact is_a Artifact）提供明确端点并保持与 ExportArtifact 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的图谱产物：图谱产物序列化图结构、拓扑、节点边证据、布局元数据或本体与追踪图投影。；该种差可由关系 GraphArtifact-is_a-Artifact 的端点角色检验。
+    - 不包含：
+  - 导出产物虽与本概念同属 Artifact，但其定义为“导出产物表示准备转移到运行边界之外的产物状态或形式，并携带导出配置、可见性、溯源和审查元数据。”，不得替代图谱产物。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **补丁产物** `PatchArtifact`
+    - 定义：补丁产物表示拟议或已应用的代码、文档、配置或数据变更，并携带来源与执行溯源。
+    - 直接上位：`Artifact`
+    - 为什么需要：补丁产物为canonical 事实 PatchArtifact-is_a-Artifact（PatchArtifact is_a Artifact）提供明确端点并保持与 ExportArtifact 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的补丁产物：补丁产物表示拟议或已应用的代码、文档、配置或数据变更，并携带来源与执行溯源。；该种差可由关系 PatchArtifact-is_a-Artifact 的端点角色检验。
+    - 不包含：
+  - 导出产物虽与本概念同属 Artifact，但其定义为“导出产物表示准备转移到运行边界之外的产物状态或形式，并携带导出配置、可见性、溯源和审查元数据。”，不得替代补丁产物。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **报告产物** `ReportArtifact`
+    - 定义：报告产物汇总运行会话或审查过程产生的发现、评估、证据、决策或进展。
+    - 直接上位：`Artifact`
+    - 为什么需要：报告产物为canonical 事实 ReportArtifact-is_a-Artifact（ReportArtifact is_a Artifact）提供明确端点并保持与 ExportArtifact 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的报告产物：报告产物汇总运行会话或审查过程产生的发现、评估、证据、决策或进展。；该种差可由关系 ReportArtifact-is_a-Artifact 的端点角色检验。
+    - 不包含：
+  - 导出产物虽与本概念同属 Artifact，但其定义为“导出产物表示准备转移到运行边界之外的产物状态或形式，并携带导出配置、可见性、溯源和审查元数据。”，不得替代报告产物。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **模式产物** `SchemaArtifact`
+    - 定义：模式产物表示运行中产生或消费的模式对象，仅限执行过程中使用的模式，不重新定义适配器导出的语义。
+    - 直接上位：`Artifact`
+    - 为什么需要：模式产物为canonical 事实 SchemaAdapter-produces-SchemaArtifact（SchemaAdapter produces SchemaArtifact）提供明确端点并保持与 ExportArtifact 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的模式产物：模式产物表示运行中产生或消费的模式对象，仅限执行过程中使用的模式，不重新定义适配器导出的语义。；该种差可由关系 SchemaAdapter-produces-SchemaArtifact 的端点角色检验。
+    - 不包含：
+  - 导出产物虽与本概念同属 Artifact，但其定义为“导出产物表示准备转移到运行边界之外的产物状态或形式，并携带导出配置、可见性、溯源和审查元数据。”，不得替代模式产物。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+
+### 运行追踪与检查点模块
+
+运行追踪与检查点模块刻画原始且有序的运行证据，包括转录、追踪记录、跨度、跨度内事件、追踪链接、检查点恢复事件、状态快照、状态差异、回放事件、审计记录与追踪保留策略。
+
+- **命令执行** `CommandExecution`
+  - 定义：命令执行是被追踪记录观测的运行活动；活动不是记录、跨度或事件记录的子类。
+  - 为什么需要：命令执行为canonical 事实 stages_output_as（CommandExecution stages_output_as OutputChunk）提供明确端点并保持与 OutputChunk 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的命令执行：命令执行是被追踪记录观测的运行活动；活动不是记录、跨度或事件记录的子类。；该种差可由关系 stages_output_as 的端点角色检验。
+  - 不包含：
+  - 输出分块只是关系 stages_output_as 的另一端；相关联不表示它是命令执行。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **可观测运行事件** `ObservabilityEvent`
+  - 定义：可观测运行事件是在确定时间发生、改变或报告运行状态并可关联到追踪、会话或尝试的事件上位概念；事件本身与记录事件的信息载体区分。
+  - 为什么需要：可观测运行事件为canonical 事实 CheckpointRestoreEvent-is_a-ObservabilityEvent（CheckpointRestoreEvent is_a ObservabilityEvent）提供明确端点并保持与 CheckpointRestoreEvent 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的可观测运行事件：可观测运行事件是在确定时间发生、改变或报告运行状态并可关联到追踪、会话或尝试的事件上位概念；事件本身与记录事件的信息载体区分。；该种差可由关系 CheckpointRestoreEvent-is_a-ObservabilityEvent 的端点角色检验。
+  - 不包含：
+  - 检查点恢复事件只是关系 CheckpointRestoreEvent-is_a-ObservabilityEvent 的另一端；相关联不表示它是可观测运行事件。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **检查点恢复事件** `CheckpointRestoreEvent`
+    - 定义：检查点恢复事件记录从已保存检查点恢复运行会话、参与者、图或工作流的可观测事件，并保存恢复溯源。
+    - 直接上位：`ObservabilityEvent`
+    - 为什么需要：检查点恢复事件为canonical 事实 CheckpointRestoreEvent-restores_from-Checkpoint（CheckpointRestoreEvent restores_from Checkpoint）提供明确端点并保持与 ReplayEvent 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的检查点恢复事件：检查点恢复事件记录从已保存检查点恢复运行会话、参与者、图或工作流的可观测事件，并保存恢复溯源。；该种差可由关系 CheckpointRestoreEvent-restores_from-Checkpoint 的端点角色检验。
+    - 不包含：
+  - 回放事件虽与本概念同属 ObservabilityEvent，但其定义为“回放事件记录为了调试、评估、复现或审查而回放追踪、跨度、会话片段、检查点或产物谱系的可观测事件。”，不得替代检查点恢复事件。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **回放事件** `ReplayEvent`
+    - 定义：回放事件记录为了调试、评估、复现或审查而回放追踪、跨度、会话片段、检查点或产物谱系的可观测事件。
+    - 直接上位：`ObservabilityEvent`
+    - 为什么需要：回放事件为canonical 事实 ReplayEvent-replays-TraceRecord（ReplayEvent replays TraceRecord）提供明确端点并保持与 CheckpointRestoreEvent 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的回放事件：回放事件记录为了调试、评估、复现或审查而回放追踪、跨度、会话片段、检查点或产物谱系的可观测事件。；该种差可由关系 ReplayEvent-replays-TraceRecord 的端点角色检验。
+    - 不包含：
+  - 检查点恢复事件虽与本概念同属 ObservabilityEvent，但其定义为“检查点恢复事件记录从已保存检查点恢复运行会话、参与者、图或工作流的可观测事件，并保存恢复溯源。”，不得替代回放事件。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **追踪事件** `TraceEvent`
+    - 定义：追踪事件是可观测的运行发生项，例如消息、动作、工具调用、状态更新、警告、策略决策、产物更新或检查点事件。
+    - 直接上位：`ObservabilityEvent`
+    - 为什么需要：追踪事件为canonical 事实 TraceSpan-records_event-TraceEvent（TraceSpan records_event TraceEvent）提供明确端点并保持与 CheckpointRestoreEvent 的定义边界；节点字段 timestamp 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的追踪事件：追踪事件是可观测的运行发生项，例如消息、动作、工具调用、状态更新、警告、策略决策、产物更新或检查点事件。；该种差可由字段 timestamp 检验。
+    - 不包含：
+  - 检查点恢复事件虽与本概念同属 ObservabilityEvent，但其定义为“检查点恢复事件记录从已保存检查点恢复运行会话、参与者、图或工作流的可观测事件，并保存恢复溯源。”，不得替代追踪事件。
+    - 结构与约束：1 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+
+- **可观测记录** `ObservabilityRecord`
+  - 定义：可观测记录是具有时间、来源和关联标识，用于保存运行行为、状态、消息或责任证据且不包含未外化私有推理的信息记录。
+  - 为什么需要：可观测记录为canonical 事实 AgentTranscript-is_a-ObservabilityRecord（AgentTranscript is_a ObservabilityRecord）提供明确端点并保持与 AgentTranscript 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的可观测记录：可观测记录是具有时间、来源和关联标识，用于保存运行行为、状态、消息或责任证据且不包含未外化私有推理的信息记录。；该种差可由关系 AgentTranscript-is_a-ObservabilityRecord 的端点角色检验。
+  - 不包含：
+  - 智能体转录记录只是关系 AgentTranscript-is_a-ObservabilityRecord 的另一端；相关联不表示它是可观测记录。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **智能体转录记录** `AgentTranscript`
+    - 定义：智能体转录记录按顺序保存实际可见或已发出的消息、动作、工具调用、模型输出、策略决策、警告和产物引用。
+    - 直接上位：`ObservabilityRecord`
+    - 为什么需要：智能体转录记录为canonical 事实 AgentTranscript-is_a-ObservabilityRecord（AgentTranscript is_a ObservabilityRecord）提供明确端点并保持与 AuditRecord 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的智能体转录记录：智能体转录记录按顺序保存实际可见或已发出的消息、动作、工具调用、模型输出、策略决策、警告和产物引用。；该种差可由关系 AgentTranscript-is_a-ObservabilityRecord 的端点角色检验。
+    - 不包含：
+  - 审计记录虽与本概念同属 ObservabilityRecord，但其定义为“审计记录是附着在运行会话或追踪上的原始审计证据，保存发生了什么以及关联了谁或什么，但不承担反馈解释职责。”，不得替代智能体转录记录。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **审计记录** `AuditRecord`
+    - 定义：审计记录是附着在运行会话或追踪上的原始审计证据，保存发生了什么以及关联了谁或什么，但不承担反馈解释职责。
+    - 直接上位：`ObservabilityRecord`
+    - 为什么需要：审计记录为canonical 事实 audit_log_summarizes_audit_record（AuditLog audit_log_summarizes_audit_record AuditRecord）提供明确端点并保持与 AgentTranscript 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的审计记录：审计记录是附着在运行会话或追踪上的原始审计证据，保存发生了什么以及关联了谁或什么，但不承担反馈解释职责。；该种差可由关系 audit_log_summarizes_audit_record 的端点角色检验。
+    - 不包含：
+  - 智能体转录记录虽与本概念同属 ObservabilityRecord，但其定义为“智能体转录记录按顺序保存实际可见或已发出的消息、动作、工具调用、模型输出、策略决策、警告和产物引用。”，不得替代审计记录。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **可观测摘要** `ObservableSummary`
+    - 定义：可观测摘要把先前事件、状态、转录或产物证据压缩为运行期可见摘要，用于上下文预算、审查或移交，同时不保存私有推理转录。
+    - 直接上位：`ObservabilityRecord`
+    - 为什么需要：可观测摘要为canonical 事实 ObservableSummary-derived_from-TraceRecord（ObservableSummary derived_from TraceRecord）提供明确端点并保持与 AgentTranscript 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的可观测摘要：可观测摘要把先前事件、状态、转录或产物证据压缩为运行期可见摘要，用于上下文预算、审查或移交，同时不保存私有推理转录。；该种差可由关系 ObservableSummary-derived_from-TraceRecord 的端点角色检验。
+    - 不包含：
+  - 智能体转录记录虽与本概念同属 ObservabilityRecord，但其定义为“智能体转录记录按顺序保存实际可见或已发出的消息、动作、工具调用、模型输出、策略决策、警告和产物引用。”，不得替代可观测摘要。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **状态记录** `StateRecord`
+    - 定义：状态记录是一种以特定版本或时点的运行状态、版本间差异或可恢复一致性边界为主要内容的可观测记录。
+    - 直接上位：`ObservabilityRecord`
+    - 为什么需要：状态记录为canonical 事实 StateRecord-is_a-ObservabilityRecord（StateRecord is_a ObservabilityRecord）提供明确端点并保持与 AgentTranscript 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的状态记录：状态记录是一种以特定版本或时点的运行状态、版本间差异或可恢复一致性边界为主要内容的可观测记录。；该种差可由关系 StateRecord-is_a-ObservabilityRecord 的端点角色检验。
+    - 不包含：
+  - 智能体转录记录虽与本概念同属 ObservabilityRecord，但其定义为“智能体转录记录按顺序保存实际可见或已发出的消息、动作、工具调用、模型输出、策略决策、警告和产物引用。”，不得替代状态记录。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+    - **检查点** `Checkpoint`
+      - 定义：检查点是保存的延续点，捕获会话状态，使运行时能够从已知状态恢复、分支、故障恢复、检查或进行时间回溯。
+      - 直接上位：`StateRecord`
+      - 为什么需要：检查点为canonical 事实 checkpoint_belongs_to_session（Checkpoint checkpoint_belongs_to_session RuntimeSession）提供明确端点并保持与 StateDiff 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的检查点：检查点是保存的延续点，捕获会话状态，使运行时能够从已知状态恢复、分支、故障恢复、检查或进行时间回溯。；该种差可由关系 checkpoint_belongs_to_session 的端点角色检验。
+      - 不包含：
+  - 状态差异虽与本概念同属 StateRecord，但其定义为“状态差异记录从一个状态快照到另一个状态快照的差别，显示两个已捕获状态之间变化的值、通道、产物或生命周期位置。”，不得替代检查点。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：2 项
+    - **状态差异** `StateDiff`
+      - 定义：状态差异记录从一个状态快照到另一个状态快照的差别，显示两个已捕获状态之间变化的值、通道、产物或生命周期位置。
+      - 直接上位：`StateRecord`
+      - 为什么需要：状态差异为canonical 事实 state_diff_from_snapshot（StateDiff state_diff_from_snapshot StateSnapshot）提供明确端点并保持与 Checkpoint 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的状态差异：状态差异记录从一个状态快照到另一个状态快照的差别，显示两个已捕获状态之间变化的值、通道、产物或生命周期位置。；该种差可由关系 state_diff_from_snapshot 的端点角色检验。
+      - 不包含：
+  - 检查点虽与本概念同属 StateRecord，但其定义为“检查点是保存的延续点，捕获会话状态，使运行时能够从已知状态恢复、分支、故障恢复、检查或进行时间回溯。”，不得替代状态差异。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：2 项
+    - **状态快照** `StateSnapshot`
+      - 定义：状态快照捕获会话、参与者、图、工具或状态图步骤的运行状态，用于检查、恢复、回放或生命周期转移。
+      - 直接上位：`StateRecord`
+      - 为什么需要：状态快照为canonical 事实 Checkpoint-captures-StateSnapshot（Checkpoint captures StateSnapshot）提供明确端点并保持与 Checkpoint 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的状态快照：状态快照捕获会话、参与者、图、工具或状态图步骤的运行状态，用于检查、恢复、回放或生命周期转移。；该种差可由关系 Checkpoint-captures-StateSnapshot 的端点角色检验。
+      - 不包含：
+  - 检查点虽与本概念同属 StateRecord，但其定义为“检查点是保存的延续点，捕获会话状态，使运行时能够从已知状态恢复、分支、故障恢复、检查或进行时间回溯。”，不得替代状态快照。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：2 项
+  - **追踪记录** `TraceRecord`
+    - 定义：追踪记录是一次运行工作流或会话片段的追踪容器，汇集跨度、追踪上下文、链接、有序事件、保留策略和根跨度身份。
+    - 直接上位：`ObservabilityRecord`
+    - 为什么需要：追踪记录为canonical 事实 trace_has_context（TraceRecord trace_has_context TraceContext）提供明确端点并保持与 AgentTranscript 的定义边界；节点字段 trace_id、sampled 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的追踪记录：追踪记录是一次运行工作流或会话片段的追踪容器，汇集跨度、追踪上下文、链接、有序事件、保留策略和根跨度身份。；该种差可由字段 trace_id、sampled 检验。
+    - 不包含：
+  - 智能体转录记录虽与本概念同属 ObservabilityRecord，但其定义为“智能体转录记录按顺序保存实际可见或已发出的消息、动作、工具调用、模型输出、策略决策、警告和产物引用。”，不得替代追踪记录。
+    - 结构与约束：2 个字段，2 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **追踪跨度** `TraceSpan`
+    - 定义：追踪跨度是追踪中的操作区间或工作单元，记录父跨度、时间、状态、属性、所含事件以及与相关跨度的链接。
+    - 直接上位：`ObservabilityRecord`
+    - 为什么需要：追踪跨度为canonical 事实 span_has_attribute（TraceSpan span_has_attribute SpanAttribute）提供明确端点并保持与 AgentTranscript 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的追踪跨度：追踪跨度是追踪中的操作区间或工作单元，记录父跨度、时间、状态、属性、所含事件以及与相关跨度的链接。；该种差可由关系 span_has_attribute 的端点角色检验。
+    - 不包含：
+  - 智能体转录记录虽与本概念同属 ObservabilityRecord，但其定义为“智能体转录记录按顺序保存实际可见或已发出的消息、动作、工具调用、模型输出、策略决策、警告和产物引用。”，不得替代追踪跨度。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **追踪元数据** `TraceMetadata`
+  - 定义：追踪元数据是附着于追踪或跨度、用于传播上下文、表达非父子链接、记录属性或状态且不表示被观测活动本身的信息。
+  - 为什么需要：追踪元数据为canonical 事实 SpanAttribute-is_a-TraceMetadata（SpanAttribute is_a TraceMetadata）提供明确端点并保持与 SpanAttribute 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的追踪元数据：追踪元数据是附着于追踪或跨度、用于传播上下文、表达非父子链接、记录属性或状态且不表示被观测活动本身的信息。；该种差可由关系 SpanAttribute-is_a-TraceMetadata 的端点角色检验。
+  - 不包含：
+  - 跨度属性只是关系 SpanAttribute-is_a-TraceMetadata 的另一端；相关联不表示它是追踪元数据。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **跨度属性** `SpanAttribute`
+    - 定义：跨度属性是附加到追踪跨度的键值属性，用于记录操作名称、模型或工具身份、状态细节、延迟、词元用量或其他可观测元数据。
+    - 直接上位：`TraceMetadata`
+    - 为什么需要：跨度属性为canonical 事实 span_has_attribute（TraceSpan span_has_attribute SpanAttribute）提供明确端点并保持与 SpanStatus 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的跨度属性：跨度属性是附加到追踪跨度的键值属性，用于记录操作名称、模型或工具身份、状态细节、延迟、词元用量或其他可观测元数据。；该种差可由关系 span_has_attribute 的端点角色检验。
+    - 不包含：
+  - 跨度状态虽与本概念同属 TraceMetadata，但其定义为“跨度状态记录追踪跨度的状态，例如未设置、正常、错误、取消、阻断、重试或降级，并可附带诊断上下文。”，不得替代跨度属性。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **跨度状态** `SpanStatus`
+    - 定义：跨度状态记录追踪跨度的状态，例如未设置、正常、错误、取消、阻断、重试或降级，并可附带诊断上下文。
+    - 直接上位：`TraceMetadata`
+    - 为什么需要：跨度状态为canonical 事实 span_has_status（TraceSpan span_has_status SpanStatus）提供明确端点并保持与 SpanAttribute 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的跨度状态：跨度状态记录追踪跨度的状态，例如未设置、正常、错误、取消、阻断、重试或降级，并可附带诊断上下文。；该种差可由关系 span_has_status 的端点角色检验。
+    - 不包含：
+  - 跨度属性虽与本概念同属 TraceMetadata，但其定义为“跨度属性是附加到追踪跨度的键值属性，用于记录操作名称、模型或工具身份、状态细节、延迟、词元用量或其他可观测元数据。”，不得替代跨度状态。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **追踪上下文** `TraceContext`
+    - 定义：追踪上下文携带追踪标识、父上下文、采样状态、传播元数据和边界信息，用于关联同一追踪记录中的运行证据。
+    - 直接上位：`TraceMetadata`
+    - 为什么需要：追踪上下文为canonical 事实 trace_has_context（TraceRecord trace_has_context TraceContext）提供明确端点并保持与 SpanAttribute 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的追踪上下文：追踪上下文携带追踪标识、父上下文、采样状态、传播元数据和边界信息，用于关联同一追踪记录中的运行证据。；该种差可由关系 trace_has_context 的端点角色检验。
+    - 不包含：
+  - 跨度属性虽与本概念同属 TraceMetadata，但其定义为“跨度属性是附加到追踪跨度的键值属性，用于记录操作名称、模型或工具身份、状态细节、延迟、词元用量或其他可观测元数据。”，不得替代追踪上下文。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **追踪链接** `TraceLink`
+    - 定义：追踪链接表示跨度、事件、追踪、执行尝试或产物之间的非父子因果或上下文关联，用于普通父子追踪结构不足以表达关系的情况。
+    - 直接上位：`TraceMetadata`
+    - 为什么需要：追踪链接为canonical 事实 trace_link_source_span（TraceLink trace_link_source_span TraceSpan）提供明确端点并保持与 SpanAttribute 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的追踪链接：追踪链接表示跨度、事件、追踪、执行尝试或产物之间的非父子因果或上下文关联，用于普通父子追踪结构不足以表达关系的情况。；该种差可由关系 trace_link_source_span 的端点角色检验。
+    - 不包含：
+  - 跨度属性虽与本概念同属 TraceMetadata，但其定义为“跨度属性是附加到追踪跨度的键值属性，用于记录操作名称、模型或工具身份、状态细节、延迟、词元用量或其他可观测元数据。”，不得替代追踪链接。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **追踪保留策略** `TraceRetentionPolicy`
+  - 定义：追踪保留策略治理追踪的存储时长、采样、脱敏、可见性、导出目的地、删除、隐私等级和不保留模式。
+  - 为什么需要：追踪保留策略为canonical 事实 TraceRetentionPolicy-governs-TraceRecord（TraceRetentionPolicy governs TraceRecord）提供明确端点并保持与 TraceRecord 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的追踪保留策略：追踪保留策略治理追踪的存储时长、采样、脱敏、可见性、导出目的地、删除、隐私等级和不保留模式。；该种差可由关系 TraceRetentionPolicy-governs-TraceRecord 的端点角色检验。
+  - 不包含：
+  - 追踪记录只是关系 TraceRetentionPolicy-governs-TraceRecord 的另一端；相关联不表示它是追踪保留策略。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+### 运行会话与执行包络模块
+
+运行会话与执行包络模块刻画有边界的运行会话、执行尝试、执行结果、运行环境、运行预算和生命周期转移，用来说明智能体活动实际发生在哪个执行片段内。
+
+- **智能体系统** `AgentSystem`
+  - 定义：智能体系统是在运行期协调参与者、模型、工具、记忆、策略、追踪、会话与产物的整体安排，用于完成有边界的智能体工作。
+  - 为什么需要：智能体系统为canonical 事实 AgentSystem-hosts-RuntimeSession（AgentSystem hosts RuntimeSession）提供明确端点并保持与 RuntimeSession 的定义边界；节点字段 system_id 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的智能体系统：智能体系统是在运行期协调参与者、模型、工具、记忆、策略、追踪、会话与产物的整体安排，用于完成有边界的智能体工作。；该种差可由字段 system_id 检验。
+  - 不包含：
+  - 运行会话只是关系 AgentSystem-hosts-RuntimeSession 的另一端；相关联不表示它是智能体系统。
+  - 结构与约束：1 个字段，0 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+
+- **进程句柄** `ProcessHandle`
+  - 定义：进程句柄标识用于监视、停止或关联某次执行尝试的操作系统进程引用。
+  - 为什么需要：进程句柄为canonical 事实 ProcessHandle-correlates-RunAttempt（ProcessHandle correlates RunAttempt）提供明确端点并保持与 RunAttempt 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的进程句柄：进程句柄标识用于监视、停止或关联某次执行尝试的操作系统进程引用。；该种差可由关系 ProcessHandle-correlates-RunAttempt 的端点角色检验。
+  - 不包含：
+  - 执行尝试只是关系 ProcessHandle-correlates-RunAttempt 的另一端；相关联不表示它是进程句柄。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **执行尝试** `RunAttempt`
+  - 定义：执行尝试是有起止和重试谱系的运行活动；它属于会话但不是会话的子类。
+  - 为什么需要：执行尝试为canonical 事实 RuntimeBudget-constrains-RunAttempt（RuntimeBudget constrains RunAttempt）提供明确端点并保持与 RuntimeBudget 的定义边界；节点字段 status、duration_ms、retry_count 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的执行尝试：执行尝试是有起止和重试谱系的运行活动；它属于会话但不是会话的子类。；该种差可由字段 status、duration_ms、retry_count 检验。
+  - 不包含：
+  - 运行预算只是关系 RuntimeBudget-constrains-RunAttempt 的另一端；相关联不表示它是执行尝试。
+  - 结构与约束：4 个字段，0 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+
+- **执行结果** `RunOutcome`
+  - 定义：执行结果记录一次执行尝试或会话的终端结果，包括成功、失败、取消、产生的产物和最终可观测状态。
+  - 为什么需要：执行结果为canonical 事实 BenchmarkAdapter-maps_success_to-RunOutcome（BenchmarkAdapter maps_success_to RunOutcome）提供明确端点并保持与 BenchmarkAdapter 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的执行结果：执行结果记录一次执行尝试或会话的终端结果，包括成功、失败、取消、产生的产物和最终可观测状态。；该种差可由关系 BenchmarkAdapter-maps_success_to-RunOutcome 的端点角色检验。
+  - 不包含：
+  - 基准适配器只是关系 BenchmarkAdapter-maps_success_to-RunOutcome 的另一端；相关联不表示它是执行结果。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **运行预算** `RuntimeBudget`
+  - 定义：运行预算记录作用于执行尝试或会话的时间、词元、成本、重试、工具调用、上下文窗口或资源消耗限制。
+  - 为什么需要：运行预算为canonical 事实 RuntimeBudget-constrains-RunAttempt（RuntimeBudget constrains RunAttempt）提供明确端点并保持与 RunAttempt 的定义边界；节点字段 cost 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的运行预算：运行预算记录作用于执行尝试或会话的时间、词元、成本、重试、工具调用、上下文窗口或资源消耗限制。；该种差可由字段 cost 检验。
+  - 不包含：
+  - 执行尝试只是关系 RuntimeBudget-constrains-RunAttempt 的另一端；相关联不表示它是运行预算。
+  - 结构与约束：1 个字段，0 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+
+- **运行环境** `RuntimeEnvironment`
+  - 定义：运行环境描述某次会话或执行尝试实际使用的具体执行环境，包括容器、沙箱、工作目录、进程设置、模型或工具可用性以及运行配置。
+  - 为什么需要：运行环境为canonical 事实 RuntimeEnvironment-has_working_directory-WorkingDirectory（RuntimeEnvironment has_working_directory WorkingDirectory）提供明确端点并保持与 WorkingDirectory 的定义边界；节点字段 environment_variables 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的运行环境：运行环境描述某次会话或执行尝试实际使用的具体执行环境，包括容器、沙箱、工作目录、进程设置、模型或工具可用性以及运行配置。；该种差可由字段 environment_variables 检验。
+  - 不包含：
+  - 工作目录只是关系 RuntimeEnvironment-has_working_directory-WorkingDirectory 的另一端；相关联不表示它是运行环境。
+  - 结构与约束：1 个字段，0 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+  - **容器** `Container`
+    - 定义：容器描述带有文件系统状态、进程隔离、网络设置和会话局部资源的运行执行环境。
+    - 直接上位：`RuntimeEnvironment`
+    - 为什么需要：容器为canonical 事实 Container-is_a-RuntimeEnvironment（Container is_a RuntimeEnvironment）提供明确端点并保持与 RuntimeEnvironment 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的容器：容器描述带有文件系统状态、进程隔离、网络设置和会话局部资源的运行执行环境。；该种差可由关系 Container-is_a-RuntimeEnvironment 的端点角色检验。
+    - 不包含：
+  - 仅能识别为上位概念 RuntimeEnvironment 的对象不在范围内；它尚未证明容器的种差或关系端点 Container-is_a-RuntimeEnvironment。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+
+- **运行会话** `RuntimeSession`
+  - 定义：运行会话是把尝试、预算、环境与产物聚合在一个身份下的有界执行片段；其子项通过组成关系进入。
+  - 为什么需要：运行会话为canonical 事实 emits_trace_event（RuntimeSession emits_trace_event TraceEvent）提供明确端点并保持与 TraceEvent 的定义边界；节点字段 lifecycle_state、start_time、session_id 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的运行会话：运行会话是把尝试、预算、环境与产物聚合在一个身份下的有界执行片段；其子项通过组成关系进入。；该种差可由字段 lifecycle_state、start_time、session_id 检验。
+  - 不包含：
+  - 追踪事件只是关系 emits_trace_event 的另一端；相关联不表示它是运行会话。
+  - 结构与约束：4 个字段，2 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+
+- **会话生命周期事件** `SessionLifecycleEvent`
+  - 定义：会话生命周期事件是在确定时间点使运行会话进入、离开或恢复某个生命周期状态，并保留前后状态、触发者、原因与追踪引用的事件上位概念。
+  - 为什么需要：会话生命周期事件为canonical 事实 SessionLifecycleEvent-changes_state_of-RuntimeSession（SessionLifecycleEvent changes_state_of RuntimeSession）提供明确端点并保持与 RuntimeSession 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的会话生命周期事件：会话生命周期事件是在确定时间点使运行会话进入、离开或恢复某个生命周期状态，并保留前后状态、触发者、原因与追踪引用的事件上位概念。；该种差可由关系 SessionLifecycleEvent-changes_state_of-RuntimeSession 的端点角色检验。
+  - 不包含：
+  - 运行会话只是关系 SessionLifecycleEvent-changes_state_of-RuntimeSession 的另一端；相关联不表示它是会话生命周期事件。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **会话结束事件** `SessionEndEvent`
+    - 定义：会话结束事件记录运行会话的可观测关闭，包括最终状态、清理、产物和剩余审计引用。
+    - 直接上位：`SessionLifecycleEvent`
+    - 为什么需要：会话结束事件为canonical 事实 closes_runtime_session（SessionEndEvent closes_runtime_session RuntimeSession）提供明确端点并保持与 SessionPauseEvent 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的会话结束事件：会话结束事件记录运行会话的可观测关闭，包括最终状态、清理、产物和剩余审计引用。；该种差可由关系 closes_runtime_session 的端点角色检验。
+    - 不包含：
+  - 会话暂停事件虽与本概念同属 SessionLifecycleEvent，但其定义为“会话暂停事件记录会话停止推进但保留可恢复状态和待处理工作的可观测转移。”，不得替代会话结束事件。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **会话暂停事件** `SessionPauseEvent`
+    - 定义：会话暂停事件记录会话停止推进但保留可恢复状态和待处理工作的可观测转移。
+    - 直接上位：`SessionLifecycleEvent`
+    - 为什么需要：会话暂停事件为canonical 事实 pauses_with_snapshot（SessionPauseEvent pauses_with_snapshot StateSnapshot）提供明确端点并保持与 SessionEndEvent 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的会话暂停事件：会话暂停事件记录会话停止推进但保留可恢复状态和待处理工作的可观测转移。；该种差可由关系 pauses_with_snapshot 的端点角色检验。
+    - 不包含：
+  - 会话结束事件虽与本概念同属 SessionLifecycleEvent，但其定义为“会话结束事件记录运行会话的可观测关闭，包括最终状态、清理、产物和剩余审计引用。”，不得替代会话暂停事件。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **会话恢复事件** `SessionResumeEvent`
+    - 定义：会话恢复事件记录从保留状态、检查点或外部延续恢复已暂停会话的可观测转移。
+    - 直接上位：`SessionLifecycleEvent`
+    - 为什么需要：会话恢复事件为canonical 事实 resumes_from_checkpoint（SessionResumeEvent resumes_from_checkpoint Checkpoint）提供明确端点并保持与 SessionEndEvent 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的会话恢复事件：会话恢复事件记录从保留状态、检查点或外部延续恢复已暂停会话的可观测转移。；该种差可由关系 resumes_from_checkpoint 的端点角色检验。
+    - 不包含：
+  - 会话结束事件虽与本概念同属 SessionLifecycleEvent，但其定义为“会话结束事件记录运行会话的可观测关闭，包括最终状态、清理、产物和剩余审计引用。”，不得替代会话恢复事件。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **会话开始事件** `SessionStartEvent`
+    - 定义：会话开始事件记录打开运行会话的可观测事件，并把会话绑定到初始参与者、环境、目标和上下文状态。
+    - 直接上位：`SessionLifecycleEvent`
+    - 为什么需要：会话开始事件为canonical 事实 opens_runtime_session（SessionStartEvent opens_runtime_session RuntimeSession）提供明确端点并保持与 SessionEndEvent 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的会话开始事件：会话开始事件记录打开运行会话的可观测事件，并把会话绑定到初始参与者、环境、目标和上下文状态。；该种差可由关系 opens_runtime_session 的端点角色检验。
+    - 不包含：
+  - 会话结束事件虽与本概念同属 SessionLifecycleEvent，但其定义为“会话结束事件记录运行会话的可观测关闭，包括最终状态、清理、产物和剩余审计引用。”，不得替代会话开始事件。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **工作目录** `WorkingDirectory`
+  - 定义：工作目录记录为运行或工具调用限定相对路径与进程执行范围的文件系统位置。
+  - 为什么需要：工作目录为canonical 事实 RuntimeEnvironment-has_working_directory-WorkingDirectory（RuntimeEnvironment has_working_directory WorkingDirectory）提供明确端点并保持与 RuntimeEnvironment 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的工作目录：工作目录记录为运行或工具调用限定相对路径与进程执行范围的文件系统位置。；该种差可由关系 RuntimeEnvironment-has_working_directory-WorkingDirectory 的端点角色检验。
+  - 不包含：
+  - 运行环境只是关系 RuntimeEnvironment-has_working_directory-WorkingDirectory 的另一端；相关联不表示它是工作目录。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+## 互操作适配域
+
+互操作适配域是八个运行关注域之一，承担外部协议、框架、基准、状态图、模式剖面、语义导出、语言剖面、图谱中间表示和前端视图进入规范本体前的适配膜职责。它记录外部构造与规范术语之间的映射方向，保留来源和版本溯源，暴露转换损失或不支持语义，并防止适配器专属字段重定义核心本体。
+
+### 基准适配模块
+
+基准适配模块刻画评测基准中的任务、环境、评分规则、指标、观察、用户模拟、产物和压力轴如何映射到评估剖面，并防止基准专属字段进入核心本体。
+
+- **基准适配器** `BenchmarkAdapter`
+  - 定义：基准适配器族把基准任务、场景、环境、评分规则、指标、观察、用户模拟、产物和压力轴映射到评估剖面，同时不改变核心本体。
+  - 直接上位：`Adapter`
+  - 为什么需要：基准适配器为canonical 事实 BenchmarkAdapter-maps_action_to-ToolCallAttempt（BenchmarkAdapter maps_action_to ToolCallAttempt）提供明确端点并保持与 FrameworkAdapter 的定义边界；节点字段 adapter_id、benchmark_version、conformance_status 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的基准适配器：基准适配器族把基准任务、场景、环境、评分规则、指标、观察、用户模拟、产物和压力轴映射到评估剖面，同时不改变核心本体。；该种差可由字段 adapter_id、benchmark_version、conformance_status 检验。
+  - 不包含：
+  - 框架适配器虽与本概念同属 Adapter，但其定义为“框架适配器记录第一阶段候选框架的运行时、工作流、智能体开发包、多智能体协作、交接和追踪构造如何投影到规范本体。”，不得替代基准适配器。
+  - 结构与约束：2 个字段，2 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+  - **AgencyBench 适配器** `AgencyBenchAdapter`
+    - 定义：AgencyBench 适配器把长时程任务、工具调用压力、上下文长度、多步观察和评分证据映射到规范任务、运行、工具和评估适配术语。
+    - 直接上位：`BenchmarkAdapter`
+    - 为什么需要：AgencyBench 适配器为canonical 事实 AgencyBenchAdapter-is_a-BenchmarkAdapter（AgencyBenchAdapter is_a BenchmarkAdapter）提供明确端点并保持与 AppWorldAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的AgencyBench 适配器：AgencyBench 适配器把长时程任务、工具调用压力、上下文长度、多步观察和评分证据映射到规范任务、运行、工具和评估适配术语。；该种差可由关系 AgencyBenchAdapter-is_a-BenchmarkAdapter 的端点角色检验。
+    - 不包含：
+  - AppWorld 适配器虽与本概念同属 BenchmarkAdapter，但其定义为“AppWorld 适配器把应用与 API 任务、可控应用状态、基于状态的测试、工具或 API 调用和基准观察映射到规范任务、工具、状态和评估术语。”，不得替代AgencyBench 适配器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **AppWorld 适配器** `AppWorldAdapter`
+    - 定义：AppWorld 适配器把应用与 API 任务、可控应用状态、基于状态的测试、工具或 API 调用和基准观察映射到规范任务、工具、状态和评估术语。
+    - 直接上位：`BenchmarkAdapter`
+    - 为什么需要：AppWorld 适配器为canonical 事实 AppWorldAdapter-is_a-BenchmarkAdapter（AppWorldAdapter is_a BenchmarkAdapter）提供明确端点并保持与 AgencyBenchAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的AppWorld 适配器：AppWorld 适配器把应用与 API 任务、可控应用状态、基于状态的测试、工具或 API 调用和基准观察映射到规范任务、工具、状态和评估术语。；该种差可由关系 AppWorldAdapter-is_a-BenchmarkAdapter 的端点角色检验。
+    - 不包含：
+  - AgencyBench 适配器虽与本概念同属 BenchmarkAdapter，但其定义为“AgencyBench 适配器把长时程任务、工具调用压力、上下文长度、多步观察和评分证据映射到规范任务、运行、工具和评估适配术语。”，不得替代AppWorld 适配器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **OSWorld 适配器** `OSWorldAdapter`
+    - 定义：OSWorld 适配器把计算机使用环境、桌面任务、执行观察、成功检查和环境压力映射到规范运行、工具、产物和评估术语。
+    - 直接上位：`BenchmarkAdapter`
+    - 为什么需要：OSWorld 适配器为canonical 事实 OSWorldAdapter-is_a-BenchmarkAdapter（OSWorldAdapter is_a BenchmarkAdapter）提供明确端点并保持与 AgencyBenchAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的OSWorld 适配器：OSWorld 适配器把计算机使用环境、桌面任务、执行观察、成功检查和环境压力映射到规范运行、工具、产物和评估术语。；该种差可由关系 OSWorldAdapter-is_a-BenchmarkAdapter 的端点角色检验。
+    - 不包含：
+  - AgencyBench 适配器虽与本概念同属 BenchmarkAdapter，但其定义为“AgencyBench 适配器把长时程任务、工具调用压力、上下文长度、多步观察和评分证据映射到规范任务、运行、工具和评估适配术语。”，不得替代OSWorld 适配器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **SWE-bench 适配器** `SWEBenchAdapter`
+    - 定义：SWEbench 适配器把软件问题任务、仓库补丁、测试、解决状态、排行榜变体和编码智能体产物映射到规范任务、产物、运行和评估指标术语。
+    - 直接上位：`BenchmarkAdapter`
+    - 为什么需要：SWE-bench 适配器为canonical 事实 SWEBenchAdapter-is_a-BenchmarkAdapter（SWEBenchAdapter is_a BenchmarkAdapter）提供明确端点并保持与 AgencyBenchAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的SWE-bench 适配器：SWEbench 适配器把软件问题任务、仓库补丁、测试、解决状态、排行榜变体和编码智能体产物映射到规范任务、产物、运行和评估指标术语。；该种差可由关系 SWEBenchAdapter-is_a-BenchmarkAdapter 的端点角色检验。
+    - 不包含：
+  - AgencyBench 适配器虽与本概念同属 BenchmarkAdapter，但其定义为“AgencyBench 适配器把长时程任务、工具调用压力、上下文长度、多步观察和评分证据映射到规范任务、运行、工具和评估适配术语。”，不得替代SWE-bench 适配器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **tau2 适配器** `Tau2Adapter`
+    - 定义：tau2 适配器把对话任务环境、知识约束、用户模拟条件、任务结果和基准验证信号映射到规范评估适配术语。
+    - 直接上位：`BenchmarkAdapter`
+    - 为什么需要：tau2 适配器为canonical 事实 Tau2Adapter-is_a-BenchmarkAdapter（Tau2Adapter is_a BenchmarkAdapter）提供明确端点并保持与 AgencyBenchAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的tau2 适配器：tau2 适配器把对话任务环境、知识约束、用户模拟条件、任务结果和基准验证信号映射到规范评估适配术语。；该种差可由关系 Tau2Adapter-is_a-BenchmarkAdapter 的端点角色检验。
+    - 不包含：
+  - AgencyBench 适配器虽与本概念同属 BenchmarkAdapter，但其定义为“AgencyBench 适配器把长时程任务、工具调用压力、上下文长度、多步观察和评分证据映射到规范任务、运行、工具和评估适配术语。”，不得替代tau2 适配器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **Terminal-Bench 适配器** `TerminalBenchAdapter`
+    - 定义：TerminalBench 适配器把终端命令任务、类容器终端执行、命令产物、评分检查和资源压力映射到规范运行、命令、产物和评估术语。
+    - 直接上位：`BenchmarkAdapter`
+    - 为什么需要：Terminal-Bench 适配器为canonical 事实 TerminalBenchAdapter-is_a-BenchmarkAdapter（TerminalBenchAdapter is_a BenchmarkAdapter）提供明确端点并保持与 AgencyBenchAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的Terminal-Bench 适配器：TerminalBench 适配器把终端命令任务、类容器终端执行、命令产物、评分检查和资源压力映射到规范运行、命令、产物和评估术语。；该种差可由关系 TerminalBenchAdapter-is_a-BenchmarkAdapter 的端点角色检验。
+    - 不包含：
+  - AgencyBench 适配器虽与本概念同属 BenchmarkAdapter，但其定义为“AgencyBench 适配器把长时程任务、工具调用压力、上下文长度、多步观察和评分证据映射到规范任务、运行、工具和评估适配术语。”，不得替代Terminal-Bench 适配器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+
+### 框架适配模块
+
+框架适配模块刻画第一阶段候选框架中的图运行时、智能体开发包、多智能体协作、工作流、交接、追踪和子智能体系统如何映射到规范术语。
+
+- **框架适配器** `FrameworkAdapter`
+  - 定义：框架适配器记录第一阶段候选框架的运行时、工作流、智能体开发包、多智能体协作、交接和追踪构造如何投影到规范本体。
+  - 直接上位：`Adapter`
+  - 为什么需要：框架适配器为canonical 事实 FrameworkAdapter-maps_agent_to-AgentActor（FrameworkAdapter maps_agent_to AgentActor）提供明确端点并保持与 BenchmarkAdapter 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的框架适配器：框架适配器记录第一阶段候选框架的运行时、工作流、智能体开发包、多智能体协作、交接和追踪构造如何投影到规范本体。；该种差可由关系 FrameworkAdapter-maps_agent_to-AgentActor 的端点角色检验。
+  - 不包含：
+  - 基准适配器虽与本概念同属 Adapter，但其定义为“基准适配器族把基准任务、场景、环境、评分规则、指标、观察、用户模拟、产物和压力轴映射到评估剖面，同时不改变核心本体。”，不得替代框架适配器。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+  - **CrewAI 适配器** `CrewAIAdapter`
+    - 定义：CrewAI 适配器把智能体、任务、团队、流程、流、护栏、记忆、知识和可观测构造映射到规范参与者、任务、编排、记忆、安全和反馈术语。
+    - 直接上位：`FrameworkAdapter`
+    - 为什么需要：CrewAI 适配器为canonical 事实 CrewAIAdapter-is_a-FrameworkAdapter（CrewAIAdapter is_a FrameworkAdapter）提供明确端点并保持与 DeepAgentsAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的CrewAI 适配器：CrewAI 适配器把智能体、任务、团队、流程、流、护栏、记忆、知识和可观测构造映射到规范参与者、任务、编排、记忆、安全和反馈术语。；该种差可由关系 CrewAIAdapter-is_a-FrameworkAdapter 的端点角色检验。
+    - 不包含：
+  - Deep Agents 适配器虽与本概念同属 FrameworkAdapter，但其定义为“DeepAgents 适配器把规划、子智能体、文件系统上下文、中断、长期记忆、MCP 工具和隔离子智能体上下文映射到规范编排、记忆、工具、运行和适配术语。”，不得替代CrewAI 适配器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **Deep Agents 适配器** `DeepAgentsAdapter`
+    - 定义：DeepAgents 适配器把规划、子智能体、文件系统上下文、中断、长期记忆、MCP 工具和隔离子智能体上下文映射到规范编排、记忆、工具、运行和适配术语。
+    - 直接上位：`FrameworkAdapter`
+    - 为什么需要：Deep Agents 适配器为canonical 事实 DeepAgentsAdapter-is_a-FrameworkAdapter（DeepAgentsAdapter is_a FrameworkAdapter）提供明确端点并保持与 CrewAIAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的Deep Agents 适配器：DeepAgents 适配器把规划、子智能体、文件系统上下文、中断、长期记忆、MCP 工具和隔离子智能体上下文映射到规范编排、记忆、工具、运行和适配术语。；该种差可由关系 DeepAgentsAdapter-is_a-FrameworkAdapter 的端点角色检验。
+    - 不包含：
+  - CrewAI 适配器虽与本概念同属 FrameworkAdapter，但其定义为“CrewAI 适配器把智能体、任务、团队、流程、流、护栏、记忆、知识和可观测构造映射到规范参与者、任务、编排、记忆、安全和反馈术语。”，不得替代Deep Agents 适配器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **LangChain 适配器** `LangChainAdapter`
+    - 定义：链式智能体框架适配器把智能体循环、中间件、工具、结构化输出、上下文和集成构造映射到规范任务、工具、上下文、运行和适配术语。
+    - 直接上位：`FrameworkAdapter`
+    - 为什么需要：LangChain 适配器为canonical 事实 LangChainAdapter-is_a-FrameworkAdapter（LangChainAdapter is_a FrameworkAdapter）提供明确端点并保持与 CrewAIAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的LangChain 适配器：链式智能体框架适配器把智能体循环、中间件、工具、结构化输出、上下文和集成构造映射到规范任务、工具、上下文、运行和适配术语。；该种差可由关系 LangChainAdapter-is_a-FrameworkAdapter 的端点角色检验。
+    - 不包含：
+  - CrewAI 适配器虽与本概念同属 FrameworkAdapter，但其定义为“CrewAI 适配器把智能体、任务、团队、流程、流、护栏、记忆、知识和可观测构造映射到规范参与者、任务、编排、记忆、安全和反馈术语。”，不得替代LangChain 适配器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **LangGraph 适配器** `LangGraphAdapter`
+    - 定义：LangGraph 适配器把节点、边、持久执行、检查点、状态更新、流和图 API 操作等图运行时构造映射到规范编排与运行术语。
+    - 直接上位：`FrameworkAdapter`
+    - 为什么需要：LangGraph 适配器为canonical 事实 LangGraphAdapter-is_a-FrameworkAdapter（LangGraphAdapter is_a FrameworkAdapter）提供明确端点并保持与 CrewAIAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的LangGraph 适配器：LangGraph 适配器把节点、边、持久执行、检查点、状态更新、流和图 API 操作等图运行时构造映射到规范编排与运行术语。；该种差可由关系 LangGraphAdapter-is_a-FrameworkAdapter 的端点角色检验。
+    - 不包含：
+  - CrewAI 适配器虽与本概念同属 FrameworkAdapter，但其定义为“CrewAI 适配器把智能体、任务、团队、流程、流、护栏、记忆、知识和可观测构造映射到规范参与者、任务、编排、记忆、安全和反馈术语。”，不得替代LangGraph 适配器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **Microsoft Agent Framework 适配器** `MicrosoftAgentFrameworkAdapter`
+    - 定义：微软智能体框架适配器把智能体、工作流、多智能体协同、运行服务和集成表面映射到规范参与者、编排、工具、运行和适配术语。
+    - 直接上位：`FrameworkAdapter`
+    - 为什么需要：Microsoft Agent Framework 适配器为canonical 事实 MicrosoftAgentFrameworkAdapter-is_a-FrameworkAdapter（MicrosoftAgentFrameworkAdapter is_a FrameworkAdapter）提供明确端点并保持与 CrewAIAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的Microsoft Agent Framework 适配器：微软智能体框架适配器把智能体、工作流、多智能体协同、运行服务和集成表面映射到规范参与者、编排、工具、运行和适配术语。；该种差可由关系 MicrosoftAgentFrameworkAdapter-is_a-FrameworkAdapter 的端点角色检验。
+    - 不包含：
+  - CrewAI 适配器虽与本概念同属 FrameworkAdapter，但其定义为“CrewAI 适配器把智能体、任务、团队、流程、流、护栏、记忆、知识和可观测构造映射到规范参与者、任务、编排、记忆、安全和反馈术语。”，不得替代Microsoft Agent Framework 适配器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **OpenAI Agents 适配器** `OpenAIAgentsAdapter`
+    - 定义：OpenAI Agents 适配器把智能体、工具、智能体作为工具、交接、护栏、会话和追踪跨度等 SDK 构造映射到规范编排、工具、安全和运行术语。
+    - 直接上位：`FrameworkAdapter`
+    - 为什么需要：OpenAI Agents 适配器为canonical 事实 OpenAIAgentsAdapter-is_a-FrameworkAdapter（OpenAIAgentsAdapter is_a FrameworkAdapter）提供明确端点并保持与 CrewAIAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的OpenAI Agents 适配器：OpenAI Agents 适配器把智能体、工具、智能体作为工具、交接、护栏、会话和追踪跨度等 SDK 构造映射到规范编排、工具、安全和运行术语。；该种差可由关系 OpenAIAgentsAdapter-is_a-FrameworkAdapter 的端点角色检验。
+    - 不包含：
+  - CrewAI 适配器虽与本概念同属 FrameworkAdapter，但其定义为“CrewAI 适配器把智能体、任务、团队、流程、流、护栏、记忆、知识和可观测构造映射到规范参与者、任务、编排、记忆、安全和反馈术语。”，不得替代OpenAI Agents 适配器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+
+- **框架映射规则** `FrameworkMapping`
+  - 定义：框架映射规则是一种 MappingRule，针对明确框架与版本，把其 agent、task、tool、handoff、state、memory、guardrail、result 或 trace 构造映射到统一概念，记录源路径、目标 ID、方向、变换、缺失语义、unsupported 情况和测试证据；框架对象本身不复制到核心类树。
+  - 直接上位：`MappingRule`
+  - 为什么需要：框架映射规则为canonical 事实 FrameworkMapping-applies_to_adapter-FrameworkAdapter（FrameworkMapping applies_to_adapter FrameworkAdapter）提供明确端点并保持与 ProtocolMapping 的定义边界；节点字段 mapping_id、framework_version、loss_kind 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的框架映射规则：框架映射规则是一种 MappingRule，针对明确框架与版本，把其 agent、task、tool、handoff、state、memory、guardrail、result 或 trace 构造映射到统一概念，记录源路径、目标 ID、方向、变换、缺失语义、unsupported 情况和测试证据；框架对象本身不复制到核心类树。；该种差可由字段 mapping_id、framework_version、loss_kind 检验。
+  - 不包含：
+  - 协议映射规则虽与本概念同属 MappingRule，但其定义为“协议映射规则是一种 MappingRule，源端或目标端至少一侧属于明确版本的通信协议，并以消息、任务、能力、身份或信任构造为映射对象；它记录外部 QName/路径、canonical 目标、方向、变换、前后条件、exact/lossy/unsupported 分类和一致性测试。”，不得替代框架映射规则。
+  - 结构与约束：3 个字段，2 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+  - **框架移交映射** `FrameworkHandoffMapping`
+    - 定义：框架交接映射是有方向的映射记录，用于把框架原生交接构造对齐到规范交接、责任转移、权限范围、可见上下文和结果归属术语。
+    - 直接上位：`FrameworkMapping`
+    - 为什么需要：框架移交映射为canonical 事实 FrameworkHandoffMapping-maps_to-Handoff（FrameworkHandoffMapping maps_to Handoff）提供明确端点并保持与 FrameworkTraceMapping 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的框架移交映射：框架交接映射是有方向的映射记录，用于把框架原生交接构造对齐到规范交接、责任转移、权限范围、可见上下文和结果归属术语。；该种差可由关系 FrameworkHandoffMapping-maps_to-Handoff 的端点角色检验。
+    - 不包含：
+  - 框架轨迹映射虽与本概念同属 FrameworkMapping，但其定义为“框架轨迹映射是有方向的映射记录，用于把框架原生追踪、跨度、运行、检查点或流构造对齐到规范追踪记录、追踪跨度、追踪事件、运行会话和产物溯源术语。”，不得替代框架移交映射。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **框架轨迹映射** `FrameworkTraceMapping`
+    - 定义：框架轨迹映射是有方向的映射记录，用于把框架原生追踪、跨度、运行、检查点或流构造对齐到规范追踪记录、追踪跨度、追踪事件、运行会话和产物溯源术语。
+    - 直接上位：`FrameworkMapping`
+    - 为什么需要：框架轨迹映射为canonical 事实 FrameworkTraceMapping-maps_to-TraceRecord（FrameworkTraceMapping maps_to TraceRecord）提供明确端点并保持与 FrameworkHandoffMapping 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的框架轨迹映射：框架轨迹映射是有方向的映射记录，用于把框架原生追踪、跨度、运行、检查点或流构造对齐到规范追踪记录、追踪跨度、追踪事件、运行会话和产物溯源术语。；该种差可由关系 FrameworkTraceMapping-maps_to-TraceRecord 的端点角色检验。
+    - 不包含：
+  - 框架移交映射虽与本概念同属 FrameworkMapping，但其定义为“框架交接映射是有方向的映射记录，用于把框架原生交接构造对齐到规范交接、责任转移、权限范围、可见上下文和结果归属术语。”，不得替代框架轨迹映射。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+
+### 适配映射基础设施模块
+
+适配映射基础设施模块刻画跨适配器族共享的映射规则、映射方向、转换警告、转换损失、不支持语义、近似证据和来源约束治理。
+
+- **适配器** `Adapter`
+  - 定义：适配器是具有身份、版本、适用外部系统、转换方向、支持范围和一致性声明的互操作能力，依据 MappingRule 在外部构造与统一概念、关系或内嵌结构之间转换，并显式报告 exact、lossy、unsupported 与 round-trip 结果；它不复制外部类树，也不改变 canonical 节点身份。
+  - 为什么需要：适配器为canonical 事实 MappingRule-governs-Adapter（MappingRule governs Adapter）提供明确端点并保持与 MappingRule 的定义边界；节点字段 adapter_id、adapter_version、scope 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的适配器：适配器是具有身份、版本、适用外部系统、转换方向、支持范围和一致性声明的互操作能力，依据 MappingRule 在外部构造与统一概念、关系或内嵌结构之间转换，并显式报告 exact、lossy、unsupported 与 round-trip 结果；它不复制外部类树，也不改变 canonical 节点身份。；该种差可由字段 adapter_id、adapter_version、scope 检验。
+  - 不包含：
+  - 映射规则只是关系 MappingRule-governs-Adapter 的另一端；相关联不表示它是适配器。
+  - 结构与约束：5 个字段，2 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+
+- **映射信息产物** `MappingArtifact`
+  - 定义：映射信息产物是带标识、版本、作者或生成方、适用映射和证据来源的信息对象，包括方向映射规则、转换警告、映射测试结果和覆盖报告；它们可以附着在 Adapter 节点详情中，但仍保留自身身份和来源，不形成第二张图。
+  - 为什么需要：映射信息产物为canonical 事实 ConversionWarning-is_a-MappingArtifact（ConversionWarning is_a MappingArtifact）提供明确端点并保持与 ConversionWarning 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的映射信息产物：映射信息产物是带标识、版本、作者或生成方、适用映射和证据来源的信息对象，包括方向映射规则、转换警告、映射测试结果和覆盖报告；它们可以附着在 Adapter 节点详情中，但仍保留自身身份和来源，不形成第二张图。；该种差可由关系 ConversionWarning-is_a-MappingArtifact 的端点角色检验。
+  - 不包含：
+  - 转换警告只是关系 ConversionWarning-is_a-MappingArtifact 的另一端；相关联不表示它是映射信息产物。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **转换警告** `ConversionWarning`
+    - 定义：转换警告是适配转换治理事件，记录映射过程中的转换损失、近似、不支持语义、歧义、非往返行为或需要人工审查的条件。
+    - 直接上位：`MappingArtifact`
+    - 为什么需要：转换警告为canonical 事实 ConversionWarning-warns_about-SchemaAdapter（ConversionWarning warns_about SchemaAdapter）提供明确端点并保持与 CoverageReport 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的转换警告：转换警告是适配转换治理事件，记录映射过程中的转换损失、近似、不支持语义、歧义、非往返行为或需要人工审查的条件。；该种差可由关系 ConversionWarning-warns_about-SchemaAdapter 的端点角色检验。
+    - 不包含：
+  - 映射覆盖报告虽与本概念同属 MappingArtifact，但其定义为“映射覆盖报告是一种 MappingArtifact，针对明确的 Adapter、外部版本和 canonical 版本，汇总构造总数、已映射数、exact/lossy/unsupported/untested 数、测试结果引用、已知空白和发布门禁；它是聚合报告，不替代单条规则或测试结果。”，不得替代转换警告。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **映射覆盖报告** `CoverageReport`
+    - 定义：映射覆盖报告是一种 MappingArtifact，针对明确的 Adapter、外部版本和 canonical 版本，汇总构造总数、已映射数、exact/lossy/unsupported/untested 数、测试结果引用、已知空白和发布门禁；它是聚合报告，不替代单条规则或测试结果。
+    - 直接上位：`MappingArtifact`
+    - 为什么需要：映射覆盖报告为canonical 事实 CoverageReport-summarizes-MappingRule（CoverageReport summarizes MappingRule）提供明确端点并保持与 ConversionWarning 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的映射覆盖报告：映射覆盖报告是一种 MappingArtifact，针对明确的 Adapter、外部版本和 canonical 版本，汇总构造总数、已映射数、exact/lossy/unsupported/untested 数、测试结果引用、已知空白和发布门禁；它是聚合报告，不替代单条规则或测试结果。；该种差可由关系 CoverageReport-summarizes-MappingRule 的端点角色检验。
+    - 不包含：
+  - 转换警告虽与本概念同属 MappingArtifact，但其定义为“转换警告是适配转换治理事件，记录映射过程中的转换损失、近似、不支持语义、歧义、非往返行为或需要人工审查的条件。”，不得替代映射覆盖报告。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **映射规则** `MappingRule`
+    - 定义：映射规则是有方向的适配产物，记录外部构造如何映射到规范术语，或规范术语如何投影到外部构造，并包含来源、版本、适用范围和损失说明。
+    - 直接上位：`MappingArtifact`
+    - 为什么需要：映射规则为canonical 事实 MappingRule-governs-Adapter（MappingRule governs Adapter）提供明确端点并保持与 ConversionWarning 的定义边界；节点字段 mapping_rule_id、version、source_construct 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的映射规则：映射规则是有方向的适配产物，记录外部构造如何映射到规范术语，或规范术语如何投影到外部构造，并包含来源、版本、适用范围和损失说明。；该种差可由字段 mapping_rule_id、version、source_construct 检验。
+    - 不包含：
+  - 转换警告虽与本概念同属 MappingArtifact，但其定义为“转换警告是适配转换治理事件，记录映射过程中的转换损失、近似、不支持语义、歧义、非往返行为或需要人工审查的条件。”，不得替代映射规则。
+    - 结构与约束：7 个字段，2 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **映射测试结果** `MappingTestResult`
+    - 定义：映射测试结果是一种 MappingArtifact，记录被测规则、源/目标版本、测试输入、预期与实际输出、exact/lossy/unsupported 分类、往返比较、通过状态、执行时间和证据；它验证规则而不是替代规则。
+    - 直接上位：`MappingArtifact`
+    - 为什么需要：映射测试结果为canonical 事实 MappingTestResult-verifies-MappingRule（MappingTestResult verifies MappingRule）提供明确端点并保持与 ConversionWarning 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的映射测试结果：映射测试结果是一种 MappingArtifact，记录被测规则、源/目标版本、测试输入、预期与实际输出、exact/lossy/unsupported 分类、往返比较、通过状态、执行时间和证据；它验证规则而不是替代规则。；该种差可由关系 MappingTestResult-verifies-MappingRule 的端点角色检验。
+    - 不包含：
+  - 转换警告虽与本概念同属 MappingArtifact，但其定义为“转换警告是适配转换治理事件，记录映射过程中的转换损失、近似、不支持语义、歧义、非往返行为或需要人工审查的条件。”，不得替代映射测试结果。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+### 协议适配模块
+
+协议适配模块刻画 MCP、A2A、FIPA、KQML 等协议中的消息、任务、能力和信任构造如何映射到规范智能体系统术语，并明确这些协议字段不能重定义核心本体。
+
+- **互操作适配器** `InteroperabilityAdapter`
+  - 定义：互操作适配器是一种 Adapter，专门在两个或更多独立系统的通信、任务、能力、身份或信任模型之间执行有方向映射，并记录协议/系统版本、映射范围、身份保持、语义损失和一致性测试；Schema 或基准导出可直接从 Adapter 其他分支专业化，不必经过本类。
+  - 直接上位：`Adapter`
+  - 为什么需要：互操作适配器为canonical 事实 InteroperabilityAdapter-is_a-Adapter（InteroperabilityAdapter is_a Adapter）提供明确端点并保持与 BenchmarkAdapter 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的互操作适配器：互操作适配器是一种 Adapter，专门在两个或更多独立系统的通信、任务、能力、身份或信任模型之间执行有方向映射，并记录协议/系统版本、映射范围、身份保持、语义损失和一致性测试；Schema 或基准导出可直接从 Adapter 其他分支专业化，不必经过本类。；该种差可由关系 InteroperabilityAdapter-is_a-Adapter 的端点角色检验。
+  - 不包含：
+  - 基准适配器虽与本概念同属 Adapter，但其定义为“基准适配器族把基准任务、场景、环境、评分规则、指标、观察、用户模拟、产物和压力轴映射到评估剖面，同时不改变核心本体。”，不得替代互操作适配器。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+  - **协议适配器** `ProtocolAdapter`
+    - 定义：协议适配器是适配膜中的组件，用于把协议原生包络、消息、任务、能力、身份和信任元数据映射到规范智能体系统术语，而不把协议字段导入核心。
+    - 直接上位：`InteroperabilityAdapter`
+    - 为什么需要：协议适配器为canonical 事实 ProtocolMapping-applies_to_adapter-ProtocolAdapter（ProtocolMapping applies_to_adapter ProtocolAdapter）提供明确端点并保持与 InteroperabilityAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的协议适配器：协议适配器是适配膜中的组件，用于把协议原生包络、消息、任务、能力、身份和信任元数据映射到规范智能体系统术语，而不把协议字段导入核心。；该种差可由关系 ProtocolMapping-applies_to_adapter-ProtocolAdapter 的端点角色检验。
+    - 不包含：
+  - 仅能识别为上位概念 InteroperabilityAdapter 的对象不在范围内；它尚未证明协议适配器的种差或关系端点 ProtocolMapping-applies_to_adapter-ProtocolAdapter。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+    - **A2A 适配器** `A2AAdapter`
+      - 定义：A2A 适配器把智能体间远程身份、任务生命周期、消息与产物交换、不透明执行边界和委派元数据映射为适配器记录。
+      - 直接上位：`ProtocolAdapter`
+      - 为什么需要：A2A 适配器为canonical 事实 A2AAdapter-is_a-ProtocolAdapter（A2AAdapter is_a ProtocolAdapter）提供明确端点并保持与 FIPAAdapter 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的A2A 适配器：A2A 适配器把智能体间远程身份、任务生命周期、消息与产物交换、不透明执行边界和委派元数据映射为适配器记录。；该种差可由关系 A2AAdapter-is_a-ProtocolAdapter 的端点角色检验。
+      - 不包含：
+  - FIPA 适配器虽与本概念同属 ProtocolAdapter，但其定义为“FIPA 适配器把智能体通信语言中的交际行为、消息参数、交互协议和智能体管理构造映射到规范消息、参与者、会话、路由和协议映射术语。”，不得替代A2A 适配器。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：3 项
+      - 直接来源主张：2 项
+    - **FIPA 适配器** `FIPAAdapter`
+      - 定义：FIPA 适配器把智能体通信语言中的交际行为、消息参数、交互协议和智能体管理构造映射到规范消息、参与者、会话、路由和协议映射术语。
+      - 直接上位：`ProtocolAdapter`
+      - 为什么需要：FIPA 适配器为canonical 事实 FIPAAdapter-is_a-ProtocolAdapter（FIPAAdapter is_a ProtocolAdapter）提供明确端点并保持与 A2AAdapter 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的FIPA 适配器：FIPA 适配器把智能体通信语言中的交际行为、消息参数、交互协议和智能体管理构造映射到规范消息、参与者、会话、路由和协议映射术语。；该种差可由关系 FIPAAdapter-is_a-ProtocolAdapter 的端点角色检验。
+      - 不包含：
+  - A2A 适配器虽与本概念同属 ProtocolAdapter，但其定义为“A2A 适配器把智能体间远程身份、任务生命周期、消息与产物交换、不透明执行边界和委派元数据映射为适配器记录。”，不得替代FIPA 适配器。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：3 项
+      - 直接来源主张：2 项
+    - **KQML 适配器** `KQMLAdapter`
+      - 定义：KQML 适配器把言语行为类型、内容语言元数据、会话控制、发送方与接收方角色和消息包络映射到规范通信与路由术语。
+      - 直接上位：`ProtocolAdapter`
+      - 为什么需要：KQML 适配器为canonical 事实 KQMLAdapter-is_a-ProtocolAdapter（KQMLAdapter is_a ProtocolAdapter）提供明确端点并保持与 A2AAdapter 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的KQML 适配器：KQML 适配器把言语行为类型、内容语言元数据、会话控制、发送方与接收方角色和消息包络映射到规范通信与路由术语。；该种差可由关系 KQMLAdapter-is_a-ProtocolAdapter 的端点角色检验。
+      - 不包含：
+  - A2A 适配器虽与本概念同属 ProtocolAdapter，但其定义为“A2A 适配器把智能体间远程身份、任务生命周期、消息与产物交换、不透明执行边界和委派元数据映射为适配器记录。”，不得替代KQML 适配器。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：3 项
+      - 直接来源主张：2 项
+    - **MCP 适配器** `MCPAdapter`
+      - 定义：MCP 适配器把客户端、服务器、工具、资源、提示、发现、授权、传输和能力元数据映射为适配器层本体记录。
+      - 直接上位：`ProtocolAdapter`
+      - 为什么需要：MCP 适配器为canonical 事实 MCPAdapter-is_a-ProtocolAdapter（MCPAdapter is_a ProtocolAdapter）提供明确端点并保持与 A2AAdapter 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的MCP 适配器：MCP 适配器把客户端、服务器、工具、资源、提示、发现、授权、传输和能力元数据映射为适配器层本体记录。；该种差可由关系 MCPAdapter-is_a-ProtocolAdapter 的端点角色检验。
+      - 不包含：
+  - A2A 适配器虽与本概念同属 ProtocolAdapter，但其定义为“A2A 适配器把智能体间远程身份、任务生命周期、消息与产物交换、不透明执行边界和委派元数据映射为适配器记录。”，不得替代MCP 适配器。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：3 项
+      - 直接来源主张：2 项
+
+- **协议映射规则** `ProtocolMapping`
+  - 定义：协议映射规则是一种 MappingRule，源端或目标端至少一侧属于明确版本的通信协议，并以消息、任务、能力、身份或信任构造为映射对象；它记录外部 QName/路径、canonical 目标、方向、变换、前后条件、exact/lossy/unsupported 分类和一致性测试。
+  - 直接上位：`MappingRule`
+  - 为什么需要：协议映射规则为canonical 事实 ProtocolMapping-applies_to_adapter-ProtocolAdapter（ProtocolMapping applies_to_adapter ProtocolAdapter）提供明确端点并保持与 FrameworkMapping 的定义边界；节点字段 mapping_id、external_version、direction 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的协议映射规则：协议映射规则是一种 MappingRule，源端或目标端至少一侧属于明确版本的通信协议，并以消息、任务、能力、身份或信任构造为映射对象；它记录外部 QName/路径、canonical 目标、方向、变换、前后条件、exact/lossy/unsupported 分类和一致性测试。；该种差可由字段 mapping_id、external_version、direction 检验。
+  - 不包含：
+  - 框架映射规则虽与本概念同属 MappingRule，但其定义为“框架映射规则是一种 MappingRule，针对明确框架与版本，把其 agent、task、tool、handoff、state、memory、guardrail、result 或 trace 构造映射到统一概念，记录源路径、目标 ID、方向、变换、缺失语义、unsupported 情况和测试证据；框架对象本身不复制到核心类树。”，不得替代协议映射规则。
+  - 结构与约束：3 个字段，2 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+  - **协议能力映射** `ProtocolCapabilityMapping`
+    - 定义：协议能力映射把协议中的能力声明对齐到跨协议边界暴露的工具、资源、提示、参与者和权限表面。
+    - 直接上位：`ProtocolMapping`
+    - 为什么需要：协议能力映射为canonical 事实 maps_protocol_capability_to_canonical_capability（ProtocolCapabilityMapping maps_protocol_capability_to_canonical_capability ToolCapability）提供明确端点并保持与 ProtocolMessageMapping 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的协议能力映射：协议能力映射把协议中的能力声明对齐到跨协议边界暴露的工具、资源、提示、参与者和权限表面。；该种差可由关系 maps_protocol_capability_to_canonical_capability 的端点角色检验。
+    - 不包含：
+  - 协议消息映射虽与本概念同属 ProtocolMapping，但其定义为“协议消息映射把协议特有消息包络对齐到规范消息、产物、参与者和追踪概念，同时保持协议字段在核心之外。”，不得替代协议能力映射。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **协议消息映射** `ProtocolMessageMapping`
+    - 定义：协议消息映射把协议特有消息包络对齐到规范消息、产物、参与者和追踪概念，同时保持协议字段在核心之外。
+    - 直接上位：`ProtocolMapping`
+    - 为什么需要：协议消息映射为canonical 事实 ProtocolMessageMapping-maps_to-Message（ProtocolMessageMapping maps_to Message）提供明确端点并保持与 ProtocolCapabilityMapping 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的协议消息映射：协议消息映射把协议特有消息包络对齐到规范消息、产物、参与者和追踪概念，同时保持协议字段在核心之外。；该种差可由关系 ProtocolMessageMapping-maps_to-Message 的端点角色检验。
+    - 不包含：
+  - 协议能力映射虽与本概念同属 ProtocolMapping，但其定义为“协议能力映射把协议中的能力声明对齐到跨协议边界暴露的工具、资源、提示、参与者和权限表面。”，不得替代协议消息映射。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **协议任务映射** `ProtocolTaskMapping`
+    - 定义：协议任务映射把协议任务生命周期状态对齐到规范目标、任务、工作项、产物和可观察追踪事件。
+    - 直接上位：`ProtocolMapping`
+    - 为什么需要：协议任务映射为canonical 事实 ProtocolTaskMapping-maps_to-Task（ProtocolTaskMapping maps_to Task）提供明确端点并保持与 ProtocolCapabilityMapping 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的协议任务映射：协议任务映射把协议任务生命周期状态对齐到规范目标、任务、工作项、产物和可观察追踪事件。；该种差可由关系 ProtocolTaskMapping-maps_to-Task 的端点角色检验。
+    - 不包含：
+  - 协议能力映射虽与本概念同属 ProtocolMapping，但其定义为“协议能力映射把协议中的能力声明对齐到跨协议边界暴露的工具、资源、提示、参与者和权限表面。”，不得替代协议任务映射。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **协议信任映射** `ProtocolTrustMapping`
+    - 定义：协议信任映射把协议身份、认证、授权和不透明性元数据对齐到信任边界与权限范围概念。
+    - 直接上位：`ProtocolMapping`
+    - 为什么需要：协议信任映射为canonical 事实 ProtocolTrustMapping-maps_to-TrustBoundary（ProtocolTrustMapping maps_to TrustBoundary）提供明确端点并保持与 ProtocolCapabilityMapping 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的协议信任映射：协议信任映射把协议身份、认证、授权和不透明性元数据对齐到信任边界与权限范围概念。；该种差可由关系 ProtocolTrustMapping-maps_to-TrustBoundary 的端点角色检验。
+    - 不包含：
+  - 协议能力映射虽与本概念同属 ProtocolMapping，但其定义为“协议能力映射把协议中的能力声明对齐到跨协议边界暴露的工具、资源、提示、参与者和权限表面。”，不得替代协议信任映射。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+
+### 模式与导出适配模块
+
+模式与导出适配模块刻画规范本体如何投影为结构化 JSON Schema、语义图形状、语言剖面、图谱中间表示和前端视图，并把结构验证与语义图验证分开。
+
+- **Schema 适配器** `SchemaAdapter`
+  - 定义：模式适配器族把规范本体术语投影为结构化模式、语义图形状、语言剖面、图谱中间表示和前端视图，同时保留溯源和转换警告。
+  - 直接上位：`Adapter`
+  - 为什么需要：Schema 适配器为canonical 事实 SchemaAdapter-governed_by-MappingRule（SchemaAdapter governed_by MappingRule）提供明确端点并保持与 BenchmarkAdapter 的定义边界；节点字段 adapter_id、schema_version、loss_kind 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的Schema 适配器：模式适配器族把规范本体术语投影为结构化模式、语义图形状、语言剖面、图谱中间表示和前端视图，同时保留溯源和转换警告。；该种差可由字段 adapter_id、schema_version、loss_kind 检验。
+  - 不包含：
+  - 基准适配器虽与本概念同属 Adapter，但其定义为“基准适配器族把基准任务、场景、环境、评分规则、指标、观察、用户模拟、产物和压力轴映射到评估剖面，同时不改变核心本体。”，不得替代Schema 适配器。
+  - 结构与约束：2 个字段，2 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+  - **前端视图适配器** `FrontendViewAdapter`
+    - 定义：前端视图适配器把规范本体和图谱中间表示记录投影为浏览器视图、筛选、三语标签和检查面板，而不创造新的本体术语。
+    - 直接上位：`SchemaAdapter`
+    - 为什么需要：前端视图适配器为canonical 事实 FrontendViewAdapter-is_a-SchemaAdapter（FrontendViewAdapter is_a SchemaAdapter）提供明确端点并保持与 GraphIRAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的前端视图适配器：前端视图适配器把规范本体和图谱中间表示记录投影为浏览器视图、筛选、三语标签和检查面板，而不创造新的本体术语。；该种差可由关系 FrontendViewAdapter-is_a-SchemaAdapter 的端点角色检验。
+    - 不包含：
+  - Graph IR 适配器虽与本概念同属 SchemaAdapter，但其定义为“图谱中间表示适配器把本体域、模块、类、关系、溯源和适配映射投影到浏览器图谱中间表示，同时不改变规范本体语义。”，不得替代前端视图适配器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **Graph IR 适配器** `GraphIRAdapter`
+    - 定义：图谱中间表示适配器把本体域、模块、类、关系、溯源和适配映射投影到浏览器图谱中间表示，同时不改变规范本体语义。
+    - 直接上位：`SchemaAdapter`
+    - 为什么需要：Graph IR 适配器为canonical 事实 GraphIRAdapter-is_a-SchemaAdapter（GraphIRAdapter is_a SchemaAdapter）提供明确端点并保持与 FrontendViewAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的Graph IR 适配器：图谱中间表示适配器把本体域、模块、类、关系、溯源和适配映射投影到浏览器图谱中间表示，同时不改变规范本体语义。；该种差可由关系 GraphIRAdapter-is_a-SchemaAdapter 的端点角色检验。
+    - 不包含：
+  - 前端视图适配器虽与本概念同属 SchemaAdapter，但其定义为“前端视图适配器把规范本体和图谱中间表示记录投影为浏览器视图、筛选、三语标签和检查面板，而不创造新的本体术语。”，不得替代Graph IR 适配器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **JSON Schema 适配器** `JSONSchemaAdapter`
+    - 定义：JSON Schema 适配器把规范结构契约投影为兼容 2020-12 版的模式，区分 JSON 结构验证与语义图验证，并记录转换警告。
+    - 直接上位：`SchemaAdapter`
+    - 为什么需要：JSON Schema 适配器为canonical 事实 JSONSchemaAdapter-is_a-SchemaAdapter（JSONSchemaAdapter is_a SchemaAdapter）提供明确端点并保持与 FrontendViewAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的JSON Schema 适配器：JSON Schema 适配器把规范结构契约投影为兼容 2020-12 版的模式，区分 JSON 结构验证与语义图验证，并记录转换警告。；该种差可由关系 JSONSchemaAdapter-is_a-SchemaAdapter 的端点角色检验。
+    - 不包含：
+  - 前端视图适配器虽与本概念同属 SchemaAdapter，但其定义为“前端视图适配器把规范本体和图谱中间表示记录投影为浏览器视图、筛选、三语标签和检查面板，而不创造新的本体术语。”，不得替代JSON Schema 适配器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **OWL 导出适配器** `OWLExportAdapter`
+    - 定义：OWL 导出适配器把规范本体术语投影为 OWL/RDF 导出产物，同时保持 OWL 公理和语义推理与规范 JSON 结构契约分离。
+    - 直接上位：`SchemaAdapter`
+    - 为什么需要：OWL 导出适配器为canonical 事实 OWLExportAdapter-is_a-SchemaAdapter（OWLExportAdapter is_a SchemaAdapter）提供明确端点并保持与 FrontendViewAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的OWL 导出适配器：OWL 导出适配器把规范本体术语投影为 OWL/RDF 导出产物，同时保持 OWL 公理和语义推理与规范 JSON 结构契约分离。；该种差可由关系 OWLExportAdapter-is_a-SchemaAdapter 的端点角色检验。
+    - 不包含：
+  - 前端视图适配器虽与本概念同属 SchemaAdapter，但其定义为“前端视图适配器把规范本体和图谱中间表示记录投影为浏览器视图、筛选、三语标签和检查面板，而不创造新的本体术语。”，不得替代OWL 导出适配器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **Pydantic 配置适配器** `PydanticProfileAdapter`
+    - 定义：Pydantic 剖面适配器把规范模式投影为基础模型类、类型适配器等模式输出，并明确这里处理的是模式转换而不是特定框架的智能体运行语义。
+    - 直接上位：`SchemaAdapter`
+    - 为什么需要：Pydantic 配置适配器为canonical 事实 PydanticProfileAdapter-is_a-SchemaAdapter（PydanticProfileAdapter is_a SchemaAdapter）提供明确端点并保持与 FrontendViewAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的Pydantic 配置适配器：Pydantic 剖面适配器把规范模式投影为基础模型类、类型适配器等模式输出，并明确这里处理的是模式转换而不是特定框架的智能体运行语义。；该种差可由关系 PydanticProfileAdapter-is_a-SchemaAdapter 的端点角色检验。
+    - 不包含：
+  - 前端视图适配器虽与本概念同属 SchemaAdapter，但其定义为“前端视图适配器把规范本体和图谱中间表示记录投影为浏览器视图、筛选、三语标签和检查面板，而不创造新的本体术语。”，不得替代Pydantic 配置适配器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **SHACL 导出适配器** `SHACLExportAdapter`
+    - 定义：SHACL 导出适配器把规范本体术语投影为 RDF 图约束的 SHACL 形状和验证报告，并与 JSON Schema 结构验证分离。
+    - 直接上位：`SchemaAdapter`
+    - 为什么需要：SHACL 导出适配器为canonical 事实 SHACLExportAdapter-is_a-SchemaAdapter（SHACLExportAdapter is_a SchemaAdapter）提供明确端点并保持与 FrontendViewAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的SHACL 导出适配器：SHACL 导出适配器把规范本体术语投影为 RDF 图约束的 SHACL 形状和验证报告，并与 JSON Schema 结构验证分离。；该种差可由关系 SHACLExportAdapter-is_a-SchemaAdapter 的端点角色检验。
+    - 不包含：
+  - 前端视图适配器虽与本概念同属 SchemaAdapter，但其定义为“前端视图适配器把规范本体和图谱中间表示记录投影为浏览器视图、筛选、三语标签和检查面板，而不创造新的本体术语。”，不得替代SHACL 导出适配器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **ShEx 导出适配器** `ShExExportAdapter`
+    - 定义：ShEx 导出适配器把规范本体术语投影为 RDF 图验证的 ShEx 形状表达，并保持 ShEx 语义区别于 SHACL 与 JSON Schema 输出。
+    - 直接上位：`SchemaAdapter`
+    - 为什么需要：ShEx 导出适配器为canonical 事实 ShExExportAdapter-is_a-SchemaAdapter（ShExExportAdapter is_a SchemaAdapter）提供明确端点并保持与 FrontendViewAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的ShEx 导出适配器：ShEx 导出适配器把规范本体术语投影为 RDF 图验证的 ShEx 形状表达，并保持 ShEx 语义区别于 SHACL 与 JSON Schema 输出。；该种差可由关系 ShExExportAdapter-is_a-SchemaAdapter 的端点角色检验。
+    - 不包含：
+  - 前端视图适配器虽与本概念同属 SchemaAdapter，但其定义为“前端视图适配器把规范本体和图谱中间表示记录投影为浏览器视图、筛选、三语标签和检查面板，而不创造新的本体术语。”，不得替代ShEx 导出适配器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **Zod 配置适配器** `ZodProfileAdapter`
+    - 定义：Zod 剖面适配器把规范模式投影为运行时模式和 JSON Schema 导出，并记录不可表达的运行时特性、输入输出模式差异和元数据注册影响。
+    - 直接上位：`SchemaAdapter`
+    - 为什么需要：Zod 配置适配器为canonical 事实 ZodProfileAdapter-is_a-SchemaAdapter（ZodProfileAdapter is_a SchemaAdapter）提供明确端点并保持与 FrontendViewAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的Zod 配置适配器：Zod 剖面适配器把规范模式投影为运行时模式和 JSON Schema 导出，并记录不可表达的运行时特性、输入输出模式差异和元数据注册影响。；该种差可由关系 ZodProfileAdapter-is_a-SchemaAdapter 的端点角色检验。
+    - 不包含：
+  - 前端视图适配器虽与本概念同属 SchemaAdapter，但其定义为“前端视图适配器把规范本体和图谱中间表示记录投影为浏览器视图、筛选、三语标签和检查面板，而不创造新的本体术语。”，不得替代Zod 配置适配器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+
+### 状态图适配模块
+
+状态图适配模块刻画 XState、SCXML 和形式化状态图中的机器、状态、转换、事件、守卫、动作、快照和路径如何映射到运行生命周期剖面，而不是把状态图字段升格为核心字段。
+
+- **状态图适配器** `StatechartAdapter`
+  - 定义：状态图适配器族把状态机和状态图构造映射到运行生命周期剖面，同时保持 XState、SCXML 和形式化状态图字段在核心之外。
+  - 直接上位：`Adapter`
+  - 为什么需要：状态图适配器为canonical 事实 StatechartAdapter-maps_action_to-Command（StatechartAdapter maps_action_to Command）提供明确端点并保持与 BenchmarkAdapter 的定义边界；节点字段 adapter_id、dialect_version、round_trip_loss 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的状态图适配器：状态图适配器族把状态机和状态图构造映射到运行生命周期剖面，同时保持 XState、SCXML 和形式化状态图字段在核心之外。；该种差可由字段 adapter_id、dialect_version、round_trip_loss 检验。
+  - 不包含：
+  - 基准适配器虽与本概念同属 Adapter，但其定义为“基准适配器族把基准任务、场景、环境、评分规则、指标、观察、用户模拟、产物和压力轴映射到评估剖面，同时不改变核心本体。”，不得替代状态图适配器。
+  - 结构与约束：2 个字段，2 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+  - **SCXML 适配器** `SCXMLAdapter`
+    - 定义：SCXML 适配器把状态机、状态、转换、事件、可执行内容、数据模型元素和互操作语义映射到规范状态图剖面与运行生命周期术语。
+    - 直接上位：`StatechartAdapter`
+    - 为什么需要：SCXML 适配器为canonical 事实 SCXMLAdapter-is_a-StatechartAdapter（SCXMLAdapter is_a StatechartAdapter）提供明确端点并保持与 XStateAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的SCXML 适配器：SCXML 适配器把状态机、状态、转换、事件、可执行内容、数据模型元素和互操作语义映射到规范状态图剖面与运行生命周期术语。；该种差可由关系 SCXMLAdapter-is_a-StatechartAdapter 的端点角色检验。
+    - 不包含：
+  - XState 适配器虽与本概念同属 StatechartAdapter，但其定义为“XState 适配器把机器、参与者、状态、转换、事件、守卫、动作、快照、图路径和基于模型的测试构造映射到规范运行状态图剖面术语。”，不得替代SCXML 适配器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **XState 适配器** `XStateAdapter`
+    - 定义：XState 适配器把机器、参与者、状态、转换、事件、守卫、动作、快照、图路径和基于模型的测试构造映射到规范运行状态图剖面术语。
+    - 直接上位：`StatechartAdapter`
+    - 为什么需要：XState 适配器为canonical 事实 XStateAdapter-is_a-StatechartAdapter（XStateAdapter is_a StatechartAdapter）提供明确端点并保持与 SCXMLAdapter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的XState 适配器：XState 适配器把机器、参与者、状态、转换、事件、守卫、动作、快照、图路径和基于模型的测试构造映射到规范运行状态图剖面术语。；该种差可由关系 XStateAdapter-is_a-StatechartAdapter 的端点角色检验。
+    - 不包含：
+  - SCXML 适配器虽与本概念同属 StatechartAdapter，但其定义为“SCXML 适配器把状态机、状态、转换、事件、可执行内容、数据模型元素和互操作语义映射到规范状态图剖面与运行生命周期术语。”，不得替代XState 适配器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+
+## 能力与资源调用域
+
+能力与资源调用域是运行关注域，描述工具与能力注册、发现、匹配、调用、执行、MCP 传输、资源、提示、结果和可观测副作用。
+
+### 能力发现与选择模块
+
+能力发现与选择模块刻画工具、资源、提示和能力候选如何被搜索、匹配、排序、过滤、消歧、选择或回退，避免把全部能力一次性暴露给模型。
+
+- **候选记录** `Candidate`
+  - 定义：Candidate 是在特定查询和发现活动中被考虑的对象记录，保存对象引用、来源和初步适用性；成为候选不意味着已被选择或获准执行。
+  - 为什么需要：候选记录为canonical 事实 SelectionDecision-selects_candidate-Candidate（SelectionDecision selects_candidate Candidate）提供明确端点并保持与 SelectionDecision 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的候选记录：Candidate 是在特定查询和发现活动中被考虑的对象记录，保存对象引用、来源和初步适用性；成为候选不意味着已被选择或获准执行。；该种差可由关系 SelectionDecision-selects_candidate-Candidate 的端点角色检验。
+  - 不包含：
+  - 选择决策只是关系 SelectionDecision-selects_candidate-Candidate 的另一端；相关联不表示它是候选记录。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **能力候选** `CapabilityCandidate`
+    - 定义：能力候选表示发现与选择阶段正在考虑的可能工具、资源、提示、API 操作或托管能力。
+    - 直接上位：`Candidate`
+    - 为什么需要：能力候选为canonical 事实 CapabilityCandidate-is_a-Candidate（CapabilityCandidate is_a Candidate）提供明确端点并保持与 PromptCandidate 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的能力候选：能力候选表示发现与选择阶段正在考虑的可能工具、资源、提示、API 操作或托管能力。；该种差可由关系 CapabilityCandidate-is_a-Candidate 的端点角色检验。
+    - 不包含：
+  - 提示候选虽与本概念同属 Candidate，但其定义为“提示候选是在提示选择决策之前，由发现、过滤或协议列表返回的提示项，用于判断是否可获取或实例化。”，不得替代能力候选。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **提示候选** `PromptCandidate`
+    - 定义：提示候选是在提示选择决策之前，由发现、过滤或协议列表返回的提示项，用于判断是否可获取或实例化。
+    - 直接上位：`Candidate`
+    - 为什么需要：提示候选为canonical 事实 PromptCandidate-is_a-Candidate（PromptCandidate is_a Candidate）提供明确端点并保持与 CapabilityCandidate 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的提示候选：提示候选是在提示选择决策之前，由发现、过滤或协议列表返回的提示项，用于判断是否可获取或实例化。；该种差可由关系 PromptCandidate-is_a-Candidate 的端点角色检验。
+    - 不包含：
+  - 能力候选虽与本概念同属 Candidate，但其定义为“能力候选表示发现与选择阶段正在考虑的可能工具、资源、提示、API 操作或托管能力。”，不得替代提示候选。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **资源候选** `ResourceCandidate`
+    - 定义：资源候选是在资源选择决策之前，由发现、过滤或协议列表返回的资源项，用于判断是否可读取、订阅或暂存入上下文。
+    - 直接上位：`Candidate`
+    - 为什么需要：资源候选为canonical 事实 ResourceCandidate-is_a-Candidate（ResourceCandidate is_a Candidate）提供明确端点并保持与 CapabilityCandidate 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的资源候选：资源候选是在资源选择决策之前，由发现、过滤或协议列表返回的资源项，用于判断是否可读取、订阅或暂存入上下文。；该种差可由关系 ResourceCandidate-is_a-Candidate 的端点角色检验。
+    - 不包含：
+  - 能力候选虽与本概念同属 Candidate，但其定义为“能力候选表示发现与选择阶段正在考虑的可能工具、资源、提示、API 操作或托管能力。”，不得替代资源候选。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **工具候选** `ToolCandidate`
+    - 定义：工具候选是一种候选记录（Candidate），其被考虑对象限定为工具（Tool），并由 ToolMatch-assesses-ToolCandidate 关系承载匹配证据。
+    - 直接上位：`Candidate`
+    - 为什么需要：工具候选为canonical 事实 ToolMatch-assesses-ToolCandidate（ToolMatch assesses ToolCandidate）提供明确端点并保持与 CapabilityCandidate 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的工具候选：工具候选是一种候选记录（Candidate），其被考虑对象限定为工具（Tool），并由 ToolMatch-assesses-ToolCandidate 关系承载匹配证据。；该种差可由关系 ToolMatch-assesses-ToolCandidate 的端点角色检验。
+    - 不包含：
+  - 能力候选虽与本概念同属 Candidate，但其定义为“能力候选表示发现与选择阶段正在考虑的可能工具、资源、提示、API 操作或托管能力。”，不得替代工具候选。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **发现活动** `DiscoveryActivity`
+  - 定义：DiscoveryActivity 接受查询或需求，检索一个或多个可发现表面并产生候选集合；它不负责最终选择决定。
+  - 为什么需要：发现活动为canonical 事实 ToolSearch-is_a-DiscoveryActivity（ToolSearch is_a DiscoveryActivity）提供明确端点并保持与 ToolSearch 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的发现活动：DiscoveryActivity 接受查询或需求，检索一个或多个可发现表面并产生候选集合；它不负责最终选择决定。；该种差可由关系 ToolSearch-is_a-DiscoveryActivity 的端点角色检验。
+  - 不包含：
+  - 工具检索只是关系 ToolSearch-is_a-DiscoveryActivity 的另一端；相关联不表示它是发现活动。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **工具检索** `ToolSearch`
+    - 定义：工具搜索是一种发现活动（DiscoveryActivity），它消费工具搜索查询（ToolSearchQuery），检索工具定义（ToolDefinition），并产出工具候选集（ToolCandidateSet）。
+    - 直接上位：`DiscoveryActivity`
+    - 为什么需要：工具检索为canonical 事实 discovers_tool（ToolSearch discovers_tool ToolDefinition）提供明确端点并保持与 DiscoveryActivity 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的工具检索：工具搜索是一种发现活动（DiscoveryActivity），它消费工具搜索查询（ToolSearchQuery），检索工具定义（ToolDefinition），并产出工具候选集（ToolCandidateSet）。；该种差可由关系 discovers_tool 的端点角色检验。
+    - 不包含：
+  - 仅能识别为上位概念 DiscoveryActivity 的对象不在范围内；它尚未证明工具检索的种差或关系端点 discovers_tool。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **发现候选集合** `DiscoveryCandidateSet`
+  - 定义：DiscoveryCandidateSet 聚合同一查询和发现批次产生的候选记录，并保留完整性、排序前状态和生成出处；它不泛指记忆检索候选集合，排序或选择结果也不是其成员类型。
+  - 为什么需要：发现候选集合为canonical 事实 ToolCandidateSet-is_a-DiscoveryCandidateSet（ToolCandidateSet is_a DiscoveryCandidateSet）提供明确端点并保持与 ToolCandidateSet 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的发现候选集合：DiscoveryCandidateSet 聚合同一查询和发现批次产生的候选记录，并保留完整性、排序前状态和生成出处；它不泛指记忆检索候选集合，排序或选择结果也不是其成员类型。；该种差可由关系 ToolCandidateSet-is_a-DiscoveryCandidateSet 的端点角色检验。
+  - 不包含：
+  - 工具候选集只是关系 ToolCandidateSet-is_a-DiscoveryCandidateSet 的另一端；相关联不表示它是发现候选集合。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **工具候选集** `ToolCandidateSet`
+    - 定义：工具候选集是一种发现候选集（DiscoveryCandidateSet），其成员限定为通过 ToolCandidateSet-contains-ToolCandidate 关系连接的工具候选（ToolCandidate）。
+    - 直接上位：`DiscoveryCandidateSet`
+    - 为什么需要：工具候选集为canonical 事实 ToolCandidateSet-contains-ToolCandidate（ToolCandidateSet contains ToolCandidate）提供明确端点并保持与 DiscoveryCandidateSet 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的工具候选集：工具候选集是一种发现候选集（DiscoveryCandidateSet），其成员限定为通过 ToolCandidateSet-contains-ToolCandidate 关系连接的工具候选（ToolCandidate）。；该种差可由关系 ToolCandidateSet-contains-ToolCandidate 的端点角色检验。
+    - 不包含：
+  - 仅能识别为上位概念 DiscoveryCandidateSet 的对象不在范围内；它尚未证明工具候选集的种差或关系端点 ToolCandidateSet-contains-ToolCandidate。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **匹配评估** `MatchAssessment`
+  - 定义：MatchAssessment 是对一个候选相对查询、需求或约束的适配判断记录，包含方法、分值、阈值和出处；它为选择提供证据但不等同于选择决定。
+  - 为什么需要：匹配评估为canonical 事实 ToolMatch-is_a-MatchAssessment（ToolMatch is_a MatchAssessment）提供明确端点并保持与 ToolMatch 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的匹配评估：MatchAssessment 是对一个候选相对查询、需求或约束的适配判断记录，包含方法、分值、阈值和出处；它为选择提供证据但不等同于选择决定。；该种差可由关系 ToolMatch-is_a-MatchAssessment 的端点角色检验。
+  - 不包含：
+  - 工具匹配评估只是关系 ToolMatch-is_a-MatchAssessment 的另一端；相关联不表示它是匹配评估。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **工具匹配评估** `ToolMatch`
+    - 定义：工具匹配是一种匹配评估（MatchAssessment），它使用名称、签名、嵌入、正则表达式或任务适配证据，评估工具候选（ToolCandidate）与工具（Tool）的匹配程度。
+    - 直接上位：`MatchAssessment`
+    - 为什么需要：工具匹配评估为canonical 事实 matches_tool（ToolMatch matches_tool Tool）提供明确端点并保持与 MatchAssessment 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的工具匹配评估：工具匹配是一种匹配评估（MatchAssessment），它使用名称、签名、嵌入、正则表达式或任务适配证据，评估工具候选（ToolCandidate）与工具（Tool）的匹配程度。；该种差可由关系 matches_tool 的端点角色检验。
+    - 不包含：
+  - 仅能识别为上位概念 MatchAssessment 的对象不在范围内；它尚未证明工具匹配评估的种差或关系端点 matches_tool。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+    - **工具嵌入匹配** `ToolEmbeddingMatch`
+      - 定义：工具嵌入匹配是一种工具匹配（ToolMatch），其判定证据限定为搜索查询与工具表征之间的向量相似度。
+      - 直接上位：`ToolMatch`
+      - 为什么需要：工具嵌入匹配为canonical 事实 ToolEmbeddingMatch-is_a-ToolMatch（ToolEmbeddingMatch is_a ToolMatch）提供明确端点并保持与 ToolRegexMatch 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的工具嵌入匹配：工具嵌入匹配是一种工具匹配（ToolMatch），其判定证据限定为搜索查询与工具表征之间的向量相似度。；该种差可由关系 ToolEmbeddingMatch-is_a-ToolMatch 的端点角色检验。
+      - 不包含：
+  - 工具正则匹配虽与本概念同属 ToolMatch，但其定义为“工具正则匹配是一种工具匹配（ToolMatch），其判定证据限定为查询与工具元数据之间的正则表达式匹配。”，不得替代工具嵌入匹配。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：2 项
+    - **工具正则匹配** `ToolRegexMatch`
+      - 定义：工具正则匹配是一种工具匹配（ToolMatch），其判定证据限定为查询与工具元数据之间的正则表达式匹配。
+      - 直接上位：`ToolMatch`
+      - 为什么需要：工具正则匹配为canonical 事实 ToolRegexMatch-is_a-ToolMatch（ToolRegexMatch is_a ToolMatch）提供明确端点并保持与 ToolEmbeddingMatch 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的工具正则匹配：工具正则匹配是一种工具匹配（ToolMatch），其判定证据限定为查询与工具元数据之间的正则表达式匹配。；该种差可由关系 ToolRegexMatch-is_a-ToolMatch 的端点角色检验。
+      - 不包含：
+  - 工具嵌入匹配虽与本概念同属 ToolMatch，但其定义为“工具嵌入匹配是一种工具匹配（ToolMatch），其判定证据限定为搜索查询与工具表征之间的向量相似度。”，不得替代工具正则匹配。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：2 项
+
+- **选择决策** `SelectionDecision`
+  - 定义：SelectionDecision 是对候选集作出的有出处决定，记录被选或拒绝对象、理由、权限/策略证据与决定者；它发生在发现和评估之后，不是候选本身。
+  - 为什么需要：选择决策为canonical 事实 SelectionDecision-selects_candidate-Candidate（SelectionDecision selects_candidate Candidate）提供明确端点并保持与 Candidate 的定义边界；节点字段 selection_id、decided_at、reason 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的选择决策：SelectionDecision 是对候选集作出的有出处决定，记录被选或拒绝对象、理由、权限/策略证据与决定者；它发生在发现和评估之后，不是候选本身。；该种差可由字段 selection_id、decided_at、reason 检验。
+  - 不包含：
+  - 候选记录只是关系 SelectionDecision-selects_candidate-Candidate 的另一端；相关联不表示它是选择决策。
+  - 结构与约束：3 个字段，2 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+  - **能力选择决策** `CapabilitySelectionDecision`
+    - 定义：能力选择决策在工具、资源、提示和 API 操作候选之间进行选择、拒绝或延后。
+    - 直接上位：`SelectionDecision`
+    - 为什么需要：能力选择决策为canonical 事实 CapabilitySelectionDecision-is_a-SelectionDecision（CapabilitySelectionDecision is_a SelectionDecision）提供明确端点并保持与 PromptSelectionDecision 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的能力选择决策：能力选择决策在工具、资源、提示和 API 操作候选之间进行选择、拒绝或延后。；该种差可由关系 CapabilitySelectionDecision-is_a-SelectionDecision 的端点角色检验。
+    - 不包含：
+  - 提示选择决策虽与本概念同属 SelectionDecision，但其定义为“提示选择决策根据任务适配、参数可用性、权限来源和工作流意图，选择、拒绝或延后某个提示候选。”，不得替代能力选择决策。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **提示选择决策** `PromptSelectionDecision`
+    - 定义：提示选择决策根据任务适配、参数可用性、权限来源和工作流意图，选择、拒绝或延后某个提示候选。
+    - 直接上位：`SelectionDecision`
+    - 为什么需要：提示选择决策为canonical 事实 PromptSelectionDecision-is_a-SelectionDecision（PromptSelectionDecision is_a SelectionDecision）提供明确端点并保持与 CapabilitySelectionDecision 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的提示选择决策：提示选择决策根据任务适配、参数可用性、权限来源和工作流意图，选择、拒绝或延后某个提示候选。；该种差可由关系 PromptSelectionDecision-is_a-SelectionDecision 的端点角色检验。
+    - 不包含：
+  - 能力选择决策虽与本概念同属 SelectionDecision，但其定义为“能力选择决策在工具、资源、提示和 API 操作候选之间进行选择、拒绝或延后。”，不得替代提示选择决策。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **资源选择决策** `ResourceSelectionDecision`
+    - 定义：资源选择决策根据相关性、授权、新鲜度、数据区域和上下文需求，选择、拒绝或延后某个资源候选。
+    - 直接上位：`SelectionDecision`
+    - 为什么需要：资源选择决策为canonical 事实 ResourceSelectionDecision-is_a-SelectionDecision（ResourceSelectionDecision is_a SelectionDecision）提供明确端点并保持与 CapabilitySelectionDecision 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的资源选择决策：资源选择决策根据相关性、授权、新鲜度、数据区域和上下文需求，选择、拒绝或延后某个资源候选。；该种差可由关系 ResourceSelectionDecision-is_a-SelectionDecision 的端点角色检验。
+    - 不包含：
+  - 能力选择决策虽与本概念同属 SelectionDecision，但其定义为“能力选择决策在工具、资源、提示和 API 操作候选之间进行选择、拒绝或延后。”，不得替代资源选择决策。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **工具选择决策** `ToolSelectionDecision`
+    - 定义：工具选择决策是一种选择决策（SelectionDecision），它审议工具匹配（ToolMatch）证据，并据此选择工具（Tool）或拒绝工具候选（ToolCandidate）。
+    - 直接上位：`SelectionDecision`
+    - 为什么需要：工具选择决策为canonical 事实 tool_selection_decision_rejects_candidate（ToolSelectionDecision tool_selection_decision_rejects_candidate ToolCandidate）提供明确端点并保持与 CapabilitySelectionDecision 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的工具选择决策：工具选择决策是一种选择决策（SelectionDecision），它审议工具匹配（ToolMatch）证据，并据此选择工具（Tool）或拒绝工具候选（ToolCandidate）。；该种差可由关系 tool_selection_decision_rejects_candidate 的端点角色检验。
+    - 不包含：
+  - 能力选择决策虽与本概念同属 SelectionDecision，但其定义为“能力选择决策在工具、资源、提示和 API 操作候选之间进行选择、拒绝或延后。”，不得替代工具选择决策。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+
+- **工具消歧提示** `ToolDisambiguationPrompt`
+  - 定义：消歧提示是向调用者索取澄清的信息制品，不是候选、匹配或选择决定的子类。
+  - 为什么需要：工具消歧提示为canonical 事实 ToolDisambiguationPrompt-clarifies-ToolSearchQuery（ToolDisambiguationPrompt clarifies ToolSearchQuery）提供明确端点并保持与 ToolSearchQuery 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的工具消歧提示：消歧提示是向调用者索取澄清的信息制品，不是候选、匹配或选择决定的子类。；该种差可由关系 ToolDisambiguationPrompt-clarifies-ToolSearchQuery 的端点角色检验。
+  - 不包含：
+  - 工具检索查询只是关系 ToolDisambiguationPrompt-clarifies-ToolSearchQuery 的另一端；相关联不表示它是工具消歧提示。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **工具回退** `ToolFallback`
+  - 定义：回退定义选择失败后的替代规则，可能尚未作出决定，故保留为独立规范而非 SelectionDecision 子类。
+  - 为什么需要：工具回退为canonical 事实 tool_fallback_replaces_tool（ToolFallback tool_fallback_replaces_tool Tool）提供明确端点并保持与 Tool 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的工具回退：回退定义选择失败后的替代规则，可能尚未作出决定，故保留为独立规范而非 SelectionDecision 子类。；该种差可由关系 tool_fallback_replaces_tool 的端点角色检验。
+  - 不包含：
+  - 工具只是关系 tool_fallback_replaces_tool 的另一端；相关联不表示它是工具回退。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **工具检索查询** `ToolSearchQuery`
+  - 定义：查询是检索输入的信息表达，不是检索活动或候选的子类。
+  - 为什么需要：工具检索查询为canonical 事实 ToolDisambiguationPrompt-clarifies-ToolSearchQuery（ToolDisambiguationPrompt clarifies ToolSearchQuery）提供明确端点并保持与 ToolDisambiguationPrompt 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的工具检索查询：查询是检索输入的信息表达，不是检索活动或候选的子类。；该种差可由关系 ToolDisambiguationPrompt-clarifies-ToolSearchQuery 的端点角色检验。
+  - 不包含：
+  - 工具消歧提示只是关系 ToolDisambiguationPrompt-clarifies-ToolSearchQuery 的另一端；相关联不表示它是工具检索查询。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+### 调用与执行模块
+
+调用与执行模块刻画工具调用、资源读取、提示获取与实例化、程序化调用、命令执行请求、可观察结果、错误与警告诊断、副作用、转录，以及执行前安全检查。
+
+- **条件性工具启用** `ConditionalToolEnabled`
+  - 定义：它是规定工具在何种上下文可用的条件规范，不是 Tool、Call 或 Attempt 的子类。
+  - 为什么需要：条件性工具启用为canonical 事实 ToolCallPlan-constrained_by-ConditionalToolEnabled（ToolCallPlan constrained_by ConditionalToolEnabled）提供明确端点并保持与 ToolCallPlan 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的条件性工具启用：它是规定工具在何种上下文可用的条件规范，不是 Tool、Call 或 Attempt 的子类。；该种差可由关系 ToolCallPlan-constrained_by-ConditionalToolEnabled 的端点角色检验。
+  - 不包含：
+  - 工具调用计划只是关系 ToolCallPlan-constrained_by-ConditionalToolEnabled 的另一端；相关联不表示它是条件性工具启用。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **调用活动** `Invocation`
+  - 定义：Invocation 表示已经发起的调用活动，携带调用者、目标操作和绑定参数；它由计划约束，可有一个或多个 Attempt，但自身不是 Attempt、Result 或 Outcome。
+  - 为什么需要：调用活动为canonical 事实 Command-is_a-Invocation（Command is_a Invocation）提供明确端点并保持与 Command 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的调用活动：Invocation 表示已经发起的调用活动，携带调用者、目标操作和绑定参数；它由计划约束，可有一个或多个 Attempt，但自身不是 Attempt、Result 或 Outcome。；该种差可由关系 Command-is_a-Invocation 的端点角色检验。
+  - 不包含：
+  - 命令只是关系 Command-is_a-Invocation 的另一端；相关联不表示它是调用活动。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **命令** `Command`
+    - 定义：命令描述工具或运行层的操作请求，可携带参数、权限、工作目录和可观察结果。
+    - 直接上位：`Invocation`
+    - 为什么需要：命令为canonical 事实 executes_in_sandbox（Command executes_in_sandbox Sandbox）提供明确端点并保持与 PromptGetRequest 的定义边界；节点字段 execution_area、arguments 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的命令：命令描述工具或运行层的操作请求，可携带参数、权限、工作目录和可观察结果。；该种差可由字段 execution_area、arguments 检验。
+    - 不包含：
+  - 提示获取请求虽与本概念同属 Invocation，但其定义为“提示获取请求是在参数绑定和上下文暂存前，从注册表或协议服务器取回提示定义或模板的事件。”，不得替代命令。
+    - 结构与约束：2 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+    - **Shell 命令** `ShellCommand`
+      - 定义：壳层命令描述带有命令文本、参数、环境、工作目录、沙箱或权限上下文的壳层调用。
+      - 直接上位：`Command`
+      - 为什么需要：Shell 命令为canonical 事实 ShellCommand-is_a-Command（ShellCommand is_a Command）提供明确端点并保持与 Command 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的Shell 命令：壳层命令描述带有命令文本、参数、环境、工作目录、沙箱或权限上下文的壳层调用。；该种差可由关系 ShellCommand-is_a-Command 的端点角色检验。
+      - 不包含：
+  - 仅能识别为上位概念 Command 的对象不在范围内；它尚未证明Shell 命令的种差或关系端点 ShellCommand-is_a-Command。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：3 项
+      - 直接来源主张：2 项
+  - **提示获取请求** `PromptGetRequest`
+    - 定义：提示获取请求是在参数绑定和上下文暂存前，从注册表或协议服务器取回提示定义或模板的事件。
+    - 直接上位：`Invocation`
+    - 为什么需要：提示获取请求为canonical 事实 mcp_authorization_authorizes_prompt_get（MCPAuthorization mcp_authorization_authorizes_prompt_get PromptGetRequest）提供明确端点并保持与 Command 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的提示获取请求：提示获取请求是在参数绑定和上下文暂存前，从注册表或协议服务器取回提示定义或模板的事件。；该种差可由关系 mcp_authorization_authorizes_prompt_get 的端点角色检验。
+    - 不包含：
+  - 命令虽与本概念同属 Invocation，但其定义为“命令描述工具或运行层的操作请求，可携带参数、权限、工作目录和可观察结果。”，不得替代提示获取请求。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **资源读取请求** `ResourceReadRequest`
+    - 定义：资源读取请求是从服务器或连接器读取命名资源的事件，包含资源身份、访问 范围、授权上下文和期望表示形式。
+    - 直接上位：`Invocation`
+    - 为什么需要：资源读取请求为canonical 事实 mcp_authorization_authorizes_resource_read（MCPAuthorization mcp_authorization_authorizes_resource_read ResourceReadRequest）提供明确端点并保持与 Command 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的资源读取请求：资源读取请求是从服务器或连接器读取命名资源的事件，包含资源身份、访问 范围、授权上下文和期望表示形式。；该种差可由关系 mcp_authorization_authorizes_resource_read 的端点角色检验。
+    - 不包含：
+  - 命令虽与本概念同属 Invocation，但其定义为“命令描述工具或运行层的操作请求，可携带参数、权限、工作目录和可观察结果。”，不得替代资源读取请求。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **工具调用** `ToolCall`
+    - 定义：工具调用是一种调用（Invocation），它标识调用者与操作、提供参数并请求已选择的工具（Tool）；call_id、requested_at、operation_id 与 idempotency_key 使该请求可追踪且可安全重放。
+    - 直接上位：`Invocation`
+    - 为什么需要：工具调用为canonical 事实 invokes_tool（ToolCall invokes_tool Tool）提供明确端点并保持与 Command 的定义边界；节点字段 arguments、call_id、requested_at 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的工具调用：工具调用是一种调用（Invocation），它标识调用者与操作、提供参数并请求已选择的工具（Tool）；call_id、requested_at、operation_id 与 idempotency_key 使该请求可追踪且可安全重放。；该种差可由字段 arguments、call_id、requested_at 检验。
+    - 不包含：
+  - 命令虽与本概念同属 Invocation，但其定义为“命令描述工具或运行层的操作请求，可携带参数、权限、工作目录和可观察结果。”，不得替代工具调用。
+    - 结构与约束：6 个字段，6 条约束
+    - 正反例与实例：4 项
+    - 直接来源主张：2 项
+    - **程序化工具调用** `ProgrammaticToolCall`
+      - 定义：程序化工具调用是一种工具调用（ToolCall），其发起源限定为生成代码、运行时编排或显式 API 逻辑，而非直接的自然语言选择。
+      - 直接上位：`ToolCall`
+      - 为什么需要：程序化工具调用为canonical 事实 ProgrammaticToolCall-is_a-ToolCall（ProgrammaticToolCall is_a ToolCall）提供明确端点并保持与 ToolCall 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的程序化工具调用：程序化工具调用是一种工具调用（ToolCall），其发起源限定为生成代码、运行时编排或显式 API 逻辑，而非直接的自然语言选择。；该种差可由关系 ProgrammaticToolCall-is_a-ToolCall 的端点角色检验。
+      - 不包含：
+  - 仅能识别为上位概念 ToolCall 的对象不在范围内；它尚未证明程序化工具调用的种差或关系端点 ProgrammaticToolCall-is_a-ToolCall。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：3 项
+      - 直接来源主张：2 项
+
+- **调用尝试** `InvocationAttempt`
+  - 定义：InvocationAttempt 是针对某个 Invocation 的单次执行尝试，具有 attempt identity、开始/结束时间、状态、超时和重试沿袭；每次重试产生新 Attempt。
+  - 为什么需要：调用尝试为canonical 事实 ToolCallAttempt-is_a-InvocationAttempt（ToolCallAttempt is_a InvocationAttempt）提供明确端点并保持与 ToolCallAttempt 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的调用尝试：InvocationAttempt 是针对某个 Invocation 的单次执行尝试，具有 attempt identity、开始/结束时间、状态、超时和重试沿袭；每次重试产生新 Attempt。；该种差可由关系 ToolCallAttempt-is_a-InvocationAttempt 的端点角色检验。
+  - 不包含：
+  - 工具调用尝试只是关系 ToolCallAttempt-is_a-InvocationAttempt 的另一端；相关联不表示它是调用尝试。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **工具调用尝试** `ToolCallAttempt`
+    - 定义：工具调用尝试是一种调用尝试（InvocationAttempt），记录某个工具调用（ToolCall）的一次执行；attempt_id 与 attempt_number 标识该次尝试，并附带状态、时间、授权、沙箱和结果上下文。
+    - 直接上位：`InvocationAttempt`
+    - 为什么需要：工具调用尝试为canonical 事实 tool_call_attempt_belongs_to_trace_span（ToolCallAttempt tool_call_attempt_belongs_to_trace_span TraceSpan）提供明确端点并保持与 InvocationAttempt 的定义边界；节点字段 attempt_id、attempt_number、started_at 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的工具调用尝试：工具调用尝试是一种调用尝试（InvocationAttempt），记录某个工具调用（ToolCall）的一次执行；attempt_id 与 attempt_number 标识该次尝试，并附带状态、时间、授权、沙箱和结果上下文。；该种差可由字段 attempt_id、attempt_number、started_at 检验。
+    - 不包含：
+  - 仅能识别为上位概念 InvocationAttempt 的对象不在范围内；它尚未证明工具调用尝试的种差或关系端点 tool_call_attempt_belongs_to_trace_span。
+    - 结构与约束：7 个字段，4 条约束
+    - 正反例与实例：4 项
+    - 直接来源主张：2 项
+    - **工具调用重试** `ToolCallRetry`
+      - 定义：工具调用重试是一种工具调用尝试（ToolCallAttempt），在可重试失败或策略决策后再次执行先前尝试，并通过 ToolCallRetry-retries-ToolCallAttempt 关系指向被重试的尝试。
+      - 直接上位：`ToolCallAttempt`
+      - 为什么需要：工具调用重试为canonical 事实 ToolCallRetry-retries-ToolCallAttempt（ToolCallRetry retries ToolCallAttempt）提供明确端点并保持与 ToolCallAttempt 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的工具调用重试：工具调用重试是一种工具调用尝试（ToolCallAttempt），在可重试失败或策略决策后再次执行先前尝试，并通过 ToolCallRetry-retries-ToolCallAttempt 关系指向被重试的尝试。；该种差可由关系 ToolCallRetry-retries-ToolCallAttempt 的端点角色检验。
+      - 不包含：
+  - 仅能识别为上位概念 ToolCallAttempt 的对象不在范围内；它尚未证明工具调用重试的种差或关系端点 ToolCallRetry-retries-ToolCallAttempt。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：3 项
+      - 直接来源主张：2 项
+
+- **调用诊断** `InvocationDiagnostic`
+  - 定义：InvocationDiagnostic 是调用范围内解释错误、警告、超时或部分执行的信息记录；非致命诊断可与 InvocationResult 共存，实际发生事件可映射到 Feedback FailureEvent。
+  - 为什么需要：调用诊断为canonical 事实 ToolError-is_a-InvocationDiagnostic（ToolError is_a InvocationDiagnostic）提供明确端点并保持与 ToolError 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的调用诊断：InvocationDiagnostic 是调用范围内解释错误、警告、超时或部分执行的信息记录；非致命诊断可与 InvocationResult 共存，实际发生事件可映射到 Feedback FailureEvent。；该种差可由关系 ToolError-is_a-InvocationDiagnostic 的端点角色检验。
+  - 不包含：
+  - 工具错误只是关系 ToolError-is_a-InvocationDiagnostic 的另一端；相关联不表示它是调用诊断。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **工具错误** `ToolError`
+    - 定义：工具错误是诊断资源，描述与某次工具调用尝试相关的错误、异常、超时、校验失败或执行失败。
+    - 直接上位：`InvocationDiagnostic`
+    - 为什么需要：工具错误为canonical 事实 ToolCallAttempt-emits_diagnostic-ToolError（ToolCallAttempt emits_diagnostic ToolError）提供明确端点并保持与 ToolWarning 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的工具错误：工具错误是诊断资源，描述与某次工具调用尝试相关的错误、异常、超时、校验失败或执行失败。；该种差可由关系 ToolCallAttempt-emits_diagnostic-ToolError 的端点角色检验。
+    - 不包含：
+  - 工具警告虽与本概念同属 InvocationDiagnostic，但其定义为“工具警告是非致命警告或诊断资源，可附着在工具结果、参数校验、降级执行、回退、不安全内容信号或部分响应上。”，不得替代工具错误。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **工具警告** `ToolWarning`
+    - 定义：工具警告是非致命警告或诊断资源，可附着在工具结果、参数校验、降级执行、回退、不安全内容信号或部分响应上。
+    - 直接上位：`InvocationDiagnostic`
+    - 为什么需要：工具警告为canonical 事实 tool_warning_attached_to_result（ToolWarning tool_warning_attached_to_result ToolResult）提供明确端点并保持与 ToolError 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的工具警告：工具警告是非致命警告或诊断资源，可附着在工具结果、参数校验、降级执行、回退、不安全内容信号或部分响应上。；该种差可由关系 tool_warning_attached_to_result 的端点角色检验。
+    - 不包含：
+  - 工具错误虽与本概念同属 InvocationDiagnostic，但其定义为“工具错误是诊断资源，描述与某次工具调用尝试相关的错误、异常、超时、校验失败或执行失败。”，不得替代工具警告。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **调用效应** `InvocationEffect`
+  - 定义：InvocationEffect 记录调用尝试产生或尝试产生的外部、持久或可补偿变化；它可以与返回结果同时存在，且需通过治理关系连接审批、审计和恢复。
+  - 为什么需要：调用效应为canonical 事实 ToolSideEffect-is_a-InvocationEffect（ToolSideEffect is_a InvocationEffect）提供明确端点并保持与 ToolSideEffect 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的调用效应：InvocationEffect 记录调用尝试产生或尝试产生的外部、持久或可补偿变化；它可以与返回结果同时存在，且需通过治理关系连接审批、审计和恢复。；该种差可由关系 ToolSideEffect-is_a-InvocationEffect 的端点角色检验。
+  - 不包含：
+  - 工具副作用只是关系 ToolSideEffect-is_a-InvocationEffect 的另一端；相关联不表示它是调用效应。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **工具副作用** `ToolSideEffect`
+    - 定义：工具副作用是工具执行产生或尝试产生的外部状态变化/持久效果的工具侧记录，随后可连接到提交审批、回滚、审计和安全域的 副作用 证据。
+    - 直接上位：`InvocationEffect`
+    - 为什么需要：工具副作用为canonical 事实 tool_side_effect_materializes_side_effect（ToolSideEffect tool_side_effect_materializes_side_effect SideEffect）提供明确端点并保持与 InvocationEffect 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的工具副作用：工具副作用是工具执行产生或尝试产生的外部状态变化/持久效果的工具侧记录，随后可连接到提交审批、回滚、审计和安全域的 副作用 证据。；该种差可由关系 tool_side_effect_materializes_side_effect 的端点角色检验。
+    - 不包含：
+  - 仅能识别为上位概念 InvocationEffect 的对象不在范围内；它尚未证明工具副作用的种差或关系端点 tool_side_effect_materializes_side_effect。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **调用返回记录** `InvocationResult`
+  - 定义：InvocationResult 是某次 Attempt 的直接返回记录，保存内容、状态、元数据和出处；诊断可以伴随它，副作用可以由同一 Attempt 造成，而业务 Outcome 由更高层解释。
+  - 为什么需要：调用返回记录为canonical 事实 ExecutionResult-is_a-InvocationResult（ExecutionResult is_a InvocationResult）提供明确端点并保持与 ExecutionResult 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的调用返回记录：InvocationResult 是某次 Attempt 的直接返回记录，保存内容、状态、元数据和出处；诊断可以伴随它，副作用可以由同一 Attempt 造成，而业务 Outcome 由更高层解释。；该种差可由关系 ExecutionResult-is_a-InvocationResult 的端点角色检验。
+  - 不包含：
+  - 执行结果只是关系 ExecutionResult-is_a-InvocationResult 的另一端；相关联不表示它是调用返回记录。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **执行结果** `ExecutionResult`
+    - 定义：执行结果是一种调用结果（InvocationResult），对应一次执行请求（ExecutionRequest），承载可观测输出、错误流、退出状态或产物引用，但不据此断言任务成功。
+    - 直接上位：`InvocationResult`
+    - 为什么需要：执行结果为canonical 事实 ExecutionObservation-observes-ExecutionResult（ExecutionObservation observes ExecutionResult）提供明确端点并保持与 ResourceReadResult 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的执行结果：执行结果是一种调用结果（InvocationResult），对应一次执行请求（ExecutionRequest），承载可观测输出、错误流、退出状态或产物引用，但不据此断言任务成功。；该种差可由关系 ExecutionObservation-observes-ExecutionResult 的端点角色检验。
+    - 不包含：
+  - 资源读取结果虽与本概念同属 InvocationResult，但其定义为“资源读取结果是读取请求返回的可观察资源内容和元数据，包括表示形式、来源、缓存提示、警告状态和是否可进入后续上下文。”，不得替代执行结果。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **资源读取结果** `ResourceReadResult`
+    - 定义：资源读取结果是读取请求返回的可观察资源内容和元数据，包括表示形式、来源、缓存提示、警告状态和是否可进入后续上下文。
+    - 直接上位：`InvocationResult`
+    - 为什么需要：资源读取结果为canonical 事实 ResourceReadResult-is_a-InvocationResult（ResourceReadResult is_a InvocationResult）提供明确端点并保持与 ExecutionResult 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的资源读取结果：资源读取结果是读取请求返回的可观察资源内容和元数据，包括表示形式、来源、缓存提示、警告状态和是否可进入后续上下文。；该种差可由关系 ResourceReadResult-is_a-InvocationResult 的端点角色检验。
+    - 不包含：
+  - 执行结果虽与本概念同属 InvocationResult，但其定义为“执行结果是一种调用结果（InvocationResult），对应一次执行请求（ExecutionRequest），承载可观测输出、错误流、退出状态或产物引用，但不据此断言任务成功。”，不得替代资源读取结果。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **工具结果** `ToolResult`
+    - 定义：工具结果是一种调用结果（InvocationResult），由工具调用尝试（ToolCallAttempt）产生，以 result_id、status、received_at 与 payload_digest 标识，并承载输出、错误、警告或元数据，但不据此断言任务成功。
+    - 直接上位：`InvocationResult`
+    - 为什么需要：工具结果为canonical 事实 tool_result_flagged_as_tool_stream_injection（ToolResult tool_result_flagged_as_tool_stream_injection ToolStreamInjectionSignal）提供明确端点并保持与 ExecutionResult 的定义边界；节点字段 result_id、status、received_at 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的工具结果：工具结果是一种调用结果（InvocationResult），由工具调用尝试（ToolCallAttempt）产生，以 result_id、status、received_at 与 payload_digest 标识，并承载输出、错误、警告或元数据，但不据此断言任务成功。；该种差可由字段 result_id、status、received_at 检验。
+    - 不包含：
+  - 执行结果虽与本概念同属 InvocationResult，但其定义为“执行结果是一种调用结果（InvocationResult），对应一次执行请求（ExecutionRequest），承载可观测输出、错误流、退出状态或产物引用，但不据此断言任务成功。”，不得替代工具结果。
+    - 结构与约束：4 个字段，2 条约束
+    - 正反例与实例：4 项
+    - 直接来源主张：2 项
+
+- **调用规范** `InvocationSpecification`
+  - 定义：InvocationSpecification 是在调用发生前形成的静态或计划性信息，规定目标操作、参数、审批、超时、幂等性和结果处理；它不证明调用已发生。
+  - 为什么需要：调用规范为canonical 事实 ExecutionRequest-is_a-InvocationSpecification（ExecutionRequest is_a InvocationSpecification）提供明确端点并保持与 ExecutionRequest 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的调用规范：InvocationSpecification 是在调用发生前形成的静态或计划性信息，规定目标操作、参数、审批、超时、幂等性和结果处理；它不证明调用已发生。；该种差可由关系 ExecutionRequest-is_a-InvocationSpecification 的端点角色检验。
+  - 不包含：
+  - 执行请求只是关系 ExecutionRequest-is_a-InvocationSpecification 的另一端；相关联不表示它是调用规范。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **执行请求** `ExecutionRequest`
+    - 定义：执行请求是一种调用规约（InvocationSpecification），用于要求运行时执行命令、调用服务、访问资源或执行工具操作。
+    - 直接上位：`InvocationSpecification`
+    - 为什么需要：执行请求为canonical 事实 ExecutionRequest-is_a-InvocationSpecification（ExecutionRequest is_a InvocationSpecification）提供明确端点并保持与 ToolCallPlan 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的执行请求：执行请求是一种调用规约（InvocationSpecification），用于要求运行时执行命令、调用服务、访问资源或执行工具操作。；该种差可由关系 ExecutionRequest-is_a-InvocationSpecification 的端点角色检验。
+    - 不包含：
+  - 工具调用计划虽与本概念同属 InvocationSpecification，但其定义为“工具调用计划是执行前的计划产物，提出候选工具动作、构造参数、审批要求、结果处理预期、重试策略和安全检查上下文。”，不得替代执行请求。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **工具调用计划** `ToolCallPlan`
+    - 定义：工具调用计划是执行前的计划产物，提出候选工具动作、构造参数、审批要求、结果处理预期、重试策略和安全检查上下文。
+    - 直接上位：`InvocationSpecification`
+    - 为什么需要：工具调用计划为canonical 事实 ToolCallPlan-constrained_by-ConditionalToolEnabled（ToolCallPlan constrained_by ConditionalToolEnabled）提供明确端点并保持与 ExecutionRequest 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的工具调用计划：工具调用计划是执行前的计划产物，提出候选工具动作、构造参数、审批要求、结果处理预期、重试策略和安全检查上下文。；该种差可由关系 ToolCallPlan-constrained_by-ConditionalToolEnabled 的端点角色检验。
+    - 不包含：
+  - 执行请求虽与本概念同属 InvocationSpecification，但其定义为“执行请求是一种调用规约（InvocationSpecification），用于要求运行时执行命令、调用服务、访问资源或执行工具操作。”，不得替代工具调用计划。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **执行前安全检查** `PreExecutionSafetyCheck`
+  - 定义：安全检查是发生在执行前的治理活动，通过关系评估计划，不是计划或调用子类。
+  - 为什么需要：执行前安全检查为canonical 事实 PreExecutionSafetyCheck-evaluates-ToolCallPlan（PreExecutionSafetyCheck evaluates ToolCallPlan）提供明确端点并保持与 ToolCallPlan 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的执行前安全检查：安全检查是发生在执行前的治理活动，通过关系评估计划，不是计划或调用子类。；该种差可由关系 PreExecutionSafetyCheck-evaluates-ToolCallPlan 的端点角色检验。
+  - 不包含：
+  - 工具调用计划只是关系 PreExecutionSafetyCheck-evaluates-ToolCallPlan 的另一端；相关联不表示它是执行前安全检查。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **提示实例化** `PromptInstantiation`
+  - 定义：提示实例化是把参数绑定到定义的活动，不是模板、调用或结果的子类。
+  - 为什么需要：提示实例化为canonical 事实 PromptInstantiation-uses-PromptTemplate（PromptInstantiation uses PromptTemplate）提供明确端点并保持与 PromptTemplate 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的提示实例化：提示实例化是把参数绑定到定义的活动，不是模板、调用或结果的子类。；该种差可由关系 PromptInstantiation-uses-PromptTemplate 的端点角色检验。
+  - 不包含：
+  - 提示模板只是关系 PromptInstantiation-uses-PromptTemplate 的另一端；相关联不表示它是提示实例化。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **资源订阅** `ResourceSubscription`
+  - 定义：资源订阅描述持续通知的选择器、投递与取消规则，是有身份的持续规范而非单次调用。
+  - 为什么需要：资源订阅为canonical 事实 ResourceSubscription-subscribes_to-ResourceDefinition（ResourceSubscription subscribes_to ResourceDefinition）提供明确端点并保持与 ResourceDefinition 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的资源订阅：资源订阅描述持续通知的选择器、投递与取消规则，是有身份的持续规范而非单次调用。；该种差可由关系 ResourceSubscription-subscribes_to-ResourceDefinition 的端点角色检验。
+  - 不包含：
+  - 资源定义只是关系 ResourceSubscription-subscribes_to-ResourceDefinition 的另一端；相关联不表示它是资源订阅。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **工具审批门** `ToolApprovalGate`
+  - 定义：工具审批门是引用安全授权决定的执行前控制规范，不是 Call 或 Attempt 的父子类型。
+  - 为什么需要：工具审批门为canonical 事实 ToolApprovalGate-gates-ToolCallAttempt（ToolApprovalGate gates ToolCallAttempt）提供明确端点并保持与 ToolCallAttempt 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的工具审批门：工具审批门是引用安全授权决定的执行前控制规范，不是 Call 或 Attempt 的父子类型。；该种差可由关系 ToolApprovalGate-gates-ToolCallAttempt 的端点角色检验。
+  - 不包含：
+  - 工具调用尝试只是关系 ToolApprovalGate-gates-ToolCallAttempt 的另一端；相关联不表示它是工具审批门。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **工具描述信任** `ToolDescriptionTrust`
+  - 定义：描述信任是附着于工具描述或来源的受治理质量，不是工具定义或调用阶段。
+  - 为什么需要：工具描述信任为canonical 事实 tool_description_trust_bounds_tool_definition（ToolDescriptionTrust tool_description_trust_bounds_tool_definition ToolDefinition）提供明确端点并保持与 ToolDefinition 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的工具描述信任：描述信任是附着于工具描述或来源的受治理质量，不是工具定义或调用阶段。；该种差可由关系 tool_description_trust_bounds_tool_definition 的端点角色检验。
+  - 不包含：
+  - 工具定义只是关系 tool_description_trust_bounds_tool_definition 的另一端；相关联不表示它是工具描述信任。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **工具结果观察** `ToolResultObservation`
+  - 定义：观察记录结果如何被解释、追踪或送入上下文，拥有与原始结果不同的出处身份。
+  - 为什么需要：工具结果观察为canonical 事实 tool_result_observation_enters_context（ToolResultObservation tool_result_observation_enters_context ContextPackage）提供明确端点并保持与 ContextPackage 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的工具结果观察：观察记录结果如何被解释、追踪或送入上下文，拥有与原始结果不同的出处身份。；该种差可由关系 tool_result_observation_enters_context 的端点角色检验。
+  - 不包含：
+  - 上下文包只是关系 tool_result_observation_enters_context 的另一端；相关联不表示它是工具结果观察。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **不安全参数模式** `UnsafeArgumentPattern`
+  - 定义：不安全参数模式是可版本化的检测/治理规范，通过关系评估参数，不是 Argument 或 Call 的子类。
+  - 为什么需要：不安全参数模式为canonical 事实 PreExecutionSafetyCheck-uses_pattern-UnsafeArgumentPattern（PreExecutionSafetyCheck uses_pattern UnsafeArgumentPattern）提供明确端点并保持与 PreExecutionSafetyCheck 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的不安全参数模式：不安全参数模式是可版本化的检测/治理规范，通过关系评估参数，不是 Argument 或 Call 的子类。；该种差可由关系 PreExecutionSafetyCheck-uses_pattern-UnsafeArgumentPattern 的端点角色检验。
+  - 不包含：
+  - 执行前安全检查只是关系 PreExecutionSafetyCheck-uses_pattern-UnsafeArgumentPattern 的另一端；相关联不表示它是不安全参数模式。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+### MCP 协议表面模块
+
+MCP 协议表面模块刻画 MCP 客户端与服务器参与者、会话、传输、授权、补充信息请求、根范围、采样，以及服务器暴露的资源、提示、工具和能力元数据。
+
+- **补充输入** `AdditionalInput`
+  - 定义：附加输入是引导交互请求的数据内容，不是交互活动、参与方或能力的子类。
+  - 为什么需要：补充输入为canonical 事实 MCPElicitation-requests-AdditionalInput（MCPElicitation requests AdditionalInput）提供明确端点并保持与 MCPElicitation 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的补充输入：附加输入是引导交互请求的数据内容，不是交互活动、参与方或能力的子类。；该种差可由关系 MCPElicitation-requests-AdditionalInput 的端点角色检验。
+  - 不包含：
+  - MCP 引导交互只是关系 MCPElicitation-requests-AdditionalInput 的另一端；相关联不表示它是补充输入。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **MCP 授权** `MCPAuthorization`
+  - 定义：MCP 授权是会话携带的同意、授权或范围证据，不是参与方或传输。
+  - 为什么需要：MCP 授权为canonical 事实 mcp_authorization_authorizes_prompt_get（MCPAuthorization mcp_authorization_authorizes_prompt_get PromptGetRequest）提供明确端点并保持与 PromptGetRequest 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的MCP 授权：MCP 授权是会话携带的同意、授权或范围证据，不是参与方或传输。；该种差可由关系 mcp_authorization_authorizes_prompt_get 的端点角色检验。
+  - 不包含：
+  - 提示获取请求只是关系 mcp_authorization_authorizes_prompt_get 的另一端；相关联不表示它是MCP 授权。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **MCP 协议能力** `MCPCapability`
+  - 定义：MCPCapability 表示通过初始化/协商声明的协议功能，例如工具、资源、提示、采样、根和引导交互支持；能力声明与包含定义条目的列表不是同一范畴。
+  - 为什么需要：MCP 协议能力为canonical 事实 MCPServerCapability-is_a-MCPCapability（MCPServerCapability is_a MCPCapability）提供明确端点并保持与 MCPServerCapability 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的MCP 协议能力：MCPCapability 表示通过初始化/协商声明的协议功能，例如工具、资源、提示、采样、根和引导交互支持；能力声明与包含定义条目的列表不是同一范畴。；该种差可由关系 MCPServerCapability-is_a-MCPCapability 的端点角色检验。
+  - 不包含：
+  - MCP 服务器能力只是关系 MCPServerCapability-is_a-MCPCapability 的另一端；相关联不表示它是MCP 协议能力。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：1 项
+  - **MCP 服务器能力** `MCPServerCapability`
+    - 定义：MCP 服务器能力是服务器声明的能力元数据，覆盖支持的工具、资源、提示、采样、根范围、补充信息请求、授权和传输特性。
+    - 直接上位：`MCPCapability`
+    - 为什么需要：MCP 服务器能力为canonical 事实 MCPServer-advertises-MCPServerCapability（MCPServer advertises MCPServerCapability）提供明确端点并保持与 MCPCapability 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的MCP 服务器能力：MCP 服务器能力是服务器声明的能力元数据，覆盖支持的工具、资源、提示、采样、根范围、补充信息请求、授权和传输特性。；该种差可由关系 MCPServer-advertises-MCPServerCapability 的端点角色检验。
+    - 不包含：
+  - 仅能识别为上位概念 MCPCapability 的对象不在范围内；它尚未证明MCP 服务器能力的种差或关系端点 MCPServer-advertises-MCPServerCapability。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **MCP 定义列表** `MCPDefinitionList`
+  - 定义：MCPDefinitionList 是具有列表版本、分页或变更通知语义的集合，其成员为工具、资源、模板、提示或根条目；列表由能力允许发布，但列表本身不是能力。
+  - 为什么需要：MCP 定义列表为canonical 事实 MCPPromptList-is_a-MCPDefinitionList（MCPPromptList is_a MCPDefinitionList）提供明确端点并保持与 MCPPromptList 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的MCP 定义列表：MCPDefinitionList 是具有列表版本、分页或变更通知语义的集合，其成员为工具、资源、模板、提示或根条目；列表由能力允许发布，但列表本身不是能力。；该种差可由关系 MCPPromptList-is_a-MCPDefinitionList 的端点角色检验。
+  - 不包含：
+  - MCP 提示列表只是关系 MCPPromptList-is_a-MCPDefinitionList 的另一端；相关联不表示它是MCP 定义列表。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **MCP 提示列表** `MCPPromptList`
+    - 定义：MCP 提示列表是服务器暴露的提示定义和提示模板列表，可用于获取、参数绑定、工作流暂存或引导式交互。
+    - 直接上位：`MCPDefinitionList`
+    - 为什么需要：MCP 提示列表为canonical 事实 mcp_prompt_list_contains_prompt_definition（MCPPromptList mcp_prompt_list_contains_prompt_definition PromptDefinition）提供明确端点并保持与 MCPResourceList 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的MCP 提示列表：MCP 提示列表是服务器暴露的提示定义和提示模板列表，可用于获取、参数绑定、工作流暂存或引导式交互。；该种差可由关系 mcp_prompt_list_contains_prompt_definition 的端点角色检验。
+    - 不包含：
+  - MCP 资源列表虽与本概念同属 MCPDefinitionList，但其定义为“MCP 资源列表是服务器暴露的资源定义和资源模板列表，可用于读取、订阅、发现或上下文/数据访问操作。”，不得替代MCP 提示列表。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **MCP 资源列表** `MCPResourceList`
+    - 定义：MCP 资源列表是服务器暴露的资源定义和资源模板列表，可用于读取、订阅、发现或上下文/数据访问操作。
+    - 直接上位：`MCPDefinitionList`
+    - 为什么需要：MCP 资源列表为canonical 事实 mcp_resource_list_contains_resource_definition（MCPResourceList mcp_resource_list_contains_resource_definition ResourceDefinition）提供明确端点并保持与 MCPPromptList 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的MCP 资源列表：MCP 资源列表是服务器暴露的资源定义和资源模板列表，可用于读取、订阅、发现或上下文/数据访问操作。；该种差可由关系 mcp_resource_list_contains_resource_definition 的端点角色检验。
+    - 不包含：
+  - MCP 提示列表虽与本概念同属 MCPDefinitionList，但其定义为“MCP 提示列表是服务器暴露的提示定义和提示模板列表，可用于获取、参数绑定、工作流暂存或引导式交互。”，不得替代MCP 资源列表。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **MCP 资源模板列表** `MCPResourceTemplateList`
+    - 定义：MCP 资源模板列表是服务器暴露的资源模板集合，可通过参数绑定来发现或读取一组 MCP 资源。
+    - 直接上位：`MCPDefinitionList`
+    - 为什么需要：MCP 资源模板列表为canonical 事实 MCPResourceTemplateList-is_a-MCPDefinitionList（MCPResourceTemplateList is_a MCPDefinitionList）提供明确端点并保持与 MCPPromptList 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的MCP 资源模板列表：MCP 资源模板列表是服务器暴露的资源模板集合，可通过参数绑定来发现或读取一组 MCP 资源。；该种差可由关系 MCPResourceTemplateList-is_a-MCPDefinitionList 的端点角色检验。
+    - 不包含：
+  - MCP 提示列表虽与本概念同属 MCPDefinitionList，但其定义为“MCP 提示列表是服务器暴露的提示定义和提示模板列表，可用于获取、参数绑定、工作流暂存或引导式交互。”，不得替代MCP 资源模板列表。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **MCP 根范围列表** `MCPRootList`
+    - 定义：MCP 根范围 列表由客户端提供，用来限定 MCP 服务器可访问的文件、目录、仓库或资源区域范围。
+    - 直接上位：`MCPDefinitionList`
+    - 为什么需要：MCP 根范围列表为canonical 事实 MCPRootList-is_a-MCPDefinitionList（MCPRootList is_a MCPDefinitionList）提供明确端点并保持与 MCPPromptList 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的MCP 根范围列表：MCP 根范围 列表由客户端提供，用来限定 MCP 服务器可访问的文件、目录、仓库或资源区域范围。；该种差可由关系 MCPRootList-is_a-MCPDefinitionList 的端点角色检验。
+    - 不包含：
+  - MCP 提示列表虽与本概念同属 MCPDefinitionList，但其定义为“MCP 提示列表是服务器暴露的提示定义和提示模板列表，可用于获取、参数绑定、工作流暂存或引导式交互。”，不得替代MCP 根范围列表。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **MCP 工具列表** `MCPToolList`
+    - 定义：MCP 工具列表是服务器暴露的工具定义和可调用能力描述符列表，供 MCP 客户端发现、过滤、审批和调用。
+    - 直接上位：`MCPDefinitionList`
+    - 为什么需要：MCP 工具列表为canonical 事实 MCPServer-publishes-MCPToolList（MCPServer publishes MCPToolList）提供明确端点并保持与 MCPPromptList 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的MCP 工具列表：MCP 工具列表是服务器暴露的工具定义和可调用能力描述符列表，供 MCP 客户端发现、过滤、审批和调用。；该种差可由关系 MCPServer-publishes-MCPToolList 的端点角色检验。
+    - 不包含：
+  - MCP 提示列表虽与本概念同属 MCPDefinitionList，但其定义为“MCP 提示列表是服务器暴露的提示定义和提示模板列表，可用于获取、参数绑定、工作流暂存或引导式交互。”，不得替代MCP 工具列表。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **MCP 交互记录** `MCPInteraction`
+  - 定义：MCPInteraction 记录会话中的协议请求、响应关联、方向、参与方、时间和结果状态；采样请求与引导交互按目的专业化，输入内容和授权证据通过关系连接。
+  - 为什么需要：MCP 交互记录为canonical 事实 MCPElicitation-is_a-MCPInteraction（MCPElicitation is_a MCPInteraction）提供明确端点并保持与 MCPElicitation 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的MCP 交互记录：MCPInteraction 记录会话中的协议请求、响应关联、方向、参与方、时间和结果状态；采样请求与引导交互按目的专业化，输入内容和授权证据通过关系连接。；该种差可由关系 MCPElicitation-is_a-MCPInteraction 的端点角色检验。
+  - 不包含：
+  - MCP 引导交互只是关系 MCPElicitation-is_a-MCPInteraction 的另一端；相关联不表示它是MCP 交互记录。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **MCP 引导交互** `MCPElicitation`
+    - 定义：MCP 补充请求是一种 MCP 交互（MCPInteraction），其中 MCP 服务器在进行中的交互内请求客户端或用户提供附加输入（AdditionalInput），并受客户端同意与策略约束。
+    - 直接上位：`MCPInteraction`
+    - 为什么需要：MCP 引导交互为canonical 事实 MCPElicitation-requests-AdditionalInput（MCPElicitation requests AdditionalInput）提供明确端点并保持与 MCPSamplingRequest 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的MCP 引导交互：MCP 补充请求是一种 MCP 交互（MCPInteraction），其中 MCP 服务器在进行中的交互内请求客户端或用户提供附加输入（AdditionalInput），并受客户端同意与策略约束。；该种差可由关系 MCPElicitation-requests-AdditionalInput 的端点角色检验。
+    - 不包含：
+  - MCP 采样请求虽与本概念同属 MCPInteraction，但其定义为“MCP 采样 请求表示 MCP 服务器请求客户端或宿主在客户端策略、上下文和授权控制下执行模型采样。”，不得替代MCP 引导交互。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **MCP 采样请求** `MCPSamplingRequest`
+    - 定义：MCP 采样 请求表示 MCP 服务器请求客户端或宿主在客户端策略、上下文和授权控制下执行模型采样。
+    - 直接上位：`MCPInteraction`
+    - 为什么需要：MCP 采样请求为canonical 事实 MCPSamplingRequest-is_a-MCPInteraction（MCPSamplingRequest is_a MCPInteraction）提供明确端点并保持与 MCPElicitation 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的MCP 采样请求：MCP 采样 请求表示 MCP 服务器请求客户端或宿主在客户端策略、上下文和授权控制下执行模型采样。；该种差可由关系 MCPSamplingRequest-is_a-MCPInteraction 的端点角色检验。
+    - 不包含：
+  - MCP 引导交互虽与本概念同属 MCPInteraction，但其定义为“MCP 补充请求是一种 MCP 交互（MCPInteraction），其中 MCP 服务器在进行中的交互内请求客户端或用户提供附加输入（AdditionalInput），并受客户端同意与策略约束。”，不得替代MCP 采样请求。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **MCP 参与方** `MCPParticipant`
+  - 定义：MCPParticipant 是加入 MCP 会话、持有会话端身份并发送或接收协议消息的角色；Client 与 Server 由职责和消息方向专业化。
+  - 为什么需要：MCP 参与方为canonical 事实 MCPClient-is_a-MCPParticipant（MCPClient is_a MCPParticipant）提供明确端点并保持与 MCPClient 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的MCP 参与方：MCPParticipant 是加入 MCP 会话、持有会话端身份并发送或接收协议消息的角色；Client 与 Server 由职责和消息方向专业化。；该种差可由关系 MCPClient-is_a-MCPParticipant 的端点角色检验。
+  - 不包含：
+  - MCP 客户端只是关系 MCPClient-is_a-MCPParticipant 的另一端；相关联不表示它是MCP 参与方。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：1 项
+  - **MCP 客户端** `MCPClient`
+    - 定义：MCP 客户端是协议参与者对象，负责打开 MCP 会话、发现服务器能力、请求提示或资源、调用工具，并为 agent 运行时 携带授权上下文。
+    - 直接上位：`MCPParticipant`
+    - 为什么需要：MCP 客户端为canonical 事实 mcp_client_opens_session（MCPClient mcp_client_opens_session MCPSession）提供明确端点并保持与 MCPServer 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的MCP 客户端：MCP 客户端是协议参与者对象，负责打开 MCP 会话、发现服务器能力、请求提示或资源、调用工具，并为 agent 运行时 携带授权上下文。；该种差可由关系 mcp_client_opens_session 的端点角色检验。
+    - 不包含：
+  - MCP 服务器虽与本概念同属 MCPParticipant，但其定义为“MCP 服务器是协议参与者对象，通过会话和传输向 MCP 客户端暴露工具、资源、提示、模板和能力元数据。”，不得替代MCP 客户端。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：1 项
+  - **MCP 服务器** `MCPServer`
+    - 定义：MCP 服务器是协议参与者对象，通过会话和传输向 MCP 客户端暴露工具、资源、提示、模板和能力元数据。
+    - 直接上位：`MCPParticipant`
+    - 为什么需要：MCP 服务器为canonical 事实 mcp_server_exposes_prompt_list（MCPServer mcp_server_exposes_prompt_list MCPPromptList）提供明确端点并保持与 MCPClient 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的MCP 服务器：MCP 服务器是协议参与者对象，通过会话和传输向 MCP 客户端暴露工具、资源、提示、模板和能力元数据。；该种差可由关系 mcp_server_exposes_prompt_list 的端点角色检验。
+    - 不包含：
+  - MCP 客户端虽与本概念同属 MCPParticipant，但其定义为“MCP 客户端是协议参与者对象，负责打开 MCP 会话、发现服务器能力、请求提示或资源、调用工具，并为 agent 运行时 携带授权上下文。”，不得替代MCP 服务器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：1 项
+
+- **MCP 会话** `MCPSession`
+  - 定义：MCP 会话记录客户端与服务器连接上下文，在其中交换能力、请求、响应、授权和传输元数据。
+  - 为什么需要：MCP 会话为canonical 事实 mcp_client_opens_session（MCPClient mcp_client_opens_session MCPSession）提供明确端点并保持与 MCPClient 的定义边界；节点字段 mcp_session_id、protocol_version、state 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的MCP 会话：MCP 会话记录客户端与服务器连接上下文，在其中交换能力、请求、响应、授权和传输元数据。；该种差可由字段 mcp_session_id、protocol_version、state 检验。
+  - 不包含：
+  - MCP 客户端只是关系 mcp_client_opens_session 的另一端；相关联不表示它是MCP 会话。
+  - 结构与约束：3 个字段，3 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+
+- **MCP 传输** `MCPTransport`
+  - 定义：MCP 传输是 MCP 客户端/服务器会话用于交换 JSON 消息 消息、能力元数据、工具调用、资源读取、提示请求和补充信息流量的协议通道与投递表面。
+  - 为什么需要：MCP 传输为canonical 事实 MCPSession-uses_transport-MCPTransport（MCPSession uses_transport MCPTransport）提供明确端点并保持与 MCPSession 的定义边界；节点字段 transport_kind 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的MCP 传输：MCP 传输是 MCP 客户端/服务器会话用于交换 JSON 消息 消息、能力元数据、工具调用、资源读取、提示请求和补充信息流量的协议通道与投递表面。；该种差可由字段 transport_kind 检验。
+  - 不包含：
+  - MCP 会话只是关系 MCPSession-uses_transport-MCPTransport 的另一端；相关联不表示它是MCP 传输。
+  - 结构与约束：1 个字段，0 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+
+### 能力注册与定义模块
+
+能力注册与定义模块刻画工具、资源、提示模板、API 操作和能力表面的静态描述层：名称、用途、参数与结果 Schema、版本、弃用信息、权限声明和可发现元数据。
+
+- **能力表面** `CapabilitySurface`
+  - 定义：能力表面是发布多个定义和描述符的集合，不是 Tool 或 Capability 的子类。
+  - 为什么需要：能力表面为canonical 事实 CapabilitySurface-publishes-CapabilityDescriptor（CapabilitySurface publishes CapabilityDescriptor）提供明确端点并保持与 CapabilityDescriptor 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的能力表面：能力表面是发布多个定义和描述符的集合，不是 Tool 或 Capability 的子类。；该种差可由关系 CapabilitySurface-publishes-CapabilityDescriptor 的端点角色检验。
+  - 不包含：
+  - 能力描述符只是关系 CapabilitySurface-publishes-CapabilityDescriptor 的另一端；相关联不表示它是能力表面。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **工具** `Tool`
+  - 定义：工具是一种可调用能力，它公开 API 操作（APIOperation），在工具定义与权限约束下接收参数，并在被调用时产生可观测结果。
+  - 为什么需要：工具为canonical 事实 Tool-exposes_operation-APIOperation（Tool exposes_operation APIOperation）提供明确端点并保持与 APIOperation 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的工具：工具是一种可调用能力，它公开 API 操作（APIOperation），在工具定义与权限约束下接收参数，并在被调用时产生可观测结果。；该种差可由关系 Tool-exposes_operation-APIOperation 的端点角色检验。
+  - 不包含：
+  - API 操作只是关系 Tool-exposes_operation-APIOperation 的另一端；相关联不表示它是工具。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **电脑控制工具** `ComputerTool`
+    - 定义：电脑工具表示对电脑、浏览器、桌面 界面 或屏幕控制环境执行动作并产生可观察 界面/环境状态的工具。
+    - 直接上位：`Tool`
+    - 为什么需要：电脑控制工具为canonical 事实 ComputerTool-is_a-Tool（ComputerTool is_a Tool）提供明确端点并保持与 FunctionTool 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的电脑控制工具：电脑工具表示对电脑、浏览器、桌面 界面 或屏幕控制环境执行动作并产生可观察 界面/环境状态的工具。；该种差可由关系 ComputerTool-is_a-Tool 的端点角色检验。
+    - 不包含：
+  - 函数工具虽与本概念同属 Tool，但其定义为“函数工具表示以可调用名称、类 JSON 参数 Schema、返回 Schema 和宿主侧实现描述的工具。”，不得替代电脑控制工具。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **函数工具** `FunctionTool`
+    - 定义：函数工具表示以可调用名称、类 JSON 参数 Schema、返回 Schema 和宿主侧实现描述的工具。
+    - 直接上位：`Tool`
+    - 为什么需要：函数工具为canonical 事实 FunctionTool-is_a-Tool（FunctionTool is_a Tool）提供明确端点并保持与 ComputerTool 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的函数工具：函数工具表示以可调用名称、类 JSON 参数 Schema、返回 Schema 和宿主侧实现描述的工具。；该种差可由关系 FunctionTool-is_a-Tool 的端点角色检验。
+    - 不包含：
+  - 电脑控制工具虽与本概念同属 Tool，但其定义为“电脑工具表示对电脑、浏览器、桌面 界面 或屏幕控制环境执行动作并产生可观察 界面/环境状态的工具。”，不得替代函数工具。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **托管工具** `HostedTool`
+    - 定义：托管工具表示由外部服务或提供商管理运行时承载的工具，其执行表面通过注册表或协议连接器调用。
+    - 直接上位：`Tool`
+    - 为什么需要：托管工具为canonical 事实 HostedTool-is_a-Tool（HostedTool is_a Tool）提供明确端点并保持与 ComputerTool 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的托管工具：托管工具表示由外部服务或提供商管理运行时承载的工具，其执行表面通过注册表或协议连接器调用。；该种差可由关系 HostedTool-is_a-Tool 的端点角色检验。
+    - 不包含：
+  - 电脑控制工具虽与本概念同属 Tool，但其定义为“电脑工具表示对电脑、浏览器、桌面 界面 或屏幕控制环境执行动作并产生可观察 界面/环境状态的工具。”，不得替代托管工具。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+    - **托管 MCP 工具** `HostedMCPTool`
+      - 定义：托管 MCP 工具表示服务器通过 MCP 向客户端暴露的工具，并携带协议元数据、授权上下文、Schema 表面和调用约束。
+      - 直接上位：`HostedTool`
+      - 为什么需要：托管 MCP 工具为canonical 事实 HostedMCPTool-is_a-HostedTool（HostedMCPTool is_a HostedTool）提供明确端点并保持与 HostedTool 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的托管 MCP 工具：托管 MCP 工具表示服务器通过 MCP 向客户端暴露的工具，并携带协议元数据、授权上下文、Schema 表面和调用约束。；该种差可由关系 HostedMCPTool-is_a-HostedTool 的端点角色检验。
+      - 不包含：
+  - 仅能识别为上位概念 HostedTool 的对象不在范围内；它尚未证明托管 MCP 工具的种差或关系端点 HostedMCPTool-is_a-HostedTool。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：2 项
+  - **本地运行时工具** `LocalRuntimeTool`
+    - 定义：本地运行时工具表示由宿主控制的进程、命令行、电脑控制、代码、浏览器或容器表面执行的工具。
+    - 直接上位：`Tool`
+    - 为什么需要：本地运行时工具为canonical 事实 LocalRuntimeTool-is_a-Tool（LocalRuntimeTool is_a Tool）提供明确端点并保持与 ComputerTool 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的本地运行时工具：本地运行时工具表示由宿主控制的进程、命令行、电脑控制、代码、浏览器或容器表面执行的工具。；该种差可由关系 LocalRuntimeTool-is_a-Tool 的端点角色检验。
+    - 不包含：
+  - 电脑控制工具虽与本概念同属 Tool，但其定义为“电脑工具表示对电脑、浏览器、桌面 界面 或屏幕控制环境执行动作并产生可观察 界面/环境状态的工具。”，不得替代本地运行时工具。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+    - **命令行工具** `ShellTool`
+      - 定义：命令行 工具表示在沙箱和策略约束下执行命令行、脚本或进程操作的工具。
+      - 直接上位：`LocalRuntimeTool`
+      - 为什么需要：命令行工具为canonical 事实 ShellTool-is_a-LocalRuntimeTool（ShellTool is_a LocalRuntimeTool）提供明确端点并保持与 LocalRuntimeTool 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的命令行工具：命令行 工具表示在沙箱和策略约束下执行命令行、脚本或进程操作的工具。；该种差可由关系 ShellTool-is_a-LocalRuntimeTool 的端点角色检验。
+      - 不包含：
+  - 仅能识别为上位概念 LocalRuntimeTool 的对象不在范围内；它尚未证明命令行工具的种差或关系端点 ShellTool-is_a-LocalRuntimeTool。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：2 项
+
+- **工具能力** `ToolCapability`
+  - 定义：工具能力描述工具可对外声明的操作或能力表面，包括执行边界、权限要求、Schema 表面和可观察结果类型。
+  - 为什么需要：工具能力为canonical 事实 maps_protocol_capability_to_canonical_capability（ProtocolCapabilityMapping maps_protocol_capability_to_canonical_capability ToolCapability）提供明确端点并保持与 ProtocolCapabilityMapping 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的工具能力：工具能力描述工具可对外声明的操作或能力表面，包括执行边界、权限要求、Schema 表面和可观察结果类型。；该种差可由关系 maps_protocol_capability_to_canonical_capability 的端点角色检验。
+  - 不包含：
+  - 协议能力映射只是关系 maps_protocol_capability_to_canonical_capability 的另一端；相关联不表示它是工具能力。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **API 操作** `APIOperation`
+    - 定义：API 操作表示外部 API 动作，包含方法、端点、参数 Schema、结果 Schema、认证要求、副作用预期和可观察调用结果。
+    - 直接上位：`ToolCapability`
+    - 为什么需要：API 操作为canonical 事实 capability_descriptor_describes_api_operation（CapabilityDescriptor capability_descriptor_describes_api_operation APIOperation）提供明确端点并保持与 ToolCapability 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的API 操作：API 操作表示外部 API 动作，包含方法、端点、参数 Schema、结果 Schema、认证要求、副作用预期和可观察调用结果。；该种差可由关系 capability_descriptor_describes_api_operation 的端点角色检验。
+    - 不包含：
+  - 仅能识别为上位概念 ToolCapability 的对象不在范围内；它尚未证明API 操作的种差或关系端点 capability_descriptor_describes_api_operation。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **工具元数据记录** `ToolMetadata`
+  - 定义：ToolMetadata 是可独立引用、版本化或治理的描述信息记录，例如能力描述符和弃用通知；普通名称、版本字符串和描述文本仍作为 ToolDefinition 字段。
+  - 为什么需要：工具元数据记录为canonical 事实 CapabilityDescriptor-is_a-ToolMetadata（CapabilityDescriptor is_a ToolMetadata）提供明确端点并保持与 CapabilityDescriptor 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的工具元数据记录：ToolMetadata 是可独立引用、版本化或治理的描述信息记录，例如能力描述符和弃用通知；普通名称、版本字符串和描述文本仍作为 ToolDefinition 字段。；该种差可由关系 CapabilityDescriptor-is_a-ToolMetadata 的端点角色检验。
+  - 不包含：
+  - 能力描述符只是关系 CapabilityDescriptor-is_a-ToolMetadata 的另一端；相关联不表示它是工具元数据记录。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **能力描述符** `CapabilityDescriptor`
+    - 定义：能力描述符是机器可读记录，说明工具、资源、提示或 API 操作的操作身份、Schema 表面、信任元数据、权限要求、发现标签和协议暴露方式。
+    - 直接上位：`ToolMetadata`
+    - 为什么需要：能力描述符为canonical 事实 capability_descriptor_describes_api_operation（CapabilityDescriptor capability_descriptor_describes_api_operation APIOperation）提供明确端点并保持与 ToolDeprecationNotice 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的能力描述符：能力描述符是机器可读记录，说明工具、资源、提示或 API 操作的操作身份、Schema 表面、信任元数据、权限要求、发现标签和协议暴露方式。；该种差可由关系 capability_descriptor_describes_api_operation 的端点角色检验。
+    - 不包含：
+  - 工具弃用通知虽与本概念同属 ToolMetadata，但其定义为“工具弃用通知是一种工具元数据（ToolMetadata），用于标识被弃用的工具定义（ToolDefinition）并记录生命周期或替代指引，而不是描述可调用能力本身。”，不得替代能力描述符。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **工具弃用通知** `ToolDeprecationNotice`
+    - 定义：工具弃用通知是一种工具元数据（ToolMetadata），用于标识被弃用的工具定义（ToolDefinition）并记录生命周期或替代指引，而不是描述可调用能力本身。
+    - 直接上位：`ToolMetadata`
+    - 为什么需要：工具弃用通知为canonical 事实 ToolDeprecationNotice-deprecates-ToolDefinition（ToolDeprecationNotice deprecates ToolDefinition）提供明确端点并保持与 CapabilityDescriptor 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的工具弃用通知：工具弃用通知是一种工具元数据（ToolMetadata），用于标识被弃用的工具定义（ToolDefinition）并记录生命周期或替代指引，而不是描述可调用能力本身。；该种差可由关系 ToolDeprecationNotice-deprecates-ToolDefinition 的端点角色检验。
+    - 不包含：
+  - 能力描述符虽与本概念同属 ToolMetadata，但其定义为“能力描述符是机器可读记录，说明工具、资源、提示或 API 操作的操作身份、Schema 表面、信任元数据、权限要求、发现标签和协议暴露方式。”，不得替代工具弃用通知。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **工具注册表** `ToolRegistry`
+  - 定义：工具注册表是能力目录资源，用来保存可用工具定义、能力描述符、Schema、权限声明、版本、发现元数据和协议暴露记录。
+  - 为什么需要：工具注册表为canonical 事实 ToolRegistry-contains_definition-ToolDefinition（ToolRegistry contains_definition ToolDefinition）提供明确端点并保持与 ToolDefinition 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的工具注册表：工具注册表是能力目录资源，用来保存可用工具定义、能力描述符、Schema、权限声明、版本、发现元数据和协议暴露记录。；该种差可由关系 ToolRegistry-contains_definition-ToolDefinition 的端点角色检验。
+  - 不包含：
+  - 工具定义只是关系 ToolRegistry-contains_definition-ToolDefinition 的另一端；相关联不表示它是工具注册表。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **工具注册规范** `ToolSpecification`
+  - 定义：ToolSpecification 是注册表中具有稳定身份、版本和约束的静态规范；它可规定工具、提示或资源如何被发现和使用，但不是一次运行时调用、尝试或结果。
+  - 为什么需要：工具注册规范为canonical 事实 PromptDefinition-is_a-ToolSpecification（PromptDefinition is_a ToolSpecification）提供明确端点并保持与 PromptDefinition 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的工具注册规范：ToolSpecification 是注册表中具有稳定身份、版本和约束的静态规范；它可规定工具、提示或资源如何被发现和使用，但不是一次运行时调用、尝试或结果。；该种差可由关系 PromptDefinition-is_a-ToolSpecification 的端点角色检验。
+  - 不包含：
+  - 提示定义只是关系 PromptDefinition-is_a-ToolSpecification 的另一端；相关联不表示它是工具注册规范。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **提示定义** `PromptDefinition`
+    - 定义：提示定义描述服务器或注册表暴露的可复用提示、工作流模板、预期参数、输出角色和适用条件。
+    - 直接上位：`ToolSpecification`
+    - 为什么需要：提示定义为canonical 事实 mcp_prompt_list_contains_prompt_definition（MCPPromptList mcp_prompt_list_contains_prompt_definition PromptDefinition）提供明确端点并保持与 ResourceDefinition 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的提示定义：提示定义描述服务器或注册表暴露的可复用提示、工作流模板、预期参数、输出角色和适用条件。；该种差可由关系 mcp_prompt_list_contains_prompt_definition 的端点角色检验。
+    - 不包含：
+  - 资源定义虽与本概念同属 ToolSpecification，但其定义为“资源定义说明协议或服务器如何暴露上下文/数据资源，并支持列举、读取、订阅和资源模板操作。”，不得替代提示定义。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+    - **提示模板** `PromptTemplate`
+      - 定义：提示模板是带变量的消息或工作流模式，在进入模型调用或 agent 步骤前可通过参数绑定实例化。
+      - 直接上位：`PromptDefinition`
+      - 为什么需要：提示模板为canonical 事实 PromptInstantiation-uses-PromptTemplate（PromptInstantiation uses PromptTemplate）提供明确端点并保持与 PromptDefinition 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的提示模板：提示模板是带变量的消息或工作流模式，在进入模型调用或 agent 步骤前可通过参数绑定实例化。；该种差可由关系 PromptInstantiation-uses-PromptTemplate 的端点角色检验。
+      - 不包含：
+  - 仅能识别为上位概念 PromptDefinition 的对象不在范围内；它尚未证明提示模板的种差或关系端点 PromptInstantiation-uses-PromptTemplate。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：2 项
+  - **资源定义** `ResourceDefinition`
+    - 定义：资源定义说明协议或服务器如何暴露上下文/数据资源，并支持列举、读取、订阅和资源模板操作。
+    - 直接上位：`ToolSpecification`
+    - 为什么需要：资源定义为canonical 事实 mcp_resource_list_contains_resource_definition（MCPResourceList mcp_resource_list_contains_resource_definition ResourceDefinition）提供明确端点并保持与 PromptDefinition 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的资源定义：资源定义说明协议或服务器如何暴露上下文/数据资源，并支持列举、读取、订阅和资源模板操作。；该种差可由关系 mcp_resource_list_contains_resource_definition 的端点角色检验。
+    - 不包含：
+  - 提示定义虽与本概念同属 ToolSpecification，但其定义为“提示定义描述服务器或注册表暴露的可复用提示、工作流模板、预期参数、输出角色和适用条件。”，不得替代资源定义。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+    - **资源模板** `ResourceTemplate`
+      - 定义：资源模板是参数化资源描述，把变量绑定到资源 URI 或选择器，使一组相关资源可被安全发现和读取。
+      - 直接上位：`ResourceDefinition`
+      - 为什么需要：资源模板为canonical 事实 ResourceTemplate-is_a-ResourceDefinition（ResourceTemplate is_a ResourceDefinition）提供明确端点并保持与 ResourceDefinition 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的资源模板：资源模板是参数化资源描述，把变量绑定到资源 URI 或选择器，使一组相关资源可被安全发现和读取。；该种差可由关系 ResourceTemplate-is_a-ResourceDefinition 的端点角色检验。
+      - 不包含：
+  - 仅能识别为上位概念 ResourceDefinition 的对象不在范围内；它尚未证明资源模板的种差或关系端点 ResourceTemplate-is_a-ResourceDefinition。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：2 项
+  - **工具定义** `ToolDefinition`
+    - 定义：工具定义是 Schema 化资源，描述工具名称、用途、可调用操作、参数 Schema、结果 Schema、权限声明、约束、版本和弃用状态。
+    - 直接上位：`ToolSpecification`
+    - 为什么需要：工具定义为canonical 事实 tool_definition_declares_permission（ToolDefinition tool_definition_declares_permission ToolPermissionSpec）提供明确端点并保持与 PromptDefinition 的定义边界；节点字段 argument_schema、name、result_schema 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的工具定义：工具定义是 Schema 化资源，描述工具名称、用途、可调用操作、参数 Schema、结果 Schema、权限声明、约束、版本和弃用状态。；该种差可由字段 argument_schema、name、result_schema 检验。
+    - 不包含：
+  - 提示定义虽与本概念同属 ToolSpecification，但其定义为“提示定义描述服务器或注册表暴露的可复用提示、工作流模板、预期参数、输出角色和适用条件。”，不得替代工具定义。
+    - 结构与约束：6 个字段，2 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **工具权限规格** `ToolPermissionSpec`
+    - 定义：工具权限规格是工具侧权限声明，说明所需 范围、审批行为、受保护资源、安全约束和策略挂钩点，但不替代真正的策略决策。
+    - 直接上位：`ToolSpecification`
+    - 为什么需要：工具权限规格为canonical 事实 ToolPermissionSpec-constrains-Tool（ToolPermissionSpec constrains Tool）提供明确端点并保持与 PromptDefinition 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的工具权限规格：工具权限规格是工具侧权限声明，说明所需 范围、审批行为、受保护资源、安全约束和策略挂钩点，但不替代真正的策略决策。；该种差可由关系 ToolPermissionSpec-constrains-Tool 的端点角色检验。
+    - 不包含：
+  - 提示定义虽与本概念同属 ToolSpecification，但其定义为“提示定义描述服务器或注册表暴露的可复用提示、工作流模板、预期参数、输出角色和适用条件。”，不得替代工具权限规格。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+## 信任、策略与安全域
+
+信任、策略与安全域是运行关注域，描述信任边界、权限范围、权限提示、策略决策、沙箱、网络控制、注入防御、提交闸门、脱敏和审计披露。
+
+### 提交与脱敏模块
+
+提交与脱敏模块同时管理副作用放行链和披露控制链：先评估写入、网络变更或外部动作是否可执行，再对敏感片段进行脱敏、抑制或审计披露。
+
+- **审计披露** `AuditDisclosure`
+  - 定义：审计披露记录内容被释放、脱敏或抑制时的可审计披露决策，包括过滤器、策略、接收方边界、敏感片段和轨迹证据。
+  - 为什么需要：审计披露为canonical 事实 audit_disclosure_records_disclosure_filter（AuditDisclosure audit_disclosure_records_disclosure_filter DisclosureFilter）提供明确端点并保持与 DisclosureFilter 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的审计披露：审计披露记录内容被释放、脱敏或抑制时的可审计披露决策，包括过滤器、策略、接收方边界、敏感片段和轨迹证据。；该种差可由关系 audit_disclosure_records_disclosure_filter 的端点角色检验。
+  - 不包含：
+  - 披露过滤器只是关系 audit_disclosure_records_disclosure_filter 的另一端；相关联不表示它是审计披露。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **提交批准** `CommitApproval`
+  - 定义：提交批准记录授权某个有边界副作用的批准结果，包括批准者或策略权限、受保护资源、范围、条件、失效时间和轨迹证据。
+  - 直接上位：`AllowDecision`
+  - 为什么需要：提交批准为canonical 事实 CommitApproval-authorizes-SideEffect（CommitApproval authorizes SideEffect）提供明确端点并保持与 AllowDecision 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的提交批准：提交批准记录授权某个有边界副作用的批准结果，包括批准者或策略权限、受保护资源、范围、条件、失效时间和轨迹证据。；该种差可由关系 CommitApproval-authorizes-SideEffect 的端点角色检验。
+  - 不包含：
+  - 仅能识别为上位概念 AllowDecision 的对象不在范围内；它尚未证明提交批准的种差或关系端点 CommitApproval-authorizes-SideEffect。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+
+- **提交拒绝** `CommitDenial`
+  - 定义：提交拒绝记录阻断所请求副作用的拒绝结果，包括策略依据、拒绝原因、受影响资源、参与者和审计轨迹。
+  - 直接上位：`DenyDecision`
+  - 为什么需要：提交拒绝为canonical 事实 CommitDenial-blocks-SideEffect（CommitDenial blocks SideEffect）提供明确端点并保持与 DenyDecision 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的提交拒绝：提交拒绝记录阻断所请求副作用的拒绝结果，包括策略依据、拒绝原因、受影响资源、参与者和审计轨迹。；该种差可由关系 CommitDenial-blocks-SideEffect 的端点角色检验。
+  - 不包含：
+  - 仅能识别为上位概念 DenyDecision 的对象不在范围内；它尚未证明提交拒绝的种差或关系端点 CommitDenial-blocks-SideEffect。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+
+- **副作用提交闸门** `CommitGate`
+  - 定义：提交门是副作用门控，用于在策略检查、批准或回滚控制满足之前阻止或延迟写入、外部动作、网络效果、提交或披露。
+  - 直接上位：`Gate`
+  - 为什么需要：副作用提交闸门为canonical 事实 commit_gate_emits_policy_decision（CommitGate commit_gate_emits_policy_decision PolicyDecision）提供明确端点并保持与 Gate 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的副作用提交闸门：提交门是副作用门控，用于在策略检查、批准或回滚控制满足之前阻止或延迟写入、外部动作、网络效果、提交或披露。；该种差可由关系 commit_gate_emits_policy_decision 的端点角色检验。
+  - 不包含：
+  - 仅能识别为上位概念 Gate 的对象不在范围内；它尚未证明副作用提交闸门的种差或关系端点 commit_gate_emits_policy_decision。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **提交请求** `CommitRequest`
+  - 定义：提交请求记录执行副作用的请求，例如文件写入、仓库提交、网络变更、外部 API 动作、记忆写入或披露释放。
+  - 为什么需要：提交请求为canonical 事实 CommitRequest-evaluated_by-CommitGate（CommitRequest evaluated_by CommitGate）提供明确端点并保持与 CommitGate 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的提交请求：提交请求记录执行副作用的请求，例如文件写入、仓库提交、网络变更、外部 API 动作、记忆写入或披露释放。；该种差可由关系 CommitRequest-evaluated_by-CommitGate 的端点角色检验。
+  - 不包含：
+  - 副作用提交闸门只是关系 CommitRequest-evaluated_by-CommitGate 的另一端；相关联不表示它是提交请求。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **披露控制活动** `DisclosureControlActivity`
+  - 定义：披露控制活动是由识别的执行者在给定接收方和信任边界下，对输出、消息、产物、轨迹或记忆内容应用披露规则的活动，记录输入内容、敏感片段、规则版本、选择结果、生成内容和审计证据；规则和结果信息不是该活动的子类。
+  - 为什么需要：披露控制活动为canonical 事实 AuditDisclosure-records_control-DisclosureControlActivity（AuditDisclosure records_control DisclosureControlActivity）提供明确端点并保持与 AuditDisclosure 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的披露控制活动：披露控制活动是由识别的执行者在给定接收方和信任边界下，对输出、消息、产物、轨迹或记忆内容应用披露规则的活动，记录输入内容、敏感片段、规则版本、选择结果、生成内容和审计证据；规则和结果信息不是该活动的子类。；该种差可由关系 AuditDisclosure-records_control-DisclosureControlActivity 的端点角色检验。
+  - 不包含：
+  - 审计披露只是关系 AuditDisclosure-records_control-DisclosureControlActivity 的另一端；相关联不表示它是披露控制活动。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **披露过滤器** `DisclosureFilter`
+    - 定义：披露过滤器把披露策略应用于输出窗口、上下文包、产物、轨迹或消息，决定内容是释放、脱敏、抑制还是升级审查。
+    - 直接上位：`DisclosureControlActivity`
+    - 为什么需要：披露过滤器为canonical 事实 disclosure_filter_suppresses_output_window（DisclosureFilter disclosure_filter_suppresses_output_window OutputWindow）提供明确端点并保持与 ProgressiveDisclosure 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的披露过滤器：披露过滤器把披露策略应用于输出窗口、上下文包、产物、轨迹或消息，决定内容是释放、脱敏、抑制还是升级审查。；该种差可由关系 disclosure_filter_suppresses_output_window 的端点角色检验。
+    - 不包含：
+  - 渐进式披露虽与本概念同属 DisclosureControlActivity，但其定义为“渐进披露记录在策略、信任边界和上下文窗口约束下分阶段释放内容的控制模式。”，不得替代披露过滤器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **渐进式披露** `ProgressiveDisclosure`
+    - 定义：渐进披露记录在策略、信任边界和上下文窗口约束下分阶段释放内容的控制模式。
+    - 直接上位：`DisclosureControlActivity`
+    - 为什么需要：渐进式披露为canonical 事实 DisclosureStage-governed_by-ProgressiveDisclosure（DisclosureStage governed_by ProgressiveDisclosure）提供明确端点并保持与 DisclosureFilter 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的渐进式披露：渐进披露记录在策略、信任边界和上下文窗口约束下分阶段释放内容的控制模式。；该种差可由关系 DisclosureStage-governed_by-ProgressiveDisclosure 的端点角色检验。
+    - 不包含：
+  - 披露过滤器虽与本概念同属 DisclosureControlActivity，但其定义为“披露过滤器把披露策略应用于输出窗口、上下文包、产物、轨迹或消息，决定内容是释放、脱敏、抑制还是升级审查。”，不得替代渐进式披露。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **脱敏处置** `Redaction`
+    - 定义：脱敏记录在内容被展示、导出、存储或跨边界发送之前，对敏感内容进行掩码、移除、替换、总结或保留不披露的操作。
+    - 直接上位：`DisclosureControlActivity`
+    - 为什么需要：脱敏处置为canonical 事实 Redaction-may_produce-SuppressedOutput（Redaction may_produce SuppressedOutput）提供明确端点并保持与 DisclosureFilter 的定义边界；节点字段 redaction_id、applied_at、replacement_marker 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的脱敏处置：脱敏记录在内容被展示、导出、存储或跨边界发送之前，对敏感内容进行掩码、移除、替换、总结或保留不披露的操作。；该种差可由字段 redaction_id、applied_at、replacement_marker 检验。
+    - 不包含：
+  - 披露过滤器虽与本概念同属 DisclosureControlActivity，但其定义为“披露过滤器把披露策略应用于输出窗口、上下文包、产物、轨迹或消息，决定内容是释放、脱敏、抑制还是升级审查。”，不得替代脱敏处置。
+    - 结构与约束：3 个字段，2 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+
+- **披露规则** `DisclosureRule`
+  - 定义：披露规则定义内容在面向某个接收方时何时可以展示、脱敏、延迟、摘要化或阻断。
+  - 为什么需要：披露规则为canonical 事实 DisclosureFilter-governed_by-DisclosureRule（DisclosureFilter governed_by DisclosureRule）提供明确端点并保持与 DisclosureFilter 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的披露规则：披露规则定义内容在面向某个接收方时何时可以展示、脱敏、延迟、摘要化或阻断。；该种差可由关系 DisclosureFilter-governed_by-DisclosureRule 的端点角色检验。
+  - 不包含：
+  - 披露过滤器只是关系 DisclosureFilter-governed_by-DisclosureRule 的另一端；相关联不表示它是披露规则。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **脱敏规则** `RedactionRule`
+    - 定义：脱敏规则定义在内容跨越输出或信任边界之前，如何检测、掩码、抑制、总结或替换敏感片段。
+    - 直接上位：`DisclosureRule`
+    - 为什么需要：脱敏规则为canonical 事实 RedactionRule-is_a-DisclosureRule（RedactionRule is_a DisclosureRule）提供明确端点并保持与 DisclosureRule 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的脱敏规则：脱敏规则定义在内容跨越输出或信任边界之前，如何检测、掩码、抑制、总结或替换敏感片段。；该种差可由关系 RedactionRule-is_a-DisclosureRule 的端点角色检验。
+    - 不包含：
+  - 仅能识别为上位概念 DisclosureRule 的对象不在范围内；它尚未证明脱敏规则的种差或关系端点 RedactionRule-is_a-DisclosureRule。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **敏感片段** `SensitiveSpan`
+  - 定义：敏感片段标识输出、来源、消息、轨迹、产物或记忆内容中需要脱敏、抑制、掩码、延迟披露或限制路由的范围。
+  - 为什么需要：敏感片段为canonical 事实 output_segment_has_sensitive_span（OutputSegment output_segment_has_sensitive_span SensitiveSpan）提供明确端点并保持与 OutputSegment 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的敏感片段：敏感片段标识输出、来源、消息、轨迹、产物或记忆内容中需要脱敏、抑制、掩码、延迟披露或限制路由的范围。；该种差可由关系 output_segment_has_sensitive_span 的端点角色检验。
+  - 不包含：
+  - 输出片段只是关系 output_segment_has_sensitive_span 的另一端；相关联不表示它是敏感片段。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **副作用** `SideEffect`
+  - 定义：副作用记录工具调用、沙箱命令、网络调用、记忆写入、文件写入、提交或协议操作产生的外部可见或持久化效果。
+  - 为什么需要：副作用为canonical 事实 side_effect_has_rollback_action（SideEffect side_effect_has_rollback_action RollbackAction）提供明确端点并保持与 RollbackAction 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的副作用：副作用记录工具调用、沙箱命令、网络调用、记忆写入、文件写入、提交或协议操作产生的外部可见或持久化效果。；该种差可由关系 side_effect_has_rollback_action 的端点角色检验。
+  - 不包含：
+  - 回滚动作只是关系 side_effect_has_rollback_action 的另一端；相关联不表示它是副作用。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **被抑制输出** `SuppressedOutput`
+  - 定义：被抑制输出记录因策略、隐私、安全、边界或预算约束而未向查看者或下游上下文释放的输出。
+  - 为什么需要：被抑制输出为canonical 事实 Redaction-may_produce-SuppressedOutput（Redaction may_produce SuppressedOutput）提供明确端点并保持与 Redaction 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的被抑制输出：被抑制输出记录因策略、隐私、安全、边界或预算约束而未向查看者或下游上下文释放的输出。；该种差可由关系 Redaction-may_produce-SuppressedOutput 的端点角色检验。
+  - 不包含：
+  - 脱敏处置只是关系 Redaction-may_produce-SuppressedOutput 的另一端；相关联不表示它是被抑制输出。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+### 注入防御模块
+
+注入防御模块把不可信来源、污点片段、来源到接收方的传播路径、工具输出注入、记忆投毒和执行前风险信号连接成可审计安全链。
+
+- **防御发现** `DefenseFinding`
+  - 定义：防御发现记录注入防御或污点分析产生的安全发现，在其转化为反馈指标、审查发现、阻断错误或策略决策之前保留原始语义。
+  - 为什么需要：防御发现为canonical 事实 DefenseFinding-triggers-MitigationAction（DefenseFinding triggers MitigationAction）提供明确端点并保持与 MitigationAction 的定义边界；节点字段 finding_id、confidence、risk_score 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的防御发现：防御发现记录注入防御或污点分析产生的安全发现，在其转化为反馈指标、审查发现、阻断错误或策略决策之前保留原始语义。；该种差可由字段 finding_id、confidence、risk_score 检验。
+  - 不包含：
+  - 缓解活动只是关系 DefenseFinding-triggers-MitigationAction 的另一端；相关联不表示它是防御发现。
+  - 结构与约束：5 个字段，2 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+
+- **检测活动** `DetectionActivity`
+  - 定义：检测活动是由识别的检测器在给定时间对内容、消息、工具输出、schema、记忆或传播路径执行检查的活动，具有输入对象、检测方法、配置版本和执行上下文，并产生独立的扫描结果或发现；结果不是活动子类。
+  - 为什么需要：检测活动为canonical 事实 PatternScan-is_a-DetectionActivity（PatternScan is_a DetectionActivity）提供明确端点并保持与 PatternScan 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的检测活动：检测活动是由识别的检测器在给定时间对内容、消息、工具输出、schema、记忆或传播路径执行检查的活动，具有输入对象、检测方法、配置版本和执行上下文，并产生独立的扫描结果或发现；结果不是活动子类。；该种差可由关系 PatternScan-is_a-DetectionActivity 的端点角色检验。
+  - 不包含：
+  - 模式扫描只是关系 PatternScan-is_a-DetectionActivity 的另一端；相关联不表示它是检测活动。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **模式扫描** `PatternScan`
+    - 定义：模式扫描是一种检测活动（DetectionActivity），检查消息、检索分块、工具结果或其他不可信内容中的注入签名（InjectionSignature）指标或策略违规，并产出注入扫描结果（InjectionScanResult）。
+    - 直接上位：`DetectionActivity`
+    - 为什么需要：模式扫描为canonical 事实 PatternScan-produces-InjectionScanResult（PatternScan produces InjectionScanResult）提供明确端点并保持与 DetectionActivity 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的模式扫描：模式扫描是一种检测活动（DetectionActivity），检查消息、检索分块、工具结果或其他不可信内容中的注入签名（InjectionSignature）指标或策略违规，并产出注入扫描结果（InjectionScanResult）。；该种差可由关系 PatternScan-produces-InjectionScanResult 的端点角色检验。
+    - 不包含：
+  - 仅能识别为上位概念 DetectionActivity 的对象不在范围内；它尚未证明模式扫描的种差或关系端点 PatternScan-produces-InjectionScanResult。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **注入扫描结果** `InjectionScanResult`
+  - 定义：注入扫描结果记录对内容进行注入或污点风险扫描的结果，包括匹配信号、受影响片段、来源、置信度、策略决策以及已知的下游接收方。
+  - 为什么需要：注入扫描结果为canonical 事实 InjectionScanResult-supports-DefenseFinding（InjectionScanResult supports DefenseFinding）提供明确端点并保持与 DefenseFinding 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的注入扫描结果：注入扫描结果记录对内容进行注入或污点风险扫描的结果，包括匹配信号、受影响片段、来源、置信度、策略决策以及已知的下游接收方。；该种差可由关系 InjectionScanResult-supports-DefenseFinding 的端点角色检验。
+  - 不包含：
+  - 防御发现只是关系 InjectionScanResult-supports-DefenseFinding 的另一端；相关联不表示它是注入扫描结果。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **注入特征规范** `InjectionSignature`
+  - 定义：注入签名是一种检测模式，表示提示注入、工具流操纵或恶意指令传播的可识别指标，并作为 scans_for_signature 关系的检测目标。
+  - 为什么需要：注入特征规范为canonical 事实 scans_for_signature（PatternScan scans_for_signature InjectionSignature）提供明确端点并保持与 PatternScan 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的注入特征规范：注入签名是一种检测模式，表示提示注入、工具流操纵或恶意指令传播的可识别指标，并作为 scans_for_signature 关系的检测目标。；该种差可由关系 scans_for_signature 的端点角色检验。
+  - 不包含：
+  - 模式扫描只是关系 scans_for_signature 的另一端；相关联不表示它是注入特征规范。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **指令冲突** `InstructionConflict`
+  - 定义：指令冲突记录可信指令与不可信或低权限指令候选之间的安全相关冲突，包括受影响范围和解决结果。
+  - 为什么需要：指令冲突为canonical 事实 InstructionConflict-resolved_by-TrustedInstructionOverride（InstructionConflict resolved_by TrustedInstructionOverride）提供明确端点并保持与 TrustedInstructionOverride 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的指令冲突：指令冲突记录可信指令与不可信或低权限指令候选之间的安全相关冲突，包括受影响范围和解决结果。；该种差可由关系 InstructionConflict-resolved_by-TrustedInstructionOverride 的端点角色检验。
+  - 不包含：
+  - 可信指令覆盖只是关系 InstructionConflict-resolved_by-TrustedInstructionOverride 的另一端；相关联不表示它是指令冲突。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **缓解活动** `MitigationAction`
+  - 定义：缓解活动是由策略决定或授权触发、针对明确对象和风险的受控处置，具有执行者、时间、作用域、前后状态、验证步骤与失败/回滚结果；净化和隔离是其下位类，可信指令覆盖保留为治理决定记录而不强行归入活动。
+  - 为什么需要：缓解活动为canonical 事实 DefenseFinding-triggers-MitigationAction（DefenseFinding triggers MitigationAction）提供明确端点并保持与 DefenseFinding 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的缓解活动：缓解活动是由策略决定或授权触发、针对明确对象和风险的受控处置，具有执行者、时间、作用域、前后状态、验证步骤与失败/回滚结果；净化和隔离是其下位类，可信指令覆盖保留为治理决定记录而不强行归入活动。；该种差可由关系 DefenseFinding-triggers-MitigationAction 的端点角色检验。
+  - 不包含：
+  - 防御发现只是关系 DefenseFinding-triggers-MitigationAction 的另一端；相关联不表示它是缓解活动。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **隔离处置** `QuarantineAction`
+    - 定义：隔离动作记录把内容、工具输出、检索记忆或产物从正常上下文和执行流中隔离，直到完成审查或策略解决。
+    - 直接上位：`MitigationAction`
+    - 为什么需要：隔离处置为canonical 事实 QuarantineAction-is_a-MitigationAction（QuarantineAction is_a MitigationAction）提供明确端点并保持与 SanitizationAction 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的隔离处置：隔离动作记录把内容、工具输出、检索记忆或产物从正常上下文和执行流中隔离，直到完成审查或策略解决。；该种差可由关系 QuarantineAction-is_a-MitigationAction 的端点角色检验。
+    - 不包含：
+  - 净化处置虽与本概念同属 MitigationAction，但其定义为“净化动作记录在不安全内容影响上下文、工具参数、记忆或披露前对其进行移除、改写、掩码、中和或收窄的处理。”，不得替代隔离处置。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **净化处置** `SanitizationAction`
+    - 定义：净化动作记录在不安全内容影响上下文、工具参数、记忆或披露前对其进行移除、改写、掩码、中和或收窄的处理。
+    - 直接上位：`MitigationAction`
+    - 为什么需要：净化处置为canonical 事实 SanitizationAction-is_a-MitigationAction（SanitizationAction is_a MitigationAction）提供明确端点并保持与 QuarantineAction 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的净化处置：净化动作记录在不安全内容影响上下文、工具参数、记忆或披露前对其进行移除、改写、掩码、中和或收窄的处理。；该种差可由关系 SanitizationAction-is_a-MitigationAction 的端点角色检验。
+    - 不包含：
+  - 隔离处置虽与本概念同属 MitigationAction，但其定义为“隔离动作记录把内容、工具输出、检索记忆或产物从正常上下文和执行流中隔离，直到完成审查或策略解决。”，不得替代净化处置。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **持久上下文风险** `PersistentContextRisk`
+  - 定义：持久上下文风险记录不安全、陈旧、对抗性或越权内容跨会话、检索、摘要、检查点或记忆写入持续存在的风险。
+  - 为什么需要：持久上下文风险为canonical 事实 ThreatSignal-indicates-PersistentContextRisk（ThreatSignal indicates PersistentContextRisk）提供明确端点并保持与 ThreatSignal 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的持久上下文风险：持久上下文风险记录不安全、陈旧、对抗性或越权内容跨会话、检索、摘要、检查点或记忆写入持续存在的风险。；该种差可由关系 ThreatSignal-indicates-PersistentContextRisk 的端点角色检验。
+  - 不包含：
+  - 威胁信号只是关系 ThreatSignal-indicates-PersistentContextRisk 的另一端；相关联不表示它是持久上下文风险。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **受污染内容** `PoisonedContent`
+  - 定义：受污染内容是具有来源、内容范围、污染类型、发现证据和适用处置状态的信息对象，其文本或结构化字段包含试图改变指令优先级、工具选择、参数、数据披露或持久记忆的对抗内容；污染事件与检测事件通过关系连接，不属于本类。
+  - 为什么需要：受污染内容为canonical 事实 ResourceContentPoisoning-affects-PoisonedContent（ResourceContentPoisoning affects PoisonedContent）提供明确端点并保持与 ResourceContentPoisoning 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的受污染内容：受污染内容是具有来源、内容范围、污染类型、发现证据和适用处置状态的信息对象，其文本或结构化字段包含试图改变指令优先级、工具选择、参数、数据披露或持久记忆的对抗内容；污染事件与检测事件通过关系连接，不属于本类。；该种差可由关系 ResourceContentPoisoning-affects-PoisonedContent 的端点角色检验。
+  - 不包含：
+  - 资源内容投毒只是关系 ResourceContentPoisoning-affects-PoisonedContent 的另一端；相关联不表示它是受污染内容。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **恶意工具输出** `MaliciousToolOutput`
+    - 定义：恶意工具输出记录来自工具、资源、沙箱或远程智能体的输出，其中包含不可信指令、外泄线索、策略绕过尝试、欺骗性工具引导或提示注入内容。
+    - 直接上位：`PoisonedContent`
+    - 为什么需要：恶意工具输出为canonical 事实 MaliciousToolOutput-is_a-PoisonedContent（MaliciousToolOutput is_a PoisonedContent）提供明确端点并保持与 PoisonedRetrievedChunk 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的恶意工具输出：恶意工具输出记录来自工具、资源、沙箱或远程智能体的输出，其中包含不可信指令、外泄线索、策略绕过尝试、欺骗性工具引导或提示注入内容。；该种差可由关系 MaliciousToolOutput-is_a-PoisonedContent 的端点角色检验。
+    - 不包含：
+  - 被投毒检索分块虽与本概念同属 PoisonedContent，但其定义为“被投毒检索分块标识含有不安全指令、误导性元数据、污点片段或提示注入内容的记忆或文档分块。”，不得替代恶意工具输出。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **被投毒检索分块** `PoisonedRetrievedChunk`
+    - 定义：被投毒检索分块标识含有不安全指令、误导性元数据、污点片段或提示注入内容的记忆或文档分块。
+    - 直接上位：`PoisonedContent`
+    - 为什么需要：被投毒检索分块为canonical 事实 PoisonedRetrievedChunk-is_a-PoisonedContent（PoisonedRetrievedChunk is_a PoisonedContent）提供明确端点并保持与 MaliciousToolOutput 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的被投毒检索分块：被投毒检索分块标识含有不安全指令、误导性元数据、污点片段或提示注入内容的记忆或文档分块。；该种差可由关系 PoisonedRetrievedChunk-is_a-PoisonedContent 的端点角色检验。
+    - 不包含：
+  - 恶意工具输出虽与本概念同属 PoisonedContent，但其定义为“恶意工具输出记录来自工具、资源、沙箱或远程智能体的输出，其中包含不可信指令、外泄线索、策略绕过尝试、欺骗性工具引导或提示注入内容。”，不得替代被投毒检索分块。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **被投毒工具描述** `PoisonedToolDescription`
+    - 定义：被投毒工具描述标识试图操纵工具选择、参数、权限或信任判断的工具说明、MCP 工具列表项、能力广告或帮助文本。
+    - 直接上位：`PoisonedContent`
+    - 为什么需要：被投毒工具描述为canonical 事实 PoisonedToolDescription-is_a-PoisonedContent（PoisonedToolDescription is_a PoisonedContent）提供明确端点并保持与 MaliciousToolOutput 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的被投毒工具描述：被投毒工具描述标识试图操纵工具选择、参数、权限或信任判断的工具说明、MCP 工具列表项、能力广告或帮助文本。；该种差可由关系 PoisonedToolDescription-is_a-PoisonedContent 的端点角色检验。
+    - 不包含：
+  - 恶意工具输出虽与本概念同属 PoisonedContent，但其定义为“恶意工具输出记录来自工具、资源、沙箱或远程智能体的输出，其中包含不可信指令、外泄线索、策略绕过尝试、欺骗性工具引导或提示注入内容。”，不得替代被投毒工具描述。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **资源内容投毒** `ResourceContentPoisoning`
+  - 定义：资源内容污染表示把对抗内容引入资源的事件或发生记录，并非 PoisonedContent 本身；应以关系指向受污染内容。
+  - 为什么需要：资源内容投毒为canonical 事实 ResourceContentPoisoning-affects-PoisonedContent（ResourceContentPoisoning affects PoisonedContent）提供明确端点并保持与 PoisonedContent 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的资源内容投毒：资源内容污染表示把对抗内容引入资源的事件或发生记录，并非 PoisonedContent 本身；应以关系指向受污染内容。；该种差可由关系 ResourceContentPoisoning-affects-PoisonedContent 的端点角色检验。
+  - 不包含：
+  - 受污染内容只是关系 ResourceContentPoisoning-affects-PoisonedContent 的另一端；相关联不表示它是资源内容投毒。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **风险流角色** `RiskFlowRole`
+  - 定义：风险流角色是上下文依赖的角色实体，用于说明消息、工具输出、记忆项、参数、凭据操作或副作用在一条 SourceSinkFlow 中作为风险来源或受保护目的地；同一实体在不同流中可承担不同角色，角色不改变其本体类型。
+  - 为什么需要：风险流角色为canonical 事实 RiskSink-is_a-RiskFlowRole（RiskSink is_a RiskFlowRole）提供明确端点并保持与 RiskSink 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的风险流角色：风险流角色是上下文依赖的角色实体，用于说明消息、工具输出、记忆项、参数、凭据操作或副作用在一条 SourceSinkFlow 中作为风险来源或受保护目的地；同一实体在不同流中可承担不同角色，角色不改变其本体类型。；该种差可由关系 RiskSink-is_a-RiskFlowRole 的端点角色检验。
+  - 不包含：
+  - 风险接收方只是关系 RiskSink-is_a-RiskFlowRole 的另一端；相关联不表示它是风险流角色。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **风险接收方** `RiskSink`
+    - 定义：风险接收方分类污点内容可能影响的受保护目标，例如工具调用、带凭据请求、文件写入、记忆更新、网络调用或最终披露。
+    - 直接上位：`RiskFlowRole`
+    - 为什么需要：风险接收方为canonical 事实 SourceSinkFlow-has_sink_role-RiskSink（SourceSinkFlow has_sink_role RiskSink）提供明确端点并保持与 RiskSource 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的风险接收方：风险接收方分类污点内容可能影响的受保护目标，例如工具调用、带凭据请求、文件写入、记忆更新、网络调用或最终披露。；该种差可由关系 SourceSinkFlow-has_sink_role-RiskSink 的端点角色检验。
+    - 不包含：
+  - 风险来源虽与本概念同属 RiskFlowRole，但其定义为“风险来源分类安全风险的起点，例如外部消息、检索文档、工具输出、远程智能体产物、记忆项、网络响应或用户提供文件。”，不得替代风险接收方。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **风险来源** `RiskSource`
+    - 定义：风险来源分类安全风险的起点，例如外部消息、检索文档、工具输出、远程智能体产物、记忆项、网络响应或用户提供文件。
+    - 直接上位：`RiskFlowRole`
+    - 为什么需要：风险来源为canonical 事实 SourceSinkFlow-has_source_role-RiskSource（SourceSinkFlow has_source_role RiskSource）提供明确端点并保持与 RiskSink 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的风险来源：风险来源分类安全风险的起点，例如外部消息、检索文档、工具输出、远程智能体产物、记忆项、网络响应或用户提供文件。；该种差可由关系 SourceSinkFlow-has_source_role-RiskSource 的端点角色检验。
+    - 不包含：
+  - 风险接收方虽与本概念同属 RiskFlowRole，但其定义为“风险接收方分类污点内容可能影响的受保护目标，例如工具调用、带凭据请求、文件写入、记忆更新、网络调用或最终披露。”，不得替代风险来源。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **来源到接收方流** `SourceSinkFlow`
+  - 定义：来源到接收方流记录不可信内容到受保护接收方的风险路径，例如工具参数、网络调用、记忆写入、副作用或披露输出。
+  - 为什么需要：来源到接收方流为canonical 事实 SourceSinkFlow-has_sink_role-RiskSink（SourceSinkFlow has_sink_role RiskSink）提供明确端点并保持与 RiskSink 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的来源到接收方流：来源到接收方流记录不可信内容到受保护接收方的风险路径，例如工具参数、网络调用、记忆写入、副作用或披露输出。；该种差可由关系 SourceSinkFlow-has_sink_role-RiskSink 的端点角色检验。
+  - 不包含：
+  - 风险接收方只是关系 SourceSinkFlow-has_sink_role-RiskSink 的另一端；相关联不表示它是来源到接收方流。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **污点承载实体** `TaintEntity`
+  - 定义：污点承载实体是被检测或策略赋予污点标识的可引用对象，具有来源、污点类别、置信度、精确范围、生命周期和清除条件；完整来源与具体片段均可专业化，但传播动作和 source/sink 角色不属于本类。
+  - 为什么需要：污点承载实体为canonical 事实 TaintPropagation-propagates-TaintEntity（TaintPropagation propagates TaintEntity）提供明确端点并保持与 TaintPropagation 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的污点承载实体：污点承载实体是被检测或策略赋予污点标识的可引用对象，具有来源、污点类别、置信度、精确范围、生命周期和清除条件；完整来源与具体片段均可专业化，但传播动作和 source/sink 角色不属于本类。；该种差可由关系 TaintPropagation-propagates-TaintEntity 的端点角色检验。
+  - 不包含：
+  - 污点传播只是关系 TaintPropagation-propagates-TaintEntity 的另一端；相关联不表示它是污点承载实体。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **污点来源** `TaintedSource`
+    - 定义：污点来源标识不可信或策略敏感的来源；其内容在进入上下文、记忆、工具参数、网络请求或对外披露前必须被追踪。
+    - 直接上位：`TaintEntity`
+    - 为什么需要：污点来源为canonical 事实 TaintedSource-is_a-TaintEntity（TaintedSource is_a TaintEntity）提供明确端点并保持与 TaintedSpan 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的污点来源：污点来源标识不可信或策略敏感的来源；其内容在进入上下文、记忆、工具参数、网络请求或对外披露前必须被追踪。；该种差可由关系 TaintedSource-is_a-TaintEntity 的端点角色检验。
+    - 不包含：
+  - 污点片段虽与本概念同属 TaintEntity，但其定义为“污点片段标识消息、来源、检索分块、工具结果或输出片段中携带污点内容的精确范围，用于后续来源到接收方分析。”，不得替代污点来源。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **污点片段** `TaintedSpan`
+    - 定义：污点片段标识消息、来源、检索分块、工具结果或输出片段中携带污点内容的精确范围，用于后续来源到接收方分析。
+    - 直接上位：`TaintEntity`
+    - 为什么需要：污点片段为canonical 事实 TaintedSpan-is_a-TaintEntity（TaintedSpan is_a TaintEntity）提供明确端点并保持与 TaintedSource 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的污点片段：污点片段标识消息、来源、检索分块、工具结果或输出片段中携带污点内容的精确范围，用于后续来源到接收方分析。；该种差可由关系 TaintedSpan-is_a-TaintEntity 的端点角色检验。
+    - 不包含：
+  - 污点来源虽与本概念同属 TaintEntity，但其定义为“污点来源标识不可信或策略敏感的来源；其内容在进入上下文、记忆、工具参数、网络请求或对外披露前必须被追踪。”，不得替代污点片段。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **污点传播** `TaintPropagation`
+  - 定义：污点传播把污点如何从来源片段、上下文包、记忆项、工具结果或产物流向另一个可观测对象显式化。
+  - 为什么需要：污点传播为canonical 事实 TaintPropagation-propagates-TaintEntity（TaintPropagation propagates TaintEntity）提供明确端点并保持与 TaintEntity 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的污点传播：污点传播把污点如何从来源片段、上下文包、记忆项、工具结果或产物流向另一个可观测对象显式化。；该种差可由关系 TaintPropagation-propagates-TaintEntity 的端点角色检验。
+  - 不包含：
+  - 污点承载实体只是关系 TaintPropagation-propagates-TaintEntity 的另一端；相关联不表示它是污点传播。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **威胁信号** `ThreatSignal`
+  - 定义：威胁信号是带检测来源、被检对象、证据位置、威胁类别、置信度和时间的证据信息，表明提示、外部内容、工具流或记忆可能携带注入或污染风险；它支持发现和决定，但不等同于已确认威胁、风险状态或缓解动作。
+  - 为什么需要：威胁信号为canonical 事实 ThreatSignal-indicates-PersistentContextRisk（ThreatSignal indicates PersistentContextRisk）提供明确端点并保持与 PersistentContextRisk 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的威胁信号：威胁信号是带检测来源、被检对象、证据位置、威胁类别、置信度和时间的证据信息，表明提示、外部内容、工具流或记忆可能携带注入或污染风险；它支持发现和决定，但不等同于已确认威胁、风险状态或缓解动作。；该种差可由关系 ThreatSignal-indicates-PersistentContextRisk 的端点角色检验。
+  - 不包含：
+  - 持久上下文风险只是关系 ThreatSignal-indicates-PersistentContextRisk 的另一端；相关联不表示它是威胁信号。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **间接注入信号** `IndirectInjectionSignal`
+    - 定义：间接注入信号记录不可信外部内容在被检索、总结、持久化到记忆、作为工具观测或经协议转换之后仍能影响智能体行为的证据。
+    - 直接上位：`ThreatSignal`
+    - 为什么需要：间接注入信号为canonical 事实 IndirectInjectionSignal-is_a-ThreatSignal（IndirectInjectionSignal is_a ThreatSignal）提供明确端点并保持与 MemoryPoisoningSignal 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的间接注入信号：间接注入信号记录不可信外部内容在被检索、总结、持久化到记忆、作为工具观测或经协议转换之后仍能影响智能体行为的证据。；该种差可由关系 IndirectInjectionSignal-is_a-ThreatSignal 的端点角色检验。
+    - 不包含：
+  - 记忆投毒信号虽与本概念同属 ThreatSignal，但其定义为“记忆投毒信号记录持久记忆、检索分块、索引、摘要或长期上下文中可能包含用于破坏后续智能体行为的指令或数据的证据。”，不得替代间接注入信号。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **记忆投毒信号** `MemoryPoisoningSignal`
+    - 定义：记忆投毒信号记录持久记忆、检索分块、索引、摘要或长期上下文中可能包含用于破坏后续智能体行为的指令或数据的证据。
+    - 直接上位：`ThreatSignal`
+    - 为什么需要：记忆投毒信号为canonical 事实 memory_poisoning_signal_flags_memory_record（MemoryPoisoningSignal memory_poisoning_signal_flags_memory_record MemoryRecord）提供明确端点并保持与 IndirectInjectionSignal 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的记忆投毒信号：记忆投毒信号记录持久记忆、检索分块、索引、摘要或长期上下文中可能包含用于破坏后续智能体行为的指令或数据的证据。；该种差可由关系 memory_poisoning_signal_flags_memory_record 的端点角色检验。
+    - 不包含：
+  - 间接注入信号虽与本概念同属 ThreatSignal，但其定义为“间接注入信号记录不可信外部内容在被检索、总结、持久化到记忆、作为工具观测或经协议转换之后仍能影响智能体行为的证据。”，不得替代记忆投毒信号。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **提示注入信号** `PromptInjectionSignal`
+    - 定义：提示注入信号记录消息、来源片段、检索内容或工具结果中试图覆盖可信指令、操纵工具参数、外泄数据或绕过策略的证据。
+    - 直接上位：`ThreatSignal`
+    - 为什么需要：提示注入信号为canonical 事实 instruction_flagged_as_prompt_injection（Instruction instruction_flagged_as_prompt_injection PromptInjectionSignal）提供明确端点并保持与 IndirectInjectionSignal 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的提示注入信号：提示注入信号记录消息、来源片段、检索内容或工具结果中试图覆盖可信指令、操纵工具参数、外泄数据或绕过策略的证据。；该种差可由关系 instruction_flagged_as_prompt_injection 的端点角色检验。
+    - 不包含：
+  - 间接注入信号虽与本概念同属 ThreatSignal，但其定义为“间接注入信号记录不可信外部内容在被检索、总结、持久化到记忆、作为工具观测或经协议转换之后仍能影响智能体行为的证据。”，不得替代提示注入信号。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **工具流注入信号** `ToolStreamInjectionSignal`
+    - 定义：工具流注入信号记录流式工具输出、工具结果消息、日志或远程产物试图把指令注入后续上下文、工具参数、路由或披露决策的证据。
+    - 直接上位：`ThreatSignal`
+    - 为什么需要：工具流注入信号为canonical 事实 tool_result_flagged_as_tool_stream_injection（ToolResult tool_result_flagged_as_tool_stream_injection ToolStreamInjectionSignal）提供明确端点并保持与 IndirectInjectionSignal 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的工具流注入信号：工具流注入信号记录流式工具输出、工具结果消息、日志或远程产物试图把指令注入后续上下文、工具参数、路由或披露决策的证据。；该种差可由关系 tool_result_flagged_as_tool_stream_injection 的端点角色检验。
+    - 不包含：
+  - 间接注入信号虽与本概念同属 ThreatSignal，但其定义为“间接注入信号记录不可信外部内容在被检索、总结、持久化到记忆、作为工具观测或经协议转换之后仍能影响智能体行为的证据。”，不得替代工具流注入信号。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **工具结构定义投毒** `ToolSchemaPoisoning`
+  - 定义：工具 schema 污染表示对 schema、默认值或描述施加对抗性变更的事件记录；受污染 schema 内容用关系指向，不把过程当内容子类。
+  - 为什么需要：工具结构定义投毒为canonical 事实 ToolSchemaPoisoning-affects-PoisonedContent（ToolSchemaPoisoning affects PoisonedContent）提供明确端点并保持与 PoisonedContent 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的工具结构定义投毒：工具 schema 污染表示对 schema、默认值或描述施加对抗性变更的事件记录；受污染 schema 内容用关系指向，不把过程当内容子类。；该种差可由关系 ToolSchemaPoisoning-affects-PoisonedContent 的端点角色检验。
+  - 不包含：
+  - 受污染内容只是关系 ToolSchemaPoisoning-affects-PoisonedContent 的另一端；相关联不表示它是工具结构定义投毒。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **可信指令覆盖** `TrustedInstructionOverride`
+  - 定义：可信指令覆盖记录高权限指令、策略或批准在限定范围内覆盖不可信或低权限指令候选的事实。
+  - 为什么需要：可信指令覆盖为canonical 事实 InstructionConflict-resolved_by-TrustedInstructionOverride（InstructionConflict resolved_by TrustedInstructionOverride）提供明确端点并保持与 InstructionConflict 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的可信指令覆盖：可信指令覆盖记录高权限指令、策略或批准在限定范围内覆盖不可信或低权限指令候选的事实。；该种差可由关系 InstructionConflict-resolved_by-TrustedInstructionOverride 的端点角色检验。
+  - 不包含：
+  - 指令冲突只是关系 InstructionConflict-resolved_by-TrustedInstructionOverride 的另一端；相关联不表示它是可信指令覆盖。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **不可信指令候选** `UntrustedInstructionCandidate`
+  - 定义：不可信指令候选记录来自不可信来源的指令式文本或结构化指令，在其被接受、忽略、隔离、覆盖或升级前先作为候选对象保留。
+  - 为什么需要：不可信指令候选为canonical 事实 PatternScan-scans-UntrustedInstructionCandidate（PatternScan scans UntrustedInstructionCandidate）提供明确端点并保持与 PatternScan 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的不可信指令候选：不可信指令候选记录来自不可信来源的指令式文本或结构化指令，在其被接受、忽略、隔离、覆盖或升级前先作为候选对象保留。；该种差可由关系 PatternScan-scans-UntrustedInstructionCandidate 的端点角色检验。
+  - 不包含：
+  - 模式扫描只是关系 PatternScan-scans-UntrustedInstructionCandidate 的另一端；相关联不表示它是不可信指令候选。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+### 权限与策略模块
+
+权限与策略模块描述一次操作在执行前如何被请求、评估、授权、拒绝、升级或例外放行，并把策略依据、权限范围和审计理由保留下来。
+
+- **授权凭据** `AuthorizationArtifact`
+  - 定义：授权凭据是由可识别签发方产生、可审计且可撤销的信息产物，记录受权主体、允许的动作、受保护资源、适用上下文、权限范围、签发与失效时间、附加义务和来源决定；它证明授权，不等同于策略规则或批准活动。
+  - 为什么需要：授权凭据为canonical 事实 AuthorizationGrant-is_a-AuthorizationArtifact（AuthorizationGrant is_a AuthorizationArtifact）提供明确端点并保持与 AuthorizationGrant 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的授权凭据：授权凭据是由可识别签发方产生、可审计且可撤销的信息产物，记录受权主体、允许的动作、受保护资源、适用上下文、权限范围、签发与失效时间、附加义务和来源决定；它证明授权，不等同于策略规则或批准活动。；该种差可由关系 AuthorizationGrant-is_a-AuthorizationArtifact 的端点角色检验。
+  - 不包含：
+  - 授权授予只是关系 AuthorizationGrant-is_a-AuthorizationArtifact 的另一端；相关联不表示它是授权凭据。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **授权授予** `AuthorizationGrant`
+    - 定义：授权授予记录策略决策之后产生的授权结果或类似凭据的许可，包含授予范围、受保护资源、主体参与者、有效窗口、撤销状态和审计依据。
+    - 直接上位：`AuthorizationArtifact`
+    - 为什么需要：授权授予为canonical 事实 AuthorizationGrant-scoped_by-PermissionScope（AuthorizationGrant scoped_by PermissionScope）提供明确端点并保持与 HumanApproval 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的授权授予：授权授予记录策略决策之后产生的授权结果或类似凭据的许可，包含授予范围、受保护资源、主体参与者、有效窗口、撤销状态和审计依据。；该种差可由关系 AuthorizationGrant-scoped_by-PermissionScope 的端点角色检验。
+    - 不包含：
+  - 人工批准记录虽与本概念同属 AuthorizationArtifact，但其定义为“人工批准记录人类对动作、权限请求、副作用、披露或策略例外作出的明确授权或拒绝，并保留参与者与轨迹溯源。”，不得替代授权授予。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+    - **能力授予** `CapabilityGrant`
+      - 定义：能力授予面向特定工具、能力、资源表面或操作，使系统能在调用点检查授权，而不是仅从参与者身份推断权限。
+      - 直接上位：`AuthorizationGrant`
+      - 为什么需要：能力授予为canonical 事实 CapabilityGrant-is_a-AuthorizationGrant（CapabilityGrant is_a AuthorizationGrant）提供明确端点并保持与 AuthorizationGrant 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的能力授予：能力授予面向特定工具、能力、资源表面或操作，使系统能在调用点检查授权，而不是仅从参与者身份推断权限。；该种差可由关系 CapabilityGrant-is_a-AuthorizationGrant 的端点角色检验。
+      - 不包含：
+  - 仅能识别为上位概念 AuthorizationGrant 的对象不在范围内；它尚未证明能力授予的种差或关系端点 CapabilityGrant-is_a-AuthorizationGrant。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：2 项
+  - **人工批准记录** `HumanApproval`
+    - 定义：人工批准记录人类对动作、权限请求、副作用、披露或策略例外作出的明确授权或拒绝，并保留参与者与轨迹溯源。
+    - 直接上位：`AuthorizationArtifact`
+    - 为什么需要：人工批准记录为canonical 事实 HumanApproval-is_a-AuthorizationArtifact（HumanApproval is_a AuthorizationArtifact）提供明确端点并保持与 AuthorizationGrant 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的人工批准记录：人工批准记录人类对动作、权限请求、副作用、披露或策略例外作出的明确授权或拒绝，并保留参与者与轨迹溯源。；该种差可由关系 HumanApproval-is_a-AuthorizationArtifact 的端点角色检验。
+    - 不包含：
+  - 授权授予虽与本概念同属 AuthorizationArtifact，但其定义为“授权授予记录策略决策之后产生的授权结果或类似凭据的许可，包含授予范围、受保护资源、主体参与者、有效窗口、撤销状态和审计依据。”，不得替代人工批准记录。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **许可提示** `PermissionPrompt`
+  - 定义：权限提示记录动作执行前的授权请求，说明请求者、请求操作、受保护资源、作用范围、可选决策以及审批通道。
+  - 为什么需要：许可提示为canonical 事实 PermissionResponse-responds_to-PermissionPrompt（PermissionResponse responds_to PermissionPrompt）提供明确端点并保持与 PermissionResponse 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的许可提示：权限提示记录动作执行前的授权请求，说明请求者、请求操作、受保护资源、作用范围、可选决策以及审批通道。；该种差可由关系 PermissionResponse-responds_to-PermissionPrompt 的端点角色检验。
+  - 不包含：
+  - 许可响应只是关系 PermissionResponse-responds_to-PermissionPrompt 的另一端；相关联不表示它是许可提示。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **许可响应** `PermissionResponse`
+  - 定义：权限响应记录权限提示的结果，包括允许、拒绝、升级、有条件允许、失效时间、用户或策略权限来源以及可追溯理由。
+  - 为什么需要：许可响应为canonical 事实 PermissionResponse-responds_to-PermissionPrompt（PermissionResponse responds_to PermissionPrompt）提供明确端点并保持与 PermissionPrompt 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的许可响应：权限响应记录权限提示的结果，包括允许、拒绝、升级、有条件允许、失效时间、用户或策略权限来源以及可追溯理由。；该种差可由关系 PermissionResponse-responds_to-PermissionPrompt 的端点角色检验。
+  - 不包含：
+  - 许可提示只是关系 PermissionResponse-responds_to-PermissionPrompt 的另一端；相关联不表示它是许可响应。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **权限作用域** `PermissionScope`
+  - 定义：权限作用域限定一次权限请求或响应，明确请求操作、受保护资源、参与者、数据区、信任边界、持续时间和允许的副作用。
+  - 为什么需要：权限作用域为canonical 事实 AuthorizationGrant-scoped_by-PermissionScope（AuthorizationGrant scoped_by PermissionScope）提供明确端点并保持与 AuthorizationGrant 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的权限作用域：权限作用域限定一次权限请求或响应，明确请求操作、受保护资源、参与者、数据区、信任边界、持续时间和允许的副作用。；该种差可由关系 AuthorizationGrant-scoped_by-PermissionScope 的端点角色检验。
+  - 不包含：
+  - 授权授予只是关系 AuthorizationGrant-scoped_by-PermissionScope 的另一端；相关联不表示它是权限作用域。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **策略决策** `PolicyDecision`
+  - 定义：策略决策记录策略规则针对某个请求操作产生的具体结果，例如允许、拒绝、升级、脱敏、隔离、转入沙箱或要求人工批准。
+  - 为什么需要：策略决策为canonical 事实 PolicyDecision-based_on-PolicyRule（PolicyDecision based_on PolicyRule）提供明确端点并保持与 PolicyRule 的定义边界；节点字段 decision_kind、decision_id、reason 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的策略决策：策略决策记录策略规则针对某个请求操作产生的具体结果，例如允许、拒绝、升级、脱敏、隔离、转入沙箱或要求人工批准。；该种差可由字段 decision_kind、decision_id、reason 检验。
+  - 不包含：
+  - 策略规则只是关系 PolicyDecision-based_on-PolicyRule 的另一端；相关联不表示它是策略决策。
+  - 结构与约束：12 个字段，3 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+  - **允许决定** `AllowDecision`
+    - 定义：允许决策表示某个有边界的操作可在指定范围、条件、轨迹证据和有效期限内继续执行。
+    - 直接上位：`PolicyDecision`
+    - 为什么需要：允许决定为canonical 事实 AllowDecision-is_a-PolicyDecision（AllowDecision is_a PolicyDecision）提供明确端点并保持与 DenyDecision 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的允许决定：允许决策表示某个有边界的操作可在指定范围、条件、轨迹证据和有效期限内继续执行。；该种差可由关系 AllowDecision-is_a-PolicyDecision 的端点角色检验。
+    - 不包含：
+  - 拒绝决定虽与本概念同属 PolicyDecision，但其定义为“拒绝决策阻止操作、工具调用、网络请求、披露或副作用继续执行，并保留拒绝理由和策略依据。”，不得替代允许决定。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **拒绝决定** `DenyDecision`
+    - 定义：拒绝决策阻止操作、工具调用、网络请求、披露或副作用继续执行，并保留拒绝理由和策略依据。
+    - 直接上位：`PolicyDecision`
+    - 为什么需要：拒绝决定为canonical 事实 DenyDecision-is_a-PolicyDecision（DenyDecision is_a PolicyDecision）提供明确端点并保持与 AllowDecision 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的拒绝决定：拒绝决策阻止操作、工具调用、网络请求、披露或副作用继续执行，并保留拒绝理由和策略依据。；该种差可由关系 DenyDecision-is_a-PolicyDecision 的端点角色检验。
+    - 不包含：
+  - 允许决定虽与本概念同属 PolicyDecision，但其定义为“允许决策表示某个有边界的操作可在指定范围、条件、轨迹证据和有效期限内继续执行。”，不得替代拒绝决定。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **升级决定** `EscalationDecision`
+    - 定义：升级决策把请求转交给更高权限的审核者、人工审批、更严格的沙箱或额外验证路径。
+    - 直接上位：`PolicyDecision`
+    - 为什么需要：升级决定为canonical 事实 EscalationDecision-is_a-PolicyDecision（EscalationDecision is_a PolicyDecision）提供明确端点并保持与 AllowDecision 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的升级决定：升级决策把请求转交给更高权限的审核者、人工审批、更严格的沙箱或额外验证路径。；该种差可由关系 EscalationDecision-is_a-PolicyDecision 的端点角色检验。
+    - 不包含：
+  - 允许决定虽与本概念同属 PolicyDecision，但其定义为“允许决策表示某个有边界的操作可在指定范围、条件、轨迹证据和有效期限内继续执行。”，不得替代升级决定。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+
+- **策略规范** `PolicySpecification`
+  - 定义：策略规范是具有身份、版本、签发方和适用范围的规范信息对象，用条件、规则、动作和例外规定主体在某一上下文中对受保护资源可执行、必须执行或禁止执行的行为；实际评估与决定通过关系引用它。
+  - 为什么需要：策略规范为canonical 事实 PolicyAction-is_a-PolicySpecification（PolicyAction is_a PolicySpecification）提供明确端点并保持与 PolicyAction 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的策略规范：策略规范是具有身份、版本、签发方和适用范围的规范信息对象，用条件、规则、动作和例外规定主体在某一上下文中对受保护资源可执行、必须执行或禁止执行的行为；实际评估与决定通过关系引用它。；该种差可由关系 PolicyAction-is_a-PolicySpecification 的端点角色检验。
+  - 不包含：
+  - 策略动作规范只是关系 PolicyAction-is_a-PolicySpecification 的另一端；相关联不表示它是策略规范。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **策略动作规范** `PolicyAction`
+    - 定义：策略动作描述策略决策选择的执行动作，例如允许、拒绝、脱敏、隔离、要求批准、转入沙箱、限制网络出口或升级。
+    - 直接上位：`PolicySpecification`
+    - 为什么需要：策略动作规范为canonical 事实 PolicyRule-prescribes-PolicyAction（PolicyRule prescribes PolicyAction）提供明确端点并保持与 PolicyCondition 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的策略动作规范：策略动作描述策略决策选择的执行动作，例如允许、拒绝、脱敏、隔离、要求批准、转入沙箱、限制网络出口或升级。；该种差可由关系 PolicyRule-prescribes-PolicyAction 的端点角色检验。
+    - 不包含：
+  - 策略条件虽与本概念同属 PolicySpecification，但其定义为“策略条件说明安全策略在主体参与者、请求操作、受保护资源、数据区、信任边界、策略依据、运行状态和执行模式上的判断谓词。”，不得替代策略动作规范。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **策略条件** `PolicyCondition`
+    - 定义：策略条件说明安全策略在主体参与者、请求操作、受保护资源、数据区、信任边界、策略依据、运行状态和执行模式上的判断谓词。
+    - 直接上位：`PolicySpecification`
+    - 为什么需要：策略条件为canonical 事实 PolicyRule-has_condition-PolicyCondition（PolicyRule has_condition PolicyCondition）提供明确端点并保持与 PolicyAction 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的策略条件：策略条件说明安全策略在主体参与者、请求操作、受保护资源、数据区、信任边界、策略依据、运行状态和执行模式上的判断谓词。；该种差可由关系 PolicyRule-has_condition-PolicyCondition 的端点角色检验。
+    - 不包含：
+  - 策略动作规范虽与本概念同属 PolicySpecification，但其定义为“策略动作描述策略决策选择的执行动作，例如允许、拒绝、脱敏、隔离、要求批准、转入沙箱、限制网络出口或升级。”，不得替代策略条件。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **策略例外** `PolicyException`
+    - 定义：策略例外记录对某条策略规则的有边界豁免，包含例外范围、被授权参与者、受保护资源、过期时间、撤销条件、补偿控制和审计原因。
+    - 直接上位：`PolicySpecification`
+    - 为什么需要：策略例外为canonical 事实 PolicyDecision-may_apply_exception-PolicyException（PolicyDecision may_apply_exception PolicyException）提供明确端点并保持与 PolicyAction 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的策略例外：策略例外记录对某条策略规则的有边界豁免，包含例外范围、被授权参与者、受保护资源、过期时间、撤销条件、补偿控制和审计原因。；该种差可由关系 PolicyDecision-may_apply_exception-PolicyException 的端点角色检验。
+    - 不包含：
+  - 策略动作规范虽与本概念同属 PolicySpecification，但其定义为“策略动作描述策略决策选择的执行动作，例如允许、拒绝、脱敏、隔离、要求批准、转入沙箱、限制网络出口或升级。”，不得替代策略例外。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **策略规则** `PolicyRule`
+    - 定义：策略规则定义安全或治理约束，用于评估参与者权限、请求操作、受保护资源、数据区、信任边界、运行上下文和执行动作。
+    - 直接上位：`PolicySpecification`
+    - 为什么需要：策略规则为canonical 事实 PolicyRule-has_condition-PolicyCondition（PolicyRule has_condition PolicyCondition）提供明确端点并保持与 PolicyAction 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的策略规则：策略规则定义安全或治理约束，用于评估参与者权限、请求操作、受保护资源、数据区、信任边界、运行上下文和执行动作。；该种差可由关系 PolicyRule-has_condition-PolicyCondition 的端点角色检验。
+    - 不包含：
+  - 策略动作规范虽与本概念同属 PolicySpecification，但其定义为“策略动作描述策略决策选择的执行动作，例如允许、拒绝、脱敏、隔离、要求批准、转入沙箱、限制网络出口或升级。”，不得替代策略规则。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+### 沙箱与网络模块
+
+沙箱与网络模块约束命令、工具调用和网络请求的执行边界，覆盖进程、文件系统、环境变量、代理路由、出口策略、凭据范围和拒绝记录。
+
+- **入站响应** `InboundResponse`
+  - 定义：入站响应记录跨边界返回的响应，包括来源、响应数据区、状态、工具或协议上下文、注入扫描结果和披露处理。
+  - 为什么需要：入站响应为canonical 事实 NetworkCall-produces-InboundResponse（NetworkCall produces InboundResponse）提供明确端点并保持与 NetworkCall 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的入站响应：入站响应记录跨边界返回的响应，包括来源、响应数据区、状态、工具或协议上下文、注入扫描结果和披露处理。；该种差可由关系 NetworkCall-produces-InboundResponse 的端点角色检验。
+  - 不包含：
+  - 网络调用只是关系 NetworkCall-produces-InboundResponse 的另一端；相关联不表示它是入站响应。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **隔离规范** `IsolationSpecification`
+  - 定义：隔离规范是带版本、适用环境和执行方的安全规范，声明沙箱对进程、命令、文件路径、挂载、环境变量、网络目的地、协议、凭据、资源限额及副作用实施的允许、拒绝和监控约束；实际 Sandbox 通过 constrained_by 引用它。
+  - 为什么需要：隔离规范为canonical 事实 Sandbox-constrained_by-IsolationSpecification（Sandbox constrained_by IsolationSpecification）提供明确端点并保持与 Sandbox 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的隔离规范：隔离规范是带版本、适用环境和执行方的安全规范，声明沙箱对进程、命令、文件路径、挂载、环境变量、网络目的地、协议、凭据、资源限额及副作用实施的允许、拒绝和监控约束；实际 Sandbox 通过 constrained_by 引用它。；该种差可由关系 Sandbox-constrained_by-IsolationSpecification 的端点角色检验。
+  - 不包含：
+  - 沙箱只是关系 Sandbox-constrained_by-IsolationSpecification 的另一端；相关联不表示它是隔离规范。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **文件系统策略** `FilesystemPolicy`
+    - 定义：文件系统策略定义适用于沙箱命令、工具调用、副作用和产物的读取、写入、执行、路径、保留与脱敏约束。
+    - 直接上位：`IsolationSpecification`
+    - 为什么需要：文件系统策略为canonical 事实 FilesystemPolicy-is_a-IsolationSpecification（FilesystemPolicy is_a IsolationSpecification）提供明确端点并保持与 NetworkPolicy 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的文件系统策略：文件系统策略定义适用于沙箱命令、工具调用、副作用和产物的读取、写入、执行、路径、保留与脱敏约束。；该种差可由关系 FilesystemPolicy-is_a-IsolationSpecification 的端点角色检验。
+    - 不包含：
+  - 网络策略虽与本概念同属 IsolationSpecification，但其定义为“网络策略定义允许或拒绝的网络出入口条件，包括目标主机、端口、协议、方法、代理路由、凭据范围、数据区和拒绝原因。”，不得替代文件系统策略。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **网络策略** `NetworkPolicy`
+    - 定义：网络策略定义允许或拒绝的网络出入口条件，包括目标主机、端口、协议、方法、代理路由、凭据范围、数据区和拒绝原因。
+    - 直接上位：`IsolationSpecification`
+    - 为什么需要：网络策略为canonical 事实 DeniedNetworkCall-denied_under-NetworkPolicy（DeniedNetworkCall denied_under NetworkPolicy）提供明确端点并保持与 FilesystemPolicy 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的网络策略：网络策略定义允许或拒绝的网络出入口条件，包括目标主机、端口、协议、方法、代理路由、凭据范围、数据区和拒绝原因。；该种差可由关系 DeniedNetworkCall-denied_under-NetworkPolicy 的端点角色检验。
+    - 不包含：
+  - 文件系统策略虽与本概念同属 IsolationSpecification，但其定义为“文件系统策略定义适用于沙箱命令、工具调用、副作用和产物的读取、写入、执行、路径、保留与脱敏约束。”，不得替代网络策略。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **进程策略** `ProcessPolicy`
+    - 定义：进程策略定义命令白名单、参数限制、环境暴露、超时、重试、资源限制和沙箱逃逸处理等执行约束。
+    - 直接上位：`IsolationSpecification`
+    - 为什么需要：进程策略为canonical 事实 ProcessPolicy-is_a-IsolationSpecification（ProcessPolicy is_a IsolationSpecification）提供明确端点并保持与 FilesystemPolicy 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的进程策略：进程策略定义命令白名单、参数限制、环境暴露、超时、重试、资源限制和沙箱逃逸处理等执行约束。；该种差可由关系 ProcessPolicy-is_a-IsolationSpecification 的端点角色检验。
+    - 不包含：
+  - 文件系统策略虽与本概念同属 IsolationSpecification，但其定义为“文件系统策略定义适用于沙箱命令、工具调用、副作用和产物的读取、写入、执行、路径、保留与脱敏约束。”，不得替代进程策略。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **网络通信端点** `NetworkEndpoint`
+  - 定义：网络通信端点是具有可寻址身份、协议、绑定位置、所属信任边界和适用网络策略的通信实体，可直接接收连接或代表目标转发流量；代理、套接字及其协议特化属于该类，网络请求和响应不属于。
+  - 为什么需要：网络通信端点为canonical 事实 NetworkCall-targets-NetworkEndpoint（NetworkCall targets NetworkEndpoint）提供明确端点并保持与 NetworkCall 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的网络通信端点：网络通信端点是具有可寻址身份、协议、绑定位置、所属信任边界和适用网络策略的通信实体，可直接接收连接或代表目标转发流量；代理、套接字及其协议特化属于该类，网络请求和响应不属于。；该种差可由关系 NetworkCall-targets-NetworkEndpoint 的端点角色检验。
+  - 不包含：
+  - 网络调用只是关系 NetworkCall-targets-NetworkEndpoint 的另一端；相关联不表示它是网络通信端点。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **代理端点** `Proxy`
+    - 定义：代理表示受控网络中介表面，根据网络策略、凭据范围、日志记录和数据区约束调解入站或出站流量。
+    - 直接上位：`NetworkEndpoint`
+    - 为什么需要：代理端点为canonical 事实 Proxy-is_a-NetworkEndpoint（Proxy is_a NetworkEndpoint）提供明确端点并保持与 Socket 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的代理端点：代理表示受控网络中介表面，根据网络策略、凭据范围、日志记录和数据区约束调解入站或出站流量。；该种差可由关系 Proxy-is_a-NetworkEndpoint 的端点角色检验。
+    - 不包含：
+  - 套接字端点虽与本概念同属 NetworkEndpoint，但其定义为“套接字记录沙箱进程、代理、工具或网络调用使用的通信端点，并关联协议、路由、策略和轨迹证据。”，不得替代代理端点。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+    - **HTTP 代理** `HTTPProxy`
+      - 定义：HTTP 代理表示在出口策略、凭据范围和披露控制下调解请求与响应的超文本代理路由。
+      - 直接上位：`Proxy`
+      - 为什么需要：HTTP 代理为canonical 事实 HTTPProxy-is_a-Proxy（HTTPProxy is_a Proxy）提供明确端点并保持与 SOCKSProxy 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的HTTP 代理：HTTP 代理表示在出口策略、凭据范围和披露控制下调解请求与响应的超文本代理路由。；该种差可由关系 HTTPProxy-is_a-Proxy 的端点角色检验。
+      - 不包含：
+  - SOCKS 代理虽与本概念同属 Proxy，但其定义为“SOCKS 代理表示用于调解网络出口的 SOCKS 路由，并保留策略、目标、凭据和审计元数据。”，不得替代HTTP 代理。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：1 项
+    - **SOCKS 代理** `SOCKSProxy`
+      - 定义：SOCKS 代理表示用于调解网络出口的 SOCKS 路由，并保留策略、目标、凭据和审计元数据。
+      - 直接上位：`Proxy`
+      - 为什么需要：SOCKS 代理为canonical 事实 SOCKSProxy-is_a-Proxy（SOCKSProxy is_a Proxy）提供明确端点并保持与 HTTPProxy 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的SOCKS 代理：SOCKS 代理表示用于调解网络出口的 SOCKS 路由，并保留策略、目标、凭据和审计元数据。；该种差可由关系 SOCKSProxy-is_a-Proxy 的端点角色检验。
+      - 不包含：
+  - HTTP 代理虽与本概念同属 Proxy，但其定义为“HTTP 代理表示在出口策略、凭据范围和披露控制下调解请求与响应的超文本代理路由。”，不得替代SOCKS 代理。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：1 项
+  - **套接字端点** `Socket`
+    - 定义：套接字记录沙箱进程、代理、工具或网络调用使用的通信端点，并关联协议、路由、策略和轨迹证据。
+    - 直接上位：`NetworkEndpoint`
+    - 为什么需要：套接字端点为canonical 事实 Socket-is_a-NetworkEndpoint（Socket is_a NetworkEndpoint）提供明确端点并保持与 Proxy 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的套接字端点：套接字记录沙箱进程、代理、工具或网络调用使用的通信端点，并关联协议、路由、策略和轨迹证据。；该种差可由关系 Socket-is_a-NetworkEndpoint 的端点角色检验。
+    - 不包含：
+  - 代理端点虽与本概念同属 NetworkEndpoint，但其定义为“代理表示受控网络中介表面，根据网络策略、凭据范围、日志记录和数据区约束调解入站或出站流量。”，不得替代套接字端点。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：1 项
+    - **域套接字** `DomainSocket`
+      - 定义：域套接字记录本地域套接字通信表面，并明确其边界、权限、凭据和沙箱影响。
+      - 直接上位：`Socket`
+      - 为什么需要：域套接字为canonical 事实 DomainSocket-is_a-Socket（DomainSocket is_a Socket）提供明确端点并保持与 Socket 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的域套接字：域套接字记录本地域套接字通信表面，并明确其边界、权限、凭据和沙箱影响。；该种差可由关系 DomainSocket-is_a-Socket 的端点角色检验。
+      - 不包含：
+  - 仅能识别为上位概念 Socket 的对象不在范围内；它尚未证明域套接字的种差或关系端点 DomainSocket-is_a-Socket。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：1 项
+
+- **网络交互事件** `NetworkInteraction`
+  - 定义：网络交互是具有发起方、目标端点、协议、时间、信任边界、凭据范围、策略决定和结果的可观测通信事件；NetworkCall 和被拒调用可据此专业化，而 OutboundRequest 与 InboundResponse 作为交互承载的信息通过关系连接。
+  - 为什么需要：网络交互事件为canonical 事实 NetworkCall-is_a-NetworkInteraction（NetworkCall is_a NetworkInteraction）提供明确端点并保持与 NetworkCall 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的网络交互事件：网络交互是具有发起方、目标端点、协议、时间、信任边界、凭据范围、策略决定和结果的可观测通信事件；NetworkCall 和被拒调用可据此专业化，而 OutboundRequest 与 InboundResponse 作为交互承载的信息通过关系连接。；该种差可由关系 NetworkCall-is_a-NetworkInteraction 的端点角色检验。
+  - 不包含：
+  - 网络调用只是关系 NetworkCall-is_a-NetworkInteraction 的另一端；相关联不表示它是网络交互事件。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **网络调用** `NetworkCall`
+    - 定义：网络调用记录已尝试或已完成的网络操作，包含目标地址、协议、方法、凭据范围、代理路由、数据区、策略决策和轨迹证据。
+    - 直接上位：`NetworkInteraction`
+    - 为什么需要：网络调用为canonical 事实 NetworkCall-accesses-NetworkResource（NetworkCall accesses NetworkResource）提供明确端点并保持与 NetworkInteraction 的定义边界；节点字段 network_call_id、method、started_at 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的网络调用：网络调用记录已尝试或已完成的网络操作，包含目标地址、协议、方法、凭据范围、代理路由、数据区、策略决策和轨迹证据。；该种差可由字段 network_call_id、method、started_at 检验。
+    - 不包含：
+  - 仅能识别为上位概念 NetworkInteraction 的对象不在范围内；它尚未证明网络调用的种差或关系端点 NetworkCall-accesses-NetworkResource。
+    - 结构与约束：4 个字段，2 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+    - **被拒网络调用** `DeniedNetworkCall`
+      - 定义：被拒绝网络调用记录被策略或沙箱控制阻止的网络请求，包括请求目标、受保护数据区、拒绝原因、策略决策和轨迹事件。
+      - 直接上位：`NetworkCall`
+      - 为什么需要：被拒网络调用为canonical 事实 DeniedNetworkCall-denied_under-NetworkPolicy（DeniedNetworkCall denied_under NetworkPolicy）提供明确端点并保持与 NetworkCall 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的被拒网络调用：被拒绝网络调用记录被策略或沙箱控制阻止的网络请求，包括请求目标、受保护数据区、拒绝原因、策略决策和轨迹事件。；该种差可由关系 DeniedNetworkCall-denied_under-NetworkPolicy 的端点角色检验。
+      - 不包含：
+  - 仅能识别为上位概念 NetworkCall 的对象不在范围内；它尚未证明被拒网络调用的种差或关系端点 DeniedNetworkCall-denied_under-NetworkPolicy。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：3 项
+      - 直接来源主张：2 项
+
+- **网络资源** `NetworkResource`
+  - 定义：网络资源标识来自网络的资源或端点，其内容、凭据、响应数据区和信任边界会影响智能体安全决策。
+  - 为什么需要：网络资源为canonical 事实 NetworkCall-accesses-NetworkResource（NetworkCall accesses NetworkResource）提供明确端点并保持与 NetworkCall 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的网络资源：网络资源标识来自网络的资源或端点，其内容、凭据、响应数据区和信任边界会影响智能体安全决策。；该种差可由关系 NetworkCall-accesses-NetworkResource 的端点角色检验。
+  - 不包含：
+  - 网络调用只是关系 NetworkCall-accesses-NetworkResource 的另一端；相关联不表示它是网络资源。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **出站请求** `OutboundRequest`
+  - 定义：出站请求记录来自工具、沙箱、协议适配器或远程智能体交互的跨边界请求，包含目标端点、方法、凭据范围、数据区和策略决策。
+  - 为什么需要：出站请求为canonical 事实 OutboundRequest-initiates-NetworkCall（OutboundRequest initiates NetworkCall）提供明确端点并保持与 NetworkCall 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的出站请求：出站请求记录来自工具、沙箱、协议适配器或远程智能体交互的跨边界请求，包含目标端点、方法、凭据范围、数据区和策略决策。；该种差可由关系 OutboundRequest-initiates-NetworkCall 的端点角色检验。
+  - 不包含：
+  - 网络调用只是关系 OutboundRequest-initiates-NetworkCall 的另一端；相关联不表示它是出站请求。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **代理路由记录** `ProxyRoute`
+  - 定义：代理路由记录网络流量使用的受控代理路径，包括代理类型、目标端点、允许协议、凭据边界、出口策略和轨迹证据。
+  - 为什么需要：代理路由记录为canonical 事实 NetworkCall-routed_by-ProxyRoute（NetworkCall routed_by ProxyRoute）提供明确端点并保持与 NetworkCall 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的代理路由记录：代理路由记录网络流量使用的受控代理路径，包括代理类型、目标端点、允许协议、凭据边界、出口策略和轨迹证据。；该种差可由关系 NetworkCall-routed_by-ProxyRoute 的端点角色检验。
+  - 不包含：
+  - 网络调用只是关系 NetworkCall-routed_by-ProxyRoute 的另一端；相关联不表示它是代理路由记录。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **沙箱** `Sandbox`
+  - 定义：沙箱是隔离执行边界，用于约束命令或工具调用的进程、文件系统、环境变量、网络、凭据和副作用。
+  - 为什么需要：沙箱为canonical 事实 Sandbox-constrained_by-IsolationSpecification（Sandbox constrained_by IsolationSpecification）提供明确端点并保持与 IsolationSpecification 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的沙箱：沙箱是隔离执行边界，用于约束命令或工具调用的进程、文件系统、环境变量、网络、凭据和副作用。；该种差可由关系 Sandbox-constrained_by-IsolationSpecification 的端点角色检验。
+  - 不包含：
+  - 隔离规范只是关系 Sandbox-constrained_by-IsolationSpecification 的另一端；相关联不表示它是沙箱。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **沙箱逃逸风险** `SandboxEscapeRisk`
+  - 定义：沙箱逃逸风险记录命令、进程、文件操作、网络路由或工具结果可能绕过或削弱沙箱隔离边界的证据。
+  - 为什么需要：沙箱逃逸风险为canonical 事实 SandboxEscapeRisk-threatens-Sandbox（SandboxEscapeRisk threatens Sandbox）提供明确端点并保持与 Sandbox 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的沙箱逃逸风险：沙箱逃逸风险记录命令、进程、文件操作、网络路由或工具结果可能绕过或削弱沙箱隔离边界的证据。；该种差可由关系 SandboxEscapeRisk-threatens-Sandbox 的端点角色检验。
+  - 不包含：
+  - 沙箱只是关系 SandboxEscapeRisk-threatens-Sandbox 的另一端；相关联不表示它是沙箱逃逸风险。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+### 信任边界模块
+
+信任边界模块定义身份、权限、可见性、数据分区与责任假设发生变化的位置，并记录控制、消息、产物或权限跨越边界时所需的审计证据。
+
+- **权限范围** `AuthorityScope`
+  - 定义：权限范围是安全域中的规范授权信封，用于说明某个参与者、工具、服务或运行时可以执行哪些操作、访问哪些受保护资源、作用于哪些数据区、跨越哪些信任边界，以及何时失效。
+  - 为什么需要：权限范围为canonical 事实 BoundaryCrossing-authorized_by-AuthorityScope（BoundaryCrossing authorized_by AuthorityScope）提供明确端点并保持与 BoundaryCrossing 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的权限范围：权限范围是安全域中的规范授权信封，用于说明某个参与者、工具、服务或运行时可以执行哪些操作、访问哪些受保护资源、作用于哪些数据区、跨越哪些信任边界，以及何时失效。；该种差可由关系 BoundaryCrossing-authorized_by-AuthorityScope 的端点角色检验。
+  - 不包含：
+  - 边界穿越事件只是关系 BoundaryCrossing-authorized_by-AuthorityScope 的另一端；相关联不表示它是权限范围。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **边界穿越事件** `BoundaryCrossing`
+  - 定义：边界穿越是可观测事件，用于记录控制、数据、产物、消息或权限跨越信任边界的过程；它必须携带来源参与者、接收方参与者、来源数据区、目标数据区、方向、被转移对象、权限依据、策略决策、协议或工具上下文以及轨迹证据。
+  - 为什么需要：边界穿越事件为canonical 事实 boundary_crossing_authorized_by（BoundaryCrossing boundary_crossing_authorized_by PolicyDecision）提供明确端点并保持与 PolicyDecision 的定义边界；节点字段 crossing_id、direction、purpose 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的边界穿越事件：边界穿越是可观测事件，用于记录控制、数据、产物、消息或权限跨越信任边界的过程；它必须携带来源参与者、接收方参与者、来源数据区、目标数据区、方向、被转移对象、权限依据、策略决策、协议或工具上下文以及轨迹证据。；该种差可由字段 crossing_id、direction、purpose 检验。
+  - 不包含：
+  - 策略决策只是关系 boundary_crossing_authorized_by 的另一端；相关联不表示它是边界穿越事件。
+  - 结构与约束：5 个字段，4 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+
+- **数据区** `DataZone`
+  - 定义：数据区按照信任级别、可见性、保留期限和处理策略组织数据，使上下文、记忆、工具输出和产物在跨边界流动时能保留安全控制信息。
+  - 为什么需要：数据区为canonical 事实 BoundaryCrossing-has_source_zone-DataZone（BoundaryCrossing has_source_zone DataZone）提供明确端点并保持与 BoundaryCrossing 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的数据区：数据区按照信任级别、可见性、保留期限和处理策略组织数据，使上下文、记忆、工具输出和产物在跨边界流动时能保留安全控制信息。；该种差可由关系 BoundaryCrossing-has_source_zone-DataZone 的端点角色检验。
+  - 不包含：
+  - 边界穿越事件只是关系 BoundaryCrossing-has_source_zone-DataZone 的另一端；相关联不表示它是数据区。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **信任边界** `TrustBoundary`
+  - 定义：信任边界表示身份、权限、可见性、执行控制、数据处理或责任假设发生变化的位置；任何跨越它的消息、工具调用、记忆写入、网络请求或远程委派都需要显式安全决策。
+  - 为什么需要：信任边界为canonical 事实 BoundaryCrossing-crosses-TrustBoundary（BoundaryCrossing crosses TrustBoundary）提供明确端点并保持与 BoundaryCrossing 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的信任边界：信任边界表示身份、权限、可见性、执行控制、数据处理或责任假设发生变化的位置；任何跨越它的消息、工具调用、记忆写入、网络请求或远程委派都需要显式安全决策。；该种差可由关系 BoundaryCrossing-crosses-TrustBoundary 的端点角色检验。
+  - 不包含：
+  - 边界穿越事件只是关系 BoundaryCrossing-crosses-TrustBoundary 的另一端；相关联不表示它是信任边界。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **外部边界** `ExternalBoundary`
+    - 定义：外部边界是一种信任边界（TrustBoundary），用于分隔受控智能体运行时与其外部的组织、服务、用户或系统。
+    - 直接上位：`TrustBoundary`
+    - 为什么需要：外部边界为canonical 事实 ExternalBoundary-is_a-TrustBoundary（ExternalBoundary is_a TrustBoundary）提供明确端点并保持与 InternalBoundary 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的外部边界：外部边界是一种信任边界（TrustBoundary），用于分隔受控智能体运行时与其外部的组织、服务、用户或系统。；该种差可由关系 ExternalBoundary-is_a-TrustBoundary 的端点角色检验。
+    - 不包含：
+  - 内部边界虽与本概念同属 TrustBoundary，但其定义为“内部边界是一种信任边界（TrustBoundary），用于分隔可信运行时组件、本地存储或内部服务与较低信任的内部执行面或数据面。”，不得替代外部边界。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **内部边界** `InternalBoundary`
+    - 定义：内部边界是一种信任边界（TrustBoundary），用于分隔可信运行时组件、本地存储或内部服务与较低信任的内部执行面或数据面。
+    - 直接上位：`TrustBoundary`
+    - 为什么需要：内部边界为canonical 事实 InternalBoundary-is_a-TrustBoundary（InternalBoundary is_a TrustBoundary）提供明确端点并保持与 ExternalBoundary 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的内部边界：内部边界是一种信任边界（TrustBoundary），用于分隔可信运行时组件、本地存储或内部服务与较低信任的内部执行面或数据面。；该种差可由关系 InternalBoundary-is_a-TrustBoundary 的端点角色检验。
+    - 不包含：
+  - 外部边界虽与本概念同属 TrustBoundary，但其定义为“外部边界是一种信任边界（TrustBoundary），用于分隔受控智能体运行时与其外部的组织、服务、用户或系统。”，不得替代内部边界。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **网络边界** `NetworkBoundary`
+    - 定义：网络边界是一种信任边界（TrustBoundary），位于运行时与可经网络访问的传输、代理、资源或远程服务之间的信任转换点。
+    - 直接上位：`TrustBoundary`
+    - 为什么需要：网络边界为canonical 事实 NetworkBoundary-is_a-TrustBoundary（NetworkBoundary is_a TrustBoundary）提供明确端点并保持与 ExternalBoundary 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的网络边界：网络边界是一种信任边界（TrustBoundary），位于运行时与可经网络访问的传输、代理、资源或远程服务之间的信任转换点。；该种差可由关系 NetworkBoundary-is_a-TrustBoundary 的端点角色检验。
+    - 不包含：
+  - 外部边界虽与本概念同属 TrustBoundary，但其定义为“外部边界是一种信任边界（TrustBoundary），用于分隔受控智能体运行时与其外部的组织、服务、用户或系统。”，不得替代网络边界。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **远程智能体边界** `RemoteAgentBoundary`
+    - 定义：远程智能体边界不是参与者本身，而是本地系统与远程智能体交换任务、消息、状态或产物时形成的不透明性、身份、权限和责任边界。
+    - 直接上位：`TrustBoundary`
+    - 为什么需要：远程智能体边界为canonical 事实 RemoteAgentBoundary-is_a-TrustBoundary（RemoteAgentBoundary is_a TrustBoundary）提供明确端点并保持与 ExternalBoundary 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的远程智能体边界：远程智能体边界不是参与者本身，而是本地系统与远程智能体交换任务、消息、状态或产物时形成的不透明性、身份、权限和责任边界。；该种差可由关系 RemoteAgentBoundary-is_a-TrustBoundary 的端点角色检验。
+    - 不包含：
+  - 外部边界虽与本概念同属 TrustBoundary，但其定义为“外部边界是一种信任边界（TrustBoundary），用于分隔受控智能体运行时与其外部的组织、服务、用户或系统。”，不得替代远程智能体边界。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **工具边界** `ToolBoundary`
+    - 定义：工具边界是一种信任边界（TrustBoundary），位于模型控制的意图转化为可执行工具请求，或工具输出重新进入模型可见上下文的位置。
+    - 直接上位：`TrustBoundary`
+    - 为什么需要：工具边界为canonical 事实 ToolBoundary-is_a-TrustBoundary（ToolBoundary is_a TrustBoundary）提供明确端点并保持与 ExternalBoundary 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的工具边界：工具边界是一种信任边界（TrustBoundary），位于模型控制的意图转化为可执行工具请求，或工具输出重新进入模型可见上下文的位置。；该种差可由关系 ToolBoundary-is_a-TrustBoundary 的端点角色检验。
+    - 不包含：
+  - 外部边界虽与本概念同属 TrustBoundary，但其定义为“外部边界是一种信任边界（TrustBoundary），用于分隔受控智能体运行时与其外部的组织、服务、用户或系统。”，不得替代工具边界。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+## 可观测性与反馈域
+
+可观测性与反馈域是从可观察运行证据中派生诊断、审查、指标、遥测、审计、恢复和学习信号的运行关注域。它区分原始轨迹证据与解释性反馈，将基准专属语义保留在适配器层，并记录反馈如何回流到编排、记忆、工具选择、策略和优化循环。
+
+### 遥测、审计与导出管线模块
+
+遥测、审计与导出管线模块将日志、遥测信号、审计日志、轨迹导出、监听器、订阅、流和事件接收端建模为从运行轨迹证据派生的可观测性管线。
+
+- **审计日志** `AuditLog`
+  - 定义：审计日志是可审查的日志记录、审计引用、遥测摘要和披露相关证据集合或通道，用于检查、诊断或导出。
+  - 为什么需要：审计日志为canonical 事实 audit_log_summarizes_audit_record（AuditLog audit_log_summarizes_audit_record AuditRecord）提供明确端点并保持与 AuditRecord 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的审计日志：审计日志是可审查的日志记录、审计引用、遥测摘要和披露相关证据集合或通道，用于检查、诊断或导出。；该种差可由关系 audit_log_summarizes_audit_record 的端点角色检验。
+  - 不包含：
+  - 审计记录只是关系 audit_log_summarizes_audit_record 的另一端；相关联不表示它是审计日志。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **日志信息制品** `LogArtifact`
+  - 定义：LogArtifact 是从运行、追踪或诊断证据形成、具有稳定内容和出处的日志信息制品；单条 LogRecord、复合 TraceExport 和迁入的 ToolTranscript 可专业化它。
+  - 为什么需要：日志信息制品为canonical 事实 LogRecord-is_a-LogArtifact（LogRecord is_a LogArtifact）提供明确端点并保持与 LogRecord 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的日志信息制品：LogArtifact 是从运行、追踪或诊断证据形成、具有稳定内容和出处的日志信息制品；单条 LogRecord、复合 TraceExport 和迁入的 ToolTranscript 可专业化它。；该种差可由关系 LogRecord-is_a-LogArtifact 的端点角色检验。
+  - 不包含：
+  - 日志记录只是关系 LogRecord-is_a-LogArtifact 的另一端；相关联不表示它是日志信息制品。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **日志记录** `LogRecord`
+    - 定义：日志记录是从轨迹、跨度、事件、诊断消息、警告、错误、工具结果或审计相关观察派生的结构化记录。
+    - 直接上位：`LogArtifact`
+    - 为什么需要：日志记录为canonical 事实 log_record_appended_to_audit_log（LogRecord log_record_appended_to_audit_log AuditLog）提供明确端点并保持与 ToolTranscript 的定义边界；节点字段 log_record_id、timestamp、severity 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的日志记录：日志记录是从轨迹、跨度、事件、诊断消息、警告、错误、工具结果或审计相关观察派生的结构化记录。；该种差可由字段 log_record_id、timestamp、severity 检验。
+    - 不包含：
+  - 工具调用记录虽与本概念同属 LogArtifact，但其定义为“工具转录是一种日志产物（LogArtifact），按顺序保存工具请求、权限提示、工具调用尝试（ToolCallAttempt）的执行、结果、警告与后续观察。”，不得替代日志记录。
+    - 结构与约束：4 个字段，2 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **工具调用记录** `ToolTranscript`
+    - 定义：工具转录是一种日志产物（LogArtifact），按顺序保存工具请求、权限提示、工具调用尝试（ToolCallAttempt）的执行、结果、警告与后续观察。
+    - 直接上位：`LogArtifact`
+    - 为什么需要：工具调用记录为canonical 事实 ToolTranscript-records-ToolCallAttempt（ToolTranscript records ToolCallAttempt）提供明确端点并保持与 LogRecord 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的工具调用记录：工具转录是一种日志产物（LogArtifact），按顺序保存工具请求、权限提示、工具调用尝试（ToolCallAttempt）的执行、结果、警告与后续观察。；该种差可由关系 ToolTranscript-records-ToolCallAttempt 的端点角色检验。
+    - 不包含：
+  - 日志记录虽与本概念同属 LogArtifact，但其定义为“日志记录是从轨迹、跨度、事件、诊断消息、警告、错误、工具结果或审计相关观察派生的结构化记录。”，不得替代工具调用记录。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **轨迹导出** `TraceExport`
+    - 定义：轨迹导出是导出的轨迹包或可移植轨迹产物，包含为调试或审查选择的轨迹记录、跨度、事件、属性、脱敏状态和来源。
+    - 直接上位：`LogArtifact`
+    - 为什么需要：轨迹导出为canonical 事实 TraceExport-exports-LogStream（TraceExport exports LogStream）提供明确端点并保持与 LogRecord 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的轨迹导出：轨迹导出是导出的轨迹包或可移植轨迹产物，包含为调试或审查选择的轨迹记录、跨度、事件、属性、脱敏状态和来源。；该种差可由关系 TraceExport-exports-LogStream 的端点角色检验。
+    - 不包含：
+  - 日志记录虽与本概念同属 LogArtifact，但其定义为“日志记录是从轨迹、跨度、事件、诊断消息、警告、错误、工具结果或审计相关观察派生的结构化记录。”，不得替代轨迹导出。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **日志消费者** `LogConsumer`
+  - 定义：LogConsumer 是消费 LogStream、LogArtifact 或 TelemetryEvent 的角色，可监听、路由、存储或转发；订阅是配置消费者的规范，不是消费者本身。
+  - 为什么需要：日志消费者为canonical 事实 LogConsumer-consumes-LogStream（LogConsumer consumes LogStream）提供明确端点并保持与 LogStream 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的日志消费者：LogConsumer 是消费 LogStream、LogArtifact 或 TelemetryEvent 的角色，可监听、路由、存储或转发；订阅是配置消费者的规范，不是消费者本身。；该种差可由关系 LogConsumer-consumes-LogStream 的端点角色检验。
+  - 不包含：
+  - 日志流只是关系 LogConsumer-consumes-LogStream 的另一端；相关联不表示它是日志消费者。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **错误监听器** `ErrorListener`
+    - 定义：错误监听器订阅运行、沙箱、工具、协议或日志事件，以检测并路由错误用于诊断。
+    - 直接上位：`LogConsumer`
+    - 为什么需要：错误监听器为canonical 事实 ErrorListener-observes-ErrorEvent（ErrorListener observes ErrorEvent）提供明确端点并保持与 EventSink 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的错误监听器：错误监听器订阅运行、沙箱、工具、协议或日志事件，以检测并路由错误用于诊断。；该种差可由关系 ErrorListener-observes-ErrorEvent 的端点角色检验。
+    - 不包含：
+  - 事件接收端虽与本概念同属 LogConsumer，但其定义为“事件接收端是接受日志流、遥测事件、审计记录或轨迹导出的目的地、消费者、接收方或导出目标，用于存储、监控、审查或转发。”，不得替代错误监听器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **事件接收端** `EventSink`
+    - 定义：事件接收端是接受日志流、遥测事件、审计记录或轨迹导出的目的地、消费者、接收方或导出目标，用于存储、监控、审查或转发。
+    - 直接上位：`LogConsumer`
+    - 为什么需要：事件接收端为canonical 事实 EventSink-receives-TelemetryEvent（EventSink receives TelemetryEvent）提供明确端点并保持与 ErrorListener 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的事件接收端：事件接收端是接受日志流、遥测事件、审计记录或轨迹导出的目的地、消费者、接收方或导出目标，用于存储、监控、审查或转发。；该种差可由关系 EventSink-receives-TelemetryEvent 的端点角色检验。
+    - 不包含：
+  - 错误监听器虽与本概念同属 LogConsumer，但其定义为“错误监听器订阅运行、沙箱、工具、协议或日志事件，以检测并路由错误用于诊断。”，不得替代事件接收端。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **日志监听器** `LogListener`
+    - 定义：日志监听器是订阅日志流或遥测通道的观察组件，并把记录路由到诊断、审查、指标、审计日志或事件接收端。
+    - 直接上位：`LogConsumer`
+    - 为什么需要：日志监听器为canonical 事实 log_listener_subscribes_to_stream（LogListener log_listener_subscribes_to_stream LogStream）提供明确端点并保持与 ErrorListener 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的日志监听器：日志监听器是订阅日志流或遥测通道的观察组件，并把记录路由到诊断、审查、指标、审计日志或事件接收端。；该种差可由关系 log_listener_subscribes_to_stream 的端点角色检验。
+    - 不包含：
+  - 错误监听器虽与本概念同属 LogConsumer，但其定义为“错误监听器订阅运行、沙箱、工具、协议或日志事件，以检测并路由错误用于诊断。”，不得替代日志监听器。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **日志流** `LogStream`
+  - 定义：日志流是从运行、工具、协议、沙箱或反馈组件投递到监听器或接收端的日志记录或遥测项有序流。
+  - 为什么需要：日志流为canonical 事实 log_stream_delivered_to_event_sink（LogStream log_stream_delivered_to_event_sink EventSink）提供明确端点并保持与 EventSink 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的日志流：日志流是从运行、工具、协议、沙箱或反馈组件投递到监听器或接收端的日志记录或遥测项有序流。；该种差可由关系 log_stream_delivered_to_event_sink 的端点角色检验。
+  - 不包含：
+  - 事件接收端只是关系 log_stream_delivered_to_event_sink 的另一端；相关联不表示它是日志流。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **日志订阅** `LogSubscription`
+  - 定义：日志订阅是在过滤和保留条件下，为日志流、遥测通道、审计订阅源或诊断事件源登记监听器的订阅。
+  - 为什么需要：日志订阅为canonical 事实 log_subscription_registers_listener（LogSubscription log_subscription_registers_listener LogListener）提供明确端点并保持与 LogListener 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的日志订阅：日志订阅是在过滤和保留条件下，为日志流、遥测通道、审计订阅源或诊断事件源登记监听器的订阅。；该种差可由关系 log_subscription_registers_listener 的端点角色检验。
+  - 不包含：
+  - 日志监听器只是关系 log_subscription_registers_listener 的另一端；相关联不表示它是日志订阅。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **遥测事件** `TelemetryEvent`
+  - 定义：遥测事件是从运行轨迹证据派生的插桩信号，用于收集、监控、诊断、指标或导出，不重新定义原始轨迹事件。
+  - 为什么需要：遥测事件为canonical 事实 telemetry_event_derived_from_trace_event（TelemetryEvent telemetry_event_derived_from_trace_event TraceEvent）提供明确端点并保持与 TraceEvent 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的遥测事件：遥测事件是从运行轨迹证据派生的插桩信号，用于收集、监控、诊断、指标或导出，不重新定义原始轨迹事件。；该种差可由关系 telemetry_event_derived_from_trace_event 的端点角色检验。
+  - 不包含：
+  - 追踪事件只是关系 telemetry_event_derived_from_trace_event 的另一端；相关联不表示它是遥测事件。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+### 指标与评估模块
+
+指标与评估模块描述通用指标、评估运行、评分规程、分数、成功准则和评估证据；基准专属场景、压力轴和排行榜语义保留在适配器层。
+
+- **评估运行** `EvaluationRun`
+  - 定义：评估运行是把指标、评分规程、成功准则和评分逻辑应用于可观察智能体行为、运行尝试、任务、产物或工具使用的评估片段。
+  - 为什么需要：评估运行为canonical 事实 evaluation_run_produces_score（EvaluationRun evaluation_run_produces_score Score）提供明确端点并保持与 Score 的定义边界；节点字段 evaluation_run_id、started_at、evaluator_id 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的评估运行：评估运行是把指标、评分规程、成功准则和评分逻辑应用于可观察智能体行为、运行尝试、任务、产物或工具使用的评估片段。；该种差可由字段 evaluation_run_id、started_at、evaluator_id 检验。
+  - 不包含：
+  - 评分只是关系 evaluation_run_produces_score 的另一端；相关联不表示它是评估运行。
+  - 结构与约束：6 个字段，4 条约束
+  - 正反例与实例：4 项
+  - 直接来源主张：2 项
+
+- **评估规范** `EvaluationSpecification`
+  - 定义：EvaluationSpecification 是评估运行使用的静态、可版本化规范，涵盖场景、rubric 和 criterion；它不保存评估执行过程或测量值。
+  - 为什么需要：评估规范为canonical 事实 EvaluationCriterion-is_a-EvaluationSpecification（EvaluationCriterion is_a EvaluationSpecification）提供明确端点并保持与 EvaluationCriterion 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的评估规范：EvaluationSpecification 是评估运行使用的静态、可版本化规范，涵盖场景、rubric 和 criterion；它不保存评估执行过程或测量值。；该种差可由关系 EvaluationCriterion-is_a-EvaluationSpecification 的端点角色检验。
+  - 不包含：
+  - 评估准则只是关系 EvaluationCriterion-is_a-EvaluationSpecification 的另一端；相关联不表示它是评估规范。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **评估准则** `EvaluationCriterion`
+    - 定义：评估准则是反馈域中的通用准则，定义用于评估智能体行为的评分、成功、评分规程或指标条件；基准专属准则保留为适配器映射。
+    - 直接上位：`EvaluationSpecification`
+    - 为什么需要：评估准则为canonical 事实 EvaluationCriterion-is_a-EvaluationSpecification（EvaluationCriterion is_a EvaluationSpecification）提供明确端点并保持与 EvaluationScenario 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的评估准则：评估准则是反馈域中的通用准则，定义用于评估智能体行为的评分、成功、评分规程或指标条件；基准专属准则保留为适配器映射。；该种差可由关系 EvaluationCriterion-is_a-EvaluationSpecification 的端点角色检验。
+    - 不包含：
+  - 评估场景虽与本概念同属 EvaluationSpecification，但其定义为“评估场景是通用评估设置，描述任务条件、输入、约束和预期观察；适配器专属基准场景字段不进入反馈核心。”，不得替代评估准则。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+    - **成功准则** `SuccessCriterion`
+      - 定义：成功准则是在相关评分规程或策略下判断任务、运行、产物、恢复尝试或评估目标是否可接受的条件。
+      - 直接上位：`EvaluationCriterion`
+      - 为什么需要：成功准则为canonical 事实 success_criterion_evaluates_task（SuccessCriterion success_criterion_evaluates_task Task）提供明确端点并保持与 EvaluationCriterion 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的成功准则：成功准则是在相关评分规程或策略下判断任务、运行、产物、恢复尝试或评估目标是否可接受的条件。；该种差可由关系 success_criterion_evaluates_task 的端点角色检验。
+      - 不包含：
+  - 仅能识别为上位概念 EvaluationCriterion 的对象不在范围内；它尚未证明成功准则的种差或关系端点 success_criterion_evaluates_task。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：2 项
+  - **评估场景** `EvaluationScenario`
+    - 定义：评估场景是通用评估设置，描述任务条件、输入、约束和预期观察；适配器专属基准场景字段不进入反馈核心。
+    - 直接上位：`EvaluationSpecification`
+    - 为什么需要：评估场景为canonical 事实 EvaluationRun-uses_scenario-EvaluationScenario（EvaluationRun uses_scenario EvaluationScenario）提供明确端点并保持与 EvaluationCriterion 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的评估场景：评估场景是通用评估设置，描述任务条件、输入、约束和预期观察；适配器专属基准场景字段不进入反馈核心。；该种差可由关系 EvaluationRun-uses_scenario-EvaluationScenario 的端点角色检验。
+    - 不包含：
+  - 评估准则虽与本概念同属 EvaluationSpecification，但其定义为“评估准则是反馈域中的通用准则，定义用于评估智能体行为的评分、成功、评分规程或指标条件；基准专属准则保留为适配器映射。”，不得替代评估场景。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **评分规程** `Rubric`
+    - 定义：评分规程是通用评分指南，定义评估准则、权重、阈值和解释规则，但不嵌入基准专属排行榜语义。
+    - 直接上位：`EvaluationSpecification`
+    - 为什么需要：评分规程为canonical 事实 EvaluationRun-applies-Rubric（EvaluationRun applies Rubric）提供明确端点并保持与 EvaluationCriterion 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的评分规程：评分规程是通用评分指南，定义评估准则、权重、阈值和解释规则，但不嵌入基准专属排行榜语义。；该种差可由关系 EvaluationRun-applies-Rubric 的端点角色检验。
+    - 不包含：
+  - 评估准则虽与本概念同属 EvaluationSpecification，但其定义为“评估准则是反馈域中的通用准则，定义用于评估智能体行为的评分、成功、评分规程或指标条件；基准专属准则保留为适配器映射。”，不得替代评分规程。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **测量记录** `Measurement`
+  - 定义：Measurement 是一次有出处的观测记录，必须引用 Metric 定义、被测对象、EvaluationRun、单位、值、时间和置信度；Metric 定义可复用，而每次 Measurement 都有独立身份。
+  - 为什么需要：测量记录为canonical 事实 Measurement-evaluates-OptimizationTarget（Measurement evaluates OptimizationTarget）提供明确端点并保持与 OptimizationTarget 的定义边界；节点字段 confidence 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的测量记录：Measurement 是一次有出处的观测记录，必须引用 Metric 定义、被测对象、EvaluationRun、单位、值、时间和置信度；Metric 定义可复用，而每次 Measurement 都有独立身份。；该种差可由字段 confidence 检验。
+  - 不包含：
+  - 优化目标只是关系 Measurement-evaluates-OptimizationTarget 的另一端；相关联不表示它是测量记录。
+  - 结构与约束：1 个字段，0 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+  - **评分** `Score`
+    - 定义：分数是在评估运行中针对指标或评分规程产生的数值、序数、类别或通过/失败评估值。
+    - 直接上位：`Measurement`
+    - 为什么需要：评分为canonical 事实 score_computed_for_metric（Score score_computed_for_metric Metric）提供明确端点并保持与 Measurement 的定义边界；节点字段 value 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的评分：分数是在评估运行中针对指标或评分规程产生的数值、序数、类别或通过/失败评估值。；该种差可由字段 value 检验。
+    - 不包含：
+  - 仅能识别为上位概念 Measurement 的对象不在范围内；它尚未证明评分的种差或关系端点 score_computed_for_metric。
+    - 结构与约束：1 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+
+- **指标** `Metric`
+  - 定义：指标是运行、任务、工具调用、路由、产物、策略决策或反馈循环的可测属性，与基准专属评分方案相分离。
+  - 为什么需要：指标为canonical 事实 metric_measures_run_attempt（Metric metric_measures_run_attempt RunAttempt）提供明确端点并保持与 RunAttempt 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的指标：指标是运行、任务、工具调用、路由、产物、策略决策或反馈循环的可测属性，与基准专属评分方案相分离。；该种差可由关系 metric_measures_run_attempt 的端点角色检验。
+  - 不包含：
+  - 执行尝试只是关系 metric_measures_run_attempt 的另一端；相关联不表示它是指标。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **成本指标** `CostMetric`
+    - 定义：成本指标衡量运行、任务、工具调用、路由或评估片段中的词元、计算、金钱、调用次数、存储或运营成本。
+    - 直接上位：`Metric`
+    - 为什么需要：成本指标为canonical 事实 CostMetric-is_a-Metric（CostMetric is_a Metric）提供明确端点并保持与 LatencyMetric 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的成本指标：成本指标衡量运行、任务、工具调用、路由或评估片段中的词元、计算、金钱、调用次数、存储或运营成本。；该种差可由关系 CostMetric-is_a-Metric 的端点角色检验。
+    - 不包含：
+  - 延迟指标虽与本概念同属 Metric，但其定义为“延迟指标衡量可观察智能体工作中的耗时、步骤延迟、工具调用时长、队列等待或响应时间。”，不得替代成本指标。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **延迟指标** `LatencyMetric`
+    - 定义：延迟指标衡量可观察智能体工作中的耗时、步骤延迟、工具调用时长、队列等待或响应时间。
+    - 直接上位：`Metric`
+    - 为什么需要：延迟指标为canonical 事实 LatencyMetric-is_a-Metric（LatencyMetric is_a Metric）提供明确端点并保持与 CostMetric 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的延迟指标：延迟指标衡量可观察智能体工作中的耗时、步骤延迟、工具调用时长、队列等待或响应时间。；该种差可由关系 LatencyMetric-is_a-Metric 的端点角色检验。
+    - 不包含：
+  - 成本指标虽与本概念同属 Metric，但其定义为“成本指标衡量运行、任务、工具调用、路由或评估片段中的词元、计算、金钱、调用次数、存储或运营成本。”，不得替代延迟指标。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **鲁棒性指标** `RobustnessMetric`
+    - 定义：鲁棒性指标衡量系统在重试、扰动、长程任务、工具失败、上下文变化或对抗压力下的稳定性。
+    - 直接上位：`Metric`
+    - 为什么需要：鲁棒性指标为canonical 事实 RobustnessMetric-is_a-Metric（RobustnessMetric is_a Metric）提供明确端点并保持与 CostMetric 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的鲁棒性指标：鲁棒性指标衡量系统在重试、扰动、长程任务、工具失败、上下文变化或对抗压力下的稳定性。；该种差可由关系 RobustnessMetric-is_a-Metric 的端点角色检验。
+    - 不包含：
+  - 成本指标虽与本概念同属 Metric，但其定义为“成本指标衡量运行、任务、工具调用、路由或评估片段中的词元、计算、金钱、调用次数、存储或运营成本。”，不得替代鲁棒性指标。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **安全指标** `SafetyMetric`
+    - 定义：安全指标衡量策略符合度、风险暴露、不安全输出率、边界违规或安全审查结果，但不拥有执行层面的强制决策。
+    - 直接上位：`Metric`
+    - 为什么需要：安全指标为canonical 事实 SafetyMetric-is_a-Metric（SafetyMetric is_a Metric）提供明确端点并保持与 CostMetric 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的安全指标：安全指标衡量策略符合度、风险暴露、不安全输出率、边界违规或安全审查结果，但不拥有执行层面的强制决策。；该种差可由关系 SafetyMetric-is_a-Metric 的端点角色检验。
+    - 不包含：
+  - 成本指标虽与本概念同属 Metric，但其定义为“成本指标衡量运行、任务、工具调用、路由或评估片段中的词元、计算、金钱、调用次数、存储或运营成本。”，不得替代安全指标。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+### 审查与优化模块
+
+审查与优化模块描述反馈证据、人工审查、自动审查、审查发现、修正、学习信号、优化循环和由反馈触发的恢复路径。
+
+- **纠正活动** `CorrectionActivity`
+  - 定义：CorrectionActivity 是由反馈或失败证据触发、对制品、计划、状态或外部效应实施修正、恢复或回滚的活动；它由计划约束并应随后复评。
+  - 为什么需要：纠正活动为canonical 事实 CorrectionActivity-followed_by-EvaluationRun（CorrectionActivity followed_by EvaluationRun）提供明确端点并保持与 EvaluationRun 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的纠正活动：CorrectionActivity 是由反馈或失败证据触发、对制品、计划、状态或外部效应实施修正、恢复或回滚的活动；它由计划约束并应随后复评。；该种差可由关系 CorrectionActivity-followed_by-EvaluationRun 的端点角色检验。
+  - 不包含：
+  - 评估运行只是关系 CorrectionActivity-followed_by-EvaluationRun 的另一端；相关联不表示它是纠正活动。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **修正** `Correction`
+    - 定义：修正是针对产物、计划、输出、路由、上下文组装或工具使用选择提出或应用的改变，用来响应反馈、诊断、验证失败或审查发现。
+    - 直接上位：`CorrectionActivity`
+    - 为什么需要：修正为canonical 事实 correction_applies_to_artifact（Correction correction_applies_to_artifact Artifact）提供明确端点并保持与 RecoveryAction 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的修正：修正是针对产物、计划、输出、路由、上下文组装或工具使用选择提出或应用的改变，用来响应反馈、诊断、验证失败或审查发现。；该种差可由关系 correction_applies_to_artifact 的端点角色检验。
+    - 不包含：
+  - 恢复动作虽与本概念同属 CorrectionActivity，但其定义为“恢复动作是由反馈或失败触发的修复、重试、改路、停止、升级、回滚或恢复执行等动作，用来响应警告、拒绝、失败尝试或审查发现。”，不得替代修正。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **恢复动作** `RecoveryAction`
+    - 定义：恢复动作是由反馈或失败触发的修复、重试、改路、停止、升级、回滚或恢复执行等动作，用来响应警告、拒绝、失败尝试或审查发现。
+    - 直接上位：`CorrectionActivity`
+    - 为什么需要：恢复动作为canonical 事实 RecoveryAction-resolves-ErrorEvent（RecoveryAction resolves ErrorEvent）提供明确端点并保持与 Correction 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的恢复动作：恢复动作是由反馈或失败触发的修复、重试、改路、停止、升级、回滚或恢复执行等动作，用来响应警告、拒绝、失败尝试或审查发现。；该种差可由关系 RecoveryAction-resolves-ErrorEvent 的端点角色检验。
+    - 不包含：
+  - 修正虽与本概念同属 CorrectionActivity，但其定义为“修正是针对产物、计划、输出、路由、上下文组装或工具使用选择提出或应用的改变，用来响应反馈、诊断、验证失败或审查发现。”，不得替代恢复动作。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **回滚动作** `RollbackAction`
+    - 定义：回滚动作是在审计控制下反转、补偿或使不安全副作用、状态转换、产物修订、记忆更新、路由选择或外部操作失效的动作。
+    - 直接上位：`CorrectionActivity`
+    - 为什么需要：回滚动作为canonical 事实 RollbackAction-responds_to-ToolSideEffect（RollbackAction responds_to ToolSideEffect）提供明确端点并保持与 Correction 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的回滚动作：回滚动作是在审计控制下反转、补偿或使不安全副作用、状态转换、产物修订、记忆更新、路由选择或外部操作失效的动作。；该种差可由关系 RollbackAction-responds_to-ToolSideEffect 的端点角色检验。
+    - 不包含：
+  - 修正虽与本概念同属 CorrectionActivity，但其定义为“修正是针对产物、计划、输出、路由、上下文组装或工具使用选择提出或应用的改变，用来响应反馈、诊断、验证失败或审查发现。”，不得替代回滚动作。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **反馈** `Feedback`
+  - 定义：反馈是由审查、诊断、指标、用户判断、策略检查或运行证据解释出的信号，用于改进、修订、阻断、批准或重新排序后续工作。
+  - 为什么需要：反馈为canonical 事实 ReviewFinding-generates-Feedback（ReviewFinding generates Feedback）提供明确端点并保持与 ReviewFinding 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的反馈：反馈是由审查、诊断、指标、用户判断、策略检查或运行证据解释出的信号，用于改进、修订、阻断、批准或重新排序后续工作。；该种差可由关系 ReviewFinding-generates-Feedback 的端点角色检验。
+  - 不包含：
+  - 审查发现只是关系 ReviewFinding-generates-Feedback 的另一端；相关联不表示它是反馈。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+  - **学习信号** `LearningSignal`
+    - 定义：学习信号是由反馈派生的证据，可更新记忆偏好、检索配置、路由策略、工具选择、策略阈值或未来编排行为。
+    - 直接上位：`Feedback`
+    - 为什么需要：学习信号为canonical 事实 learning_signal_derived_from_feedback（LearningSignal learning_signal_derived_from_feedback Feedback）提供明确端点并保持与 Feedback 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的学习信号：学习信号是由反馈派生的证据，可更新记忆偏好、检索配置、路由策略、工具选择、策略阈值或未来编排行为。；该种差可由关系 learning_signal_derived_from_feedback 的端点角色检验。
+    - 不包含：
+  - 仅能识别为上位概念 Feedback 的对象不在范围内；它尚未证明学习信号的种差或关系端点 learning_signal_derived_from_feedback。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **反馈事件** `FeedbackEvent`
+  - 定义：反馈事件是可观察的控制循环事件，把批评、警告、偏好、更正、批准或修订信号送回任务、路由、工作者或优化者。
+  - 为什么需要：反馈事件为canonical 事实 feedback_event_carries_feedback（FeedbackEvent feedback_event_carries_feedback Feedback）提供明确端点并保持与 Feedback 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的反馈事件：反馈事件是可观察的控制循环事件，把批评、警告、偏好、更正、批准或修订信号送回任务、路由、工作者或优化者。；该种差可由关系 feedback_event_carries_feedback 的端点角色检验。
+  - 不包含：
+  - 反馈只是关系 feedback_event_carries_feedback 的另一端；相关联不表示它是反馈事件。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **优化循环** `OptimizationLoop`
+  - 定义：优化循环是有界反馈循环，消费反馈、指标、分数、审查发现或学习信号，以改进后续路由、工具选择、提示、策略阈值或任务尝试。
+  - 为什么需要：优化循环为canonical 事实 optimization_loop_consumes_feedback（OptimizationLoop optimization_loop_consumes_feedback Feedback）提供明确端点并保持与 Feedback 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的优化循环：优化循环是有界反馈循环，消费反馈、指标、分数、审查发现或学习信号，以改进后续路由、工具选择、提示、策略阈值或任务尝试。；该种差可由关系 optimization_loop_consumes_feedback 的端点角色检验。
+  - 不包含：
+  - 反馈只是关系 optimization_loop_consumes_feedback 的另一端；相关联不表示它是优化循环。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **优化目标** `OptimizationTarget`
+  - 定义：优化目标是规定待改善属性和方向的规范，被评审或测量引用。
+  - 为什么需要：优化目标为canonical 事实 Measurement-evaluates-OptimizationTarget（Measurement evaluates OptimizationTarget）提供明确端点并保持与 Measurement 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的优化目标：优化目标是规定待改善属性和方向的规范，被评审或测量引用。；该种差可由关系 Measurement-evaluates-OptimizationTarget 的端点角色检验。
+  - 不包含：
+  - 测量记录只是关系 Measurement-evaluates-OptimizationTarget 的另一端；相关联不表示它是优化目标。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **恢复计划** `RecoveryPlan`
+  - 定义：恢复计划选择一个或多个恢复动作，把它们连接到触发它们的失败或反馈证据，并约束重试、回滚、升级或停止行为。
+  - 为什么需要：恢复计划为canonical 事实 RecoveryPlan-specifies-RecoveryAction（RecoveryPlan specifies RecoveryAction）提供明确端点并保持与 RecoveryAction 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的恢复计划：恢复计划选择一个或多个恢复动作，把它们连接到触发它们的失败或反馈证据，并约束重试、回滚、升级或停止行为。；该种差可由关系 RecoveryPlan-specifies-RecoveryAction 的端点角色检验。
+  - 不包含：
+  - 恢复动作只是关系 RecoveryPlan-specifies-RecoveryAction 的另一端；相关联不表示它是恢复计划。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **审查** `Review`
+  - 定义：审查是对任务、产物、轨迹片段、计划、答案、工具结果或策略敏感决策的有界检查记录，可产生发现、批准、修改请求或反馈。
+  - 为什么需要：审查为canonical 事实 review_produces_review_finding（Review review_produces_review_finding ReviewFinding）提供明确端点并保持与 ReviewFinding 的定义边界；节点字段 review_id、subject_version、status 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的审查：审查是对任务、产物、轨迹片段、计划、答案、工具结果或策略敏感决策的有界检查记录，可产生发现、批准、修改请求或反馈。；该种差可由字段 review_id、subject_version、status 检验。
+  - 不包含：
+  - 审查发现只是关系 review_produces_review_finding 的另一端；相关联不表示它是审查。
+  - 结构与约束：4 个字段，2 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+
+- **评审活动** `ReviewActivity`
+  - 定义：ReviewActivity 是带审查者、任务分配、被评版本、准则和时间边界的检查活动；它产生 Review 记录和 findings，而不是与记录同一。
+  - 为什么需要：评审活动为canonical 事实 ReviewActivity-evaluates-OptimizationTarget（ReviewActivity evaluates OptimizationTarget）提供明确端点并保持与 OptimizationTarget 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的评审活动：ReviewActivity 是带审查者、任务分配、被评版本、准则和时间边界的检查活动；它产生 Review 记录和 findings，而不是与记录同一。；该种差可由关系 ReviewActivity-evaluates-OptimizationTarget 的端点角色检验。
+  - 不包含：
+  - 优化目标只是关系 ReviewActivity-evaluates-OptimizationTarget 的另一端；相关联不表示它是评审活动。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **自动审查** `AutomatedReview`
+    - 定义：自动审查是机器生成的审查过程，检查任务、输出、计划、轨迹或产物，并记录发现、置信度、准则和来源；在策略要求人工批准时不能替代人工批准。
+    - 直接上位：`ReviewActivity`
+    - 为什么需要：自动审查为canonical 事实 AutomatedReview-is_a-ReviewActivity（AutomatedReview is_a ReviewActivity）提供明确端点并保持与 HumanReview 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的自动审查：自动审查是机器生成的审查过程，检查任务、输出、计划、轨迹或产物，并记录发现、置信度、准则和来源；在策略要求人工批准时不能替代人工批准。；该种差可由关系 AutomatedReview-is_a-ReviewActivity 的端点角色检验。
+    - 不包含：
+  - 人工审查虽与本概念同属 ReviewActivity，但其定义为“人工审查是由人类参与者提供的审查证据，包括批准、修改请求、阻断性问题、质量判断、负责审查者身份和被审查对象。”，不得替代自动审查。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **人工审查** `HumanReview`
+    - 定义：人工审查是由人类参与者提供的审查证据，包括批准、修改请求、阻断性问题、质量判断、负责审查者身份和被审查对象。
+    - 直接上位：`ReviewActivity`
+    - 为什么需要：人工审查为canonical 事实 HumanReview-is_a-ReviewActivity（HumanReview is_a ReviewActivity）提供明确端点并保持与 AutomatedReview 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的人工审查：人工审查是由人类参与者提供的审查证据，包括批准、修改请求、阻断性问题、质量判断、负责审查者身份和被审查对象。；该种差可由关系 HumanReview-is_a-ReviewActivity 的端点角色检验。
+    - 不包含：
+  - 自动审查虽与本概念同属 ReviewActivity，但其定义为“自动审查是机器生成的审查过程，检查任务、输出、计划、轨迹或产物，并记录发现、置信度、准则和来源；在策略要求人工批准时不能替代人工批准。”，不得替代人工审查。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **审查发现** `ReviewFinding`
+  - 定义：审查发现是在审查中发现的具体问题、观察、建议、缺陷或批准说明，并连接到其所涉及的产物、轨迹事件、工具结果、计划或决策。
+  - 为什么需要：审查发现为canonical 事实 review_finding_about_artifact（ReviewFinding review_finding_about_artifact Artifact）提供明确端点并保持与 Artifact 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的审查发现：审查发现是在审查中发现的具体问题、观察、建议、缺陷或批准说明，并连接到其所涉及的产物、轨迹事件、工具结果、计划或决策。；该种差可由关系 review_finding_about_artifact 的端点角色检验。
+  - 不包含：
+  - 运行产物只是关系 review_finding_about_artifact 的另一端；相关联不表示它是审查发现。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+### 警告与错误模块
+
+警告与错误模块描述从可观察运行证据派生的警告记录、错误事件、诊断消息、失败模式、风险桥接信号和不确定性证据。
+
+- **诊断信号** `DiagnosticSignal`
+  - 定义：DiagnosticSignal 是附着于运行、尝试、结果或评审的信息记录，用于表达警告、风险、置信和诊断；它可以由事件产生，但不等同于事件发生。
+  - 为什么需要：诊断信号为canonical 事实 ConfidenceSignal-is_a-DiagnosticSignal（ConfidenceSignal is_a DiagnosticSignal）提供明确端点并保持与 ConfidenceSignal 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的诊断信号：DiagnosticSignal 是附着于运行、尝试、结果或评审的信息记录，用于表达警告、风险、置信和诊断；它可以由事件产生，但不等同于事件发生。；该种差可由关系 ConfidenceSignal-is_a-DiagnosticSignal 的端点角色检验。
+  - 不包含：
+  - 置信信号只是关系 ConfidenceSignal-is_a-DiagnosticSignal 的另一端；相关联不表示它是诊断信号。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **置信信号** `ConfidenceSignal`
+    - 定义：置信信号是附着在观察、审查发现、指标、检索结果、答案、路由选择或策略相关决策上的置信度或不确定性证据。
+    - 直接上位：`DiagnosticSignal`
+    - 为什么需要：置信信号为canonical 事实 confidence_signal_qualifies_review_finding（ConfidenceSignal confidence_signal_qualifies_review_finding ReviewFinding）提供明确端点并保持与 DiagnosticMessage 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的置信信号：置信信号是附着在观察、审查发现、指标、检索结果、答案、路由选择或策略相关决策上的置信度或不确定性证据。；该种差可由关系 confidence_signal_qualifies_review_finding 的端点角色检验。
+    - 不包含：
+  - 诊断消息虽与本概念同属 DiagnosticSignal，但其定义为“诊断消息是从日志、轨迹事件、验证失败、警告或审查发现派生的诊断输出、调试消息、解释或修复提示。”，不得替代置信信号。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **诊断消息** `DiagnosticMessage`
+    - 定义：诊断消息是从日志、轨迹事件、验证失败、警告或审查发现派生的诊断输出、调试消息、解释或修复提示。
+    - 直接上位：`DiagnosticSignal`
+    - 为什么需要：诊断消息为canonical 事实 diagnostic_message_derived_from_log_record（DiagnosticMessage diagnostic_message_derived_from_log_record LogRecord）提供明确端点并保持与 ConfidenceSignal 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的诊断消息：诊断消息是从日志、轨迹事件、验证失败、警告或审查发现派生的诊断输出、调试消息、解释或修复提示。；该种差可由关系 diagnostic_message_derived_from_log_record 的端点角色检验。
+    - 不包含：
+  - 置信信号虽与本概念同属 DiagnosticSignal，但其定义为“置信信号是附着在观察、审查发现、指标、检索结果、答案、路由选择或策略相关决策上的置信度或不确定性证据。”，不得替代诊断消息。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **风险信号** `RiskSignal`
+    - 定义：风险信号是安全桥接信号，记录动作、输出、工具结果、边界跨越、指令或记忆项可能涉及策略敏感、不安全或信任边界相关的证据。
+    - 直接上位：`DiagnosticSignal`
+    - 为什么需要：风险信号为canonical 事实 risk_signal_flags_policy_decision（RiskSignal risk_signal_flags_policy_decision PolicyDecision）提供明确端点并保持与 ConfidenceSignal 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的风险信号：风险信号是安全桥接信号，记录动作、输出、工具结果、边界跨越、指令或记忆项可能涉及策略敏感、不安全或信任边界相关的证据。；该种差可由关系 risk_signal_flags_policy_decision 的端点角色检验。
+    - 不包含：
+  - 置信信号虽与本概念同属 DiagnosticSignal，但其定义为“置信信号是附着在观察、审查发现、指标、检索结果、答案、路由选择或策略相关决策上的置信度或不确定性证据。”，不得替代风险信号。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **警告** `Warning`
+    - 定义：警告是非致命的可观察警示，记录置信度下降、策略顾虑、风险上下文、部分执行或可恢复运行问题，但不宣称最终失败。
+    - 直接上位：`DiagnosticSignal`
+    - 为什么需要：警告为canonical 事实 WarningEvent-raises-Warning（WarningEvent raises Warning）提供明确端点并保持与 ConfidenceSignal 的定义边界；节点字段 warning_code 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的警告：警告是非致命的可观察警示，记录置信度下降、策略顾虑、风险上下文、部分执行或可恢复运行问题，但不宣称最终失败。；该种差可由字段 warning_code 检验。
+    - 不包含：
+  - 置信信号虽与本概念同属 DiagnosticSignal，但其定义为“置信信号是附着在观察、审查发现、指标、检索结果、答案、路由选择或策略相关决策上的置信度或不确定性证据。”，不得替代警告。
+    - 结构与约束：1 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+
+- **错误流** `ErrorStream`
+  - 定义：错误流是在运行或协议执行期间观察到的错误事件、阻断性失败、可重试失败、警告升级和诊断消息的有序流。
+  - 为什么需要：错误流为canonical 事实 ErrorStream-contains-ErrorEvent（ErrorStream contains ErrorEvent）提供明确端点并保持与 ErrorEvent 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的错误流：错误流是在运行或协议执行期间观察到的错误事件、阻断性失败、可重试失败、警告升级和诊断消息的有序流。；该种差可由关系 ErrorStream-contains-ErrorEvent 的端点角色检验。
+  - 不包含：
+  - 错误事件只是关系 ErrorStream-contains-ErrorEvent 的另一端；相关联不表示它是错误流。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **失败相关事件** `FailureEvent`
+  - 定义：FailureEvent 是在明确运行、调用、协议或策略位置发生的异常、失败或警告事件，具有时间、位置和影响；失败模式分类它，诊断信号解释它。
+  - 为什么需要：失败相关事件为canonical 事实 ErrorEvent-is_a-FailureEvent（ErrorEvent is_a FailureEvent）提供明确端点并保持与 ErrorEvent 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的失败相关事件：FailureEvent 是在明确运行、调用、协议或策略位置发生的异常、失败或警告事件，具有时间、位置和影响；失败模式分类它，诊断信号解释它。；该种差可由关系 ErrorEvent-is_a-FailureEvent 的端点角色检验。
+  - 不包含：
+  - 错误事件只是关系 ErrorEvent-is_a-FailureEvent 的另一端；相关联不表示它是失败相关事件。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **错误事件** `ErrorEvent`
+    - 定义：错误事件是可观察事件，记录失败、异常、超时、验证错误、被阻断操作或不可恢复运行状态，并携带轨迹与诊断上下文。
+    - 直接上位：`FailureEvent`
+    - 为什么需要：错误事件为canonical 事实 ErrorEvent-classified_by-FailureMode（ErrorEvent classified_by FailureMode）提供明确端点并保持与 WarningEvent 的定义边界；节点字段 error_code、error_event_id、severity 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的错误事件：错误事件是可观察事件，记录失败、异常、超时、验证错误、被阻断操作或不可恢复运行状态，并携带轨迹与诊断上下文。；该种差可由字段 error_code、error_event_id、severity 检验。
+    - 不包含：
+  - 警告事件虽与本概念同属 FailureEvent，但其定义为“警告事件是从运行、工具、策略、检索、审查或遥测证据中提出警告的可观察事件，执行可以在约束下继续。”，不得替代错误事件。
+    - 结构与约束：5 个字段，2 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **警告事件** `WarningEvent`
+    - 定义：警告事件是从运行、工具、策略、检索、审查或遥测证据中提出警告的可观察事件，执行可以在约束下继续。
+    - 直接上位：`FailureEvent`
+    - 为什么需要：警告事件为canonical 事实 WarningEvent-raises-Warning（WarningEvent raises Warning）提供明确端点并保持与 ErrorEvent 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的警告事件：警告事件是从运行、工具、策略、检索、审查或遥测证据中提出警告的可观察事件，执行可以在约束下继续。；该种差可由关系 WarningEvent-raises-Warning 的端点角色检验。
+    - 不包含：
+  - 错误事件虽与本概念同属 FailureEvent，但其定义为“错误事件是可观察事件，记录失败、异常、超时、验证错误、被阻断操作或不可恢复运行状态，并携带轨迹与诊断上下文。”，不得替代警告事件。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **失败模式** `FailureMode`
+  - 定义：失败模式分类智能体运行、工具调用、检索、策略门或协议交互中反复出现的失败方式。
+  - 为什么需要：失败模式为canonical 事实 ErrorEvent-classified_by-FailureMode（ErrorEvent classified_by FailureMode）提供明确端点并保持与 ErrorEvent 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的失败模式：失败模式分类智能体运行、工具调用、检索、策略门或协议交互中反复出现的失败方式。；该种差可由关系 ErrorEvent-classified_by-FailureMode 的端点角色检验。
+  - 不包含：
+  - 错误事件只是关系 ErrorEvent-classified_by-FailureMode 的另一端；相关联不表示它是失败模式。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **阻断错误** `BlockingError`
+    - 定义：阻断错误记录会影响运行决策的阻断性失败、风险、不确定性、置信度下降或诊断证据。
+    - 直接上位：`FailureMode`
+    - 为什么需要：阻断错误为canonical 事实 blocking_error_blocks_run_attempt（BlockingError blocking_error_blocks_run_attempt RunAttempt）提供明确端点并保持与 RetryableError 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的阻断错误：阻断错误记录会影响运行决策的阻断性失败、风险、不确定性、置信度下降或诊断证据。；该种差可由关系 blocking_error_blocks_run_attempt 的端点角色检验。
+    - 不包含：
+  - 可重试错误虽与本概念同属 FailureMode，但其定义为“可重试错误标识在有界策略下可以重试的错误，因为失败是临时的、可恢复的或由外部原因造成。”，不得替代阻断错误。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **可重试错误** `RetryableError`
+    - 定义：可重试错误标识在有界策略下可以重试的错误，因为失败是临时的、可恢复的或由外部原因造成。
+    - 直接上位：`FailureMode`
+    - 为什么需要：可重试错误为canonical 事实 retryable_error_triggers_recovery_plan（RetryableError retryable_error_triggers_recovery_plan RecoveryPlan）提供明确端点并保持与 BlockingError 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的可重试错误：可重试错误标识在有界策略下可以重试的错误，因为失败是临时的、可恢复的或由外部原因造成。；该种差可由关系 retryable_error_triggers_recovery_plan 的端点角色检验。
+    - 不包含：
+  - 阻断错误虽与本概念同属 FailureMode，但其定义为“阻断错误记录会影响运行决策的阻断性失败、风险、不确定性、置信度下降或诊断证据。”，不得替代可重试错误。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+## 记忆与上下文持久化域
+
+记忆与上下文持久化域是面向智能体记忆库、作用域化记忆记录、上下文组装、检索管线和记忆生命周期操作的运行关注域。它覆盖摄入、记忆类型、分块、嵌入、索引、检索、排序、上下文纳入、摘要、偏好记忆，以及在来源与安全控制下让持久记忆影响未来行为的写入、更新、删除、合并、巩固、过期和验证循环。
+
+### 分块与定位模块
+
+分块与定位模块描述面向记忆使用的文档切分、分块边界、分块元数据、定位提示和文档内锚定，使材料在检索、重排序和上下文组装之前保持可追溯的来源位置与语义边界。
+
+- **分块信息制品** `ChunkArtifact`
+  - 定义：ChunkArtifact 是具有来源身份、版本和跨度的信息制品，用于承载一个 Chunk、增加局部语境的 SituatedChunk，或对确切 Chunk/来源跨度的 ChunkReference；它不包含分块运行、边界参数或纯质量判断。
+  - 为什么需要：分块信息制品为canonical 事实 Chunk-is_a-ChunkArtifact（Chunk is_a ChunkArtifact）提供明确端点并保持与 Chunk 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的分块信息制品：ChunkArtifact 是具有来源身份、版本和跨度的信息制品，用于承载一个 Chunk、增加局部语境的 SituatedChunk，或对确切 Chunk/来源跨度的 ChunkReference；它不包含分块运行、边界参数或纯质量判断。；该种差可由关系 Chunk-is_a-ChunkArtifact 的端点角色检验。
+  - 不包含：
+  - 分块只是关系 Chunk-is_a-ChunkArtifact 的另一端；相关联不表示它是分块信息制品。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **分块** `Chunk`
+    - 定义：分块是文档、输出、消息或记忆项的有界片段，包含来源片段、边界、来源和检索元数据，用于索引与上下文组装。
+    - 直接上位：`ChunkArtifact`
+    - 为什么需要：分块为canonical 事实 chunk_derived_from_document（Chunk chunk_derived_from_document Document）提供明确端点并保持与 ChunkReference 的定义边界；节点字段 chunk_id、ordinal 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的分块：分块是文档、输出、消息或记忆项的有界片段，包含来源片段、边界、来源和检索元数据，用于索引与上下文组装。；该种差可由字段 chunk_id、ordinal 检验。
+    - 不包含：
+  - 分块引用虽与本概念同属 ChunkArtifact，但其定义为“分块引用把分块或已检索分块连接到其来源的精确来源片段、锚点、行范围、页范围、偏移或文档版本。”，不得替代分块。
+    - 结构与约束：2 个字段，2 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+    - **已定位分块** `SituatedChunk`
+      - 定义：定位后分块是在索引前补充了文档局部上下文、章节说明、来源目的或任务相关依据说明的分块。
+      - 直接上位：`Chunk`
+      - 为什么需要：已定位分块为canonical 事实 SituatingPromptRun-produces-SituatedChunk（SituatingPromptRun produces SituatedChunk）提供明确端点并保持与 Chunk 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的已定位分块：定位后分块是在索引前补充了文档局部上下文、章节说明、来源目的或任务相关依据说明的分块。；该种差可由关系 SituatingPromptRun-produces-SituatedChunk 的端点角色检验。
+      - 不包含：
+  - 仅能识别为上位概念 Chunk 的对象不在范围内；它尚未证明已定位分块的种差或关系端点 SituatingPromptRun-produces-SituatedChunk。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：3 项
+      - 直接来源主张：2 项
+  - **分块引用** `ChunkReference`
+    - 定义：分块引用把分块或已检索分块连接到其来源的精确来源片段、锚点、行范围、页范围、偏移或文档版本。
+    - 直接上位：`ChunkArtifact`
+    - 为什么需要：分块引用为canonical 事实 chunk_reference_targets_source_span（ChunkReference chunk_reference_targets_source_span SourceSpan）提供明确端点并保持与 Chunk 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的分块引用：分块引用把分块或已检索分块连接到其来源的精确来源片段、锚点、行范围、页范围、偏移或文档版本。；该种差可由关系 chunk_reference_targets_source_span 的端点角色检验。
+    - 不包含：
+  - 分块虽与本概念同属 ChunkArtifact，但其定义为“分块是文档、输出、消息或记忆项的有界片段，包含来源片段、边界、来源和检索元数据，用于索引与上下文组装。”，不得替代分块引用。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **分块元数据** `ChunkMetadata`
+  - 定义：ChunkMetadata 是附着于 Chunk 或 ChunkingRun 的可审计信息，具有明确元数据种类、值或证据与来源，包括 ChunkBoundary、ChunkOverlap、ChunkProvenance、ChunkQualitySignal 和 ChunkContextNote；它不是 Chunk 本身，也不是改变 Chunk 的活动。
+  - 为什么需要：分块元数据为canonical 事实 Chunk-has_metadata-ChunkMetadata（Chunk has_metadata ChunkMetadata）提供明确端点并保持与 Chunk 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的分块元数据：ChunkMetadata 是附着于 Chunk 或 ChunkingRun 的可审计信息，具有明确元数据种类、值或证据与来源，包括 ChunkBoundary、ChunkOverlap、ChunkProvenance、ChunkQualitySignal 和 ChunkContextNote；它不是 Chunk 本身，也不是改变 Chunk 的活动。；该种差可由关系 Chunk-has_metadata-ChunkMetadata 的端点角色检验。
+  - 不包含：
+  - 分块只是关系 Chunk-has_metadata-ChunkMetadata 的另一端；相关联不表示它是分块元数据。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **分块边界** `ChunkBoundary`
+    - 定义：分块边界是分块的结构边界，例如字节偏移、令牌跨度、行范围、页范围、章节断点、语义边界或重叠边界。
+    - 直接上位：`ChunkMetadata`
+    - 为什么需要：分块边界为canonical 事实 chunk_has_boundary（Chunk chunk_has_boundary ChunkBoundary）提供明确端点并保持与 ChunkContextNote 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的分块边界：分块边界是分块的结构边界，例如字节偏移、令牌跨度、行范围、页范围、章节断点、语义边界或重叠边界。；该种差可由关系 chunk_has_boundary 的端点角色检验。
+    - 不包含：
+  - 分块上下文注记虽与本概念同属 ChunkMetadata，但其定义为“分块上下文说明是附加到分块的短说明，解释其局部章节、周边上下文或检索相关性的原因。”，不得替代分块边界。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **分块上下文注记** `ChunkContextNote`
+    - 定义：分块上下文说明是附加到分块的短说明，解释其局部章节、周边上下文或检索相关性的原因。
+    - 直接上位：`ChunkMetadata`
+    - 为什么需要：分块上下文注记为canonical 事实 ChunkContextNote-is_a-ChunkMetadata（ChunkContextNote is_a ChunkMetadata）提供明确端点并保持与 ChunkBoundary 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的分块上下文注记：分块上下文说明是附加到分块的短说明，解释其局部章节、周边上下文或检索相关性的原因。；该种差可由关系 ChunkContextNote-is_a-ChunkMetadata 的端点角色检验。
+    - 不包含：
+  - 分块边界虽与本概念同属 ChunkMetadata，但其定义为“分块边界是分块的结构边界，例如字节偏移、令牌跨度、行范围、页范围、章节断点、语义边界或重叠边界。”，不得替代分块上下文注记。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **分块重叠** `ChunkOverlap`
+    - 定义：分块重叠是相邻分块共享的重叠片段，用于在检索和上下文组装时保持局部连续性。
+    - 直接上位：`ChunkMetadata`
+    - 为什么需要：分块重叠为canonical 事实 ChunkOverlap-is_a-ChunkMetadata（ChunkOverlap is_a ChunkMetadata）提供明确端点并保持与 ChunkBoundary 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的分块重叠：分块重叠是相邻分块共享的重叠片段，用于在检索和上下文组装时保持局部连续性。；该种差可由关系 ChunkOverlap-is_a-ChunkMetadata 的端点角色检验。
+    - 不包含：
+  - 分块边界虽与本概念同属 ChunkMetadata，但其定义为“分块边界是分块的结构边界，例如字节偏移、令牌跨度、行范围、页范围、章节断点、语义边界或重叠边界。”，不得替代分块重叠。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **分块来源记录** `ChunkProvenance`
+    - 定义：分块来源记录把分块连接到其文档、来源片段、版本、校验和、摄入运行和转换历史。
+    - 直接上位：`ChunkMetadata`
+    - 为什么需要：分块来源记录为canonical 事实 chunk_has_provenance（Chunk chunk_has_provenance ChunkProvenance）提供明确端点并保持与 ChunkBoundary 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的分块来源记录：分块来源记录把分块连接到其文档、来源片段、版本、校验和、摄入运行和转换历史。；该种差可由关系 chunk_has_provenance 的端点角色检验。
+    - 不包含：
+  - 分块边界虽与本概念同属 ChunkMetadata，但其定义为“分块边界是分块的结构边界，例如字节偏移、令牌跨度、行范围、页范围、章节断点、语义边界或重叠边界。”，不得替代分块来源记录。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **分块质量信号** `ChunkQualitySignal`
+    - 定义：分块质量信号描述分块的抽取置信度、解析完整性、重复状态、陈旧性、毒性或检索有用性。
+    - 直接上位：`ChunkMetadata`
+    - 为什么需要：分块质量信号为canonical 事实 ChunkQualitySignal-is_a-ChunkMetadata（ChunkQualitySignal is_a ChunkMetadata）提供明确端点并保持与 ChunkBoundary 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的分块质量信号：分块质量信号描述分块的抽取置信度、解析完整性、重复状态、陈旧性、毒性或检索有用性。；该种差可由关系 ChunkQualitySignal-is_a-ChunkMetadata 的端点角色检验。
+    - 不包含：
+  - 分块边界虽与本概念同属 ChunkMetadata，但其定义为“分块边界是分块的结构边界，例如字节偏移、令牌跨度、行范围、页范围、章节断点、语义边界或重叠边界。”，不得替代分块质量信号。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **分块处理活动** `ChunkProcessingActivity`
+  - 定义：ChunkProcessingActivity 是带运行身份、输入版本、策略或模型、输出版本、时间、结果和错误的活动，覆盖 ChunkingRun、SituatingPromptRun 和 ChunkCompression；产物通过 produces 指向 Chunk/SituatedChunk，本活动本身不作为信息制品。
+  - 为什么需要：分块处理活动为canonical 事实 ChunkCompression-is_a-ChunkProcessingActivity（ChunkCompression is_a ChunkProcessingActivity）提供明确端点并保持与 ChunkCompression 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的分块处理活动：ChunkProcessingActivity 是带运行身份、输入版本、策略或模型、输出版本、时间、结果和错误的活动，覆盖 ChunkingRun、SituatingPromptRun 和 ChunkCompression；产物通过 produces 指向 Chunk/SituatedChunk，本活动本身不作为信息制品。；该种差可由关系 ChunkCompression-is_a-ChunkProcessingActivity 的端点角色检验。
+  - 不包含：
+  - 分块压缩活动只是关系 ChunkCompression-is_a-ChunkProcessingActivity 的另一端；相关联不表示它是分块处理活动。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **分块压缩活动** `ChunkCompression`
+    - 定义：旧定义的“压缩产物”会混淆输入与过程；裁决为保留来源锚点并产生新 Chunk 的活动，而产物仍是 Chunk。
+    - 直接上位：`ChunkProcessingActivity`
+    - 为什么需要：分块压缩活动为canonical 事实 ChunkCompression-consumes-Chunk（ChunkCompression consumes Chunk）提供明确端点并保持与 ChunkingRun 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的分块压缩活动：旧定义的“压缩产物”会混淆输入与过程；裁决为保留来源锚点并产生新 Chunk 的活动，而产物仍是 Chunk。；该种差可由关系 ChunkCompression-consumes-Chunk 的端点角色检验。
+    - 不包含：
+  - 分块运行虽与本概念同属 ChunkProcessingActivity，但其定义为“分块运行是把文档、输出或记忆项切分为可检索分块的可观测事件，并记录边界、重叠、片段和来源元数据。”，不得替代分块压缩活动。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **分块运行** `ChunkingRun`
+    - 定义：分块运行是把文档、输出或记忆项切分为可检索分块的可观测事件，并记录边界、重叠、片段和来源元数据。
+    - 直接上位：`ChunkProcessingActivity`
+    - 为什么需要：分块运行为canonical 事实 ChunkingRun-consumes-Document（ChunkingRun consumes Document）提供明确端点并保持与 ChunkCompression 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的分块运行：分块运行是把文档、输出或记忆项切分为可检索分块的可观测事件，并记录边界、重叠、片段和来源元数据。；该种差可由关系 ChunkingRun-consumes-Document 的端点角色检验。
+    - 不包含：
+  - 分块压缩活动虽与本概念同属 ChunkProcessingActivity，但其定义为“旧定义的“压缩产物”会混淆输入与过程；裁决为保留来源锚点并产生新 Chunk 的活动，而产物仍是 Chunk。”，不得替代分块运行。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **分块定位提示运行** `SituatingPromptRun`
+    - 定义：定位提示运行是为分块补充文档局部或任务局部上下文的可观测事件，使检索保留章节含义、来源目的和周边证据。
+    - 直接上位：`ChunkProcessingActivity`
+    - 为什么需要：分块定位提示运行为canonical 事实 SituatingPromptRun-consumes-Chunk（SituatingPromptRun consumes Chunk）提供明确端点并保持与 ChunkCompression 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的分块定位提示运行：定位提示运行是为分块补充文档局部或任务局部上下文的可观测事件，使检索保留章节含义、来源目的和周边证据。；该种差可由关系 SituatingPromptRun-consumes-Chunk 的端点角色检验。
+    - 不包含：
+  - 分块压缩活动虽与本概念同属 ChunkProcessingActivity，但其定义为“旧定义的“压缩产物”会混淆输入与过程；裁决为保留来源锚点并产生新 Chunk 的活动，而产物仍是 Chunk。”，不得替代分块定位提示运行。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+### 上下文组装模块
+
+上下文组装模块描述运行上下文窗口、上下文槽位、预算、来源、摘要、刷新、排除和排序规则，决定哪些记忆记录、检索结果、消息、运行观测和指令可以进入下一次模型调用或智能体步骤。
+
+- **上下文信息制品** `ContextArtifact`
+  - 定义：ContextArtifact 是具有上下文版本、来源、预算位置与消费者关联的信息制品，覆盖 ContextWindow、ContextSummary、ContextSlot 和 ContextSource；最终 ContextPackage 由 Info 域唯一拥有并通过关系引用，ContextAssembly/Refresh 是活动或事件，规则不属于本类。
+  - 为什么需要：上下文信息制品为canonical 事实 ContextSlot-is_a-ContextArtifact（ContextSlot is_a ContextArtifact）提供明确端点并保持与 ContextSlot 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的上下文信息制品：ContextArtifact 是具有上下文版本、来源、预算位置与消费者关联的信息制品，覆盖 ContextWindow、ContextSummary、ContextSlot 和 ContextSource；最终 ContextPackage 由 Info 域唯一拥有并通过关系引用，ContextAssembly/Refresh 是活动或事件，规则不属于本类。；该种差可由关系 ContextSlot-is_a-ContextArtifact 的端点角色检验。
+  - 不包含：
+  - 上下文槽位只是关系 ContextSlot-is_a-ContextArtifact 的另一端；相关联不表示它是上下文信息制品。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **上下文槽位** `ContextSlot`
+    - 定义：上下文槽位是上下文窗口中为系统指令、任务状态、检索证据、记忆记录、摘要、工具结果或产物保留的位置或片段。
+    - 直接上位：`ContextArtifact`
+    - 为什么需要：上下文槽位为canonical 事实 ContextSlot-sourced_from-ContextSource（ContextSlot sourced_from ContextSource）提供明确端点并保持与 ContextSource 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的上下文槽位：上下文槽位是上下文窗口中为系统指令、任务状态、检索证据、记忆记录、摘要、工具结果或产物保留的位置或片段。；该种差可由关系 ContextSlot-sourced_from-ContextSource 的端点角色检验。
+    - 不包含：
+  - 上下文来源描述虽与本概念同属 ContextArtifact，但其定义为“上下文来源是上下文内容的来源描述符，例如消息、记忆记录、检索结果、文档分块、工具结果、轨迹观测或产物。”，不得替代上下文槽位。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **上下文来源描述** `ContextSource`
+    - 定义：上下文来源是上下文内容的来源描述符，例如消息、记忆记录、检索结果、文档分块、工具结果、轨迹观测或产物。
+    - 直接上位：`ContextArtifact`
+    - 为什么需要：上下文来源描述为canonical 事实 ContextSlot-sourced_from-ContextSource（ContextSlot sourced_from ContextSource）提供明确端点并保持与 ContextSlot 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的上下文来源描述：上下文来源是上下文内容的来源描述符，例如消息、记忆记录、检索结果、文档分块、工具结果、轨迹观测或产物。；该种差可由关系 ContextSlot-sourced_from-ContextSource 的端点角色检验。
+    - 不包含：
+  - 上下文槽位虽与本概念同属 ContextArtifact，但其定义为“上下文槽位是上下文窗口中为系统指令、任务状态、检索证据、记忆记录、摘要、工具结果或产物保留的位置或片段。”，不得替代上下文来源描述。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **上下文摘要** `ContextSummary`
+    - 定义：上下文摘要是先前状态、证据、会话、检索材料或记忆记录的压缩表示，用于适配上下文预算且不保存隐藏推理。
+    - 直接上位：`ContextArtifact`
+    - 为什么需要：上下文摘要为canonical 事实 ContextSummary-summarizes-ContextWindow（ContextSummary summarizes ContextWindow）提供明确端点并保持与 ContextSlot 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的上下文摘要：上下文摘要是先前状态、证据、会话、检索材料或记忆记录的压缩表示，用于适配上下文预算且不保存隐藏推理。；该种差可由关系 ContextSummary-summarizes-ContextWindow 的端点角色检验。
+    - 不包含：
+  - 上下文槽位虽与本概念同属 ContextArtifact，但其定义为“上下文槽位是上下文窗口中为系统指令、任务状态、检索证据、记忆记录、摘要、工具结果或产物保留的位置或片段。”，不得替代上下文摘要。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **上下文窗口** `ContextWindow`
+    - 定义：上下文窗口是一次模型调用或智能体步骤可见的有界集合，包含指令、消息、已检索分块、记忆记录、摘要、工具结果和产物。
+    - 直接上位：`ContextArtifact`
+    - 为什么需要：上下文窗口为canonical 事实 ContextWindow-has_slot-ContextSlot（ContextWindow has_slot ContextSlot）提供明确端点并保持与 ContextSlot 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的上下文窗口：上下文窗口是一次模型调用或智能体步骤可见的有界集合，包含指令、消息、已检索分块、记忆记录、摘要、工具结果和产物。；该种差可由关系 ContextWindow-has_slot-ContextSlot 的端点角色检验。
+    - 不包含：
+  - 上下文槽位虽与本概念同属 ContextArtifact，但其定义为“上下文槽位是上下文窗口中为系统指令、任务状态、检索证据、记忆记录、摘要、工具结果或产物保留的位置或片段。”，不得替代上下文窗口。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **上下文组装** `ContextAssembly`
+  - 定义：上下文组装是选择、排序、预算和排除信息的可观测活动，通过关系产生窗口与 ContextPackage。
+  - 为什么需要：上下文组装为canonical 事实 context_assembly_applies_ordering_rule（ContextAssembly context_assembly_applies_ordering_rule ContextOrderingRule）提供明确端点并保持与 ContextOrderingRule 的定义边界；节点字段 assembly_id、context_version 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的上下文组装：上下文组装是选择、排序、预算和排除信息的可观测活动，通过关系产生窗口与 ContextPackage。；该种差可由字段 assembly_id、context_version 检验。
+  - 不包含：
+  - 上下文排序规则只是关系 context_assembly_applies_ordering_rule 的另一端；相关联不表示它是上下文组装。
+  - 结构与约束：2 个字段，2 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+
+- **上下文排除决定** `ContextExclusion`
+  - 定义：它记录一次材料因隐私、信任、相关性、安全或预算被排除的决定，不是可复用规则的子类。
+  - 为什么需要：上下文排除决定为canonical 事实 context_exclusion_excludes_chunk（ContextExclusion context_exclusion_excludes_chunk Chunk）提供明确端点并保持与 Chunk 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的上下文排除决定：它记录一次材料因隐私、信任、相关性、安全或预算被排除的决定，不是可复用规则的子类。；该种差可由关系 context_exclusion_excludes_chunk 的端点角色检验。
+  - 不包含：
+  - 分块只是关系 context_exclusion_excludes_chunk 的另一端；相关联不表示它是上下文排除决定。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **上下文刷新事件** `ContextRefreshEvent`
+  - 定义：上下文刷新事件是在新证据、反馈或状态变化后重新运行检索、替换陈旧记忆、重算摘要或重排上下文的可观测更新。
+  - 为什么需要：上下文刷新事件为canonical 事实 ContextRefreshEvent-refreshes-ContextPackage（ContextRefreshEvent refreshes ContextPackage）提供明确端点并保持与 ContextPackage 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的上下文刷新事件：上下文刷新事件是在新证据、反馈或状态变化后重新运行检索、替换陈旧记忆、重算摘要或重排上下文的可观测更新。；该种差可由关系 ContextRefreshEvent-refreshes-ContextPackage 的端点角色检验。
+  - 不包含：
+  - 上下文包只是关系 ContextRefreshEvent-refreshes-ContextPackage 的另一端；相关联不表示它是上下文刷新事件。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **上下文规则** `ContextRule`
+  - 定义：ContextRule 是具有身份、版本、适用范围、优先级和评估条件的规范，覆盖 ContextOrderingRule 与 ContextBudget；一次 ContextExclusion 是应用规则后的决定，通过关系记录，不是规则子类。
+  - 为什么需要：上下文规则为canonical 事实 ContextAssembly-applies-ContextRule（ContextAssembly applies ContextRule）提供明确端点并保持与 ContextAssembly 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的上下文规则：ContextRule 是具有身份、版本、适用范围、优先级和评估条件的规范，覆盖 ContextOrderingRule 与 ContextBudget；一次 ContextExclusion 是应用规则后的决定，通过关系记录，不是规则子类。；该种差可由关系 ContextAssembly-applies-ContextRule 的端点角色检验。
+  - 不包含：
+  - 上下文组装只是关系 ContextAssembly-applies-ContextRule 的另一端；相关联不表示它是上下文规则。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **上下文预算** `ContextBudget`
+    - 定义：上下文预算定义决定哪些信息可以进入运行上下文时使用的令牌、窗口、成本、新鲜度和优先级限制。
+    - 直接上位：`ContextRule`
+    - 为什么需要：上下文预算为canonical 事实 context_assembly_uses_budget（ContextAssembly context_assembly_uses_budget ContextBudget）提供明确端点并保持与 ContextOrderingRule 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的上下文预算：上下文预算定义决定哪些信息可以进入运行上下文时使用的令牌、窗口、成本、新鲜度和优先级限制。；该种差可由关系 context_assembly_uses_budget 的端点角色检验。
+    - 不包含：
+  - 上下文排序规则虽与本概念同属 ContextRule，但其定义为“上下文排序规则按优先级、近因性、新鲜度、权威、来源信任、检索排名、任务相关性、消息角色和预算压力排序上下文。”，不得替代上下文预算。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **上下文排序规则** `ContextOrderingRule`
+    - 定义：上下文排序规则按优先级、近因性、新鲜度、权威、来源信任、检索排名、任务相关性、消息角色和预算压力排序上下文。
+    - 直接上位：`ContextRule`
+    - 为什么需要：上下文排序规则为canonical 事实 context_assembly_applies_ordering_rule（ContextAssembly context_assembly_applies_ordering_rule ContextOrderingRule）提供明确端点并保持与 ContextBudget 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的上下文排序规则：上下文排序规则按优先级、近因性、新鲜度、权威、来源信任、检索排名、任务相关性、消息角色和预算压力排序上下文。；该种差可由关系 context_assembly_applies_ordering_rule 的端点角色检验。
+    - 不包含：
+  - 上下文预算虽与本概念同属 ContextRule，但其定义为“上下文预算定义决定哪些信息可以进入运行上下文时使用的令牌、窗口、成本、新鲜度和优先级限制。”，不得替代上下文排序规则。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+### 嵌入与索引模块
+
+嵌入与索引模块描述用于检索记忆的向量、词汇、图表征、索引条目、索引键和刷新事件。
+
+- **检索索引** `Index`
+  - 定义：Index 是具有索引种类、配置身份、输入表示要求与版本序列的检索结构，覆盖 VectorIndex、HybridIndex 和 TfIdfIndex；每次构建结果由 IndexVersion 表示，分片和条目通过 part_of 连接，后端数据库通过 hosts 连接。
+  - 为什么需要：检索索引为canonical 事实 IndexVersion-version_of-Index（IndexVersion version_of Index）提供明确端点并保持与 IndexVersion 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的检索索引：Index 是具有索引种类、配置身份、输入表示要求与版本序列的检索结构，覆盖 VectorIndex、HybridIndex 和 TfIdfIndex；每次构建结果由 IndexVersion 表示，分片和条目通过 part_of 连接，后端数据库通过 hosts 连接。；该种差可由关系 IndexVersion-version_of-Index 的端点角色检验。
+  - 不包含：
+  - 索引版本只是关系 IndexVersion-version_of-Index 的另一端；相关联不表示它是检索索引。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **混合索引** `HybridIndex`
+    - 定义：混合索引是在评分或排序融合前结合稠密语义向量、稀疏词汇特征或图与上下文信号的检索索引。
+    - 直接上位：`Index`
+    - 为什么需要：混合索引为canonical 事实 HybridIndex-is_a-Index（HybridIndex is_a Index）提供明确端点并保持与 TfIdfIndex 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的混合索引：混合索引是在评分或排序融合前结合稠密语义向量、稀疏词汇特征或图与上下文信号的检索索引。；该种差可由关系 HybridIndex-is_a-Index 的端点角色检验。
+    - 不包含：
+  - TF-IDF 索引虽与本概念同属 Index，但其定义为“TF-IDF 索引用词频和逆文档频率权重表示文档、分块或记忆记录。”，不得替代混合索引。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **TF-IDF 索引** `TfIdfIndex`
+    - 定义：TF-IDF 索引用词频和逆文档频率权重表示文档、分块或记忆记录。
+    - 直接上位：`Index`
+    - 为什么需要：TF-IDF 索引为canonical 事实 TfIdfIndex-is_a-Index（TfIdfIndex is_a Index）提供明确端点并保持与 HybridIndex 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的TF-IDF 索引：TF-IDF 索引用词频和逆文档频率权重表示文档、分块或记忆记录。；该种差可由关系 TfIdfIndex-is_a-Index 的端点角色检验。
+    - 不包含：
+  - 混合索引虽与本概念同属 Index，但其定义为“混合索引是在评分或排序融合前结合稠密语义向量、稀疏词汇特征或图与上下文信号的检索索引。”，不得替代TF-IDF 索引。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **向量索引** `VectorIndex`
+    - 定义：向量索引组织嵌入向量和元数据，使检索查询能够返回相似的记忆记录、分块或上下文候选。
+    - 直接上位：`Index`
+    - 为什么需要：向量索引为canonical 事实 vector_index_contains_embedding（VectorIndex vector_index_contains_embedding EmbeddingVector）提供明确端点并保持与 HybridIndex 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的向量索引：向量索引组织嵌入向量和元数据，使检索查询能够返回相似的记忆记录、分块或上下文候选。；该种差可由关系 vector_index_contains_embedding 的端点角色检验。
+    - 不包含：
+  - 混合索引虽与本概念同属 Index，但其定义为“混合索引是在评分或排序融合前结合稠密语义向量、稀疏词汇特征或图与上下文信号的检索索引。”，不得替代向量索引。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **索引处理活动** `IndexActivity`
+  - 定义：IndexActivity 是具有运行身份、输入来源、模型或索引配置、输出版本、结果和错误的活动，覆盖 EmbeddingRun 与 IndexBuildRun；IndexRefreshEvent 保持独立事件并通过 supersedes 连接版本。
+  - 为什么需要：索引处理活动为canonical 事实 EmbeddingRun-is_a-IndexActivity（EmbeddingRun is_a IndexActivity）提供明确端点并保持与 EmbeddingRun 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的索引处理活动：IndexActivity 是具有运行身份、输入来源、模型或索引配置、输出版本、结果和错误的活动，覆盖 EmbeddingRun 与 IndexBuildRun；IndexRefreshEvent 保持独立事件并通过 supersedes 连接版本。；该种差可由关系 EmbeddingRun-is_a-IndexActivity 的端点角色检验。
+  - 不包含：
+  - 嵌入运行只是关系 EmbeddingRun-is_a-IndexActivity 的另一端；相关联不表示它是索引处理活动。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **嵌入运行** `EmbeddingRun`
+    - 定义：嵌入运行是特定嵌入模型及版本编码分块、文档片段、记忆记录或查询并产生嵌入向量的可观测事件。
+    - 直接上位：`IndexActivity`
+    - 为什么需要：嵌入运行为canonical 事实 embedding_run_embeds_chunk（EmbeddingRun embedding_run_embeds_chunk Chunk）提供明确端点并保持与 IndexBuildRun 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的嵌入运行：嵌入运行是特定嵌入模型及版本编码分块、文档片段、记忆记录或查询并产生嵌入向量的可观测事件。；该种差可由关系 embedding_run_embeds_chunk 的端点角色检验。
+    - 不包含：
+  - 索引构建运行虽与本概念同属 IndexActivity，但其定义为“索引构建运行是从记忆记录、分块、嵌入、词汇特征或图链接构建或刷新索引并产生索引版本的可观测事件。”，不得替代嵌入运行。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **索引构建运行** `IndexBuildRun`
+    - 定义：索引构建运行是从记忆记录、分块、嵌入、词汇特征或图链接构建或刷新索引并产生索引版本的可观测事件。
+    - 直接上位：`IndexActivity`
+    - 为什么需要：索引构建运行为canonical 事实 IndexBuildRun-consumes-Representation（IndexBuildRun consumes Representation）提供明确端点并保持与 EmbeddingRun 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的索引构建运行：索引构建运行是从记忆记录、分块、嵌入、词汇特征或图链接构建或刷新索引并产生索引版本的可观测事件。；该种差可由关系 IndexBuildRun-consumes-Representation 的端点角色检验。
+    - 不包含：
+  - 嵌入运行虽与本概念同属 IndexActivity，但其定义为“嵌入运行是特定嵌入模型及版本编码分块、文档片段、记忆记录或查询并产生嵌入向量的可观测事件。”，不得替代索引构建运行。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **索引条目** `IndexEntry`
+  - 定义：索引条目表示记忆或检索索引中的可寻址项，可被轻量上下文发现指针引用。
+  - 为什么需要：索引条目为canonical 事实 IndexEntry-keyed_by-IndexKey（IndexEntry keyed_by IndexKey）提供明确端点并保持与 IndexKey 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的索引条目：索引条目表示记忆或检索索引中的可寻址项，可被轻量上下文发现指针引用。；该种差可由关系 IndexEntry-keyed_by-IndexKey 的端点角色检验。
+  - 不包含：
+  - 索引键只是关系 IndexEntry-keyed_by-IndexKey 的另一端；相关联不表示它是索引条目。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **索引键** `IndexKey`
+  - 定义：索引键表示用于查找、过滤或关联检索索引条目的键值或规范化键。
+  - 为什么需要：索引键为canonical 事实 IndexEntry-keyed_by-IndexKey（IndexEntry keyed_by IndexKey）提供明确端点并保持与 IndexEntry 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的索引键：索引键表示用于查找、过滤或关联检索索引条目的键值或规范化键。；该种差可由关系 IndexEntry-keyed_by-IndexKey 的端点角色检验。
+  - 不包含：
+  - 索引条目只是关系 IndexEntry-keyed_by-IndexKey 的另一端；相关联不表示它是索引键。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **索引刷新事件** `IndexRefreshEvent`
+  - 定义：索引刷新事件记录检索索引被重建、更新或替换的可观察事件，用于解释候选内容来自哪个索引版本。
+  - 为什么需要：索引刷新事件为canonical 事实 IndexRefreshEvent-produces-IndexVersion（IndexRefreshEvent produces IndexVersion）提供明确端点并保持与 IndexVersion 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的索引刷新事件：索引刷新事件记录检索索引被重建、更新或替换的可观察事件，用于解释候选内容来自哪个索引版本。；该种差可由关系 IndexRefreshEvent-produces-IndexVersion 的端点角色检验。
+  - 不包含：
+  - 索引版本只是关系 IndexRefreshEvent-produces-IndexVersion 的另一端；相关联不表示它是索引刷新事件。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **索引分片** `IndexShard`
+  - 定义：索引分片是向量、词汇、混合或图索引的分区，用于扩展检索并保持索引版本来源。
+  - 为什么需要：索引分片为canonical 事实 IndexShard-part_of-IndexVersion（IndexShard part_of IndexVersion）提供明确端点并保持与 IndexVersion 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的索引分片：索引分片是向量、词汇、混合或图索引的分区，用于扩展检索并保持索引版本来源。；该种差可由关系 IndexShard-part_of-IndexVersion 的端点角色检验。
+  - 不包含：
+  - 索引版本只是关系 IndexShard-part_of-IndexVersion 的另一端；相关联不表示它是索引分片。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **索引版本** `IndexVersion`
+  - 定义：索引版本是索引的版本化快照，包含构建来源、来源覆盖、嵌入模型、词汇配置、分片布局和有效期。
+  - 为什么需要：索引版本为canonical 事实 IndexVersion-version_of-Index（IndexVersion version_of Index）提供明确端点并保持与 Index 的定义边界；节点字段 index_id、version、built_at 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的索引版本：索引版本是索引的版本化快照，包含构建来源、来源覆盖、嵌入模型、词汇配置、分片布局和有效期。；该种差可由字段 index_id、version、built_at 检验。
+  - 不包含：
+  - 检索索引只是关系 IndexVersion-version_of-Index 的另一端；相关联不表示它是索引版本。
+  - 结构与约束：3 个字段，2 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+
+- **表示** `Representation`
+  - 定义：Representation 是具有表示方法、生成来源、版本和被表示对象的信息，可为 Embedding 或其他向量/结构表示；它不同于生成表示的活动、承载表示的索引以及被表示的 Chunk/MemoryRecord。
+  - 为什么需要：表示为canonical 事实 IndexBuildRun-consumes-Representation（IndexBuildRun consumes Representation）提供明确端点并保持与 IndexBuildRun 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的表示：Representation 是具有表示方法、生成来源、版本和被表示对象的信息，可为 Embedding 或其他向量/结构表示；它不同于生成表示的活动、承载表示的索引以及被表示的 Chunk/MemoryRecord。；该种差可由关系 IndexBuildRun-consumes-Representation 的端点角色检验。
+  - 不包含：
+  - 索引构建运行只是关系 IndexBuildRun-consumes-Representation 的另一端；相关联不表示它是表示。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **嵌入表示** `Embedding`
+    - 定义：嵌入属于记忆与检索索引，用稠密、稀疏、词汇或图表征支持比较、召回和排序，而不是上下文摄入域直接拥有的输入对象。
+    - 直接上位：`Representation`
+    - 为什么需要：嵌入表示为canonical 事实 embeds_chunk（EmbeddingModel embeds_chunk Embedding）提供明确端点并保持与 VectorRepresentation 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的嵌入表示：嵌入属于记忆与检索索引，用稠密、稀疏、词汇或图表征支持比较、召回和排序，而不是上下文摄入域直接拥有的输入对象。；该种差可由关系 embeds_chunk 的端点角色检验。
+    - 不包含：
+  - 向量表示虽与本概念同属 Representation，但其定义为“VectorRepresentation 是以向量维度、数值类型、稀疏性、距离兼容性和生成版本为区分特征的 Representation，覆盖 DenseVector、SparseVector 和 EmbeddingVector；它不等同于 VectorIndex 或 VectorDatabase。”，不得替代嵌入表示。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+    - **图嵌入** `GraphEmbedding`
+      - 定义：图嵌入记录由图节点、图边或子图编码得到的表征，用于图检索、相似度比较和上下文候选排序。
+      - 直接上位：`Embedding`
+      - 为什么需要：图嵌入为canonical 事实 GraphEmbedding-is_a-Embedding（GraphEmbedding is_a Embedding）提供明确端点并保持与 TextEmbedding 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的图嵌入：图嵌入记录由图节点、图边或子图编码得到的表征，用于图检索、相似度比较和上下文候选排序。；该种差可由关系 GraphEmbedding-is_a-Embedding 的端点角色检验。
+      - 不包含：
+  - 文本嵌入虽与本概念同属 Embedding，但其定义为“文本嵌入记录由文本、分块或工具描述编码得到的稠密、稀疏或词汇表征，用于相似度检索、排序与上下文选择。”，不得替代图嵌入。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：2 项
+    - **文本嵌入** `TextEmbedding`
+      - 定义：文本嵌入记录由文本、分块或工具描述编码得到的稠密、稀疏或词汇表征，用于相似度检索、排序与上下文选择。
+      - 直接上位：`Embedding`
+      - 为什么需要：文本嵌入为canonical 事实 TextEmbedding-is_a-Embedding（TextEmbedding is_a Embedding）提供明确端点并保持与 GraphEmbedding 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的文本嵌入：文本嵌入记录由文本、分块或工具描述编码得到的稠密、稀疏或词汇表征，用于相似度检索、排序与上下文选择。；该种差可由关系 TextEmbedding-is_a-Embedding 的端点角色检验。
+      - 不包含：
+  - 图嵌入虽与本概念同属 Embedding，但其定义为“图嵌入记录由图节点、图边或子图编码得到的表征，用于图检索、相似度比较和上下文候选排序。”，不得替代文本嵌入。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：2 项
+  - **向量表示** `VectorRepresentation`
+    - 定义：VectorRepresentation 是以向量维度、数值类型、稀疏性、距离兼容性和生成版本为区分特征的 Representation，覆盖 DenseVector、SparseVector 和 EmbeddingVector；它不等同于 VectorIndex 或 VectorDatabase。
+    - 直接上位：`Representation`
+    - 为什么需要：向量表示为canonical 事实 VectorRepresentation-is_a-Representation（VectorRepresentation is_a Representation）提供明确端点并保持与 Embedding 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的向量表示：VectorRepresentation 是以向量维度、数值类型、稀疏性、距离兼容性和生成版本为区分特征的 Representation，覆盖 DenseVector、SparseVector 和 EmbeddingVector；它不等同于 VectorIndex 或 VectorDatabase。；该种差可由关系 VectorRepresentation-is_a-Representation 的端点角色检验。
+    - 不包含：
+  - 嵌入表示虽与本概念同属 Representation，但其定义为“嵌入属于记忆与检索索引，用稠密、稀疏、词汇或图表征支持比较、召回和排序，而不是上下文摄入域直接拥有的输入对象。”，不得替代向量表示。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+    - **稠密向量** `DenseVector`
+      - 定义：稠密向量是嵌入模型产生的稠密嵌入向量表示，用于对记忆记录、分块或上下文候选进行语义相似度搜索。
+      - 直接上位：`VectorRepresentation`
+      - 为什么需要：稠密向量为canonical 事实 DenseVector-is_a-VectorRepresentation（DenseVector is_a VectorRepresentation）提供明确端点并保持与 EmbeddingVector 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的稠密向量：稠密向量是嵌入模型产生的稠密嵌入向量表示，用于对记忆记录、分块或上下文候选进行语义相似度搜索。；该种差可由关系 DenseVector-is_a-VectorRepresentation 的端点角色检验。
+      - 不包含：
+  - 嵌入向量虽与本概念同属 VectorRepresentation，但其定义为“嵌入向量是由分块、文档片段、记忆记录或查询产生的向量表示，用于相似度搜索、排序、聚类或索引构建。”，不得替代稠密向量。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：2 项
+    - **嵌入向量** `EmbeddingVector`
+      - 定义：嵌入向量是由分块、文档片段、记忆记录或查询产生的向量表示，用于相似度搜索、排序、聚类或索引构建。
+      - 直接上位：`VectorRepresentation`
+      - 为什么需要：嵌入向量为canonical 事实 EmbeddingVector-represents-Chunk（EmbeddingVector represents Chunk）提供明确端点并保持与 DenseVector 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的嵌入向量：嵌入向量是由分块、文档片段、记忆记录或查询产生的向量表示，用于相似度搜索、排序、聚类或索引构建。；该种差可由关系 EmbeddingVector-represents-Chunk 的端点角色检验。
+      - 不包含：
+  - 稠密向量虽与本概念同属 VectorRepresentation，但其定义为“稠密向量是嵌入模型产生的稠密嵌入向量表示，用于对记忆记录、分块或上下文候选进行语义相似度搜索。”，不得替代嵌入向量。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：2 项
+    - **稀疏向量** `SparseVector`
+      - 定义：稀疏向量是加权令牌、词项或特征维度等稀疏表示，用于对记忆记录和分块进行词汇或混合检索。
+      - 直接上位：`VectorRepresentation`
+      - 为什么需要：稀疏向量为canonical 事实 SparseVector-is_a-VectorRepresentation（SparseVector is_a VectorRepresentation）提供明确端点并保持与 DenseVector 的定义边界。
+      - 包含：
+  - 纳入符合下列已审查种差的稀疏向量：稀疏向量是加权令牌、词项或特征维度等稀疏表示，用于对记忆记录和分块进行词汇或混合检索。；该种差可由关系 SparseVector-is_a-VectorRepresentation 的端点角色检验。
+      - 不包含：
+  - 稠密向量虽与本概念同属 VectorRepresentation，但其定义为“稠密向量是嵌入模型产生的稠密嵌入向量表示，用于对记忆记录、分块或上下文候选进行语义相似度搜索。”，不得替代稀疏向量。
+      - 结构与约束：0 个字段，0 条约束
+      - 正反例与实例：2 项
+      - 直接来源主张：2 项
+
+- **向量数据库** `VectorDatabase`
+  - 定义：向量数据库是面向向量索引、嵌入、元数据过滤和记忆记录或分块近邻检索的存储与查询表面。
+  - 直接上位：`MemoryStore`
+  - 为什么需要：向量数据库为canonical 事实 VectorDatabase-hosts-VectorIndex（VectorDatabase hosts VectorIndex）提供明确端点并保持与 MemoryStore 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的向量数据库：向量数据库是面向向量索引、嵌入、元数据过滤和记忆记录或分块近邻检索的存储与查询表面。；该种差可由关系 VectorDatabase-hosts-VectorIndex 的端点角色检验。
+  - 不包含：
+  - 仅能识别为上位概念 MemoryStore 的对象不在范围内；它尚未证明向量数据库的种差或关系端点 VectorDatabase-hosts-VectorIndex。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+### 记忆摄入模块
+
+记忆摄入模块描述来源加载、文档准备、附件、元数据、去重和摄入事件，用于判断外部或内部材料能否进入记忆使用流程。
+
+- **去重事件** `DeduplicationEvent`
+  - 定义：去重事件是在摄入中发现重复或近重复来源材料，并把保留记录与被抑制的重复证据连接起来的可观测事件。
+  - 为什么需要：去重事件为canonical 事实 DeduplicationEvent-occurs_during-IngestionRun（DeduplicationEvent occurs_during IngestionRun）提供明确端点并保持与 IngestionRun 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的去重事件：去重事件是在摄入中发现重复或近重复来源材料，并把保留记录与被抑制的重复证据连接起来的可观测事件。；该种差可由关系 DeduplicationEvent-occurs_during-IngestionRun 的端点角色检验。
+  - 不包含：
+  - 摄入运行只是关系 DeduplicationEvent-occurs_during-IngestionRun 的另一端；相关联不表示它是去重事件。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **文档加载能力** `DocumentLoader`
+  - 定义：DocumentLoader 是在访问和信任控制下取得资源内容的能力；它与 IngestionPolicy 通过 uses 而非伪共同父类连接。
+  - 为什么需要：文档加载能力为canonical 事实 IngestionRun-uses-DocumentLoader（IngestionRun uses DocumentLoader）提供明确端点并保持与 IngestionRun 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的文档加载能力：DocumentLoader 是在访问和信任控制下取得资源内容的能力；它与 IngestionPolicy 通过 uses 而非伪共同父类连接。；该种差可由关系 IngestionRun-uses-DocumentLoader 的端点角色检验。
+  - 不包含：
+  - 摄入运行只是关系 IngestionRun-uses-DocumentLoader 的另一端；相关联不表示它是文档加载能力。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **文档元数据** `DocumentMetadata`
+  - 定义：文档元数据记录用于记忆的文档来源、版本、校验和、作者、时间戳、格式、权限、信任区域和解析状态。
+  - 为什么需要：文档元数据为canonical 事实 document_has_document_metadata（Document document_has_document_metadata DocumentMetadata）提供明确端点并保持与 Document 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的文档元数据：文档元数据记录用于记忆的文档来源、版本、校验和、作者、时间戳、格式、权限、信任区域和解析状态。；该种差可由关系 document_has_document_metadata 的端点角色检验。
+  - 不包含：
+  - 文档只是关系 document_has_document_metadata 的另一端；相关联不表示它是文档元数据。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **文件系统** `FileSystem`
+  - 定义：文件系统表示受运行、安全和访问策略治理的文件资源表面，而不是上下文输入产物本身。
+  - 为什么需要：文件系统为canonical 事实 FileSystem-hosts-DirectoryResource（FileSystem hosts DirectoryResource）提供明确端点并保持与 DirectoryResource 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的文件系统：文件系统表示受运行、安全和访问策略治理的文件资源表面，而不是上下文输入产物本身。；该种差可由关系 FileSystem-hosts-DirectoryResource 的端点角色检验。
+  - 不包含：
+  - 目录资源只是关系 FileSystem-hosts-DirectoryResource 的另一端；相关联不表示它是文件系统。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **可摄入资源** `IngestibleResource`
+  - 定义：IngestibleResource 是具有稳定身份或定位信息、访问与信任上下文的实体或信息资源，可被 IngestionRun 通过 DocumentLoader 读取并转换为文档、元数据、分块或记忆记录；它只描述摄入输入，不包括工具能力资源、运行活动或摄入产生的审计事件。
+  - 为什么需要：可摄入资源为canonical 事实 IngestionRun-reads-IngestibleResource（IngestionRun reads IngestibleResource）提供明确端点并保持与 IngestionRun 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的可摄入资源：IngestibleResource 是具有稳定身份或定位信息、访问与信任上下文的实体或信息资源，可被 IngestionRun 通过 DocumentLoader 读取并转换为文档、元数据、分块或记忆记录；它只描述摄入输入，不包括工具能力资源、运行活动或摄入产生的审计事件。；该种差可由关系 IngestionRun-reads-IngestibleResource 的端点角色检验。
+  - 不包含：
+  - 摄入运行只是关系 IngestionRun-reads-IngestibleResource 的另一端；相关联不表示它是可摄入资源。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **数据库资源** `Database`
+    - 定义：数据库表示数据库资源表面，其行或查询结果可通过来源引用作为上下文证据被定位。
+    - 直接上位：`IngestibleResource`
+    - 为什么需要：数据库资源为canonical 事实 Database-is_a-IngestibleResource（Database is_a IngestibleResource）提供明确端点并保持与 DatabaseRow 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的数据库资源：数据库表示数据库资源表面，其行或查询结果可通过来源引用作为上下文证据被定位。；该种差可由关系 Database-is_a-IngestibleResource 的端点角色检验。
+    - 不包含：
+  - 数据库行资源虽与本概念同属 IngestibleResource，但其定义为“数据库行表示可通过来源引用寻址、并受策略和溯源约束的数据库行或查询结果行。”，不得替代数据库资源。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **数据库行资源** `DatabaseRow`
+    - 定义：数据库行表示可通过来源引用寻址、并受策略和溯源约束的数据库行或查询结果行。
+    - 直接上位：`IngestibleResource`
+    - 为什么需要：数据库行资源为canonical 事实 DatabaseRow-is_a-IngestibleResource（DatabaseRow is_a IngestibleResource）提供明确端点并保持与 Database 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的数据库行资源：数据库行表示可通过来源引用寻址、并受策略和溯源约束的数据库行或查询结果行。；该种差可由关系 DatabaseRow-is_a-IngestibleResource 的端点角色检验。
+    - 不包含：
+  - 数据库资源虽与本概念同属 IngestibleResource，但其定义为“数据库表示数据库资源表面，其行或查询结果可通过来源引用作为上下文证据被定位。”，不得替代数据库行资源。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **数据库表资源** `DatabaseTable`
+    - 定义：数据库表表示数据库资源表面中的结构化表，其行或切片可作为上下文证据被引用。
+    - 直接上位：`IngestibleResource`
+    - 为什么需要：数据库表资源为canonical 事实 DatabaseTable-is_a-IngestibleResource（DatabaseTable is_a IngestibleResource）提供明确端点并保持与 Database 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的数据库表资源：数据库表表示数据库资源表面中的结构化表，其行或切片可作为上下文证据被引用。；该种差可由关系 DatabaseTable-is_a-IngestibleResource 的端点角色检验。
+    - 不包含：
+  - 数据库资源虽与本概念同属 IngestibleResource，但其定义为“数据库表示数据库资源表面，其行或查询结果可通过来源引用作为上下文证据被定位。”，不得替代数据库表资源。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **目录资源** `DirectoryResource`
+    - 定义：目录资源表示限定文件、路径、发现、权限和遍历策略范围的目录类资源。
+    - 直接上位：`IngestibleResource`
+    - 为什么需要：目录资源为canonical 事实 FileSystem-hosts-DirectoryResource（FileSystem hosts DirectoryResource）提供明确端点并保持与 Database 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的目录资源：目录资源表示限定文件、路径、发现、权限和遍历策略范围的目录类资源。；该种差可由关系 FileSystem-hosts-DirectoryResource 的端点角色检验。
+    - 不包含：
+  - 数据库资源虽与本概念同属 IngestibleResource，但其定义为“数据库表示数据库资源表面，其行或查询结果可通过来源引用作为上下文证据被定位。”，不得替代目录资源。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **文档** `Document`
+    - 定义：文档是被加载或附加的记忆来源产物，用于解析、元数据捕获、分块、索引、引用或后续检索。
+    - 直接上位：`IngestibleResource`
+    - 为什么需要：文档为canonical 事实 document_attached_from_source（Document document_attached_from_source SourceAttachment）提供明确端点并保持与 Database 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的文档：文档是被加载或附加的记忆来源产物，用于解析、元数据捕获、分块、索引、引用或后续检索。；该种差可由关系 document_attached_from_source 的端点角色检验。
+    - 不包含：
+  - 数据库资源虽与本概念同属 IngestibleResource，但其定义为“数据库表示数据库资源表面，其行或查询结果可通过来源引用作为上下文证据被定位。”，不得替代文档。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **文件资源** `FileResource`
+    - 定义：文件资源表示带有路径、版本、摘要、权限和可用来源片段的文件类资源。
+    - 直接上位：`IngestibleResource`
+    - 为什么需要：文件资源为canonical 事实 StorageArea-stores-FileResource（StorageArea stores FileResource）提供明确端点并保持与 Database 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的文件资源：文件资源表示带有路径、版本、摘要、权限和可用来源片段的文件类资源。；该种差可由关系 StorageArea-stores-FileResource 的端点角色检验。
+    - 不包含：
+  - 数据库资源虽与本概念同属 IngestibleResource，但其定义为“数据库表示数据库资源表面，其行或查询结果可通过来源引用作为上下文证据被定位。”，不得替代文件资源。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **图边资源** `GraphEdge`
+    - 定义：图边表示图资源中的关系边，可通过图引用作为结构化上下文证据被定位。
+    - 直接上位：`IngestibleResource`
+    - 为什么需要：图边资源为canonical 事实 GraphEdge-is_a-IngestibleResource（GraphEdge is_a IngestibleResource）提供明确端点并保持与 Database 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的图边资源：图边表示图资源中的关系边，可通过图引用作为结构化上下文证据被定位。；该种差可由关系 GraphEdge-is_a-IngestibleResource 的端点角色检验。
+    - 不包含：
+  - 数据库资源虽与本概念同属 IngestibleResource，但其定义为“数据库表示数据库资源表面，其行或查询结果可通过来源引用作为上下文证据被定位。”，不得替代图边资源。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **图节点资源** `GraphNode`
+    - 定义：图节点表示图资源中的节点，可通过图节点引用作为上下文证据或检索结果被定位。
+    - 直接上位：`IngestibleResource`
+    - 为什么需要：图节点资源为canonical 事实 GraphNode-is_a-IngestibleResource（GraphNode is_a IngestibleResource）提供明确端点并保持与 Database 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的图节点资源：图节点表示图资源中的节点，可通过图节点引用作为上下文证据或检索结果被定位。；该种差可由关系 GraphNode-is_a-IngestibleResource 的端点角色检验。
+    - 不包含：
+  - 数据库资源虽与本概念同属 IngestibleResource，但其定义为“数据库表示数据库资源表面，其行或查询结果可通过来源引用作为上下文证据被定位。”，不得替代图节点资源。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **图存储资源** `GraphStore`
+    - 定义：图存储表示图存储或图检索表面，其节点和边可被引用，而不把存储整体作为上下文输入。
+    - 直接上位：`IngestibleResource`
+    - 为什么需要：图存储资源为canonical 事实 GraphStore-is_a-IngestibleResource（GraphStore is_a IngestibleResource）提供明确端点并保持与 Database 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的图存储资源：图存储表示图存储或图检索表面，其节点和边可被引用，而不把存储整体作为上下文输入。；该种差可由关系 GraphStore-is_a-IngestibleResource 的端点角色检验。
+    - 不包含：
+  - 数据库资源虽与本概念同属 IngestibleResource，但其定义为“数据库表示数据库资源表面，其行或查询结果可通过来源引用作为上下文证据被定位。”，不得替代图存储资源。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **来源附件** `SourceAttachment`
+    - 定义：来源附件是进入摄入流程的附加来源对象或引用，携带来源、位置、校验和和信任边界元数据。
+    - 直接上位：`IngestibleResource`
+    - 为什么需要：来源附件为canonical 事实 SourceAttachment-describes-IngestibleResource（SourceAttachment describes IngestibleResource）提供明确端点并保持与 Database 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的来源附件：来源附件是进入摄入流程的附加来源对象或引用，携带来源、位置、校验和和信任边界元数据。；该种差可由关系 SourceAttachment-describes-IngestibleResource 的端点角色检验。
+    - 不包含：
+  - 数据库资源虽与本概念同属 IngestibleResource，但其定义为“数据库表示数据库资源表面，其行或查询结果可通过来源引用作为上下文证据被定位。”，不得替代来源附件。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **文本语料集** `TextCorpus`
+    - 定义：文本语料表示一组可被摄入、分块、索引、检索或引用以构成上下文的文本来源。
+    - 直接上位：`IngestibleResource`
+    - 为什么需要：文本语料集为canonical 事实 TextCorpus-is_a-IngestibleResource（TextCorpus is_a IngestibleResource）提供明确端点并保持与 Database 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的文本语料集：文本语料表示一组可被摄入、分块、索引、检索或引用以构成上下文的文本来源。；该种差可由关系 TextCorpus-is_a-IngestibleResource 的端点角色检验。
+    - 不包含：
+  - 数据库资源虽与本概念同属 IngestibleResource，但其定义为“数据库表示数据库资源表面，其行或查询结果可通过来源引用作为上下文证据被定位。”，不得替代文本语料集。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **摄入策略** `IngestionPolicy`
+  - 定义：摄入策略决定哪些来源在记忆持久化前可以被加载、解析、去重、附加、存储、排除或送交安全审查。
+  - 为什么需要：摄入策略为canonical 事实 IngestionRun-governed_by-IngestionPolicy（IngestionRun governed_by IngestionPolicy）提供明确端点并保持与 IngestionRun 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的摄入策略：摄入策略决定哪些来源在记忆持久化前可以被加载、解析、去重、附加、存储、排除或送交安全审查。；该种差可由关系 IngestionRun-governed_by-IngestionPolicy 的端点角色检验。
+  - 不包含：
+  - 摄入运行只是关系 IngestionRun-governed_by-IngestionPolicy 的另一端；相关联不表示它是摄入策略。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **摄入运行** `IngestionRun`
+  - 定义：IngestionRun 是有输入、加载器、策略、结果和错误的可观测活动，不是资源或产物。
+  - 为什么需要：摄入运行为canonical 事实 ingestion_run_loads_document（IngestionRun ingestion_run_loads_document Document）提供明确端点并保持与 Document 的定义边界；节点字段 ingestion_run_id、started_at 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的摄入运行：IngestionRun 是有输入、加载器、策略、结果和错误的可观测活动，不是资源或产物。；该种差可由字段 ingestion_run_id、started_at 检验。
+  - 不包含：
+  - 文档只是关系 ingestion_run_loads_document 的另一端；相关联不表示它是摄入运行。
+  - 结构与约束：2 个字段，2 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+
+- **存储区域** `StorageArea`
+  - 定义：存储区域表示限制资源、文件、记忆项或来源描述符可见性与保留策略的存储范围。
+  - 为什么需要：存储区域为canonical 事实 StorageArea-stores-FileResource（StorageArea stores FileResource）提供明确端点并保持与 FileResource 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的存储区域：存储区域表示限制资源、文件、记忆项或来源描述符可见性与保留策略的存储范围。；该种差可由关系 StorageArea-stores-FileResource 的端点角色检验。
+  - 不包含：
+  - 文件资源只是关系 StorageArea-stores-FileResource 的另一端；相关联不表示它是存储区域。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+### 记忆生命周期操作模块
+
+记忆生命周期操作模块描述记忆记录影响未来上下文或行为之前，对其执行写入、更新、删除、丢弃、合并、巩固、压缩、过期、验证、取代、反思和审计的智能体记忆操作。
+
+- **记忆审计事件** `MemoryAuditEvent`
+  - 定义：记忆审计事件记录谁读取、写入、更新、验证、删除、导出或复用了某条记忆记录，是可观测审计事件。
+  - 为什么需要：记忆审计事件为canonical 事实 memory_audit_event_records_memory_operation（MemoryAuditEvent memory_audit_event_records_memory_operation MemoryRecord）提供明确端点并保持与 MemoryRecord 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的记忆审计事件：记忆审计事件记录谁读取、写入、更新、验证、删除、导出或复用了某条记忆记录，是可观测审计事件。；该种差可由关系 memory_audit_event_records_memory_operation 的端点角色检验。
+  - 不包含：
+  - 记忆记录只是关系 memory_audit_event_records_memory_operation 的另一端；相关联不表示它是记忆审计事件。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **记忆冲突** `MemoryConflict`
+  - 定义：记忆冲突记录记忆记录、来源证据、偏好、策略或当前用户指令之间需要解决或取代的矛盾。
+  - 为什么需要：记忆冲突为canonical 事实 memory_conflict_flags_record（MemoryConflict memory_conflict_flags_record MemoryRecord）提供明确端点并保持与 MemoryRecord 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的记忆冲突：记忆冲突记录记忆记录、来源证据、偏好、策略或当前用户指令之间需要解决或取代的矛盾。；该种差可由关系 memory_conflict_flags_record 的端点角色检验。
+  - 不包含：
+  - 记忆记录只是关系 memory_conflict_flags_record 的另一端；相关联不表示它是记忆冲突。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **记忆操作** `MemoryOperation`
+  - 定义：MemoryOperation 是具有操作身份、操作者、理由、适用策略、输入版本、输出版本、时间、结果和错误的活动，覆盖写入、更新、合并、删除、丢弃、驱逐、过期、取代、压缩、巩固、验证、反思和衰减；所有变更产生新版本或明确不可用状态，不原地改写旧证据。
+  - 为什么需要：记忆操作为canonical 事实 MemoryOperation-acts_on-MemoryRecord（MemoryOperation acts_on MemoryRecord）提供明确端点并保持与 MemoryRecord 的定义边界；节点字段 operation_id、occurred_at、reason 使该区别可验证。
+  - 包含：
+  - 纳入符合下列已审查种差的记忆操作：MemoryOperation 是具有操作身份、操作者、理由、适用策略、输入版本、输出版本、时间、结果和错误的活动，覆盖写入、更新、合并、删除、丢弃、驱逐、过期、取代、压缩、巩固、验证、反思和衰减；所有变更产生新版本或明确不可用状态，不原地改写旧证据。；该种差可由字段 operation_id、occurred_at、reason 检验。
+  - 不包含：
+  - 记忆记录只是关系 MemoryOperation-acts_on-MemoryRecord 的另一端；相关联不表示它是记忆操作。
+  - 结构与约束：9 个字段，2 条约束
+  - 正反例与实例：3 项
+  - 直接来源主张：2 项
+  - **记忆压缩操作** `MemoryCompaction`
+    - 定义：记忆压缩是在保留来源锚点和检索效用的同时压缩记忆内容或历史，以降低存储和上下文成本的操作。
+    - 直接上位：`MemoryOperation`
+    - 为什么需要：记忆压缩操作为canonical 事实 memory_compaction_compacts_record（MemoryCompaction memory_compaction_compacts_record MemoryRecord）提供明确端点并保持与 MemoryConsolidation 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的记忆压缩操作：记忆压缩是在保留来源锚点和检索效用的同时压缩记忆内容或历史，以降低存储和上下文成本的操作。；该种差可由关系 memory_compaction_compacts_record 的端点角色检验。
+    - 不包含：
+  - 记忆巩固操作虽与本概念同属 MemoryOperation，但其定义为“记忆巩固是把多个观测、情景、记录或反馈项提炼为摘要、语义记忆、反思记忆或流程的可观测操作。”，不得替代记忆压缩操作。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **记忆巩固操作** `MemoryConsolidation`
+    - 定义：记忆巩固是把多个观测、情景、记录或反馈项提炼为摘要、语义记忆、反思记忆或流程的可观测操作。
+    - 直接上位：`MemoryOperation`
+    - 为什么需要：记忆巩固操作为canonical 事实 memory_consolidation_merges_records（MemoryConsolidation memory_consolidation_merges_records MemoryRecord）提供明确端点并保持与 MemoryCompaction 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的记忆巩固操作：记忆巩固是把多个观测、情景、记录或反馈项提炼为摘要、语义记忆、反思记忆或流程的可观测操作。；该种差可由关系 memory_consolidation_merges_records 的端点角色检验。
+    - 不包含：
+  - 记忆压缩操作虽与本概念同属 MemoryOperation，但其定义为“记忆压缩是在保留来源锚点和检索效用的同时压缩记忆内容或历史，以降低存储和上下文成本的操作。”，不得替代记忆巩固操作。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **记忆衰减操作** `MemoryDecay`
+    - 定义：裁决为按时间或矛盾证据降低新鲜度、优先级、置信度或检索权重的策略驱动 MemoryOperation。
+    - 直接上位：`MemoryOperation`
+    - 为什么需要：记忆衰减操作为canonical 事实 memory_decay_lowers_record_priority（MemoryDecay memory_decay_lowers_record_priority MemoryRecord）提供明确端点并保持与 MemoryCompaction 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的记忆衰减操作：裁决为按时间或矛盾证据降低新鲜度、优先级、置信度或检索权重的策略驱动 MemoryOperation。；该种差可由关系 memory_decay_lowers_record_priority 的端点角色检验。
+    - 不包含：
+  - 记忆压缩操作虽与本概念同属 MemoryOperation，但其定义为“记忆压缩是在保留来源锚点和检索效用的同时压缩记忆内容或历史，以降低存储和上下文成本的操作。”，不得替代记忆衰减操作。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **记忆删除操作** `MemoryDelete`
+    - 定义：记忆删除是在删除、隐私、保留或用户请求策略下移除记忆记录或使其不可用的可观测操作。
+    - 直接上位：`MemoryOperation`
+    - 为什么需要：记忆删除操作为canonical 事实 memory_delete_removes_record（MemoryDelete memory_delete_removes_record MemoryRecord）提供明确端点并保持与 MemoryCompaction 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的记忆删除操作：记忆删除是在删除、隐私、保留或用户请求策略下移除记忆记录或使其不可用的可观测操作。；该种差可由关系 memory_delete_removes_record 的端点角色检验。
+    - 不包含：
+  - 记忆压缩操作虽与本概念同属 MemoryOperation，但其定义为“记忆压缩是在保留来源锚点和检索效用的同时压缩记忆内容或历史，以降低存储和上下文成本的操作。”，不得替代记忆删除操作。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **记忆丢弃操作** `MemoryDiscard`
+    - 定义：记忆丢弃是在持久化前因无关、不安全、重复、陈旧、低置信度或超出范围而拒绝候选记忆的可观测操作。
+    - 直接上位：`MemoryOperation`
+    - 为什么需要：记忆丢弃操作为canonical 事实 memory_discard_rejects_item（MemoryDiscard memory_discard_rejects_item MemoryItem）提供明确端点并保持与 MemoryCompaction 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的记忆丢弃操作：记忆丢弃是在持久化前因无关、不安全、重复、陈旧、低置信度或超出范围而拒绝候选记忆的可观测操作。；该种差可由关系 memory_discard_rejects_item 的端点角色检验。
+    - 不包含：
+  - 记忆压缩操作虽与本概念同属 MemoryOperation，但其定义为“记忆压缩是在保留来源锚点和检索效用的同时压缩记忆内容或历史，以降低存储和上下文成本的操作。”，不得替代记忆丢弃操作。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **记忆驱逐操作** `MemoryEviction`
+    - 定义：记忆驱逐是因容量、陈旧性或策略从活动库、缓存或上下文候选池中移除或降低记忆优先级的操作。
+    - 直接上位：`MemoryOperation`
+    - 为什么需要：记忆驱逐操作为canonical 事实 memory_eviction_evicts_record（MemoryEviction memory_eviction_evicts_record MemoryRecord）提供明确端点并保持与 MemoryCompaction 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的记忆驱逐操作：记忆驱逐是因容量、陈旧性或策略从活动库、缓存或上下文候选池中移除或降低记忆优先级的操作。；该种差可由关系 memory_eviction_evicts_record 的端点角色检验。
+    - 不包含：
+  - 记忆压缩操作虽与本概念同属 MemoryOperation，但其定义为“记忆压缩是在保留来源锚点和检索效用的同时压缩记忆内容或历史，以降低存储和上下文成本的操作。”，不得替代记忆驱逐操作。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **记忆过期操作** `MemoryExpiration`
+    - 定义：裁决为按时间、范围、同意或保留策略把记录版本标为过期的 MemoryOperation，并保留发生时间。
+    - 直接上位：`MemoryOperation`
+    - 为什么需要：记忆过期操作为canonical 事实 memory_expiration_expires_record（MemoryExpiration memory_expiration_expires_record MemoryRecord）提供明确端点并保持与 MemoryCompaction 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的记忆过期操作：裁决为按时间、范围、同意或保留策略把记录版本标为过期的 MemoryOperation，并保留发生时间。；该种差可由关系 memory_expiration_expires_record 的端点角色检验。
+    - 不包含：
+  - 记忆压缩操作虽与本概念同属 MemoryOperation，但其定义为“记忆压缩是在保留来源锚点和检索效用的同时压缩记忆内容或历史，以降低存储和上下文成本的操作。”，不得替代记忆过期操作。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **记忆合并操作** `MemoryMerge`
+    - 定义：记忆合并是在保留来源、冲突、来源链接和被取代记录谱系的同时合并相关记忆记录的可观测操作。
+    - 直接上位：`MemoryOperation`
+    - 为什么需要：记忆合并操作为canonical 事实 memory_merge_combines_records（MemoryMerge memory_merge_combines_records MemoryRecord）提供明确端点并保持与 MemoryCompaction 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的记忆合并操作：记忆合并是在保留来源、冲突、来源链接和被取代记录谱系的同时合并相关记忆记录的可观测操作。；该种差可由关系 memory_merge_combines_records 的端点角色检验。
+    - 不包含：
+  - 记忆压缩操作虽与本概念同属 MemoryOperation，但其定义为“记忆压缩是在保留来源锚点和检索效用的同时压缩记忆内容或历史，以降低存储和上下文成本的操作。”，不得替代记忆合并操作。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **记忆反思操作** `MemoryReflection`
+    - 定义：反思是从可观察情景、反馈与结果产生高层记录的 MemoryOperation，不保存隐藏思维链。
+    - 直接上位：`MemoryOperation`
+    - 为什么需要：记忆反思操作为canonical 事实 MemoryReflection-is_a-MemoryOperation（MemoryReflection is_a MemoryOperation）提供明确端点并保持与 MemoryCompaction 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的记忆反思操作：反思是从可观察情景、反馈与结果产生高层记录的 MemoryOperation，不保存隐藏思维链。；该种差可由关系 MemoryReflection-is_a-MemoryOperation 的端点角色检验。
+    - 不包含：
+  - 记忆压缩操作虽与本概念同属 MemoryOperation，但其定义为“记忆压缩是在保留来源锚点和检索效用的同时压缩记忆内容或历史，以降低存储和上下文成本的操作。”，不得替代记忆反思操作。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **记忆取代操作** `MemorySupersession`
+    - 定义：取代是以更新或更高权威版本替换旧记录并保留 lineage 的 MemoryOperation。
+    - 直接上位：`MemoryOperation`
+    - 为什么需要：记忆取代操作为canonical 事实 memory_supersession_replaces_record（MemorySupersession memory_supersession_replaces_record MemoryRecord）提供明确端点并保持与 MemoryCompaction 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的记忆取代操作：取代是以更新或更高权威版本替换旧记录并保留 lineage 的 MemoryOperation。；该种差可由关系 memory_supersession_replaces_record 的端点角色检验。
+    - 不包含：
+  - 记忆压缩操作虽与本概念同属 MemoryOperation，但其定义为“记忆压缩是在保留来源锚点和检索效用的同时压缩记忆内容或历史，以降低存储和上下文成本的操作。”，不得替代记忆取代操作。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **记忆更新操作** `MemoryUpdate`
+    - 定义：记忆更新是修订既有记忆记录的内容、置信度、范围、来源、保留状态或链接的可观测操作。
+    - 直接上位：`MemoryOperation`
+    - 为什么需要：记忆更新操作为canonical 事实 memory_update_crosses_trust_boundary（MemoryUpdate memory_update_crosses_trust_boundary TrustBoundary）提供明确端点并保持与 MemoryCompaction 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的记忆更新操作：记忆更新是修订既有记忆记录的内容、置信度、范围、来源、保留状态或链接的可观测操作。；该种差可由关系 memory_update_crosses_trust_boundary 的端点角色检验。
+    - 不包含：
+  - 记忆压缩操作虽与本概念同属 MemoryOperation，但其定义为“记忆压缩是在保留来源锚点和检索效用的同时压缩记忆内容或历史，以降低存储和上下文成本的操作。”，不得替代记忆更新操作。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **记忆验证操作** `MemoryValidation`
+    - 定义：记忆验证是在复用前检查记忆记录的来源、安全、信任边界、新鲜度、冲突、投毒或用户批准的审查或策略操作。
+    - 直接上位：`MemoryOperation`
+    - 为什么需要：记忆验证操作为canonical 事实 MemoryValidation-evaluates-MemoryRecord（MemoryValidation evaluates MemoryRecord）提供明确端点并保持与 MemoryCompaction 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的记忆验证操作：记忆验证是在复用前检查记忆记录的来源、安全、信任边界、新鲜度、冲突、投毒或用户批准的审查或策略操作。；该种差可由关系 MemoryValidation-evaluates-MemoryRecord 的端点角色检验。
+    - 不包含：
+  - 记忆压缩操作虽与本概念同属 MemoryOperation，但其定义为“记忆压缩是在保留来源锚点和检索效用的同时压缩记忆内容或历史，以降低存储和上下文成本的操作。”，不得替代记忆验证操作。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **记忆写入操作** `MemoryWrite`
+    - 定义：记忆写入是从消息、工具结果、轨迹事件、经验、偏好、摘要或反思提出或提交新记忆记录的可观测操作。
+    - 直接上位：`MemoryOperation`
+    - 为什么需要：记忆写入操作为canonical 事实 memory_write_evaluated_by_policy_decision（MemoryWrite memory_write_evaluated_by_policy_decision PolicyDecision）提供明确端点并保持与 MemoryCompaction 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的记忆写入操作：记忆写入是从消息、工具结果、轨迹事件、经验、偏好、摘要或反思提出或提交新记忆记录的可观测操作。；该种差可由关系 memory_write_evaluated_by_policy_decision 的端点角色检验。
+    - 不包含：
+  - 记忆压缩操作虽与本概念同属 MemoryOperation，但其定义为“记忆压缩是在保留来源锚点和检索效用的同时压缩记忆内容或历史，以降低存储和上下文成本的操作。”，不得替代记忆写入操作。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：4 项
+    - 直接来源主张：2 项
+
+### 检索与排序模块
+
+检索与排序模块描述从记忆索引和记忆记录中召回候选内容、计算语义或词汇相关性、重排序、融合分数并在进入上下文之前做选择的过程。
+
+- **词汇检索评分** `LexicalScore`
+  - 定义：词汇评分是基于查询与候选分块或记忆记录之间的令牌、词项、词频统计、逆文档频率或精确匹配证据得到的相关性评分。
+  - 直接上位：`RetrievalScore`
+  - 为什么需要：词汇检索评分为canonical 事实 candidate_chunk_scored_by_lexical（CandidateChunk candidate_chunk_scored_by_lexical LexicalScore）提供明确端点并保持与 RerankScore 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的词汇检索评分：词汇评分是基于查询与候选分块或记忆记录之间的令牌、词项、词频统计、逆文档频率或精确匹配证据得到的相关性评分。；该种差可由关系 candidate_chunk_scored_by_lexical 的端点角色检验。
+  - 不包含：
+  - 重排评分虽与本概念同属 RetrievalScore，但其定义为“重排评分是在初始检索候选生成之后，由重排模型或二级评分方法分配的评分。”，不得替代词汇检索评分。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **排序操作** `RankingOperation`
+  - 定义：RankingOperation 是具有输入 CandidateSet、评分证据、策略、输出顺序或选择、时间和结果的活动，覆盖 RankFusion 与 TopKSelection；它不包含评分值、候选信息或检索查询本身。
+  - 为什么需要：排序操作为canonical 事实 RankFusion-is_a-RankingOperation（RankFusion is_a RankingOperation）提供明确端点并保持与 RankFusion 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的排序操作：RankingOperation 是具有输入 CandidateSet、评分证据、策略、输出顺序或选择、时间和结果的活动，覆盖 RankFusion 与 TopKSelection；它不包含评分值、候选信息或检索查询本身。；该种差可由关系 RankFusion-is_a-RankingOperation 的端点角色检验。
+  - 不包含：
+  - 排序融合只是关系 RankFusion-is_a-RankingOperation 的另一端；相关联不表示它是排序操作。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **排序融合** `RankFusion`
+    - 定义：排序融合是把多个索引、模型、过滤器或检索方法产生的候选列表或评分合并为单一顺序的排序事件。
+    - 直接上位：`RankingOperation`
+    - 为什么需要：排序融合为canonical 事实 rank_fusion_combines_candidate_set（RankFusion rank_fusion_combines_candidate_set CandidateSet）提供明确端点并保持与 TopKSelection 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的排序融合：排序融合是把多个索引、模型、过滤器或检索方法产生的候选列表或评分合并为单一顺序的排序事件。；该种差可由关系 rank_fusion_combines_candidate_set 的端点角色检验。
+    - 不包含：
+  - 前 K 项选择虽与本概念同属 RankingOperation，但其定义为“TopKSelection 是在 k、预算、多样性、新鲜度与策略约束下选择候选的 RankingOperation。”，不得替代排序融合。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **前 K 项选择** `TopKSelection`
+    - 定义：TopKSelection 是在 k、预算、多样性、新鲜度与策略约束下选择候选的 RankingOperation。
+    - 直接上位：`RankingOperation`
+    - 为什么需要：前 K 项选择为canonical 事实 top_k_selection_selects_retrieved_chunk（TopKSelection top_k_selection_selects_retrieved_chunk RetrievedChunk）提供明确端点并保持与 RankFusion 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的前 K 项选择：TopKSelection 是在 k、预算、多样性、新鲜度与策略约束下选择候选的 RankingOperation。；该种差可由关系 top_k_selection_selects_retrieved_chunk 的端点角色检验。
+    - 不包含：
+  - 排序融合虽与本概念同属 RankingOperation，但其定义为“排序融合是把多个索引、模型、过滤器或检索方法产生的候选列表或评分合并为单一顺序的排序事件。”，不得替代前 K 项选择。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **重排评分** `RerankScore`
+  - 定义：重排评分是在初始检索候选生成之后，由重排模型或二级评分方法分配的评分。
+  - 直接上位：`RetrievalScore`
+  - 为什么需要：重排评分为canonical 事实 RerankScore-is_a-RetrievalScore（RerankScore is_a RetrievalScore）提供明确端点并保持与 LexicalScore 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的重排评分：重排评分是在初始检索候选生成之后，由重排模型或二级评分方法分配的评分。；该种差可由关系 RerankScore-is_a-RetrievalScore 的端点角色检验。
+  - 不包含：
+  - 词汇检索评分虽与本概念同属 RetrievalScore，但其定义为“词汇评分是基于查询与候选分块或记忆记录之间的令牌、词项、词频统计、逆文档频率或精确匹配证据得到的相关性评分。”，不得替代重排评分。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **检索信息制品** `RetrievalArtifact`
+  - 定义：RetrievalArtifact 是具有查询或运行关联、来源、索引版本与选择状态的信息制品，覆盖 RetrievalQuery、CandidateSet、CandidateChunk、RetrievedChunk 和 RetrievalTrace；评分由 RetrievalScore 表示，过滤由规范表示，RankFusion/TopKSelection 是活动。
+  - 为什么需要：检索信息制品为canonical 事实 CandidateChunk-is_a-RetrievalArtifact（CandidateChunk is_a RetrievalArtifact）提供明确端点并保持与 CandidateChunk 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的检索信息制品：RetrievalArtifact 是具有查询或运行关联、来源、索引版本与选择状态的信息制品，覆盖 RetrievalQuery、CandidateSet、CandidateChunk、RetrievedChunk 和 RetrievalTrace；评分由 RetrievalScore 表示，过滤由规范表示，RankFusion/TopKSelection 是活动。；该种差可由关系 CandidateChunk-is_a-RetrievalArtifact 的端点角色检验。
+  - 不包含：
+  - 候选分块只是关系 CandidateChunk-is_a-RetrievalArtifact 的另一端；相关联不表示它是检索信息制品。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **候选分块** `CandidateChunk`
+    - 定义：候选分块是在检索与排序中被考虑的分块，携带来源、匹配证据、评分槽位和选择状态。
+    - 直接上位：`RetrievalArtifact`
+    - 为什么需要：候选分块为canonical 事实 candidate_chunk_scored_by_lexical（CandidateChunk candidate_chunk_scored_by_lexical LexicalScore）提供明确端点并保持与 CandidateSet 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的候选分块：候选分块是在检索与排序中被考虑的分块，携带来源、匹配证据、评分槽位和选择状态。；该种差可由关系 candidate_chunk_scored_by_lexical 的端点角色检验。
+    - 不包含：
+  - 候选集合虽与本概念同属 RetrievalArtifact，但其定义为“候选集合是一次查询在过滤、评分、重排、Top-K 选择或上下文纳入之前产生的有界检索候选集合。”，不得替代候选分块。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **候选集合** `CandidateSet`
+    - 定义：候选集合是一次查询在过滤、评分、重排、Top-K 选择或上下文纳入之前产生的有界检索候选集合。
+    - 直接上位：`RetrievalArtifact`
+    - 为什么需要：候选集合为canonical 事实 CandidateSet-contains-CandidateChunk（CandidateSet contains CandidateChunk）提供明确端点并保持与 CandidateChunk 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的候选集合：候选集合是一次查询在过滤、评分、重排、Top-K 选择或上下文纳入之前产生的有界检索候选集合。；该种差可由关系 CandidateSet-contains-CandidateChunk 的端点角色检验。
+    - 不包含：
+  - 候选分块虽与本概念同属 RetrievalArtifact，但其定义为“候选分块是在检索与排序中被考虑的分块，携带来源、匹配证据、评分槽位和选择状态。”，不得替代候选集合。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **检索查询** `RetrievalQuery`
+    - 定义：查询内容、过滤、预算与索引版本构成可重放 RetrievalArtifact；实际执行通过关系表示，不把信息对象与事件混型。
+    - 直接上位：`RetrievalArtifact`
+    - 为什么需要：检索查询为canonical 事实 RetrievalQuery-produces-CandidateSet（RetrievalQuery produces CandidateSet）提供明确端点并保持与 CandidateChunk 的定义边界；节点字段 query_id、query_text、top_k 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的检索查询：查询内容、过滤、预算与索引版本构成可重放 RetrievalArtifact；实际执行通过关系表示，不把信息对象与事件混型。；该种差可由字段 query_id、query_text、top_k 检验。
+    - 不包含：
+  - 候选分块虽与本概念同属 RetrievalArtifact，但其定义为“候选分块是在检索与排序中被考虑的分块，携带来源、匹配证据、评分槽位和选择状态。”，不得替代检索查询。
+    - 结构与约束：3 个字段，2 条约束
+    - 正反例与实例：3 项
+    - 直接来源主张：2 项
+  - **检索轨迹** `RetrievalTrace`
+    - 定义：检索轨迹解释查询文本、过滤器、索引版本、候选构造、评分、排序融合、排除和 Top-K 选择。
+    - 直接上位：`RetrievalArtifact`
+    - 为什么需要：检索轨迹为canonical 事实 RetrievalTrace-records-RankFusion（RetrievalTrace records RankFusion）提供明确端点并保持与 CandidateChunk 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的检索轨迹：检索轨迹解释查询文本、过滤器、索引版本、候选构造、评分、排序融合、排除和 Top-K 选择。；该种差可由关系 RetrievalTrace-records-RankFusion 的端点角色检验。
+    - 不包含：
+  - 候选分块虽与本概念同属 RetrievalArtifact，但其定义为“候选分块是在检索与排序中被考虑的分块，携带来源、匹配证据、评分槽位和选择状态。”，不得替代检索轨迹。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **已检索分块** `RetrievedChunk`
+    - 定义：已检索分块是检索返回的分块，带有评分、排名、来源、索引版本和上下文纳入元数据。
+    - 直接上位：`RetrievalArtifact`
+    - 为什么需要：已检索分块为canonical 事实 retrieved_chunk_fills_context_slot（RetrievedChunk retrieved_chunk_fills_context_slot ContextSlot）提供明确端点并保持与 CandidateChunk 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的已检索分块：已检索分块是检索返回的分块，带有评分、排名、来源、索引版本和上下文纳入元数据。；该种差可由关系 retrieved_chunk_fills_context_slot 的端点角色检验。
+    - 不包含：
+  - 候选分块虽与本概念同属 RetrievalArtifact，但其定义为“候选分块是在检索与排序中被考虑的分块，携带来源、匹配证据、评分槽位和选择状态。”，不得替代已检索分块。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+
+- **检索过滤器** `RetrievalFilter`
+  - 定义：检索过滤器按命名空间、记忆类型、来源、时间范围、信任区域、权限、新鲜度、任务范围或排除策略过滤检索。
+  - 为什么需要：检索过滤器为canonical 事实 RetrievalQuery-uses-RetrievalFilter（RetrievalQuery uses RetrievalFilter）提供明确端点并保持与 RetrievalQuery 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的检索过滤器：检索过滤器按命名空间、记忆类型、来源、时间范围、信任区域、权限、新鲜度、任务范围或排除策略过滤检索。；该种差可由关系 RetrievalQuery-uses-RetrievalFilter 的端点角色检验。
+  - 不包含：
+  - 检索查询只是关系 RetrievalQuery-uses-RetrievalFilter 的另一端；相关联不表示它是检索过滤器。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **相似度评分** `SimilarityScore`
+  - 定义：相似度评分表示查询与候选记忆记录或分块之间的语义相似度，通常来自嵌入距离或向量相似度。
+  - 直接上位：`RetrievalScore`
+  - 为什么需要：相似度评分为canonical 事实 candidate_chunk_scored_by_similarity（CandidateChunk candidate_chunk_scored_by_similarity SimilarityScore）提供明确端点并保持与 LexicalScore 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的相似度评分：相似度评分表示查询与候选记忆记录或分块之间的语义相似度，通常来自嵌入距离或向量相似度。；该种差可由关系 candidate_chunk_scored_by_similarity 的端点角色检验。
+  - 不包含：
+  - 词汇检索评分虽与本概念同属 RetrievalScore，但其定义为“词汇评分是基于查询与候选分块或记忆记录之间的令牌、词项、词频统计、逆文档频率或精确匹配证据得到的相关性评分。”，不得替代相似度评分。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+### 记忆存储、范围与类型模块
+
+记忆存储、范围与类型模块描述持久和会话级记忆库、命名空间、访问范围、记忆记录、保留策略，以及工作记忆、短期记忆、长期记忆、情景记忆、语义记忆、程序记忆、反思记忆、偏好记忆、任务记忆、会话记忆和跨会话记忆的类型体系。
+
+- **记忆实体** `MemoryEntity`
+  - 定义：MemoryEntity 是具有 canonical 身份、内容或载体、来源、版本和生命周期的信息实体，覆盖 MemoryRecord、MemoryItem 和 MemoryFile；kind、duration、scope 作为其记录字段的正交分类，不成为本类下的并列伪子类。MemoryStore、Namespace、Scope 和 Policy 通过关系治理它。
+  - 为什么需要：记忆实体为canonical 事实 MemoryFile-is_a-MemoryEntity（MemoryFile is_a MemoryEntity）提供明确端点并保持与 MemoryFile 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的记忆实体：MemoryEntity 是具有 canonical 身份、内容或载体、来源、版本和生命周期的信息实体，覆盖 MemoryRecord、MemoryItem 和 MemoryFile；kind、duration、scope 作为其记录字段的正交分类，不成为本类下的并列伪子类。MemoryStore、Namespace、Scope 和 Policy 通过关系治理它。；该种差可由关系 MemoryFile-is_a-MemoryEntity 的端点角色检验。
+  - 不包含：
+  - 记忆文件只是关系 MemoryFile-is_a-MemoryEntity 的另一端；相关联不表示它是记忆实体。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+  - **记忆文件** `MemoryFile`
+    - 定义：记忆文件是文件承载的持久记忆资源，在即时提示窗口之外保存项目约定、用户偏好、笔记、计划或跨会话上下文。
+    - 直接上位：`MemoryEntity`
+    - 为什么需要：记忆文件为canonical 事实 MemoryFile-materializes-MemoryRecord（MemoryFile materializes MemoryRecord）提供明确端点并保持与 MemoryItem 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的记忆文件：记忆文件是文件承载的持久记忆资源，在即时提示窗口之外保存项目约定、用户偏好、笔记、计划或跨会话上下文。；该种差可由关系 MemoryFile-materializes-MemoryRecord 的端点角色检验。
+    - 不包含：
+  - 记忆项虽与本概念同属 MemoryEntity，但其定义为“记忆项是可寻址记忆单元，可保存为文本、摘要、向量支撑分块、经验、偏好、程序或反思。”，不得替代记忆文件。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **记忆项** `MemoryItem`
+    - 定义：记忆项是可寻址记忆单元，可保存为文本、摘要、向量支撑分块、经验、偏好、程序或反思。
+    - 直接上位：`MemoryEntity`
+    - 为什么需要：记忆项为canonical 事实 MemoryItem-represented_by-MemoryRecord（MemoryItem represented_by MemoryRecord）提供明确端点并保持与 MemoryFile 的定义边界。
+    - 包含：
+  - 纳入符合下列已审查种差的记忆项：记忆项是可寻址记忆单元，可保存为文本、摘要、向量支撑分块、经验、偏好、程序或反思。；该种差可由关系 MemoryItem-represented_by-MemoryRecord 的端点角色检验。
+    - 不包含：
+  - 记忆文件虽与本概念同属 MemoryEntity，但其定义为“记忆文件是文件承载的持久记忆资源，在即时提示窗口之外保存项目约定、用户偏好、笔记、计划或跨会话上下文。”，不得替代记忆项。
+    - 结构与约束：0 个字段，0 条约束
+    - 正反例与实例：2 项
+    - 直接来源主张：2 项
+  - **记忆记录** `MemoryRecord`
+    - 定义：记忆记录是持久或会话级记忆条目，包含内容、来源、类型、命名空间、作用范围、保留状态、置信度和生命周期历史。
+    - 直接上位：`MemoryEntity`
+    - 为什么需要：记忆记录为canonical 事实 memory_record_belongs_to_data_zone（MemoryRecord memory_record_belongs_to_data_zone DataZone）提供明确端点并保持与 MemoryFile 的定义边界；节点字段 memory_scope、memory_kind、memory_record_id 使该区别可验证。
+    - 包含：
+  - 纳入符合下列已审查种差的记忆记录：记忆记录是持久或会话级记忆条目，包含内容、来源、类型、命名空间、作用范围、保留状态、置信度和生命周期历史。；该种差可由字段 memory_scope、memory_kind、memory_record_id 检验。
+    - 不包含：
+  - 记忆文件虽与本概念同属 MemoryEntity，但其定义为“记忆文件是文件承载的持久记忆资源，在即时提示窗口之外保存项目约定、用户偏好、笔记、计划或跨会话上下文。”，不得替代记忆记录。
+    - 结构与约束：10 个字段，6 条约束
+    - 正反例与实例：4 项
+    - 直接来源主张：2 项
+
+- **记忆命名空间** `MemoryNamespace`
+  - 定义：记忆命名空间是隔离和查找边界，用用户、任务、项目、租户、智能体、线程或跨会话复用上下文分隔记忆记录。
+  - 为什么需要：记忆命名空间为canonical 事实 memory_store_has_namespace（MemoryStore memory_store_has_namespace MemoryNamespace）提供明确端点并保持与 MemoryStore 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的记忆命名空间：记忆命名空间是隔离和查找边界，用用户、任务、项目、租户、智能体、线程或跨会话复用上下文分隔记忆记录。；该种差可由关系 memory_store_has_namespace 的端点角色检验。
+  - 不包含：
+  - 记忆存储只是关系 memory_store_has_namespace 的另一端；相关联不表示它是记忆命名空间。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **记忆保留策略** `MemoryRetentionPolicy`
+  - 定义：记忆保留策略治理记忆记录、摘要、索引和轨迹可以保留、刷新、压缩、过期、删除或披露多久以及如何处理。
+  - 为什么需要：记忆保留策略为canonical 事实 memory_store_governed_by_retention_policy（MemoryStore memory_store_governed_by_retention_policy MemoryRetentionPolicy）提供明确端点并保持与 MemoryStore 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的记忆保留策略：记忆保留策略治理记忆记录、摘要、索引和轨迹可以保留、刷新、压缩、过期、删除或披露多久以及如何处理。；该种差可由关系 memory_store_governed_by_retention_policy 的端点角色检验。
+  - 不包含：
+  - 记忆存储只是关系 memory_store_governed_by_retention_policy 的另一端；相关联不表示它是记忆保留策略。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **记忆范围规范** `MemoryScope`
+  - 定义：记忆范围是策略边界，说明记忆在会话、用户、任务、租户和信任上下文中可被读取、写入、更新、复用、披露或遗忘的位置。
+  - 为什么需要：记忆范围规范为canonical 事实 MemoryRecord-scoped_by-MemoryScope（MemoryRecord scoped_by MemoryScope）提供明确端点并保持与 MemoryRecord 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的记忆范围规范：记忆范围是策略边界，说明记忆在会话、用户、任务、租户和信任上下文中可被读取、写入、更新、复用、披露或遗忘的位置。；该种差可由关系 MemoryRecord-scoped_by-MemoryScope 的端点角色检验。
+  - 不包含：
+  - 记忆记录只是关系 MemoryRecord-scoped_by-MemoryScope 的另一端；相关联不表示它是记忆范围规范。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+- **记忆存储** `MemoryStore`
+  - 定义：记忆库是存储锚点，支持在会话或长期范围内读取、写入、更新、删除、合并、压缩、过期、检索和审计记忆记录。
+  - 为什么需要：记忆存储为canonical 事实 memory_store_governed_by_retention_policy（MemoryStore memory_store_governed_by_retention_policy MemoryRetentionPolicy）提供明确端点并保持与 MemoryRetentionPolicy 的定义边界。
+  - 包含：
+  - 纳入符合下列已审查种差的记忆存储：记忆库是存储锚点，支持在会话或长期范围内读取、写入、更新、删除、合并、压缩、过期、检索和审计记忆记录。；该种差可由关系 memory_store_governed_by_retention_policy 的端点角色检验。
+  - 不包含：
+  - 记忆保留策略只是关系 memory_store_governed_by_retention_policy 的另一端；相关联不表示它是记忆存储。
+  - 结构与约束：0 个字段，0 条约束
+  - 正反例与实例：2 项
+  - 直接来源主张：2 项
+
+## 关系合同
+
+- `CommandOutputObservation` — **has_exit_status_observation** → `ExitStatusObservation` (`CommandOutputObservation-has_exit_status_observation-ExitStatusObservation`)
+  - 输出观测关联独立的退出状态观测，使文本输出与终止状态不混为一个字段。
+- `CommandOutputObservation` — **is_a** → `ExecutionObservation` (`CommandOutputObservation-is_a-ExecutionObservation`)
+  - 命令输出观测 是一种 执行观测。区分特征：任一命令输出观测都是对执行所产生可见输出的 ExecutionObservation，区分特征是观测对象为命令输出。
+- `CommandOutputObservation` — **references_execution_result** → `ExecutionResultReference` (`CommandOutputObservation-references_execution_result-ExecutionResultReference`)
+  - 命令输出观测必须指出产生该可见输出的执行结果引用。
+- `ContextIngressEvent` — **makes_available** → `CommandOutputObservation` (`ContextIngressEvent-makes_available-CommandOutputObservation`)
+  - 上下文摄入事件使经选择的命令输出观测对后续模型调用可见。
+- `CommandOutputObservation` — **derived_from_trace_event** → `TraceEvent` (`derived_from_trace_event`)
+  - 将上下文观测连接到产生该观测的可观察运行时追踪事件。
+- `EnvironmentBindingReference` — **is_a** → `ExecutionReference` (`EnvironmentBindingReference-is_a-ExecutionReference`)
+  - 环境绑定引用 是一种 执行引用。区分特征：任一环境绑定引用都是指向执行上下文绑定的 ExecutionReference，且只披露引用而非秘密值。
+- `ExecutionObservation` — **observes** → `ExecutionResult` (`ExecutionObservation-observes-ExecutionResult`)
+  - 执行观测以一个可审计的执行结果为观测对象；观测记录与被观测结果保持身份分离。
+- `ExecutionResultReference` — **is_a** → `ExecutionReference` (`ExecutionResultReference-is_a-ExecutionReference`)
+  - 执行结果引用 是一种 执行引用。区分特征：任一执行结果引用都是以某次运行或工具结果为指称对象的 ExecutionReference。
+- `ExitStatusObservation` — **is_a** → `ExecutionObservation` (`ExitStatusObservation-is_a-ExecutionObservation`)
+  - 退出状态观测 是一种 执行观测。区分特征：任一退出状态观测都是针对执行终止结果的 ExecutionObservation，并通过字段保存具体状态值。
+- `CommandOutputObservation` — **has_stderr_chunk** → `StandardErrorChunk` (`has_stderr_chunk`)
+  - 将命令输出观测连接到为诊断、上下文暂存或审计而选取的有边界标准错误分块。
+- `CommandOutputObservation` — **has_stdout_chunk** → `StandardOutputChunk` (`has_stdout_chunk`)
+  - 将命令输出观测连接到为上下文暂存、显示或审计而选取的有边界标准输出分块。
+- `ContextIngressEvent` — **ingested_into_context** → `ContextPackage` (`ingested_into_context`)
+  - 将可观察的上下文摄入事件连接到对模型调用或智能体步骤可见的上下文包。
+- `CommandOutputObservation` — **produced_by_command_execution** → `CommandExecution` (`produced_by_command_execution`)
+  - 将命令输出观测连接到产生它的运行时命令执行事件。
+- `StandardError` — **is_a** → `OutputStream` (`StandardError-is_a-OutputStream`)
+  - 标准错误流 是一种 输出流。区分特征：任一 stderr 都是按产生顺序组织片段的 OutputStream，区分特征是诊断输出通道。
+- `StandardErrorChunk` — **is_a** → `OutputChunk` (`StandardErrorChunk-is_a-OutputChunk`)
+  - 标准错误分块 是一种 输出分块。区分特征：任一标准错误分块都是来源通道为 stderr 的 OutputChunk。
+- `StandardErrorChunk` — **part_of** → `StandardError` (`StandardErrorChunk-part_of-StandardError`)
+  - 每个标准错误分块都属于一个有序 stderr 流。
+- `StandardOutput` — **is_a** → `OutputStream` (`StandardOutput-is_a-OutputStream`)
+  - 标准输出流 是一种 输出流。区分特征：任一 stdout 都是按产生顺序组织片段的 OutputStream，区分特征是常规输出通道。
+- `StandardOutputChunk` — **is_a** → `OutputChunk` (`StandardOutputChunk-is_a-OutputChunk`)
+  - 标准输出分块 是一种 输出分块。区分特征：任一标准输出分块都是来源通道为 stdout 的 OutputChunk。
+- `StandardOutputChunk` — **part_of** → `StandardOutput` (`StandardOutputChunk-part_of-StandardOutput`)
+  - 每个标准输出分块都属于一个有序 stdout 流。
+- `CommandOutputObservation` — **summarized_as_context_input** → `ContextSummary` (`summarized_as_context_input`)
+  - 将执行输出连接到在上下文预算限制下承载其后续信息的摘要。
+- `WorkingDirectoryReference` — **is_a** → `ExecutionReference` (`WorkingDirectoryReference-is_a-ExecutionReference`)
+  - 工作目录引用 是一种 执行引用。区分特征：任一工作目录引用都是指向执行发生目录的 ExecutionReference，而非目录资源本身。
+- `AudioBlock` — **is_a** → `ContentBlock` (`AudioBlock-is_a-ContentBlock`)
+  - 音频内容块 是一种 内容块。区分特征：任一音频块都是载荷模态为音频或音频观测的 ContentBlock。
+- `AudioBlock` — **transcribed_as** → `TextBlock` (`AudioBlock-transcribed_as-TextBlock`)
+  - 音频块可产生保留来源关联的文本转写块。
+- `CodeBlock` — **is_a** → `ContentBlock` (`CodeBlock-is_a-ContentBlock`)
+  - 代码内容块 是一种 内容块。区分特征：任一代码块都是载荷按源代码、补丁、堆栈或命令语法解释的 ContentBlock。
+- `ContentBlock` — **compressed_into_summary** → `ContextSummary` (`compressed_into_summary`)
+  - 将源内容或输出连接到为适配上下文预算而形成的可观察摘要。
+- `ContentBlock` — **located_at_source_span** → `SourceSpan` (`ContentBlock-located_at_source_span-SourceSpan`)
+  - 内容块可定位到支持其载荷的精确来源片段。
+- `ContentBlock` — **derived_from_source** → `SourceReference` (`derived_from_source`)
+  - 将内容块、输出片段或摘要连接到其派生自的来源引用。
+- `FileAttachmentBlock` — **is_a** → `ContentBlock` (`FileAttachmentBlock-is_a-ContentBlock`)
+  - 文件附件内容块 是一种 内容块。区分特征：任一文件附件块都是以文件引用或文件摘录为载荷的 ContentBlock。
+- `FileAttachmentBlock` — **references_source** → `SourceReference` (`FileAttachmentBlock-references_source-SourceReference`)
+  - 文件附件块通过来源引用定位实际文件，而不在块节点复制存储系统。
+- `ContentBlock` — **has_source_reference** → `SourceReference` (`has_source_reference`)
+  - 将上下文制品、内容块、引用或检索候选项连接到支持它的来源引用。
+- `ImageBlock` — **is_a** → `ContentBlock` (`ImageBlock-is_a-ContentBlock`)
+  - 图像内容块 是一种 内容块。区分特征：任一图像块都是载荷模态为图像或图像观测的 ContentBlock。
+- `MessageContentBlock` — **contains_block** → `ContentBlock` (`MessageContentBlock-contains_block-ContentBlock`)
+  - 消息内容关联对象聚合一个或多个实际内容块。
+- `MessageContentBlock` — **used_in** → `Message` (`MessageContentBlock-used_in-Message`)
+  - 关联对象指出这些内容块被哪一个消息包络使用。
+- `ContentBlock` — **redacted_by_policy** → `PolicyRule` (`redacted_by_policy`)
+  - 将内容连接到在披露或上下文暂存前移除或遮蔽敏感片段的策略规则。
+- `StructuredDataBlock` — **is_a** → `ContentBlock` (`StructuredDataBlock-is_a-ContentBlock`)
+  - 结构化数据内容块 是一种 内容块。区分特征：任一结构化数据块都是载荷具有机器可解析结构的 ContentBlock。
+- `TableBlock` — **is_a** → `ContentBlock` (`TableBlock-is_a-ContentBlock`)
+  - 表格内容块 是一种 内容块。区分特征：任一表格块都是以行、列和单元格结构为区分特征的 ContentBlock。
+- `TextBlock` — **is_a** → `ContentBlock` (`TextBlock-is_a-ContentBlock`)
+  - 文本内容块 是一种 内容块。区分特征：任一文本块都是以字符或自然语言文本为载荷的 ContentBlock。
+- `ContentBlock` — **truncated_by_window** → `TruncatedContextSpan` (`truncated_by_window`)
+  - 将内容连接到使其缩短的上下文或输出窗口决策。
+- `IndexPointer` — **references** → `DiscoveryIndex` (`IndexPointer-references-DiscoveryIndex`)
+  - 索引指针引用发现索引，而不是成为索引的子类。
+- `IndexVersionReference` — **refers_to** → `IndexVersion` (`IndexVersionReference-refers_to-IndexVersion`)
+  - Info 域的版本引用映射到 Memory 域唯一拥有的持久索引版本。
+- `LightIndex` — **exposes** → `DiscoverySurface` (`LightIndex-exposes-DiscoverySurface`)
+  - 轻量索引通过明确的发现界面暴露可搜索内容。
+- `LightIndex` — **is_a** → `DiscoveryIndex` (`LightIndex-is_a-DiscoveryIndex`)
+  - 轻量发现索引 是一种 发现索引。区分特征：任一 LightIndex 都是只为快速上下文发现提供指针集合或表面的 DiscoveryIndex，不拥有完整持久索引生命周期。
+- `LightweightRetrievalTrace` — **records** → `DiscoveryResult` (`LightweightRetrievalTrace-records-DiscoveryResult`)
+  - 轻量检索轨迹记录发现结果、分数、排名与来源证据以支持重放。
+- `RetrievalScore` — **is_a** → `DiscoveryScore` (`RetrievalScore-is_a-DiscoveryScore`)
+  - 检索评分 是一种 发现评分。区分特征：任一检索评分都是由相似度、相关性或重排方法产生的 DiscoveryScore。
+- `RetrievedCandidate` — **is_a** → `DiscoveryResult` (`RetrievedCandidate-is_a-DiscoveryResult`)
+  - 检索候选 是一种 发现结果。区分特征：任一检索候选都是发现过程返回、尚待选择的 DiscoveryResult。
+- `RetrievedCandidate` — **ranked_at** → `CandidateRank` (`RetrievedCandidate-ranked_at-CandidateRank`)
+  - 检索候选记录其排序位置，排序值不获得独立分类链。
+- `RetrievedContextCandidate` — **is_a** → `RetrievedCandidate` (`RetrievedContextCandidate-is_a-RetrievedCandidate`)
+  - 检索上下文候选 是一种 检索候选。区分特征：任一检索上下文候选都是被评估用于具体 ContextPackage 的 RetrievedCandidate，区分特征是目标为上下文纳入。
+- `RetrievedContextCandidate` — **scored_by** → `RetrievalScore` (`RetrievedContextCandidate-scored_by-RetrievalScore`)
+  - 面向上下文的候选关联可解释的检索评分。
+- `SearchResult` — **is_a** → `DiscoveryResult` (`SearchResult-is_a-DiscoveryResult`)
+  - 搜索结果 是一种 发现结果。区分特征：任一搜索结果都是由搜索界面返回并携带来源与评分的 DiscoveryResult。
+- `SearchResult` — **scored_by** → `SearchScore` (`SearchResult-scored_by-SearchScore`)
+  - 搜索结果通过评分关系关联观测值，不把分数误作结果父类。
+- `SearchScore` — **is_a** → `DiscoveryScore` (`SearchScore-is_a-DiscoveryScore`)
+  - 搜索评分 是一种 发现评分。区分特征：任一搜索评分都是搜索匹配方法针对结果给出的 DiscoveryScore。
+- `RetrievedContextCandidate` — **selected_for_context** → `ContextPackage` (`selected_for_context`)
+  - 将检索候选项、来源片段、消息或观测连接到包含它的上下文包。
+- `AssistantMessage` — **is_a** → `Message` (`AssistantMessage-is_a-Message`)
+  - 助手消息 是一种 消息。区分特征：任一助手消息都是发送角色为助手、可携带模型输出或工具意图的 Message。
+- `ContextPackage` — **contains_candidate** → `RetrievedCandidate` (`ContextPackage-contains_candidate-RetrievedCandidate`)
+  - 经选择的检索候选可作为上下文包组成部分并保留其来源与评分。
+- `ContextPackage` — **contains_message** → `Message` (`ContextPackage-contains_message-Message`)
+  - 上下文包记录某次模型调用实际可见的消息集合。
+- `ContextPackage` — **contains** → `FewShotExample` (`ContextPackage-contains-FewShotExample`)
+  - 上下文包可把少样本示例作为有来源的上下文信息纳入。
+- `Conversation` — **contains_turn** → `ConversationTurn` (`Conversation-contains_turn-ConversationTurn`)
+  - 会话由带顺序的会话轮次组成。
+- `Conversation` — **is_a** → `ConversationElement` (`Conversation-is_a-ConversationElement`)
+  - 会话 是一种 会话结构元素。区分特征：任一会话都是按共同会话身份组织轮次和消息的 ConversationElement，区分特征是其聚合范围覆盖完整交换。
+- `ConversationTurn` — **contains_message** → `Message` (`ConversationTurn-contains_message-Message`)
+  - 一个轮次包含在该交换位置出现的一个或多个消息包络。
+- `ConversationTurn` — **is_a** → `ConversationElement` (`ConversationTurn-is_a-ConversationElement`)
+  - 会话轮次 是一种 会话结构元素。区分特征：任一会话轮次都是定位一次交换位置并包含消息的 ConversationElement。
+- `ConversationTurn` — **precedes** → `ConversationTurn` (`ConversationTurn-precedes-ConversationTurn`)
+  - 轮次通过有向时序关系表达先后，而不是依赖 TurnIndex 图节点。
+- `DeveloperMessage` — **is_a** → `Message` (`DeveloperMessage-is_a-Message`)
+  - 开发者消息 是一种 消息。区分特征：任一开发者消息都是发送角色为 developer、携带实现约束或任务框架的 Message。
+- `ExternalAgentMessage` — **is_a** → `Message` (`ExternalAgentMessage-is_a-Message`)
+  - 外部智能体消息 是一种 消息。区分特征：外部智能体消息是一种跨互操作或信任边界交换的 Message，不是 Actor；修正旧 actor_type 并纳入消息层级。
+- `Instruction` — **has_instruction_authority** → `InstructionAuthority` (`has_instruction_authority`)
+  - 将指令连接到用于解决系统、开发者、用户、策略、检索内容或工具来源指令冲突的权威来源。
+- `Instruction` — **has_instruction_priority** → `InstructionPriority` (`has_instruction_priority`)
+  - 将指令连接到多项指令竞争时采用的优先次序。
+- `Instruction` — **has_instruction_scope** → `InstructionScope` (`has_instruction_scope`)
+  - 将指令连接到其适用的会话、任务、工具调用、来源片段或信任边界。
+- `ContextPackage` — **has_visible_window** → `VisibleContextWindow` (`has_visible_window`)
+  - 将上下文包连接到模型调用、行为者或下游接收者可见的窗口。
+- `Instruction` — **instruction_flagged_as_prompt_injection** → `PromptInjectionSignal` (`instruction_flagged_as_prompt_injection`)
+  - 该关系把指令或指令候选连接到解释其覆盖可信指令、操纵行为、外泄数据或绕过策略尝试的提示注入信号。
+- `InstructionApplicability` — **is_a** → `InstructionMetadata` (`InstructionApplicability-is_a-InstructionMetadata`)
+  - 指令适用性 是一种 指令元数据。区分特征：任一指令适用性对象都是说明指令在何条件下生效或失效的 InstructionMetadata。
+- `InstructionAuthority` — **is_a** → `InstructionMetadata` (`InstructionAuthority-is_a-InstructionMetadata`)
+  - 指令权威 是一种 指令元数据。区分特征：任一指令权威对象都是记录签发来源和权威层级的 InstructionMetadata。
+- `InstructionOverride` — **is_a** → `Instruction` (`InstructionOverride-is_a-Instruction`)
+  - 指令覆盖 是一种 指令。区分特征：任一指令覆盖都是以更高权威或更具体范围替换、收窄另一指令的 Instruction。
+- `InstructionOverride` — **overrides** → `Instruction` (`InstructionOverride-overrides-Instruction`)
+  - 授权的覆盖指令明确指向被替换或收窄的原指令。
+- `InstructionPriority` — **is_a** → `InstructionMetadata` (`InstructionPriority-is_a-InstructionMetadata`)
+  - 指令优先级 是一种 指令元数据。区分特征：任一指令优先级对象都是记录适用指令竞争次序的 InstructionMetadata。
+- `InstructionProvenance` — **is_a** → `InstructionMetadata` (`InstructionProvenance-is_a-InstructionMetadata`)
+  - 指令来源 是一种 指令元数据。区分特征：任一指令来源对象都是把指令连接到消息、策略、模板或批准记录的 InstructionMetadata。
+- `InstructionProvenance` — **references_source** → `SourceReference` (`InstructionProvenance-references_source-SourceReference`)
+  - 指令来源元数据指向可审计的来源引用。
+- `InstructionResolution` — **resolves** → `InstructionConflict` (`InstructionResolution-resolves-InstructionConflict`)
+  - Info 域拥有解决结果记录，但所解决的 InstructionConflict 仅引用 Safety 域 canonical 概念。
+- `InstructionScope` — **is_a** → `InstructionMetadata` (`InstructionScope-is_a-InstructionMetadata`)
+  - 指令范围 是一种 指令元数据。区分特征：任一指令范围对象都是界定指令作用于会话、任务、工具调用或边界的 InstructionMetadata。
+- `Message` — **message_scanned_by_pattern_scan** → `PatternScan` (`message_scanned_by_pattern_scan`)
+  - 该关系把消息信封连接到检查其内容块、指令、附件或来源引用中注入与策略风险的模式扫描。
+- `Message` — **carries_instruction** → `Instruction` (`Message-carries_instruction-Instruction`)
+  - 消息可承载规范性指令，但消息自身不因此成为指令子类。
+- `Message` — **contains_content_block** → `ContentBlock` (`Message-contains_content_block-ContentBlock`)
+  - 消息包络包含可单独引用、过滤和预算的类型化内容块。
+- `Message` — **replies_to** → `Message` (`Message-replies_to-Message`)
+  - 回复结构以 Message 到 Message 的单一有向关系表达，ReplyTo 不再作为影子节点。
+- `MessageHistory` — **contains_message** → `Message` (`MessageHistory-contains_message-Message`)
+  - 可观察消息历史聚合已保留的消息版本，支持连续性和重放。
+- `MessageHistory` — **is_a** → `ConversationElement` (`MessageHistory-is_a-ConversationElement`)
+  - 消息历史 是一种 会话结构元素。区分特征：任一消息历史都是为连续性或重放保留有序消息版本的 ConversationElement。
+- `Message` — **part_of_conversation** → `Conversation` (`part_of_conversation`)
+  - 将消息或轮次连接到提供顺序和连续性的对话或线程。
+- `PromptTemplateInstance` — **instantiates** → `PromptTemplate` (`PromptTemplateInstance-instantiates-PromptTemplate`)
+  - 已填充的模板实例引用 Tool 域的模板定义，避免在 Info 域复制定义节点。
+- `ProtocolEnvelope` — **wraps** → `Message` (`ProtocolEnvelope-wraps-Message`)
+  - 协议包络包装 canonical Message，同时把协议专有字段留给 Adapter 映射。
+- `SystemMessage` — **is_a** → `Message` (`SystemMessage-is_a-Message`)
+  - 系统消息 是一种 消息。区分特征：任一系统消息都是发送角色为 system、携带高权威约束或会话框架的 Message。
+- `SystemPrompt` — **is_a** → `Instruction` (`SystemPrompt-is_a-Instruction`)
+  - 系统提示指令 是一种 指令。区分特征：任一系统提示都是以 system 权威框定模型行为的 Instruction；它可由 SystemMessage 承载但不等同于消息包络。
+- `ToolObservationMessage` — **is_a** → `Message` (`ToolObservationMessage-is_a-Message`)
+  - 工具观测消息 是一种 消息。区分特征：任一工具观测消息都是把工具或环境观测放入可见上下文的 Message。
+- `ToolResultMessage` — **is_a** → `Message` (`ToolResultMessage-is_a-Message`)
+  - 工具结果消息 是一种 消息。区分特征：任一工具结果消息都是将 ToolResult 的可见数据、错误或制品引用包装为后续上下文的 Message。
+- `ToolResultMessage` — **references_tool_result** → `ToolResult` (`ToolResultMessage-references_tool_result-ToolResult`)
+  - 工具结果消息引用 Tool 域实际 ToolResult，而不复制执行结果语义。
+- `UserMessage` — **is_a** → `Message` (`UserMessage-is_a-Message`)
+  - 用户消息 是一种 消息。区分特征：任一用户消息都是发送角色为 user、引入请求、约束、附件或反馈的 Message。
+- `OutputCitation` — **cites_source** → `SourceSpan` (`cites_source`)
+  - 将可见输出中的引用连接到支持所显示主张或片段的精确来源区段。
+- `VisibleContextWindow` — **context_window_crosses_trust_boundary** → `TrustBoundary` (`context_window_crosses_trust_boundary`)
+  - 该关系把可见上下文窗口连接到其跨越的信任边界，表示来自其它参与者、数据区、工具、记忆或远程智能体的内容变为可见。
+- `ContextSelectionDecision` — **selects_window** → `OutputWindow` (`ContextSelectionDecision-selects_window-OutputWindow`)
+  - 上下文选择决定记录采用哪个窗口及采用理由。
+- `ContextSelectionDecision` — **suppresses** → `SuppressedContext` (`ContextSelectionDecision-suppresses-SuppressedContext`)
+  - 选择决定明确关联因策略、预算或相关性而被抑制的内容记录。
+- `DisclosedOutputSegment` — **is_a** → `DisclosureArtifact` (`DisclosedOutputSegment-is_a-DisclosureArtifact`)
+  - 已披露输出片段 是一种 披露审计制品。区分特征：任一已披露输出片段既是披露控制产生的 DisclosureArtifact，也仍是具有顺序和来源的 OutputSegment；多父维度分别表达治理状态和内容结构。
+- `DisclosedOutputSegment` — **is_a** → `OutputSegment` (`DisclosedOutputSegment-is_a-OutputSegment`)
+  - 已披露输出片段 是一种 输出片段。区分特征：任一已披露输出片段既是披露控制产生的 DisclosureArtifact，也仍是具有顺序和来源的 OutputSegment；多父维度分别表达治理状态和内容结构。
+- `DisclosureStage` — **governed_by** → `ProgressiveDisclosure` (`DisclosureStage-governed_by-ProgressiveDisclosure`)
+  - 输出披露活动引用 Safety 域唯一拥有的渐进披露控制，不在 Info 域复制。
+- `DisclosureStage` — **produces** → `DisclosedOutputSegment` (`DisclosureStage-produces-DisclosedOutputSegment`)
+  - 披露阶段产生带接收方、边界和引用信息的可见输出片段。
+- `DisclosedOutputSegment` — **displayed_to_actor** → `AgentActor` (`displayed_to_actor`)
+  - 将已披露输出片段连接到能够查看它的行为者或接收者。
+- `HeadTailWindow` — **is_a** → `OutputWindow` (`HeadTailWindow-is_a-OutputWindow`)
+  - 首尾输出窗口 是一种 输出窗口。区分特征：任一首尾窗口都是通过保留开头和结尾范围定义可见区间的 OutputWindow。
+- `OutputSegment` — **output_segment_has_sensitive_span** → `SensitiveSpan` (`output_segment_has_sensitive_span`)
+  - 该关系把输出片段连接到需要脱敏、掩码、抑制、延迟释放或限制路由的敏感片段。
+- `OutputChunk` — **is_a** → `OutputSegment` (`OutputChunk-is_a-OutputSegment`)
+  - 输出分块 是一种 输出片段。区分特征：任一输出分块都是为传输、引用或预算而划定边界的 OutputSegment。
+- `OutputCitation` — **anchored_by** → `CitationAnchor` (`OutputCitation-anchored_by-CitationAnchor`)
+  - 输出引用通过稳定引用锚定位到支持可见片段的原始来源。
+- `OutputCitation` — **is_a** → `OutputInformation` (`OutputCitation-is_a-OutputInformation`)
+  - 输出引用 是一种 输出信息。区分特征：任一输出引用都是把可见输出关联到来源锚的 OutputInformation，区分特征是证据定位。
+- `OutputSegment` — **is_a** → `OutputInformation` (`OutputSegment-is_a-OutputInformation`)
+  - 输出片段 是一种 输出信息。区分特征：任一输出片段都是具有顺序、范围、来源和可见性的 OutputInformation。
+- `OutputSegment` — **partitioned_into** → `OutputChunk` (`OutputSegment-partitioned_into-OutputChunk`)
+  - 输出片段可进一步划分为用于传输、引用或预算的分块。
+- `OutputStream` — **contains_segment** → `OutputSegment` (`OutputStream-contains_segment-OutputSegment`)
+  - 输出流由有序、可寻址的输出片段组成。
+- `OutputStream` — **is_a** → `OutputInformation` (`OutputStream-is_a-OutputInformation`)
+  - 输出流 是一种 输出信息。区分特征：任一输出流都是按产生顺序组织输出片段的 OutputInformation 集合。
+- `OutputWindow` — **is_a** → `OutputInformation` (`OutputWindow-is_a-OutputInformation`)
+  - 输出窗口 是一种 输出信息。区分特征：任一输出窗口都是规定某接收方可见或保留范围的 OutputInformation 规范。
+- `OutputWindow` — **selects_from** → `OutputStream` (`OutputWindow-selects_from-OutputStream`)
+  - 输出窗口声明从哪个输出流选择可见范围。
+- `DisclosedOutputSegment` — **released_to_boundary** → `TrustBoundary` (`released_to_boundary`)
+  - 将已披露输出片段连接到获准跨越的信任边界或外部边界。
+- `SuppressedContext` — **suppressed_by_rule** → `DisclosureRule` (`suppressed_by_rule`)
+  - 将被抑制的上下文或输出连接到扣留它的披露、脱敏、隐私、安全或边界规则。
+- `SuppressedContext` — **is_a** → `DisclosureArtifact` (`SuppressedContext-is_a-DisclosureArtifact`)
+  - 已抑制上下文 是一种 披露审计制品。区分特征：任一已抑制上下文都是记录因策略、隐私、相关性或预算未披露内容的 DisclosureArtifact。
+- `TruncatedContextSpan` — **is_a** → `DisclosureArtifact` (`TruncatedContextSpan-is_a-DisclosureArtifact`)
+  - 已截断上下文片段 是一种 披露审计制品。区分特征：任一截断上下文片段都是记录窗口、限长或摘要移除范围的 DisclosureArtifact，而不是长度值。
+- `TruncatedContextSpan` — **omitted_from** → `OutputWindow` (`TruncatedContextSpan-omitted_from-OutputWindow`)
+  - 截断片段记录它从哪个输出窗口中被移除，支持完整性审计。
+- `VisibleContextWindow` — **is_a** → `OutputWindow` (`VisibleContextWindow-is_a-OutputWindow`)
+  - 可见上下文窗口 是一种 输出窗口。区分特征：任一可见上下文窗口都是针对特定 Actor、模型调用或步骤定义可见范围的 OutputWindow。
+- `SourceReference` — **belongs_to_data_zone** → `DataZoneReference` (`belongs_to_data_zone`)
+  - 该关系把来源或上下文产物连接到治理其可见性、保留期限和允许用途的数据区。
+- `CitationAnchor` — **anchors** → `SourceSpan` (`CitationAnchor-anchors-SourceSpan`)
+  - 引用锚精确锚定支撑某项主张的来源片段。
+- `CitationAnchor` — **is_a** → `SourceAnchor` (`CitationAnchor-is_a-SourceAnchor`)
+  - 引用锚 是一种 来源锚。区分特征：任一引用锚都是专门为一项可见主张绑定精确 SourceSpan 的 SourceAnchor。
+- `ContentDigest` — **is_a** → `SourceIdentity` (`ContentDigest-is_a-SourceIdentity`)
+  - 内容摘要 是一种 来源身份信息。区分特征：任一内容摘要都是从来源内容计算并用于判同、缓存或完整性检查的 SourceIdentity。
+- `DatabaseRowReference` — **is_a** → `SourceReference` (`DatabaseRowReference-is_a-SourceReference`)
+  - 数据库行引用 是一种 来源引用。区分特征：任一数据库行引用都是以行、查询结果或表切片为指称对象的 SourceReference。
+- `DataZoneReference` — **refers_to** → `DataZone` (`DataZoneReference-refers_to-DataZone`)
+  - 数据区引用指向 Safety 域唯一 DataZone，而不复制数据区分类。
+- `FileResourceReference` — **is_a** → `SourceReference` (`FileResourceReference-is_a-SourceReference`)
+  - 文件资源引用 是一种 来源引用。区分特征：任一文件资源引用都是以路径、URI、版本、摘要或片段定位文件的 SourceReference。
+- `GraphNodeReference` — **is_a** → `SourceReference` (`GraphNodeReference-is_a-SourceReference`)
+  - 图节点引用 是一种 来源引用。区分特征：任一图节点引用都是以图标识和节点标识定位图中来源对象的 SourceReference。
+- `SourceReference` — **has_checksum** → `SourceChecksum` (`has_checksum`)
+  - 将来源引用连接到用于检测摄入或上下文暂存后内容漂移的摘要值。
+- `SourceReference` — **has_source_span** → `SourceSpan` (`has_source_span`)
+  - 将来源引用连接到用作证据的精确片段、行、范围、页、行号、偏移或锚点。
+- `SourceReference` — **has_version** → `SourceVersion` (`has_version`)
+  - 将来源引用连接到所引用的版本、修订、快照、提交或发布版本。
+- `NetworkSourceReference` — **is_a** → `SourceReference` (`NetworkSourceReference-is_a-SourceReference`)
+  - 网络来源引用 是一种 来源引用。区分特征：任一网络来源引用都是以端点、请求或响应来源为指称对象并保留边界元数据的 SourceReference。
+- `SourceReference` — **source_reference_belongs_to_data_zone** → `DataZone` (`source_reference_belongs_to_data_zone`)
+  - 该关系把来源引用连接到治理其分类、信任、保留、记忆使用、工具暴露和披露路由的数据区。
+- `SourceAnchor` — **reidentifies** → `SourceSpan` (`SourceAnchor-reidentifies-SourceSpan`)
+  - 稳定来源锚用于在分块、渲染或修订后重新识别片段。
+- `SourceCellRange` — **is_a** → `SourceLocation` (`SourceCellRange-is_a-SourceLocation`)
+  - 来源单元格范围 是一种 来源位置。区分特征：任一单元格范围都是用表、工作表或矩阵坐标区分的 SourceLocation。
+- `SourceChecksum` — **is_a** → `ContentDigest` (`SourceChecksum-is_a-ContentDigest`)
+  - 来源校验和 是一种 内容摘要。区分特征：任一来源校验和都是使用明确校验算法生成的 ContentDigest，区分特征是面向变更检测与完整性验证。
+- `SourceLineRange` — **is_a** → `SourceLocation` (`SourceLineRange-is_a-SourceLocation`)
+  - 来源行范围 是一种 来源位置。区分特征：任一来源行范围都是用起止行号定位代码、日志或文本的 SourceLocation。
+- `SourceOffset` — **is_a** → `SourceLocation` (`SourceOffset-is_a-SourceLocation`)
+  - 来源偏移 是一种 来源位置。区分特征：任一来源偏移都是用字节、字符、词元或结构位置定位的 SourceLocation。
+- `SourcePageRange` — **is_a** → `SourceLocation` (`SourcePageRange-is_a-SourceLocation`)
+  - 来源页范围 是一种 来源位置。区分特征：任一来源页范围都是用起止页定位分页文档的 SourceLocation。
+- `SourceReference` — **accessed_via** → `AccessPath` (`SourceReference-accessed_via-AccessPath`)
+  - 访问路径描述如何解析来源，但不把路径当成来源子类。
+- `SourceReference` — **described_by** → `ResourceDescriptor` (`SourceReference-described_by-ResourceDescriptor`)
+  - 资源描述符提供类型、访问提示和信任元数据，来源引用仍保持稳定身份。
+- `SourceReference` — **has_identity** → `SourceIdentity` (`SourceReference-has_identity-SourceIdentity`)
+  - 来源引用关联版本或内容指纹，使同一定位在修订后仍可判别。
+- `SourceReference` — **has_provenance** → `SourceProvenance` (`SourceReference-has_provenance-SourceProvenance`)
+  - 来源引用保留采集、转换和信任来源的可审计来历。
+- `SourceReference` — **located_at** → `SourceLocation` (`SourceReference-located_at-SourceLocation`)
+  - 来源引用通过位置对象给出路径、页、行、单元格或偏移范围。
+- `SourceSpan` — **is_a** → `SourceLocation` (`SourceSpan-is_a-SourceLocation`)
+  - 来源片段 是一种 来源位置。区分特征：任一来源片段都是具有明确起止边界、用于支撑内容块或主张的 SourceLocation。
+- `SourceVersion` — **is_a** → `SourceIdentity` (`SourceVersion-is_a-SourceIdentity`)
+  - 来源版本 是一种 来源身份信息。区分特征：任一来源版本都是以修订、时间戳、提交、快照或发布标识区分来源状态的 SourceIdentity。
+- `TextDocumentReference` — **is_a** → `SourceReference` (`TextDocumentReference-is_a-SourceReference`)
+  - 文本文档引用 是一种 来源引用。区分特征：任一文本文档引用都是以 TextDocument 为指称对象并携带位置、版本或摘要的 SourceReference。
+- `TextDocumentReference` — **refers_to** → `TextDocument` (`TextDocumentReference-refers_to-TextDocument`)
+  - 文本文档引用与被引用文档分开，允许引用携带不同位置和版本。
+- `TrustBoundaryReference` — **refers_to** → `TrustBoundary` (`TrustBoundaryReference-refers_to-TrustBoundary`)
+  - 信任边界引用指向 Safety 域 canonical TrustBoundary，保留来源路径的治理上下文。
+- `AgentAsToolInvocation` — **is_a** → `DelegationProcess` (`AgentAsToolInvocation-is_a-DelegationProcess`)
+  - 智能体作为工具调用 是一种 委派过程。区分特征：智能体作为工具调用是管理者保留控制权和答案归属的一种有界委派过程。
+- `AnswerOwnership` — **is_a** → `CoordinationOwnershipRecord` (`AnswerOwnership-is_a-CoordinationOwnershipRecord`)
+  - 答案归属 是一种 协调归属记录。区分特征：答案归属是以最终响应或产物责任主体为区分内容的一种协调归属记录。
+- `TaskDistribution` — **assigns_work_item_to** → `WorkerAgent` (`assigns_work_item_to`)
+  - 工作项分配关系把任务分发事件连接到接收有范围工作项的工作者智能体。
+- `DelegationContract` — **constrained_by_budget** → `DelegationBudget` (`constrained_by_budget`)
+  - 预算约束关系把委派契约连接到治理委派工作的令牌、时间、成本、重试、上下文或工具调用预算。
+- `ControlOwnership` — **is_a** → `CoordinationOwnershipRecord` (`ControlOwnership-is_a-CoordinationOwnershipRecord`)
+  - 控制归属 是一种 协调归属记录。区分特征：控制归属是以当前下一步控制者为区分内容的一种协调归属记录。
+- `Orchestrator` — **delegates_to_subagent** → `SubagentRole` (`delegates_to_subagent`)
+  - 对象关系定义域为编排者，值域为子智能体；用于表达这两个智能体系统术语之间可验证、可追溯的语义连接。
+- `DelegationBudget` — **constrains** → `DelegationProcess` (`DelegationBudget-constrains-DelegationProcess`)
+  - 委派预算限制该过程的时间、成本、重试与调用。
+- `DelegationContract` — **bounds** → `SubagentContext` (`DelegationContract-bounds-SubagentContext`)
+  - 委托合同界定子智能体可见上下文，而不复制上下文内容。
+- `DelegationContract` — **grants** → `DelegatedAuthority` (`DelegationContract-grants-DelegatedAuthority`)
+  - 委派合同授予且限定代理权限。
+- `DelegationEvent` — **changes** → `DelegationProcess` (`DelegationEvent-changes-DelegationProcess`)
+  - 委派事件启动、更新、取消或完成委派过程。
+- `DelegationOwnership` — **is_a** → `CoordinationOwnershipRecord` (`DelegationOwnership-is_a-CoordinationOwnershipRecord`)
+  - 委派归属 是一种 协调归属记录。区分特征：委派归属是以委派者与代理者之间责任划分为区分内容的一种协调归属记录。
+- `DelegationProcess` — **governed_by** → `DelegationContract` (`DelegationProcess-governed_by-DelegationContract`)
+  - 每个委派过程由明确的工作、范围与完成合同约束。
+- `DelegationProcess` — **produces** → `DelegationResult` (`DelegationProcess-produces-DelegationResult`)
+  - 委派过程产生带状态、证据和来源的委派结果。
+- `TaskDistribution` — **distributes_task_to** → `AgentActor` (`distributes_task_to`)
+  - 对象关系定义域为任务分发，值域为智能体参与者；用于表达这两个智能体系统术语之间可验证、可追溯的语义连接。
+- `Handoff` — **causes** → `ResponsibilityTransfer` (`Handoff-causes-ResponsibilityTransfer`)
+  - 有效移交导致责任或保管权发生可审计转移。
+- `ContextIsolation` — **isolates_context_for** → `SubagentRole` (`isolates_context_for`)
+  - 上下文隔离关系把隔离策略连接到受其限定可见消息、工具、记忆和来源的子智能体。
+- `Orchestrator` — **is_a** → `CoordinationRole` (`Orchestrator-is_a-CoordinationRole`)
+  - 编排者角色 是一种 协调角色。区分特征：编排者描述分解、委派、路由和综合职责，是可由不同 Actor 承担的协调角色，而非固定 Actor 子类。
+- `AgentAsToolInvocation` — **retains_answer_ownership** → `AnswerOwnership` (`retains_answer_ownership`)
+  - 答案归属保留关系把工具式智能体调用连接到记录管理者仍对最终答案负责的归属记录。
+- `SubagentRole` — **is_a** → `CoordinationRole` (`SubagentRole-is_a-CoordinationRole`)
+  - 子智能体角色 是一种 协调角色。区分特征：子智能体角色是以受限任务、权限、上下文和向上汇报为区分特征的一种协调角色。
+- `TaskDistribution` — **assigns** → `WorkItem` (`TaskDistribution-assigns-WorkItem`)
+  - 任务分发把工作项映射给选定执行角色。
+- `TaskDistribution` — **is_a** → `DelegationProcess` (`TaskDistribution-is_a-DelegationProcess`)
+  - 任务分发 是一种 委派过程。区分特征：任务分发是把工作项分配给选定执行者并保留范围证据的一种委派过程。
+- `Handoff` — **transfers_control_to** → `HandoffTarget` (`transfers_control_to`)
+  - 控制转移关系把交接事件连接到接收下一步工作流控制权的目标参与者、路由或端点。
+- `Orchestrator` — **uses_agent_as_tool** → `AgentAsToolInvocation` (`uses_agent_as_tool`)
+  - 智能体工具调用关系把编排者连接到一种有边界调用，其中另一智能体作为辅助者被调用而管理者仍保留控制。
+- `WorkerAgent` — **is_a** → `CoordinationRole` (`WorkerAgent-is_a-CoordinationRole`)
+  - 工作者角色 是一种 协调角色。区分特征：工作者表示接收范围化工作并返回证据的职责，可由 Agent、模型服务或工具服务承担，因此改为协调角色。
+- `WorkerCapabilityMatch` — **justifies** → `WorkerSelection` (`WorkerCapabilityMatch-justifies-WorkerSelection`)
+  - 能力匹配证据解释为何选择某工作者。
+- `WorkerSelection` — **evaluates** → `WorkerAvailability` (`WorkerSelection-evaluates-WorkerAvailability`)
+  - 工作者选择评估带时间的可用性记录。
+- `WorkerSelection` — **selects_from** → `WorkerPool` (`WorkerSelection-selects_from-WorkerPool`)
+  - 工作者选择以候选池为输入并记录选择证据。
+- `AggregationRule` — **governs** → `Synthesis` (`AggregationRule-governs-Synthesis`)
+  - 聚合规则约束并行结果、证据和选票如何合并。
+- `ChainStage` — **is_a** → `CompositionPart` (`ChainStage-is_a-CompositionPart`)
+  - 链阶段 是一种 组合部件。区分特征：链阶段是以提示链中的顺序位置、输入、输出和守卫为区分特征的一种组合部件。
+- `OrchestrationTopology` — **uses_pattern** → `CompositionPattern` (`OrchestrationTopology-uses_pattern-CompositionPattern`)
+  - 编排拓扑由一个或多个静态组合模式构成。
+- `ParallelBranch` — **is_a** → `CompositionPart` (`ParallelBranch-is_a-CompositionPart`)
+  - 并行分支 是一种 组合部件。区分特征：并行分支是以独立工作范围、上下文切片和汇合要求为区分特征的一种组合部件。
+- `Parallelization` — **contains_branch** → `ParallelBranch` (`Parallelization-contains_branch-ParallelBranch`)
+  - 并行模式包含独立分支及其汇合约束。
+- `Parallelization` — **is_a** → `CompositionPattern` (`Parallelization-is_a-CompositionPattern`)
+  - 并行化模式 是一种 组合模式。区分特征：并行化是一种以多个分支并发执行和汇合为区分特征的组合模式。
+- `PromptChain` — **contains_stage** → `ChainStage` (`PromptChain-contains_stage-ChainStage`)
+  - 链阶段是提示链的有序部件，不是提示链的子类。
+- `PromptChain` — **is_a** → `CompositionPattern` (`PromptChain-is_a-CompositionPattern`)
+  - 提示链模式 是一种 组合模式。区分特征：提示链是一种以模型或提示阶段顺序串联为区分特征的组合模式。
+- `SectionAssignment` — **is_a** → `CompositionPart` (`SectionAssignment-is_a-CompositionPart`)
+  - 分段分配 是一种 组合部件。区分特征：分段分配是把片段、执行者、上下文和预期输出绑定在一起的一种组合部件规约。
+- `Sectioning` — **creates** → `SectionAssignment` (`Sectioning-creates-SectionAssignment`)
+  - 分段模式产生面向工作者和片段的分配记录。
+- `Sectioning` — **is_a** → `CompositionPattern` (`Sectioning-is_a-CompositionPattern`)
+  - 分段模式 是一种 组合模式。区分特征：分段是一种以把较大工作或产物切分后独立处理为区分特征的组合模式。
+- `Synthesis` — **produces** → `SynthesisOutput` (`Synthesis-produces-SynthesisOutput`)
+  - 综合活动产生可追溯到各输入的不可变输出。
+- `SynthesisPlan` — **governs** → `Synthesis` (`SynthesisPlan-governs-Synthesis`)
+  - 综合计划规定输入、优先级、冲突和汇总规则。
+- `Synthesis` — **synthesizes_from_input** → `SynthesisInput` (`synthesizes_from_input`)
+  - 综合输入关系把综合事件连接到其消费的工作者输出、检索证据、投票、工具结果或反馈输入。
+- `Voting` — **consumes** → `VoteBallot` (`Voting-consumes-VoteBallot`)
+  - 投票模式聚合可追踪选票，而选票不是一种投票模式。
+- `Voting` — **is_a** → `CompositionPattern` (`Voting-is_a-CompositionPattern`)
+  - 投票模式 是一种 组合模式。区分特征：投票是一种以收集多个候选判断并按规则选择或聚合为区分特征的组合模式。
+- `CritiqueArtifact` — **is_a** → `RevisionArtifact` (`CritiqueArtifact-is_a-RevisionArtifact`)
+  - 批评产物 是一种 修订信息产物。区分特征：批评产物是以发现、请求修改、置信度和来源为区分内容的一种修订产物。
+- `EvaluatorOptimizer` — **controls** → `ImprovementLoop` (`EvaluatorOptimizer-controls-ImprovementLoop`)
+  - 评估优化角色决定修订、重试、升级或停止。
+- `FeedbackRouting` — **is_a** → `ReviewCoordination` (`FeedbackRouting-is_a-ReviewCoordination`)
+  - 反馈路由 是一种 审核协调活动。区分特征：反馈路由是把适用反馈送往任务、角色、修订计划或闸门的一种审核协调活动。
+- `FeedbackRouting` — **selects** → `RevisionPlan` (`FeedbackRouting-selects-RevisionPlan`)
+  - 反馈路由把适用反馈映射到具体修订计划。
+- `ImprovementAttempt` — **updates** → `OptimizerState` (`ImprovementAttempt-updates-OptimizerState`)
+  - 每次尝试产生新的优化器可见状态，不原地覆盖历史。
+- `ImprovementLoop` — **contains_attempt** → `ImprovementAttempt` (`ImprovementLoop-contains_attempt-ImprovementAttempt`)
+  - 改进尝试是循环中的一次迭代，不是改进循环的一种。
+- `ImprovementLoop` — **uses_revision** → `RevisionPlan` (`ImprovementLoop-uses_revision-RevisionPlan`)
+  - 改进循环中的后续尝试必须能追溯到适用的修订计划，使修改对象、判据与重试谱系保持可审计。
+- `ReflectionRecord` — **is_a** → `RevisionArtifact` (`ReflectionRecord-is_a-RevisionArtifact`)
+  - 反思记录 是一种 修订信息产物。区分特征：反思记录是以可观察总结与改进依据为区分内容的一种修订产物，明确排除私有思维链。
+- `StopRetryLineage` — **retries_from_attempt** → `ImprovementAttempt` (`retries_from_attempt`)
+  - 重试来源关系把停止重试脉络连接到派生下一次有边界重试或修订的改进尝试。
+- `ReviewAssignment` — **initiates** → `ReviewEvent` (`ReviewAssignment-initiates-ReviewEvent`)
+  - 审核分派触发具名审核事件并确定责任主体。
+- `ReviewEvent` — **produces** → `CritiqueArtifact` (`ReviewEvent-produces-CritiqueArtifact`)
+  - 审核事件产生可观察批评产物，而不暴露私有推理。
+- `RevisionPlan` — **governs** → `ImprovementAttempt` (`RevisionPlan-governs-ImprovementAttempt`)
+  - 新尝试必须按修订计划修改明确对象与判据。
+- `RevisionPlan` — **is_a** → `RevisionArtifact` (`RevisionPlan-is_a-RevisionArtifact`)
+  - 修订计划 是一种 修订信息产物。区分特征：修订计划是一种说明修改对象、前序尝试、触发反馈与判据的修订产物规约。
+- `StopRetryLineage` — **is_a** → `RevisionArtifact` (`StopRetryLineage-is_a-RevisionArtifact`)
+  - 停止重试脉络 是一种 修订信息产物。区分特征：停止重试脉络是把审核、失败或闸门结果连接到后续重试、停止或回滚的一种修订产物记录。
+- `StopRetryLineage` — **terminates_on_condition** → `StopCondition` (`terminates_on_condition`)
+  - 停止条件关系把停止重试脉络连接到终止循环、分支、重试序列或委派尝试的停止条件。
+- `ThinkAsTool` — **produces** → `ReflectionRecord` (`ThinkAsTool-produces-ReflectionRecord`)
+  - 工具式审议只产出可审计反思记录，不表示私有思维链。
+- `BranchCondition` — **is_a** → `RoutingCondition` (`BranchCondition-is_a-RoutingCondition`)
+  - 分支条件 是一种 路由条件。区分特征：分支条件是以判定可运行分支为区分用途的一种路由条件。
+- `Gate` — **evaluates** → `GateCondition` (`Gate-evaluates-GateCondition`)
+  - 闸门评估条件后才允许、阻止或改向。
+- `Gate` — **is_a** → `ControlGate` (`Gate-is_a-ControlGate`)
+  - 控制闸门 是一种 控制闸门能力。区分特征：Gate 是根据条件允许、阻止、改向或升级工作的具体控制闸门能力。
+- `Gate` — **produces** → `GateOutcome` (`Gate-produces-GateOutcome`)
+  - 闸门评估产生可观察且可审计的结果。
+- `GateCondition` — **is_a** → `RoutingCondition` (`GateCondition-is_a-RoutingCondition`)
+  - 闸门条件 是一种 路由条件。区分特征：闸门条件是以控制闸门许可、阻止或升级判定为区分用途的一种路由条件，不是 Gate 的子类。
+- `GateOutcome` — **triggers** → `DownstreamOperation` (`GateOutcome-triggers-DownstreamOperation`)
+  - 允许、改向、重试或停止结果触发相应下游操作。
+- `RetryPolicy` — **creates_new** → `RunAttempt` (`RetryPolicy-creates_new-RunAttempt`)
+  - 重试必须创建新尝试并保留谱系，不得原地重跑同一尝试。
+- `RetryPolicy` — **is_a** → `RoutingSpecification` (`RetryPolicy-is_a-RoutingSpecification`)
+  - 重试策略 是一种 路由规约。区分特征：重试策略是一种规定何时创建新尝试、退避、升级和停止的路由规约。
+- `Route` — **is_a** → `RoutingSpecification` (`Route-is_a-RoutingSpecification`)
+  - 路线 是一种 路由规约。区分特征：路线是声明控制流从当前点到类型化目标的路由规约；实际选择发生在 RoutingDecision。
+- `Route` — **points_to** → `RoutingTarget` (`Route-points_to-RoutingTarget`)
+  - 路线映射到实际接收控制流的目标。
+- `RoutingCondition` — **is_a** → `RoutingSpecification` (`RoutingCondition-is_a-RoutingSpecification`)
+  - 路由条件 是一种 路由规约。区分特征：三个条件旧概念都可无例外定义为可求值路由规约，并由分支选择、闸门判定与终止用途区分。
+- `RoutingDecision` — **applies** → `RoutingPolicy` (`RoutingDecision-applies-RoutingPolicy`)
+  - 路由决策应用当时有效的策略，而不是策略的子类。
+- `RoutingDecision` — **selects** → `RoutingTarget` (`RoutingDecision-selects-RoutingTarget`)
+  - 决策产生对类型化路由目标的可重放选择。
+- `RoutingPolicy` — **has_condition** → `BranchCondition` (`RoutingPolicy-has_condition-BranchCondition`)
+  - 路由策略以分支条件限制可选路径。
+- `RoutingPolicy` — **is_a** → `RoutingSpecification` (`RoutingPolicy-is_a-RoutingSpecification`)
+  - 路由策略 是一种 路由规约。区分特征：路由策略是一种根据状态、证据和约束规定可选路径的路由规约。
+- `StopCondition` — **is_a** → `RoutingCondition` (`StopCondition-is_a-RoutingCondition`)
+  - 停止条件 是一种 路由条件。区分特征：停止条件是一种以成功、失败、预算、安全或人工决定终止循环为区分用途的路由条件。
+- `StopCondition` — **terminates** → `RuntimeSession` (`StopCondition-terminates-RuntimeSession`)
+  - 满足停止条件时终止相应会话或编排循环。
+- `Goal` — **elaborated_by** → `TaskPlan` (`Goal-elaborated_by-TaskPlan`)
+  - 任务计划把目标展开为可排序、可分派和可验证的工作规约；计划不等同于目标或执行。
+- `Goal` — **is_a** → `IntentionalEntity` (`Goal-is_a-IntentionalEntity`)
+  - 目标 是一种 意图性实体。区分特征：Goal 是表达期望未来状态的意图性实体；它与 Objective 是一般目标与可度量目标的差异，不用伪造 Goal→Plan 的继承。
+- `Goal` — **refined_into** → `Objective` (`Goal-refined_into-Objective`)
+  - 高层目标被细化为可度量、可分派的具体目标。
+- `TaskPlan` — **has_control_topology** → `OrchestrationTopology` (`has_control_topology`)
+  - 控制拓扑关系把任务计划连接到组织管理者工作者、层级、图式、并行或动态协同的编排拓扑。
+- `Intent` — **commits_to** → `Goal` (`Intent-commits_to-Goal`)
+  - 意图表达主体对目标采取行动的承诺；意图不是目标的子类。
+- `Intent` — **is_a** → `IntentionalEntity` (`Intent-is_a-IntentionalEntity`)
+  - 行动意图 是一种 意图性实体。区分特征：Intent 符合“意图性实体＋具名主体行动承诺”的严格定义，并与 Goal/Objective 有清晰兄弟边界。
+- `Objective` — **is_a** → `IntentionalEntity` (`Objective-is_a-IntentionalEntity`)
+  - 可度量目标 是一种 意图性实体。区分特征：Objective 是带可度量判据和可分派边界的意图性实体，与 Goal 通过细化关系连接而非子类关系。
+- `Objective` — **realized_by** → `TaskPlan` (`Objective-realized_by-TaskPlan`)
+  - 任务计划规定实现具体目标的工作路径。
+- `Task` — **constrained_by** → `TaskConstraint` (`Task-constrained_by-TaskConstraint`)
+  - 任务显式关联影响其执行的期限、预算、权限、能力、安全或依赖约束。
+- `Task` — **has_completion_criterion** → `TaskCompletionCriterion` (`Task-has_completion_criterion-TaskCompletionCriterion`)
+  - 每个可执行任务明确关联至少一个可判定完成条件，使完成判断不依赖隐含约定。
+- `Task` — **is_a** → `WorkSpecification` (`Task-is_a-WorkSpecification`)
+  - 任务 是一种 工作规约。区分特征：旧定义混合任务定义与执行实例；本次把 Task 收敛为可分派工作规约，实际一次执行由 RunAttempt 表示。
+- `TaskCompletionCriterion` — **evaluates** → `RunOutcome` (`TaskCompletionCriterion-evaluates-RunOutcome`)
+  - 完成判据依据可观察执行结果判断任务是否满足。
+- `TaskCompletionCriterion` — **is_a** → `TaskCondition` (`TaskCompletionCriterion-is_a-TaskCondition`)
+  - 任务完成判据 是一种 任务条件。区分特征：完成判据是一种以可观察完成条件为区分内容的 TaskCondition。
+- `TaskConstraint` — **is_a** → `TaskCondition` (`TaskConstraint-is_a-TaskCondition`)
+  - 任务约束 是一种 任务条件。区分特征：任务约束是一种限定截止期、预算、权限、能力或安全边界的 TaskCondition。
+- `TaskDependency` — **constrains** → `Task` (`TaskDependency-constrains-Task`)
+  - 任务依赖限制任务何时可以开始或继续。
+- `TaskDependency` — **is_a** → `TaskCondition` (`TaskDependency-is_a-TaskCondition`)
+  - 任务依赖 是一种 任务条件。区分特征：任务依赖是一种要求先决结果、资源或批准的 TaskCondition，而不是 Task 的子类。
+- `TaskPlan` — **contains_step** → `TaskStep` (`TaskPlan-contains_step-TaskStep`)
+  - 步骤是任务计划的有序组成部分，不是一种计划。
+- `TaskPlan` — **is_a** → `WorkSpecification` (`TaskPlan-is_a-WorkSpecification`)
+  - 任务计划 是一种 工作规约。区分特征：任务计划是一种组织任务、步骤、依赖、约束和判据的工作规约。
+- `TaskPlan` — **specifies** → `Task` (`TaskPlan-specifies-Task`)
+  - 计划说明要执行的任务定义。
+- `TaskStep` — **invokes** → `ToolCall` (`TaskStep-invokes-ToolCall`)
+  - 可执行任务步骤可发起具名工具调用；步骤规约、调用事件和后续尝试保持不同身份。
+- `TaskStep` — **is_a** → `WorkSpecification` (`TaskStep-is_a-WorkSpecification`)
+  - 任务步骤 是一种 工作规约。区分特征：任务步骤是一种描述计划内单个可执行或可审核步骤的工作规约；它通过 part-of 属于计划。
+- `WorkItem` — **is_a** → `WorkSpecification` (`WorkItem-is_a-WorkSpecification`)
+  - 工作项 是一种 工作规约。区分特征：工作项是一种已限定执行者、范围与预期产出的可分派工作规约。
+- `Actor` — **has_binding** → `ActorBinding` (`Actor-has_binding-ActorBinding`)
+  - 主体通过可审计绑定取得角色、能力或权限。
+- `ActorAuthorityScope` — **constrains** → `Actor` (`ActorAuthorityScope-constrains-Actor`)
+  - 权限范围限定主体可访问的操作、资源和信任边界。
+- `ActorCapabilityBinding` — **is_a** → `ActorBinding` (`ActorCapabilityBinding-is_a-ActorBinding`)
+  - 参与者能力绑定 是一种 主体绑定记录。区分特征：它是以可调用能力及使用条件为区分特征的一种主体绑定记录。
+- `ActorRoleBinding` — **is_a** → `ActorBinding` (`ActorRoleBinding-is_a-ActorBinding`)
+  - 参与者角色绑定 是一种 主体绑定记录。区分特征：它是以责任角色分派为区分特征的一种主体绑定记录。
+- `AgentActor` — **is_a** → `SoftwareActor` (`AgentActor-is_a-SoftwareActor`)
+  - 智能体参与者 是一种 软件参与主体。区分特征：智能体参与者是能自主行动、接收委派并承担可追踪责任的一种软件主体。
+- `AgentActor` — **associated_with_attempt** → `RunAttempt` (`associated_with_attempt`)
+  - 把运行参与者连接到其具有参与、责任或溯源证据的执行尝试。
+- `DeveloperActor` — **is_a** → `HumanActor` (`DeveloperActor-is_a-HumanActor`)
+  - 开发者参与者 是一种 人类参与主体。区分特征：开发者参与者是以开发指令、实现约束和环境设置责任为区分特征的人类主体。
+- `EmbeddingModel` — **is_a** → `Model` (`EmbeddingModel-is_a-Model`)
+  - 嵌入模型 是一种 运行模型。区分特征：嵌入模型是以生成检索或匹配表示为区分能力的一种模型。
+- `EmbeddingModel` — **embeds_chunk** → `Embedding` (`embeds_chunk`)
+  - 对象关系定义域为嵌入模型，值域为嵌入；用于表达这两个智能体系统术语之间可验证、可追溯的语义连接。
+- `ExternalServiceActor` — **is_a** → `SoftwareActor` (`ExternalServiceActor-is_a-SoftwareActor`)
+  - 外部服务参与者 是一种 软件参与主体。区分特征：外部服务参与者是位于受控系统边界之外并通过请求/响应参与运行的一种软件主体。
+- `GenerativeModel` — **is_a** → `Model` (`GenerativeModel-is_a-Model`)
+  - 生成模型 是一种 运行模型。区分特征：生成模型是以产生文本、代码、结构化输出或调用参数为区分能力的一种模型。
+- `AgentActor` — **has_actor_authority_scope** → `ActorAuthorityScope` (`has_actor_authority_scope`)
+  - 把运行参与者连接到限定其可用工具、操作、资源、数据区域和边界的权限范围。
+- `AgentActor` — **has_actor_capability_binding** → `ActorCapabilityBinding` (`has_actor_capability_binding`)
+  - 把运行参与者连接到其在指定条件下可使用的调用、观察、生成、检索、排序或审查能力。
+- `AgentActor` — **has_actor_role_binding** → `ActorRoleBinding` (`has_actor_role_binding`)
+  - 把运行参与者连接到说明其委派责任、审查职责、批准权限或问责范围的角色绑定。
+- `HumanActor` — **is_a** → `Actor` (`HumanActor-is_a-Actor`)
+  - 人类参与主体 是一种 运行参与主体。区分特征：所有人类参与者均是 Actor，并由“自然人承担”这一稳定区分特征与软件主体分开。
+- `HumanActor` — **may_review** → `AgentActor` (`HumanActor-may_review-AgentActor`)
+  - 人类主体可以审核智能体主体的工作并留下责任证据。
+- `HumanOperator` — **is_a** → `HumanActor` (`HumanOperator-is_a-HumanActor`)
+  - 人类操作员 是一种 人类参与主体。区分特征：人类操作员是能暂停、恢复、重定向或补充信息的一种人类主体。
+- `ModelActor` — **is_a** → `SoftwareActor` (`ModelActor-is_a-SoftwareActor`)
+  - 模型参与者 是一种 软件参与主体。区分特征：模型参与者保留为调用一个或多个模型并消耗预算的软件主体；GenerativeModel 等改挂 Model，避免把模型本身误作其子类。
+- `ModelActor` — **uses** → `Model` (`ModelActor-uses-Model`)
+  - 模型参与者是调用模型的软件主体，而不是模型实体本身。
+- `AgentActor` — **participates_in_session** → `RuntimeSession` (`participates_in_session`)
+  - 把运行参与者身份连接到其行动、观察、授权、生成、检索、排序、审查或执行所在的会话。
+- `RemoteAgentReference` — **remote_agent_crosses_trust_boundary** → `TrustBoundary` (`remote_agent_crosses_trust_boundary`)
+  - 把不透明远程智能体引用连接到任务、消息、产物或状态交换所跨越的信任边界。
+- `RemoteAgentReference` — **refers_to** → `AgentActor` (`RemoteAgentReference-refers_to-AgentActor`)
+  - 远程智能体引用映射到外部可识别主体，但不宣称本地拥有该主体。
+- `RerankerModel` — **is_a** → `Model` (`RerankerModel-is_a-Model`)
+  - 重排序模型 是一种 运行模型。区分特征：重排序模型是以重新排列候选项为区分能力的一种模型。
+- `RerankerModel` — **reranks_result** → `RetrievedChunk` (`reranks_result`)
+  - 对象关系定义域为重排模型模型，值域为已检索分块；用于表达这两个智能体系统术语之间可验证、可追溯的语义连接。
+- `ReviewerActor` — **is_a** → `HumanActor` (`ReviewerActor-is_a-HumanActor`)
+  - 审核者参与者 是一种 人类参与主体。区分特征：审核者参与者是以检查产物、证据和敏感决策并记录结论为职责的人类主体。
+- `SoftwareActor` — **is_a** → `Actor` (`SoftwareActor-is_a-Actor`)
+  - 软件参与主体 是一种 运行参与主体。区分特征：AgentActor 和各服务 Actor 都满足“由软件承担的可行动主体”，共同父类严格且不依赖实现品牌。
+- `SystemServiceActor` — **is_a** → `SoftwareActor` (`SystemServiceActor-is_a-SoftwareActor`)
+  - 系统服务参与者 是一种 软件参与主体。区分特征：系统服务参与者是代表调度、沙箱、存储、遥测或策略中介的一种内部软件主体。
+- `ToolServiceActor` — **is_a** → `SoftwareActor` (`ToolServiceActor-is_a-SoftwareActor`)
+  - 工具服务参与者 是一种 软件参与主体。区分特征：工具服务参与者是接收可调用请求并返回可观察结果的一种软件主体。
+- `UserActor` — **is_a** → `HumanActor` (`UserActor-is_a-HumanActor`)
+  - 用户参与者 是一种 人类参与主体。区分特征：用户参与者是以提出请求、反馈、批准或附件为区分交互的一种人类主体。
+- `Artifact` — **artifact_attributed_to_actor** → `AgentActor` (`artifact_attributed_to_actor`)
+  - 把运行产物连接到负责创建、批准、修改或交付它的参与者。
+- `Artifact` — **artifact_consumed_by_attempt** → `RunAttempt` (`artifact_consumed_by_attempt`)
+  - 把运行产物连接到读取、转换、引用、验证或纳入它的执行尝试。
+- `Artifact` — **artifact_exported_as** → `ExportArtifact` (`artifact_exported_as`)
+  - 把运行产物连接到为接收方、适配器或信任边界准备的导出产物或交付形式。
+- `Artifact` — **artifact_produced_by_event** → `TraceEvent` (`artifact_produced_by_event`)
+  - 把运行产物连接到发出、更新或物化它的追踪事件。
+- `Artifact` — **artifact_reviewed_by** → `ReviewEvent` (`artifact_reviewed_by`)
+  - 把运行产物连接到检查、接受、拒绝或请求修改它的审查事件。
+- `Artifact` — **addresses** → `Task` (`Artifact-addresses-Task`)
+  - 产物映射到它回答、实现或修复的任务。
+- `Artifact` — **derived_from** → `Artifact` (`Artifact-derived_from-Artifact`)
+  - 新版本产物可从既有产物派生，但不得原地覆盖。
+- `Artifact` — **generated_by** → `RunAttempt` (`Artifact-generated_by-RunAttempt`)
+  - 产物由可追踪的执行尝试生成。
+- `Artifact` — **reviewed_by** → `ReviewerActor` (`Artifact-reviewed_by-ReviewerActor`)
+  - 产物的审核责任关联到具体审核主体。
+- `ExportArtifact` — **is_a** → `Artifact` (`ExportArtifact-is_a-Artifact`)
+  - 导出产物 是一种 运行产物。区分特征：导出产物是一种为外部交换生成并带格式与目标信息的 Artifact。
+- `GraphArtifact` — **is_a** → `Artifact` (`GraphArtifact-is_a-Artifact`)
+  - 图谱产物 是一种 运行产物。区分特征：图谱产物是以节点、边和图结构为主要内容的一种 Artifact。
+- `PatchArtifact` — **is_a** → `Artifact` (`PatchArtifact-is_a-Artifact`)
+  - 补丁产物 是一种 运行产物。区分特征：补丁产物是以对既有版本的可应用差异为区分内容的一种 Artifact。
+- `ReportArtifact` — **is_a** → `Artifact` (`ReportArtifact-is_a-Artifact`)
+  - 报告产物 是一种 运行产物。区分特征：报告产物是以结构化论述、发现或结论为主要内容的一种 Artifact。
+- `SchemaArtifact` — **is_a** → `Artifact` (`SchemaArtifact-is_a-Artifact`)
+  - 模式产物 是一种 运行产物。区分特征：模式产物是以机器可验证的数据结构合同为区分内容的一种 Artifact。
+- `AgentTranscript` — **is_a** → `ObservabilityRecord` (`AgentTranscript-is_a-ObservabilityRecord`)
+  - 智能体转录记录 是一种 可观测记录。区分特征：智能体转录记录是一种保存可观察消息与动作序列的可观测记录。
+- `AuditRecord` — **is_a** → `ObservabilityRecord` (`AuditRecord-is_a-ObservabilityRecord`)
+  - 审计记录 是一种 可观测记录。区分特征：审计记录是以责任、授权与治理证据为区分内容的一种可观测记录。
+- `Checkpoint` — **checkpoint_belongs_to_session** → `RuntimeSession` (`checkpoint_belongs_to_session`)
+  - 把检查点连接到它所保存状态所属的运行会话或线程边界。
+- `Checkpoint` — **captures** → `StateSnapshot` (`Checkpoint-captures-StateSnapshot`)
+  - 检查点保存可用于恢复的状态快照。
+- `Checkpoint` — **is_a** → `StateRecord` (`Checkpoint-is_a-StateRecord`)
+  - 检查点 是一种 状态记录。区分特征：检查点是一种附带恢复标识与一致性边界的状态记录。
+- `CheckpointRestoreEvent` — **is_a** → `ObservabilityEvent` (`CheckpointRestoreEvent-is_a-ObservabilityEvent`)
+  - 检查点恢复事件 是一种 可观测运行事件。区分特征：检查点恢复事件是以从既有检查点重建运行状态为区分特征的一种可观测事件。
+- `CheckpointRestoreEvent` — **restores_from** → `Checkpoint` (`CheckpointRestoreEvent-restores_from-Checkpoint`)
+  - 恢复事件以既有检查点为恢复原因与输入。
+- `ObservableSummary` — **derived_from** → `TraceRecord` (`ObservableSummary-derived_from-TraceRecord`)
+  - 可观测摘要是从原始追踪证据派生的信息。
+- `ObservableSummary` — **is_a** → `ObservabilityRecord` (`ObservableSummary-is_a-ObservabilityRecord`)
+  - 可观测摘要 是一种 可观测记录。区分特征：可观测摘要是一种从原始追踪或审计证据派生的简化记录。
+- `ReplayEvent` — **is_a** → `ObservabilityEvent` (`ReplayEvent-is_a-ObservabilityEvent`)
+  - 回放事件 是一种 可观测运行事件。区分特征：回放事件是以重放既有输入与追踪证据为区分特征的一种可观测事件。
+- `ReplayEvent` — **replays** → `TraceRecord` (`ReplayEvent-replays-TraceRecord`)
+  - 回放事件根据既有追踪记录重现可观察执行。
+- `TraceSpan` — **span_has_attribute** → `SpanAttribute` (`span_has_attribute`)
+  - 把追踪跨度连接到键值化可观测元数据，例如操作名称、模型或工具身份、词元用量、延迟、状态细节或边界标签。
+- `TraceSpan` — **span_has_status** → `SpanStatus` (`span_has_status`)
+  - 把追踪跨度连接到其状态记录，使错误、取消、阻断、重试或降级执行能够被直接检查而无需重新解释。
+- `SpanAttribute` — **is_a** → `TraceMetadata` (`SpanAttribute-is_a-TraceMetadata`)
+  - 跨度属性 是一种 追踪元数据。区分特征：跨度属性是以键值形式描述跨度的一种追踪元数据。
+- `SpanStatus` — **is_a** → `TraceMetadata` (`SpanStatus-is_a-TraceMetadata`)
+  - 跨度状态 是一种 追踪元数据。区分特征：跨度状态是记录跨度完成、错误或未设置状态的一种追踪元数据，而不是跨度的子类。
+- `CommandExecution` — **stages_output_as** → `OutputChunk` (`stages_output_as`)
+  - 对象关系定义域为命令执行，值域为输出分块；用于表达这两个智能体系统术语之间可验证、可追溯的语义连接。
+- `StateDiff` — **state_diff_from_snapshot** → `StateSnapshot` (`state_diff_from_snapshot`)
+  - 把状态差异连接到被比较的源快照，该快照提供变化前的值、通道、产物或生命周期位置。
+- `StateDiff` — **state_diff_to_snapshot** → `StateSnapshot` (`state_diff_to_snapshot`)
+  - 把状态差异连接到变化后的目标快照，该快照显示结果值、通道、产物或生命周期位置。
+- `StateDiff` — **is_a** → `StateRecord` (`StateDiff-is_a-StateRecord`)
+  - 状态差异 是一种 状态记录。区分特征：状态差异是以两个状态版本之间增删改为区分内容的一种状态记录。
+- `StateRecord` — **is_a** → `ObservabilityRecord` (`StateRecord-is_a-ObservabilityRecord`)
+  - 状态记录 是一种 可观测记录。区分特征：快照、差异和检查点都保存状态证据，且各自具有完整/差异/恢复边界的明确兄弟区分。
+- `StateSnapshot` — **is_a** → `StateRecord` (`StateSnapshot-is_a-StateRecord`)
+  - 状态快照 是一种 状态记录。区分特征：状态快照是以某一时点完整状态为区分内容的一种状态记录。
+- `TraceEvent` — **trace_event_recorded_as_log_record** → `LogRecord` (`trace_event_recorded_as_log_record`)
+  - 该关系把原始轨迹事件记录为结构化日志记录，同时保留原始运行证据。
+- `TraceEvent` — **trace_event_records_error_event** → `ErrorEvent` (`trace_event_records_error_event`)
+  - 该关系说明轨迹事件记录或观察到错误事件，区分原始证据与错误解释。
+- `TraceRecord` — **trace_has_context** → `TraceContext` (`trace_has_context`)
+  - 把追踪记录连接到携带标识、采样状态和边界元数据的传播与关联上下文。
+- `TraceLink` — **trace_link_source_span** → `TraceSpan` (`trace_link_source_span`)
+  - 把追踪链接对象连接到参与非父子因果或上下文关系的源跨度。
+- `TraceLink` — **trace_link_target_span** → `TraceSpan` (`trace_link_target_span`)
+  - 把追踪链接对象连接到非父子因果或上下文关系所指向的目标跨度。
+- `TraceRecord` — **trace_record_exported_as_trace_export** → `TraceExport` (`trace_record_exported_as_trace_export`)
+  - 该关系把轨迹记录连接到用于传输、审查或保留的轨迹导出产物。
+- `TraceSpan` — **trace_span_exported_by_trace_export** → `TraceExport` (`trace_span_exported_by_trace_export`)
+  - 该关系把运行跨度连接到承载其选定数据和来源的轨迹导出包。
+- `TraceContext` — **is_a** → `TraceMetadata` (`TraceContext-is_a-TraceMetadata`)
+  - 追踪上下文 是一种 追踪元数据。区分特征：追踪上下文是携带 trace/span 标识、采样和传播信息的一种追踪元数据。
+- `TraceEvent` — **is_a** → `ObservabilityEvent` (`TraceEvent-is_a-ObservabilityEvent`)
+  - 追踪事件 是一种 可观测运行事件。区分特征：追踪事件是以被记录在追踪时间线上为区分特征的一种可观测事件，不是 TraceSpan 的子类。
+- `TraceEvent` — **observes** → `RunAttempt` (`TraceEvent-observes-RunAttempt`)
+  - 追踪事件观测并关联具体执行尝试。
+- `TraceLink` — **is_a** → `TraceMetadata` (`TraceLink-is_a-TraceMetadata`)
+  - 追踪链接 是一种 追踪元数据。区分特征：追踪链接是表达非父子跨度关联的一种追踪元数据。
+- `TraceRecord` — **contains_span** → `TraceSpan` (`TraceRecord-contains_span-TraceSpan`)
+  - 跨度是追踪记录的组成部分，不是追踪记录的子类。
+- `TraceRecord` — **is_a** → `ObservabilityRecord` (`TraceRecord-is_a-ObservabilityRecord`)
+  - 追踪记录 是一种 可观测记录。区分特征：追踪记录是以跨组件因果与时间执行证据为区分内容的一种可观测记录。
+- `TraceRetentionPolicy` — **governs** → `TraceRecord` (`TraceRetentionPolicy-governs-TraceRecord`)
+  - 保留策略规定追踪记录的保存、抽样与删除。
+- `TraceSpan` — **is_a** → `ObservabilityRecord` (`TraceSpan-is_a-ObservabilityRecord`)
+  - 追踪跨度 是一种 可观测记录。区分特征：跨度是记录一个有界操作区间及其状态的可观测记录；它组成 TraceRecord，但并非 TraceRecord 的子类。
+- `TraceSpan` — **records_event** → `TraceEvent` (`TraceSpan-records_event-TraceEvent`)
+  - 跨度在其时间区间内记录事件；事件不是跨度的一种。
+- `AgentSystem` — **hosts** → `RuntimeSession` (`AgentSystem-hosts-RuntimeSession`)
+  - 智能体系统承载运行会话；会话不是系统的子类。
+- `SessionEndEvent` — **closes_runtime_session** → `RuntimeSession` (`closes_runtime_session`)
+  - 把会话结束事件连接到它关闭的运行会话，保留终端状态、清理证据和产物引用。
+- `Container` — **is_a** → `RuntimeEnvironment` (`Container-is_a-RuntimeEnvironment`)
+  - 容器 是一种 运行环境。区分特征：容器是一种具有进程隔离、文件系统和网络配置的具体运行环境，满足“运行环境＋容器化隔离”的严格定义。
+- `RuntimeSession` — **emits_trace_event** → `TraceEvent` (`emits_trace_event`)
+  - 对象关系定义域为运行会话，值域为轨迹事件；用于表达这两个智能体系统术语之间可验证、可追溯的语义连接。
+- `SessionStartEvent` — **opens_runtime_session** → `RuntimeSession` (`opens_runtime_session`)
+  - 把会话开始事件连接到它开启的运行会话，并保留初始参与者、环境、目标和上下文状态。
+- `SessionPauseEvent` — **pauses_with_snapshot** → `StateSnapshot` (`pauses_with_snapshot`)
+  - 把暂停事件连接到被保留的状态快照，使运行时之后可以恢复或检查暂停的会话。
+- `ProcessHandle` — **correlates** → `RunAttempt` (`ProcessHandle-correlates-RunAttempt`)
+  - 进程句柄把操作系统进程引用关联到一次执行尝试。
+- `SessionResumeEvent` — **resumes_from_checkpoint** → `Checkpoint` (`resumes_from_checkpoint`)
+  - 把会话恢复事件连接到用于恢复状态、待处理工作和执行上下文的检查点。
+- `RunAttempt` — **run_attempt_belongs_to_task** → `Task` (`run_attempt_belongs_to_task`)
+  - 把执行尝试连接到它实际实现的任务或工作项，并保持编排意图与观测到的运行执行相互区分。
+- `RunAttempt` — **occurs_in** → `RuntimeEnvironment` (`RunAttempt-occurs_in-RuntimeEnvironment`)
+  - 执行尝试在特定运行环境与时间区间内发生。
+- `RunAttempt` — **produces** → `RunOutcome` (`RunAttempt-produces-RunOutcome`)
+  - 一次尝试完成、失败或取消时产生可观察结果。
+- `RuntimeBudget` — **constrains** → `RunAttempt` (`RuntimeBudget-constrains-RunAttempt`)
+  - 运行预算限制尝试可消耗的时间、令牌、成本与重试。
+- `RuntimeEnvironment` — **has_working_directory** → `WorkingDirectory` (`RuntimeEnvironment-has_working_directory-WorkingDirectory`)
+  - 工作目录是环境配置的一部分，而不是一种运行环境。
+- `RuntimeSession` — **has_attempt** → `RunAttempt` (`RuntimeSession-has_attempt-RunAttempt`)
+  - 一次会话包含一次或多次执行尝试。
+- `RuntimeSession` — **session_has_trace** → `TraceRecord` (`session_has_trace`)
+  - 把运行会话连接到包含根跨度、跨度、事件、链接、上下文和保留策略的追踪记录。
+- `SessionEndEvent` — **is_a** → `SessionLifecycleEvent` (`SessionEndEvent-is_a-SessionLifecycleEvent`)
+  - 会话结束事件 是一种 会话生命周期事件。区分特征：会话结束事件是以会话关闭为区分特征的一种生命周期事件。
+- `SessionLifecycleEvent` — **changes_state_of** → `RuntimeSession` (`SessionLifecycleEvent-changes_state_of-RuntimeSession`)
+  - 生命周期事件记录会话状态的合法时间转移。
+- `SessionPauseEvent` — **is_a** → `SessionLifecycleEvent` (`SessionPauseEvent-is_a-SessionLifecycleEvent`)
+  - 会话暂停事件 是一种 会话生命周期事件。区分特征：暂停事件是保留可恢复状态并停止推进的一种会话生命周期事件。
+- `SessionResumeEvent` — **is_a** → `SessionLifecycleEvent` (`SessionResumeEvent-is_a-SessionLifecycleEvent`)
+  - 会话恢复事件 是一种 会话生命周期事件。区分特征：恢复事件是从暂停或检查点继续执行的一种会话生命周期事件。
+- `SessionStartEvent` — **is_a** → `SessionLifecycleEvent` (`SessionStartEvent-is_a-SessionLifecycleEvent`)
+  - 会话开始事件 是一种 会话生命周期事件。区分特征：开始事件是建立会话身份及初始绑定的一种会话生命周期事件。
+- `RunAttempt` — **uses_runtime_environment** → `RuntimeEnvironment` (`uses_runtime_environment`)
+  - 把执行尝试连接到运行时实际使用的容器、沙箱、工作目录、模型或工具可用性以及配置。
+- `AgencyBenchAdapter` — **is_a** → `BenchmarkAdapter` (`AgencyBenchAdapter-is_a-BenchmarkAdapter`)
+  - AgencyBench 适配器 是一种 基准适配器。区分特征：AgencyBench 适配器是按 AgencyBench 的长程任务、环境与评分合同区分的 BenchmarkAdapter。
+- `AppWorldAdapter` — **is_a** → `BenchmarkAdapter` (`AppWorldAdapter-is_a-BenchmarkAdapter`)
+  - AppWorld 适配器 是一种 基准适配器。区分特征：AppWorld 适配器以 AppWorld API 环境、任务状态和测试结果映射为区分特征。
+- `BenchmarkAdapter` — **is_a** → `Adapter` (`BenchmarkAdapter-is_a-Adapter`)
+  - 基准适配器 是一种 适配器。区分特征：基准适配器是把外部基准的任务、环境、轨迹、指标与结果映射到统一概念的 Adapter。
+- `BenchmarkAdapter` — **maps_action_to** → `ToolCallAttempt` (`BenchmarkAdapter-maps_action_to-ToolCallAttempt`)
+  - 可执行基准动作映射到可审计的工具调用尝试。
+- `BenchmarkAdapter` — **maps_artifact_to** → `Artifact` (`BenchmarkAdapter-maps_artifact_to-Artifact`)
+  - 基准产物保持外部身份并映射到 Artifact。
+- `BenchmarkAdapter` — **maps_environment_to** → `RuntimeEnvironment` (`BenchmarkAdapter-maps_environment_to-RuntimeEnvironment`)
+  - 基准环境映射到运行环境概念。
+- `BenchmarkAdapter` — **maps_observation_to** → `CommandOutputObservation` (`BenchmarkAdapter-maps_observation_to-CommandOutputObservation`)
+  - 环境观测映射到统一输出观测概念。
+- `BenchmarkAdapter` — **maps_score_to** → `Score` (`BenchmarkAdapter-maps_score_to-Score`)
+  - 基准分值映射到统一 Score 并保留评估器版本。
+- `BenchmarkAdapter` — **maps_success_to** → `RunOutcome` (`BenchmarkAdapter-maps_success_to-RunOutcome`)
+  - 基准成功判定映射到运行结果，不与分数混型。
+- `BenchmarkAdapter` — **maps_task_to** → `Task` (`BenchmarkAdapter-maps_task_to-Task`)
+  - 基准任务映射到统一 Task，不成为新任务类。
+- `BenchmarkAdapter` — **maps_benchmark_score_to_metric** → `Metric` (`maps_benchmark_score_to_metric`)
+  - 该关系把基准适配器连接到规范指标术语，用于把基准分数、成功率、评分检查、评审规则或压力轴表示为评估证据。
+- `OSWorldAdapter` — **is_a** → `BenchmarkAdapter` (`OSWorldAdapter-is_a-BenchmarkAdapter`)
+  - OSWorld 适配器 是一种 基准适配器。区分特征：OSWorld 适配器以桌面环境状态、计算机操作轨迹与成功判定映射为区分特征。
+- `SWEBenchAdapter` — **is_a** → `BenchmarkAdapter` (`SWEBenchAdapter-is_a-BenchmarkAdapter`)
+  - SWE-bench 适配器 是一种 基准适配器。区分特征：SWE-bench 适配器以软件问题、代码仓库环境、补丁产物与测试结果映射为区分特征。
+- `Tau2Adapter` — **is_a** → `BenchmarkAdapter` (`Tau2Adapter-is_a-BenchmarkAdapter`)
+  - tau2 适配器 是一种 基准适配器。区分特征：tau2 适配器以双主体对话、工具操作、领域策略与验证结果映射为区分特征。
+- `TerminalBenchAdapter` — **is_a** → `BenchmarkAdapter` (`TerminalBenchAdapter-is_a-BenchmarkAdapter`)
+  - Terminal-Bench 适配器 是一种 基准适配器。区分特征：Terminal-Bench 适配器以容器环境、终端命令轨迹、生成产物与验证器结果映射为区分特征。
+- `CrewAIAdapter` — **is_a** → `FrameworkAdapter` (`CrewAIAdapter-is_a-FrameworkAdapter`)
+  - CrewAI 适配器 是一种 框架适配器。区分特征：CrewAI 适配器以 Crew、Agent、Task、Process 与 Flow 构造映射为区分特征。
+- `DeepAgentsAdapter` — **is_a** → `FrameworkAdapter` (`DeepAgentsAdapter-is_a-FrameworkAdapter`)
+  - Deep Agents 适配器 是一种 框架适配器。区分特征：Deep Agents 适配器以规划、子智能体、文件系统上下文、中断与长期记忆映射为区分特征。
+- `FrameworkAdapter` — **is_a** → `Adapter` (`FrameworkAdapter-is_a-Adapter`)
+  - 框架适配器 是一种 适配器。区分特征：框架适配器是把框架原生主体、任务、工具、状态和轨迹映射到统一概念的 Adapter。
+- `FrameworkAdapter` — **maps_agent_to** → `AgentActor` (`FrameworkAdapter-maps_agent_to-AgentActor`)
+  - 框架原生 agent 映射到统一软件主体而不复制主体类树。
+- `FrameworkAdapter` — **maps_task_to** → `Task` (`FrameworkAdapter-maps_task_to-Task`)
+  - 框架任务合同映射到统一 Task。
+- `FrameworkAdapter` — **maps_tool_to** → `Tool` (`FrameworkAdapter-maps_tool_to-Tool`)
+  - 框架工具包装器映射到统一 Tool 身份。
+- `FrameworkHandoffMapping` — **is_a** → `FrameworkMapping` (`FrameworkHandoffMapping-is_a-FrameworkMapping`)
+  - 框架移交映射 是一种 框架映射规则。区分特征：该规范专门映射框架 handoff 的责任、权限、上下文和结果所有权，是 FrameworkMapping 的下位类。
+- `FrameworkHandoffMapping` — **maps_to** → `Handoff` (`FrameworkHandoffMapping-maps_to-Handoff`)
+  - 外部 handoff 映射保留职责与权限转移语义。
+- `FrameworkMapping` — **applies_to_adapter** → `FrameworkAdapter` (`FrameworkMapping-applies_to_adapter-FrameworkAdapter`)
+  - 每条框架映射明确指向执行该映射的框架适配器，使映射规则、适配能力和版本责任可独立追踪。
+- `FrameworkMapping` — **is_a** → `MappingRule` (`FrameworkMapping-is_a-MappingRule`)
+  - 框架映射规则 是一种 映射规则。区分特征：LangGraph 与 OpenAI Agents SDK 对 state、handoff、tool 和 trace 使用不同框架合同，证明需要版本化框架映射规则而不是框架类复制。
+- `FrameworkTraceMapping` — **is_a** → `FrameworkMapping` (`FrameworkTraceMapping-is_a-FrameworkMapping`)
+  - 框架轨迹映射 是一种 框架映射规则。区分特征：该规范专门映射框架 run、trace、span、checkpoint 与 stream，是 FrameworkMapping 的下位类。
+- `FrameworkTraceMapping` — **maps_to** → `TraceRecord` (`FrameworkTraceMapping-maps_to-TraceRecord`)
+  - 框架轨迹结构映射到统一 TraceRecord 并记录损失。
+- `LangChainAdapter` — **is_a** → `FrameworkAdapter` (`LangChainAdapter-is_a-FrameworkAdapter`)
+  - LangChain 适配器 是一种 框架适配器。区分特征：LangChain 适配器以智能体循环、中间件、工具、结构化输出和运行上下文映射为区分特征。
+- `LangGraphAdapter` — **is_a** → `FrameworkAdapter` (`LangGraphAdapter-is_a-FrameworkAdapter`)
+  - LangGraph 适配器 是一种 框架适配器。区分特征：LangGraph 适配器以状态图节点、边、持久执行、checkpoint 和 stream 映射为区分特征。
+- `MicrosoftAgentFrameworkAdapter` — **is_a** → `FrameworkAdapter` (`MicrosoftAgentFrameworkAdapter-is_a-FrameworkAdapter`)
+  - Microsoft Agent Framework 适配器 是一种 框架适配器。区分特征：该适配器以 Microsoft Agent Framework 的 agent、workflow、executor 和服务集成映射为区分特征。
+- `OpenAIAgentsAdapter` — **is_a** → `FrameworkAdapter` (`OpenAIAgentsAdapter-is_a-FrameworkAdapter`)
+  - OpenAI Agents 适配器 是一种 框架适配器。区分特征：该适配器以 OpenAI Agents SDK 的 agent、tool、handoff、guardrail、session 与 tracing 映射为区分特征。
+- `ConversionWarning` — **is_a** → `MappingArtifact` (`ConversionWarning-is_a-MappingArtifact`)
+  - 转换警告 是一种 映射信息产物。区分特征：转换警告是记录有损、歧义、不支持或不可往返语义的 MappingArtifact，不是适配器或映射活动。
+- `ConversionWarning` — **warns_about** → `SchemaAdapter` (`ConversionWarning-warns_about-SchemaAdapter`)
+  - 有损或不可往返的 schema 投影由转换警告指向具体适配器。
+- `CoverageReport` — **is_a** → `MappingArtifact` (`CoverageReport-is_a-MappingArtifact`)
+  - 映射覆盖报告 是一种 映射信息产物。区分特征：规范测试套件和生产本体工程都需要版本化覆盖与缺口证据；该报告将其固定为可审计聚合产物。
+- `CoverageReport` — **summarizes** → `MappingRule` (`CoverageReport-summarizes-MappingRule`)
+  - 覆盖报告汇总 exact、lossy 与 unsupported 映射覆盖。
+- `MappingRule` — **governs** → `Adapter` (`MappingRule-governs-Adapter`)
+  - 映射规则规定适配器的方向、范围、版本和损失处理。
+- `MappingRule` — **is_a** → `MappingArtifact` (`MappingRule-is_a-MappingArtifact`)
+  - 映射规则 是一种 映射信息产物。区分特征：映射规则是带方向、源目标版本、变换与前后条件的规范性 MappingArtifact。
+- `MappingRule` — **may_emit** → `ConversionWarning` (`MappingRule-may_emit-ConversionWarning`)
+  - 遇到有损、歧义或不支持语义时规则产生转换警告。
+- `MappingTestResult` — **is_a** → `MappingArtifact` (`MappingTestResult-is_a-MappingArtifact`)
+  - 映射测试结果 是一种 映射信息产物。区分特征：JSON Schema 测试套件和 XState/SCXML 映射文档都要求以具体输入输出验证表示转换，支持独立测试结果产物。
+- `MappingTestResult` — **verifies** → `MappingRule` (`MappingTestResult-verifies-MappingRule`)
+  - 映射测试结果记录对具体规则和版本的验证。
+- `A2AAdapter` — **is_a** → `ProtocolAdapter` (`A2AAdapter-is_a-ProtocolAdapter`)
+  - A2A 适配器 是一种 协议适配器。区分特征：A2A 适配器以远程智能体身份、任务生命周期、消息与产物交换映射为区分特征。
+- `FIPAAdapter` — **is_a** → `ProtocolAdapter` (`FIPAAdapter-is_a-ProtocolAdapter`)
+  - FIPA 适配器 是一种 协议适配器。区分特征：FIPA 适配器以 ACL communicative act、消息参数、交互协议和主体管理映射为区分特征。
+- `InteroperabilityAdapter` — **is_a** → `Adapter` (`InteroperabilityAdapter-is_a-Adapter`)
+  - 互操作适配器 是一种 适配器。区分特征：MCP、A2A 与 FIPA 三套独立规范分别定义跨系统能力、任务和消息互操作，证明该中间上位概念具有真实共同区分特征。
+- `KQMLAdapter` — **is_a** → `ProtocolAdapter` (`KQMLAdapter-is_a-ProtocolAdapter`)
+  - KQML 适配器 是一种 协议适配器。区分特征：KQML 适配器以 performative、内容语言、会话控制与消息信封映射为区分特征。
+- `ProtocolCapabilityMapping` — **maps_protocol_capability_to_canonical_capability** → `ToolCapability` (`maps_protocol_capability_to_canonical_capability`)
+  - 该关系把协议能力映射连接到规范工具能力术语，用于外部工具、资源、提示、服务或智能体能力声明。
+- `MCPAdapter` — **is_a** → `ProtocolAdapter` (`MCPAdapter-is_a-ProtocolAdapter`)
+  - MCP 适配器 是一种 协议适配器。区分特征：MCP 适配器是按 MCP client/server、tool、resource、prompt、capability、authorization 与 transport 映射区分的 ProtocolAdapter，构成黄金链叶节点。
+- `ProtocolAdapter` — **is_a** → `InteroperabilityAdapter` (`ProtocolAdapter-is_a-InteroperabilityAdapter`)
+  - 协议适配器 是一种 互操作适配器。区分特征：协议适配器是以协议原生信封、任务、能力、身份和信任元数据为映射对象的 InteroperabilityAdapter。
+- `ProtocolCapabilityMapping` — **is_a** → `ProtocolMapping` (`ProtocolCapabilityMapping-is_a-ProtocolMapping`)
+  - 协议能力映射 是一种 协议映射规则。区分特征：该映射以协议 capability advertisement 与统一工具、资源、提示和权限表面对齐为区分特征。
+- `ProtocolCapabilityMapping` — **maps_to** → `Tool` (`ProtocolCapabilityMapping-maps_to-Tool`)
+  - 协议能力声明可映射到统一工具/能力表面，此处固定工具目标。
+- `ProtocolMapping` — **applies_to_adapter** → `ProtocolAdapter` (`ProtocolMapping-applies_to_adapter-ProtocolAdapter`)
+  - 每条协议映射明确绑定实施它的协议适配器，避免把协议规范、映射规则与运行适配能力混成一个节点。
+- `ProtocolMapping` — **is_a** → `MappingRule` (`ProtocolMapping-is_a-MappingRule`)
+  - 协议映射规则 是一种 映射规则。区分特征：三套协议对能力、任务与消息构造使用不同表示且需显式版本互操作，因此映射必须是可审计规则而非无信息边。
+- `ProtocolMessageMapping` — **is_a** → `ProtocolMapping` (`ProtocolMessageMapping-is_a-ProtocolMapping`)
+  - 协议消息映射 是一种 协议映射规则。区分特征：该映射以协议消息信封、参与方、内容与会话字段对齐为区分特征。
+- `ProtocolMessageMapping` — **maps_to** → `Message` (`ProtocolMessageMapping-maps_to-Message`)
+  - 协议消息信封映射到统一 Message，外部字段留在映射信息中。
+- `ProtocolTaskMapping` — **is_a** → `ProtocolMapping` (`ProtocolTaskMapping-is_a-ProtocolMapping`)
+  - 协议任务映射 是一种 协议映射规则。区分特征：该映射以协议任务状态、产物和完成/失败语义对齐为区分特征。
+- `ProtocolTaskMapping` — **maps_to** → `Task` (`ProtocolTaskMapping-maps_to-Task`)
+  - 协议任务生命周期映射到统一 Task 并保留状态损失。
+- `ProtocolTrustMapping` — **is_a** → `ProtocolMapping` (`ProtocolTrustMapping-is_a-ProtocolMapping`)
+  - 协议信任映射 是一种 协议映射规则。区分特征：该映射以协议身份、认证、授权与远端不透明性对齐为区分特征。
+- `ProtocolTrustMapping` — **maps_to** → `TrustBoundary` (`ProtocolTrustMapping-maps_to-TrustBoundary`)
+  - 协议身份、授权和不透明性元数据映射到信任边界语义。
+- `FrontendViewAdapter` — **is_a** → `SchemaAdapter` (`FrontendViewAdapter-is_a-SchemaAdapter`)
+  - 前端视图适配器 是一种 Schema 适配器。区分特征：前端视图适配器是把 canonical 投影为只读图谱视图模型的 SchemaAdapter，不创建 shadow node。
+- `GraphIRAdapter` — **is_a** → `SchemaAdapter` (`GraphIRAdapter-is_a-SchemaAdapter`)
+  - Graph IR 适配器 是一种 Schema 适配器。区分特征：Graph IR 适配器是把 class、relation 与 annotation 投影为中间图表示的 SchemaAdapter。
+- `JSONSchemaAdapter` — **is_a** → `SchemaAdapter` (`JSONSchemaAdapter-is_a-SchemaAdapter`)
+  - JSON Schema 适配器 是一种 Schema 适配器。区分特征：JSON Schema 适配器是把结构字段、基数、枚举和约束投影到指定 JSON Schema dialect 的 SchemaAdapter。
+- `OWLExportAdapter` — **is_a** → `SchemaAdapter` (`OWLExportAdapter-is_a-SchemaAdapter`)
+  - OWL 导出适配器 是一种 Schema 适配器。区分特征：OWL 导出适配器是把类、对象属性、IRI 与可表达公理投影到 OWL 的 SchemaAdapter，并显式记录闭世界约束损失。
+- `PydanticProfileAdapter` — **is_a** → `SchemaAdapter` (`PydanticProfileAdapter-is_a-SchemaAdapter`)
+  - Pydantic 配置适配器 是一种 Schema 适配器。区分特征：Pydantic 配置适配器是把字段与验证约束投影到特定 Pydantic 版本模型的 SchemaAdapter。
+- `SchemaAdapter` — **governed_by** → `MappingRule` (`SchemaAdapter-governed_by-MappingRule`)
+  - 导出投影由明确字段、关系和约束映射规则控制。
+- `SchemaAdapter` — **is_a** → `Adapter` (`SchemaAdapter-is_a-Adapter`)
+  - Schema 适配器 是一种 适配器。区分特征：Schema 适配器是把统一本体节点、关系和内嵌信息投影到外部结构或验证语言的 Adapter。
+- `SchemaAdapter` — **produces** → `SchemaArtifact` (`SchemaAdapter-produces-SchemaArtifact`)
+  - 执行导出可产生有独立身份和版本的 SchemaArtifact。
+- `SchemaAdapter` — **projects** → `Tool` (`SchemaAdapter-projects-Tool`)
+  - 统一概念可被投影到外部 schema，但 Tool 本体身份不改变。
+- `SHACLExportAdapter` — **is_a** → `SchemaAdapter` (`SHACLExportAdapter-is_a-SchemaAdapter`)
+  - SHACL 导出适配器 是一种 Schema 适配器。区分特征：SHACL 导出适配器是把图节点形状、属性路径和基数约束投影到 SHACL 的 SchemaAdapter。
+- `ShExExportAdapter` — **is_a** → `SchemaAdapter` (`ShExExportAdapter-is_a-SchemaAdapter`)
+  - ShEx 导出适配器 是一种 Schema 适配器。区分特征：ShEx 导出适配器是把 RDF 节点约束投影为 ShEx shape expression 的 SchemaAdapter。
+- `ZodProfileAdapter` — **is_a** → `SchemaAdapter` (`ZodProfileAdapter-is_a-SchemaAdapter`)
+  - Zod 配置适配器 是一种 Schema 适配器。区分特征：Zod 配置适配器是把字段、联合与运行时验证约束投影到指定 Zod 版本的 SchemaAdapter。
+- `SCXMLAdapter` — **is_a** → `StatechartAdapter` (`SCXMLAdapter-is_a-StatechartAdapter`)
+  - SCXML 适配器 是一种 状态图适配器。区分特征：SCXML 适配器是按 W3C SCXML 状态、转移、事件、守卫与历史语义区分的 StatechartAdapter。
+- `StatechartAdapter` — **is_a** → `Adapter` (`StatechartAdapter-is_a-Adapter`)
+  - 状态图适配器 是一种 适配器。区分特征：状态图适配器是把外部状态、转移、事件、守卫与动作映射到统一运行和编排概念的 Adapter。
+- `StatechartAdapter` — **maps_action_to** → `Command` (`StatechartAdapter-maps_action_to-Command`)
+  - 可执行状态图动作可映射到统一 Command，并保留副作用信息。
+- `StatechartAdapter` — **maps_event_to** → `TraceEvent` (`StatechartAdapter-maps_event_to-TraceEvent`)
+  - 状态图事件映射到可追踪事件身份。
+- `StatechartAdapter` — **maps_final_to** → `RunOutcome` (`StatechartAdapter-maps_final_to-RunOutcome`)
+  - 终态映射到运行结果，不将最终状态误作结果子类。
+- `StatechartAdapter` — **maps_guard_to** → `GateCondition` (`StatechartAdapter-maps_guard_to-GateCondition`)
+  - 状态图守卫映射到门条件而不是 Gate 本身。
+- `StatechartAdapter` — **maps_state_to** → `StateSnapshot` (`StatechartAdapter-maps_state_to-StateSnapshot`)
+  - 外部状态表示映射到可审计状态快照，同时记录历史/并行语义损失。
+- `XStateAdapter` — **is_a** → `StatechartAdapter` (`XStateAdapter-is_a-StatechartAdapter`)
+  - XState 适配器 是一种 状态图适配器。区分特征：XState 适配器是按 XState machine、actor、guard、action、invoke 与 snapshot 语义区分的 StatechartAdapter。
+- `CapabilityCandidate` — **is_a** → `Candidate` (`CapabilityCandidate-is_a-Candidate`)
+  - 能力候选 是一种 候选记录。区分特征：能力候选是在 Candidate 上限定候选对象为能力的一种候选记录。
+- `CapabilitySelectionDecision` — **is_a** → `SelectionDecision` (`CapabilitySelectionDecision-is_a-SelectionDecision`)
+  - 能力选择决策 是一种 选择决策。区分特征：能力选择决定是以能力候选为对象的一种 SelectionDecision。
+- `ToolSearch` — **discovers_tool** → `ToolDefinition` (`discovers_tool`)
+  - 对象关系定义域为工具搜索，值域为工具；用于表达这两个智能体系统术语之间可验证、可追溯的语义连接。
+- `ToolMatch` — **matches_tool** → `Tool` (`matches_tool`)
+  - 对象关系定义域为工具匹配，值域为工具；用于表达这两个智能体系统术语之间可验证、可追溯的语义连接。
+- `PromptCandidate` — **is_a** → `Candidate` (`PromptCandidate-is_a-Candidate`)
+  - 提示候选 是一种 候选记录。区分特征：提示候选是在 Candidate 上限定候选对象为提示定义的专业化。
+- `PromptSelectionDecision` — **is_a** → `SelectionDecision` (`PromptSelectionDecision-is_a-SelectionDecision`)
+  - 提示选择决策 是一种 选择决策。区分特征：提示选择决定是针对提示候选的一种 SelectionDecision。
+- `ResourceCandidate` — **is_a** → `Candidate` (`ResourceCandidate-is_a-Candidate`)
+  - 资源候选 是一种 候选记录。区分特征：资源候选是在 Candidate 上限定候选对象为资源定义的专业化。
+- `ResourceSelectionDecision` — **is_a** → `SelectionDecision` (`ResourceSelectionDecision-is_a-SelectionDecision`)
+  - 资源选择决策 是一种 选择决策。区分特征：资源选择决定是针对资源候选的一种 SelectionDecision。
+- `SelectionDecision` — **selects_candidate** → `Candidate` (`SelectionDecision-selects_candidate-Candidate`)
+  - 选择决定必须指向唯一的被评估候选，并保留排序、约束与证据以支持重放和审计。
+- `ToolFallback` — **tool_fallback_replaces_tool** → `Tool` (`tool_fallback_replaces_tool`)
+  - 当原工具不可用、不安全、已弃用或不适合时，把回退选择连接到被替换的工具。
+- `ToolCandidate` — **tool_invocation_candidate_checked_by_safety_check** → `PreExecutionSafetyCheck` (`tool_invocation_candidate_checked_by_safety_check`)
+  - 在调用进入执行或审批前，用执行前安全检查评估候选工具调用。
+- `ToolSelectionDecision` — **tool_selection_decision_rejects_candidate** → `ToolCandidate` (`tool_selection_decision_rejects_candidate`)
+  - 记录因适配差、缺少权限、不安全参数、策略失败或排名较低而被选择决策拒绝的工具候选。
+- `ToolSelectionDecision` — **tool_selection_decision_selects_tool** → `Tool` (`tool_selection_decision_selects_tool`)
+  - 记录在候选排序、消歧、策略过滤或回退后，工具选择决策选中了哪个工具。
+- `ToolCandidate` — **is_a** → `Candidate` (`ToolCandidate-is_a-Candidate`)
+  - 工具候选 是一种 候选记录。区分特征：工具候选是在 Candidate 上限定候选对象为工具定义的专业化。
+- `ToolCandidateSet` — **contains** → `ToolCandidate` (`ToolCandidateSet-contains-ToolCandidate`)
+  - 候选集由候选记录组成。
+- `ToolCandidateSet` — **is_a** → `DiscoveryCandidateSet` (`ToolCandidateSet-is_a-DiscoveryCandidateSet`)
+  - 工具候选集 是一种 发现候选集合。区分特征：工具候选集是成员限于 ToolCandidate 的一种 DiscoveryCandidateSet；它与记忆检索域的 CandidateSet 不是同一集合类型。
+- `ToolDisambiguationPrompt` — **clarifies** → `ToolSearchQuery` (`ToolDisambiguationPrompt-clarifies-ToolSearchQuery`)
+  - 消歧提示补充模糊查询所缺的信息。
+- `ToolEmbeddingMatch` — **is_a** → `ToolMatch` (`ToolEmbeddingMatch-is_a-ToolMatch`)
+  - 工具嵌入匹配 是一种 工具匹配评估。区分特征：嵌入匹配是以向量相似度生成证据的一种 ToolMatch。
+- `ToolFallback` — **responds_to** → `ToolSelectionDecision` (`ToolFallback-responds_to-ToolSelectionDecision`)
+  - 拒绝或不可用的选择决定可以触发回退。
+- `ToolMatch` — **assesses** → `ToolCandidate` (`ToolMatch-assesses-ToolCandidate`)
+  - 匹配记录评估候选而不是候选的父类。
+- `ToolMatch` — **is_a** → `MatchAssessment` (`ToolMatch-is_a-MatchAssessment`)
+  - 工具匹配评估 是一种 匹配评估。区分特征：ToolMatch 是专门评估工具候选适配度的一种 MatchAssessment，不再误作选择事件。
+- `ToolRegexMatch` — **is_a** → `ToolMatch` (`ToolRegexMatch-is_a-ToolMatch`)
+  - 工具正则匹配 是一种 工具匹配评估。区分特征：正则匹配是以模式命中生成证据的一种 ToolMatch。
+- `ToolSearch` — **consumes_query** → `ToolSearchQuery` (`ToolSearch-consumes_query-ToolSearchQuery`)
+  - 检索以显式查询作为输入。
+- `ToolSearch` — **is_a** → `DiscoveryActivity` (`ToolSearch-is_a-DiscoveryActivity`)
+  - 工具检索 是一种 发现活动。区分特征：工具检索是以工具定义为检索对象的一种 DiscoveryActivity。
+- `ToolSearch` — **produces** → `ToolCandidateSet` (`ToolSearch-produces-ToolCandidateSet`)
+  - 检索输出候选集合而非直接输出选择决定。
+- `ToolSelectionDecision` — **considers** → `ToolMatch` (`ToolSelectionDecision-considers-ToolMatch`)
+  - 选择决定引用匹配证据。
+- `ToolSelectionDecision` — **is_a** → `SelectionDecision` (`ToolSelectionDecision-is_a-SelectionDecision`)
+  - 工具选择决策 是一种 选择决策。区分特征：工具选择决定是以 ToolCandidate 为对象的一种 SelectionDecision。
+- `Command` — **is_a** → `Invocation` (`Command-is_a-Invocation`)
+  - 命令 是一种 调用活动。区分特征：Command 是通过命令运行表面发起操作的一种 Invocation，不是命令定义或执行结果。
+- `Command` — **executes_in_sandbox** → `Sandbox` (`executes_in_sandbox`)
+  - 对象关系定义域为沙箱命令，值域为沙箱；用于表达这两个智能体系统术语之间可验证、可追溯的语义连接。
+- `ExecutionRequest` — **is_a** → `InvocationSpecification` (`ExecutionRequest-is_a-InvocationSpecification`)
+  - 执行请求 是一种 调用规范。区分特征：执行请求是描述待运行操作和约束的一种 InvocationSpecification，尚不是发生的调用。
+- `ExecutionResult` — **is_a** → `InvocationResult` (`ExecutionResult-is_a-InvocationResult`)
+  - 执行结果 是一种 调用返回记录。区分特征：执行结果是包含输出、状态或制品引用的一种 InvocationResult 记录。
+- `ToolCall` — **invokes_tool** → `Tool` (`invokes_tool`)
+  - 对象关系定义域为工具调用，值域为工具；用于表达这两个智能体系统术语之间可验证、可追溯的语义连接。
+- `PreExecutionSafetyCheck` — **evaluates** → `ToolCallPlan` (`PreExecutionSafetyCheck-evaluates-ToolCallPlan`)
+  - 安全检查在执行前评估计划。
+- `PreExecutionSafetyCheck` — **uses_pattern** → `UnsafeArgumentPattern` (`PreExecutionSafetyCheck-uses_pattern-UnsafeArgumentPattern`)
+  - 执行前安全检查使用版本化不安全参数模式。
+- `ProgrammaticToolCall` — **is_a** → `ToolCall` (`ProgrammaticToolCall-is_a-ToolCall`)
+  - 程序化工具调用 是一种 工具调用。区分特征：程序化调用仅增加由代码/API 发起的差异，仍是一种 ToolCall。
+- `PromptGetRequest` — **is_a** → `Invocation` (`PromptGetRequest-is_a-Invocation`)
+  - 提示获取请求 是一种 调用活动。区分特征：提示获取请求是对已注册提示定义发起的一种 Invocation。
+- `PromptInstantiation` — **uses** → `PromptTemplate` (`PromptInstantiation-uses-PromptTemplate`)
+  - 提示实例化活动使用模板并绑定参数，不与模板或结果同一。
+- `ResourceReadRequest` — **is_a** → `Invocation` (`ResourceReadRequest-is_a-Invocation`)
+  - 资源读取请求 是一种 调用活动。区分特征：资源读取请求是针对资源定义发起的一种 Invocation。
+- `ResourceReadResult` — **is_a** → `InvocationResult` (`ResourceReadResult-is_a-InvocationResult`)
+  - 资源读取结果 是一种 调用返回记录。区分特征：资源读取结果是携带表示、出处和缓存信息的一种 InvocationResult。
+- `ResourceSubscription` — **subscribes_to** → `ResourceDefinition` (`ResourceSubscription-subscribes_to-ResourceDefinition`)
+  - 资源订阅以资源定义为选择和交付范围。
+- `ToolCall` — **returns_tool_result** → `ToolResult` (`returns_tool_result`)
+  - 对象关系定义域为工具调用，值域为工具结果；用于表达这两个智能体系统术语之间可验证、可追溯的语义连接。
+- `ShellCommand` — **is_a** → `Command` (`ShellCommand-is_a-Command`)
+  - Shell 命令 是一种 命令。区分特征：ShellCommand 是经 shell 语法和运行时约束专业化的一种 Command。
+- `ToolCallAttempt` — **tool_call_attempt_belongs_to_trace_span** → `TraceSpan` (`tool_call_attempt_belongs_to_trace_span`)
+  - 把具体工具调用尝试连接到限定其持续时间、重试、属性和状态的 追踪 跨度。
+- `ToolCall` — **tool_call_emits_trace_event** → `TraceEvent` (`tool_call_emits_trace_event`)
+  - 记录工具调用发出的可观察 追踪事件，保留时间、参与者、所选工具、参数、结果和策略证据。
+- `ToolCall` — **tool_call_evaluated_by_policy_decision** → `PolicyDecision` (`tool_call_evaluated_by_policy_decision`)
+  - 该关系把工具调用连接到在副作用发生前允许、拒绝、升级、沙箱化或限制执行的策略决策。
+- `ToolCall` — **tool_call_executes_in_sandbox** → `Sandbox` (`tool_call_executes_in_sandbox`)
+  - 该关系把工具调用连接到执行时约束进程、文件系统、网络、凭据和副作用行为的沙箱边界。
+- `ToolCall` — **tool_call_requires_permission_scope** → `PermissionScope` (`tool_call_requires_permission_scope`)
+  - 该关系把工具调用连接到权限作用域，说明请求操作、受保护资源、参与者、数据区、信任边界、持续时间和副作用。
+- `ToolDescriptionTrust` — **tool_description_trust_bounds_tool_definition** → `ToolDefinition` (`tool_description_trust_bounds_tool_definition`)
+  - 把工具描述信任证据连接到工具定义，说明其注解、描述、Schema 或服务器来源如何约束安全使用。
+- `ToolResult` — **tool_result_flagged_as_tool_stream_injection** → `ToolStreamInjectionSignal` (`tool_result_flagged_as_tool_stream_injection`)
+  - 该关系把工具结果连接到工具流注入信号，标记返回输出中的不安全指令、欺骗性工具引导或外泄线索。
+- `ToolResultObservation` — **tool_result_observation_enters_context** → `ContextPackage` (`tool_result_observation_enters_context`)
+  - 把工具结果观察连接到上下文包，表示该观察会被暂存给后续模型调用或 agent 步骤。
+- `ToolResult` — **tool_result_scanned_by_pattern_scan** → `PatternScan` (`tool_result_scanned_by_pattern_scan`)
+  - 该关系把工具结果连接到扫描，该扫描在结果被复用于上下文或动作选择前检查日志、流式分块、产物、状态文本或结果消息。
+- `ToolSideEffect` — **tool_side_effect_materializes_side_effect** → `SideEffect` (`tool_side_effect_materializes_side_effect`)
+  - 把工具侧副作用记录连接到安全域 规范 副作用，用于审计、审批、回滚和披露策略。
+- `ToolSideEffect` — **tool_side_effect_requires_commit_gate** → `CommitGate` (`tool_side_effect_requires_commit_gate`)
+  - 把工具侧副作用记录连接到必须批准、拒绝、沙箱化或回滚持久外部变化的提交门。
+- `ToolWarning` — **tool_warning_attached_to_result** → `ToolResult` (`tool_warning_attached_to_result`)
+  - 把非致命警告或诊断附加到工具结果，避免降级执行或部分响应证据丢失。
+- `ToolApprovalGate` — **gates** → `ToolCallAttempt` (`ToolApprovalGate-gates-ToolCallAttempt`)
+  - 审批门控制尝试是否可以开始。
+- `ToolCall` — **has_attempt** → `ToolCallAttempt` (`ToolCall-has_attempt-ToolCallAttempt`)
+  - 一次调用可由一个或多个有身份的尝试实现。
+- `ToolCall` — **is_a** → `Invocation` (`ToolCall-is_a-Invocation`)
+  - 工具调用 是一种 调用活动。区分特征：ToolCall 是以工具为执行对象的一种 Invocation，与静态 ToolDefinition 和 ToolCallPlan 分开。
+- `ToolCallAttempt` — **emits_diagnostic** → `ToolError` (`ToolCallAttempt-emits_diagnostic-ToolError`)
+  - 失败尝试可输出错误诊断。
+- `ToolCallAttempt` — **is_a** → `InvocationAttempt` (`ToolCallAttempt-is_a-InvocationAttempt`)
+  - 工具调用尝试 是一种 调用尝试。区分特征：ToolCallAttempt 是尝试执行某次工具调用的一种 InvocationAttempt，拥有独立次数和状态。
+- `ToolCallAttempt` — **may_cause** → `ToolSideEffect` (`ToolCallAttempt-may_cause-ToolSideEffect`)
+  - 外部状态变化与返回值分开记录。
+- `ToolCallAttempt` — **produces_result** → `ToolResult` (`ToolCallAttempt-produces_result-ToolResult`)
+  - 尝试产生返回记录；尝试本身不是结果。
+- `ToolCallPlan` — **constrained_by** → `ConditionalToolEnabled` (`ToolCallPlan-constrained_by-ConditionalToolEnabled`)
+  - 条件启用规范约束工具调用计划何时可执行。
+- `ToolCallPlan` — **is_a** → `InvocationSpecification` (`ToolCallPlan-is_a-InvocationSpecification`)
+  - 工具调用计划 是一种 调用规范。区分特征：工具调用计划是规定拟用工具、参数、审批与重试的一种 InvocationSpecification；计划不是调用事件。
+- `ToolCallPlan` — **plans** → `ToolCall` (`ToolCallPlan-plans-ToolCall`)
+  - 计划描述拟执行调用，尚未发生调用。
+- `ToolCallRetry` — **is_a** → `ToolCallAttempt` (`ToolCallRetry-is_a-ToolCallAttempt`)
+  - 工具调用重试 是一种 工具调用尝试。区分特征：重试具有新的 attempt identity 且完整满足 ToolCallAttempt，只额外引用先前失败。
+- `ToolCallRetry` — **retries** → `ToolCallAttempt` (`ToolCallRetry-retries-ToolCallAttempt`)
+  - 重试是由先前尝试触发的新尝试。
+- `ToolError` — **is_a** → `InvocationDiagnostic` (`ToolError-is_a-InvocationDiagnostic`)
+  - 工具错误 是一种 调用诊断。区分特征：ToolError 是记录调用失败的一种 InvocationDiagnostic，不是 ToolResult 或失败事件本身。
+- `ToolResult` — **evidences** → `RunOutcome` (`ToolResult-evidences-RunOutcome`)
+  - 工具返回值可作为 RunOutcome 的证据，但不等同于运行或业务 Outcome。
+- `ToolResult` — **is_a** → `InvocationResult` (`ToolResult-is_a-InvocationResult`)
+  - 工具结果 是一种 调用返回记录。区分特征：ToolResult 是由工具调用尝试返回的一种 InvocationResult；它不等同于 Attempt、SideEffect 或 Outcome。
+- `ToolResultObservation` — **observes** → `ToolResult` (`ToolResultObservation-observes-ToolResult`)
+  - 观察记录解释结果如何进入追踪或上下文，不与结果同一。
+- `ToolSideEffect` — **is_a** → `InvocationEffect` (`ToolSideEffect-is_a-InvocationEffect`)
+  - 工具副作用 是一种 调用效应。区分特征：工具副作用是由调用产生外部持久状态变化的一种 InvocationEffect，与返回值分开。
+- `ToolSideEffect` — **recovered_by** → `RecoveryAction` (`ToolSideEffect-recovered_by-RecoveryAction`)
+  - 副作用的补偿或回滚由明确恢复动作承担。
+- `ToolWarning` — **is_a** → `InvocationDiagnostic` (`ToolWarning-is_a-InvocationDiagnostic`)
+  - 工具警告 是一种 调用诊断。区分特征：ToolWarning 是调用范围内的非致命 InvocationDiagnostic，可与成功结果并存。
+- `MCPAuthorization` — **mcp_authorization_authorizes_prompt_get** → `PromptGetRequest` (`mcp_authorization_authorizes_prompt_get`)
+  - 用协议侧同意、授权、审批、范围、受保护资源或宿主策略元数据授权 MCP 提示获取请求。
+- `MCPAuthorization` — **mcp_authorization_authorizes_resource_read** → `ResourceReadRequest` (`mcp_authorization_authorizes_resource_read`)
+  - 用协议侧同意、授权、审批、范围、受保护资源或宿主策略元数据授权 MCP 资源读取请求。
+- `MCPAuthorization` — **mcp_authorization_authorizes_tool_call** → `ToolCall` (`mcp_authorization_authorizes_tool_call`)
+  - 用协议侧同意、授权、审批、范围、受保护资源或宿主策略元数据授权 MCP 工具调用。
+- `MCPAuthorization` — **mcp_authorization_maps_to_authorization_grant** → `AuthorizationGrant` (`mcp_authorization_maps_to_authorization_grant`)
+  - 该关系把 MCP 授权元数据或授权流程输出连接到记录范围、参与者、资源、失效时间和审计依据的规范授权授予。
+- `MCPClient` — **mcp_client_opens_session** → `MCPSession` (`mcp_client_opens_session`)
+  - 把 MCP 客户端连接到它与服务器打开的会话，用于能力发现、授权、工具调用、资源读取、提示和补充信息请求。
+- `MCPPromptList` — **mcp_prompt_list_contains_prompt_definition** → `PromptDefinition` (`mcp_prompt_list_contains_prompt_definition`)
+  - 表示 MCP 提示列表包含某个提示定义，并保持提示发现和已实例化提示消息之间的区别。
+- `MCPResourceList` — **mcp_resource_list_contains_resource_definition** → `ResourceDefinition` (`mcp_resource_list_contains_resource_definition`)
+  - 表示 MCP 资源列表包含某个资源定义，并保持资源发现和资源读取结果之间的区别。
+- `MCPServer` — **mcp_server_exposes_prompt_list** → `MCPPromptList` (`mcp_server_exposes_prompt_list`)
+  - 表示 MCP 服务器暴露服务器侧提示列表，使客户端能获取可复用提示定义和模板。
+- `MCPServer` — **mcp_server_exposes_resource_list** → `MCPResourceList` (`mcp_server_exposes_resource_list`)
+  - 表示 MCP 服务器暴露服务器侧资源列表，使客户端能发现可读取或可订阅的上下文/数据资源。
+- `MCPAuthorization` — **governs** → `MCPSession` (`MCPAuthorization-governs-MCPSession`)
+  - 授权资料约束会话内受保护操作。
+- `MCPClient` — **is_a** → `MCPParticipant` (`MCPClient-is_a-MCPParticipant`)
+  - MCP 客户端 是一种 MCP 参与方。区分特征：MCPClient 是在会话中发起发现和请求的一种 MCPParticipant 角色。
+- `MCPElicitation` — **is_a** → `MCPInteraction` (`MCPElicitation-is_a-MCPInteraction`)
+  - MCP 引导交互 是一种 MCP 交互记录。区分特征：引导交互是请求附加输入的一种 MCPInteraction 记录。
+- `MCPElicitation` — **requests** → `AdditionalInput` (`MCPElicitation-requests-AdditionalInput`)
+  - 引导交互请求继续处理所需的附加输入。
+- `MCPPromptList` — **is_a** → `MCPDefinitionList` (`MCPPromptList-is_a-MCPDefinitionList`)
+  - MCP 提示列表 是一种 MCP 定义列表。区分特征：提示列表是成员限于提示定义的一种 MCPDefinitionList，而不是协议能力。
+- `MCPResourceList` — **is_a** → `MCPDefinitionList` (`MCPResourceList-is_a-MCPDefinitionList`)
+  - MCP 资源列表 是一种 MCP 定义列表。区分特征：资源列表是成员限于资源定义的一种 MCPDefinitionList。
+- `MCPResourceTemplateList` — **is_a** → `MCPDefinitionList` (`MCPResourceTemplateList-is_a-MCPDefinitionList`)
+  - MCP 资源模板列表 是一种 MCP 定义列表。区分特征：资源模板列表是成员限于参数化资源定义的一种 MCPDefinitionList。
+- `MCPRootList` — **is_a** → `MCPDefinitionList` (`MCPRootList-is_a-MCPDefinitionList`)
+  - MCP 根范围列表 是一种 MCP 定义列表。区分特征：根列表是成员限于客户端授权工作区根的一种 MCPDefinitionList。
+- `MCPSamplingRequest` — **is_a** → `MCPInteraction` (`MCPSamplingRequest-is_a-MCPInteraction`)
+  - MCP 采样请求 是一种 MCP 交互记录。区分特征：采样请求是服务器请求客户端执行模型采样的一种 MCPInteraction。
+- `MCPServer` — **advertises** → `MCPServerCapability` (`MCPServer-advertises-MCPServerCapability`)
+  - 服务器在会话初始化中声明能力。
+- `MCPServer` — **is_a** → `MCPParticipant` (`MCPServer-is_a-MCPParticipant`)
+  - MCP 服务器 是一种 MCP 参与方。区分特征：MCPServer 是在会话中发布能力并响应请求的一种 MCPParticipant 角色。
+- `MCPServer` — **publishes** → `MCPToolList` (`MCPServer-publishes-MCPToolList`)
+  - 服务器发布工具定义列表供发现。
+- `MCPServerCapability` — **is_a** → `MCPCapability` (`MCPServerCapability-is_a-MCPCapability`)
+  - MCP 服务器能力 是一种 MCP 协议能力。区分特征：服务器能力是在 MCP 会话中由服务端声明的一种 MCPCapability。
+- `MCPSession` — **has_participant** → `MCPServer` (`MCPSession-has_participant-MCPServer`)
+  - 会话连接服务器参与方。
+- `MCPSession` — **may_emit** → `ToolError` (`MCPSession-may_emit-ToolError`)
+  - 协议、授权或传输失败可产生明确错误诊断。
+- `MCPSession` — **renegotiates_after** → `ToolError` (`MCPSession-renegotiates_after-ToolError`)
+  - 可恢复协议失败后通过重新初始化或能力协商恢复。
+- `MCPSession` — **uses_transport** → `MCPTransport` (`MCPSession-uses_transport-MCPTransport`)
+  - 会话通过明确传输通道交换消息。
+- `MCPToolList` — **is_a** → `MCPDefinitionList` (`MCPToolList-is_a-MCPDefinitionList`)
+  - MCP 工具列表 是一种 MCP 定义列表。区分特征：工具列表是成员限于工具定义的一种 MCPDefinitionList，而不是“工具能力”的子类。
+- `APIOperation` — **is_a** → `ToolCapability` (`APIOperation-is_a-ToolCapability`)
+  - API 操作 是一种 工具能力。区分特征：API 操作在工具能力上增加方法、端点与调用约束，仍是一种可调用工具能力。
+- `CapabilityDescriptor` — **capability_descriptor_describes_api_operation** → `APIOperation` (`capability_descriptor_describes_api_operation`)
+  - 把能力描述符连接到其描述的 API 操作，包括端点、方法、参数、结果、授权和副作用元数据。
+- `CapabilityDescriptor` — **is_a** → `ToolMetadata` (`CapabilityDescriptor-is_a-ToolMetadata`)
+  - 能力描述符 是一种 工具元数据记录。区分特征：能力描述符是带独立来源和版本的机器可读工具元数据。
+- `CapabilitySurface` — **publishes** → `CapabilityDescriptor` (`CapabilitySurface-publishes-CapabilityDescriptor`)
+  - 能力表面发布机器可读描述以供发现。
+- `ComputerTool` — **is_a** → `Tool` (`ComputerTool-is_a-Tool`)
+  - 电脑控制工具 是一种 工具。区分特征：计算机工具增加交互环境控制特征后仍完整满足 Tool 定义。
+- `FunctionTool` — **is_a** → `Tool` (`FunctionTool-is_a-Tool`)
+  - 函数工具 是一种 工具。区分特征：函数工具是以可调用函数和参数契约专业化的 Tool。
+- `HostedMCPTool` — **is_a** → `HostedTool` (`HostedMCPTool-is_a-HostedTool`)
+  - 托管 MCP 工具 是一种 托管工具。区分特征：HostedMCPTool 是经 MCP 服务器暴露的 HostedTool，满足严格“是一种”。
+- `HostedTool` — **is_a** → `Tool` (`HostedTool-is_a-Tool`)
+  - 托管工具 是一种 工具。区分特征：托管工具是由外部或提供方运行时承载的一种 Tool。
+- `LocalRuntimeTool` — **is_a** → `Tool` (`LocalRuntimeTool-is_a-Tool`)
+  - 本地运行时工具 是一种 工具。区分特征：本地运行时工具是由宿主控制执行边界的一种 Tool。
+- `PromptDefinition` — **is_a** → `ToolSpecification` (`PromptDefinition-is_a-ToolSpecification`)
+  - 提示定义 是一种 工具注册规范。区分特征：提示定义是注册表中可发现、可参数化项目的静态规范，不是运行时请求。
+- `PromptTemplate` — **is_a** → `PromptDefinition` (`PromptTemplate-is_a-PromptDefinition`)
+  - 提示模板 是一种 提示定义。区分特征：模板是静态 PromptDefinition 的一种，不属于运行时调用模块；实例化活动通过关系使用它。
+- `ResourceDefinition` — **is_a** → `ToolSpecification` (`ResourceDefinition-is_a-ToolSpecification`)
+  - 资源定义 是一种 工具注册规范。区分特征：资源定义是可读、订阅或模板化资源的静态注册规范。
+- `ResourceTemplate` — **is_a** → `ResourceDefinition` (`ResourceTemplate-is_a-ResourceDefinition`)
+  - 资源模板 是一种 资源定义。区分特征：资源模板是静态 ResourceDefinition 的一种，应由注册定义模块拥有。
+- `ShellTool` — **is_a** → `LocalRuntimeTool` (`ShellTool-is_a-LocalRuntimeTool`)
+  - 命令行工具 是一种 本地运行时工具。区分特征：ShellTool 是通过 shell/进程表面执行的一种 LocalRuntimeTool。
+- `ToolDefinition` — **tool_definition_declares_permission** → `ToolPermissionSpec` (`tool_definition_declares_permission`)
+  - 把工具定义连接到工具侧权限声明，说明所需 范围、审批、受保护资源和安全挂钩点。
+- `Tool` — **exposes_operation** → `APIOperation` (`Tool-exposes_operation-APIOperation`)
+  - 工具可暴露一个或多个可调用操作。
+- `Tool` — **offers_capability** → `ToolCapability` (`Tool-offers_capability-ToolCapability`)
+  - 能力是对工具可做什么的说明，不是工具实体的父类。
+- `ToolDefinition` — **constrains_plan** → `ToolCallPlan` (`ToolDefinition-constrains_plan-ToolCallPlan`)
+  - 静态定义为计划提供操作和参数约束，但不是计划。
+- `ToolDefinition` — **describes** → `Tool` (`ToolDefinition-describes-Tool`)
+  - 定义描述工具，但不等同于可调用实现。
+- `ToolDefinition` — **is_a** → `ToolSpecification` (`ToolDefinition-is_a-ToolSpecification`)
+  - 工具定义 是一种 工具注册规范。区分特征：工具定义是描述工具身份、操作和结构约束的一种静态注册规范。
+- `ToolDeprecationNotice` — **deprecates** → `ToolDefinition` (`ToolDeprecationNotice-deprecates-ToolDefinition`)
+  - 弃用通知治理定义的生命周期并指向替代项。
+- `ToolDeprecationNotice` — **is_a** → `ToolMetadata` (`ToolDeprecationNotice-is_a-ToolMetadata`)
+  - 工具弃用通知 是一种 工具元数据记录。区分特征：弃用通知有独立发布时间、依据与替代项，故保留为可溯源 ToolMetadata。
+- `ToolPermissionSpec` — **constrains** → `Tool` (`ToolPermissionSpec-constrains-Tool`)
+  - 权限规范约束工具使用但不作运行时授权决定。
+- `ToolPermissionSpec` — **is_a** → `ToolSpecification` (`ToolPermissionSpec-is_a-ToolSpecification`)
+  - 工具权限规格 是一种 工具注册规范。区分特征：权限声明是约束工具可用范围的一种注册规范，并不等同于运行时授权决定。
+- `ToolRegistry` — **contains_definition** → `ToolDefinition` (`ToolRegistry-contains_definition-ToolDefinition`)
+  - 注册表聚合可发现的工具定义。
+- `AuditDisclosure` — **audit_disclosure_records_disclosure_filter** → `DisclosureFilter` (`audit_disclosure_records_disclosure_filter`)
+  - 该关系把审计披露记录连接到做出释放、脱敏、抑制或升级决策的披露过滤器。
+- `AuditDisclosure` — **records_control** → `DisclosureControlActivity` (`AuditDisclosure-records_control-DisclosureControlActivity`)
+  - 审计披露记录指向实际执行的披露控制活动。
+- `CommitGate` — **commit_gate_emits_policy_decision** → `PolicyDecision` (`commit_gate_emits_policy_decision`)
+  - 该关系把提交门连接到其产生的策略决策，使副作用批准、拒绝、升级或有条件释放可追踪。
+- `CommitApproval` — **authorizes** → `SideEffect` (`CommitApproval-authorizes-SideEffect`)
+  - 批准仅授权其范围内的副作用。
+- `CommitApproval` — **is_a** → `AllowDecision` (`CommitApproval-is_a-AllowDecision`)
+  - 提交批准 是一种 允许决定。区分特征：副作用提交批准是限定副作用范围的 AllowDecision；跨模块引用避免复制 PolicyDecision。
+- `CommitDenial` — **blocks** → `SideEffect` (`CommitDenial-blocks-SideEffect`)
+  - 拒绝记录阻止对应副作用发生。
+- `CommitDenial` — **is_a** → `DenyDecision` (`CommitDenial-is_a-DenyDecision`)
+  - 提交拒绝 是一种 拒绝决定。区分特征：副作用提交拒绝是阻止指定副作用的 DenyDecision。
+- `CommitGate` — **is_a** → `Gate` (`CommitGate-is_a-Gate`)
+  - 副作用提交闸门 是一种 控制闸门。区分特征：CommitGate 是专门控制持久或外部副作用的 Gate；展示标签改为 Side-effect commit gate，避免误解为 Git commit。
+- `CommitGate` — **may_produce** → `CommitApproval` (`CommitGate-may_produce-CommitApproval`)
+  - 满足政策与授权条件时，闸门产生批准记录。
+- `CommitGate` — **may_produce** → `CommitDenial` (`CommitGate-may_produce-CommitDenial`)
+  - 条件不满足时，闸门产生拒绝记录而不是副作用。
+- `CommitRequest` — **evaluated_by** → `CommitGate` (`CommitRequest-evaluated_by-CommitGate`)
+  - 副作用请求必须经过明确的副作用提交闸门评估。
+- `DisclosureFilter` — **disclosure_filter_suppresses_output_window** → `OutputWindow` (`disclosure_filter_suppresses_output_window`)
+  - 该关系把披露过滤器连接到其因敏感片段、策略、接收方边界或数据区控制而抑制或限制的输出窗口。
+- `DisclosureFilter` — **governed_by** → `DisclosureRule` (`DisclosureFilter-governed_by-DisclosureRule`)
+  - 披露过滤活动由明确披露规则控制。
+- `DisclosureFilter` — **is_a** → `DisclosureControlActivity` (`DisclosureFilter-is_a-DisclosureControlActivity`)
+  - 披露过滤器 是一种 披露控制活动。区分特征：披露过滤是依据披露规则选择释放、脱敏、抑制或升级结果的 DisclosureControlActivity。
+- `ProgressiveDisclosure` — **is_a** → `DisclosureControlActivity` (`ProgressiveDisclosure-is_a-DisclosureControlActivity`)
+  - 渐进式披露 是一种 披露控制活动。区分特征：渐进式披露是按阶段逐步释放内容的 DisclosureControlActivity；阶段计划作为其结构信息。
+- `Redaction` — **is_a** → `DisclosureControlActivity` (`Redaction-is_a-DisclosureControlActivity`)
+  - 脱敏处置 是一种 披露控制活动。区分特征：脱敏是遮蔽、移除、替换或概括敏感片段的 DisclosureControlActivity。
+- `Redaction` — **may_produce** → `SuppressedOutput` (`Redaction-may_produce-SuppressedOutput`)
+  - 完全抑制是脱敏活动的一种可能结果，而非所有脱敏的必然结果。
+- `Redaction` — **targets** → `SensitiveSpan` (`Redaction-targets-SensitiveSpan`)
+  - 脱敏活动必须定位到具体敏感片段。
+- `RedactionRule` — **is_a** → `DisclosureRule` (`RedactionRule-is_a-DisclosureRule`)
+  - 脱敏规则 是一种 披露规则。区分特征：脱敏规则是规定检测与变换敏感片段方式的 DisclosureRule。
+- `SideEffect` — **side_effect_has_rollback_action** → `RollbackAction` (`side_effect_has_rollback_action`)
+  - 该关系把副作用连接到可在批准后或失败后补偿、回滚、删除、撤销或中和该效果的回滚动作。
+- `SideEffect` — **side_effect_produced_by_network_call** → `NetworkCall` (`side_effect_produced_by_network_call`)
+  - 该关系把持久化或外部可见副作用连接到在出口与凭据策略下产生或尝试产生它的网络调用。
+- `SideEffect` — **side_effect_produced_by_sandbox_command** → `Command` (`side_effect_produced_by_sandbox_command`)
+  - 该关系把持久化或外部可见副作用连接到在执行策略下产生或尝试产生它的沙箱命令。
+- `SideEffect` — **side_effect_produced_by_tool_call** → `ToolCall` (`side_effect_produced_by_tool_call`)
+  - 该关系把持久化或外部可见副作用连接到产生或尝试产生它的工具调用，使工具执行与提交授权保持区分。
+- `DefenseFinding` — **triggers** → `MitigationAction` (`DefenseFinding-triggers-MitigationAction`)
+  - 被策略接受的防御发现可触发缓解活动。
+- `IndirectInjectionSignal` — **is_a** → `ThreatSignal` (`IndirectInjectionSignal-is_a-ThreatSignal`)
+  - 间接注入信号 是一种 威胁信号。区分特征：间接注入信号是由外部内容经检索、工具或摘要影响行为这一特征区分的 ThreatSignal。
+- `InjectionScanResult` — **supports** → `DefenseFinding` (`InjectionScanResult-supports-DefenseFinding`)
+  - 发现由具体扫描结果及证据支持。
+- `InstructionConflict` — **resolved_by** → `TrustedInstructionOverride` (`InstructionConflict-resolved_by-TrustedInstructionOverride`)
+  - 冲突仅在高权限指令具有明确作用域时由可信覆盖记录解决。
+- `MaliciousToolOutput` — **is_a** → `PoisonedContent` (`MaliciousToolOutput-is_a-PoisonedContent`)
+  - 恶意工具输出 是一种 受污染内容。区分特征：恶意工具输出是来源为工具结果且含操纵或外泄指令的 PoisonedContent。
+- `MemoryPoisoningSignal` — **memory_poisoning_signal_flags_memory_record** → `MemoryRecord` (`memory_poisoning_signal_flags_memory_record`)
+  - 记忆投毒信号标记记忆记录关系把记忆投毒信号连接到疑似携带对抗性或不安全持久影响的具体记忆记录。
+- `MemoryPoisoningSignal` — **is_a** → `ThreatSignal` (`MemoryPoisoningSignal-is_a-ThreatSignal`)
+  - 记忆投毒信号 是一种 威胁信号。区分特征：记忆污染信号是指向持久记忆、索引、摘要或检索片段污染证据的 ThreatSignal。
+- `PatternScan` — **is_a** → `DetectionActivity` (`PatternScan-is_a-DetectionActivity`)
+  - 模式扫描 是一种 检测活动。区分特征：模式扫描是使用签名或规则检查内容的 DetectionActivity，其输出另建 InjectionScanResult。
+- `PatternScan` — **produces** → `InjectionScanResult` (`PatternScan-produces-InjectionScanResult`)
+  - 扫描活动产生扫描结果记录，二者不作继承。
+- `PatternScan` — **scans** → `UntrustedInstructionCandidate` (`PatternScan-scans-UntrustedInstructionCandidate`)
+  - 模式扫描在接受前检查未受信指令候选。
+- `PoisonedRetrievedChunk` — **is_a** → `PoisonedContent` (`PoisonedRetrievedChunk-is_a-PoisonedContent`)
+  - 被投毒检索分块 是一种 受污染内容。区分特征：被污染检索片段是按检索分块身份区分的 PoisonedContent。
+- `PoisonedToolDescription` — **is_a** → `PoisonedContent` (`PoisonedToolDescription-is_a-PoisonedContent`)
+  - 被投毒工具描述 是一种 受污染内容。区分特征：被污染工具描述是出现在工具元数据中、企图操纵选择或参数的 PoisonedContent。
+- `PromptInjectionSignal` — **is_a** → `ThreatSignal` (`PromptInjectionSignal-is_a-ThreatSignal`)
+  - 提示注入信号 是一种 威胁信号。区分特征：提示注入信号是表明内容试图覆盖可信指令或绕过策略的 ThreatSignal。
+- `QuarantineAction` — **is_a** → `MitigationAction` (`QuarantineAction-is_a-MitigationAction`)
+  - 隔离处置 是一种 缓解活动。区分特征：隔离处置是通过把可疑内容移出正常上下文或执行流来降低风险的 MitigationAction。
+- `ResourceContentPoisoning` — **affects** → `PoisonedContent` (`ResourceContentPoisoning-affects-PoisonedContent`)
+  - 资源内容投毒事件指向受影响内容，不把事件误作内容子类。
+- `RiskSink` — **is_a** → `RiskFlowRole` (`RiskSink-is_a-RiskFlowRole`)
+  - 风险接收方 是一种 风险流角色。区分特征：风险汇是受保护目的对象在 source-sink 分析中承担的角色，而非固定实体类型。
+- `RiskSource` — **is_a** → `RiskFlowRole` (`RiskSource-is_a-RiskFlowRole`)
+  - 风险来源 是一种 风险流角色。区分特征：风险源是外部消息、工具输出或记忆项在具体流中承担的来源角色。
+- `SanitizationAction` — **is_a** → `MitigationAction` (`SanitizationAction-is_a-MitigationAction`)
+  - 净化处置 是一种 缓解活动。区分特征：净化处置是通过移除、改写、屏蔽或缩窄不安全内容来降低风险的 MitigationAction。
+- `PatternScan` — **scans_for_signature** → `InjectionSignature` (`scans_for_signature`)
+  - 对象关系定义域为模式扫描，值域为注入签名；用于表达这两个智能体系统术语之间可验证、可追溯的语义连接。
+- `SourceSinkFlow` — **has_sink_role** → `RiskSink` (`SourceSinkFlow-has_sink_role-RiskSink`)
+  - 风险流显式包含受保护的汇角色。
+- `SourceSinkFlow` — **has_source_role** → `RiskSource` (`SourceSinkFlow-has_source_role-RiskSource`)
+  - 风险流显式包含来源角色。
+- `TaintedSource` — **is_a** → `TaintEntity` (`TaintedSource-is_a-TaintEntity`)
+  - 污点来源 是一种 污点承载实体。区分特征：污点来源是因来源级不可信或敏感标记而成为污点承载实体的一类 TaintEntity。
+- `TaintedSpan` — **is_a** → `TaintEntity` (`TaintedSpan-is_a-TaintEntity`)
+  - 污点片段 是一种 污点承载实体。区分特征：污点片段是以精确文本或结构范围承载污点的 TaintEntity，与完整来源可并列。
+- `TaintPropagation` — **propagates** → `TaintEntity` (`TaintPropagation-propagates-TaintEntity`)
+  - 传播事件记录污点在承载实体之间的移动。
+- `ThreatSignal` — **indicates** → `PersistentContextRisk` (`ThreatSignal-indicates-PersistentContextRisk`)
+  - 持久化相关信号可表明长期上下文风险，但风险不是信号子类。
+- `ToolSchemaPoisoning` — **affects** → `PoisonedContent` (`ToolSchemaPoisoning-affects-PoisonedContent`)
+  - 工具 Schema 投毒事件指向受影响内容，不把变更过程误作内容。
+- `ToolStreamInjectionSignal` — **is_a** → `ThreatSignal` (`ToolStreamInjectionSignal-is_a-ThreatSignal`)
+  - 工具流注入信号 是一种 威胁信号。区分特征：工具流注入信号是来源为流式工具输出并企图影响后续动作的 ThreatSignal。
+- `AllowDecision` — **is_a** → `PolicyDecision` (`AllowDecision-is_a-PolicyDecision`)
+  - 允许决定 是一种 策略决策。区分特征：允许决定是结论为允许并带有作用域与义务的 PolicyDecision。
+- `AuthorizationGrant` — **is_a** → `AuthorizationArtifact` (`AuthorizationGrant-is_a-AuthorizationArtifact`)
+  - 授权授予 是一种 授权凭据。区分特征：授权授予是证明某主体获准执行受限操作的 AuthorizationArtifact。
+- `AuthorizationGrant` — **scoped_by** → `PermissionScope` (`AuthorizationGrant-scoped_by-PermissionScope`)
+  - 授权凭据的有效操作和资源由权限范围约束。
+- `CapabilityGrant` — **is_a** → `AuthorizationGrant` (`CapabilityGrant-is_a-AuthorizationGrant`)
+  - 能力授予 是一种 授权授予。区分特征：能力授予是把授权限制到明确能力表面的 AuthorizationGrant。
+- `DenyDecision` — **is_a** → `PolicyDecision` (`DenyDecision-is_a-PolicyDecision`)
+  - 拒绝决定 是一种 策略决策。区分特征：拒绝决定是结论为阻止请求并记录拒绝依据的 PolicyDecision。
+- `EscalationDecision` — **is_a** → `PolicyDecision` (`EscalationDecision-is_a-PolicyDecision`)
+  - 升级决定 是一种 策略决策。区分特征：升级决定是把未决请求交由更高权限主体处理的 PolicyDecision，并非授权本身。
+- `HumanApproval` — **is_a** → `AuthorizationArtifact` (`HumanApproval-is_a-AuthorizationArtifact`)
+  - 人工批准记录 是一种 授权凭据。区分特征：这里保留的是可审计的人类批准记录，因而是一种 AuthorizationArtifact；批准活动本身不与记录混型。
+- `PermissionResponse` — **responds_to** → `PermissionPrompt` (`PermissionResponse-responds_to-PermissionPrompt`)
+  - 响应必须指向原始许可提示以形成可审计配对。
+- `PolicyAction` — **is_a** → `PolicySpecification` (`PolicyAction-is_a-PolicySpecification`)
+  - 策略动作规范 是一种 策略规范。区分特征：此节点表示规则规定的允许、拒绝、升级或附加义务动作规范，而非动作执行事件。
+- `PolicyCondition` — **is_a** → `PolicySpecification` (`PolicyCondition-is_a-PolicySpecification`)
+  - 策略条件 是一种 策略规范。区分特征：策略条件是描述何时适用规则的规范片段，属于 PolicySpecification。
+- `PolicyDecision` — **based_on** → `PolicyRule` (`PolicyDecision-based_on-PolicyRule`)
+  - 决定必须保留其规则依据。
+- `PolicyDecision` — **may_apply_exception** → `PolicyException` (`PolicyDecision-may_apply_exception-PolicyException`)
+  - 仅在明确命中的例外条件下，决定才引用策略例外。
+- `PolicyException` — **is_a** → `PolicySpecification` (`PolicyException-is_a-PolicySpecification`)
+  - 策略例外 是一种 策略规范。区分特征：策略例外是带适用条件、授权者和有效期的 PolicySpecification，不是决定或授权凭据。
+- `PolicyRule` — **has_condition** → `PolicyCondition` (`PolicyRule-has_condition-PolicyCondition`)
+  - 条件是规则的组成而不是规则的实例。
+- `PolicyRule` — **is_a** → `PolicySpecification` (`PolicyRule-is_a-PolicySpecification`)
+  - 策略规则 是一种 策略规范。区分特征：策略规则是把条件与规定动作组合成可评估规范的一种 PolicySpecification。
+- `PolicyRule` — **prescribes** → `PolicyAction` (`PolicyRule-prescribes-PolicyAction`)
+  - 规则规定满足条件时应执行的策略动作。
+- `DeniedNetworkCall` — **denied_under** → `NetworkPolicy` (`DeniedNetworkCall-denied_under-NetworkPolicy`)
+  - 拒绝调用必须记录作出拒绝的网络策略。
+- `DeniedNetworkCall` — **is_a** → `NetworkCall` (`DeniedNetworkCall-is_a-NetworkCall`)
+  - 被拒网络调用 是一种 网络调用。区分特征：被策略拦截的调用仍是一次网络调用尝试，以拒绝结果为区分特征。
+- `DomainSocket` — **is_a** → `Socket` (`DomainSocket-is_a-Socket`)
+  - 域套接字 是一种 套接字端点。区分特征：域套接字是使用本地域地址族的 Socket；它不是代理或网络调用。
+- `FilesystemPolicy` — **is_a** → `IsolationSpecification` (`FilesystemPolicy-is_a-IsolationSpecification`)
+  - 文件系统策略 是一种 隔离规范。区分特征：文件系统策略是按路径与读写执行操作约束隔离环境的 IsolationSpecification。
+- `HTTPProxy` — **is_a** → `Proxy` (`HTTPProxy-is_a-Proxy`)
+  - HTTP 代理 是一种 代理端点。区分特征：HTTP 代理是按 HTTP/HTTPS 转发语义区分的 Proxy。
+- `NetworkCall` — **accesses** → `NetworkResource` (`NetworkCall-accesses-NetworkResource`)
+  - 网络调用访问网络资源，同时保留端点、响应内容和信任边界的区别。
+- `NetworkCall` — **is_a** → `NetworkInteraction` (`NetworkCall-is_a-NetworkInteraction`)
+  - 网络调用 是一种 网络交互事件。区分特征：网络调用是具有目标、协议和结果的网络交互事件，满足 NetworkInteraction 加调用区分特征。
+- `NetworkCall` — **produces** → `InboundResponse` (`NetworkCall-produces-InboundResponse`)
+  - 完成的网络调用可产生入站响应；无响应的失败调用不强制该边。
+- `NetworkCall` — **routed_by** → `ProxyRoute` (`NetworkCall-routed_by-ProxyRoute`)
+  - 经代理的调用记录实际采用的代理路径。
+- `NetworkCall` — **targets** → `NetworkEndpoint` (`NetworkCall-targets-NetworkEndpoint`)
+  - 调用记录其可寻址目标端点。
+- `NetworkPolicy` — **is_a** → `IsolationSpecification` (`NetworkPolicy-is_a-IsolationSpecification`)
+  - 网络策略 是一种 隔离规范。区分特征：网络策略是按目的地、端口、协议和凭据约束隔离环境的 IsolationSpecification。
+- `OutboundRequest` — **initiates** → `NetworkCall` (`OutboundRequest-initiates-NetworkCall`)
+  - 出站请求触发网络调用尝试，但请求信息本身不是调用事件子类。
+- `ProcessPolicy` — **is_a** → `IsolationSpecification` (`ProcessPolicy-is_a-IsolationSpecification`)
+  - 进程策略 是一种 隔离规范。区分特征：进程策略是按命令、参数、环境和资源限制约束隔离执行的 IsolationSpecification。
+- `Proxy` — **is_a** → `NetworkEndpoint` (`Proxy-is_a-NetworkEndpoint`)
+  - 代理端点 是一种 网络通信端点。区分特征：代理是代表目标接收并转发通信的 NetworkEndpoint；路由规范另由 ProxyRoute 表达。
+- `Sandbox` — **constrained_by** → `IsolationSpecification` (`Sandbox-constrained_by-IsolationSpecification`)
+  - 沙箱的隔离保证由适用隔离规范约束。
+- `SandboxEscapeRisk` — **threatens** → `Sandbox` (`SandboxEscapeRisk-threatens-Sandbox`)
+  - 逃逸风险描述对某个隔离边界保证的威胁。
+- `Socket` — **is_a** → `NetworkEndpoint` (`Socket-is_a-NetworkEndpoint`)
+  - 套接字端点 是一种 网络通信端点。区分特征：套接字是由地址族、协议和绑定信息区分的 NetworkEndpoint。
+- `SOCKSProxy` — **is_a** → `Proxy` (`SOCKSProxy-is_a-Proxy`)
+  - SOCKS 代理 是一种 代理端点。区分特征：SOCKS 代理是按 SOCKS 转发协议区分的 Proxy。
+- `BoundaryCrossing` — **boundary_crossing_authorized_by** → `PolicyDecision` (`boundary_crossing_authorized_by`)
+  - 该关系把边界穿越事件连接到允许、拒绝、升级、沙箱化或限制该转移的策略决策。
+- `BoundaryCrossing` — **boundary_crossing_has_source_actor** → `AgentActor` (`boundary_crossing_has_source_actor`)
+  - 该关系把边界穿越事件连接到发起、发送、委派或产生转移的来源参与者、服务、工具、用户或远程智能体。
+- `BoundaryCrossing` — **boundary_crossing_has_target_actor** → `AgentActor` (`boundary_crossing_has_target_actor`)
+  - 该关系把边界穿越事件连接到接收、解释、执行或存储被转移对象的接收方参与者、服务、工具、用户或远程智能体。
+- `BoundaryCrossing` — **boundary_crossing_recorded_by_trace_event** → `TraceEvent` (`boundary_crossing_recorded_by_trace_event`)
+  - 该关系把边界穿越事件连接到记录时间戳、参与者、请求、策略和结果证据的可观测轨迹事件。
+- `BoundaryCrossing` — **authorized_by** → `AuthorityScope` (`BoundaryCrossing-authorized_by-AuthorityScope`)
+  - 跨界操作必须能追溯到适用的权限范围。
+- `BoundaryCrossing` — **crosses** → `TrustBoundary` (`BoundaryCrossing-crosses-TrustBoundary`)
+  - 穿越事件记录所跨越的信任边界。
+- `BoundaryCrossing` — **has_source_zone** → `DataZone` (`BoundaryCrossing-has_source_zone-DataZone`)
+  - 来源数据区是穿越审计的必要端点。
+- `BoundaryCrossing` — **has_target_zone** → `DataZone` (`BoundaryCrossing-has_target_zone-DataZone`)
+  - 目标数据区与来源区分开记录，避免方向丢失。
+- `ExternalBoundary` — **is_a** → `TrustBoundary` (`ExternalBoundary-is_a-TrustBoundary`)
+  - 外部边界 是一种 信任边界。区分特征：任一外部边界都是把受控系统与外部主体或服务分开的信任边界，符合 genus 加区分特征。
+- `InternalBoundary` — **is_a** → `TrustBoundary` (`InternalBoundary-is_a-TrustBoundary`)
+  - 内部边界 是一种 信任边界。区分特征：任一内部边界都是受控系统内部信任假设变化处的 TrustBoundary。
+- `NetworkBoundary` — **is_a** → `TrustBoundary` (`NetworkBoundary-is_a-TrustBoundary`)
+  - 网络边界 是一种 信任边界。区分特征：网络边界是由网络可达性或传输面区分的信任边界；内部网段之间也可成立，因此不挂到 ExternalBoundary。
+- `RemoteAgentBoundary` — **is_a** → `TrustBoundary` (`RemoteAgentBoundary-is_a-TrustBoundary`)
+  - 远程智能体边界 是一种 信任边界。区分特征：远程智能体边界以远程主体的不透明身份、权限和责任为区分特征；受同组织控制的远程主体未必是 ExternalBoundary。
+- `ToolBoundary` — **is_a** → `TrustBoundary` (`ToolBoundary-is_a-TrustBoundary`)
+  - 工具边界 是一种 信任边界。区分特征：工具边界是意图转为可执行调用或工具输出返回时的 TrustBoundary；本地工具同样可形成该边界，故不从属于 ExternalBoundary。
+- `AuditLog` — **audit_log_summarizes_audit_record** → `AuditRecord` (`audit_log_summarizes_audit_record`)
+  - 该关系把审计日志集合连接到其摘要化的运行审计记录证据。
+- `AuditLog` — **documents** → `Review` (`AuditLog-documents-Review`)
+  - 审计日志保留评审和治理动作的可检查证据。
+- `ErrorListener` — **is_a** → `LogConsumer` (`ErrorListener-is_a-LogConsumer`)
+  - 错误监听器 是一种 日志消费者。区分特征：错误监听器是专门消费并路由错误事件的一种 LogConsumer。
+- `ErrorListener` — **observes** → `ErrorEvent` (`ErrorListener-observes-ErrorEvent`)
+  - 错误监听器消费发生的错误事件。
+- `ErrorListener` — **triggers** → `RecoveryAction` (`ErrorListener-triggers-RecoveryAction`)
+  - 可恢复错误可由监听器路由并触发恢复动作。
+- `EventSink` — **is_a** → `LogConsumer` (`EventSink-is_a-LogConsumer`)
+  - 事件接收端 是一种 日志消费者。区分特征：事件 Sink 是接收、存储或转发日志/遥测的一种 LogConsumer。
+- `EventSink` — **receives** → `TelemetryEvent` (`EventSink-receives-TelemetryEvent`)
+  - 事件接收端接收遥测事件而不改变其身份。
+- `LogListener` — **log_listener_subscribes_to_stream** → `LogStream` (`log_listener_subscribes_to_stream`)
+  - 该关系把日志监听器连接到它观察和路由的日志流。
+- `LogRecord` — **log_record_appended_to_audit_log** → `AuditLog` (`log_record_appended_to_audit_log`)
+  - 该关系把结构化日志记录追加到可审查的审计日志集合。
+- `LogStream` — **log_stream_delivered_to_event_sink** → `EventSink` (`log_stream_delivered_to_event_sink`)
+  - 该关系把日志流投递到用于存储、监控、审查或转发的事件接收端。
+- `LogSubscription` — **log_subscription_registers_listener** → `LogListener` (`log_subscription_registers_listener`)
+  - 该关系说明日志订阅为过滤后的遥测、诊断或审计流登记监听器。
+- `LogConsumer` — **consumes** → `LogStream` (`LogConsumer-consumes-LogStream`)
+  - 消费者读取或接收日志流。
+- `LogListener` — **is_a** → `LogConsumer` (`LogListener-is_a-LogConsumer`)
+  - 日志监听器 是一种 日志消费者。区分特征：日志监听器是订阅并路由日志记录的一种 LogConsumer。
+- `LogListener` — **routes_failure_to** → `ErrorListener` (`LogListener-routes_failure_to-ErrorListener`)
+  - 通用监听器将错误记录路由至错误处理消费者。
+- `LogRecord` — **is_a** → `LogArtifact` (`LogRecord-is_a-LogArtifact`)
+  - 日志记录 是一种 日志信息制品。区分特征：LogRecord 是有时间、正文、属性与出处的单条 LogArtifact。
+- `LogStream` — **contains** → `LogRecord` (`LogStream-contains-LogRecord`)
+  - 日志流按序包含日志记录。
+- `LogSubscription` — **configures** → `LogListener` (`LogSubscription-configures-LogListener`)
+  - 订阅规定监听范围、过滤和保留条件。
+- `TelemetryEvent` — **telemetry_event_derived_from_trace_event** → `TraceEvent` (`telemetry_event_derived_from_trace_event`)
+  - 该关系说明遥测事件派生自原始轨迹事件，而不是第二套运行事实。
+- `TelemetryEvent` — **telemetry_event_emitted_to_log_stream** → `LogStream` (`telemetry_event_emitted_to_log_stream`)
+  - 该关系把派生遥测事件发送到日志流，供监控、指标、诊断、审计或导出消费。
+- `ToolTranscript` — **is_a** → `LogArtifact` (`ToolTranscript-is_a-LogArtifact`)
+  - 工具调用记录 是一种 日志信息制品。区分特征：调用记录是跨请求、尝试、结果与诊断的有序日志制品，由 Feedback Logging 拥有，调用模块通过 records 关系引用。
+- `ToolTranscript` — **records** → `ToolCallAttempt` (`ToolTranscript-records-ToolCallAttempt`)
+  - 调用记录保留尝试及其结果和诊断的审计序列。
+- `TraceExport` — **exports** → `LogStream` (`TraceExport-exports-LogStream`)
+  - 导出制品是日志/追踪流的可移植投影。
+- `TraceExport` — **is_a** → `LogArtifact` (`TraceExport-is_a-LogArtifact`)
+  - 轨迹导出 是一种 日志信息制品。区分特征：TraceExport 是可移植、带出处和脱敏状态的一种复合 LogArtifact。
+- `CostMetric` — **is_a** → `Metric` (`CostMetric-is_a-Metric`)
+  - 成本指标 是一种 指标。区分特征：成本指标是将可测属性限定为令牌、计算、金钱等成本的一种 Metric 定义。
+- `EvaluationRun` — **evaluation_run_produces_score** → `Score` (`evaluation_run_produces_score`)
+  - 该关系记录评估运行产生的分数。
+- `EvaluationCriterion` — **is_a** → `EvaluationSpecification` (`EvaluationCriterion-is_a-EvaluationSpecification`)
+  - 评估准则 是一种 评估规范。区分特征：评估准则是在 EvaluationSpecification 上增加判断条件的一种规范。
+- `EvaluationRun` — **applies** → `Rubric` (`EvaluationRun-applies-Rubric`)
+  - 运行应用评分规则而不成为规则的子类。
+- `EvaluationRun` — **evaluates** → `ToolResult` (`EvaluationRun-evaluates-ToolResult`)
+  - 评估运行可把工具返回记录作为被评对象，并保留使用的场景、规则、指标与证据。
+- `EvaluationRun` — **produces** → `Feedback` (`EvaluationRun-produces-Feedback`)
+  - 评估运行可把测量与判据解释为供后续纠正、批准或记忆写入使用的反馈。
+- `EvaluationRun` — **produces** → `Measurement` (`EvaluationRun-produces-Measurement`)
+  - 评估活动产生带出处和时间的测量记录。
+- `EvaluationRun` — **uses_scenario** → `EvaluationScenario` (`EvaluationRun-uses_scenario-EvaluationScenario`)
+  - 评估运行在明确场景约束下执行。
+- `EvaluationScenario` — **is_a** → `EvaluationSpecification` (`EvaluationScenario-is_a-EvaluationSpecification`)
+  - 评估场景 是一种 评估规范。区分特征：评估场景是限定输入、环境和约束的一种 EvaluationSpecification。
+- `LatencyMetric` — **is_a** → `Metric` (`LatencyMetric-is_a-Metric`)
+  - 延迟指标 是一种 指标。区分特征：延迟指标是将可测属性限定为时间和等待的一种 Metric 定义。
+- `Measurement` — **evaluates** → `OptimizationTarget` (`Measurement-evaluates-OptimizationTarget`)
+  - 测量记录指出被评对象或目标。
+- `Measurement` — **measures** → `Metric` (`Measurement-measures-Metric`)
+  - 测量引用指标定义、单位和值；两者不混型。
+- `Metric` — **metric_measures_run_attempt** → `RunAttempt` (`metric_measures_run_attempt`)
+  - 该关系把指标连接到其衡量的运行尝试。
+- `Metric` — **metric_measures_tool_call** → `ToolCall` (`metric_measures_tool_call`)
+  - 该关系把指标连接到其衡量的工具调用。
+- `RobustnessMetric` — **is_a** → `Metric` (`RobustnessMetric-is_a-Metric`)
+  - 鲁棒性指标 是一种 指标。区分特征：稳健性指标是将可测属性限定为扰动和失败下稳定性的一种 Metric。
+- `Rubric` — **is_a** → `EvaluationSpecification` (`Rubric-is_a-EvaluationSpecification`)
+  - 评分规程 是一种 评估规范。区分特征：Rubric 是组合准则、权重、阈值和解释规则的一种 EvaluationSpecification。
+- `SafetyMetric` — **is_a** → `Metric` (`SafetyMetric-is_a-Metric`)
+  - 安全指标 是一种 指标。区分特征：安全指标是将可测属性限定为合规、风险或违规率的一种 Metric，不拥有执法决定。
+- `Score` — **score_computed_for_metric** → `Metric` (`score_computed_for_metric`)
+  - 该关系把分数连接到产生该值的指标。
+- `Score` — **assessed_against** → `SuccessCriterion` (`Score-assessed_against-SuccessCriterion`)
+  - 分数依据成功准则解释为通过或失败。
+- `Score` — **is_a** → `Measurement` (`Score-is_a-Measurement`)
+  - 评分 是一种 测量记录。区分特征：Score 是以数值、等级、类别或通过/失败表达的一种 Measurement；它不是 Metric 定义。
+- `Score` — **may_trigger** → `Correction` (`Score-may_trigger-Correction`)
+  - 未达阈值的测量可触发纠正和再评估。
+- `SuccessCriterion` — **success_criterion_evaluates_task** → `Task` (`success_criterion_evaluates_task`)
+  - 该关系把成功准则连接到其用于判断的任务。
+- `SuccessCriterion` — **is_a** → `EvaluationCriterion` (`SuccessCriterion-is_a-EvaluationCriterion`)
+  - 成功准则 是一种 评估准则。区分特征：成功准则是在 EvaluationCriterion 上限定可接受成功条件的一种准则。
+- `AutomatedReview` — **is_a** → `ReviewActivity` (`AutomatedReview-is_a-ReviewActivity`)
+  - 自动审查 是一种 评审活动。区分特征：自动评审是由机器执行且保留模型/规则出处的一种 ReviewActivity。
+- `Correction` — **correction_applies_to_artifact** → `Artifact` (`correction_applies_to_artifact`)
+  - 该关系把修正动作连接到被修改、修复或替换的产物。
+- `Correction` — **is_a** → `CorrectionActivity` (`Correction-is_a-CorrectionActivity`)
+  - 修正 是一种 纠正活动。区分特征：Correction 是根据反馈修改制品、计划或选择的一种 CorrectionActivity。
+- `CorrectionActivity` — **followed_by** → `EvaluationRun` (`CorrectionActivity-followed_by-EvaluationRun`)
+  - 纠正后的新版本必须通过重新评估验证。
+- `FeedbackEvent` — **feedback_event_carries_feedback** → `Feedback` (`feedback_event_carries_feedback`)
+  - 该关系把编排反馈事件连接到其携带的反馈证据。
+- `FeedbackEvent` — **feedback_event_informs_policy_decision** → `PolicyDecision` (`feedback_event_informs_policy_decision`)
+  - 该关系把反馈事件连接到它提供安全、风险或权限证据的策略决策。
+- `FeedbackEvent` — **feedback_event_targets_optimization_loop** → `OptimizationLoop` (`feedback_event_targets_optimization_loop`)
+  - 该关系把反馈事件定向到消费反馈、指标或审查发现的优化循环。
+- `FeedbackEvent` — **feedback_event_targets_route** → `Route` (`feedback_event_targets_route`)
+  - 该关系把反馈事件定向到需要改变分支、处理器或停止路径的路由。
+- `FeedbackEvent` — **feedback_event_targets_task** → `Task` (`feedback_event_targets_task`)
+  - 该关系把反馈事件定向到需要改变计划、优先级或重试路径的任务。
+- `FeedbackEvent` — **feedback_event_targets_worker** → `WorkerAgent` (`feedback_event_targets_worker`)
+  - 该关系把反馈事件定向到需要改变分配、审查职责或未来选择的工作者。
+- `Feedback` — **motivates** → `Correction` (`Feedback-motivates-Correction`)
+  - 反馈可触发纠正，但不自动修改策略或核心本体。
+- `Feedback` — **triggers** → `MemoryWrite` (`Feedback-triggers-MemoryWrite`)
+  - 经审查且允许持久化的反馈可触发一次明确的 MemoryWrite；反馈本身不会直接改写记忆记录。
+- `FeedbackEvent` — **informs** → `FeedbackRouting` (`FeedbackEvent-informs-FeedbackRouting`)
+  - 反馈事件提供路由所需的纠正、警告、偏好或批准信号。
+- `HumanReview` — **is_a** → `ReviewActivity` (`HumanReview-is_a-ReviewActivity`)
+  - 人工审查 是一种 评审活动。区分特征：人类评审是由可问责的人类审查者执行的一种 ReviewActivity。
+- `LearningSignal` — **learning_signal_derived_from_feedback** → `Feedback` (`learning_signal_derived_from_feedback`)
+  - 该关系从反馈派生学习信号，并避免存储隐藏推理文本。
+- `LearningSignal` — **learning_signal_updates_memory_preference** → `MemoryRecord` (`learning_signal_updates_memory_preference`)
+  - 该关系说明学习信号更新用于检索、持久化或上下文组装的记忆偏好。
+- `LearningSignal` — **learning_signal_updates_routing_policy** → `RoutingPolicy` (`learning_signal_updates_routing_policy`)
+  - 该关系说明学习信号更新编排路由策略。
+- `LearningSignal` — **learning_signal_updates_tool_selection** → `ToolSelectionDecision` (`learning_signal_updates_tool_selection`)
+  - 该关系说明学习信号更新工具选择决策或未来选择准则。
+- `LearningSignal` — **is_a** → `Feedback` (`LearningSignal-is_a-Feedback`)
+  - 学习信号 是一种 反馈。区分特征：LearningSignal 是被解释为未来改进建议的一种 Feedback，只能产生变更提案。
+- `OptimizationLoop` — **optimization_loop_consumes_feedback** → `Feedback` (`optimization_loop_consumes_feedback`)
+  - 该关系说明优化循环消费反馈以改进后续提示、路由、工具选择或重试。
+- `OptimizationLoop` — **optimization_loop_consumes_metric** → `Metric` (`optimization_loop_consumes_metric`)
+  - 该关系说明优化循环消费指标以改进成本、延迟、正确性、鲁棒性或安全性。
+- `RecoveryAction` — **is_a** → `CorrectionActivity` (`RecoveryAction-is_a-CorrectionActivity`)
+  - 恢复动作 是一种 纠正活动。区分特征：恢复动作是在失败后恢复可接受状态的一种 CorrectionActivity。
+- `RecoveryAction` — **resolves** → `ErrorEvent` (`RecoveryAction-resolves-ErrorEvent`)
+  - 恢复动作以具体错误事件为触发和解决对象。
+- `RecoveryPlan` — **specifies** → `RecoveryAction` (`RecoveryPlan-specifies-RecoveryAction`)
+  - 恢复计划选择并约束恢复动作。
+- `ReviewFinding` — **review_finding_about_artifact** → `Artifact` (`review_finding_about_artifact`)
+  - 该关系把审查发现连接到其涉及的具体产物。
+- `ReviewFinding` — **review_finding_about_trace_event** → `TraceEvent` (`review_finding_about_trace_event`)
+  - 该关系把审查发现连接到其解释的轨迹事件。
+- `Review` — **review_produces_review_finding** → `ReviewFinding` (`review_produces_review_finding`)
+  - 该关系说明人工或自动审查产生了审查发现。
+- `Review` — **contains_finding** → `ReviewFinding` (`Review-contains_finding-ReviewFinding`)
+  - 评审记录聚合具体发现；发现不是评审子类。
+- `ReviewActivity` — **evaluates** → `OptimizationTarget` (`ReviewActivity-evaluates-OptimizationTarget`)
+  - 评审活动针对明确被评对象及优化目标。
+- `ReviewActivity` — **produces** → `Review` (`ReviewActivity-produces-Review`)
+  - 活动产生可审计的评审记录。
+- `ReviewFinding` — **generates** → `Feedback` (`ReviewFinding-generates-Feedback`)
+  - 发现被解释为供后续行动使用的反馈。
+- `RollbackAction` — **is_a** → `CorrectionActivity` (`RollbackAction-is_a-CorrectionActivity`)
+  - 回滚动作 是一种 纠正活动。区分特征：回滚动作是通过逆转或补偿先前变化进行纠正的一种 CorrectionActivity。
+- `RollbackAction` — **responds_to** → `ToolSideEffect` (`RollbackAction-responds_to-ToolSideEffect`)
+  - 回滚动作补偿已发生或部分发生的副作用。
+- `FeedbackEvent` — **triggers_revision_attempt** → `ImprovementAttempt` (`triggers_revision_attempt`)
+  - 修订触发关系把返回控制循环的反馈连接到由该反馈启动的有边界改进尝试。
+- `BlockingError` — **blocking_error_blocks_run_attempt** → `RunAttempt` (`blocking_error_blocks_run_attempt`)
+  - 该关系把阻断错误连接到被阻断或终止的运行尝试。
+- `BlockingError` — **is_a** → `FailureMode` (`BlockingError-is_a-FailureMode`)
+  - 阻断错误 是一种 失败模式。区分特征：BlockingError 描述会阻断继续执行的失败方式，是一种 FailureMode，而不是某次错误发生记录。
+- `ConfidenceSignal` — **confidence_signal_qualifies_review_finding** → `ReviewFinding` (`confidence_signal_qualifies_review_finding`)
+  - 该关系把置信信号附着到审查发现，显式表达不确定性或证据强度。
+- `ConfidenceSignal` — **is_a** → `DiagnosticSignal` (`ConfidenceSignal-is_a-DiagnosticSignal`)
+  - 置信信号 是一种 诊断信号。区分特征：置信信号是携带置信度或不确定性证据的一种 DiagnosticSignal。
+- `DiagnosticMessage` — **diagnostic_message_derived_from_log_record** → `LogRecord` (`diagnostic_message_derived_from_log_record`)
+  - 该关系从日志记录派生诊断消息，并保留诊断背后的日志证据。
+- `DiagnosticMessage` — **is_a** → `DiagnosticSignal` (`DiagnosticMessage-is_a-DiagnosticSignal`)
+  - 诊断消息 是一种 诊断信号。区分特征：诊断消息是以文本、代码和修复建议表达的一种 DiagnosticSignal。
+- `ErrorEvent` — **classified_by** → `FailureMode` (`ErrorEvent-classified_by-FailureMode`)
+  - 发生的错误事件由可复用失败模式分类。
+- `ErrorEvent` — **emits** → `DiagnosticMessage` (`ErrorEvent-emits-DiagnosticMessage`)
+  - 错误事件产生诊断消息和修复提示。
+- `ErrorEvent` — **is_a** → `FailureEvent` (`ErrorEvent-is_a-FailureEvent`)
+  - 错误事件 是一种 失败相关事件。区分特征：ErrorEvent 是记录实际失败、异常或超时的一种 FailureEvent。
+- `ErrorStream` — **contains** → `ErrorEvent` (`ErrorStream-contains-ErrorEvent`)
+  - 错误流按序聚合错误事件。
+- `RetryableError` — **retryable_error_triggers_recovery_plan** → `RecoveryPlan` (`retryable_error_triggers_recovery_plan`)
+  - 该关系把可重试错误连接到用于修复、重试、改路或停止的恢复计划。
+- `RetryableError` — **is_a** → `FailureMode` (`RetryableError-is_a-FailureMode`)
+  - 可重试错误 是一种 失败模式。区分特征：RetryableError 描述允许受限重试的失败方式，是一种 FailureMode；具体重试仍是新的 Attempt。
+- `RiskSignal` — **risk_signal_flags_policy_decision** → `PolicyDecision` (`risk_signal_flags_policy_decision`)
+  - 该关系把风险信号连接到其影响的策略决策。
+- `RiskSignal` — **affects** → `ToolCallAttempt` (`RiskSignal-affects-ToolCallAttempt`)
+  - 风险信号可约束或升级相关调用尝试。
+- `RiskSignal` — **is_a** → `DiagnosticSignal` (`RiskSignal-is_a-DiagnosticSignal`)
+  - 风险信号 是一种 诊断信号。区分特征：风险信号是表达潜在安全或策略敏感性的 DiagnosticSignal，不声称已发生失败。
+- `Warning` — **is_a** → `DiagnosticSignal` (`Warning-is_a-DiagnosticSignal`)
+  - 警告 是一种 诊断信号。区分特征：Warning 是非致命诊断信号；发生它的时点由 WarningEvent 表示，两者不混型。
+- `WarningEvent` — **is_a** → `FailureEvent` (`WarningEvent-is_a-FailureEvent`)
+  - 警告事件 是一种 失败相关事件。区分特征：WarningEvent 是执行可继续但产生告警的一种 FailureEvent 专业化。
+- `WarningEvent` — **raises** → `Warning` (`WarningEvent-raises-Warning`)
+  - 警告事件产生非致命诊断信号。
+- `Chunk` — **chunk_derived_from_document** → `Document` (`chunk_derived_from_document`)
+  - 分块派生自文档关系把分块连接到其被切分出的文档或记忆来源，保留用于检索和引用的来源谱系。
+- `Chunk` — **chunk_has_boundary** → `ChunkBoundary` (`chunk_has_boundary`)
+  - 分块具有边界关系把分块连接到偏移、令牌跨度、行范围、页范围、章节断点、语义边界或重叠等结构边界。
+- `Chunk` — **chunk_has_provenance** → `ChunkProvenance` (`chunk_has_provenance`)
+  - 分块具有来源关系把分块连接到覆盖来源版本、校验和、摄入运行、转换历史和文档片段的来源证据。
+- `ChunkReference` — **chunk_reference_targets_source_span** → `SourceSpan` (`chunk_reference_targets_source_span`)
+  - 分块引用指向来源片段关系把分块引用连接到其引用的精确来源片段、锚点、行范围、页范围、偏移或文档版本。
+- `Chunk` — **has_metadata** → `ChunkMetadata` (`Chunk-has_metadata-ChunkMetadata`)
+  - 分块通过统一元数据对象附着边界、来源和质量信息。
+- `Chunk` — **is_a** → `ChunkArtifact` (`Chunk-is_a-ChunkArtifact`)
+  - 分块 是一种 分块信息制品。区分特征：任一 Chunk 都是保留来源跨度、边界和检索元数据的 ChunkArtifact。
+- `ChunkBoundary` — **is_a** → `ChunkMetadata` (`ChunkBoundary-is_a-ChunkMetadata`)
+  - 分块边界 是一种 分块元数据。区分特征：分块边界是描述起止偏移、页行范围或语义断点的 ChunkMetadata。
+- `ChunkCompression` — **consumes** → `Chunk` (`ChunkCompression-consumes-Chunk`)
+  - 压缩活动读取分块内容与来源锚点。
+- `ChunkCompression` — **is_a** → `ChunkProcessingActivity` (`ChunkCompression-is_a-ChunkProcessingActivity`)
+  - 分块压缩活动 是一种 分块处理活动。区分特征：旧定义的“压缩产物”会混淆输入与过程；裁决为保留来源锚点并产生新 Chunk 的活动，而产物仍是 Chunk。
+- `ChunkCompression` — **produces** → `Chunk` (`ChunkCompression-produces-Chunk`)
+  - 压缩产生新版本 Chunk，不原地改写输入。
+- `ChunkContextNote` — **is_a** → `ChunkMetadata` (`ChunkContextNote-is_a-ChunkMetadata`)
+  - 分块上下文注记 是一种 分块元数据。区分特征：该注记是说明局部章节、周边语境或检索相关性的 ChunkMetadata。
+- `ChunkingRun` — **consumes** → `Document` (`ChunkingRun-consumes-Document`)
+  - 分块运行必须有原始文档输入。
+- `ChunkingRun` — **is_a** → `ChunkProcessingActivity` (`ChunkingRun-is_a-ChunkProcessingActivity`)
+  - 分块运行 是一种 分块处理活动。区分特征：分块运行是按策略把文档划分为可检索 Chunk 的 ChunkProcessingActivity。
+- `ChunkingRun` — **produces** → `Chunk` (`ChunkingRun-produces-Chunk`)
+  - 分块活动产生带边界和来源的 Chunk。
+- `ChunkOverlap` — **is_a** → `ChunkMetadata` (`ChunkOverlap-is_a-ChunkMetadata`)
+  - 分块重叠 是一种 分块元数据。区分特征：重叠量和共享跨度是相邻分块的结构元数据，不是分块或活动。
+- `ChunkProvenance` — **is_a** → `ChunkMetadata` (`ChunkProvenance-is_a-ChunkMetadata`)
+  - 分块来源记录 是一种 分块元数据。区分特征：来源记录是连接文档版本、跨度、校验和、摄入与变换历史的 ChunkMetadata。
+- `ChunkQualitySignal` — **is_a** → `ChunkMetadata` (`ChunkQualitySignal-is_a-ChunkMetadata`)
+  - 分块质量信号 是一种 分块元数据。区分特征：质量信号是记录解析完整性、重复、陈旧或毒性证据的 ChunkMetadata，而非 Chunk 的种类。
+- `ChunkReference` — **is_a** → `ChunkArtifact` (`ChunkReference-is_a-ChunkArtifact`)
+  - 分块引用 是一种 分块信息制品。区分特征：分块引用是可独立传递且指向确切 Chunk/来源跨度的 ChunkArtifact，不复制被引节点。
+- `ChunkReference` — **references** → `Chunk` (`ChunkReference-references-Chunk`)
+  - 引用指向唯一分块及其确切来源跨度。
+- `SituatedChunk` — **is_a** → `Chunk` (`SituatedChunk-is_a-Chunk`)
+  - 已定位分块 是一种 分块。区分特征：任一 SituatedChunk 仍是 Chunk，并以附加局部语境和任务相关根据信息作为区分特征。
+- `SituatingPromptRun` — **consumes** → `Chunk` (`SituatingPromptRun-consumes-Chunk`)
+  - 定位运行以原分块为输入，不能把运行当分块子类。
+- `SituatingPromptRun` — **is_a** → `ChunkProcessingActivity` (`SituatingPromptRun-is_a-ChunkProcessingActivity`)
+  - 分块定位提示运行 是一种 分块处理活动。区分特征：该运行是给 Chunk 补充可追溯局部语境的 ChunkProcessingActivity。
+- `SituatingPromptRun` — **produces** → `SituatedChunk` (`SituatingPromptRun-produces-SituatedChunk`)
+  - 定位输出是保留原来源且补充局部语境的下位分块。
+- `ContextAssembly` — **context_assembly_applies_ordering_rule** → `ContextOrderingRule` (`context_assembly_applies_ordering_rule`)
+  - 上下文组装应用排序规则关系把上下文组装连接到放置消息、记忆、摘要、指令和工具结果的排序规则。
+- `ContextAssembly` — **context_assembly_includes_retrieved_chunk** → `RetrievedChunk` (`context_assembly_includes_retrieved_chunk`)
+  - 上下文组装纳入已检索分块关系记录上下文组装把已检索分块纳入模型调用或智能体步骤的运行可见上下文。
+- `ContextAssembly` — **context_assembly_uses_budget** → `ContextBudget` (`context_assembly_uses_budget`)
+  - 上下文组装使用预算关系把上下文组装连接到约束纳入决策的令牌、成本、新鲜度、优先级或窗口预算。
+- `ContextExclusion` — **context_exclusion_excludes_chunk** → `Chunk` (`context_exclusion_excludes_chunk`)
+  - 上下文排除排除分块关系记录上下文排除故意从可见上下文省略、脱敏、延后或阻止某个分块。
+- `ContextAssembly` — **applies** → `ContextRule` (`ContextAssembly-applies-ContextRule`)
+  - 排序和预算必须能追到具体规则。
+- `ContextAssembly` — **consumes** → `MemoryRecord` (`ContextAssembly-consumes-MemoryRecord`)
+  - 组装可直接读取范围和策略允许的记忆记录。
+- `ContextAssembly` — **consumes** → `RetrievedChunk` (`ContextAssembly-consumes-RetrievedChunk`)
+  - 组装读取经筛选与安全检查的检索分块。
+- `ContextAssembly` — **delivered_to** → `RunAttempt` (`ContextAssembly-delivered_to-RunAttempt`)
+  - 组装活动记录使用该不可变上下文版本的具体运行尝试。
+- `ContextAssembly` — **produces** → `ContextPackage` (`ContextAssembly-produces-ContextPackage`)
+  - 最终上下文包使用 Info 域唯一 canonical ID，Memory 不复制节点。
+- `ContextAssembly` — **produces** → `ContextWindow` (`ContextAssembly-produces-ContextWindow`)
+  - 组装产生有界且版本化的可见上下文窗口。
+- `ContextAssembly` — **records** → `ContextExclusion` (`ContextAssembly-records-ContextExclusion`)
+  - 被排除材料及理由由决定记录承载。
+- `ContextBudget` — **is_a** → `ContextRule` (`ContextBudget-is_a-ContextRule`)
+  - 上下文预算 是一种 上下文规则。区分特征：上下文预算是一种 ContextRule，以 token、窗口、成本、新鲜度和优先级限制组装。
+- `ContextOrderingRule` — **is_a** → `ContextRule` (`ContextOrderingRule-is_a-ContextRule`)
+  - 上下文排序规则 是一种 上下文规则。区分特征：排序规则是以权威、相关性、新鲜度或角色决定次序的 ContextRule。
+- `ContextRefreshEvent` — **refreshes** → `ContextPackage` (`ContextRefreshEvent-refreshes-ContextPackage`)
+  - 刷新事件产生新上下文包版本并保留旧版。
+- `ContextRefreshEvent` — **triggers** → `ContextAssembly` (`ContextRefreshEvent-triggers-ContextAssembly`)
+  - 新证据或过期信息触发重新组装而非原地修改。
+- `ContextSlot` — **is_a** → `ContextArtifact` (`ContextSlot-is_a-ContextArtifact`)
+  - 上下文槽位 是一种 上下文信息制品。区分特征：槽位是为特定内容种类、优先级和预算保留的 ContextArtifact 片段。
+- `ContextSlot` — **sourced_from** → `ContextSource` (`ContextSlot-sourced_from-ContextSource`)
+  - 每个槽位内容保留直接来源描述。
+- `ContextSource` — **is_a** → `ContextArtifact` (`ContextSource-is_a-ContextArtifact`)
+  - 上下文来源描述 是一种 上下文信息制品。区分特征：来源描述是标识消息、记录、分块、工具结果或制品来处的 ContextArtifact。
+- `ContextSummary` — **is_a** → `ContextArtifact` (`ContextSummary-is_a-ContextArtifact`)
+  - 上下文摘要 是一种 上下文信息制品。区分特征：摘要是压缩可见状态和证据的 ContextArtifact，并明确排除隐藏思维链。
+- `ContextSummary` — **summarizes** → `ContextWindow` (`ContextSummary-summarizes-ContextWindow`)
+  - 摘要指明其压缩的可见上下文版本，不表示隐藏推理。
+- `ContextWindow` — **has_slot** → `ContextSlot` (`ContextWindow-has_slot-ContextSlot`)
+  - 窗口由有用途与预算的槽位组成。
+- `ContextWindow` — **is_a** → `ContextArtifact` (`ContextWindow-is_a-ContextArtifact`)
+  - 上下文窗口 是一种 上下文信息制品。区分特征：上下文窗口是供一次模型调用或 Agent 步骤使用的有界、可版本化 ContextArtifact。
+- `DenseVector` — **is_a** → `VectorRepresentation` (`DenseVector-is_a-VectorRepresentation`)
+  - 稠密向量 是一种 向量表示。区分特征：任一 DenseVector 都是在大部分维度有数值的 VectorRepresentation。
+- `EmbeddingRun` — **embedding_run_embeds_chunk** → `Chunk` (`embedding_run_embeds_chunk`)
+  - 嵌入运行编码分块关系记录嵌入运行使用特定嵌入模型和版本编码某个分块或记忆片段。
+- `Embedding` — **is_a** → `Representation` (`Embedding-is_a-Representation`)
+  - 嵌入表示 是一种 表示。区分特征：Embedding 是将内容编码为可比较特征的 Representation，不等同于生成它的运行。
+- `EmbeddingRun` — **is_a** → `IndexActivity` (`EmbeddingRun-is_a-IndexActivity`)
+  - 嵌入运行 是一种 索引处理活动。区分特征：嵌入运行是用指定模型从来源内容生成表示的 IndexActivity。
+- `EmbeddingRun` — **produces** → `EmbeddingVector` (`EmbeddingRun-produces-EmbeddingVector`)
+  - 运行产生版本化向量表示。
+- `EmbeddingRun` — **uses** → `EmbeddingModel` (`EmbeddingRun-uses-EmbeddingModel`)
+  - 嵌入运行记录模型及版本，模型不在 Memory 域复制。
+- `EmbeddingVector` — **is_a** → `Embedding` (`EmbeddingVector-is_a-Embedding`)
+  - 嵌入向量 是一种 嵌入表示。区分特征：EmbeddingVector 同时是向量形态的 VectorRepresentation 和由嵌入编码得到的 Embedding；两条父关系均满足严格 is_a。
+- `EmbeddingVector` — **is_a** → `VectorRepresentation` (`EmbeddingVector-is_a-VectorRepresentation`)
+  - 嵌入向量 是一种 向量表示。区分特征：EmbeddingVector 同时是向量形态的 VectorRepresentation 和由嵌入编码得到的 Embedding；两条父关系均满足严格 is_a。
+- `EmbeddingVector` — **represents** → `Chunk` (`EmbeddingVector-represents-Chunk`)
+  - 向量必须指明所表示的分块，而非脱离来源。
+- `GraphEmbedding` — **is_a** → `Embedding` (`GraphEmbedding-is_a-Embedding`)
+  - 图嵌入 是一种 嵌入表示。区分特征：GraphEmbedding 是以图节点、边或邻域结构为来源的 Embedding。
+- `HybridIndex` — **is_a** → `Index` (`HybridIndex-is_a-Index`)
+  - 混合索引 是一种 检索索引。区分特征：HybridIndex 是同时组合稠密、稀疏、词汇或图信号的 Index。
+- `IndexBuildRun` — **consumes** → `Representation` (`IndexBuildRun-consumes-Representation`)
+  - 索引构建记录实际纳入的表示及其版本。
+- `IndexBuildRun` — **is_a** → `IndexActivity` (`IndexBuildRun-is_a-IndexActivity`)
+  - 索引构建运行 是一种 索引处理活动。区分特征：索引构建运行是从记录、分块与表示生成不可变 IndexVersion 的 IndexActivity。
+- `IndexBuildRun` — **produces** → `IndexVersion` (`IndexBuildRun-produces-IndexVersion`)
+  - 构建运行产生不可变索引版本。
+- `IndexEntry` — **keyed_by** → `IndexKey` (`IndexEntry-keyed_by-IndexKey`)
+  - 条目与查找键显式配对。
+- `IndexEntry` — **part_of** → `IndexVersion` (`IndexEntry-part_of-IndexVersion`)
+  - 条目归属于具体索引版本。
+- `IndexEntry` — **stores** → `Representation` (`IndexEntry-stores-Representation`)
+  - 条目保存可追到来源对象与生成运行的表示。
+- `IndexRefreshEvent` — **produces** → `IndexVersion` (`IndexRefreshEvent-produces-IndexVersion`)
+  - 刷新以新 IndexVersion 作为输出，形成明确 before/after。
+- `IndexRefreshEvent` — **supersedes** → `IndexVersion` (`IndexRefreshEvent-supersedes-IndexVersion`)
+  - 刷新标明被替代版本，不原地更改。
+- `IndexShard` — **part_of** → `IndexVersion` (`IndexShard-part_of-IndexVersion`)
+  - 分片属于明确版本，避免跨版本混查。
+- `IndexVersion` — **version_of** → `Index` (`IndexVersion-version_of-Index`)
+  - 版本指向其索引种类与配置身份。
+- `SparseVector` — **is_a** → `VectorRepresentation` (`SparseVector-is_a-VectorRepresentation`)
+  - 稀疏向量 是一种 向量表示。区分特征：任一 SparseVector 都是仅在少量维度保留非零特征的 VectorRepresentation。
+- `TextEmbedding` — **is_a** → `Embedding` (`TextEmbedding-is_a-Embedding`)
+  - 文本嵌入 是一种 嵌入表示。区分特征：TextEmbedding 是从文本内容编码得到的 Embedding。
+- `TfIdfIndex` — **is_a** → `Index` (`TfIdfIndex-is_a-Index`)
+  - TF-IDF 索引 是一种 检索索引。区分特征：TfIdfIndex 是以词频—逆文档频率权重组织条目的 Index。
+- `VectorIndex` — **vector_index_contains_embedding** → `EmbeddingVector` (`vector_index_contains_embedding`)
+  - 向量索引包含嵌入关系把向量索引连接到其存储或使其可搜索的嵌入向量，并保留索引版本来源。
+- `VectorDatabase` — **hosts** → `VectorIndex` (`VectorDatabase-hosts-VectorIndex`)
+  - 向量数据库是后端存储，不是 Index 子类。
+- `VectorDatabase` — **is_a** → `MemoryStore` (`VectorDatabase-is_a-MemoryStore`)
+  - 向量数据库 是一种 记忆存储。区分特征：在本域中 VectorDatabase 是承载向量索引与元数据查询的 MemoryStore 后端，不是 Index。
+- `VectorIndex` — **is_a** → `Index` (`VectorIndex-is_a-Index`)
+  - 向量索引 是一种 检索索引。区分特征：VectorIndex 是按向量表示和元数据组织近邻检索的 Index。
+- `VectorRepresentation` — **is_a** → `Representation` (`VectorRepresentation-is_a-Representation`)
+  - 向量表示 是一种 表示。区分特征：两项资料分别使用稠密/稀疏表示与记忆检索向量，支持从一般 Representation 专业化出的向量父类。
+- `Database` — **is_a** → `IngestibleResource` (`Database-is_a-IngestibleResource`)
+  - 数据库资源 是一种 可摄入资源。区分特征：在摄入语境中 Database 是可按策略寻址和读取的 IngestibleResource。
+- `DatabaseRow` — **is_a** → `IngestibleResource` (`DatabaseRow-is_a-IngestibleResource`)
+  - 数据库行资源 是一种 可摄入资源。区分特征：可单独定位、授权和引用的 DatabaseRow 是粒度更细的 IngestibleResource。
+- `DatabaseTable` — **is_a** → `IngestibleResource` (`DatabaseTable-is_a-IngestibleResource`)
+  - 数据库表资源 是一种 可摄入资源。区分特征：DatabaseTable 是可按表或切片摄入的结构化 IngestibleResource。
+- `DeduplicationEvent` — **occurs_during** → `IngestionRun` (`DeduplicationEvent-occurs_during-IngestionRun`)
+  - 去重是摄入过程中的可审计事件，而非资源子类。
+- `DeduplicationEvent` — **prevents_duplicate** → `MemoryWrite` (`DeduplicationEvent-prevents_duplicate-MemoryWrite`)
+  - 确认重复的摄入候选必须阻止重复写入，同时保留被抑制证据。
+- `DirectoryResource` — **is_a** → `IngestibleResource` (`DirectoryResource-is_a-IngestibleResource`)
+  - 目录资源 是一种 可摄入资源。区分特征：DirectoryResource 是以路径树和遍历策略为区分特征的 IngestibleResource。
+- `Document` — **document_attached_from_source** → `SourceAttachment` (`document_attached_from_source`)
+  - 文档来自来源附件关系把记忆文档连接到提供内容、来源和信任边界证据的附件来源引用或对象。
+- `Document` — **document_has_document_metadata** → `DocumentMetadata` (`document_has_document_metadata`)
+  - 文档具有文档元数据关系把记忆文档连接到描述来源、版本、校验和、格式、作者、时间戳、信任区域和解析状态的元数据。
+- `Document` — **is_a** → `IngestibleResource` (`Document-is_a-IngestibleResource`)
+  - 文档 是一种 可摄入资源。区分特征：Document 是已加载且可解析、分块、索引与引用的 IngestibleResource。
+- `FileResource` — **is_a** → `IngestibleResource` (`FileResource-is_a-IngestibleResource`)
+  - 文件资源 是一种 可摄入资源。区分特征：FileResource 是以路径、版本、摘要和权限为区分特征的 IngestibleResource。
+- `FileSystem` — **hosts** → `DirectoryResource` (`FileSystem-hosts-DirectoryResource`)
+  - 文件系统承载目录资源，但文件系统表面本身不等同于被摄取资源。
+- `GraphEdge` — **is_a** → `IngestibleResource` (`GraphEdge-is_a-IngestibleResource`)
+  - 图边资源 是一种 可摄入资源。区分特征：可按身份、方向与来源读取的 GraphEdge 是可摄入的细粒度 IngestibleResource。
+- `GraphNode` — **is_a** → `IngestibleResource` (`GraphNode-is_a-IngestibleResource`)
+  - 图节点资源 是一种 可摄入资源。区分特征：可按身份、属性与来源读取的 GraphNode 是可摄入的细粒度 IngestibleResource。
+- `GraphStore` — **is_a** → `IngestibleResource` (`GraphStore-is_a-IngestibleResource`)
+  - 图存储资源 是一种 可摄入资源。区分特征：GraphStore 是通过图查询暴露节点、边与邻域的 IngestibleResource。
+- `IngestionRun` — **ingestion_run_loads_document** → `Document` (`ingestion_run_loads_document`)
+  - 摄入运行加载文档关系记录摄入运行在文档进入记忆存储、分块、索引或引用前加载、解析或规范化该文档。
+- `IngestionRun` — **ingestion_run_writes_to_memory_store** → `MemoryStore` (`ingestion_run_writes_to_memory_store`)
+  - 摄入运行写入记忆库关系记录摄入运行在摄入策略、来源和去重控制下把已接受来源材料写入记忆库。
+- `IngestionRun` — **governed_by** → `IngestionPolicy` (`IngestionRun-governed_by-IngestionPolicy`)
+  - 允许读取、去重和持久化的边界由摄入策略决定。
+- `IngestionRun` — **may_emit** → `ErrorEvent` (`IngestionRun-may_emit-ErrorEvent`)
+  - 访问、解析或策略失败产生统一错误事件，失败不被静默吞掉。
+- `IngestionRun` — **produces** → `Document` (`IngestionRun-produces-Document`)
+  - 解析成功的摄入可产生带来源锚点的文档。
+- `IngestionRun` — **produces** → `DocumentMetadata` (`IngestionRun-produces-DocumentMetadata`)
+  - 摄入同时产生版本、校验和、权限与解析状态元数据。
+- `IngestionRun` — **reads** → `IngestibleResource` (`IngestionRun-reads-IngestibleResource`)
+  - 运行必须指出被读取的可摄入资源，而不是只挂在模块上。
+- `IngestionRun` — **uses** → `DocumentLoader` (`IngestionRun-uses-DocumentLoader`)
+  - 摄入运行记录实际采用的加载能力。
+- `IngestionRun` — **writes** → `MemoryRecord` (`IngestionRun-writes-MemoryRecord`)
+  - 通过策略与验证的摄入结果可写成记忆记录，闭合来源到记忆链。
+- `SourceAttachment` — **describes** → `IngestibleResource` (`SourceAttachment-describes-IngestibleResource`)
+  - 附件保存原始资源的定位、摘要与信任上下文。
+- `SourceAttachment` — **is_a** → `IngestibleResource` (`SourceAttachment-is_a-IngestibleResource`)
+  - 来源附件 是一种 可摄入资源。区分特征：SourceAttachment 是随摄入携带定位、摘要与信任信息且可读取的 IngestibleResource。
+- `StorageArea` — **stores** → `FileResource` (`StorageArea-stores-FileResource`)
+  - 存储区域为文件资源提供受策略约束的存放表面。
+- `TextCorpus` — **is_a** → `IngestibleResource` (`TextCorpus-is_a-IngestibleResource`)
+  - 文本语料集 是一种 可摄入资源。区分特征：TextCorpus 是以一组文本或文本记录为区分特征的集合型 IngestibleResource。
+- `MemoryAuditEvent` — **memory_audit_event_records_memory_operation** → `MemoryRecord` (`memory_audit_event_records_memory_operation`)
+  - 记忆审计事件记录记忆操作关系把记忆审计事件连接到被读取、写入、更新、验证、删除、导出或复用的记忆记录。
+- `MemoryCompaction` — **memory_compaction_compacts_record** → `MemoryRecord` (`memory_compaction_compacts_record`)
+  - 记忆压缩压缩记录关系记录记忆压缩在保留来源锚点和检索效用的同时缩短或折叠记忆记录。
+- `MemoryConflict` — **memory_conflict_flags_record** → `MemoryRecord` (`memory_conflict_flags_record`)
+  - 记忆冲突标记记录关系把记忆冲突连接到其主张、偏好、策略、来源或指令与另一活动记忆或当前上下文矛盾的记录。
+- `MemoryConsolidation` — **memory_consolidation_merges_records** → `MemoryRecord` (`memory_consolidation_merges_records`)
+  - 记忆巩固合并记录关系把记忆巩固连接到被提炼为摘要、语义记忆、反思记忆或流程的记录。
+- `MemoryConsolidation` — **memory_consolidation_produces_summary** → `ContextSummary` (`memory_consolidation_produces_summary`)
+  - 记忆巩固产生摘要关系记录记忆巩固从观测、情景、记录、反馈或结果中产生上下文摘要。
+- `MemoryDecay` — **memory_decay_lowers_record_priority** → `MemoryRecord` (`memory_decay_lowers_record_priority`)
+  - 记忆衰减降低记录优先级关系记录记忆衰减随时间或矛盾证据降低记录的新鲜度、优先级、置信度或检索权重。
+- `MemoryDelete` — **memory_delete_removes_record** → `MemoryRecord` (`memory_delete_removes_record`)
+  - 记忆删除移除记录关系记录记忆删除操作在隐私、保留或用户请求策略下移除或禁用记忆记录。
+- `MemoryDiscard` — **memory_discard_rejects_item** → `MemoryItem` (`memory_discard_rejects_item`)
+  - 记忆丢弃拒绝记忆项关系记录候选记忆项因无关、不安全、重复、陈旧、低置信度或超出范围而在持久化前被拒绝。
+- `MemoryEviction` — **memory_eviction_evicts_record** → `MemoryRecord` (`memory_eviction_evicts_record`)
+  - 记忆驱逐驱逐记录关系记录记忆驱逐因容量、陈旧性或策略从活动库、缓存或候选池移除或降低记录优先级。
+- `MemoryExpiration` — **memory_expiration_expires_record** → `MemoryRecord` (`memory_expiration_expires_record`)
+  - 记忆过期使记录过期关系记录记忆记录、摘要、索引条目或保留窗口根据时间、同意、范围或保留策略过期。
+- `MemoryMerge` — **memory_merge_combines_records** → `MemoryRecord` (`memory_merge_combines_records`)
+  - 记忆合并组合记录关系记录记忆合并在保留来源、冲突证据和取代谱系的同时组合相关记忆记录。
+- `MemorySupersession` — **memory_supersession_replaces_record** → `MemoryRecord` (`memory_supersession_replaces_record`)
+  - 记忆取代替换记录关系记录更新或更高权威记忆记录在保留谱系和审计证据的同时取代旧记录。
+- `MemoryUpdate` — **memory_update_crosses_trust_boundary** → `TrustBoundary` (`memory_update_crosses_trust_boundary`)
+  - 记忆更新跨越信任边界关系记录记忆更新跨越或依赖信任边界，例如外部内容进入持久记忆。
+- `MemoryWrite` — **memory_write_evaluated_by_policy_decision** → `PolicyDecision` (`memory_write_evaluated_by_policy_decision`)
+  - 记忆写入由策略决策评估关系把记忆写入连接到允许、拒绝、升级、沙箱化或约束持久化的策略决策。
+- `MemoryAuditEvent` — **records** → `MemoryOperation` (`MemoryAuditEvent-records-MemoryOperation`)
+  - 审计事件记录操作者、理由、时间、输入输出版本与结果。
+- `MemoryCompaction` — **is_a** → `MemoryOperation` (`MemoryCompaction-is_a-MemoryOperation`)
+  - 记忆压缩操作 是一种 记忆操作。区分特征：MemoryCompaction 是在保留来源锚点与检索效用下缩减内容或历史的 MemoryOperation。
+- `MemoryCompaction` — **produces** → `MemoryRecord` (`MemoryCompaction-produces-MemoryRecord`)
+  - 压缩输出新版本并保留可回溯来源锚点。
+- `MemoryConflict` — **resolved_by** → `MemoryConsolidation` (`MemoryConflict-resolved_by-MemoryConsolidation`)
+  - 冲突可触发保留证据的巩固活动，而非自动覆盖。
+- `MemoryConsolidation` — **is_a** → `MemoryOperation` (`MemoryConsolidation-is_a-MemoryOperation`)
+  - 记忆巩固操作 是一种 记忆操作。区分特征：MemoryConsolidation 是把多条观察、情景或反馈提炼为有来历新记录的 MemoryOperation。
+- `MemoryConsolidation` — **produces** → `MemoryRecord` (`MemoryConsolidation-produces-MemoryRecord`)
+  - 巩固从多条有来源输入生成新的综合记录。
+- `MemoryDecay` — **is_a** → `MemoryOperation` (`MemoryDecay-is_a-MemoryOperation`)
+  - 记忆衰减操作 是一种 记忆操作。区分特征：裁决为按时间或矛盾证据降低新鲜度、优先级、置信度或检索权重的策略驱动 MemoryOperation。
+- `MemoryDelete` — **is_a** → `MemoryOperation` (`MemoryDelete-is_a-MemoryOperation`)
+  - 记忆删除操作 是一种 记忆操作。区分特征：MemoryDelete 是依删除、隐私、保留或用户请求策略使记录不可用的 MemoryOperation。
+- `MemoryDiscard` — **is_a** → `MemoryOperation` (`MemoryDiscard-is_a-MemoryOperation`)
+  - 记忆丢弃操作 是一种 记忆操作。区分特征：MemoryDiscard 是在持久化前因不相关、不安全、重复或低置信而拒绝候选的 MemoryOperation。
+- `MemoryDiscard` — **prevents** → `MemoryWrite` (`MemoryDiscard-prevents-MemoryWrite`)
+  - 候选因不相关、不安全或重复被丢弃时不得继续写入。
+- `MemoryEviction` — **is_a** → `MemoryOperation` (`MemoryEviction-is_a-MemoryOperation`)
+  - 记忆驱逐操作 是一种 记忆操作。区分特征：MemoryEviction 是因容量、陈旧或策略从活跃存储或候选池移除/降级记录的 MemoryOperation。
+- `MemoryExpiration` — **governed_by** → `MemoryRetentionPolicy` (`MemoryExpiration-governed_by-MemoryRetentionPolicy`)
+  - 过期必须引用时间、同意或范围策略。
+- `MemoryExpiration` — **is_a** → `MemoryOperation` (`MemoryExpiration-is_a-MemoryOperation`)
+  - 记忆过期操作 是一种 记忆操作。区分特征：裁决为按时间、范围、同意或保留策略把记录版本标为过期的 MemoryOperation，并保留发生时间。
+- `MemoryMerge` — **is_a** → `MemoryOperation` (`MemoryMerge-is_a-MemoryOperation`)
+  - 记忆合并操作 是一种 记忆操作。区分特征：MemoryMerge 是组合相关记录并保留全部来源、冲突与被替代谱系的 MemoryOperation。
+- `MemoryMerge` — **produces** → `MemoryRecord` (`MemoryMerge-produces-MemoryRecord`)
+  - 合并产生保留多源来历的新记录。
+- `MemoryOperation` — **acts_on** → `MemoryRecord` (`MemoryOperation-acts_on-MemoryRecord`)
+  - 所有生命周期操作显式指出目标或输入记录。
+- `MemoryReflection` — **is_a** → `MemoryOperation` (`MemoryReflection-is_a-MemoryOperation`)
+  - 记忆反思操作 是一种 记忆操作。区分特征：反思是从可观察情景、反馈与结果产生高层记录的 MemoryOperation，不保存隐藏思维链。
+- `MemorySupersession` — **is_a** → `MemoryOperation` (`MemorySupersession-is_a-MemoryOperation`)
+  - 记忆取代操作 是一种 记忆操作。区分特征：取代是以更新或更高权威版本替换旧记录并保留 lineage 的 MemoryOperation。
+- `MemorySupersession` — **produces** → `MemoryRecord` (`MemorySupersession-produces-MemoryRecord`)
+  - 取代操作产生更高权威或更新版本，并保留旧记录。
+- `MemoryUpdate` — **is_a** → `MemoryOperation` (`MemoryUpdate-is_a-MemoryOperation`)
+  - 记忆更新操作 是一种 记忆操作。区分特征：MemoryUpdate 是读取既有版本并产生带变更理由新版本的 MemoryOperation，不原地修改。
+- `MemoryUpdate` — **produces** → `MemoryRecord` (`MemoryUpdate-produces-MemoryRecord`)
+  - 更新输出带变更原因的新记录版本。
+- `MemoryUpdate` — **supersedes** → `MemoryRecord` (`MemoryUpdate-supersedes-MemoryRecord`)
+  - 更新保留输入并以新版本取代它。
+- `MemoryValidation` — **evaluates** → `MemoryRecord` (`MemoryValidation-evaluates-MemoryRecord`)
+  - 复用前验证来源、安全、新鲜度和授权。
+- `MemoryValidation` — **is_a** → `MemoryOperation` (`MemoryValidation-is_a-MemoryOperation`)
+  - 记忆验证操作 是一种 记忆操作。区分特征：MemoryValidation 是复用前检查来源、安全、边界、新鲜度、冲突与批准的 MemoryOperation。
+- `MemoryWrite` — **is_a** → `MemoryOperation` (`MemoryWrite-is_a-MemoryOperation`)
+  - 记忆写入操作 是一种 记忆操作。区分特征：MemoryWrite 是从可观测消息、工具结果、轨迹、偏好、摘要或反思创建新 MemoryRecord 的 MemoryOperation。
+- `MemoryWrite` — **produces** → `MemoryRecord` (`MemoryWrite-produces-MemoryRecord`)
+  - 写入产生带版本、来源、范围与策略的新记录。
+- `CandidateChunk` — **candidate_chunk_scored_by_lexical** → `LexicalScore` (`candidate_chunk_scored_by_lexical`)
+  - 候选分块由词汇评分关系把候选分块连接到令牌、词项、词频统计、逆文档频率或精确匹配等词汇相关证据。
+- `CandidateChunk` — **candidate_chunk_scored_by_similarity** → `SimilarityScore` (`candidate_chunk_scored_by_similarity`)
+  - 候选分块由相似度评分关系把候选分块连接到嵌入距离或向量相似度等语义相似证据。
+- `CandidateChunk` — **is_a** → `RetrievalArtifact` (`CandidateChunk-is_a-RetrievalArtifact`)
+  - 候选分块 是一种 检索信息制品。区分特征：CandidateChunk 是处于评估而未最终选择状态的 RetrievalArtifact，并引用同一 canonical Chunk。
+- `CandidateChunk` — **refers_to** → `Chunk` (`CandidateChunk-refers_to-Chunk`)
+  - 候选保留规范分块身份与来源。
+- `CandidateChunk` — **scored_by** → `RetrievalScore` (`CandidateChunk-scored_by-RetrievalScore`)
+  - 候选可以携带一种或多种有来源的检索评分。
+- `CandidateSet` — **contains** → `CandidateChunk` (`CandidateSet-contains-CandidateChunk`)
+  - 候选集合包含候选分块，集合与成员不可混型。
+- `CandidateSet` — **is_a** → `RetrievalArtifact` (`CandidateSet-is_a-RetrievalArtifact`)
+  - 候选集合 是一种 检索信息制品。区分特征：CandidateSet 是一次查询产生的有界 RetrievalArtifact 集合，与成员 CandidateChunk 分开建模。
+- `LexicalScore` — **is_a** → `RetrievalScore` (`LexicalScore-is_a-RetrievalScore`)
+  - 词汇检索评分 是一种 检索评分。区分特征：LexicalScore 是由词项、BM25、TF-IDF 或精确匹配证据得到的 RetrievalScore，父概念由 Info 唯一拥有。
+- `RankFusion` — **rank_fusion_combines_candidate_set** → `CandidateSet` (`rank_fusion_combines_candidate_set`)
+  - 排序融合组合候选集合关系把排序融合事件连接到来自多个检索器、索引或评分方法的候选集合或评分列表。
+- `RankFusion` — **is_a** → `RankingOperation` (`RankFusion-is_a-RankingOperation`)
+  - 排序融合 是一种 排序操作。区分特征：RankFusion 是组合多索引、模型或方法的候选顺序/评分的 RankingOperation。
+- `RankFusion` — **orders** → `CandidateSet` (`RankFusion-orders-CandidateSet`)
+  - 排序融合对既有候选集合产生可审计顺序。
+- `RerankScore` — **is_a** → `RetrievalScore` (`RerankScore-is_a-RetrievalScore`)
+  - 重排评分 是一种 检索评分。区分特征：RerankScore 是初检后由重排模型或二次方法产生的 RetrievalScore。
+- `RetrievalQuery` — **is_a** → `RetrievalArtifact` (`RetrievalQuery-is_a-RetrievalArtifact`)
+  - 检索查询 是一种 检索信息制品。区分特征：查询内容、过滤、预算与索引版本构成可重放 RetrievalArtifact；实际执行通过关系表示，不把信息对象与事件混型。
+- `RetrievalQuery` — **produces** → `CandidateSet` (`RetrievalQuery-produces-CandidateSet`)
+  - 查询产生过滤和初排前后的明确候选集合。
+- `RetrievalQuery` — **queries** → `IndexVersion` (`RetrievalQuery-queries-IndexVersion`)
+  - 检索绑定索引版本，避免结果随刷新漂移。
+- `RetrievalQuery` — **uses** → `RetrievalFilter` (`RetrievalQuery-uses-RetrievalFilter`)
+  - 查询记录实际过滤条件，支持重放。
+- `RetrievalTrace` — **is_a** → `RetrievalArtifact` (`RetrievalTrace-is_a-RetrievalArtifact`)
+  - 检索轨迹 是一种 检索信息制品。区分特征：RetrievalTrace 是记录查询、过滤、索引版本、候选、评分、融合、排除和选择的 RetrievalArtifact。
+- `RetrievalTrace` — **records** → `RankFusion` (`RetrievalTrace-records-RankFusion`)
+  - 轨迹保留实际融合方法、输入列表与最终顺序。
+- `RetrievalTrace` — **records** → `RetrievalQuery` (`RetrievalTrace-records-RetrievalQuery`)
+  - 轨迹记录查询、索引、过滤、评分和选择链。
+- `RetrievedChunk` — **retrieved_chunk_fills_context_slot** → `ContextSlot` (`retrieved_chunk_fills_context_slot`)
+  - 已检索分块填充上下文槽位关系把已检索分块连接到其占据的上下文槽位，使证据位置可审计。
+- `RetrievedChunk` — **retrieved_chunk_scanned_by_pattern_scan** → `PatternScan` (`retrieved_chunk_scanned_by_pattern_scan`)
+  - 已检索分块由模式扫描检查关系把已检索分块连接到复用前检查提示注入、污点、投毒或策略敏感内容的安全扫描。
+- `RetrievedChunk` — **has_safety_finding** → `DefenseFinding` (`RetrievedChunk-has_safety_finding-DefenseFinding`)
+  - 进入上下文前的扫描结果以跨域发现引用记录，不复制 Safety 概念。
+- `RetrievedChunk` — **is_a** → `RetrievalArtifact` (`RetrievedChunk-is_a-RetrievalArtifact`)
+  - 已检索分块 是一种 检索信息制品。区分特征：RetrievedChunk 是选择输出的 RetrievalArtifact，带最终分数、秩和纳入状态；它不是所有 CandidateChunk 的子类。
+- `RetrievalQuery` — **retrieves_chunk** → `RetrievedChunk` (`retrieves_chunk`)
+  - 对象关系定义域为检索查询，值域为已检索分块；用于表达这两个智能体系统术语之间可验证、可追溯的语义连接。
+- `SimilarityScore` — **is_a** → `RetrievalScore` (`SimilarityScore-is_a-RetrievalScore`)
+  - 相似度评分 是一种 检索评分。区分特征：SimilarityScore 是由向量距离或语义相似性得到的 RetrievalScore。
+- `TopKSelection` — **top_k_selection_selects_retrieved_chunk** → `RetrievedChunk` (`top_k_selection_selects_retrieved_chunk`)
+  - Top-K 选择选中已检索分块关系把 Top-K 选择决策连接到在排名、多样性、新鲜度、预算和策略约束下被接受的已检索分块。
+- `TopKSelection` — **is_a** → `RankingOperation` (`TopKSelection-is_a-RankingOperation`)
+  - 前 K 项选择 是一种 排序操作。区分特征：TopKSelection 是在 k、预算、多样性、新鲜度与策略约束下选择候选的 RankingOperation。
+- `TopKSelection` — **selects_from** → `CandidateSet` (`TopKSelection-selects_from-CandidateSet`)
+  - Top-k 在预算、多样性和策略约束下从候选集合选择。
+- `MemoryRecord` — **memory_record_belongs_to_data_zone** → `DataZone` (`memory_record_belongs_to_data_zone`)
+  - 记忆记录属于数据区域关系把记忆记录连接到治理其信任等级、保留、可见性和允许复用的数据区域。
+- `MemoryStore` — **memory_store_governed_by_retention_policy** → `MemoryRetentionPolicy` (`memory_store_governed_by_retention_policy`)
+  - 记忆库受保留策略治理关系把记忆库连接到控制刷新、压缩、过期、删除、披露和审计行为的保留策略。
+- `MemoryStore` — **memory_store_has_namespace** → `MemoryNamespace` (`memory_store_has_namespace`)
+  - 记忆库具有命名空间关系把记忆库连接到按用户、任务、项目、租户、线程或跨会话复用上下文分隔记录的命名空间。
+- `MemoryFile` — **is_a** → `MemoryEntity` (`MemoryFile-is_a-MemoryEntity`)
+  - 记忆文件 是一种 记忆实体。区分特征：MemoryFile 是以文件为持久化载体并保留项目约定、偏好或上下文的 MemoryEntity。
+- `MemoryFile` — **materializes** → `MemoryRecord` (`MemoryFile-materializes-MemoryRecord`)
+  - 文件可物化一个或多个记录，但文件格式不改变记录的记忆类别。
+- `MemoryItem` — **is_a** → `MemoryEntity` (`MemoryItem-is_a-MemoryEntity`)
+  - 记忆项 是一种 记忆实体。区分特征：MemoryItem 是可单独寻址、检索和引用的最小 MemoryEntity，不规定存储格式或时长。
+- `MemoryItem` — **represented_by** → `MemoryRecord` (`MemoryItem-represented_by-MemoryRecord`)
+  - 可寻址记忆项以带来源和生命周期的记录表示。
+- `MemoryRecord` — **governed_by** → `MemoryRetentionPolicy` (`MemoryRecord-governed_by-MemoryRetentionPolicy`)
+  - 保留、过期、压缩与删除必须能追到适用策略。
+- `MemoryRecord` — **is_a** → `MemoryEntity` (`MemoryRecord-is_a-MemoryEntity`)
+  - 记忆记录 是一种 记忆实体。区分特征：MemoryRecord 是带内容、来源、kind/duration/scope、命名空间、置信度和生命周期的版本化 MemoryEntity。
+- `MemoryRecord` — **member_of** → `MemoryNamespace` (`MemoryRecord-member_of-MemoryNamespace`)
+  - 命名空间提供隔离与查找边界。
+- `MemoryRecord` — **owned_by** → `Actor` (`MemoryRecord-owned_by-Actor`)
+  - 每条记录显式引用负责其读写范围与纠错请求的主体，不复制 Runtime Actor。
+- `MemoryRecord` — **scoped_by** → `MemoryScope` (`MemoryRecord-scoped_by-MemoryScope`)
+  - 记录的读取、复用和披露范围由 MemoryScope 约束。
+- `MemoryStore` — **stores** → `MemoryRecord` (`MemoryStore-stores-MemoryRecord`)
+  - 存储承载可寻址记录，记录不是存储的子类。

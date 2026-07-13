@@ -1,7 +1,7 @@
 # Source Registry
 
-Date: 2026-06-30
-Status: canonical Phase 0C registry, closure-audited
+Date: 2026-07-13
+Status: canonical Phase 0C registry, closure-audited and P0 source-claim relevance updated
 
 ## Files
 
@@ -29,7 +29,7 @@ Status: canonical Phase 0C registry, closure-audited
 | `title` | Normalized title extracted from the Markdown link label. |
 | `url` | Source URL extracted from the Markdown link. |
 | `year` | Literature year when available; blank for living engineering docs/repos. |
-| `source_type` | Venue, paper type, repo, official docs, spec, standard, or related source type. |
+| `source_type` | Controlled source class such as venue, paper type, repo, official docs, spec, standard, or vendor whitepaper. |
 | `priority` | A, B, or C review priority. |
 | `status` | Phase 0B acquisition status: `fetched`, `search-verified`, or `known-primary`. |
 | `why_it_matters` | Concise extraction rationale from the source corpus. |
@@ -39,13 +39,13 @@ Status: canonical Phase 0C registry, closure-audited
 
 | metric | count |
 |---|---:|
-| All registered sources | 361 |
+| All registered sources | 373 |
 | Literature sources | 160 |
-| Engineering sources | 201 |
-| Priority A sources | 252 |
-| Priority B sources | 104 |
+| Engineering sources | 213 |
+| Priority A sources | 263 |
+| Priority B sources | 105 |
 | Priority C sources | 5 |
-| Status `fetched` | 39 |
+| Status `fetched` | 51 |
 | Status `search-verified` | 187 |
 | Status `known-primary` | 116 |
 | Status `source-matrix-registered` | 18 |
@@ -66,6 +66,29 @@ Seven additional cross-domain ontology pattern rows were added during the
 agent-plane correction pass. They cover Gene Ontology, CIDOC CRM, Palantir
 Ontology, DBpedia, and FOAF as structural references only; their subject matter
 is not imported into the agent-system ontology.
+
+Microsoft Fabric IQ Ontology and Skan Agentic Ontology of Work were added for
+the unified-graph upgrade. Microsoft is recorded as an evolving official
+product document; Skan is recorded as `vendor-whitepaper`, not as a standard or
+peer-reviewed paper.
+
+Ten targeted primary sources were added for the P0 source-claim relevance
+correction: POSIX command semantics, OpenAI instruction governance, NIST ABAC,
+FIRST CVSS v4, OPA policy decisions, MCP tasks and transports, RFC 9530 digest
+fields, RFC 6455 WebSocket, and LangGraph interrupts. These rows ground domain
+facts; Moonweave-specific predicate names, endpoint granularity, and graph
+direction remain documented design mappings rather than source claims.
+
+## Controlled Source Types
+
+`source_type` values are closed by the source-registry validator. In addition
+to the existing venue, paper, preprint, repository, documentation,
+specification, standard, guidance, site, viewer, and source-code classes, the
+registry defines:
+
+| value | definition |
+|---|---|
+| `vendor-whitepaper` | A whitepaper published by a product vendor that contains technical or methodological claims but has no independent standards-body or peer-review endorsement. |
 
 ## Phase 0C Preparation Boundary
 

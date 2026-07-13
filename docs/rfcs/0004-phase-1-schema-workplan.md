@@ -16,19 +16,19 @@ Depends on:
 
 Close Phase 1 and define the implementation workplan for the first executable ontology/schema/frontend slice.
 
-This workplan is intentionally narrow: it turns the concrete accepted ontology system in `ontology/agent-ontology.md` and `ontology/agent-ontology.json` into reviewable schemas, fixtures, profile sketches, Graph IR, and a local Moonweave-styled explorer. It does not reopen Phase 0 broad research.
+This workplan is intentionally narrow: it migrates the frozen Phase 1 ontology release into reviewable module sources, a strict candidate, generated schemas/types/fixtures, and a local Moonweave-styled explorer. It does not reopen Phase 0 broad research.
 
-The Phase 1 output is the agent-system ontology itself, not only the rules for designing one. RFC 0001-0003 define boundaries; `ontology/agent-ontology.json` defines concrete agent-system planes, modules, classes, object properties, data properties, controlled individuals, axioms, adapter mappings, and hygiene gates that downstream implementation must consume. Ontology-engineering metadata remains artifact metadata only, not an agent-system term family.
+The Phase 1 output is the agent-system ontology itself, not only the rules for designing one. RFC 0001-0003 define evidence and ownership boundaries. The legacy `ontology/agent-ontology.json` is now a frozen migration baseline: its planes, modules, classes, properties, individuals, axioms, and mappings require explicit dispositions, but it is not the editable source for the unified graph. Ontology-engineering metadata remains artifact metadata only, not an agent-system term family.
 
 ## Implementation Scope
 
-1. Treat `ontology/agent-ontology.json` as the concrete Phase 1 ontology source of truth.
-2. Generate a JSON Schema Draft 2020-12 structural contract from the accepted ontology system.
-3. Add valid and invalid fixtures for trust-boundary, provenance, observable trace, profile, and adapter rules.
-4. Add generated profile sketches for Zod, Pydantic, OWL/RDF, SHACL, and ShEx exports.
-5. Build Graph IR from ontology planes, modules, classes, properties, individuals, axioms, relations, and adapter mappings rather than hand-written demo nodes.
-6. Implement a local React explorer using canonical ontology fixtures only.
-7. Verify source IDs, living metadata, schema validation, graph constraints, and frontend rendering.
+1. Freeze `ontology/agent-ontology.json`, its definition ledger, and its legacy generator as read-only migration inputs with hashes and exactly-once record manifests.
+2. Maintain the only editable ontology facts under `ontology/source/**`, using one product wrapper and forty-one Module wrappers.
+3. Generate a strict unpublished candidate from those sources without reading the legacy or published generated canonical.
+4. Add valid and invalid fixtures for hierarchy, trust-boundary, provenance, observable trace, profile, and adapter rules.
+5. Generate optional Zod, Pydantic, OWL/RDF, SHACL, and ShEx projections only from canonical node/relation information.
+6. Build the sole visible graph from candidate `planes/modules/classes/relations`; structure, examples, instances, source claims, constraints, cases, and mappings remain inline information.
+7. Switch canonical, Schema, generated types/index, fixtures/tests, and the React consumer atomically only after all migration and release gates pass.
 
 ## Non-Goals
 
@@ -43,12 +43,12 @@ The Phase 1 output is the agent-system ontology itself, not only the rules for d
 | gate | required result |
 |---|---|
 | RFC freeze | RFC 0001, 0002, and 0003 are accepted. |
-| Ontology system freeze | `ontology/agent-ontology.md` and `ontology/agent-ontology.json` exist and define agent-system planes, modules, classes, properties, individuals, axioms, adapter mappings, and hygiene gates. |
+| Ontology system freeze | Legacy canonical, definition ledger, and generator hashes/counts/record pointers are captured; they are read-only migration inputs. |
 | Source integrity | Every implementation source ID exists in `research/source-registry.csv`. |
 | Living metadata | Every engineering source used for field-level schema claims is normalized. |
 | Structural schema | Ajv validates accepted fixtures and rejects invalid fixtures. |
-| Graph IR | Generated graph is non-empty and is generated from ontology planes/modules/classes/properties/individuals/axioms/adapter mappings, with MCP, A2A, statechart, and benchmark semantics separated. |
-| Frontend | The explorer renders a non-empty graph, inspector, evidence ledger, schema view, statechart view, and adapter map. |
+| Unified graph | The generated graph is non-empty and is derived only from canonical `planes/modules/classes/relations`; annotations and generated projections create no shadow graph elements. |
+| Frontend | The explorer renders one non-empty canonical concept graph and one inline node/relation characteristics table. Schema constraints, examples, instances, evidence, statechart annotations, and adapter mappings appear only as information attached to the selected canonical node or relation; no competing graph or page is required. |
 
 ## Handoff To Later Phases
 

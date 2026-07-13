@@ -4,6 +4,13 @@ Date: 2026-06-30
 Status: complete
 Gate result: passed after cross-domain pattern review and agent-plane correction
 
+> **Supersession note (2026-07-13):** This file is the immutable record of the
+> v1 Phase 1 freeze. Its 36/413/157/92/75/368/7 counts and parallel collection
+> handoff are historical, not current v2 counts or architecture. RFC 0005 and
+> the unified-graph upgrade plan retain eight first-level Domains while moving
+> all domain-semantic editing to `ontology/source/**`; current candidate or
+> release counts are read from that generated artifact's `ontology_metrics`.
+
 ## Correction
 
 Earlier Phase 1 artifacts correctly reviewed the boundary rules for ontology
@@ -39,7 +46,7 @@ mappings.
 | `research/source-notes/fibo-alignment-review.md` | FIBO alignment review, source reading record, and gate record. |
 | `research/source-notes/cross-domain-ontology-pattern-review.md` | Cross-domain ontology pattern review and agent-plane correction gate. |
 
-## What Phase 1 Now Freezes
+## What Phase 1 Froze In v1 (Historical)
 
 Phase 1 now freezes the following concrete ontology structure:
 
@@ -68,7 +75,7 @@ Phase 1 now freezes the following concrete ontology structure:
 | Feedback Plane | warnings, feedback, review, logs, metrics, recovery, optimization loops |
 | Adapter Plane | protocol, framework, benchmark, statechart, and schema mappings |
 
-## Gate Results
+## Historical v1 Gate Results
 
 | gate | observed | result |
 |---|---:|---|
@@ -88,25 +95,25 @@ Phase 1 now freezes the following concrete ontology structure:
 | Adapter-only concepts promoted to core | 0 | PASS |
 | Hidden chain-of-thought required fields | 0 | PASS |
 
-## Implementation Handoff
+## Superseded Implementation Handoff
 
-Downstream work must use `ontology/agent-ontology.json` as the source of
-truth. Older demo data such as small hand-written graph fixtures may be useful
-for smoke tests, but they are not authoritative ontology design.
+The original downstream instruction to use generated
+`ontology/agent-ontology.json` as an editable source of truth is superseded.
+For v2, only `ontology/source/**` owns domain-semantic edits. Canonical JSON,
+Markdown, root Schema, generated types, source index, fixtures, Graph IR, and
+semantic exports are deterministic projections of the same graph. Hand-written
+GraphView data and migration ledgers are not runtime or publication sources.
 
-Required next steps:
+The replacement handoff is:
 
-1. Phase 2: transform `ontology/agent-ontology.json` into the canonical ontology model
-   and structural JSON Schema contract.
-2. Phase 3: generate fixtures and schema validation tests from the ontology
-   system.
-3. Phase 4: generate Zod/Pydantic/OWL/RDF/SHACL/ShEx profiles from the
-   ontology system.
-4. Phase 5: generate Graph IR from planes, modules, classes, properties, individuals,
-   axioms, relations, and adapter mappings in the ontology
-   system.
-5. Phase 6: update the frontend explorer to render the ontology system, not a
-   reduced mock graph.
+1. Build and validate the single `planes/modules/classes/relations` graph from
+   reviewed Module sources.
+2. Keep structure fields, examples, controlled values, constraints, source
+   claims, mappings, and case fragments attached to their node or relation.
+3. Generate all machine profiles and UI indexes without creating parallel
+   Schema, ABox, TBox, Instance, Evidence, or Adapter navigation products.
+4. Publish only through the atomic release gate; a candidate with
+   `releasable=false` is not a release.
 
 ## Phase 1 Closure
 
