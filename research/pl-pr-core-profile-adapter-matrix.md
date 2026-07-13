@@ -3,6 +3,12 @@
 Date: 2026-06-30
 Status: accepted for RFC drafting
 
+> **2026-07-13 clarification:** RFC 0005 interprets every `core`, `profile`,
+> `core+profile`, and `adapter` disposition below as ownership/applicability
+> metadata on the same canonical Concept or Relation. These values do not create
+> navigation roots, parallel graphs, pages, or products; all eight first-level
+> Domains, including `adapter-plane`, remain in the single Explorer hierarchy.
+
 ## Scope
 
 This matrix converts the Phase 0C provisional layer/relation proposals into post-Phase-0 design dispositions.

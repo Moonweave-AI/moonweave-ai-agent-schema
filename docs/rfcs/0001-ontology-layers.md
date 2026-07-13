@@ -3,6 +3,9 @@
 Status: accepted
 Created: 2026-06-30
 Accepted: 2026-06-30
+
+> **2026-07-13 clarification:** RFC 0005 clarifies that Core/Profile/Adapter are ownership and applicability annotations only. They do not define a competing user navigation hierarchy. The canonical Explorer retains `Agent Ontology -> Domain -> Module -> Concept`, including `adapter-plane` as a first-level Domain.
+
 Depends on:
 
 - `research/source-notes/phase-0c-completion.md`
@@ -31,7 +34,7 @@ The architecture uses three disposition levels:
 | Profile families | Optional mechanism, memory/context, orchestration, validation, security, lifecycle, and statechart semantics over core anchors. | Claims that a mechanism family is mandatory for every agent system. |
 | Adapter membranes | Concrete protocol, framework, benchmark, validator, and statechart implementation mappings. | Canonical ontology ownership unless a later RFC promotes a concept with cross-source evidence. |
 
-This means the system can later visualize an agent architecture as planes and flows:
+This means the system can later analyze an agent architecture through the following planes and flows. These are analytical ownership/applicability perspectives attached to the canonical eight-Domain graph; they are not an additional navigation hierarchy or another set of user-visible Planes:
 
 - evidence/provenance plane: sources, constraints, decisions, review state;
 - actor/trust plane: actors, opaque external actor references, services, tools, humans, and boundary crossings;
@@ -125,3 +128,5 @@ This RFC is accepted when:
 - Some useful concepts remain profile or adapter-owned.
 - Later implementation will need generated views, not one monolithic schema.
 - Review effort shifts from "what fields exist?" to "which profile owns this semantics?"
+
+Generated views are machine projections of the same canonical node/edge information. They are not independent ontology pages, graphs, or editable truth sources.

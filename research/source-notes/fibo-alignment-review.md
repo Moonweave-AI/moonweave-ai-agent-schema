@@ -5,6 +5,11 @@ Status: complete
 Canonical output: `ontology/agent-ontology.md`, `ontology/agent-ontology.json`
 Current scope: artifact governance reference only
 
+> **Supersession note (2026-07-13):** The quantitative table below is a
+> historical 2026-06-30 v1 snapshot. RFC 0005 and the unified-graph upgrade
+> plan supersede the old Phase 2 handoff. Current candidate/release counts come
+> only from the relevant generated artifact's `ontology_metrics`.
+
 ## Sources Read
 
 | source id | source | use |
@@ -58,12 +63,12 @@ redefine them.
 | Labels and definitions required | Every agent-system term has `label` and genus/differentia-style `definition`. |
 | Reusable relations live high in the hierarchy | Relation families are canonical edge definitions, not framework-specific copies. |
 | Adapter concepts are separate membranes | Protocol/framework/benchmark concepts live in adapter mappings unless they are observable agent-system runtime objects. |
-| Source/product separation | `research/` remains evidence; `ontology/agent-ontology.*` is the canonical product consumed by Phase 2. |
+| Source/product separation | `research/` remains evidence; `ontology/source/**` is the editable domain-semantic source; `ontology/agent-ontology.*` is a generated canonical product. |
 | Hygiene tests | AOEF requires source integrity, unique labels, non-circular definitions, plane-term resolution, relation completeness, and no stale draft chain. |
 
-## Canonical Ontology Shape
+## Historical v1 Canonical Ontology Shape
 
-| current metric | value |
+| v1 metric (2026-06-30) | historical value |
 |---|---:|
 | Domains | 1 |
 | Agent-system planes | 8 |
@@ -104,9 +109,12 @@ The only authoritative Phase 1 ontology entrypoints are now:
 
 ## Phase 2 Handoff
 
-Phase 2 must generate schema, Graph IR, fixtures, and frontend data from
-`ontology/agent-ontology.json`. It must not infer ontology structure directly
-from research notes, historical draft prose, or hand-written mock graph data.
+The original instruction to use `ontology/agent-ontology.json` as an editable
+downstream source is superseded. The v2 builder reads domain semantics only
+from `ontology/source/**`; canonical JSON, Markdown, root Schema, generated
+types, source index, payload fixtures, Graph IR, and optional semantic exports
+are deterministic products. Neither research prose nor generated canonical
+output may be fed back as a second editable truth source.
 
 The later cross-domain ontology-pattern correction further clarified that FIBO
 is a governance/modeling reference. The agent ontology itself is now plane-

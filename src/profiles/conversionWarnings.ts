@@ -1,20 +1,50 @@
-export const conversionWarnings = [
-  {
-    id: "warning-zod-transform-loss",
-    artifact_type: "ConversionWarning",
-    source_profile: "zod",
-    target_profile: "json-schema-2020-12",
-    message: "Zod transforms and runtime-only refinements may not round-trip into canonical JSON Schema.",
-    source_ids: ["eng-val-zod-json-schema", "eng-val-zod-release-430"],
-    review_status: "accepted"
-  },
-  {
-    id: "warning-pydantic-mode-loss",
-    artifact_type: "ConversionWarning",
-    source_profile: "pydantic",
-    target_profile: "json-schema-2020-12",
-    message: "Pydantic validation and serialization modes can project different JSON Schema views.",
-    source_ids: ["eng-val-pydantic-json-schema"],
-    review_status: "accepted"
-  }
-] as const;
+import type { CanonicalOntology } from "../lib/ontology-index";
+
+export interface DerivedConversionWarning {
+  readonly id: string;
+  readonly node_id: string;
+  readonly relation_id: string | null;
+  readonly field_id: string | null;
+  readonly mapping_id: string | null;
+  readonly severity: string;
+  readonly message: string;
+}
+
+/** Derives warnings only from reviewed canonical constraints and lossy mappings. */
+export const deriveConversionWarnings = (
+  ontology: CanonicalOntology,
+): readonly DerivedConversionWarning[] =>
+  ontology.classes.flatMap((concept) => {
+    const mappingWarnings = (concept.external_mappings ?? []).flatMap((mapping) => {
+      if (!mapping || typeof mapping !== "object") return [];
+      const value = mapping as Readonly<Record<string, unknown>>;
+      if (value.mapping_kind !== "lossy" && value.mapping_kind !== "unsupported") return [];
+      return [{
+        id: `mapping-warning:${concept.id}:${String(value.id)}`,
+        node_id: concept.id,
+        relation_id: null,
+        field_id: null,
+        mapping_id: String(value.id),
+        severity: value.mapping_kind === "unsupported" ? "error" : "warning",
+        message: String(
+          value.conversion_note && typeof value.conversion_note === "object"
+            ? (value.conversion_note as { readonly en?: unknown }).en ?? value.mapping_kind
+            : value.mapping_kind,
+        ),
+      }];
+    });
+    const constraintWarnings = (concept.structure?.constraints ?? []).flatMap((constraint) =>
+      constraint.severity === "warning"
+        ? [{
+            id: `constraint-warning:${concept.id}:${constraint.id}`,
+            node_id: concept.id,
+            relation_id: null,
+            field_id: null,
+            mapping_id: null,
+            severity: "warning",
+            message: constraint.explanations?.en ?? constraint.id,
+          }]
+        : [],
+    );
+    return [...mappingWarnings, ...constraintWarnings];
+  });
