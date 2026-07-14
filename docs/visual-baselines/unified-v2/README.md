@@ -14,11 +14,13 @@ information to expand inside the existing characteristics table.
   The `windows-latest` validation job owns the reviewed pixel gate. Local machines and other
   operating systems still execute the complete structural, responsive, keyboard, theme, and
   reduced-motion E2E contract without comparing runner-specific pixels.
-- The current candidate Windows baselines were reviewed from the actual-image attachments of the
-  failed GitHub Actions run `29296996097`, commit `b4d390e20d2169e1ac9f7ca1fa94799b5a4a5371`.
-  That run compared the new 7,242-claim site against the stale 7,244-claim baselines; it did not
-  validate these candidate PNGs. Replace this note with a green run provenance only after a commit
-  containing the candidate PNGs passes the Windows visual gate.
+- The current Windows baselines originated from the reviewed actual-image attachments of failed
+  run `29296996097`, where the new 7,242-claim site correctly rejected stale 7,244-claim PNGs.
+  They were accepted by green GitHub Actions run `29298321356` at commit
+  `90fde904a24e2f11e477bebbacd080d863f9194e`, including the Windows pixel gate and the complete
+  cross-platform quality gate.
+- Reviewed SHA-256: desktop `12B7A6F35DC04FEE7339DCFDC079E4C9F8F1238F4E0B12ED8A19832AC1D57747`;
+  mobile `265BCB434D35CDB74A82E82ABEE2466CABC50881917070F3167CDC98F254BD69`.
 - Every maintained E2E invocation starts its own Vite server. Reusing an unrelated process on port
   5173 is forbidden because that can make a current test suite validate an older site build.
 
