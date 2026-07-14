@@ -343,6 +343,21 @@ describe("maintenance input loaders", () => {
 });
 
 describe("maintenance root adapters", () => {
+  it("installs Chromium before the Pages workflow runs the full verification chain", () => {
+    const workflow = readFileSync(
+      resolve(repositoryRoot, ".github/workflows/deploy.yml"),
+      "utf8",
+    );
+    const chromiumInstall =
+      "node node_modules/@playwright/test/cli.js install --with-deps chromium";
+    const installIndex = workflow.indexOf(chromiumInstall);
+    const verifyIndex = workflow.indexOf("run: npm run verify");
+
+    expect(workflow).toMatch(/push:\s*\n\s*branches:\s*\n\s*- main/u);
+    expect(installIndex).toBeGreaterThanOrEqual(0);
+    expect(verifyIndex).toBeGreaterThan(installIndex);
+  });
+
   it("keeps the platform-specific visual regression executable in Windows CI", () => {
     const workflow = readFileSync(
       resolve(repositoryRoot, ".github/workflows/ontology-validation.yml"),

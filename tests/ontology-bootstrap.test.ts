@@ -251,10 +251,23 @@ const listFiles = (root: string): string[] => {
     .sort((left, right) => left.localeCompare(right));
 };
 
-const outputBytes = (root: string): Map<string, Buffer> =>
+interface OutputFingerprint {
+  byteLength: number;
+  sha256: string;
+}
+
+const outputFingerprints = (root: string): Map<string, OutputFingerprint> =>
   new Map(
-    listFiles(root).map((path) => [relative(root, path).replaceAll("\\", "/"), readFileSync(path)]),
+    listFiles(root).map((path) => {
+      const payload = readFileSync(path);
+      return [
+        relative(root, path).replaceAll("\\", "/"),
+        { byteLength: payload.byteLength, sha256: sha256(payload) },
+      ];
+    }),
   );
+
+const crossPlatformReproducibilityTimeoutMs = 60_000;
 
 const requireSuccessfulRun = (run: BootstrapRun): void => {
   expect(
@@ -472,15 +485,11 @@ describe("bootstrap reproducibility and input immutability", () => {
     requireSuccessfulRun(firstRun);
     requireSuccessfulRun(secondRun);
 
-    const firstOutput = outputBytes(firstRun.outputRoot);
-    const secondOutput = outputBytes(secondRun.outputRoot);
+    const firstOutput = outputFingerprints(firstRun.outputRoot);
+    const secondOutput = outputFingerprints(secondRun.outputRoot);
     expect(firstOutput.size).toBeGreaterThan(0);
-    expect([...firstOutput.keys()]).toEqual([...secondOutput.keys()]);
-
-    for (const [path, payload] of firstOutput) {
-      expect(secondOutput.get(path), path).toEqual(payload);
-    }
-  }, 15_000);
+    expect([...firstOutput.entries()]).toEqual([...secondOutput.entries()]);
+  }, crossPlatformReproducibilityTimeoutMs);
 
   it("does not modify either the copied inputs or the frozen release snapshot", () => {
     requireSuccessfulRun(firstRun);

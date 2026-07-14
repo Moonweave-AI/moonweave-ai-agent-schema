@@ -1869,10 +1869,11 @@ Runtime
 | 关系语义闭环 | 24 条 Info 关系的三语定义与 48 个正例/边界例逐谓词对齐；7 个已合并旧谓词的 14 个案例只作为唯一 canonical 边内迁移信息；2 个错挂 `chunks_document` 案例移除；通用定义模板、错误 owner 和缺失双端点均由递归门禁阻断 |
 | 单图呈现 | 唯一 Explorer route、唯一 graph surface；Schema、实例、来源、约束和案例只作节点/边信息；桌面与移动均通过 |
 | 合同与生成 | 生成类型是 UI consumer 的类型真相源；运行时拒绝 v1/GraphView/缺元数据产物；clean 双构建 byte-identical |
-| 自动验证 | contract 35 文件/354 项、全量 40 文件/369 项、Playwright 26/26 项全部通过 |
+| 自动验证 | contract 35 文件/355 项、全量 40 文件/370 项、Playwright 26/26 项全部通过 |
 | 覆盖率 | Statements 93.18%、Branches 80.38%、Functions 94.59%、Lines 94.46% |
 | 安全与来源链接 | 42 个 source 文档、3 个 fixture、17 个 UI 文件与 373 个 registry URL 通过安全门；124 个被引用链接中 0 broken，网络超时或 403 记为 inconclusive 而非伪报通过 |
 | 视觉回归 | 1360×900 desktop 与 390×844 mobile 的 Windows 像素基线连续复现；其他 OS 仍执行完整结构、响应式、键盘、主题和 reduced-motion E2E |
+| Pages 发布链 | 仅由 `main` 或人工 dispatch 发布；完整 `verify` 前显式安装 Chromium；冻结输入的双构建一致性以逐文件字节长度和 SHA-256 校验，避免 CI 平台 I/O 差异造成伪超时 |
 
 ### 17.1 数据与层级
 
