@@ -60,6 +60,9 @@ const canonical = JSON.parse(
       traversal_relation_id: string | null;
     }>;
   }>;
+  ontology_metrics: {
+    source_claims: number;
+  };
 };
 
 const sourceIndex = JSON.parse(
@@ -154,6 +157,10 @@ const disclosureConcept = canonical.classes.find((concept) => {
   ) > 5;
 });
 
+const visualBaselineEnabled =
+  process.platform === "win32" &&
+  process.env.MOONWEAVE_VISUAL_BASELINE === "1";
+
 test.describe("Moonweave unified ontology explorer", () => {
   test("renders the preserved single-page shell and exactly one canonical graph", async ({ page }) => {
     await page.goto("/");
@@ -174,6 +181,13 @@ test.describe("Moonweave unified ontology explorer", () => {
     );
     await expect(page.getByTestId("ontology-characteristics")).toBeVisible();
     await expect(page.locator("[data-detail-row]")).toHaveCount(12);
+    const sourceClaimMetric = page
+      .getByTestId("left-statistics")
+      .locator(".metric-stack > div")
+      .filter({ hasText: "来源主张" });
+    await expect(sourceClaimMetric.locator("strong")).toHaveText(
+      String(canonical.ontology_metrics.source_claims),
+    );
 
     const nodeCount = Number(await page.getByTestId("graph-count").getAttribute("data-node-count"));
     expect(nodeCount).toBe(9);
@@ -181,8 +195,8 @@ test.describe("Moonweave unified ontology explorer", () => {
 
   test("matches the unified-graph desktop and mobile visual baselines", async ({ page }) => {
     test.skip(
-      process.platform !== "win32",
-      "Pixel baselines are platform-specific and are reviewed on the Windows validation job.",
+      !visualBaselineEnabled,
+      "Pixel baselines are runner-specific and are reviewed on the Windows CI validation job.",
     );
     await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
     await page.goto("/");

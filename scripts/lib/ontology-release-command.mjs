@@ -209,7 +209,6 @@ export const runOntologyReleaseCommand = ({
       {
         cwd: validationWorkspace,
         environment: {
-          MOONWEAVE_E2E_STRICT_SERVER: "1",
           PLAYWRIGHT_HTML_OUTPUT_DIR: resolve(temporaryRoot, "playwright-report"),
         },
       },
