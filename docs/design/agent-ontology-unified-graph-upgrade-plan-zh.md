@@ -1,5 +1,7 @@
 # Moonweave Agent Ontology 统一图谱层级深化升级计划
 
+> 后续校正（2026-07-14）：本文件记录 v2 的实施合同与历史验收，不再作为模块边界、概念纵深和图谱布局的最新实施依据。用户二次反馈与当前 622 个 Concept 的复审表明，v2 仍有大量平铺根节点、模块文字模板和伪 fCoSE 同心圆布局。后续升级以 [语义纵深、模块边界与图谱呈现二次升级计划](./agent-ontology-semantic-depth-and-graph-visualization-upgrade-plan-zh.md) 为准；本文件关于单一图谱、节点内信息和不新增 ABox/TBox/Schema/Instance 平行页面的决定继续有效。
+
 > 版本：Draft 1.0
 > 日期：2026-07-13
 > 基线分支：`chore/agent-ontology-audit`
