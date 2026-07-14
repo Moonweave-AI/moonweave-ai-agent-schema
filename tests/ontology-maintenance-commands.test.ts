@@ -356,6 +356,12 @@ describe("maintenance root adapters", () => {
     expect(workflow).toMatch(/push:\s*\n\s*branches:\s*\n\s*- main/u);
     expect(installIndex).toBeGreaterThanOrEqual(0);
     expect(verifyIndex).toBeGreaterThan(installIndex);
+    expect(workflow).toMatch(
+      /windows-visual-gate:[\s\S]*runs-on: windows-latest[\s\S]*MOONWEAVE_VISUAL_BASELINE: "1"[\s\S]*run: npm run test:ontology-ui/u,
+    );
+    expect(workflow).toMatch(
+      /deploy:[\s\S]*needs:\s*\n\s*- build\s*\n\s*- windows-visual-gate/u,
+    );
   });
 
   it("keeps the platform-specific visual regression executable in Windows CI", () => {
@@ -367,13 +373,48 @@ describe("maintenance root adapters", () => {
       resolve(repositoryRoot, "playwright.config.ts"),
       "utf8",
     );
+    const e2eContract = readFileSync(
+      resolve(repositoryRoot, "e2e/ontology-explorer.spec.ts"),
+      "utf8",
+    );
+    const captureCommand = readFileSync(
+      resolve(repositoryRoot, "scripts/capture-ontology-visual-baseline.mjs"),
+      "utf8",
+    );
 
     expect(workflow).toMatch(
-      /name: Windows visual and interaction regression[\s\S]*if: runner\.os == 'Windows'[\s\S]*run: npm run test:ontology-ui/u,
+      /name: Windows visual and interaction regression[\s\S]*if: runner\.os == 'Windows'[\s\S]*MOONWEAVE_VISUAL_BASELINE: "1"[\s\S]*run: npm run test:ontology-ui/u,
     );
     expect(playwrightConfig).toContain(
       "docs/visual-baselines/unified-v2/{platform}/{projectName}/{arg}{ext}",
     );
+    expect(e2eContract).toContain("const visualBaselineEnabled =");
+    expect(e2eContract).toContain(
+      'process.env.MOONWEAVE_VISUAL_BASELINE === "1"',
+    );
+    expect(captureCommand).toContain('MOONWEAVE_VISUAL_BASELINE: "1"');
+  });
+
+  it("starts an isolated Vite server for every maintained E2E run", () => {
+    const playwrightConfig = readFileSync(
+      resolve(repositoryRoot, "playwright.config.ts"),
+      "utf8",
+    );
+    const retiredFlagSurfaces = [
+      playwrightConfig,
+      readFileSync(
+        resolve(repositoryRoot, "scripts/capture-ontology-visual-baseline.mjs"),
+        "utf8",
+      ),
+      readFileSync(
+        resolve(repositoryRoot, "scripts/lib/ontology-release-command.mjs"),
+        "utf8",
+      ),
+    ].join("\n");
+
+    expect(playwrightConfig).toContain("reuseExistingServer: false");
+    expect(playwrightConfig).toContain("--strictPort");
+    expect(retiredFlagSurfaces).not.toContain("MOONWEAVE_E2E_STRICT_SERVER");
   });
 
   it("keeps maintained command entrypoints in coverage and excludes only named frozen replay code", () => {

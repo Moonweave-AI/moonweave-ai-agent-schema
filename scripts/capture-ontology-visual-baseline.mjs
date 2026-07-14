@@ -19,7 +19,7 @@ const result = spawnSync(
   ],
   {
     cwd: repositoryRoot,
-    env: { ...process.env, MOONWEAVE_E2E_STRICT_SERVER: "1" },
+    env: { ...process.env, MOONWEAVE_VISUAL_BASELINE: "1" },
     stdio: "inherit",
     windowsHide: true,
   },
