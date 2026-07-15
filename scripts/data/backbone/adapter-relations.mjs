@@ -53,5 +53,3 @@ export const ADAPTER_BACKBONE_RELATION_DECISIONS = Object.freeze([
   Object.freeze(["XStateAdapter-is_a-StatechartAdapter","primary-backbone","StatechartAdapter","XStateAdapter"]),
   Object.freeze(["ZodProfileAdapter-is_a-StructuralSchemaAdapter","primary-backbone","StructuralSchemaAdapter","ZodProfileAdapter"]),
 ]);
-
-\n

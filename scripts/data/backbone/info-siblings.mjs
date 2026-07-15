@@ -60,5 +60,3 @@ export const INFO_SIBLING_COMPARISON_DECISIONS = Object.freeze([
   Object.freeze(["UserMessage","AssistantMessage","Message"]),
   Object.freeze(["WorkingDirectoryReference","EnvironmentBindingReference","ExecutionReference"]),
 ]);
-
-\n

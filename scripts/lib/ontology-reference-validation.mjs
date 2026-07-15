@@ -545,5 +545,3 @@ export const validateReferencesAndInformation = (canonical, sourceIndex) => {
     }
   }
 };
-
-\n

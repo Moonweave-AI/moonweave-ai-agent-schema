@@ -99,4 +99,3 @@ export const TOOL_ROOT_STATUS_DECISIONS = Object.freeze([
   Object.freeze(["ToolWarning",null]),
   Object.freeze(["UnsafeArgumentPattern",null]),
 ]);
-\n

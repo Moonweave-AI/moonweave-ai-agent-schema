@@ -49,5 +49,3 @@ export const TOOL_SIBLING_COMPARISON_DECISIONS = Object.freeze([
   Object.freeze(["ToolSelectionDecision","Candidate","SelectionDecision"]),
   Object.freeze(["ToolWarning","ToolError","InvocationDiagnostic"]),
 ]);
-
-\n

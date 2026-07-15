@@ -90,5 +90,3 @@ export const INFO_BACKBONE_RELATION_DECISIONS = Object.freeze([
   Object.freeze(["UserMessage-is_a-Message","primary-backbone","Message","UserMessage"]),
   Object.freeze(["WorkingDirectoryReference-is_a-ExecutionReference","primary-backbone","ExecutionReference","WorkingDirectoryReference"]),
 ]);
-
-\n

@@ -98,4 +98,3 @@ export const createObjectEvidencePhases = (context) => {
 
   return Object.freeze({ operationalNotionsForConcept, operationalNotionsForRelation, rewriteAcceptedObjectEvidence });
 };
-\n

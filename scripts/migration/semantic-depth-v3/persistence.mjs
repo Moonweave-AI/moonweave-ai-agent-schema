@@ -295,4 +295,3 @@ export const createPersistencePhases = (context) => {
 
   return Object.freeze({ updateProduct, csvCell, writeCsv, backboneDepths, writeLedgersAndAudit, writeCurrentCqLedger, appendRegistrySources, persistSources });
 };
-\n

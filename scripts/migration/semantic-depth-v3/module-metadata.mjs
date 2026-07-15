@@ -747,4 +747,3 @@ export const createModuleMetadataPhases = (context) => {
 
   return Object.freeze({ ensureReview, applyReviewedModuleDecision, applyDirectionalDistinctFactRationales, applyReviewedRepresentativeInverseReadings, addModuleMetadata, assignLogicalBackbone, completeSiblingDifferentiation });
 };
-\n

@@ -120,5 +120,3 @@ export const MEMORY_ROOT_STATUS_DECISIONS = Object.freeze([
   Object.freeze(["VectorRepresentation",null]),
   Object.freeze(["VisibleContextWindow",null]),
 ]);
-
-\n

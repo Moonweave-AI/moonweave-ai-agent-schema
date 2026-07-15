@@ -159,4 +159,3 @@ export const buildBilateralSiblingDifferentia = (parameters) => {
   ];
   return Object.freeze({ ...templates[variant] });
 };
-\n

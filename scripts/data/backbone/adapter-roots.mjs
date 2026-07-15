@@ -51,5 +51,3 @@ export const ADAPTER_ROOT_STATUS_DECISIONS = Object.freeze([
   Object.freeze(["XStateAdapter",null]),
   Object.freeze(["ZodProfileAdapter",null]),
 ]);
-
-\n

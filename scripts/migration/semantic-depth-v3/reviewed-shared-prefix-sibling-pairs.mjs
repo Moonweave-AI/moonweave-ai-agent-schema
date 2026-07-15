@@ -192,4 +192,3 @@ export const reviewedSharedPrefixSiblingPairs = Object.freeze(
   [...reviewedPairs].sort((left, right) =>
     pairKey(left).localeCompare(pairKey(right), "en")),
 );
-\n

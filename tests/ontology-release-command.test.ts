@@ -58,8 +58,9 @@ describe("ontology release command", () => {
     const packageJson = JSON.parse(
       readFileSync(resolve(repositoryRoot, "package.json"), "utf8"),
     ) as { scripts: Record<string, string> };
-    const [packageContractCommand, packagePerformanceCommand] =
-      packageJson.scripts["ontology:validate"]?.split(" && ") ?? [];
+    const [packageContractCommand, packagePerformanceCommand] = (
+      packageJson.scripts["ontology:validate"]?.split(" && ") ?? []
+    ).filter((command) => command.startsWith("vitest run"));
     const packageContractArguments = packageContractCommand?.split(/\s+/u);
     const packagePerformanceArguments = packagePerformanceCommand?.split(/\s+/u);
 

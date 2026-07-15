@@ -41,5 +41,3 @@ export const FEEDBACK_SIBLING_COMPARISON_DECISIONS = Object.freeze([
   Object.freeze(["Warning","ConfidenceSignal","DiagnosticSignal"]),
   Object.freeze(["WarningEvent","ErrorEvent","FailureEvent"]),
 ]);
-
-\n

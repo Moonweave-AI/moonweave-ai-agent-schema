@@ -103,5 +103,3 @@ export const MEMORY_BACKBONE_RELATION_DECISIONS = Object.freeze([
   Object.freeze(["VectorIndex-is_a-Index","primary-backbone","Index","VectorIndex"]),
   Object.freeze(["VectorRepresentation-is_a-Representation","primary-backbone","Representation","VectorRepresentation"]),
 ]);
-
-\n

@@ -368,4 +368,3 @@ export const createLegacyStructurePhases = (context) => {
 
   return Object.freeze({ moveSplitModules, moveOwnedConcepts, mergeActorAuthorityScope, applyOwnerAndIdentityCorrections, replaceStrings, normalizeTerminology, repairSourceAttachmentEvidence, completeCrossDomainBoundaryContexts });
 };
-\n

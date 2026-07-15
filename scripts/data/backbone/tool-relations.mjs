@@ -76,4 +76,3 @@ export const TOOL_BACKBONE_RELATION_DECISIONS = Object.freeze([
   Object.freeze(["ToolSideEffect-is_a-InvocationEffect","primary-backbone","InvocationEffect","ToolSideEffect"]),
   Object.freeze(["ToolWarning-is_a-InvocationDiagnostic","primary-backbone","InvocationDiagnostic","ToolWarning"]),
 ]);
-\n

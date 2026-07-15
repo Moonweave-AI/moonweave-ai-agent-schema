@@ -39,5 +39,3 @@ export const ADAPTER_SIBLING_COMPARISON_DECISIONS = Object.freeze([
   Object.freeze(["XStateAdapter","SCXMLAdapter","StatechartAdapter"]),
   Object.freeze(["ZodProfileAdapter","JSONSchemaAdapter","StructuralSchemaAdapter"]),
 ]);
-
-\n

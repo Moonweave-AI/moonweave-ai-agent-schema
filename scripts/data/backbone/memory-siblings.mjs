@@ -70,5 +70,3 @@ export const MEMORY_SIBLING_COMPARISON_DECISIONS = Object.freeze([
   Object.freeze(["VectorIndex","HybridIndex","Index"]),
   Object.freeze(["VectorRepresentation","Embedding","Representation"]),
 ]);
-
-\n
