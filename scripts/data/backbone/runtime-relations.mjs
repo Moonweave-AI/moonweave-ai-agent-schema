@@ -54,5 +54,3 @@ export const RUNTIME_BACKBONE_RELATION_DECISIONS = Object.freeze([
   Object.freeze(["TraceSpan-is_a-ObservabilityRecord","primary-backbone","ObservabilityRecord","TraceSpan"]),
   Object.freeze(["UserActor-is_a-HumanActor","primary-backbone","HumanActor","UserActor"]),
 ]);
-
-\n

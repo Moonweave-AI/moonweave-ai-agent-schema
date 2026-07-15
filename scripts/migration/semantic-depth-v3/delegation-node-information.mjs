@@ -398,4 +398,3 @@ export const createDelegationNodeInformationPhases = (context) => {
 
   return Object.freeze({ applyDelegationNodeInformation });
 };
-\n

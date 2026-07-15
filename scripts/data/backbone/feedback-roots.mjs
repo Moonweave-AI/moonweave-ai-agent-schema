@@ -70,4 +70,3 @@ export const FEEDBACK_ROOT_STATUS_DECISIONS = Object.freeze([
   Object.freeze(["Warning",null]),
   Object.freeze(["WarningEvent",null]),
 ]);
-\n

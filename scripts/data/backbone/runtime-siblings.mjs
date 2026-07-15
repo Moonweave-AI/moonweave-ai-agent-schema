@@ -44,5 +44,3 @@ export const RUNTIME_SIBLING_COMPARISON_DECISIONS = Object.freeze([
   Object.freeze(["TraceSpan","AgentTranscript","ObservabilityRecord"]),
   Object.freeze(["UserActor","DeveloperActor","HumanActor"]),
 ]);
-
-\n

@@ -48,4 +48,3 @@ export const ORCHESTRATION_SIBLING_COMPARISON_DECISIONS = Object.freeze([
   Object.freeze(["WorkerRole","Orchestrator","CoordinationRole"]),
   Object.freeze(["WorkItem","Task","WorkSpecification"]),
 ]);
-\n

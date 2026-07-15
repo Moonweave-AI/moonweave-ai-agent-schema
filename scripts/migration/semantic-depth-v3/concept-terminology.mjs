@@ -796,4 +796,3 @@ export const createConceptTerminologyPhases = (context) => {
 
   return Object.freeze({ completeConceptGenusDifferentia });
 };
-\n

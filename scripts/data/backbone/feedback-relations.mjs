@@ -54,4 +54,3 @@ export const FEEDBACK_BACKBONE_RELATION_DECISIONS = Object.freeze([
   Object.freeze(["Warning-is_a-DiagnosticSignal","primary-backbone","DiagnosticSignal","Warning"]),
   Object.freeze(["WarningEvent-is_a-FailureEvent","primary-backbone","FailureEvent","WarningEvent"]),
 ]);
-\n

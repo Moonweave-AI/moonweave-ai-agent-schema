@@ -72,4 +72,3 @@ export const SAFETY_BACKBONE_RELATION_DECISIONS = Object.freeze([
   Object.freeze(["ToolBoundary-is_a-TrustBoundary","primary-backbone","TrustBoundary","ToolBoundary"]),
   Object.freeze(["ToolStreamInjectionSignal-is_a-ThreatSignal","primary-backbone","ThreatSignal","ToolStreamInjectionSignal"]),
 ]);
-\n

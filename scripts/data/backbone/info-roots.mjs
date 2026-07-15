@@ -106,5 +106,3 @@ export const INFO_ROOT_STATUS_DECISIONS = Object.freeze([
   Object.freeze(["UserMessage",null]),
   Object.freeze(["WorkingDirectoryReference",null]),
 ]);
-
-\n

@@ -85,4 +85,3 @@ export const ORCHESTRATION_BACKBONE_RELATION_DECISIONS = Object.freeze([
   Object.freeze(["WorkerSelectionProcess-uses-WorkerPool","primary-backbone","WorkerSelectionProcess","WorkerPool"]),
   Object.freeze(["WorkItem-is_a-WorkSpecification","primary-backbone","WorkSpecification","WorkItem"]),
 ]);
-\n

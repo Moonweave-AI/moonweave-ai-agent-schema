@@ -94,5 +94,3 @@ export const SAFETY_ROOT_STATUS_DECISIONS = Object.freeze([
   Object.freeze(["TrustedInstructionOverride","composition-root"]),
   Object.freeze(["UntrustedInstructionCandidate",null]),
 ]);
-
-\n

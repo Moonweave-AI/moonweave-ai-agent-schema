@@ -254,5 +254,3 @@ export const validateOntologyV3ModuleBoundaries = (
 export const ontologyV3ModuleBoundaries = ONTOLOGY_V3_MODULE_BOUNDARIES;
 export const expectedOntologyV3ModuleIds = EXPECTED_ONTOLOGY_V3_MODULE_IDS;
 export const ontologyV3ModuleBoundaryValidation = validateOntologyV3ModuleBoundaries();
-
-\n

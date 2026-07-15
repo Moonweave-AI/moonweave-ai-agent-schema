@@ -43,5 +43,3 @@ export const SAFETY_SIBLING_COMPARISON_DECISIONS = Object.freeze([
   Object.freeze(["ToolStreamInjectionSignal","IndirectInjectionSignal","ThreatSignal"]),
   Object.freeze(["UntrustedInstructionCandidate","InjectionScanResult","PatternScan"]),
 ]);
-
-\n

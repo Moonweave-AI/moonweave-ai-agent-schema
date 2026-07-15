@@ -69,5 +69,3 @@ export const RUNTIME_ROOT_STATUS_DECISIONS = Object.freeze([
   Object.freeze(["UserActor",null]),
   Object.freeze(["WorkingDirectory",null]),
 ]);
-
-\n
