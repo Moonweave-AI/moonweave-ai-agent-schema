@@ -432,5 +432,5 @@ describe("dynamic shared-prefix ontology audit", () => {
     });
     expect(report.lexical_families).toEqual(audit.lexical_families);
     expect(JSON.stringify(report.shared_prefix_audit)).not.toContain('"reviewed"');
-  });
+  }, 15_000); // Full-source O(n²) pair audit can exceed the 5 s unit budget on shared CI.
 });
