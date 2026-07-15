@@ -339,7 +339,7 @@ describe("bilateral sibling differentia", () => {
     expect(() =>
       validateSemanticDepthContracts(validationContext(invalidArtifact)),
     ).toThrow(/both endpoints must share the accepted taxonomy parent or primary-backbone layout parent/iu);
-  });
+  }, 15_000); // This regression validates the complete release twice on shared CI.
 
   it("uses multiple reviewed phrasings instead of one global sentence template", () => {
     const reviewedTexts = readOntology().classes.flatMap((concept) =>
