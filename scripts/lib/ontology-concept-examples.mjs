@@ -39,6 +39,131 @@ const relationFact = (relation) =>
     `canonical 事実 ${relation.id}（${relation.source_id} ${relation.predicate} ${relation.target_id}）`,
   );
 
+const domainScenarioIntroductions = Object.freeze({
+  info: localized(
+    "在一次多模态助手的上下文准备运行中，",
+    "During a multimodal assistant run for context preparation,",
+    "マルチモーダル支援エージェントのコンテキスト準備実行では、",
+  ),
+  orchestration: localized(
+    "在一次协调器的任务分解与委派运行中，",
+    "During a coordinator run for task decomposition and delegation,",
+    "コーディネーターによるタスク分解と委任の実行では、",
+  ),
+  runtime: localized(
+    "在一次带追踪与重试的任务执行中，",
+    "During a traced task execution with retries,",
+    "追跡と再試行を伴うタスク実行では、",
+  ),
+  adapter: localized(
+    "在一次外部框架或协议的集成构建中，",
+    "During an integration build for an external framework or protocol,",
+    "外部フレームワークまたはプロトコルの統合ビルドでは、",
+  ),
+  tool: localized(
+    "在一次智能体工具发现、选择与调用运行中，",
+    "During an agent tool-use run for discovery, selection, and invocation,",
+    "エージェントによるツールの発見・選択・呼び出し実行では、",
+  ),
+  safety: localized(
+    "在一次受保护的授权与副作用处理运行中，",
+    "During a guarded agent run for authorization and side-effect handling,",
+    "認可と副作用を保護するエージェント実行では、",
+  ),
+  feedback: localized(
+    "在一次评估、纠正与改进决策循环中，",
+    "During an evaluation and correction cycle for improvement decisions,",
+    "評価・修正・改善判断のサイクルでは、",
+  ),
+  memory: localized(
+    "在一次检索增强的记忆接入与组装运行中，",
+    "During a retrieval-augmented memory run for ingestion and assembly,",
+    "検索拡張メモリの取り込みと組み立て実行では、",
+  ),
+});
+
+const scenarioDomain = (moduleId) => {
+  const candidate = typeof moduleId === "string" ? moduleId.split("-")[0] : "runtime";
+  return Object.hasOwn(domainScenarioIntroductions, candidate) ? candidate : "runtime";
+};
+
+const compactExampleValue = (value) => {
+  const serialized = JSON.stringify(value);
+  if (serialized === undefined) return String(value);
+  return serialized.length <= 80 ? serialized : `${serialized.slice(0, 77)}...`;
+};
+
+const fieldEvidence = (fieldValues) => {
+  const entries = Object.entries(fieldValues ?? {});
+  if (entries.length === 0) return localized("", "", "");
+  const rendered = entries.map(([id, value]) => `${id}=${compactExampleValue(value)}`).join(", ");
+  return localized(
+    `记录同时写入经审查字段 ${rendered}。`,
+    `The record also binds reviewed fields ${rendered}.`,
+    `記録には審査済み項目 ${rendered} も設定されます。`,
+  );
+};
+
+const withoutTerminalPunctuation = (value) =>
+  value.trim().replace(/[。．.!?！？]+$/gu, "");
+
+export const buildConcreteAgentPositiveScenario = ({ concept: inputConcept, anchor = null, fieldValues = {} }) => {
+  const concept = {
+    ...inputConcept,
+    definitions: inputConcept.definitions ?? inputConcept.short_definitions,
+  };
+  if (!concept.definitions) {
+    throw new Error(`Concept ${concept.id} has no localized definition for its positive scenario`);
+  }
+  const reviewedDefinition = localized(
+    withoutTerminalPunctuation(concept.definitions.zh),
+    withoutTerminalPunctuation(concept.definitions.en),
+    withoutTerminalPunctuation(concept.definitions.ja),
+  );
+  const introduction = domainScenarioIntroductions[scenarioDomain(concept.module_id)];
+  const fields = fieldEvidence(fieldValues);
+  if (anchor === null) {
+    return Object.freeze({
+      descriptions: localized(
+        `${introduction.zh}系统实例化${concept.labels.zh}（${concept.id}）。其已审查定义是“${reviewedDefinition.zh}”。${fields.zh}`,
+        `${introduction.en} the system materializes ${concept.labels.en} (${concept.id}). Its reviewed definition is “${reviewedDefinition.en}”. ${fields.en}`.trim(),
+        `${introduction.ja}システムは${concept.labels.ja}（${concept.id}）を具体化します。審査済み定義は「${reviewedDefinition.ja}」です。${fields.ja}`,
+      ),
+      expected_result: localized(
+        `该运行保留 ${concept.id} 的定义身份和可验证字段。`,
+        `The run preserves ${concept.id}'s defined identity and verifiable fields.`,
+        `この実行は ${concept.id} の定義済み同一性と検証可能な項目を保持します。`,
+      ),
+      why_valid_or_invalid: localized(
+        "该说明给出具体领域操作、完整定义和实际字段值，而不是只复述类型标签。",
+        "The scenario gives a concrete domain operation, the complete definition, and actual field values instead of merely repeating a type label.",
+        "この説明は型ラベルの反復ではなく、具体的な領域操作、完全な定義、実際の項目値を示します。",
+      ),
+    });
+  }
+  const endpointRole = anchor.source_id === concept.id
+    ? localized("源端点", "source", "始点")
+    : localized("目标端点", "target", "終点");
+  const directedFact = `${anchor.source_id} ${anchor.predicate} ${anchor.target_id}`;
+  return Object.freeze({
+    descriptions: localized(
+      `${introduction.zh}系统将${concept.labels.zh}（${concept.id}）记录为 ${directedFact} 的${endpointRole.zh}。其已审查定义是“${reviewedDefinition.zh}”。${fields.zh}`,
+      `${introduction.en} the system records ${concept.labels.en} (${concept.id}) as the ${endpointRole.en} of ${directedFact}. Its reviewed definition is “${reviewedDefinition.en}”. ${fields.en}`.trim(),
+      `${introduction.ja}システムは${concept.labels.ja}（${concept.id}）を ${directedFact} の${endpointRole.ja}として記録します。審査済み定義は「${reviewedDefinition.ja}」です。${fields.ja}`,
+    ),
+    expected_result: localized(
+      `该运行可查询 ${concept.id} 以及方向保持不变的事实 ${anchor.id}。`,
+      `The run can query ${concept.id} together with direction-preserving fact ${anchor.id}.`,
+      `この実行では ${concept.id} と方向を保持した事実 ${anchor.id} を共に照会できます。`,
+    ),
+    why_valid_or_invalid: localized(
+      `该场景同时给出真实运行语境、${anchor.id} 的 canonical 方向、概念定义和可用字段值。`,
+      `The scenario combines a real operational context, the canonical direction of ${anchor.id}, the concept definition, and available field values.`,
+      `このシナリオは実際の運用文脈、${anchor.id} の canonical 方向、概念定義、利用可能な項目値を組み合わせます。`,
+    ),
+  });
+};
+
 const joinLocalizedIds = (ids) => ids.join("、");
 
 const informationContractIsComplete = (concept) =>
@@ -191,35 +316,16 @@ const exclusionBoundary = ({ concept, contrast, anchor }) => {
 };
 
 const positiveExample = ({ concept, original, anchor, contrast, fieldValues }) => {
-  const fact = relationFact(anchor);
-  const contrastText = contrast?.concept
-    ? localized(
-        `；该记录不与边界对照项 ${contrast.concept.id} 混用`,
-        `; the record is not conflated with boundary contrast ${contrast.concept.id}`,
-        `。境界対照 ${contrast.concept.id} と混同しません`,
-      )
-    : localized("", "", "");
+  const scenario = buildConcreteAgentPositiveScenario({ concept, anchor, fieldValues });
   return {
     ...structuredClone(original),
     scenario_id: null,
-    descriptions: localized(
-      `在可核验图谱片段中，${concept.id} 以自身 canonical ID 参与${fact.zh}${contrastText.zh}。${concept.definitions.zh}`,
-      `In a verifiable graph fragment, ${concept.id} participates in ${fact.en} under its own canonical ID${contrastText.en}. ${concept.definitions.en}`,
-      `検証可能なグラフ断片で、${concept.id} は自身の canonical ID により${fact.ja}へ参加します${contrastText.ja}。${concept.definitions.ja}`,
-    ),
+    descriptions: scenario.descriptions,
     field_values: fieldValues,
     related_node_ids: unique([concept.id, anchor.source_id, anchor.target_id]),
     related_relation_ids: [anchor.id],
-    expected_result: localized(
-      `查询必须解析到 ${anchor.id} 的 ${concept.id} 端点，并通过该节点的字段与种差校验。`,
-      `The query must resolve ${concept.id} as an endpoint of ${anchor.id} and validate the node's fields and differentia.`,
-      `照会は ${anchor.id} の端点として ${concept.id} を解決し、ノードの項目と種差を検証しなければなりません。`,
-    ),
-    why_valid_or_invalid: localized(
-      `示例复用真实端点和关系 ${anchor.id}，没有用名称相似性替代关系或类型断言。`,
-      `The example reuses the actual endpoints and relation ${anchor.id}; name similarity does not substitute for a relation or type assertion.`,
-      `この例は実在する端点と関係 ${anchor.id} を再利用し、名称類似性で関係または型アサーションを代替しません。`,
-    ),
+    expected_result: scenario.expected_result,
+    why_valid_or_invalid: scenario.why_valid_or_invalid,
     source_claims: compressClaims(anchor.source_claims?.length ? anchor.source_claims : concept.source_claims),
   };
 };

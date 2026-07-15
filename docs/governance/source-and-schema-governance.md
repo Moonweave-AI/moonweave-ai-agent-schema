@@ -1,6 +1,6 @@
 # Source And Schema Governance
 
-Status: accepted v2
+Status: accepted v3
 Created: 2026-06-30
 
 ## Source Policy
@@ -102,9 +102,16 @@ A2A remote delegation, MCP capability surfaces, handoffs, agents-as-tools, and l
 - A formal release requires one atomic replacement of canonical JSON,
   Markdown, root Schema, generated TypeScript types, source index, fixtures,
   tests, and the Explorer consumer.
-- Publication is established by the root canonical artifact carrying
-  `release_channel=release` and `releasable=true`, followed by the complete
-  release gate below. A candidate directory is never publication evidence.
+- `npm run ontology:release` materializes that formal artifact tree only after
+  portable gates pass: dependency policy/audit, ontology security, referenced
+  links, deterministic candidates, isolated validation, coverage, typecheck,
+  production build, browser contracts, and a final live-source candidate
+  comparison that closes the validation-to-publication race window.
+- Repository publication is established only when the materialized root carries
+  `release_channel=release` and `releasable=true`, the runner-specific visual
+  gate below passes, and the artifacts plus reviewed baselines are committed
+  together. A local candidate or uncommitted formal tree is never publication
+  evidence.
 
 ## Release Gate
 
@@ -116,12 +123,14 @@ A release can be cut only when:
 - Typecheck, unit tests, build, and E2E pass.
 - Frontend canvas is non-empty on desktop and mobile.
 - Playwright visual comparison passes against the reviewed 1360 × 900 desktop
-  and 390 × 844 mobile baselines in `docs/visual-baselines/unified-v2/`.
+  and 390 × 844 mobile baselines in `docs/visual-baselines/unified-v3/`.
 - No hidden chain-of-thought field appears in schema, fixtures, or rendered UI.
 - No `needs-targeted-check` source is used for accepted field-level schema claims.
 - Future-dated sources are not active evidence.
 - Canonical JSON validates against its actual generated Schema.
-- All published Concepts have a path to their Module root.
+- All published Concepts have a path from their Module entry through derived ownership and a reviewed taxonomy or structural backbone; the backbone may be arbitrarily deep and must be acyclic.
+- Accepted Module membership is discovered from source and checked bidirectionally against `research/ontology-module-boundary-v3.csv`; no current module count is a builder constant.
+- Site publication is complete only when `dist/build-manifest.json` and the deployed runtime DOM identify the deployment commit and bundled ontology identity.
 - All `is_a` edges pass the seven-question review in RFC 0005.
 - Schema, example, source, constraint, and case annotations never enter graph elements.
 - The single-page/no-competing-tab E2E suite passes.

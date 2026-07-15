@@ -17,11 +17,21 @@ export interface SourceLinkReport {
   readonly failures: readonly SourceLinkResult[];
 }
 
+export interface SourceDnsAnswer {
+  readonly address: string;
+  readonly family: number;
+}
+
 export function checkSourceLinks(
   sources: readonly SourceLink[],
   options?: {
     readonly concurrency?: number;
     readonly timeoutMs?: number;
-    readonly fetchImpl?: typeof fetch;
+    readonly maxRedirects?: number;
+    readonly fetchImpl?: (input: string, init?: RequestInit) => Promise<Response>;
+    readonly dnsLookupImpl?: (
+      hostname: string,
+      options: { readonly all: true; readonly verbatim: true },
+    ) => Promise<readonly SourceDnsAnswer[] | SourceDnsAnswer | string>;
   },
 ): Promise<SourceLinkReport>;

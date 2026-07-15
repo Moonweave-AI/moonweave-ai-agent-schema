@@ -32,12 +32,14 @@ const CONTROLLED_SOURCE_TYPES = new Set([
   "ICML",
   "ICML poster",
   "IETF draft",
+  "journal-paper",
   "K-CAP",
   "methodology",
   "NeurIPS",
   "NeurIPS list",
   "official-blog",
   "official-doc",
+  "official-docs",
   "official-guidance",
   "official-site",
   "official-spec",
@@ -73,6 +75,7 @@ const registryPath = join(process.cwd(), "research", "source-registry.csv");
 const livingPath = join(process.cwd(), "research", "living-source-metadata.csv");
 const generatedIndexPath = join(process.cwd(), "src", "generated", "source-index.json");
 const httpAllowlistPath = join(process.cwd(), "research", "source-http-allowlist.json");
+const productPath = join(process.cwd(), "ontology", "source", "agent-ontology.product.json");
 
 function parseCsvLine(line: string): readonly string[] {
   const cells: string[] = [];
@@ -136,6 +139,7 @@ function sha256(bytes: Buffer): string {
 
 const registryBytes = readFileSync(registryPath);
 const livingBytes = readFileSync(livingPath);
+const productBytes = readFileSync(productPath);
 const registryRows = parseCsv(registryBytes);
 const livingRows = parseCsv(livingBytes);
 const registryById = new Map(registryRows.map((row) => [row.id, row]));
@@ -244,12 +248,15 @@ describe("generated source index contract", () => {
     const sourceIndex = JSON.parse(readFileSync(generatedIndexPath, "utf8")) as {
       registry_fingerprint?: string;
       living_fingerprint?: string;
+      product_fingerprint?: string;
       sources?: readonly Readonly<Record<string, unknown>>[];
     };
 
     expect(sourceIndex.registry_fingerprint).toBe(sha256(registryBytes));
     expect(sourceIndex.living_fingerprint).toBe(sha256(livingBytes));
+    expect(sourceIndex.product_fingerprint).toBe(sha256(productBytes));
     expect(Array.isArray(sourceIndex.sources)).toBe(true);
+    expect(sourceIndex.sources).toHaveLength(registryRows.length);
 
     const forbiddenClaimFields = (sourceIndex.sources ?? []).flatMap((source) =>
       ["supports", "locator"].filter((field) => Object.hasOwn(source, field)).map((field) => `${String(source.id)}:${field}`)

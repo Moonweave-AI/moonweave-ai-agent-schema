@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-
-import canonicalOntologyData from "../ontology/agent-ontology.json";
 import { OntologyCharacteristics } from "./components/OntologyCharacteristics";
 import { OntologyDirectory } from "./components/OntologyDirectory";
 import { OntologyGraph, type ThemeMode } from "./components/OntologyGraph";
-import sourceIndexData from "./generated/source-index.json";
+import communityGraphData from "./generated/ontology-community-graph.json";
+import { renderSiteBuildIdentity } from "./components/site-build-identity";
 import { uiText, type Language } from "./i18n/ui-text";
+import { useOntologyDetailScene } from "./hooks/useOntologyGraphController";
+import { useSiteBuildManifestState } from "./hooks/useSiteBuildManifestState";
+import {
+  communityProjectionFingerprint,
+} from "./lib/ontology-community-network";
 import {
   ontologyEntityDefinition,
   ontologyEntityLabel,
@@ -13,50 +17,38 @@ import {
   type OntologyEntityRef,
 } from "./lib/ontology-index";
 import {
-  createOntologyRuntime,
   ontologyMetricValue,
+  type OntologyRuntime,
 } from "./lib/ontology-runtime";
+import { canonicalIdentityForOntology } from "./lib/site-build-manifest";
 import {
-  buildVisibleConceptGraph,
+  downloadJsonArtifact,
+  ontologyEntityKindText,
+} from "./lib/ontology-ui-actions";
+import {
+  buildVisibleSceneGraph,
   restoreOntologyViewHash,
   serializeOntologyViewHash,
   type OntologyViewState,
 } from "./lib/ontology-view-model";
-
-const ontologyRuntime = createOntologyRuntime(canonicalOntologyData, sourceIndexData);
-const canonicalOntology = ontologyRuntime.ontology;
-const ontologyIndex = ontologyRuntime.index;
-
-const initialLocation = restoreOntologyViewHash(
-  typeof window === "undefined" ? "" : window.location.hash,
-  ontologyIndex,
-);
-
-const initialDirectoryExpansion = new Set<OntologyEntityRef>([
-  ...ontologyPrimaryPath(ontologyIndex, initialLocation.state.focusedEntityRef),
-]);
-
 type LocationNotice = "root-repaired" | "invalid-focus" | null;
-
-const graphProjectionDirectoryRefs = new Set<OntologyEntityRef>();
-
-const entityKindText = (
-  kind: "root" | "plane" | "module" | "concept",
-  language: Language,
-): string => {
-  const text = uiText[language];
-  if (kind === "root") return text.ontologyKind;
-  if (kind === "plane") return text.planeKind;
-  if (kind === "module") return text.moduleKind;
-  return text.conceptKind;
-};
-
-function App() {
+export interface AppProps { readonly ontologyRuntime: OntologyRuntime; readonly canonicalFingerprint: string }
+function App({ ontologyRuntime, canonicalFingerprint }: AppProps) {
+  const canonicalOntology = ontologyRuntime.ontology;
+  const ontologyIndex = ontologyRuntime.index;
+  const initialLocation = useMemo(
+    () => restoreOntologyViewHash(window.location.hash, ontologyIndex), [ontologyIndex]);
+  const initialDirectoryExpansion = useMemo(
+    () => new Set<OntologyEntityRef>(ontologyPrimaryPath(
+      ontologyIndex, initialLocation.state.focusedEntityRef)),
+    [initialLocation.state.focusedEntityRef, ontologyIndex]);
+  const canonicalIdentity = useMemo(() => canonicalIdentityForOntology(
+    canonicalOntology,
+    canonicalFingerprint,
+    communityProjectionFingerprint(communityGraphData),
+  ), [canonicalFingerprint, canonicalOntology]);
   const [language, setLanguage] = useState<Language>("zh");
   const [theme, setTheme] = useState<ThemeMode>("dark");
-  const [graphRootRef, setGraphRootRef] = useState<OntologyEntityRef>(
-    initialLocation.state.graphRootRef,
-  );
   const [focusedEntityRef, setFocusedEntityRef] = useState<OntologyEntityRef>(
     initialLocation.state.focusedEntityRef,
   );
@@ -65,9 +57,6 @@ function App() {
   );
   const [directoryExpandedRefs, setDirectoryExpandedRefs] = useState<Set<OntologyEntityRef>>(
     initialDirectoryExpansion,
-  );
-  const [graphExpandedRefs, setGraphExpandedRefs] = useState<Set<OntologyEntityRef>>(
-    new Set(initialLocation.state.graphExpandedRefs),
   );
   const [directoryCollapsed, setDirectoryCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -80,7 +69,15 @@ function App() {
         : null,
   );
   const [announcement, setAnnouncement] = useState("");
+  const buildManifestState = useSiteBuildManifestState(canonicalIdentity);
   const text = uiText[language];
+  const detailScene = useOntologyDetailScene(ontologyIndex, {
+    rootRef: initialLocation.state.graphRootRef,
+    focusedEntityRef: initialLocation.state.focusedEntityRef,
+    focusedRelationId: initialLocation.state.focusedRelationId,
+    expandedRefs: initialLocation.state.graphExpandedRefs,
+  });
+  const graphRootRef = detailScene.sceneState.rootRef;
 
   const viewState = useMemo<OntologyViewState>(
     () => ({
@@ -88,29 +85,22 @@ function App() {
       focusedEntityRef,
       focusedRelationId,
       directoryExpandedRefs,
-      graphExpandedRefs,
+      graphExpandedRefs: new Set(detailScene.sceneState.expansionsByRef.keys()),
     }),
     [
       directoryExpandedRefs,
       focusedEntityRef,
       focusedRelationId,
-      graphExpandedRefs,
       graphRootRef,
+      detailScene.sceneState.expansionsByRef,
     ],
   );
-  const graphProjectionState = useMemo<OntologyViewState>(
-    () => ({
-      graphRootRef,
+  const view = useMemo(
+    () => buildVisibleSceneGraph(ontologyIndex, detailScene.sceneState, {
       focusedEntityRef,
       focusedRelationId,
-      directoryExpandedRefs: graphProjectionDirectoryRefs,
-      graphExpandedRefs,
     }),
-    [focusedEntityRef, focusedRelationId, graphExpandedRefs, graphRootRef],
-  );
-  const view = useMemo(
-    () => buildVisibleConceptGraph(ontologyIndex, graphProjectionState),
-    [graphProjectionState],
+    [focusedEntityRef, focusedRelationId, detailScene.sceneState],
   );
   const focusedEntity =
     ontologyIndex.entitiesByRef.get(focusedEntityRef) ??
@@ -148,12 +138,20 @@ function App() {
   }, [viewState]);
 
   useEffect(() => {
+    if (detailScene.diagnostic) setAnnouncement(text.sceneBudgetReached);
+  }, [detailScene.diagnostic, text.sceneBudgetReached]);
+
+  useEffect(() => {
     const restoreHash = () => {
       const restored = restoreOntologyViewHash(window.location.hash, ontologyIndex);
-      setGraphRootRef(restored.state.graphRootRef);
       setFocusedEntityRef(restored.state.focusedEntityRef);
       setFocusedRelationId(restored.state.focusedRelationId);
-      setGraphExpandedRefs(new Set(restored.state.graphExpandedRefs));
+      detailScene.restore({
+        rootRef: restored.state.graphRootRef,
+        focusedEntityRef: restored.state.focusedEntityRef,
+        focusedRelationId: restored.state.focusedRelationId,
+        expandedRefs: restored.state.graphExpandedRefs,
+      });
       setDirectoryExpandedRefs(
         new Set(ontologyPrimaryPath(ontologyIndex, restored.state.focusedEntityRef)),
       );
@@ -167,13 +165,12 @@ function App() {
     };
     window.addEventListener("hashchange", restoreHash);
     return () => window.removeEventListener("hashchange", restoreHash);
-  }, []);
+  }, [detailScene.restore]);
 
   const navigateToEntity = useCallback((ref: OntologyEntityRef) => {
-    setGraphRootRef(ref);
+    detailScene.setSelection([ref]);
     setFocusedEntityRef(ref);
     setFocusedRelationId(null);
-    setGraphExpandedRefs(new Set([ref]));
     setDirectoryExpandedRefs((previous) => {
       const next = new Set(previous);
       for (const pathRef of ontologyPrimaryPath(ontologyIndex, ref)) next.add(pathRef);
@@ -182,7 +179,7 @@ function App() {
     setHighlightedScenarioId(null);
     const entity = ontologyIndex.entitiesByRef.get(ref);
     if (entity) setAnnouncement(text.focusNode(ontologyEntityLabel(entity, language)));
-  }, [language, text]);
+  }, [detailScene.setSelection, language, text]);
 
   const focusEntity = useCallback((ref: OntologyEntityRef) => {
     setFocusedEntityRef(ref);
@@ -191,8 +188,9 @@ function App() {
     if (entity) setAnnouncement(text.focusNode(ontologyEntityLabel(entity, language)));
   }, [language, text]);
 
-  const focusRelation = useCallback((relationId: string) => {
+  const focusRelation = useCallback((relationId: string | null) => {
     setFocusedRelationId(relationId);
+    if (!relationId) return;
     const relation = ontologyIndex.relationsById.get(relationId);
     const label = relation
       ? relation.labels?.[language] ?? relation.predicate
@@ -207,26 +205,6 @@ function App() {
       else next.add(ref);
       return next;
     });
-  }, []);
-
-  const expandGraphRef = useCallback((ref: OntologyEntityRef) => {
-    setGraphExpandedRefs((previous) => {
-      const next = new Set(previous);
-      next.add(ref);
-      return next;
-    });
-  }, []);
-
-  const downloadCanonical = useCallback(() => {
-    const blob = new Blob([JSON.stringify(canonicalOntologyData, null, 2)], {
-      type: "application/json",
-    });
-    const href = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = href;
-    anchor.download = "agent-ontology.json";
-    anchor.click();
-    URL.revokeObjectURL(href);
   }, []);
 
   return (
@@ -257,7 +235,8 @@ function App() {
               <button type="button" data-testid="theme-dark" className={theme === "dark" ? "is-active" : ""} aria-pressed={theme === "dark"} onClick={() => setTheme("dark")}>{text.darkTheme}</button>
               <button type="button" data-testid="theme-light" className={theme === "light" ? "is-active" : ""} aria-pressed={theme === "light"} onClick={() => setTheme("light")}>{text.lightTheme}</button>
             </div>
-            <button type="button" className="download-link" onClick={downloadCanonical}>{text.downloadJson}</button>
+            <button type="button" className="download-link" onClick={() => downloadJsonArtifact(canonicalOntology, "agent-ontology.json")}>{text.downloadJson}</button>
+            {renderSiteBuildIdentity(buildManifestState, text)}
           </div>
         </header>
 
@@ -320,7 +299,7 @@ function App() {
 
             <div className="entity-hero">
               <div>
-                <p className="eyebrow">{entityKindText(focusedEntity.kind, language)}</p>
+                <p className="eyebrow">{ontologyEntityKindText(focusedEntity.kind, language)}</p>
                 <h2>{ontologyEntityLabel(focusedEntity, language)}</h2>
                 <p>{ontologyEntityDefinition(focusedEntity, language)}</p>
               </div>
@@ -330,19 +309,15 @@ function App() {
                 <div><dt>{text.source}</dt><dd>{focusedSourceClaims?.length ?? 0}</dd></div>
               </dl>
             </div>
-
             <OntologyGraph
               index={ontologyIndex}
-              view={view}
               language={language}
               theme={theme}
-              graphRootRef={graphRootRef}
+              canonicalFingerprint={canonicalFingerprint}
               focusedEntityRef={focusedEntityRef}
               focusedRelationId={focusedRelationId}
-              highlightedScenarioId={highlightedScenarioId}
               onFocusEntity={focusEntity}
               onFocusRelation={focusRelation}
-              onExpandEntity={expandGraphRef}
             />
             <OntologyCharacteristics
               index={ontologyIndex}
@@ -355,7 +330,7 @@ function App() {
               onNavigateEntity={navigateToEntity}
               onFocusRelation={focusRelation}
               onBackToNode={() => setFocusedRelationId(null)}
-              onExpandAdjacent={expandGraphRef}
+              onExpandAdjacent={detailScene.expandAdjacent}
               onHighlightScenario={setHighlightedScenarioId}
             />
           </section>

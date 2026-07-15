@@ -1,10 +1,12 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  coverageExcludedTestFiles,
+  ontologyPerformanceTestFiles,
   ontologyValidationTestFiles,
   parseOntologyReleaseArguments,
   runNodeCommand,
@@ -52,17 +54,122 @@ const fakePipeline = () => {
 };
 
 describe("ontology release command", () => {
-  it("keeps package and isolated-release ontology validation scopes identical", () => {
+  it("keeps package and isolated-release ontology validation scopes aligned", () => {
     const packageJson = JSON.parse(
       readFileSync(resolve(repositoryRoot, "package.json"), "utf8"),
     ) as { scripts: Record<string, string> };
-    const packageValidationFiles = packageJson.scripts["ontology:validate"]
-      ?.split(/\s+/u)
-      .slice(2);
+    const [packageContractCommand, packagePerformanceCommand] =
+      packageJson.scripts["ontology:validate"]?.split(" && ") ?? [];
+    const packageContractArguments = packageContractCommand?.split(/\s+/u);
+    const packagePerformanceArguments = packagePerformanceCommand?.split(/\s+/u);
 
-    expect(packageValidationFiles).toEqual(ontologyValidationTestFiles);
+    expect(packageContractArguments).toEqual([
+      "vitest",
+      "run",
+      "--exclude",
+      ...coverageExcludedTestFiles,
+    ]);
     expect(new Set(ontologyValidationTestFiles).size).toBe(
       ontologyValidationTestFiles.length,
+    );
+    expect(ontologyValidationTestFiles).not.toContain(
+      "tests/ontology-layout-dense-scenes.test.ts",
+    );
+    expect(ontologyValidationTestFiles).not.toContain(
+      "tests/ontology-layout-performance.test.ts",
+    );
+    expect(ontologyValidationTestFiles).not.toContain(
+      "tests/ontology-relation-layout.test.ts",
+    );
+    expect(packagePerformanceArguments).toEqual([
+      "vitest",
+      "run",
+      ...ontologyPerformanceTestFiles,
+      "--maxWorkers=1",
+      "--no-file-parallelism",
+    ]);
+  });
+
+  it("runs every ontology contract in release validation or an explicit isolated gate", () => {
+    const isolatedOntologyTests = new Set([
+      "tests/ontology-client-loading.test.ts",
+      ...ontologyPerformanceTestFiles,
+    ]);
+    const discoveredOntologyTests = readdirSync(resolve(repositoryRoot, "tests"))
+      .filter((file) => /^ontology-.*\.test\.(?:ts|tsx)$/u.test(file))
+      .map((file) => `tests/${file}`)
+      .sort();
+
+    expect(discoveredOntologyTests.filter((file) =>
+      !ontologyValidationTestFiles.includes(file) && !isolatedOntologyTests.has(file)))
+      .toEqual([]);
+  });
+
+  it("excludes only the wall-clock community-network benchmark from coverage", () => {
+    const packageJson = JSON.parse(
+      readFileSync(resolve(repositoryRoot, "package.json"), "utf8"),
+    ) as { scripts: Record<string, string> };
+    const packageCoverageArguments = packageJson.scripts["test:coverage"]
+      ?.split(/\s+/u)
+      .slice(2);
+    const packageCoverageExclusions = packageCoverageArguments
+      ?.flatMap((argument, index, arguments_) =>
+        argument === "--exclude" ? [arguments_[index + 1]] : [])
+      .filter((value): value is string => value !== undefined);
+
+    expect(coverageExcludedTestFiles).toEqual([
+      "tests/ontology-community-network-performance.test.ts",
+    ]);
+    expect(packageCoverageExclusions).toEqual(coverageExcludedTestFiles);
+    expect(packageJson.scripts["test:unit"]).toBe("vitest run");
+  });
+
+  it("exposes a portable deterministic community-projection verification command", () => {
+    const packageJson = JSON.parse(
+      readFileSync(resolve(repositoryRoot, "package.json"), "utf8"),
+    ) as { scripts: Record<string, string> };
+
+    expect(packageJson.scripts["ontology:communities:verify"]).toBe(
+      "npm run ontology:communities:test && npm run ontology:communities:generate && " +
+      "npm run ontology:communities:check && git diff --exit-code -- " +
+      "src/generated/ontology-community-graph.json",
+    );
+    expect(packageJson.scripts["ontology:verify"]).toMatch(
+      /^npm run ontology:communities:verify &&/u,
+    );
+  });
+
+  it("pins the Python community-projection toolchain in validation and deployment CI", () => {
+    const requirements = readFileSync(
+      resolve(repositoryRoot, "requirements-graph-visualization.txt"),
+      "utf8",
+    );
+    const validationWorkflow = readFileSync(
+      resolve(repositoryRoot, ".github/workflows/ontology-validation.yml"),
+      "utf8",
+    );
+    const deploymentWorkflow = readFileSync(
+      resolve(repositoryRoot, ".github/workflows/deploy.yml"),
+      "utf8",
+    );
+    const setupPython =
+      "actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1";
+    const dependencyInstall =
+      "python -m pip install --disable-pip-version-check --require-hashes --requirement " +
+      "requirements-graph-visualization.txt";
+
+    expect(requirements).toMatch(
+      /^networkx==3\.6\.1 \\\r?\n\s+--hash=sha256:[a-f0-9]{64}$/mu,
+    );
+
+    for (const workflow of [validationWorkflow, deploymentWorkflow]) {
+      expect(workflow).toContain(setupPython);
+      expect(workflow).toContain('python-version: "3.13.5"');
+      expect(workflow).toContain("cache-dependency-path: requirements-graph-visualization.txt");
+      expect(workflow).toContain(dependencyInstall);
+    }
+    expect(validationWorkflow).toContain(
+      "run: npm run ontology:communities:verify",
     );
   });
 
@@ -122,15 +229,98 @@ describe("ontology release command", () => {
       pipeline,
     });
 
-    const spawnedArguments = spawn.mock.calls.map(([, arguments_]) => arguments_ as string[]);
-    expect(spawnedArguments).toHaveLength(13);
-    expect(spawnedArguments[0]?.at(0)).toMatch(/verify-ontology-security\.mjs$/u);
-    expect(spawnedArguments[1]).toEqual(
+    const spawnedCommands = spawn.mock.calls.map(([executable, arguments_, options]) => ({
+      executable,
+      arguments: arguments_ as string[],
+      options,
+    }));
+    const spawnedArguments = spawnedCommands.map(({ arguments: commandArguments }) =>
+      commandArguments);
+    expect(spawnedArguments).toHaveLength(27);
+    expect(spawnedArguments[0]?.at(0)).toMatch(/verify-dependency-policy\.mjs$/u);
+    expect(spawnedArguments[1]?.at(0)).toMatch(/audit-npm-dependencies\.mjs$/u);
+    expect(spawnedArguments[2]?.at(0)).toMatch(/verify-ontology-security\.mjs$/u);
+    expect(spawnedArguments[3]).toEqual(
       expect.arrayContaining(["--referenced-only", "--allow-inconclusive"]),
     );
     expect(spawnedArguments.filter((arguments_) => arguments_.includes("--output-root")))
-      .toHaveLength(3);
-    expect(spawnedArguments.some((arguments_) => arguments_.includes("--coverage"))).toBe(true);
+      .toHaveLength(4);
+    const communityGenerations = spawnedCommands.filter(
+      ({ arguments: commandArguments }) =>
+        commandArguments[0]?.endsWith("generate-ontology-community-graph.py"),
+    );
+    expect(communityGenerations).toHaveLength(4);
+    const communityGeneration = communityGenerations.find(
+      ({ arguments: commandArguments }) =>
+        commandArguments.includes(
+          resolve(temporaryRoot, "release/ontology/agent-ontology.json"),
+        ),
+    );
+    expect(communityGeneration).toEqual(expect.objectContaining({
+      executable: "python",
+      arguments: [
+        expect.stringMatching(/generate-ontology-community-graph\.py$/u),
+        "--input",
+        resolve(temporaryRoot, "release/ontology/agent-ontology.json"),
+        "--output",
+        resolve(
+          temporaryRoot,
+          "release/src/generated/ontology-community-graph.json",
+        ),
+      ],
+    }));
+    const communityVerifications = spawnedCommands.filter(
+      ({ arguments: commandArguments }) =>
+        commandArguments[0]?.endsWith("verify-ontology-community-graph.mjs"),
+    );
+    expect(communityVerifications).toHaveLength(4);
+    const communityVerification = communityVerifications.find(({ options }) =>
+      (options as { cwd?: string }).cwd === resolve(temporaryRoot, "release"));
+    expect(communityVerification).toEqual(expect.objectContaining({
+      executable: process.execPath,
+      options: expect.objectContaining({ cwd: resolve(temporaryRoot, "release") }),
+    }));
+    const performanceInvocation = spawnedArguments.find((arguments_) =>
+      arguments_[2] === ontologyPerformanceTestFiles[0]);
+    expect(performanceInvocation).toEqual([
+      expect.stringMatching(/vitest\.mjs$/u),
+      "run",
+      ...ontologyPerformanceTestFiles,
+      "--maxWorkers=1",
+      "--no-file-parallelism",
+    ]);
+    const coverageInvocation = spawnedArguments.find((arguments_) =>
+      arguments_.includes("--coverage"));
+    expect(coverageInvocation).toEqual([
+      expect.stringMatching(/vitest\.mjs$/u),
+      "run",
+      "--coverage",
+      "--exclude",
+      ...coverageExcludedTestFiles,
+      "--coverage.reportsDirectory",
+      resolve(temporaryRoot, "coverage"),
+    ]);
+    expect(
+      spawnedArguments.some((arguments_) =>
+        arguments_[0]?.endsWith("write-site-build-manifest.mjs")),
+    ).toBe(true);
+    expect(
+      spawnedArguments.some((arguments_) =>
+        arguments_[0]?.endsWith("verify-site-artifact.mjs")),
+    ).toBe(true);
+    const stagedSiteVerification = spawn.mock.calls.find(([, arguments_]) =>
+      (arguments_ as string[])[0]?.endsWith("verify-site-artifact.mjs"));
+    expect(stagedSiteVerification?.[2]).toEqual(
+      expect.objectContaining({
+        cwd: resolve(temporaryRoot, "validation-workspace"),
+        env: expect.objectContaining({
+          MOONWEAVE_ONTOLOGY_ARTIFACT_PATH: resolve(
+            temporaryRoot,
+            "validation-workspace/ontology/agent-ontology.json",
+          ),
+        }),
+      }),
+    );
     expect(
       spawnedArguments.some(
         (arguments_) =>
@@ -138,12 +328,20 @@ describe("ontology release command", () => {
           arguments_.includes("tests/ontology-release-command.test.ts"),
       ),
     ).toBe(true);
+    const browserContractInvocation = spawnedArguments.find((arguments_) =>
+      /@playwright[\\/]test[\\/]cli\.js$/u.test(arguments_[0] ?? ""));
+    expect(browserContractInvocation).toEqual([
+      expect.stringMatching(/@playwright[\\/]test[\\/]cli\.js$/u),
+      "test",
+      "--output",
+      resolve(temporaryRoot, "playwright-results"),
+    ]);
     expect(pipeline.createReleaseValidationWorkspace).toHaveBeenCalledOnce();
     expect(pipeline.publishArtifactTree).toHaveBeenCalledOnce();
     expect(pipeline.assertPublishedArtifactsMatch).toHaveBeenCalledOnce();
     expect(removeTemporaryRoot).toHaveBeenCalledWith(temporaryRoot);
     expect(logger).toHaveBeenCalledWith(
-      expect.stringMatching(/release committed after all quality gates passed/iu),
+      expect.stringMatching(/release artifacts materialized after portable quality gates passed/iu),
     );
   });
 
@@ -163,7 +361,13 @@ describe("ontology release command", () => {
       pipeline,
     });
 
-    expect(spawn).toHaveBeenCalledTimes(7);
+    expect(spawn).toHaveBeenCalledTimes(13);
+    expect(
+      spawn.mock.calls.some(([, arguments_]) =>
+        /(?:verify-dependency-policy|audit-npm-dependencies)\.mjs$/u.test(
+          (arguments_ as string[])[0] ?? "",
+        )),
+    ).toBe(false);
     expect(
       spawn.mock.calls.some(([, arguments_]) => (arguments_ as string[]).includes("--coverage")),
     ).toBe(false);
@@ -175,7 +379,10 @@ describe("ontology release command", () => {
   it("propagates a labelled preflight failure and cleans up without entering the lifecycle", () => {
     const pipeline = fakePipeline();
     const removeTemporaryRoot = vi.fn();
-    const spawn = vi.fn(() => ({ ...successfulSpawn(), status: 9 }));
+    const spawn = vi.fn((_executable?: string, arguments_?: readonly string[]) => ({
+      ...successfulSpawn(),
+      status: arguments_?.[0]?.endsWith("verify-ontology-security.mjs") ? 9 : 0,
+    }));
 
     expect(() =>
       runOntologyReleaseCommand({
@@ -216,6 +423,18 @@ describe("ontology release command", () => {
     );
     expect(ontologyValidationTestFiles).toContain(
       "tests/ontology-source-text-integrity.test.ts",
+    );
+    expect(ontologyValidationTestFiles).toContain(
+      "tests/ontology-semantic-golden-paths.test.ts",
+    );
+    expect(ontologyValidationTestFiles).toContain(
+      "tests/ontology-semantic-integrity.test.ts",
+    );
+    expect(ontologyValidationTestFiles).toContain(
+      "tests/ontology-semantic-depth-release.test.ts",
+    );
+    expect(ontologyValidationTestFiles).toContain(
+      "tests/site-build-scripts.test.ts",
     );
 
     const result = spawnSync(process.execPath, [rootScript, "--unknown"], {

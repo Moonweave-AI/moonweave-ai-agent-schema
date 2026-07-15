@@ -6,6 +6,10 @@ import { OntologyCharacteristics } from "../src/components/OntologyCharacteristi
 import { OntologyDirectory } from "../src/components/OntologyDirectory";
 import { OntologyGraph } from "../src/components/OntologyGraph";
 import { uiText } from "../src/i18n/ui-text";
+import {
+  buildOntologyCommunityNetworkModel,
+  type OntologyCommunityGraphEdge,
+} from "../src/lib/ontology-community-network";
 import { buildOntologyIndex } from "../src/lib/ontology-index";
 import {
   buildVisibleConceptGraph,
@@ -16,6 +20,7 @@ import {
   inheritanceProjectionFixture,
   ontologyViewModelFixture,
 } from "./fixtures/ontology-view-model.fixture";
+import { buildCommunityGraphFixture } from "./fixtures/ontology-community-graph.fixture";
 
 const sourceIndex = {
   generated: true,
@@ -53,6 +58,14 @@ const buildFixture = () => {
 describe("unified graph UI contract", () => {
   it("keeps UI copy trilingual without embedding canonical entity translations", () => {
     expect(uiText.zh.hierarchy).toBe("逻辑层级与语义关系");
+    expect(Object.keys(uiText.zh)).not.toEqual(expect.arrayContaining([
+      "graphModeHierarchy",
+      "graphModeRelations",
+      "topDownLayout",
+      "leftRightLayout",
+      "resetScene",
+      "showRelationLabels",
+    ]));
     expect(uiText.en.logicalPosition).toBe("Logical position");
     expect(uiText.ja.structureConstraints).toBe("構造と制約");
     expect(JSON.stringify(uiText)).not.toMatch(/AuthorityScope|AgentRun|ToolCall/);
@@ -60,19 +73,36 @@ describe("unified graph UI contract", () => {
 
   it("keeps App as composition only and removes the legacy parallel presentation chain", () => {
     const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+    const graphSource = readFileSync(
+      new URL("../src/components/OntologyGraph.tsx", import.meta.url),
+      "utf8",
+    );
+    const runtimeSource = readFileSync(
+      new URL("../src/lib/ontology-network-runtime.ts", import.meta.url), "utf8");
+    const networkStyles = readFileSync(
+      new URL("../src/styles/ontology-network.css", import.meta.url), "utf8");
     const uiSources = [
       app,
       readFileSync(new URL("../src/components/OntologyCharacteristics.tsx", import.meta.url), "utf8"),
-      readFileSync(new URL("../src/components/OntologyGraph.tsx", import.meta.url), "utf8"),
+      graphSource,
+      runtimeSource,
     ].join("\n");
 
     expect(app.split(/\r?\n/).length).toBeLessThan(400);
-    expect(uiSources).not.toMatch(/selectedRef|maturityForClass|maturityForPlane|GraphView/);
-    expect(uiSources).not.toMatch(/\.slice\(0,/);
+    expect(app).toContain("useOntologyDetailScene");
+    expect(app).not.toMatch(
+      /useOntologyExplorerSceneActions|visibleRelationPredicates|setMode|setDirection/u,
+    );
+    expect(uiSources).not.toMatch(/\bselectedRef\b|maturityForClass|maturityForPlane|GraphView/);
+    expect(graphSource).not.toMatch(/readonly view:|graphRootRef|layoutDirection|layoutMode/);
     expect(uiSources).not.toMatch(/inspector-panel|catalog-section|abox-|tbox-/);
-    expect(uiSources).toMatch(/fixedNodeConstraint/);
-    expect(uiSources).toMatch(/event\.key === " "[\s\S]*onExpandEntity/);
-    expect(uiSources).toMatch(/event\.key === "Escape"[\s\S]*onFocusEntity\(graphRootRef\)/);
+    expect(runtimeSource).toContain('import("vis-network")');
+    expect(runtimeSource).toContain('network.once("stabilizationIterationsDone"');
+    expect(runtimeSource).toContain("network.stabilize(");
+    expect(runtimeSource).toContain("physics: { enabled: false }");
+    expect(runtimeSource).not.toMatch(/innerHTML|unpkg\.com|new Worker/);
+    expect(uiSources).not.toMatch(/cytoscape|fcose|elk-layered|ontology-layout\.worker/iu);
+    expect(networkStyles).not.toMatch(/graph-mode|layout-direction|graph-expansion/iu);
   });
 
   it("renders the primary directory recursively to arbitrary concept depth", () => {
@@ -129,29 +159,27 @@ describe("unified graph UI contract", () => {
     expect(renderSearch("finalizes")).toContain('data-directory-ref="concept:AgentRun"');
   });
 
-  it("renders exactly one graph surface with canonical direction and parallel predicates", () => {
-    const { index, state, view } = buildFixture();
+  it("renders exactly one Graphify-style graph surface", () => {
+    const { index, state } = buildFixture();
     const html = renderToStaticMarkup(
       <OntologyGraph
         index={index}
-        view={view}
         language="en"
         theme="dark"
-        graphRootRef={state.graphRootRef}
+        canonicalFingerprint={`sha256:${buildCommunityGraphFixture(index).source_sha256}`}
         focusedEntityRef={state.focusedEntityRef}
         focusedRelationId={state.focusedRelationId}
+        communityGraph={buildCommunityGraphFixture(index)}
         onFocusEntity={vi.fn()}
         onFocusRelation={vi.fn()}
-        onExpandEntity={vi.fn()}
       />,
     );
 
-    expect((html.match(/data-testid="cytoscape-graph"/g) ?? [])).toHaveLength(1);
-    expect(html).toContain('data-layout-policy="canonical-primary-path-rings"');
-    expect(html).toContain('data-source="concept:AgentRun" data-target="concept:RunResult"');
-    expect(html).toContain('data-predicate="produces"');
-    expect(html).toContain('data-predicate="finalizes"');
-    expect(html).toContain('data-source="concept:RunResult" data-target="concept:AgentRun"');
+    expect((html.match(/data-testid="ontology-network-graph"/g) ?? [])).toHaveLength(1);
+    expect(html).toContain('data-layout-engine="vis-network-forceatlas2"');
+    expect(html).toContain('data-node-color-policy="community"');
+    expect(html).toContain('data-edge-label-policy="hover-only"');
+    expect(html).not.toMatch(/Logical hierarchy|Relation exploration|layout-direction/u);
   });
 
   it("keeps the same twelve-row detail table and discloses every collapsed list total", () => {
@@ -212,19 +240,18 @@ describe("unified graph UI contract", () => {
     const graphHtml = renderToStaticMarkup(
       <OntologyGraph
         index={index}
-        view={view}
         language="en"
         theme="dark"
-        graphRootRef={state.graphRootRef}
+        canonicalFingerprint={`sha256:${buildCommunityGraphFixture(index).source_sha256}`}
         focusedEntityRef={state.focusedEntityRef}
         focusedRelationId={relationState.focusedRelationId}
+        communityGraph={buildCommunityGraphFixture(index)}
         onFocusEntity={vi.fn()}
         onFocusRelation={vi.fn()}
-        onExpandEntity={vi.fn()}
       />,
     );
-    expect(graphHtml).toContain('class="graph-edge-tooltip" role="tooltip"');
-    expect(graphHtml).toContain("AgentRun — produces → RunResult");
+    expect(graphHtml).toContain('data-edge-label-policy="hover-only"');
+    expect(graphHtml).not.toContain('class="graph-edge-tooltip"');
   });
 
   it("marks instance explanation as not applicable for a module organization node", () => {
@@ -427,19 +454,17 @@ describe("unified graph UI contract", () => {
     const graphHtml = renderToStaticMarkup(
       <OntologyGraph
         index={index}
-        view={view}
         language="en"
         theme="dark"
-        graphRootRef={state.graphRootRef}
+        canonicalFingerprint={`sha256:${buildCommunityGraphFixture(index).source_sha256}`}
         focusedEntityRef={state.focusedEntityRef}
         focusedRelationId={null}
-        highlightedScenarioId={caseId}
+        communityGraph={buildCommunityGraphFixture(index)}
         onFocusEntity={vi.fn()}
         onFocusRelation={vi.fn()}
-        onExpandEntity={vi.fn()}
       />,
     );
-    expect(graphHtml).toContain("Next case steps (+2)");
+    expect(graphHtml).toContain('data-layout-engine="vis-network-forceatlas2"');
 
     const detailsHtml = renderToStaticMarkup(
       <OntologyCharacteristics
@@ -462,25 +487,29 @@ describe("unified graph UI contract", () => {
     expect(detailsHtml).toContain("Current step: 1. AgentRun example 1");
   });
 
-  it("localizes derived organization edges instead of exposing raw snake_case predicates", () => {
+  it("localizes derived organization edges without exposing them as canonical facts", () => {
     const { index } = buildFixture();
-    const state = createOntologyViewState(index);
-    const html = renderToStaticMarkup(
-      <OntologyGraph
-        index={index}
-        view={buildVisibleConceptGraph(index, state)}
-        language="en"
-        theme="dark"
-        graphRootRef={state.graphRootRef}
-        focusedEntityRef={state.focusedEntityRef}
-        focusedRelationId={null}
-        onFocusEntity={vi.fn()}
-        onFocusRelation={vi.fn()}
-        onExpandEntity={vi.fn()}
-      />,
-    );
+    const base = buildCommunityGraphFixture(index);
+    const planeRef = [...index.entitiesByRef.keys()].find(
+      (ref) => ref.startsWith("plane:"),
+    ) as `plane:${string}`;
+    const derived: OntologyCommunityGraphEdge = {
+      id: "derived-root-plane",
+      source: index.rootRef,
+      target: planeRef,
+      relation: "contains_domain",
+      evidence: "derived",
+    };
+    const model = buildOntologyCommunityNetworkModel(index, {
+      ...base,
+      metrics: { ...base.metrics, edge_count: base.metrics.edge_count + 1 },
+      edges: [...base.edges, derived],
+    }, "en", "dark");
 
-    expect(html).toContain("contains domain");
-    expect(html).not.toContain(">contains_domain</button>");
+    expect(model.edges.at(-1)).toMatchObject({
+      relationLabel: "contains domain",
+      canonicalRelationId: null,
+      dashes: true,
+    });
   });
 });

@@ -2,6 +2,10 @@ import { useMemo } from "react";
 
 import { uiText, type Language } from "../i18n/ui-text";
 import {
+  defaultVisibleOntologyChildren,
+  isDefaultVisibleOntologyEntity,
+} from "../lib/ontology-default-visibility";
+import {
   localizedOntologyText,
   ontologyEntityDefinition,
   ontologyEntityLabel,
@@ -149,8 +153,10 @@ const DirectoryBranch = ({
   visited,
 }: DirectoryBranchProps) => {
   const entity = index.entitiesByRef.get(entityRef);
-  if (!entity || visited.has(entityRef)) return null;
-  const children = index.organizationalChildrenByRef.get(entityRef) ?? [];
+  if (!entity || visited.has(entityRef) || !isDefaultVisibleOntologyEntity(index, entityRef)) {
+    return null;
+  }
+  const children = defaultVisibleOntologyChildren(index, entityRef);
   const expanded = expandedRefs.has(entityRef);
   const nextVisited = new Set(visited).add(entityRef);
   const label = ontologyEntityLabel(entity, language);
@@ -215,10 +221,12 @@ export const OntologyDirectory = (props: OntologyDirectoryProps) => {
   const text = uiText[language];
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
   const searchDocuments = useMemo(
-    () => [...index.entitiesByRef.values()].map((entity) => ({
-      entity,
-      text: searchableText(index, entity, language),
-    })),
+    () => [...index.entitiesByRef.values()]
+      .filter((entity) => isDefaultVisibleOntologyEntity(index, entity.ref))
+      .map((entity) => ({
+        entity,
+        text: searchableText(index, entity, language),
+      })),
     [index, language],
   );
   const searchResults = useMemo(

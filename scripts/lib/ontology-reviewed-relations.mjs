@@ -168,7 +168,7 @@ const distinctGroup = (id, relation_ids, zh, en, ja) => ({
   distinct_fact_rationale: localized(zh, en, ja),
 });
 
-export const REVIEWED_DISTINCT_FACT_GROUPS = deepFreeze([
+const REVIEWED_DISTINCT_FACT_GROUP_CANDIDATES = [
   distinctGroup(
     "content-provenance-versus-reference",
     ["derived_from_source", "has_source_reference"],
@@ -337,7 +337,26 @@ export const REVIEWED_DISTINCT_FACT_GROUPS = deepFreeze([
     "combines_candidate_set identifies candidate-set inputs to fusion; orders identifies the candidate set carrying the fused output order.",
     "combines_candidate_set は融合入力の候補集合、orders は融合後の統一次序を持つ候補集合出力を示します。",
   ),
+];
+
+const RETIRED_DISTINCT_FACT_GROUP_IDS = new Set([
+  // SourceAttachment was removed during the v3 ownership migration, so its
+  // former same-endpoint distinction is historical evidence, not an active
+  // convergence requirement.
+  "source-attachment-type-versus-description",
 ]);
+
+export const REVIEWED_DISTINCT_FACT_GROUPS = deepFreeze(
+  REVIEWED_DISTINCT_FACT_GROUP_CANDIDATES.filter(
+    ({ id }) => !RETIRED_DISTINCT_FACT_GROUP_IDS.has(id),
+  ),
+);
+
+export const HISTORICAL_REPLAY_DISTINCT_FACT_GROUPS = deepFreeze(
+  REVIEWED_DISTINCT_FACT_GROUP_CANDIDATES.filter(({ id }) =>
+    RETIRED_DISTINCT_FACT_GROUP_IDS.has(id),
+  ),
+);
 
 const claimKey = (claim) =>
   [
@@ -425,9 +444,13 @@ export const convergeReviewedRelations = ({
   relations,
   legacyRelations = [],
   sourceRegistryById = new Map(),
+  distinctFactGroups = REVIEWED_DISTINCT_FACT_GROUPS,
 }) => {
   if (!Array.isArray(relations)) throw new TypeError("relations must be an array");
   if (!Array.isArray(legacyRelations)) throw new TypeError("legacyRelations must be an array");
+  if (!Array.isArray(distinctFactGroups)) {
+    throw new TypeError("distinctFactGroups must be an array");
+  }
 
   const relationById = new Map();
   for (const relation of relations) {
@@ -549,7 +572,7 @@ export const convergeReviewedRelations = ({
   }
 
   const reviewedGroupBySet = new Map();
-  for (const group of REVIEWED_DISTINCT_FACT_GROUPS) {
+  for (const group of distinctFactGroups) {
     const groupRelations = group.relation_ids.map((relationId) => {
       const relation = relationById.get(relationId);
       if (!relation) throw new Error(`Required retained relation ${relationId} does not exist`);

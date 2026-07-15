@@ -9,12 +9,14 @@ export default defineConfig({
   testDir: "./e2e",
   snapshotPathTemplate: resolve(
     import.meta.dirname,
-    "docs/visual-baselines/unified-v2/{platform}/{projectName}/{arg}{ext}",
+    "docs/visual-baselines/unified-v3/{platform}/{projectName}/{arg}{ext}",
   ),
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // Full-graph stabilization timing is process-local; concurrent pages would measure runner
+  // contention instead of the Graphify-style network initialization.
+  workers: 1,
   reporter: [["html", { outputFolder: "playwright-report" }], ["list"]],
   use: {
     baseURL: "http://127.0.0.1:5173",

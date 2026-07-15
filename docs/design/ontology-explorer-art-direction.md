@@ -1,11 +1,12 @@
 # Ontology Explorer Art Direction
 
-Status: accepted v1
+Status: accepted v2 (Graphify-style single graph)
 Created: 2026-06-30
+Revised: 2026-07-15
 
 ## Visual Thesis
 
-The explorer is a cinematic moonlit research lab for inspecting agent-system ontology evidence. It must feel like a live atlas of claims, protocols, traces, schemas, and trust boundaries, not a generic SaaS dashboard. Its product thesis is **one graph, one hierarchy, inline information**: a single canonical concept graph carries Domain, Module, and Concept logic, while the selected node or relation is explained in the same page.
+The explorer is a cinematic moonlit research lab for inspecting agent-system ontology evidence. It must feel like a live atlas of claims, protocols, traces, schemas, and trust boundaries, not a generic SaaS dashboard. Its product thesis is **one graph, complete semantics, inline information**: a single canonical concept graph carries Domain, Module, Concept, and relation logic, while the selected node or relation is explained on the same page.
 
 The first viewport is the product: the existing single-page atlas with a hierarchy directory, one graph surface, and an inline characteristics table. There is no marketing hero and no competing ontology workbench.
 
@@ -36,16 +37,16 @@ Token mapping:
 | ref | case | useful pattern | adoption rule |
 |---|---|---|---|
 | 01 | Stately Visualizer | state machine canvas and selected-state explanation | Borrow state/transition clarity, not its inspector split or visual brand. |
-| 02 | React Flow homepage | historical node editor primitives and canvas affordances | Historical interaction reference only; the implemented graph engine is Cytoscape.js with fCoSE. |
+| 02 | React Flow homepage | historical node editor primitives and canvas affordances | Historical interaction reference only; do not add a node-editor mode or a second graph implementation. |
 | 03 | React Flow examples | historical custom-node, edge, minimap, controls, and export patterns | Historical reference only; do not reintroduce React Flow as a second graph implementation. |
 | 04 | React Flow UI templates | historical workflow editor node affordances | Historical reference only after Moonweave token mapping. |
-| 05 | React Flow accessibility docs | keyboard and screen-reader expectations | Historical accessibility reference; verify equivalent behavior in Cytoscape.js and the DOM fallback. |
+| 05 | React Flow accessibility docs | keyboard and screen-reader expectations | Historical accessibility reference; verify equivalent behavior in the graph controls and inline information fallback. |
 | 06 | Carbon chart types | chart selection discipline | Use for evidence/status panels. |
 | 07 | Carbon flow charts | flow direction and label guidance | Use for relation readability. |
 | 08 | Material Design 3 color | semantic color roles | Keep color semantic, not decorative. |
 | 09 | Observable Plot gallery | compact data-dense panels | Use for evidence ledger density. |
-| 10 | D3 force-directed graph examples | dense graph legibility tradeoffs | Use sparingly; no chaotic default layout. |
-| 11 | Cytoscape.js demos | graph exploration, selection, and clustering | Use Cytoscape.js with fCoSE as the actual graph and layout engine. |
+| 10 | D3 force-directed graph examples | dense graph legibility tradeoffs | Use sparse labels and restrained edges; never leave physics running indefinitely. |
+| 11 | [Graphify](https://github.com/Graphify-Labs/graphify) | community-colored, degree-scaled, ForceAtlas2-based network exploration | Use as the primary presentation baseline, adapted to Moonweave tokens and complete directed ontology relations. |
 | 12 | Neo4j Bloom | graph search and focused entity explanation | Adapt its focus mental model to the inline characteristics table; do not add a side inspector. |
 | 13 | Gephi overview | network analysis vocabulary | Use for future offline analysis exports. |
 | 14 | Mermaid live editor | source-to-diagram feedback loop | Use for statechart export inspiration. |
@@ -72,7 +73,7 @@ Token mapping:
 
 - Topbar: brand, language, theme, export.
 - Left rail: recursive canonical hierarchy directory and disclosure controls.
-- Graph stage: Cytoscape.js canvas with fCoSE layout, controls, luminous semantic nodes, and woven directed edges.
+- Graph stage: one `vis-network` canvas with `ForceAtlas2Based` initial stabilization, community legend/filter, search, fit, pan, zoom, drag, semantic nodes, and directed edges.
 - Inline characteristics: hierarchy, definitions, relations, examples, structure, sources, mappings, changes.
 - Export controls: graph JSON, schema JSON, SVG, PNG.
 
@@ -80,12 +81,23 @@ Cards are limited to repeated rows within the single inline characteristics area
 
 ## Interaction Principles
 
-1. Clicking a node updates the same-page characteristics table; only an explicit expand action changes graph topology.
-2. Directory and graph filters change only visibility and focus, never canonical data or the eight-Domain hierarchy.
+1. Clicking a node or relation updates the same-page characteristics table; selection never creates a detail page, shadow node, or second graph.
+2. Directory, search, and community filters change only visibility and focus, never canonical data, relation direction, or the eight-Domain hierarchy.
 3. Source IDs remain visible wherever a claim is inspected.
-4. Trust-boundary edges are animated or visually differentiated.
+4. Canonical/explicit facts use stronger solid edges; derived presentation edges use lighter dashed edges. Relation labels stay hidden until hover or selection.
 5. Adapter-only concepts use blush styling and never look more canonical than core concepts.
-6. Export actions operate on the current view, not hidden state.
+6. Initial physics stabilization is deterministic and stops when complete; dragging a node must not make the whole graph continually oscillate.
+7. Export actions operate on the current view, not hidden state.
+
+## Graph Data And Visual Contract
+
+- NetworkX `MultiDiGraph` is the offline graph record for complete directed, multi-predicate, parallel relation facts.
+- Community detection consumes a deterministic simple undirected projection only. Prefer Leiden when available and fall back to seeded Louvain; this projection must never rewrite canonical semantics.
+- Community identity controls node color. It does not encode node type, ontology level, ownership, acceptance status, or business importance.
+- Node size scales with graph degree to reveal structural hubs. It must be described as connectivity, not semantic priority.
+- Only sufficiently connected nodes keep permanent labels. Every node remains discoverable through search, hover, selection, and the inline characteristics area.
+- The browser uses locally bundled `vis-network` `ForceAtlas2Based`, stabilizes once, then disables physics. There are no hierarchy/relationship modes, layout direction controls, or user-selectable layout engines.
+- Schema, fields, constraints, examples, instances, case paths, sources, mappings, and governance remain information on their original node or relation. They do not enter community detection as extra nodes.
 
 ## Wireframes
 
@@ -125,6 +137,9 @@ one inline node/relation characteristics table
 - Purple-blue SaaS gradient homepage.
 - Decorative blobs or generic AI imagery.
 - A graph that hides provenance or makes adapters look canonical.
+- Community colors presented as ontology types or modules.
+- Permanent labels on every node, continuously moving physics, or visible labels on every edge.
+- Top-down/left-to-right toggles, hierarchy/relationship modes, or competing layout engines.
 - Long prose replacing the graph as the first viewport.
 - Raw colors outside token definitions.
 - ABox/TBox/Schema/Instance routes, tabs, inspectors, or parallel graphs.

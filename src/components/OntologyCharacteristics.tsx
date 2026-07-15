@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { uiText, type Language } from "../i18n/ui-text";
+import { isDefaultVisibleOntologyRelation } from "../lib/ontology-default-visibility";
 import {
   localizedOntologyText,
   ontologyEntityLabel,
@@ -25,6 +26,7 @@ import type {
   VisibleOntologyGraph,
 } from "../lib/ontology-view-model";
 import { DisclosureList } from "./DisclosureList";
+import { OntologyDeprecationLineageFact } from "./OntologyDeprecationLineage";
 
 export interface OntologyCharacteristicsProps {
   readonly index: OntologyIndex;
@@ -444,9 +446,20 @@ const EntityDetailsRows = ({
   const entity = details?.entity ?? index.entitiesByRef.get(focusedEntityRef)!;
   const data = entity.data as unknown as OntologyInformationView;
   const path = ontologyPrimaryPath(index, entity.ref);
-  const primary = entity.kind === "concept" ? index.primaryParentRelationByConceptId.get(entity.id) : undefined;
-  const additional = entity.kind === "concept" ? index.additionalParentRelationsByConceptId.get(entity.id) ?? [] : [];
-  const children = entity.kind === "concept" ? index.directChildRelationsByConceptId.get(entity.id) ?? [] : [];
+  const primaryCandidate = entity.kind === "concept"
+    ? index.primaryParentRelationByConceptId.get(entity.id)
+    : undefined;
+  const primary = primaryCandidate && isDefaultVisibleOntologyRelation(index, primaryCandidate)
+    ? primaryCandidate
+    : undefined;
+  const additional = entity.kind === "concept"
+    ? (index.additionalParentRelationsByConceptId.get(entity.id) ?? [])
+      .filter((relation) => isDefaultVisibleOntologyRelation(index, relation))
+    : [];
+  const children = entity.kind === "concept"
+    ? (index.directChildRelationsByConceptId.get(entity.id) ?? [])
+      .filter((relation) => isDefaultVisibleOntologyRelation(index, relation))
+    : [];
   const primaryEntity = primary
     ? entityForConcept(index, primary.target_id)
     : index.entitiesByRef.get(index.organizationalParentByRef.get(entity.ref) ?? "");
@@ -458,8 +471,9 @@ const EntityDetailsRows = ({
         })
       : (index.organizationalChildrenByRef.get(entity.ref) ?? []).flatMap((ref) => {
           const child = index.entitiesByRef.get(ref);
-          return child ? [child] : [];
+          return child?.data.status === "accepted" ? [child] : [];
         });
+  const deprecatedPredecessors = details?.collections.deprecatedPredecessors.items ?? [];
   const examples = arrayValue<CanonicalExample>(data.examples);
   const positive = examples.filter(({ kind }) => kind === "positive");
   const counter = examples.filter(({ kind }) => kind === "counterexample" || kind === "boundary");
@@ -683,6 +697,12 @@ const EntityDetailsRows = ({
           <div><dt>{text.introduced}</dt><dd>{data.introduced_in ?? text.notApplicable}</dd></div>
           <div><dt>{text.deprecated}</dt><dd>{data.deprecated_in ?? text.notApplicable}</dd></div>
           <div><dt>{text.replacements}</dt><dd>{data.replaced_by_ids?.join(", ") || text.notApplicable}</dd></div>
+          <OntologyDeprecationLineageFact
+            index={index}
+            predecessors={deprecatedPredecessors}
+            language={language}
+            onNavigate={onNavigateEntity}
+          />
           <div><dt>{text.deprecationReason}</dt><dd>{localized(data.deprecation_reason, language, text.notApplicable)}</dd></div>
           <div><dt>{text.changeNote}</dt><dd>{localized(data.change_note, language, text.notApplicable)}</dd></div>
         </dl>

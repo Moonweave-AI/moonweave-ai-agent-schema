@@ -41,6 +41,7 @@ export type ReviewedRelationLike = Readonly<{
 
 export const REVIEWED_RELATION_MERGES: readonly ReviewedRelationMerge[];
 export const REVIEWED_DISTINCT_FACT_GROUPS: readonly ReviewedDistinctFactGroup[];
+export const HISTORICAL_REPLAY_DISTINCT_FACT_GROUPS: readonly ReviewedDistinctFactGroup[];
 export const REVIEWED_RELATION_SPECIAL_DECISIONS: readonly ReviewedRelationSpecialDecision[];
 
 export function convergeReviewedRelations<T extends ReviewedRelationLike>(input: Readonly<{
@@ -51,6 +52,7 @@ export function convergeReviewedRelations<T extends ReviewedRelationLike>(input:
     [key: string]: unknown;
   }>[];
   sourceRegistryById?: ReadonlyMap<string, Readonly<Record<string, unknown>>> | Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+  distinctFactGroups?: readonly ReviewedDistinctFactGroup[];
 }>): Readonly<{
   relations: readonly T[];
   dispositionByRelationId: ReadonlyMap<string, RelationDisposition>;

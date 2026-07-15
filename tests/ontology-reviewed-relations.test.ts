@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  HISTORICAL_REPLAY_DISTINCT_FACT_GROUPS,
   REVIEWED_DISTINCT_FACT_GROUPS,
   REVIEWED_RELATION_MERGES,
   REVIEWED_RELATION_SPECIAL_DECISIONS,
@@ -163,6 +164,12 @@ describe("reviewed relation convergence registry", () => {
 
   it("documents every retained same-endpoint fact group with a concrete trilingual rationale", () => {
     expect(REVIEWED_DISTINCT_FACT_GROUPS.length).toBeGreaterThanOrEqual(15);
+    expect(REVIEWED_DISTINCT_FACT_GROUPS.map(({ id }) => id)).not.toContain(
+      "source-attachment-type-versus-description",
+    );
+    expect(HISTORICAL_REPLAY_DISTINCT_FACT_GROUPS.map(({ id }) => id)).toEqual([
+      "source-attachment-type-versus-description",
+    ]);
     for (const group of REVIEWED_DISTINCT_FACT_GROUPS) {
       expect(group.relation_ids.length, group.id).toBeGreaterThan(1);
       expect(hasLocalizedText(group.distinct_fact_rationale), group.id).toBe(true);

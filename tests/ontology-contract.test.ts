@@ -54,7 +54,7 @@ const canonicalFixture = {
   date: productSourceFixture.product.date,
   artifact_metadata: {
     artifact_kind: "canonical-agent-ontology",
-    contract_version: "1.0.0",
+    contract_version: "2.0.0",
     canonical_version: productSourceFixture.product.canonical_version,
     release_channel: "candidate",
     releasable: false,
@@ -91,6 +91,16 @@ const canonicalFixture = {
     legacy_individuals_remaining: 0,
     legacy_data_properties_remaining: 0,
     legacy_axioms_remaining: 0,
+    module_count_by_domain: { "tool-plane": 1 },
+    root_status_counts: { "module-key-root": 1 },
+    concept_depth_histogram: { "0": 1, "1": 1 },
+    max_concept_depth: 1,
+    unresolved_root_count: 0,
+    cross_kind_is_a_count: 0,
+    primary_backbone_cycle_count: 0,
+    template_text_violation_count: 0,
+    module_label_suffix_violation_count: 0,
+    unowned_cq_count: 0,
   },
 };
 
@@ -125,6 +135,15 @@ const contractValidator = (
 const validationDiagnostics = (validate: ValidateFunction): string =>
   JSON.stringify(validate.errors ?? [], null, 2);
 
+const withoutProperty = (
+  value: Readonly<Record<string, unknown>>,
+  property: string,
+): Record<string, unknown> => {
+  const copy = structuredClone(value) as Record<string, unknown>;
+  delete copy[property];
+  return copy;
+};
+
 const expectValid = (
   definitionName: "productSource" | "moduleSource" | "canonicalArtifact",
   value: unknown,
@@ -149,8 +168,10 @@ describe("ontology v2 artifact contract bootstrap", () => {
       `Phase 1 requires ${artifactContractPath} before source or canonical data can be built`,
     ).toBeDefined();
     expect(artifactContract?.$schema).toBe("https://json-schema.org/draft/2020-12/schema");
-    expect(artifactContract?.$id).toBeTypeOf("string");
-    expect(artifactContract?.contract_version).toBeTypeOf("string");
+    expect(artifactContract?.$id).toBe(
+      "https://moonweave.ai/schemas/agent-ontology-artifact-contract/2.0.0",
+    );
+    expect(artifactContract?.contract_version).toBe("2.0.0");
     expect(artifactContract?.supported_canonical_major).toBeTypeOf("number");
     expect(artifactContract?.$defs).toEqual(
       expect.objectContaining({
@@ -173,6 +194,160 @@ describe.runIf(artifactContract !== undefined)("ontology v2 source and canonical
 
   it("accepts the minimal AgentOntology -> Domain -> Module -> Concept canonical root", () => {
     expectValid("canonicalArtifact", canonicalFixture);
+  });
+
+  it("requires accepted Modules to publish reviewed boundary and key-notion contracts", () => {
+    for (const property of [
+      "key_notion",
+      "owns_when",
+      "references_when",
+      "boundary_decisions",
+      "overlap_checks",
+    ]) {
+      expect(
+        expectInvalid("moduleSource", {
+          ...moduleSourceFixture,
+          module: withoutProperty(
+            moduleSourceFixture.module as unknown as Readonly<Record<string, unknown>>,
+            property,
+          ),
+        }),
+      ).toContain(property);
+    }
+  });
+
+  it("requires accepted Concepts to declare root, alias, and sibling differentiation state", () => {
+    for (const property of ["root_status", "lexical_aliases", "sibling_differentiation"]) {
+      const malformedSource = replaceConcept(
+        moduleSourceFixture,
+        "InvocationAttempt",
+        (concept) => withoutProperty(
+          concept as unknown as Readonly<Record<string, unknown>>,
+          property,
+        ),
+      );
+      expect(expectInvalid("moduleSource", malformedSource)).toContain(property);
+    }
+  });
+
+  it("requires every competency question to declare one semantic owner", () => {
+    const [question, ...remainingQuestions] = moduleSourceFixture.module.competency_questions;
+    expect(question).toBeDefined();
+    const malformedSource = {
+      ...moduleSourceFixture,
+      module: {
+        ...moduleSourceFixture.module,
+        competency_questions: [
+          withoutProperty(
+            question as unknown as Readonly<Record<string, unknown>>,
+            "primary_owner_module_id",
+          ),
+          ...remainingQuestions,
+        ],
+      },
+    };
+
+    expect(expectInvalid("moduleSource", malformedSource)).toContain(
+      "primary_owner_module_id",
+    );
+  });
+
+  it("requires accepted Modules to publish between three and eight competency questions", () => {
+    expect(
+      expectInvalid("moduleSource", {
+        ...moduleSourceFixture,
+        module: {
+          ...moduleSourceFixture.module,
+          competency_questions: moduleSourceFixture.module.competency_questions.slice(0, 2),
+        },
+      }),
+    ).toMatch(/competency_questions|minItems/u);
+
+    expect(
+      expectInvalid("moduleSource", {
+        ...moduleSourceFixture,
+        module: {
+          ...moduleSourceFixture.module,
+          competency_questions: Array.from(
+            { length: 9 },
+            () => moduleSourceFixture.module.competency_questions[0],
+          ),
+        },
+      }),
+    ).toMatch(/competency_questions|maxItems/u);
+  });
+
+  it("requires applicable interaction facets to identify reviewed semantic families", () => {
+    const malformedSource = structuredClone(moduleSourceFixture);
+    malformedSource.module.interaction_contract.facets.input.family_concept_ids = [];
+    malformedSource.module.interaction_contract.facets.input.relation_ids = [];
+
+    expect(expectInvalid("moduleSource", malformedSource)).toMatch(
+      /family_concept_ids|relation_ids/u,
+    );
+  });
+
+  it("requires taxonomy contracts to publish an arbitrary-depth backbone policy", () => {
+    const malformedSource = structuredClone(moduleSourceFixture);
+    const taxonomyContract = malformedSource.module.taxonomy_contract as Partial<
+      typeof malformedSource.module.taxonomy_contract
+    >;
+    delete taxonomyContract.hierarchy_policy;
+
+    expect(expectInvalid("moduleSource", malformedSource)).toContain("hierarchy_policy");
+  });
+
+  it("allows mixed backbones to retain reviewed flat composition roots", () => {
+    const mixedBackboneSource = {
+      ...structuredClone(moduleSourceFixture),
+      module: {
+        ...structuredClone(moduleSourceFixture.module),
+        taxonomy_contract: {
+          ...structuredClone(moduleSourceFixture.module.taxonomy_contract),
+          applicability: "mixed-backbone",
+          flat_root_exception_concept_ids: ["ToolCallAttempt"],
+        },
+      },
+    };
+
+    expectValid("moduleSource", mixedBackboneSource);
+  });
+
+  it("requires accepted relations to declare layout role and conditional endpoints", () => {
+    const missingRole = replaceRelation(
+      moduleSourceFixture,
+      "ToolCallAttempt-is_a-InvocationAttempt",
+      (relation) => withoutProperty(
+        relation as unknown as Readonly<Record<string, unknown>>,
+        "layout_role",
+      ),
+    );
+    expect(expectInvalid("moduleSource", missingRole)).toContain("layout_role");
+
+    const missingBackboneParent = replaceRelation(
+      moduleSourceFixture,
+      "ToolCallAttempt-is_a-InvocationAttempt",
+      (relation) => ({
+        ...relation,
+        layout_role: "primary-backbone",
+        layout_parent_id: null,
+      }),
+    );
+    expect(expectInvalid("moduleSource", missingBackboneParent)).toContain(
+      "layout_parent_id",
+    );
+
+    const crossLinkWithEndpoints = replaceRelation(
+      moduleSourceFixture,
+      "ToolCallAttempt-is_a-InvocationAttempt",
+      (relation) => ({
+        ...relation,
+        layout_role: "cross-link",
+      }),
+    );
+    expect(expectInvalid("moduleSource", crossLinkWithEndpoints)).toMatch(
+      /layout_parent_id|layout_child_id/u,
+    );
   });
 
   it("allows incomplete trilingual information while a concept is draft", () => {

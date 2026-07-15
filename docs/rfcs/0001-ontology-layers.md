@@ -6,6 +6,8 @@ Accepted: 2026-06-30
 
 > **2026-07-13 clarification:** RFC 0005 clarifies that Core/Profile/Adapter are ownership and applicability annotations only. They do not define a competing user navigation hierarchy. The canonical Explorer retains `Agent Ontology -> Domain -> Module -> Concept`, including `adapter-plane` as a first-level Domain.
 
+> **2026-07-14 v3 clarification:** Domain and Module remain stable navigation entries, but Module count and Concept depth are not fixed. Below a Module, reviewed `is_a` and structural Relation facts form an arbitrary-depth logical backbone; schema, examples, sources, and cases remain inline information rather than parallel graph layers.
+
 Depends on:
 
 - `research/source-notes/phase-0c-completion.md`

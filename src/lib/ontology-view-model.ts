@@ -1,13 +1,29 @@
 import {
   ontologyEntityRef,
-  type CanonicalField,
   type CanonicalConcept,
+  type CanonicalField,
   type CanonicalRelation,
   type EffectiveOntologyField,
   type IndexedOntologyEntity,
   type OntologyEntityRef,
   type OntologyIndex,
 } from "./ontology-index";
+import {
+  projectOntologyScene,
+  type OntologyLayoutDirection,
+  type OntologySceneMode,
+  type OntologySceneState,
+} from "./ontology-scene";
+import {
+  addExpandedNeighborhood,
+  canonicalEdge,
+  derivedEdge,
+  entityDetails,
+  hiddenAdjacency,
+  initialTopology,
+  visibleNode,
+  withParallelCounts,
+} from "./ontology-view-projection";
 
 export interface OntologyViewState {
   readonly graphRootRef: OntologyEntityRef;
@@ -30,6 +46,17 @@ export interface VisibleOntologyNode {
   readonly id: string;
   readonly kind: IndexedOntologyEntity["kind"];
   readonly entity: IndexedOntologyEntity;
+  readonly layoutParentRef: OntologyEntityRef | null;
+  readonly ownershipParentRef: OntologyEntityRef | null;
+  readonly semanticPrimaryParentRef: OntologyEntityRef | null;
+  readonly logicalDepth: number;
+  readonly directChildCount: number;
+  readonly hiddenChildCount: number;
+  readonly semanticDegree: number;
+  readonly isExpanded: boolean;
+  readonly isExpandable: boolean;
+  readonly isOnFocusPath: boolean;
+  readonly isPinned: boolean;
 }
 
 export interface VisibleOntologyEdge {
@@ -40,6 +67,13 @@ export interface VisibleOntologyEdge {
   readonly derived: boolean;
   readonly canonicalRelationId: string | null;
   readonly hierarchyRole: "ownership" | "primary-parent" | "additional-parent" | "child" | null;
+  readonly family: "ownership" | "primary-backbone" | "secondary-backbone" | "semantic";
+  readonly direction: "source-to-target";
+  readonly parallelGroupKey: string;
+  readonly parallelCount: number;
+  readonly parallelIndex: number;
+  readonly labelPriority: number;
+  readonly affectsHierarchyLayout: boolean;
 }
 
 export interface CompleteCollection<T> {
@@ -61,6 +95,7 @@ export interface EntityDetails {
     readonly incomingRelations: CompleteCollection<CanonicalRelation>;
     readonly outgoingRelations: CompleteCollection<CanonicalRelation>;
     readonly externalMappings: CompleteCollection<unknown>;
+    readonly deprecatedPredecessors: CompleteCollection<CanonicalConcept>;
   };
 }
 
@@ -76,6 +111,12 @@ export interface VisibleOntologyGraph {
   readonly counts: { readonly visibleNodes: number; readonly visibleEdges: number };
   readonly details: EntityDetails | RelationDetails;
   readonly hiddenAdjacentRefs: readonly OntologyEntityRef[];
+  readonly sceneHidden?: {
+    readonly hierarchyNodes: number;
+    readonly hierarchyEdges: number;
+    readonly semanticNodes: number;
+    readonly semanticEdges: number;
+  };
   readonly diagnostics: {
     readonly schemaFieldNodeCount: 0;
     readonly exampleNodeCount: 0;
@@ -84,17 +125,6 @@ export interface VisibleOntologyGraph {
     readonly casePathNodeCount: 0;
   };
 }
-
-const complete = <T>(items: readonly T[]): CompleteCollection<T> => ({
-  items,
-  total: items.length,
-  isComplete: true,
-});
-
-const conceptIdFromRef = (ref: OntologyEntityRef): string | null =>
-  ref.startsWith("concept:") ? ref.slice("concept:".length) : null;
-
-const asArray = (value: unknown): readonly unknown[] => (Array.isArray(value) ? value : []);
 
 export const createOntologyViewState = (
   index: OntologyIndex,
@@ -155,230 +185,6 @@ export const reduceOntologyViewState = (
   }
 };
 
-const derivedEdge = (
-  id: string,
-  source: OntologyEntityRef,
-  target: OntologyEntityRef,
-  predicate: string,
-): VisibleOntologyEdge => ({
-  id,
-  source,
-  target,
-  predicate,
-  derived: true,
-  canonicalRelationId: null,
-  hierarchyRole: "ownership",
-});
-
-const canonicalEdge = (
-  relation: CanonicalRelation,
-  index: OntologyIndex,
-): VisibleOntologyEdge => {
-  const primary = index.primaryParentRelationByConceptId.get(relation.source_id)?.id === relation.id;
-  const hierarchyRole =
-    relation.predicate !== "is_a"
-      ? null
-      : primary
-        ? "primary-parent"
-        : "additional-parent";
-  return {
-    id: relation.id,
-    source: ontologyEntityRef("concept", relation.source_id),
-    target: ontologyEntityRef("concept", relation.target_id),
-    predicate: relation.predicate,
-    derived: false,
-    canonicalRelationId: relation.id,
-    hierarchyRole,
-  };
-};
-
-const addOrganizationalChildren = (
-  index: OntologyIndex,
-  parentRef: OntologyEntityRef,
-  nodeRefs: Set<OntologyEntityRef>,
-  edges: Map<string, VisibleOntologyEdge>,
-): void => {
-  const parent = index.entitiesByRef.get(parentRef);
-  if (!parent) return;
-  for (const childRef of index.organizationalChildrenByRef.get(parentRef) ?? []) {
-    const child = index.entitiesByRef.get(childRef);
-    if (!child) continue;
-    nodeRefs.add(childRef);
-    if (parent.kind === "concept" && child.kind === "concept") {
-      const primary = index.primaryParentRelationByConceptId.get(child.id);
-      if (primary?.target_id === parent.id) {
-        edges.set(primary.id, canonicalEdge(primary, index));
-      }
-      continue;
-    }
-    let predicate = "declares_concept";
-    let id = `derived:declares-concept:${parent.id}:${child.id}`;
-    if (parent.kind === "root") {
-      predicate = "contains_domain";
-      id = `derived:contains-domain:${parent.id}:${child.id}`;
-    } else if (parent.kind === "plane") {
-      predicate = "contains_module";
-      id = `derived:contains-module:${parent.id}:${child.id}`;
-    }
-    edges.set(id, derivedEdge(id, parentRef, childRef, predicate));
-  }
-};
-
-const initialTopology = (
-  index: OntologyIndex,
-  rootRef: OntologyEntityRef,
-): { nodeRefs: Set<OntologyEntityRef>; edges: Map<string, VisibleOntologyEdge> } => {
-  const nodeRefs = new Set<OntologyEntityRef>([rootRef]);
-  const edges = new Map<string, VisibleOntologyEdge>();
-  const root = index.entitiesByRef.get(rootRef);
-  if (!root) throw new Error(`Unknown graph root ${rootRef}`);
-
-  if (root.kind === "root") {
-    addOrganizationalChildren(index, rootRef, nodeRefs, edges);
-  } else if (root.kind === "plane") {
-    const parentRef = index.organizationalParentByRef.get(rootRef);
-    if (parentRef) {
-      nodeRefs.add(parentRef);
-      const parent = index.entitiesByRef.get(parentRef)!;
-      edges.set(
-        `derived:contains-domain:${parent.id}:${root.id}`,
-        derivedEdge(
-          `derived:contains-domain:${parent.id}:${root.id}`,
-          parentRef,
-          rootRef,
-          "contains_domain",
-        ),
-      );
-    }
-    addOrganizationalChildren(index, rootRef, nodeRefs, edges);
-  } else if (root.kind === "module") {
-    const parentRef = index.organizationalParentByRef.get(rootRef);
-    if (parentRef) {
-      nodeRefs.add(parentRef);
-      const parent = index.entitiesByRef.get(parentRef)!;
-      edges.set(
-        `derived:contains-module:${parent.id}:${root.id}`,
-        derivedEdge(
-          `derived:contains-module:${parent.id}:${root.id}`,
-          parentRef,
-          rootRef,
-          "contains_module",
-        ),
-      );
-    }
-    addOrganizationalChildren(index, rootRef, nodeRefs, edges);
-  } else {
-    const conceptId = root.id;
-    const relations = [
-      ...(index.outgoingRelationsByConceptId.get(conceptId) ?? []),
-      ...(index.incomingRelationsByConceptId.get(conceptId) ?? []),
-    ];
-    for (const relation of relations) {
-      nodeRefs.add(ontologyEntityRef("concept", relation.source_id));
-      nodeRefs.add(ontologyEntityRef("concept", relation.target_id));
-      edges.set(relation.id, canonicalEdge(relation, index));
-    }
-    const hasHierarchyParent = (index.outgoingRelationsByConceptId.get(conceptId) ?? []).some(
-      (relation) => relation.predicate === "is_a" && relation.relation_kind === "hierarchy",
-    );
-    if (!hasHierarchyParent) {
-      const module = index.moduleByConceptId.get(conceptId);
-      if (module) {
-        const moduleRef = ontologyEntityRef("module", module.id);
-        nodeRefs.add(moduleRef);
-        const id = `derived:declares-concept:${module.id}:${conceptId}`;
-        edges.set(id, derivedEdge(id, moduleRef, rootRef, "declares_concept"));
-      }
-    }
-  }
-  return { nodeRefs, edges };
-};
-
-const entityDetails = (
-  index: OntologyIndex,
-  entityRef: OntologyEntityRef,
-): EntityDetails => {
-  const entity = index.entitiesByRef.get(entityRef) ?? index.entitiesByRef.get(index.rootRef)!;
-  const conceptId = conceptIdFromRef(entity.ref);
-  const data = entity.data as CanonicalConcept & {
-    readonly structure?: { readonly fields?: readonly unknown[]; readonly constraints?: readonly unknown[] };
-    readonly examples?: readonly unknown[];
-    readonly source_claims?: readonly unknown[];
-    readonly global_constraints?: readonly unknown[];
-  };
-  const constraints =
-    entity.kind === "root"
-      ? asArray(data.global_constraints)
-      : asArray(data.structure?.constraints);
-  const effectiveFields = conceptId
-    ? (index.effectiveFieldsByConceptId.get(conceptId) ?? [])
-    : [];
-  return {
-    kind: "entity",
-    entity,
-    collections: {
-      localFields: complete((data.structure?.fields ?? []) as readonly CanonicalField[]),
-      inheritedFields: complete(
-        effectiveFields.filter(({ inheritanceDepth }) => inheritanceDepth > 0),
-      ),
-      effectiveFields: complete(effectiveFields),
-      constraints: complete(constraints),
-      examples: complete(asArray(data.examples)),
-      sourceClaims: complete(asArray(data.source_claims)),
-      incomingRelations: complete(
-        conceptId ? (index.incomingRelationsByConceptId.get(conceptId) ?? []) : [],
-      ),
-      outgoingRelations: complete(
-        conceptId ? (index.outgoingRelationsByConceptId.get(conceptId) ?? []) : [],
-      ),
-      externalMappings: complete(asArray(data.external_mappings)),
-    },
-  };
-};
-
-const addExpandedNeighborhood = (
-  index: OntologyIndex,
-  ref: OntologyEntityRef,
-  nodeRefs: Set<OntologyEntityRef>,
-  edges: Map<string, VisibleOntologyEdge>,
-): void => {
-  addOrganizationalChildren(index, ref, nodeRefs, edges);
-  const conceptId = conceptIdFromRef(ref);
-  if (!conceptId) return;
-  const relations = [
-    ...(index.outgoingRelationsByConceptId.get(conceptId) ?? []),
-    ...(index.incomingRelationsByConceptId.get(conceptId) ?? []),
-  ];
-  for (const relation of relations) {
-    nodeRefs.add(ontologyEntityRef("concept", relation.source_id));
-    nodeRefs.add(ontologyEntityRef("concept", relation.target_id));
-    edges.set(relation.id, canonicalEdge(relation, index));
-  }
-};
-
-const hiddenAdjacency = (
-  index: OntologyIndex,
-  focusedRef: OntologyEntityRef,
-  visibleRefs: ReadonlySet<OntologyEntityRef>,
-): readonly OntologyEntityRef[] => {
-  const conceptId = conceptIdFromRef(focusedRef);
-  if (!conceptId) {
-    return (index.organizationalChildrenByRef.get(focusedRef) ?? []).filter(
-      (ref) => !visibleRefs.has(ref),
-    );
-  }
-  const adjacent = new Set<OntologyEntityRef>();
-  for (const relation of [
-    ...(index.outgoingRelationsByConceptId.get(conceptId) ?? []),
-    ...(index.incomingRelationsByConceptId.get(conceptId) ?? []),
-  ]) {
-    adjacent.add(ontologyEntityRef("concept", relation.source_id));
-    adjacent.add(ontologyEntityRef("concept", relation.target_id));
-  }
-  adjacent.delete(focusedRef);
-  return [...adjacent].filter((ref) => !visibleRefs.has(ref));
-};
-
 export const buildVisibleConceptGraph = (
   index: OntologyIndex,
   state: OntologyViewState,
@@ -393,8 +199,8 @@ export const buildVisibleConceptGraph = (
   const nodes = [...nodeRefs]
     .map((ref) => index.entitiesByRef.get(ref))
     .filter((entity): entity is IndexedOntologyEntity => entity !== undefined)
-    .map((entity) => ({ ref: entity.ref, id: entity.id, kind: entity.kind, entity }));
-  const visibleEdges = [...edges.values()];
+    .map((entity) => visibleNode(index, state, entity, nodeRefs));
+  const visibleEdges = withParallelCounts([...edges.values()]);
   const focusedRelation = state.focusedRelationId
     ? index.relationsById.get(state.focusedRelationId)
     : undefined;
@@ -424,13 +230,108 @@ export const buildVisibleConceptGraph = (
   };
 };
 
-const entityId = (ref: OntologyEntityRef): string => ref.slice(ref.indexOf(":") + 1);
+/**
+ * Scene-driven projection used by the detail explorer. The legacy view-state projection remains
+ * available while App routing migrates, so existing root/focus hashes keep resolving.
+ */
+export const buildVisibleSceneGraph = (
+  index: OntologyIndex,
+  sceneState: OntologySceneState,
+  focus: {
+    readonly focusedEntityRef?: OntologyEntityRef;
+    readonly focusedRelationId?: string | null;
+    readonly visibleRelationPredicates?: readonly string[];
+  } = {},
+): VisibleOntologyGraph => {
+  const projection = projectOntologyScene(index, sceneState);
+  const nodeRefs = new Set(projection.nodeRefs);
+  const focusedEntityRef = focus.focusedEntityRef ?? sceneState.rootRef;
+  const focusedRelationId = focus.focusedRelationId ?? null;
+  const compatibilityState: OntologyViewState = {
+    graphRootRef: sceneState.rootRef,
+    focusedEntityRef,
+    focusedRelationId,
+    directoryExpandedRefs: new Set(),
+    graphExpandedRefs: new Set(sceneState.expansionsByRef.keys()),
+  };
+  const nodes = projection.nodeRefs
+    .map((ref) => index.entitiesByRef.get(ref))
+    .filter((entity): entity is IndexedOntologyEntity => entity !== undefined)
+    .map((entity) => visibleNode(index, compatibilityState, entity, nodeRefs));
+  const focusedRelation = focusedRelationId
+    ? index.relationsById.get(focusedRelationId)
+    : undefined;
+  const relationIds = new Set(projection.relationIds);
+  if (focusedRelation) {
+    const source = ontologyEntityRef("concept", focusedRelation.source_id);
+    const target = ontologyEntityRef("concept", focusedRelation.target_id);
+    if (nodeRefs.has(source) && nodeRefs.has(target)) relationIds.add(focusedRelation.id);
+  }
+  const edges = [
+    ...projection.derivedEdges.map((edge) =>
+      derivedEdge(edge.id, edge.source, edge.target, edge.predicate)),
+    ...[...relationIds]
+      .map((id) => index.relationsById.get(id))
+      .filter((relation): relation is CanonicalRelation => relation !== undefined)
+      .map((relation) => canonicalEdge(relation, index)),
+  ];
+  const visiblePredicates = new Set(focus.visibleRelationPredicates ?? []);
+  const countedEdges = withParallelCounts(edges.filter((edge) =>
+    edge.family !== "semantic" || visiblePredicates.size === 0 ||
+    visiblePredicates.has(edge.predicate) || edge.id === focusedRelationId));
+  const focusedEdge = countedEdges.find(({ id }) => id === focusedRelationId);
+  const relationDetailEdge = focusedEdge ?? (
+    focusedRelation ? canonicalEdge(focusedRelation, index) : undefined
+  );
+  const details: EntityDetails | RelationDetails = relationDetailEdge
+    ? { kind: "relation", relation: focusedRelation ?? null, edge: relationDetailEdge }
+    : entityDetails(index, focusedEntityRef);
+  return {
+    nodes,
+    edges: countedEdges,
+    counts: { visibleNodes: nodes.length, visibleEdges: countedEdges.length },
+    details,
+    hiddenAdjacentRefs: hiddenAdjacency(index, focusedEntityRef, nodeRefs),
+    sceneHidden: projection.hidden,
+    diagnostics: {
+      schemaFieldNodeCount: 0,
+      exampleNodeCount: 0,
+      sourceClaimNodeCount: 0,
+      constraintNodeCount: 0,
+      casePathNodeCount: 0,
+    },
+  };
+};
 
-export const serializeOntologyViewHash = (state: OntologyViewState): string => {
+const entityId = (ref: OntologyEntityRef): string => ref.slice(ref.indexOf(":") + 1);
+const MAX_ONTOLOGY_VIEW_HASH_LENGTH = 8_192;
+const MAX_ONTOLOGY_VIEW_PREDICATES = 32;
+const MAX_ONTOLOGY_VIEW_ROOT_LENGTH = 512;
+const MAX_ONTOLOGY_VIEW_FOCUS_LENGTH = 1_024;
+
+export const serializeOntologyViewHash = (
+  state: OntologyViewState,
+  graphOptions?: {
+    readonly mode: OntologySceneMode;
+    readonly direction: OntologyLayoutDirection;
+    readonly predicates?: readonly string[];
+  },
+): string => {
   const focus = state.focusedRelationId
     ? `relation:${encodeURIComponent(state.focusedRelationId)}`
     : `node:${encodeURIComponent(entityId(state.focusedEntityRef))}`;
-  return `#root=${encodeURIComponent(state.graphRootRef)}&focus=${focus}`;
+  const options = graphOptions
+    ? `&mode=${graphOptions.mode}&direction=${graphOptions.direction}`
+    : "";
+  const predicates = graphOptions?.predicates
+    ? [...new Set(graphOptions.predicates)]
+      .filter((predicate) => /^[A-Za-z][A-Za-z0-9_.:-]{0,119}$/.test(predicate))
+      .sort()
+      .slice(0, MAX_ONTOLOGY_VIEW_PREDICATES)
+      .map((predicate) => `&predicate=${encodeURIComponent(predicate)}`)
+      .join("")
+    : "";
+  return `#root=${encodeURIComponent(state.graphRootRef)}&focus=${focus}${options}${predicates}`;
 };
 
 const findEntityRefById = (index: OntologyIndex, id: string): OntologyEntityRef | null => {
@@ -438,6 +339,27 @@ const findEntityRefById = (index: OntologyIndex, id: string): OntologyEntityRef 
     if (entity.id === id) return entity.ref;
   }
   return null;
+};
+
+const conceptRootContainsFocus = (
+  index: OntologyIndex,
+  rootRef: OntologyEntityRef,
+  focusRef: OntologyEntityRef,
+): boolean => {
+  const pending: OntologyEntityRef[] = [focusRef];
+  const visited = new Set<OntologyEntityRef>();
+  while (pending.length > 0) {
+    const current = pending.shift()!;
+    if (current === rootRef) return true;
+    if (visited.has(current)) continue;
+    visited.add(current);
+    const organizationalParent = index.organizationalParentByRef.get(current);
+    const primaryBackboneParent = index.backboneParentByRef.get(current)?.parentRef;
+    for (const parent of new Set([organizationalParent, primaryBackboneParent])) {
+      if (parent && !visited.has(parent)) pending.push(parent);
+    }
+  }
+  return false;
 };
 
 const rootContainsFocus = (
@@ -460,13 +382,7 @@ const rootContainsFocus = (
     }
   }
   if (root.kind === "concept" && focus.kind === "concept") {
-    const relations = [
-      ...(index.incomingRelationsByConceptId.get(root.id) ?? []),
-      ...(index.outgoingRelationsByConceptId.get(root.id) ?? []),
-    ];
-    return relations.some(
-      (relation) => relation.source_id === focus.id || relation.target_id === focus.id,
-    );
+    return conceptRootContainsFocus(index, rootRef, focusRef);
   }
   return false;
 };
@@ -553,6 +469,9 @@ const inferredGraphExpansions = (
 
 export interface RestoredOntologyLocation {
   readonly state: OntologyViewState;
+  readonly layoutMode: OntologySceneMode;
+  readonly layoutDirection: OntologyLayoutDirection;
+  readonly relationPredicates: readonly string[];
   readonly normalizedHash: string;
   readonly repairedRoot: boolean;
   readonly invalidFocus: boolean;
@@ -562,12 +481,31 @@ export const restoreOntologyViewHash = (
   hash: string,
   index: OntologyIndex,
 ): RestoredOntologyLocation => {
-  const params = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : hash);
-  const requestedRoot = params.get("root") as OntologyEntityRef | null;
+  const safeHash = hash.length <= MAX_ONTOLOGY_VIEW_HASH_LENGTH ? hash : "";
+  const params = new URLSearchParams(safeHash.startsWith("#") ? safeHash.slice(1) : safeHash);
+  const layoutMode: OntologySceneMode = params.get("mode") === "relations"
+    ? "relations"
+    : "hierarchy";
+  const layoutDirection: OntologyLayoutDirection = params.get("direction") === "RIGHT"
+    ? "RIGHT"
+    : "DOWN";
+  const relationPredicates = Object.freeze([
+    ...new Set(params.getAll("predicate")
+      .slice(0, MAX_ONTOLOGY_VIEW_PREDICATES)
+      .filter((predicate) => /^[A-Za-z][A-Za-z0-9_.:-]{0,119}$/.test(predicate) &&
+        predicate !== "is_a" && index.relationsByPredicate.has(predicate))),
+  ].sort());
+  const rootValue = params.get("root");
+  const requestedRoot = rootValue && rootValue.length <= MAX_ONTOLOGY_VIEW_ROOT_LENGTH
+    ? rootValue as OntologyEntityRef
+    : null;
   const requestedRootIsValid = Boolean(requestedRoot && index.entitiesByRef.has(requestedRoot));
   let graphRootRef =
     requestedRootIsValid ? requestedRoot! : index.rootRef;
-  const focusValue = params.get("focus") ?? `node:${entityId(graphRootRef)}`;
+  const requestedFocus = params.get("focus");
+  const focusValue = requestedFocus && requestedFocus.length <= MAX_ONTOLOGY_VIEW_FOCUS_LENGTH
+    ? requestedFocus
+    : `node:${entityId(graphRootRef)}`;
   let focusedEntityRef = graphRootRef;
   let focusedRelationId: string | null = null;
   let repairedRoot = Boolean(requestedRoot && !requestedRootIsValid);
@@ -632,7 +570,15 @@ export const restoreOntologyViewHash = (
   });
   return {
     state,
-    normalizedHash: serializeOntologyViewHash(state),
+    layoutMode,
+    layoutDirection,
+    relationPredicates,
+    normalizedHash: serializeOntologyViewHash(
+      state,
+      params.has("mode") || params.has("direction") || params.has("predicate")
+        ? { mode: layoutMode, direction: layoutDirection, predicates: relationPredicates }
+        : undefined,
+    ),
     repairedRoot,
     invalidFocus,
   };

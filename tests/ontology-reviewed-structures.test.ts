@@ -10,6 +10,7 @@ import {
   addStructuredInstanceExamples,
   applyReviewedStructurePatches,
   applyReviewedSubtypeDiscriminators,
+  reviewedStructurePatchesForHistoricalReplay,
 } from "../scripts/lib/ontology-reviewed-structures.mjs";
 
 type LocalizedText = Readonly<Record<"zh" | "en" | "ja", string>>;
@@ -114,11 +115,11 @@ const hasReviewedClaims = (claims: readonly SourceClaim[]) =>
   );
 
 describe("reviewed Concept structure registry", () => {
-  it("covers all 41 Modules with an existing, correctly owned key Concept", () => {
+  it("covers every declared Module with an existing, correctly owned key Concept", () => {
     const moduleIds = moduleSources.map(({ module }) => module.id).sort();
     const coveredModuleIds = [...new Set(REVIEWED_STRUCTURE_PATCHES.map(({ module_id }) => module_id))].sort();
 
-    expect(moduleIds).toHaveLength(41);
+    expect(new Set(moduleIds).size).toBe(moduleIds.length);
     expect(coveredModuleIds).toEqual(moduleIds);
     expect(Object.isFrozen(REVIEWED_STRUCTURE_PATCHES)).toBe(true);
     for (const patch of REVIEWED_STRUCTURE_PATCHES) {
@@ -167,6 +168,9 @@ describe("reviewed Concept structure registry", () => {
   it("substantively structures the priority closed-loop Concepts", () => {
     const priorityIds = [
       "RuntimeSession",
+      "RunAttempt",
+      "Instruction",
+      "OptimizationLoop",
       "Task",
       "TaskPlan",
       "ToolCall",
@@ -251,7 +255,10 @@ describe("reviewed Concept structure transforms", () => {
       const fields = effectiveById.get(concept.id)?.fields ?? [];
       const instances = concept.examples.filter(({ kind }) => kind === "instance");
       if (fields.length === 0) {
-        expect(instances).toHaveLength(0);
+        const previousInstances = structured
+          .find(({ id }) => id === concept.id)
+          ?.examples.filter(({ kind }) => kind === "instance") ?? [];
+        expect(instances).toEqual(previousInstances);
         continue;
       }
       expect(instances).toHaveLength(1);
@@ -341,6 +348,39 @@ describe("reviewed Concept structure transforms", () => {
         ),
       ),
     ).toThrow(/runtime-system/u);
+  });
+
+  it("accepts only the explicit pre-split owner aliases during historical replay", () => {
+    const withReviewedLegacyOwners = concepts.map((concept) => {
+      const legacyOwners = new Map([
+        ["DelegationContract", "orchestration-actors-delegation"],
+        ["Instruction", "info-messages-instructions"],
+        ["NetworkCall", "safety-sandbox-network"],
+        ["OptimizationLoop", "feedback-review-optimization"],
+        ["Redaction", "safety-commit-redaction"],
+        ["RunAttempt", "runtime-system"],
+      ]);
+      const legacyOwner = legacyOwners.get(concept.id);
+      return legacyOwner ? { ...concept, module_id: legacyOwner } : concept;
+    });
+
+    expect(() => applyReviewedStructurePatches(withReviewedLegacyOwners)).not.toThrow();
+  });
+
+  it("omits only unresolved v3 additions from the frozen historical replay", () => {
+    const complete = reviewedStructurePatchesForHistoricalReplay({ concepts, relations });
+    const withoutInstructionMetadataFact = reviewedStructurePatchesForHistoricalReplay({
+      concepts,
+      relations: relations.filter(({ id }) => id !== "Instruction-has_metadata-InstructionMetadata"),
+    });
+
+    expect(complete).toEqual(REVIEWED_STRUCTURE_PATCHES);
+    expect(withoutInstructionMetadataFact.map(({ concept_id }) => concept_id)).not.toContain(
+      "Instruction",
+    );
+    expect(withoutInstructionMetadataFact.map(({ concept_id }) => concept_id)).toContain(
+      "RuntimeSession",
+    );
   });
 
   it("rejects duplicate and internally unresolved reviewed structure decisions", () => {

@@ -53,7 +53,7 @@ const runtimeOntologyFixture = {
   artifact_metadata: {
     ...ontologyViewModelFixture.artifact_metadata,
     artifact_kind: "canonical-agent-ontology",
-    contract_version: "1.0.0",
+    contract_version: "2.0.0",
     release_channel: "candidate",
     releasable: false,
     generated_at: "2026-07-13T00:00:00.000Z",

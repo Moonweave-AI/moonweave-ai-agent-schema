@@ -23,7 +23,7 @@ The Phase 1 output is the agent-system ontology itself, not only the rules for d
 ## Implementation Scope
 
 1. Freeze `ontology/agent-ontology.json`, its definition ledger, and its legacy generator as read-only migration inputs with hashes and exactly-once record manifests.
-2. Maintain the only editable ontology facts under `ontology/source/**`, using one product wrapper and forty-one Module wrappers.
+2. Maintain the only editable ontology facts under `ontology/source/**`, using one product wrapper and recursively discovered Module wrappers. Forty-one is frozen v1 migration coverage, not a current upper bound; v3 currently accepts 47 capability-bounded Modules.
 3. Generate a strict unpublished candidate from those sources without reading the legacy or published generated canonical.
 4. Add valid and invalid fixtures for hierarchy, trust-boundary, provenance, observable trace, profile, and adapter rules.
 5. Generate optional Zod, Pydantic, OWL/RDF, SHACL, and ShEx projections only from canonical node/relation information.

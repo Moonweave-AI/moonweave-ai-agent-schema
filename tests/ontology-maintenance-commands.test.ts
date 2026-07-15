@@ -326,7 +326,16 @@ describe("maintained ontology command orchestration", () => {
 
 describe("maintenance input loaders", () => {
   it("reads the real repository inputs without mutating them", () => {
-    expect(loadProductSource(repositoryRoot).product.date).toBe("2026-07-13");
+    const expectedProduct = JSON.parse(
+      readFileSync(
+        resolve(repositoryRoot, "ontology/source/agent-ontology.product.json"),
+        "utf8",
+      ),
+    ) as Readonly<{ product: Readonly<{ date: string }> }>;
+    expect(loadProductSource(repositoryRoot).product.date).toBe(
+      expectedProduct.product.date,
+    );
+    expect(expectedProduct.product.date).toMatch(/^\d{4}-\d{2}-\d{2}$/u);
     const { registry, allowlist } = loadRegistryAndAllowlist(repositoryRoot);
     expect(registry.length).toBeGreaterThan(100);
     expect(Array.isArray(allowlist)).toBe(true);
@@ -336,8 +345,12 @@ describe("maintenance input loaders", () => {
     expect(decisions.bundles.every((bundle: unknown) => bundle !== null)).toBe(true);
     expect(decisions.sourceIds.length).toBe(registry.length);
     const security = loadSecurityInputs(repositoryRoot);
-    expect(security.sourceDocumentCount).toBe(42);
-    expect(security.documents.length).toBeGreaterThan(42);
+    const loadedSourceDocuments = security.documents.filter(({ label }: { label: string }) =>
+      label.startsWith("ontology/source/"),
+    );
+    expect(security.sourceDocumentCount).toBe(loadedSourceDocuments.length);
+    expect(security.sourceDocumentCount).toBeGreaterThan(0);
+    expect(security.documents.length).toBeGreaterThan(security.sourceDocumentCount);
     expect(security.uiFiles.length).toBeGreaterThan(0);
   });
 });
@@ -364,6 +377,35 @@ describe("maintenance root adapters", () => {
     );
   });
 
+  it("keeps Pages credentials scoped to deployment and runs the complete PR browser suite", () => {
+    const deploymentWorkflow = readFileSync(
+      resolve(repositoryRoot, ".github/workflows/deploy.yml"),
+      "utf8",
+    );
+    const validationWorkflow = readFileSync(
+      resolve(repositoryRoot, ".github/workflows/ontology-validation.yml"),
+      "utf8",
+    );
+    const packageMetadata = JSON.parse(
+      readFileSync(resolve(repositoryRoot, "package.json"), "utf8"),
+    ) as Readonly<{ scripts: Readonly<Record<string, string>> }>;
+    const [deploymentHeader = ""] = deploymentWorkflow.split(/\njobs:\s*\n/u);
+
+    expect(deploymentHeader).toMatch(/permissions:\s*\n\s*contents: read/u);
+    expect(deploymentHeader).not.toContain("pages: write");
+    expect(deploymentHeader).not.toContain("id-token: write");
+    expect(deploymentWorkflow).toMatch(
+      /deploy:[\s\S]*permissions:\s*\n\s*pages: write\s*\n\s*id-token: write/u,
+    );
+    expect(validationWorkflow).toMatch(
+      /quality-gates:[\s\S]*run: npm run e2e/u,
+    );
+    expect(packageMetadata.scripts.e2e).toBe("playwright test");
+    expect(
+      readFileSync(resolve(repositoryRoot, "e2e/graph-accessibility.spec.ts"), "utf8"),
+    ).toContain("accessibility");
+  });
+
   it("keeps the platform-specific visual regression executable in Windows CI", () => {
     const workflow = readFileSync(
       resolve(repositoryRoot, ".github/workflows/ontology-validation.yml"),
@@ -374,7 +416,7 @@ describe("maintenance root adapters", () => {
       "utf8",
     );
     const e2eContract = readFileSync(
-      resolve(repositoryRoot, "e2e/ontology-explorer.spec.ts"),
+      resolve(repositoryRoot, "e2e/ontology-explorer-core.spec.ts"),
       "utf8",
     );
     const captureCommand = readFileSync(
@@ -386,12 +428,13 @@ describe("maintenance root adapters", () => {
       /name: Windows visual and interaction regression[\s\S]*if: runner\.os == 'Windows'[\s\S]*MOONWEAVE_VISUAL_BASELINE: "1"[\s\S]*run: npm run test:ontology-ui/u,
     );
     expect(playwrightConfig).toContain(
-      "docs/visual-baselines/unified-v2/{platform}/{projectName}/{arg}{ext}",
+      "docs/visual-baselines/unified-v3/{platform}/{projectName}/{arg}{ext}",
     );
-    expect(e2eContract).toContain("const visualBaselineEnabled =");
     expect(e2eContract).toContain(
-      'process.env.MOONWEAVE_VISUAL_BASELINE === "1"',
+      'process.env.MOONWEAVE_VISUAL_BASELINE !== "1"',
     );
+    expect(e2eContract).toContain('"graphify-community-graph.png"');
+    expect(captureCommand).toContain('"Graphify visual baseline"');
     expect(captureCommand).toContain('MOONWEAVE_VISUAL_BASELINE: "1"');
   });
 
@@ -434,6 +477,9 @@ describe("maintenance root adapters", () => {
         "scripts/apply-reviewed-ontology-migration.mjs",
         "scripts/lib/ontology-legacy-migration.mjs",
         "scripts/lib/ontology-migration-factories.mjs",
+        "scripts/migration/legacy-reviewed-module-closure.mjs",
+        "scripts/migration/legacy-reviewed-output-writer.mjs",
+        "scripts/migrate-concept-genus-differentia.mjs",
       ]),
     );
     for (const scriptName of [

@@ -22,6 +22,7 @@ import {
   candidateSourceFingerprint,
   createReleaseValidationWorkspace,
   executeReleaseLifecycle,
+  ontologyCommunityArtifactPath,
   ontologyReleaseArtifactPaths,
   publishArtifactTree,
   releaseValidationEnvironment,
@@ -251,9 +252,47 @@ describe("staged artifact safeguards", () => {
         "utf8",
       );
       writeFileSync(resolve(root, "source-index.json"), "same-index", "utf8");
+      writeArtifact(
+        root,
+        "src/generated/ontology-community-graph.json",
+        JSON.stringify({
+          source_sha256: root === candidate ? "candidate-sha" : "release-sha",
+          projection_sha256: root === candidate
+            ? "candidate-projection-sha"
+            : "release-projection-sha",
+          communities: [{ id: 0, member_refs: ["root:same-ontology"] }],
+          nodes: [{ ref: "root:same-ontology", community_id: 0, degree: 0 }],
+          edges: [],
+        }),
+      );
     }
 
     expect(() => assertReleaseMatchesCandidate(candidate, release)).not.toThrow();
+    writeArtifact(
+      release,
+      "src/generated/ontology-community-graph.json",
+      JSON.stringify({
+        source_sha256: "release-sha",
+        projection_sha256: "release-projection-sha",
+        communities: [{ id: 0, member_refs: ["root:drifted"] }],
+        nodes: [{ ref: "root:drifted", community_id: 0, degree: 0 }],
+        edges: [],
+      }),
+    );
+    expect(() => assertReleaseMatchesCandidate(candidate, release)).toThrow(
+      /ontology-community-graph\.json drifted/u,
+    );
+    writeArtifact(
+      release,
+      "src/generated/ontology-community-graph.json",
+      JSON.stringify({
+        source_sha256: "release-sha",
+        projection_sha256: "release-projection-sha",
+        communities: [{ id: 0, member_refs: ["root:same-ontology"] }],
+        nodes: [{ ref: "root:same-ontology", community_id: 0, degree: 0 }],
+        edges: [],
+      }),
+    );
     writeFileSync(resolve(release, "source-index.json"), "drifted-index", "utf8");
     expect(() => assertReleaseMatchesCandidate(candidate, release)).toThrow(
       /source-index\.json drifted/u,
@@ -298,6 +337,10 @@ describe("staged artifact safeguards", () => {
 
     const releaseStage = temporaryRoot();
     writeExactReleaseTree(releaseStage);
+    expect(ontologyCommunityArtifactPath).toBe(
+      "src/generated/ontology-community-graph.json",
+    );
+    expect(ontologyReleaseArtifactPaths).toContain(ontologyCommunityArtifactPath);
     expect(() => assertExpectedReleaseArtifactPaths(releaseStage)).not.toThrow();
     rmSync(resolve(releaseStage, ontologyReleaseArtifactPaths[0]));
     expect(() => assertExpectedReleaseArtifactPaths(releaseStage)).toThrow(
@@ -392,6 +435,29 @@ describe("staged artifact safeguards", () => {
     };
 
     expect(() => validate(validCanonical)).not.toThrow();
+    writeFileSync(canonicalPath, JSON.stringify(validCanonical), "utf8");
+    const artifactSizeRecords: unknown[] = [];
+    validateStagedOntologyRelease({
+      canonicalPath,
+      expectedSourceFingerprint: fingerprint,
+      recordArtifactSize: (record) => artifactSizeRecords.push(record),
+    });
+    expect(artifactSizeRecords).toHaveLength(1);
+    expect(artifactSizeRecords[0]).toMatchObject({
+      measurements: {
+        raw_bytes: expect.any(Number),
+        minified_bytes: expect.any(Number),
+        gzip_bytes: expect.any(Number),
+        nested_support_bytes: 0,
+        nested_copied_direct_support_count: 0,
+      },
+      limits: {
+        raw_bytes: expect.any(Number),
+        minified_bytes: expect.any(Number),
+        gzip_bytes: expect.any(Number),
+        nested_support_bytes: expect.any(Number),
+      },
+    });
     expect(() =>
       validate({
         ...validCanonical,

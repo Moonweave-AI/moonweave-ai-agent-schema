@@ -29,8 +29,9 @@ interface OntologyModule {
   id: string;
   plane_id: string;
   taxonomy_contract: {
-    applicability: "specialization" | "flat-root-exception";
+    applicability: "specialization" | "mixed-backbone" | "flat-root-exception";
     not_applicable_reason: LocalizedText | null;
+    allowed_backbone_predicates: string[];
     review: Review;
   };
 }
@@ -38,7 +39,15 @@ interface OntologyModule {
 interface Concept {
   id: string;
   module_id: string;
+  semantic_kind?: string | null;
   primary_parent_relation_id?: string | null;
+  root_status?:
+    | "domain-upper-root"
+    | "module-key-root"
+    | "composition-root"
+    | "unresolved-root"
+    | null;
+  status?: string;
 }
 
 interface Relation {
@@ -47,9 +56,16 @@ interface Relation {
   source_id: string;
   target_id: string;
   relation_kind: string;
+  layout_role?: "primary-backbone" | "secondary-backbone" | "cross-link" | null;
+  layout_parent_id?: string | null;
+  layout_child_id?: string | null;
+  status?: string;
 }
 
 interface CandidateOntology {
+  artifact_metadata: {
+    release_channel: string;
+  };
   planes: Plane[];
   modules: OntologyModule[];
   classes: Concept[];
@@ -98,6 +114,34 @@ const expectedDomainIds = [
   "safety-plane",
   "tool-plane",
 ] as const;
+
+const acceptedRootStatuses = new Set([
+  "domain-upper-root",
+  "module-key-root",
+  "composition-root",
+]);
+
+const approvedCrossKindIsACompatibilityRules = new Set<string>();
+
+const delegationGoldenBackbone = [
+  ["DelegationProcess", "is_a", "CollaborationProcess"],
+  ["HandoffProcess", "is_a", "CollaborationProcess"],
+  ["InitiationPhase", "is_a", "DelegationPhase"],
+  ["AcceptancePhase", "is_a", "DelegationPhase"],
+  ["RevocationPhase", "is_a", "DelegationPhase"],
+  ["CompletionPhase", "is_a", "DelegationPhase"],
+  ["DelegationPhase", "phase_of", "DelegationProcess"],
+  ["DelegationProcess", "produces", "DelegationResult"],
+] as const;
+
+const contextOwnershipAnchors = new Map<string, string>([
+  ["DiscoveryResult", "info-indexing"],
+  ["ContextAssembly", "memory-context"],
+  ["ContextPackage", "memory-context"],
+  ["ContextWindow", "memory-context"],
+  ["VisibleContextWindow", "memory-context"],
+  ["DisclosureStage", "info-output-disclosure"],
+]);
 
 const localizedTextIsComplete = (value: LocalizedText | null): boolean =>
   value !== null &&
@@ -198,7 +242,32 @@ const hierarchyLedger = (): readonly CsvRow[] => {
 };
 
 const isARelations = (ontology: CandidateOntology): Relation[] =>
-  ontology.relations.filter((relation) => relation.predicate === "is_a");
+  ontology.relations.filter(
+    (relation) => relation.status === "accepted" && relation.predicate === "is_a",
+  );
+
+const primaryBackboneRelations = (ontology: CandidateOntology): Relation[] => {
+  const acceptedConcepts = new Map(
+    ontology.classes
+      .filter(({ status }) => status === "accepted")
+      .map((concept) => [concept.id, concept]),
+  );
+  const modules = new Map(ontology.modules.map((module) => [module.id, module]));
+  return ontology.relations.filter((relation) => {
+    const child = relation.layout_child_id == null
+      ? undefined
+      : acceptedConcepts.get(relation.layout_child_id);
+    const parent = relation.layout_parent_id == null
+      ? undefined
+      : acceptedConcepts.get(relation.layout_parent_id);
+    const allowedPredicates = child
+      ? modules.get(child.module_id)?.taxonomy_contract.allowed_backbone_predicates ?? []
+      : [];
+    return relation.status === "accepted" && relation.layout_role === "primary-backbone" &&
+      child !== undefined && parent !== undefined &&
+      allowedPredicates.includes(relation.predicate);
+  });
+};
 
 const cycleParticipants = (
   conceptIds: readonly string[],
@@ -206,9 +275,10 @@ const cycleParticipants = (
 ): string[] => {
   const parentsByChild = new Map<string, string[]>();
   for (const relation of hierarchyRelations) {
-    parentsByChild.set(relation.source_id, [
-      ...(parentsByChild.get(relation.source_id) ?? []),
-      relation.target_id,
+    if (relation.layout_child_id == null || relation.layout_parent_id == null) continue;
+    parentsByChild.set(relation.layout_child_id, [
+      ...(parentsByChild.get(relation.layout_child_id) ?? []),
+      relation.layout_parent_id,
     ]);
   }
 
@@ -272,14 +342,14 @@ describe("candidate ontology taxonomy", () => {
     expect([...ids].sort()).toEqual(expectedDomainIds);
   });
 
-  it("keeps all 41 modules owned by exactly one existing domain", () => {
+  it("keeps all 47 modules owned by exactly one existing domain", () => {
     const ontology = candidateOntology();
     const domainIds = new Set(ontology.planes.map((plane) => plane.id));
     const invalidOwners = ontology.modules
       .filter((module) => !domainIds.has(module.plane_id))
       .map((module) => `${module.id}:${module.plane_id}`);
 
-    expect(ontology.modules).toHaveLength(41);
+    expect(ontology.modules).toHaveLength(47);
     expect(duplicateValues(ontology.modules.map((module) => module.id))).toEqual([]);
     expect(invalidOwners).toEqual([]);
   });
@@ -311,24 +381,84 @@ describe("candidate ontology taxonomy", () => {
     expect(invalidEndpoints).toEqual([]);
   });
 
-  it("keeps the is_a graph acyclic", () => {
+  it("keeps the accepted primary backbone acyclic at arbitrary depth", () => {
     const ontology = candidateOntology();
     expect(
       cycleParticipants(
-        ontology.classes.map((concept) => concept.id),
-        isARelations(ontology),
+        ontology.classes
+          .filter(({ status }) => status === "accepted")
+          .map((concept) => concept.id),
+        primaryBackboneRelations(ontology),
       ),
     ).toEqual([]);
   });
 
-  it("requires every non-root concept to expose at least one is_a parent", () => {
+  it("rejects cross-kind is_a without an approved kind compatibility rule", () => {
     const ontology = candidateOntology();
-    const hierarchyRelations = isARelations(ontology);
-    const missingParents = ontology.classes
-      .filter((concept) => concept.primary_parent_relation_id != null)
+    const conceptsById = new Map(
+      ontology.classes.map((concept) => [concept.id, concept]),
+    );
+    const violations = isARelations(ontology).flatMap((relation) => {
+      const sourceKind = conceptsById.get(relation.source_id)?.semantic_kind;
+      const targetKind = conceptsById.get(relation.target_id)?.semantic_kind;
+      if (
+        typeof sourceKind !== "string" ||
+        typeof targetKind !== "string" ||
+        sourceKind === targetKind
+      ) {
+        return [];
+      }
+      const compatibilityKey = `${sourceKind}->${targetKind}`;
+      return approvedCrossKindIsACompatibilityRules.has(compatibilityKey)
+        ? []
+        : [`${relation.id}:${compatibilityKey}`];
+    });
+
+    expect(violations).toEqual([]);
+  });
+
+  it("requires every accepted root to declare a reviewed root_status", () => {
+    const ontology = candidateOntology();
+    const conceptsWithParents = new Set(
+      primaryBackboneRelations(ontology).map(({ layout_child_id: childId }) => childId),
+    );
+    const violations = ontology.classes
       .filter(
         (concept) =>
-          !hierarchyRelations.some((relation) => relation.source_id === concept.id),
+          concept.status === "accepted" && !conceptsWithParents.has(concept.id),
+      )
+      .filter(
+        (concept) =>
+          typeof concept.root_status !== "string" ||
+          !acceptedRootStatuses.has(concept.root_status),
+      )
+      .map((concept) => `${concept.id}:${String(concept.root_status)}`);
+
+    expect(violations).toEqual([]);
+  });
+
+  it("rejects unresolved-root in a release artifact", () => {
+    const ontology = candidateOntology();
+    const unresolvedRoots = ontology.artifact_metadata.release_channel === "release"
+      ? ontology.classes
+          .filter((concept) => concept.root_status === "unresolved-root")
+          .map((concept) => concept.id)
+      : [];
+
+    expect(unresolvedRoots).toEqual([]);
+  });
+
+  it("requires every accepted non-root concept to expose a reviewed primary backbone", () => {
+    const ontology = candidateOntology();
+    const hierarchyRelations = primaryBackboneRelations(ontology);
+    const missingParents = ontology.classes
+      .filter((concept) => concept.status === "accepted")
+      .filter((concept) => concept.root_status == null)
+      .filter(
+        (concept) =>
+          !hierarchyRelations.some(
+            (relation) => relation.layout_child_id === concept.id,
+          ),
       )
       .map((concept) => concept.id);
 
@@ -338,17 +468,17 @@ describe("candidate ontology taxonomy", () => {
   it("derives at least one module-local root concept for every module", () => {
     const ontology = candidateOntology();
     const conceptById = new Map(ontology.classes.map((concept) => [concept.id, concept]));
-    const hierarchyRelations = isARelations(ontology);
+    const hierarchyRelations = primaryBackboneRelations(ontology);
     const modulesWithoutRoots = ontology.modules
       .filter((module) => {
         const ownedConcepts = ontology.classes.filter(
-          (concept) => concept.module_id === module.id,
+          (concept) => concept.status === "accepted" && concept.module_id === module.id,
         );
         return !ownedConcepts.some((concept) =>
           hierarchyRelations
-            .filter((relation) => relation.source_id === concept.id)
+            .filter((relation) => relation.layout_child_id === concept.id)
             .every(
-              (relation) => conceptById.get(relation.target_id)?.module_id !== module.id,
+              (relation) => conceptById.get(relation.layout_parent_id ?? "")?.module_id !== module.id,
             ),
         );
       })
@@ -357,18 +487,24 @@ describe("candidate ontology taxonomy", () => {
     expect(modulesWithoutRoots).toEqual([]);
   });
 
-  it("requires a real specialization chain or an accepted flat-root exception", () => {
+  it("requires a reviewed specialization/mixed backbone or an accepted flat-root exception", () => {
     const ontology = candidateOntology();
     const conceptById = new Map(ontology.classes.map((concept) => [concept.id, concept]));
-    const hierarchyRelations = isARelations(ontology);
+    const hierarchyRelations = primaryBackboneRelations(ontology);
     const invalidModules = ontology.modules.flatMap((module) => {
-      const hasLocalSpecialization = hierarchyRelations.some(
+      const hasLocalBackbone = hierarchyRelations.some(
         (relation) =>
-          conceptById.get(relation.source_id)?.module_id === module.id &&
-          conceptById.get(relation.target_id)?.module_id === module.id,
+          conceptById.get(relation.layout_child_id ?? "")?.module_id === module.id &&
+          conceptById.get(relation.layout_parent_id ?? "")?.module_id === module.id,
       );
-      if (module.taxonomy_contract.applicability === "specialization") {
-        return hasLocalSpecialization ? [] : [`${module.id}:missing-specialization`];
+      if (
+        module.taxonomy_contract.applicability === "specialization" ||
+        module.taxonomy_contract.applicability === "mixed-backbone"
+      ) {
+        return hasLocalBackbone &&
+          module.taxonomy_contract.allowed_backbone_predicates.length > 0
+          ? []
+          : [`${module.id}:missing-reviewed-backbone`];
       }
 
       const contract = module.taxonomy_contract;
@@ -376,7 +512,7 @@ describe("candidate ontology taxonomy", () => {
         (reviewer) =>
           reviewer.reviewer_role === "ontology" && reviewer.reviewer_id.trim().length > 0,
       );
-      return !hasLocalSpecialization &&
+      return !hasLocalBackbone &&
         localizedTextIsComplete(contract.not_applicable_reason) &&
         contract.review.review_status === "accepted" &&
         acceptedOntologyReviewer
@@ -387,26 +523,61 @@ describe("candidate ontology taxonomy", () => {
     expect(invalidModules).toEqual([]);
   });
 
-  it("requires primary_parent_relation_id to select one outgoing is_a assertion", () => {
+  it("requires primary_parent_relation_id to reference a canonical is_a fact", () => {
     const ontology = candidateOntology();
-    const hierarchyRelations = isARelations(ontology);
-    const invalidPrimaryParents = ontology.classes.flatMap((concept) => {
-      const outgoing = hierarchyRelations.filter(
-        (relation) => relation.source_id === concept.id,
-      );
-      if (outgoing.length === 0) {
-        return concept.primary_parent_relation_id == null
+    const relationsById = new Map(ontology.relations.map((relation) => [relation.id, relation]));
+    const acceptedConceptIds = new Set(
+      ontology.classes.filter(({ status }) => status === "accepted").map(({ id }) => id),
+    );
+    const invalidPrimaryParents = ontology.classes
+      .filter(({ status }) => status === "accepted")
+      .flatMap((concept) => {
+        if (concept.primary_parent_relation_id == null) return [];
+        const relation = relationsById.get(concept.primary_parent_relation_id);
+        return relation?.status === "accepted" &&
+          relation.predicate === "is_a" &&
+          relation.source_id === concept.id &&
+          acceptedConceptIds.has(relation.target_id)
           ? []
-          : [`${concept.id}:root-has-primary-parent`];
-      }
-      return outgoing.some(
-        (relation) => relation.id === concept.primary_parent_relation_id,
-      )
-        ? []
-        : [`${concept.id}:missing-or-invalid-primary-parent`];
-    });
+          : [`${concept.id}:missing-or-invalid-canonical-is-a-parent`];
+      });
 
     expect(invalidPrimaryParents).toEqual([]);
+  });
+
+  it("keeps the delegation golden backbone continuous", () => {
+    const ontology = candidateOntology();
+    const missingFacts = delegationGoldenBackbone.flatMap(
+      ([sourceId, predicate, targetId]) =>
+        ontology.relations.some(
+          (relation) =>
+            relation.source_id === sourceId &&
+            relation.predicate === predicate &&
+            relation.target_id === targetId,
+        )
+          ? []
+          : [`${sourceId}-${predicate}-${targetId}`],
+    );
+
+    expect(missingFacts).toEqual([]);
+  });
+
+  it("keeps context discovery assembly and disclosure as separate owners", () => {
+    const ontology = candidateOntology();
+    const conceptsById = new Map(
+      ontology.classes.map((concept) => [concept.id, concept]),
+    );
+    const violations = [...contextOwnershipAnchors].flatMap(
+      ([conceptId, expectedModuleId]) => {
+        const concept = conceptsById.get(conceptId);
+        if (concept === undefined) return [`${conceptId}:missing`];
+        return concept.module_id === expectedModuleId
+          ? []
+          : [`${conceptId}:${concept.module_id}!=${expectedModuleId}`];
+      },
+    );
+
+    expect(violations).toEqual([]);
   });
 
   it("represents reviewed multiple inheritance with edges from one concept node", () => {
