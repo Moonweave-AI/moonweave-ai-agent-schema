@@ -53,7 +53,7 @@ The families below are information families within canonical node/relation recor
 
 Future schema fields must follow these constraints:
 
-1. The canonical root must carry a stable ID and closed `artifact_metadata` containing `artifact_kind`, contract/canonical version, release channel, releasability, generated/do-not-edit flags, deterministic source-tree fingerprint, generator version, and source paths. Canonical nodes and relations carry their own lifecycle and review records.
+1. The canonical root must carry a stable ID and closed `artifact_metadata` containing `artifact_kind`, contract/canonical version, release channel, releasability, generated/do-not-edit flags, deterministic source/evidence/release-input fingerprints, generator version, and input paths. Canonical nodes and relations carry their own lifecycle and review records. The site build manifest additionally binds the raw canonical bytes to the deployed Git commit.
 2. Every canonical field, profile mapping, adapter mapping, and conversion warning must carry `source_ids`, normalized source/version metadata when the source is living, derivation note, and review status.
 3. Any field derived from a living doc/repo must cite a row in `research/living-source-metadata.csv` with `normalization_status=normalized`, or must remain draft/profile-only until checked.
 4. `TrustBoundary` is a canonical Concept in `classes[]`, owned by `safety-trust-boundary`; it is not a parallel top-level artifact. Every cross-boundary relation must carry a `boundary_context` referencing that Concept and localized authority-basis and protocol/resource context. The relation endpoints remain the sole source/target identity and are not copied into `boundary_context`.

@@ -1,5 +1,7 @@
 export type ReleaseMode = "check" | "release";
 
+import type { OntologyArtifactSizeRecord } from "./ontology-artifact-size.mjs";
+
 export interface ReleaseLifecycleDependencies {
   mode: ReleaseMode;
   verifyMigration: () => unknown;
@@ -13,6 +15,7 @@ export interface ReleaseLifecycleDependencies {
 }
 
 export const ontologyReleaseArtifactPaths: ReadonlyArray<string>;
+export const ontologyCommunityArtifactPath: string;
 
 export function releaseValidationEnvironment(workspaceRoot: string): {
   MOONWEAVE_ONTOLOGY_ARTIFACT_PATH: string;
@@ -31,6 +34,7 @@ export function assertPublishedArtifactsMatch(stageRoot: string, targetRoot: str
 export function validateStagedOntologyRelease(options: {
   canonicalPath: string;
   expectedSourceFingerprint: string;
+  recordArtifactSize?: (record: OntologyArtifactSizeRecord) => unknown;
 }): Record<string, unknown>;
 
 export function candidateSourceFingerprint(canonicalPath: string): string;

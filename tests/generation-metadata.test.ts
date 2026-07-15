@@ -1,9 +1,12 @@
+import { createHash } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
 
 import {
   deterministicGeneratedAt,
   ONTOLOGY_GENERATOR_VERSION,
 } from "../scripts/lib/generation-metadata.mjs";
+import { sourceTreeFingerprint } from "../scripts/lib/stable-json.mjs";
 
 describe("deterministic ontology generation metadata", () => {
   it("uses SOURCE_DATE_EPOCH when supplied", () => {
@@ -35,5 +38,29 @@ describe("deterministic ontology generation metadata", () => {
     expect(() => deterministicGeneratedAt("not-a-date", undefined)).toThrow(
       /Product release date is invalid/iu,
     );
+  });
+
+  it("fingerprints normalized paths, byte lengths, and raw bytes without reserialization", () => {
+    const first = Buffer.from("a\r\nb", "utf8");
+    const second = Buffer.from([0, 255, 10]);
+    const expected = createHash("sha256")
+      .update("a/source.json")
+      .update("\u0000")
+      .update(String(first.byteLength), "ascii")
+      .update("\u0000")
+      .update(first)
+      .update("z/evidence.csv")
+      .update("\u0000")
+      .update(String(second.byteLength), "ascii")
+      .update("\u0000")
+      .update(second)
+      .digest("hex");
+
+    expect(
+      sourceTreeFingerprint([
+        ["z\\evidence.csv", second],
+        ["a/source.json", first],
+      ]),
+    ).toBe(expected);
   });
 });

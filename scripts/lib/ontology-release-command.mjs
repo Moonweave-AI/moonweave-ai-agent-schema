@@ -11,25 +11,44 @@ import {
   candidateSourceFingerprint,
   createReleaseValidationWorkspace,
   executeReleaseLifecycle,
+  ontologyCommunityArtifactPath,
   publishArtifactTree,
   releaseValidationEnvironment,
   validateStagedOntologyRelease,
 } from "./ontology-release-pipeline.mjs";
+import { currentCommitSha, currentRef } from "./site-build-metadata.mjs";
 
 const defaultRepositoryRoot = resolve(import.meta.dirname, "../..");
 
 export const ontologyValidationTestFiles = Object.freeze([
+  "tests/dependency-security-gates.test.ts",
+  "tests/graph-accessibility.test.tsx",
+  "tests/ontology-backbone.test.ts",
   "tests/ontology-bootstrap.test.ts",
+  "tests/ontology-bootstrap-runtime.test.tsx",
   "tests/ontology-components-behavior.test.tsx",
   "tests/ontology-concept-examples.test.ts",
+  "tests/ontology-concept-genus-differentia.test.ts",
   "tests/ontology-contract.test.ts",
   "tests/ontology-controlled-values.test.ts",
+  "tests/ontology-domain-closure.test.ts",
   "tests/ontology-domain-decisions.test.ts",
+  "tests/ontology-delegation-structures.test.ts",
+  "tests/ontology-deprecated-visibility.test.tsx",
+  "tests/ontology-e2e-interaction-contract.test.ts",
+  "tests/ontology-e2e-long-task-contract.test.ts",
   "tests/ontology-example-field-semantics.test.ts",
   "tests/ontology-external-mapping-integrity.test.ts",
   "tests/ontology-generator.test.ts",
+  "tests/ontology-generator-projections.test.ts",
+  "tests/ontology-generator-validation.test.ts",
+  "tests/ontology-community-artifact.test.ts",
+  "tests/ontology-community-network.test.ts",
   "tests/ontology-graph-behavior.test.tsx",
+  "tests/ontology-graph-runtime-lifecycle.test.tsx",
   "tests/ontology-information.test.ts",
+  "tests/ontology-information-integrity.test.ts",
+  "tests/ontology-information-projection.test.ts",
   "tests/ontology-legacy-audit.test.ts",
   "tests/ontology-legacy-migration.test.ts",
   "tests/ontology-maintenance-commands.test.ts",
@@ -45,15 +64,40 @@ export const ontologyValidationTestFiles = Object.freeze([
   "tests/ontology-source-claim-relevance.test.ts",
   "tests/ontology-source-text-integrity.test.ts",
   "tests/ontology-taxonomy.test.ts",
+  "tests/ontology-module-boundary.test.ts",
+  "tests/ontology-module-owner-consistency.test.ts",
+  "tests/ontology-artifact-size.test.ts",
+  "tests/ontology-language-naturalness.test.ts",
+  "tests/ontology-semantic-golden-paths.test.ts",
+  "tests/ontology-semantic-integrity.test.ts",
+  "tests/ontology-shared-prefix-audit.test.ts",
+  "tests/ontology-semantic-differentia-agency.test.ts",
+  "tests/ontology-semantic-depth-release.test.ts",
+  "tests/ontology-validation-boundaries.test.ts",
+  "tests/ontology-v3-object-evidence.test.ts",
+  "tests/ontology-record-operations-core.test.ts",
+  "tests/ontology-record-operations-synchronization.test.ts",
+  "tests/ontology-layout-worker-contract.test.ts",
+  "tests/ontology-scene.test.ts",
   "tests/ontology-ui-contract.test.tsx",
   "tests/ontology-view-model.test.ts",
   "tests/schema-validation.test.ts",
+  "tests/site-build-manifest.test.ts",
+  "tests/site-build-scripts.test.ts",
   "tests/source-registry.test.ts",
   "tests/source-link-checker.test.ts",
   "tests/atomic-write.test.ts",
   "tests/generation-metadata.test.ts",
   "tests/graph.test.ts",
   "tests/profile-projection.test.ts",
+]);
+
+export const ontologyPerformanceTestFiles = Object.freeze([
+  "tests/ontology-community-network-performance.test.ts",
+]);
+
+export const coverageExcludedTestFiles = Object.freeze([
+  "tests/ontology-community-network-performance.test.ts",
 ]);
 
 const defaultPipeline = Object.freeze({
@@ -75,8 +119,9 @@ export const parseOntologyReleaseArguments = (arguments_) => {
   throw new Error(`Unknown argument: ${arguments_.join(" ")}`);
 };
 
-export const runNodeCommand = ({
+const runCommand = ({
   label,
+  executable,
   script,
   args = [],
   cwd,
@@ -86,7 +131,7 @@ export const runNodeCommand = ({
   logger = console.log,
 }) => {
   logger(`\n[ontology release] ${label}`);
-  const result = spawn(processObject.execPath, [script, ...args], {
+  const result = spawn(executable, [script, ...args], {
     cwd,
     env: { ...processObject.env, ...environment },
     stdio: "inherit",
@@ -96,6 +141,12 @@ export const runNodeCommand = ({
     throw new Error(`${label} failed with exit code ${result.status ?? "unknown"}`);
   }
 };
+
+export const runNodeCommand = (options) =>
+  runCommand({
+    ...options,
+    executable: options.processObject?.execPath ?? process.execPath,
+  });
 
 export const runOntologyReleaseCommand = ({
   arguments_ = [],
@@ -114,6 +165,10 @@ export const runOntologyReleaseCommand = ({
     migrationAudit: resolve(scriptsRoot, "verify-legacy-ontology-migration-audit.mjs"),
     decisions: resolve(scriptsRoot, "validate-ontology-domain-decisions.mjs"),
     builder: resolve(scriptsRoot, "build-agent-ontology.mjs"),
+    dependencyPolicy: resolve(scriptsRoot, "verify-dependency-policy.mjs"),
+    dependencyAudit: resolve(scriptsRoot, "audit-npm-dependencies.mjs"),
+    communityGenerator: resolve(scriptsRoot, "generate-ontology-community-graph.py"),
+    communityVerifier: resolve(scriptsRoot, "verify-ontology-community-graph.mjs"),
     security: resolve(scriptsRoot, "verify-ontology-security.mjs"),
     sourceLinks: resolve(scriptsRoot, "check-source-links.mjs"),
   };
@@ -128,17 +183,53 @@ export const runOntologyReleaseCommand = ({
       processObject,
       logger,
     });
+  const runPython = (label, script, args = [], options = {}) =>
+    runCommand({
+      label,
+      executable: "python",
+      script,
+      args,
+      cwd: options.cwd ?? repositoryRoot,
+      environment: options.environment ?? {},
+      spawn,
+      processObject,
+      logger,
+    });
 
   const temporaryRoot = makeTemporaryRoot();
   const candidateA = resolve(temporaryRoot, "candidate-a");
   const candidateB = resolve(temporaryRoot, "candidate-b");
+  const liveCandidate = resolve(temporaryRoot, "candidate-live-source");
   const releaseStage = resolve(temporaryRoot, "release");
   const validationWorkspace = resolve(temporaryRoot, "validation-workspace");
   const canonicalPath = (root) => resolve(root, "ontology/agent-ontology.json");
+  const communityArtifactPath = (root) =>
+    resolve(root, ontologyCommunityArtifactPath);
   let sourceFingerprint = null;
 
-  const buildCandidate = (outputRoot) =>
+  const materializeCommunityProjection = (outputRoot) => {
+    runPython(
+      "Generate deterministic NetworkX community projection",
+      paths.communityGenerator,
+      [
+        "--input",
+        canonicalPath(outputRoot),
+        "--output",
+        communityArtifactPath(outputRoot),
+      ],
+    );
+    runNode(
+      "Verify NetworkX community projection",
+      paths.communityVerifier,
+      [],
+      { cwd: outputRoot },
+    );
+  };
+
+  const buildCandidate = (outputRoot) => {
     runNode("Build candidate", paths.builder, ["--output-root", outputRoot]);
+    materializeCommunityProjection(outputRoot);
+  };
 
   const runQualityGates = () => {
     pipeline.createReleaseValidationWorkspace({
@@ -152,15 +243,34 @@ export const runOntologyReleaseCommand = ({
       vite: resolve(validationWorkspace, "node_modules/vite/bin/vite.js"),
       playwright: resolve(validationWorkspace, "node_modules/@playwright/test/cli.js"),
       security: resolve(validationWorkspace, "scripts/verify-ontology-security.mjs"),
+      siteManifest: resolve(validationWorkspace, "scripts/write-site-build-manifest.mjs"),
+      siteVerify: resolve(validationWorkspace, "scripts/verify-site-artifact.mjs"),
     };
     const validationCommand = {
       cwd: validationWorkspace,
-      environment: pipeline.releaseValidationEnvironment(validationWorkspace),
+      environment: {
+        ...pipeline.releaseValidationEnvironment(validationWorkspace),
+        GITHUB_SHA:
+          processObject.env.GITHUB_SHA ?? currentCommitSha(repositoryRoot),
+        GITHUB_REF_NAME:
+          processObject.env.GITHUB_REF_NAME ?? currentRef(repositoryRoot),
+      },
     };
     runNode(
       "Validate ontology contracts",
       validationPaths.vitest,
       ["run", ...ontologyValidationTestFiles],
+      validationCommand,
+    );
+    runNode(
+      "Validate isolated community-network model performance",
+      validationPaths.vitest,
+      [
+        "run",
+        ...ontologyPerformanceTestFiles,
+        "--maxWorkers=1",
+        "--no-file-parallelism",
+      ],
       validationCommand,
     );
     runNode(
@@ -175,6 +285,8 @@ export const runOntologyReleaseCommand = ({
       [
         "run",
         "--coverage",
+        "--exclude",
+        ...coverageExcludedTestFiles,
         "--coverage.reportsDirectory",
         resolve(temporaryRoot, "coverage"),
       ],
@@ -189,26 +301,33 @@ export const runOntologyReleaseCommand = ({
     runNode(
       "Build application",
       validationPaths.vite,
-      [
-        "build",
-        "--outDir",
-        resolve(temporaryRoot, "application-build"),
-        "--emptyOutDir",
-      ],
+      ["build", "--emptyOutDir"],
       validationCommand,
     );
     runNode(
-      "Run ontology explorer E2E",
+      "Write staged site build manifest",
+      validationPaths.siteManifest,
+      [],
+      validationCommand,
+    );
+    runNode(
+      "Verify staged site artifact",
+      validationPaths.siteVerify,
+      [],
+      validationCommand,
+    );
+    runNode(
+      "Run complete browser contract suite",
       validationPaths.playwright,
       [
         "test",
-        "e2e/ontology-explorer.spec.ts",
         "--output",
         resolve(temporaryRoot, "playwright-results"),
       ],
       {
         cwd: validationWorkspace,
         environment: {
+          ...validationCommand.environment,
           PLAYWRIGHT_HTML_OUTPUT_DIR: resolve(temporaryRoot, "playwright-report"),
         },
       },
@@ -216,6 +335,10 @@ export const runOntologyReleaseCommand = ({
   };
 
   try {
+    if (mode === "release") {
+      runNode("Validate locked dependency policy", paths.dependencyPolicy);
+      runNode("Audit all known dependency vulnerabilities", paths.dependencyAudit);
+    }
     runNode("Validate repository published-content security", paths.security);
     runNode("Check referenced source links", paths.sourceLinks, [
       "--referenced-only",
@@ -242,21 +365,27 @@ export const runOntologyReleaseCommand = ({
           "--output-root",
           releaseStage,
         ]);
+        materializeCommunityProjection(releaseStage);
         pipeline.assertExpectedReleaseArtifactPaths(releaseStage);
         pipeline.assertReleaseMatchesCandidate(candidateA, releaseStage);
         pipeline.validateStagedOntologyRelease({
           canonicalPath: canonicalPath(releaseStage),
           expectedSourceFingerprint: sourceFingerprint,
+          recordArtifactSize: (record) =>
+            logger(`\n[ontology release] Artifact size gate ${JSON.stringify(record)}`),
         });
       },
       checkPublished: () =>
         pipeline.assertPublishedArtifactsMatch(releaseStage, repositoryRoot),
-      publishRelease: ({ validatePublished }) =>
-        pipeline.publishArtifactTree({
+      publishRelease: ({ validatePublished }) => {
+        buildCandidate(liveCandidate);
+        pipeline.assertArtifactTreesEqual(candidateA, liveCandidate);
+        return pipeline.publishArtifactTree({
           stageRoot: releaseStage,
           targetRoot: repositoryRoot,
           validatePublished,
-        }),
+        });
+      },
       runQualityGates,
       validatePublishedRelease: () =>
         pipeline.assertPublishedArtifactsMatch(releaseStage, repositoryRoot),
@@ -264,7 +393,8 @@ export const runOntologyReleaseCommand = ({
     logger(
       mode === "check"
         ? "\nOntology migration, candidate determinism, and published artifacts are current."
-        : "\nOntology release committed after all quality gates passed.",
+        : "\nOntology release artifacts materialized after portable quality gates passed; " +
+          "runner-specific visual review remains required before publication.",
     );
   } finally {
     removeTemporaryRoot(temporaryRoot);

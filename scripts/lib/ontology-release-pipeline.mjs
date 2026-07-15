@@ -8,6 +8,10 @@ import {
 import { isAbsolute, relative, resolve } from "node:path";
 
 import { writeFileTransaction } from "./atomic-write.mjs";
+import { assertOntologyArtifactSize } from "./ontology-artifact-size.mjs";
+
+export const ontologyCommunityArtifactPath =
+  "src/generated/ontology-community-graph.json";
 
 export const ontologyReleaseArtifactPaths = Object.freeze([
   "fixtures/generated/concept-payload-examples.json",
@@ -16,6 +20,7 @@ export const ontologyReleaseArtifactPaths = Object.freeze([
   "ontology/agent-ontology.md",
   "schemas/agent-ontology.schema.json",
   "schemas/generated/concept-payloads.schema.json",
+  ontologyCommunityArtifactPath,
   "src/generated/source-index.json",
   "src/lib/canonical-ontology-types.ts",
 ]);
@@ -146,12 +151,33 @@ export const assertExpectedReleaseArtifactPaths = (stageRoot) => {
   }
 };
 
+const communityProjectionSemantics = (projection) => Object.fromEntries(
+  Object.entries(projection).filter(([key]) =>
+    key !== "source_sha256" && key !== "projection_sha256"),
+);
+
 export const assertReleaseMatchesCandidate = (candidateRoot, releaseRoot) => {
   assertArtifactPathSetsEqual(candidateRoot, releaseRoot);
   const candidate = artifactTree(candidateRoot);
   const release = artifactTree(releaseRoot);
   for (const [artifactPath, candidateBytes] of candidate) {
     const releaseBytes = release.get(artifactPath);
+    if (artifactPath === ontologyCommunityArtifactPath) {
+      const candidateProjection = JSON.parse(candidateBytes.toString("utf8"));
+      const releaseProjection = JSON.parse(releaseBytes.toString("utf8"));
+      // Candidate and release canonical bytes intentionally differ in the two
+      // publication metadata fields. Each projection has already passed its
+      // own source/projection digest verifier, so compare only graph semantics.
+      if (
+        JSON.stringify(communityProjectionSemantics(releaseProjection)) !==
+        JSON.stringify(communityProjectionSemantics(candidateProjection))
+      ) {
+        throw new Error(
+          `Release artifact ${artifactPath} drifted after candidate preflight`,
+        );
+      }
+      continue;
+    }
     if (artifactPath !== "ontology/agent-ontology.json") {
       if (!candidateBytes.equals(releaseBytes)) {
         throw new Error(
@@ -326,8 +352,10 @@ const assertReleaseLifecycle = (canonical) => {
 export const validateStagedOntologyRelease = ({
   canonicalPath,
   expectedSourceFingerprint,
+  recordArtifactSize = () => {},
 }) => {
-  const canonical = JSON.parse(readFileSync(canonicalPath, "utf8"));
+  const canonicalBytes = readFileSync(canonicalPath);
+  const canonical = JSON.parse(canonicalBytes.toString("utf8"));
   const metadata = canonical.artifact_metadata ?? {};
   for (const [name, expected] of Object.entries(requiredReleaseMetadata)) {
     if (metadata[name] !== expected) {
@@ -353,6 +381,7 @@ export const validateStagedOntologyRelease = ({
     }
   }
   assertReleaseLifecycle(canonical);
+  recordArtifactSize(assertOntologyArtifactSize({ canonicalBytes, canonical }));
   return canonical;
 };
 

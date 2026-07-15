@@ -89,14 +89,15 @@ Moonweave Agent Schema organizes agent systems through eight operational concern
 | Interoperability & Adapter Domain | Adapter membrane for protocol, framework, benchmark, statechart, schema/export, language profile, Graph IR, and frontend projections, with directional mapping rules, source/version provenance, conversion warnings, and core-pollution controls. |
 | Capability & Resource Invocation Domain | Capability registries, tool/resource/prompt/API definitions, discovery and selection, schema conformance, tool execution, resource reads, prompt instantiation, MCP protocol surfaces, authorization bridges, diagnostics, trace/context handoff, and auditable side effects. |
 | Trust, Policy & Safety Domain | Auditable safety propagation across trust boundaries, authority scopes, permission prompts, policy decisions, sandbox and network controls, source-sink injection defense, memory poisoning signals, side-effect commit gates, redaction, and audit disclosure. |
-| Observability & Feedback Domain | Diagnostic warnings and errors, the Telemetry, Audit And Export Pipeline Module, review findings, corrections, generic metrics and evaluation runs, recovery actions, learning signals, and explicit feedback-flow edges back to orchestration, memory, tool selection, policy, and optimization loops; benchmark-specific semantics remain adapter-owned. |
+| Observability & Feedback Domain | Diagnostic warnings and errors, logging and telemetry, review findings, corrections, generic metrics and evaluation runs, recovery actions, learning signals, and explicit feedback-flow edges back to orchestration, memory, tool selection, policy, and optimization loops; benchmark-specific semantics remain adapter-owned. |
 | Memory & Context Persistence Domain | Scoped memory stores, memory records and typology, ingestion, chunking, embedding/indexing, retrieval/ranking, context assembly, summaries, preference memory, and lifecycle operations such as write, update, delete, merge, consolidation, expiration, validation, reflection, audit, and memory-poisoning controls. |
 
 ## Layer Boundary
 
 The ontology uses a strict boundary model. Core/profile/adapter are ownership
 and applicability annotations, not a competing navigation hierarchy; the sole
-Explorer hierarchy is Agent Ontology → Domain → Module → Concept.
+Explorer hierarchy is Agent Ontology → Domain → Module → Concept → narrower
+Concept → …; Domain and Module are stable entry boundaries, not a depth limit.
 
 - Core terms must be broadly observable across agent systems.
 - Profile terms describe optional but reusable views such as memory, orchestration, validation, and lifecycle profiles.
@@ -156,8 +157,10 @@ npm run verify
 npm run e2e
 ```
 
-Build an unpublished candidate, publish the reviewed release artifacts, and
-verify that generated files have not drifted:
+Build an unpublished candidate, materialize the reviewed formal artifact tree,
+and verify that generated files have not drifted. Repository publication still
+requires the reviewed runner-specific visual gate and a commit containing both
+the artifacts and baselines:
 
 ```bash
 npm run ontology:legacy:audit
@@ -194,15 +197,27 @@ Important governance files:
 
 ## Current Status
 
-The v2 pipeline is source-first and review-gated. Its eight Domains
-and 41 Modules share one recursive Concept hierarchy; scalar fields, controlled
+The v3 pipeline is source-first and review-gated. Its eight Domains and the
+capability-bounded Modules reported by `ontology_metrics.modules` share one canonical graph with
+arbitrary-depth reviewed taxonomy and structural backbones; scalar fields, controlled
 values, examples, source claims, mappings, and validation constraints remain
 information on those nodes and relations. Graph IR, payload Schema, fixtures,
 and future semantic exports are projections and never editable truth sources.
 
+The Explorer renders that one graph with a locally bundled `vis-network`
+`ForceAtlas2Based` view inspired by Graphify. An offline NetworkX
+`MultiDiGraph` preserves every directed, multi-predicate relation; its simple
+undirected projection is used only for deterministic Leiden/Louvain community
+discovery. Community color and hub size are visual aids, not ontology types,
+hierarchy, or importance. After initial stabilization the browser freezes the
+physics layout, while search, community filtering, focus, pan, zoom, and drag
+remain interactions on the same graph. There are no hierarchy/relationship
+modes or top-down/left-to-right layout controls. A production build manifest
+binds the deployed commit to the canonical and source fingerprints.
+
 An artifact with `artifact_metadata.release_channel="candidate"` or
 `releasable=false` is an unpublished verification candidate, even when its
-internal review status is `accepted`. Formal v2 publication is established only
+internal review status is `accepted`. Formal v3 publication is established only
 by the atomic cutover of every generated root artifact and a root canonical
 artifact marked `release` and `releasable=true`; documentation must not infer
 publication from a candidate build directory.

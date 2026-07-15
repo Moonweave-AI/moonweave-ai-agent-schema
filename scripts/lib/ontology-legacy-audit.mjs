@@ -334,9 +334,21 @@ export const auditLegacyMigration = ({ repositoryRoot }) => {
   const moduleCount = sourceDocuments.filter(
     ({ source_kind: sourceKind }) => sourceKind === "agent-ontology-module",
   ).length;
-  if (productCount !== 1 || moduleCount !== 41) {
+  const currentModuleIds = new Set(sourceDocuments
+    .filter(({ source_kind: sourceKind }) => sourceKind === "agent-ontology-module")
+    .map(({ module }) => module.id));
+  const frozenLegacyModuleIds = new Set((legacy.modules ?? []).map(({ id }) => id));
+  const missingLegacyModules = [...frozenLegacyModuleIds]
+    .filter((moduleId) => !currentModuleIds.has(moduleId))
+    .sort();
+  if (
+    productCount !== 1
+    || moduleCount !== currentModuleIds.size
+    || frozenLegacyModuleIds.size !== 41
+    || missingLegacyModules.length
+  ) {
     throw new Error(
-      `Current source tree must contain one product and 41 Module documents; found ${productCount}/${moduleCount}`,
+      `Current source tree must contain one product and exactly-once coverage of the 41 frozen v1 Modules; found ${productCount}/${moduleCount}, missing ${missingLegacyModules.join(", ") || "none"}`,
     );
   }
   const sourceTargetRefs = collectSourceTargetRefs(sourceDocuments);

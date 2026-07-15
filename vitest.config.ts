@@ -1,6 +1,12 @@
 import { defineConfig } from "vitest/config";
+import { currentCommitSha } from "./scripts/lib/site-build-metadata.mjs";
+
+const buildCommitSha = currentCommitSha(import.meta.dirname);
 
 export default defineConfig({
+  define: {
+    __MOONWEAVE_BUILD_COMMIT_SHA__: JSON.stringify(buildCommitSha),
+  },
   test: {
     environment: "node",
     include: ["tests/**/*.test.{ts,tsx}"],
@@ -13,7 +19,6 @@ export default defineConfig({
       exclude: [
         "src/generated/**",
         "src/lib/canonical-ontology-types.ts",
-        "src/main.tsx",
         // One-time reviewed migration replay; maintained release validation uses
         // the read-only legacy audit instead.
         "scripts/apply-reviewed-ontology-migration.mjs",
@@ -31,6 +36,12 @@ export default defineConfig({
         "scripts/lib/ontology-legacy-migration.mjs",
         // Factories used exclusively by the frozen legacy replay implementation.
         "scripts/lib/ontology-migration-factories.mjs",
+        // Closure builder imported only by the excluded frozen legacy replay.
+        "scripts/migration/legacy-reviewed-module-closure.mjs",
+        // Output writer imported only by the excluded frozen legacy replay.
+        "scripts/migration/legacy-reviewed-output-writer.mjs",
+        // One-time Concept terminology rewrite: no package command or maintained caller.
+        "scripts/migrate-concept-genus-differentia.mjs",
         // Coverage infrastructure cannot meaningfully instrument its own provider.
         "scripts/vitest-subprocess-coverage-provider.mjs",
       ],

@@ -39,6 +39,7 @@ export interface ReleasePipelineDependencies {
   readonly validateStagedOntologyRelease: (options: {
     readonly canonicalPath: string;
     readonly expectedSourceFingerprint: string;
+    readonly recordArtifactSize?: (record: Readonly<Record<string, unknown>>) => unknown;
   }) => unknown;
 }
 
@@ -54,6 +55,8 @@ export interface ReleaseCommandOptions {
 }
 
 export const ontologyValidationTestFiles: readonly string[];
+export const ontologyPerformanceTestFiles: readonly string[];
+export const coverageExcludedTestFiles: readonly string[];
 export function parseOntologyReleaseArguments(
   arguments_: readonly string[],
 ): Readonly<{ mode: "check" | "release" }>;

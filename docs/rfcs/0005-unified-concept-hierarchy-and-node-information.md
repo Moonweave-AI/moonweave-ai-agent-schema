@@ -99,7 +99,7 @@ Selecting a node or relation changes focus and the inline characteristics table.
 The published canonical retains only the unique collections needed to express the graph:
 
 - `planes`: eight Domains with their own information;
-- `modules`: forty-one Module roots with their own information;
+- `modules`: source-discovered, boundary-ledger-approved Module entries with their own information (47 in the v3 release, never a builder constant);
 - `classes`: canonical Concepts with nested information;
 - `relations`: unique hierarchy and semantic relations with nested contracts;
 - artifact metadata, cases, metrics, and generated provenance needed for validation.
@@ -187,7 +187,7 @@ Canonical `artifact_metadata` is closed and contains:
 
 ### Lifecycle and review records
 
-Plane, Module, Concept, and Relation lifecycle is `draft|review|accepted|deprecated`. Each has a closed review record:
+Plane, Module, Concept, and Relation lifecycle is `draft|review|accepted|deprecated`. Each has a closed review record. v3 additionally records Module ownership boundaries, Concept root and sibling differentia, CQ ownership, and Relation layout roles without creating additional graph facts:
 
 ```json
 {
@@ -283,8 +283,8 @@ Release first builds and validates in a temporary directory. Only after every ga
 
 This RFC is accepted only when the invariants in sections 1 and 17 of `docs/design/agent-ontology-unified-graph-upgrade-plan-zh.md` are treated as normative release gates. In particular:
 
-- all eight Domains and all forty-one reviewed Modules retain canonical paths;
-- every accepted Concept is a Module root or has a reviewed `is_a` parent, with no cycles or unresolved endpoints;
+- all eight Domains and every boundary-ledger-approved Module retain canonical paths;
+- every accepted Concept is a reviewed root or has a reviewed taxonomic/structural backbone parent, with no cycles or unresolved endpoints; `primary_parent_relation_id` remains reserved for strict `is_a`;
 - every applicable node and relation carries the required localized definition, boundary, example, source, and contract information;
 - schema/example/source/constraint/case annotations create zero GraphNodes;
 - one Explorer route, one graph surface, and one inline characteristics table pass desktop, mobile, keyboard, and reduced-motion verification;

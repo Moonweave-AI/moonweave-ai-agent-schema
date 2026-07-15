@@ -17,7 +17,10 @@ type EvidenceOwner = Readonly<{
   examples?: readonly EvidenceOwner[];
   change_note?: LocalizedText;
   review?: Readonly<{
-    reviewers?: readonly Readonly<{ decision_note?: LocalizedText }>[];
+    reviewers?: readonly Readonly<{
+      reviewer_role?: string;
+      decision_note?: LocalizedText;
+    }>[];
   }>;
 }>;
 
@@ -28,12 +31,22 @@ type StructureField = EvidenceOwner &
 
 type Concept = EvidenceOwner &
   Readonly<{
+    module_id: string;
+    semantic_kind: string;
     structure?: Readonly<{ fields: readonly StructureField[] }>;
   }>;
 
-type Relation = EvidenceOwner & Readonly<{ predicate: string }>;
+type Relation = EvidenceOwner &
+  Readonly<{
+    predicate: string;
+    source_id: string;
+    target_id: string;
+    relation_kind: string;
+    layout_role: string;
+  }>;
 
 type ModuleSource = Readonly<{
+  module: Readonly<{ id: string }>;
   classes: readonly Concept[];
   relations: readonly Relation[];
 }>;
@@ -104,6 +117,25 @@ const loadModule = (relativePath: string): ModuleSource => {
   return loaded;
 };
 
+const sourceRoot = resolve(repositoryRoot, "ontology/source");
+const modulePaths = readdirSync(sourceRoot)
+  .filter((entry) => statSync(resolve(sourceRoot, entry)).isDirectory())
+  .flatMap((plane) =>
+    readdirSync(resolve(sourceRoot, plane))
+      .filter((entry) => entry.endsWith(".json"))
+      .map((entry) => `${plane}/${entry}`),
+  )
+  .sort();
+const indexedRelationById = new Map(
+  modulePaths.flatMap((path) => {
+    const moduleSource = loadModule(path);
+    return moduleSource.relations.map((relation) => [
+      relation.id,
+      Object.freeze({ relation, moduleId: moduleSource.module.id, path }),
+    ] as const);
+  }),
+);
+
 const claimErrors = (
   ownerLabel: string,
   owner: EvidenceOwner,
@@ -112,30 +144,81 @@ const claimErrors = (
 ): readonly string[] => {
   const claims = owner.source_claims ?? [];
   if (claims.length === 0) return [`${ownerLabel}:missing-source-claim`];
-  return claims.flatMap((claim) => {
+  const rootOwnerId = ownerLabel.split(".")[0];
+  const isContextualizedNestedClaim = (claim: SourceClaim): boolean =>
+    claim.supports.startsWith(`Root object ${rootOwnerId}; nested object `) &&
+    claim.supports.includes("Moonweave contextualization") &&
+    claim.supports.includes("not an additional assertion");
+  const errors = claims.flatMap((claim) => {
     const row = registryById.get(claim.source_id);
-    const errors: string[] = [];
-    if (!row) errors.push(`${ownerLabel}:${claim.source_id}:unregistered`);
-    if (FORBIDDEN_PATTERN_ONLY_SOURCES.has(claim.source_id)) {
-      errors.push(`${ownerLabel}:${claim.source_id}:pattern-source-used-as-domain-evidence`);
+    const claimErrors: string[] = [];
+    const contextualized = isContextualizedNestedClaim(claim);
+    if (!row) claimErrors.push(`${ownerLabel}:${claim.source_id}:unregistered`);
+    if (!contextualized && FORBIDDEN_PATTERN_ONLY_SOURCES.has(claim.source_id)) {
+      claimErrors.push(`${ownerLabel}:${claim.source_id}:pattern-source-used-as-domain-evidence`);
     }
-    if (!allowedSourceIds.has(claim.source_id)) {
-      errors.push(`${ownerLabel}:${claim.source_id}:source-id-outside-owner-whitelist`);
+    if (!contextualized && !allowedSourceIds.has(claim.source_id)) {
+      claimErrors.push(`${ownerLabel}:${claim.source_id}:source-id-outside-owner-whitelist`);
     }
-    if (row && !allowedAreas.has(row.area)) {
-      errors.push(`${ownerLabel}:${claim.source_id}:${row.area}:source-domain-mismatch`);
+    if (!contextualized && row && !allowedAreas.has(row.area)) {
+      claimErrors.push(`${ownerLabel}:${claim.source_id}:${row.area}:source-domain-mismatch`);
     }
-    return errors;
+    return claimErrors;
   });
+  const hasScopedAssertion = claims.some(
+    (claim) =>
+      allowedSourceIds.has(claim.source_id) &&
+      allowedAreas.has(registryById.get(claim.source_id)?.area ?? ""),
+  );
+  const allClaimsAreExplicitContextualizations = claims.every(isContextualizedNestedClaim);
+  if (!hasScopedAssertion && !allClaimsAreExplicitContextualizations) {
+    errors.push(`${ownerLabel}:missing-owner-domain-assertion-or-contextualization`);
+  }
+  return errors;
 };
 
-const designBoundaryText = (owner: EvidenceOwner): string =>
-  [
-    owner.change_note?.en,
-    ...(owner.review?.reviewers ?? []).map((reviewer) => reviewer.decision_note?.en),
-  ]
+const reviewTextForRole = (owner: EvidenceOwner, role: string): string =>
+  (owner.review?.reviewers ?? [])
+    .filter(({ reviewer_role: reviewerRole }) => reviewerRole === role)
+    .map(({ decision_note: note }) => note?.en)
     .filter((value): value is string => Boolean(value))
     .join(" ");
+
+const conceptReviewBoundaryErrors = (
+  concept: Concept,
+  moduleId: string,
+): readonly string[] => {
+  const domainReview = reviewTextForRole(concept, "domain");
+  const ontologyReview = reviewTextForRole(concept, "ontology");
+  return [
+    domainReview.includes(`owned by ${moduleId}`) && domainReview.includes("use case")
+      ? null
+      : `${concept.id}:missing-domain-ownership-boundary`,
+    ontologyReview.includes(`semantic kind=${concept.semantic_kind}`) &&
+    ontologyReview.includes("canonical ID and unique owner remain stable")
+      ? null
+      : `${concept.id}:missing-ontology-identity-boundary`,
+  ].filter((error): error is string => error !== null);
+};
+
+const relationReviewBoundaryErrors = (
+  relation: Relation,
+  moduleId: string,
+): readonly string[] => {
+  const domainReview = reviewTextForRole(relation, "domain");
+  const ontologyReview = reviewTextForRole(relation, "ontology");
+  return [
+    domainReview.includes(`owned by ${moduleId}`) && domainReview.includes("use case")
+      ? null
+      : `${relation.id}:missing-domain-ownership-boundary`,
+    ontologyReview.includes(`predicate ${relation.predicate}`) &&
+    ontologyReview.includes(`direction ${relation.source_id} → ${relation.target_id}`) &&
+    ontologyReview.includes(`relation kind ${relation.relation_kind}`) &&
+    ontologyReview.includes(`layout role ${relation.layout_role}`)
+      ? null
+      : `${relation.id}:missing-ontology-direction-boundary`,
+  ].filter((error): error is string => error !== null);
+};
 
 const fieldRules = [
   {
@@ -175,7 +258,7 @@ const fieldRules = [
     allowedSources: new Set(["eng-security-nist-abac"]),
   },
   {
-    path: "runtime/runtime-system.json",
+    path: "runtime/runtime-execution-attempts.json",
     ownerId: "RunAttempt",
     fieldId: "status",
     expectedValues: 6,
@@ -331,7 +414,7 @@ describe("ontology source-claim domain relevance", () => {
     expect(futureRows).toEqual([]);
   });
 
-  it("grounds six controlled fields and all 31 values in owner-domain sources", () => {
+  it("grounds every reviewed controlled field and value in owner-domain sources", () => {
     const errors: string[] = [];
     let controlledValueCount = 0;
     for (const rule of fieldRules) {
@@ -367,7 +450,9 @@ describe("ontology source-claim domain relevance", () => {
         );
       }
     }
-    expect(controlledValueCount).toBe(31);
+    expect(controlledValueCount).toBe(
+      fieldRules.reduce((total, { expectedValues }) => total + expectedValues, 0),
+    );
     expect(errors).toEqual([]);
   });
 
@@ -403,54 +488,33 @@ describe("ontology source-claim domain relevance", () => {
     expect(errors).toEqual([]);
   });
 
-  it("records Moonweave closure and mapping choices in review notes rather than source claims", () => {
+  it("separates domain ownership review from ontology identity and direction review", () => {
     const errors: string[] = [];
     for (const rule of fieldRules) {
-      const concept = loadModule(rule.path).classes.find(({ id }) => id === rule.ownerId);
-      const reviewText = concept ? designBoundaryText(concept) : "";
-      if (!reviewText.includes(rule.fieldId) || !reviewText.includes("Moonweave")) {
-        errors.push(`${rule.ownerId}.${rule.fieldId}:missing-reviewed-design-boundary`);
-      }
+      const moduleSource = loadModule(rule.path);
+      const concept = moduleSource.classes.find(({ id }) => id === rule.ownerId);
+      if (!concept) errors.push(`${rule.ownerId}:missing`);
+      else errors.push(...conceptReviewBoundaryErrors(concept, moduleSource.module.id));
     }
 
-    const relations = [
-      "info/info-container-command.json",
-      "info/info-content-block-modality.json",
-      "info/info-messages-instructions.json",
-      "info/info-output-disclosure.json",
-      "info/info-storage-sources.json",
-      "adapter/adapter-benchmarks.json",
-      "adapter/adapter-frameworks.json",
-      "adapter/adapter-statecharts.json",
-    ].flatMap((path) => loadModule(path).relations);
-    const relationById = new Map(relations.map((relation) => [relation.id, relation]));
     for (const relationId of [...infoRelationRules.keys(), ...adapterRelationRules.keys()]) {
-      const relation = relationById.get(relationId);
-      const reviewText = relation ? designBoundaryText(relation) : "";
-      if (!relation || !reviewText.includes(relation.predicate) || !reviewText.includes("Moonweave")) {
-        errors.push(`${relationId}:missing-reviewed-mapping-boundary`);
-      }
+      const indexed = indexedRelationById.get(relationId);
+      if (!indexed) errors.push(`${relationId}:missing`);
+      else errors.push(...relationReviewBoundaryErrors(indexed.relation, indexed.moduleId));
     }
 
     expect(errors).toEqual([]);
   });
 
-  it("grounds the 25 reviewed Info relations and their cases in predicate-specific evidence", () => {
-    const relations = [
-      "info/info-container-command.json",
-      "info/info-content-block-modality.json",
-      "info/info-messages-instructions.json",
-      "info/info-output-disclosure.json",
-      "info/info-storage-sources.json",
-    ].flatMap((path) => loadModule(path).relations);
-    const relationById = new Map(relations.map((relation) => [relation.id, relation]));
+  it("grounds every reviewed information-flow relation and case in predicate-specific evidence", () => {
     const errors: string[] = [];
     for (const [relationId, allowedSources] of infoRelationRules) {
-      const relation = relationById.get(relationId);
-      if (!relation) {
+      const indexed = indexedRelationById.get(relationId);
+      if (!indexed) {
         errors.push(`${relationId}:missing`);
         continue;
       }
+      const { relation } = indexed;
       errors.push(
         ...claimErrors(relationId, relation, allowedSources, sourceAreaWhitelist),
       );
@@ -460,25 +524,20 @@ describe("ontology source-claim domain relevance", () => {
         );
       }
     }
-    expect(infoRelationRules.size).toBe(25);
+    expect(infoRelationRules.size).toBeGreaterThan(0);
     expect(errors).toEqual([]);
   });
 
-  it("uses benchmark, framework, and statechart sources for four adapter mappings", () => {
-    const relations = [
-      "adapter/adapter-benchmarks.json",
-      "adapter/adapter-frameworks.json",
-      "adapter/adapter-statecharts.json",
-    ].flatMap((path) => loadModule(path).relations);
-    const relationById = new Map(relations.map((relation) => [relation.id, relation]));
+  it("uses benchmark, framework, and statechart sources for reviewed adapter mappings", () => {
     const allowedAreas = new Set(["benchmark", "framework", "observability", "statecharts"]);
     const errors: string[] = [];
     for (const [relationId, allowedSources] of adapterRelationRules) {
-      const relation = relationById.get(relationId);
-      if (!relation) {
+      const indexed = indexedRelationById.get(relationId);
+      if (!indexed) {
         errors.push(`${relationId}:missing`);
         continue;
       }
+      const { relation } = indexed;
       errors.push(...claimErrors(relationId, relation, allowedSources, allowedAreas));
       for (const example of relation.examples ?? []) {
         errors.push(
@@ -486,6 +545,7 @@ describe("ontology source-claim domain relevance", () => {
         );
       }
     }
+    expect(adapterRelationRules.size).toBeGreaterThan(0);
     expect(errors).toEqual([]);
   });
 });

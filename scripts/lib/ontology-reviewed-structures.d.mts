@@ -111,6 +111,15 @@ export const REVIEWED_SUBTYPE_DISCRIMINATORS: readonly Readonly<{
   children: readonly (readonly [string, string, Readonly<Record<string, unknown>>])[];
 }>[];
 
+export function reviewedStructurePatchesForHistoricalReplay(input: {
+  concepts: readonly Readonly<{ id: string }>[];
+  relations: readonly Readonly<{
+    source_id: string;
+    predicate: string;
+    target_id: string;
+  }>[];
+}): readonly ReviewedStructurePatch[];
+
 export function applyReviewedStructurePatches<T extends OntologyConceptLike>(
   concepts: readonly T[],
   patches?: readonly ReviewedStructurePatch[],

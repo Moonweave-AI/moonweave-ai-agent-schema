@@ -8,17 +8,13 @@ const toPascalCase = (value) =>
   value
     .replace(/(^|[-_.:]+)([A-Za-z0-9])/g, (_match, _separator, letter) => letter.toUpperCase())
     .replace(/[^A-Za-z0-9_$]/g, "");
-
 const propertyName = (value) =>
   /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(value) ? value : JSON.stringify(value);
-
 const schemaWithoutComposition = (schema) =>
   Object.fromEntries(
-    Object.entries(schema).filter(
-      ([key]) => !["allOf", "anyOf", "oneOf", "if", "then", "else"].includes(key),
-    ),
+    Object.entries(schema).filter(([key]) =>
+      !["allOf", "anyOf", "oneOf", "if", "then", "else"].includes(key)),
   );
-
 const schemaEnumValues = (schema, definitions, visited = new Set()) => {
   if (!schema || typeof schema !== "object") return [];
   if (Object.hasOwn(schema, "const")) return [schema.const];
@@ -34,7 +30,8 @@ const schemaEnumValues = (schema, definitions, visited = new Set()) => {
 const conditionalPropertyConst = (entry, property) => {
   if (!entry?.if?.required?.includes(property)) return undefined;
   const condition = entry.if.properties?.[property];
-  return condition && Object.hasOwn(condition, "const") ? condition.const : undefined;
+  return condition && Object.hasOwn(condition, "const")
+    ? condition.const : undefined;
 };
 
 const findFiniteConditionalDiscriminator = (schema, definitions) => {
@@ -42,11 +39,9 @@ const findFiniteConditionalDiscriminator = (schema, definitions) => {
   for (const [property, propertySchema] of Object.entries(schema.properties)) {
     const values = schemaEnumValues(propertySchema, definitions);
     if (values.length < 2) continue;
-    if (
-      schema.allOf.some(
-        (entry) => conditionalPropertyConst(entry, property) !== undefined,
-      )
-    ) {
+    if (schema.allOf.some(
+      (entry) => conditionalPropertyConst(entry, property) !== undefined,
+    )) {
       return { property, values };
     }
   }
@@ -79,9 +74,8 @@ const mergeConditionalPropertySchema = (baseSchema, conditionalSchema) => {
 
 const compositionOnly = (schema) =>
   Object.fromEntries(
-    ["allOf", "anyOf", "oneOf", "not"]
-      .filter((key) => Object.hasOwn(schema, key))
-      .map((key) => [key, schema[key]]),
+    ["allOf", "anyOf", "oneOf", "not"].filter((key) =>
+      Object.hasOwn(schema, key)).map((key) => [key, schema[key]]),
   );
 
 const schemaBaseType = (schema, definitionNames, definitions, level) => {
@@ -351,8 +345,113 @@ export const generateCanonicalSchema = (contract, metadata = null) => ({
 const localized = (value, language = "zh") =>
   value?.[language] ?? value?.en ?? value?.ja ?? "";
 
-const renderList = (values, language) =>
-  values?.length ? values.map((value) => `  - ${localized(value, language)}`).join("\n") : "  - 不适用";
+const renderList = (values, language, prefix) =>
+  values?.length
+    ? values.map((value) => `${prefix}- ${localized(value, language)}`)
+    : [`${prefix}- 不适用`];
+
+const renderCardinality = ({ min, max }) => `${min}..${max ?? "*"}`;
+
+const renderConceptStructure = (structure, prefix, language) => {
+  const lines = [`${prefix}- 身份键：${structure.identity_keys.length ? structure.identity_keys.map((id) => `\`${id}\``).join("、") : "无"}`];
+  for (const field of structure.fields) {
+    lines.push(
+      `${prefix}- 字段 **${localized(field.labels, language) || field.id}** \`${field.id}\`（${field.datatype}；${renderCardinality(field.cardinality)}）`,
+      `${prefix}  - 定义：${localized(field.definitions, language)}`,
+      `${prefix}  - 示例值：\`${JSON.stringify(field.example_value)}\``,
+    );
+    if (field.allowed_values.length > 0) {
+      lines.push(
+        `${prefix}  - 允许值：${field.allowed_values.map(({ value }) => `\`${String(value)}\``).join("、")}`,
+      );
+    }
+  }
+  for (const constraint of structure.constraints) {
+    lines.push(
+      `${prefix}- 约束 \`${constraint.id}\`（${constraint.severity}；${constraint.expression_language}）：${localized(constraint.explanations, language)}`,
+      `${prefix}  - 表达式：\`${constraint.expression}\``,
+    );
+  }
+  for (const constraint of structure.required_relation_constraints) {
+    lines.push(
+      `${prefix}- 必需关系 \`${constraint.id}\`：${constraint.direction} \`${constraint.predicate}\` \`${constraint.target_concept_id}\`（${renderCardinality(constraint.cardinality)}）`,
+      `${prefix}  - 说明：${localized(constraint.explanations, language)}`,
+    );
+  }
+  return lines;
+};
+
+const renderConceptExamples = (examples, prefix, language) =>
+  examples.flatMap((example) => {
+    const lines = [
+      `${prefix}- [${example.kind}] **${localized(example.labels, language) || example.id}** \`${example.id}\``,
+      `${prefix}  - 说明：${localized(example.descriptions, language)}`,
+      `${prefix}  - 预期：${localized(example.expected_result, language)}`,
+      `${prefix}  - 判定理由：${localized(example.why_valid_or_invalid, language)}`,
+    ];
+    if (example.related_node_ids.length > 0) {
+      lines.push(`${prefix}  - 关联节点：${example.related_node_ids.map((id) => `\`${id}\``).join("、")}`);
+    }
+    if (example.related_relation_ids.length > 0) {
+      lines.push(`${prefix}  - 关联关系：${example.related_relation_ids.map((id) => `\`${id}\``).join("、")}`);
+    }
+    if (Object.keys(example.field_values ?? {}).length > 0) {
+      lines.push(`${prefix}  - 字段值：\`${JSON.stringify(example.field_values)}\``);
+    }
+    return lines;
+  });
+
+const renderSourceClaims = (sourceClaims, prefix) =>
+  sourceClaims.flatMap((claim) => [
+    `${prefix}- \`${claim.source_id}\`（${claim.evidence_kind}；${claim.confidence}；${claim.review_status}）`,
+    `${prefix}  - 定位：${claim.locator}`,
+    `${prefix}  - 支持：${claim.supports}`,
+  ]);
+
+const renderRelation = (relation, language) => {
+  const contractSummary = [
+    relation.relation_kind,
+    relation.temporal_scope,
+    relation.layout_role ? `布局角色 ${relation.layout_role}` : null,
+  ].filter(Boolean).join("；");
+  const lines = [
+    `- \`${relation.source_id}\` — **${relation.predicate}** → \`${relation.target_id}\` (\`${relation.id}\`)`,
+    `  - 定义：${localized(relation.definitions, language)}`,
+    `  - 合同：${contractSummary}`,
+  ];
+  if (relation.cardinality) {
+    lines.push(
+      `  - 基数：source ${renderCardinality(relation.cardinality.source)}；target ${renderCardinality(relation.cardinality.target)}`,
+    );
+  } else if (relation.cardinality_not_applicable_reason) {
+    lines.push(`  - 基数不适用：${localized(relation.cardinality_not_applicable_reason, language)}`);
+  }
+  if (relation.inverse_reading) {
+    lines.push(
+      `  - 逆向读法：**${localized(relation.inverse_reading.labels, language)}**（\`${relation.inverse_reading.predicate}\`）`,
+    );
+  }
+  if (relation.distinct_fact_rationale) {
+    lines.push(`  - 独立事实理由：${localized(relation.distinct_fact_rationale, language)}`);
+  }
+  if (relation.boundary_context) {
+    lines.push(
+      `  - 边界上下文：\`${relation.boundary_context.trust_boundary_concept_id}\`；${localized(relation.boundary_context.authority_basis, language)}；${localized(relation.boundary_context.protocol_or_resource_context, language)}`,
+    );
+  }
+  for (const constraint of [...(relation.conditions ?? []), ...(relation.constraints ?? [])]) {
+    lines.push(
+      `  - 约束 \`${constraint.id}\`：${localized(constraint.explanations, language)}（\`${constraint.expression}\`）`,
+    );
+  }
+  if (relation.examples?.length > 0) {
+    lines.push("  - 正反例与实例：", ...renderConceptExamples(relation.examples, "    ", language));
+  }
+  if (relation.source_claims?.length > 0) {
+    lines.push("  - 直接来源主张：", ...renderSourceClaims(relation.source_claims, "    "));
+  }
+  return lines.join("\n");
+};
 
 const renderConcept = ({
   concept,
@@ -360,37 +459,42 @@ const renderConcept = ({
   moduleId,
   childrenByParent,
   conceptById,
-  relationById,
+  primaryBackboneByChild,
   language,
 }) => {
   const prefix = "  ".repeat(depth);
-  const primaryParent = concept.primary_parent_relation_id
-    ? relationById.get(concept.primary_parent_relation_id)
-    : null;
+  const primaryParent = primaryBackboneByChild.get(concept.id) ?? null;
   const lines = [
     `${prefix}- **${localized(concept.labels, language) || concept.id}** \`${concept.id}\``,
     `${prefix}  - 定义：${localized(concept.definitions, language)}`,
   ];
-  if (primaryParent) lines.push(`${prefix}  - 直接上位：\`${primaryParent.target_id}\``);
-  if (concept.why_needed) lines.push(`${prefix}  - 为什么需要：${localized(concept.why_needed, language)}`);
-  if (concept.includes) lines.push(`${prefix}  - 包含：\n${renderList(concept.includes, language)}`);
-  if (concept.excludes) lines.push(`${prefix}  - 不包含：\n${renderList(concept.excludes, language)}`);
-  if (concept.structure) {
-    lines.push(
-      `${prefix}  - 结构与约束：${concept.structure.fields.length} 个字段，${
-        concept.structure.constraints.length + concept.structure.required_relation_constraints.length
-      } 条约束`,
-    );
+  if (primaryParent) {
+    lines.push(`${prefix}  - 逻辑骨架上位：\`${primaryParent.layout_parent_id}\``);
   }
-  if (concept.examples) lines.push(`${prefix}  - 正反例与实例：${concept.examples.length} 项`);
-  if (concept.source_claims) lines.push(`${prefix}  - 直接来源主张：${concept.source_claims.length} 项`);
+  if (concept.why_needed) lines.push(`${prefix}  - 为什么需要：${localized(concept.why_needed, language)}`);
+  if (concept.includes) {
+    lines.push(`${prefix}  - 包含：`, ...renderList(concept.includes, language, `${prefix}    `));
+  }
+  if (concept.excludes) {
+    lines.push(`${prefix}  - 不包含：`, ...renderList(concept.excludes, language, `${prefix}    `));
+  }
+  if (concept.structure) {
+    lines.push(`${prefix}  - 结构与约束：`);
+    lines.push(...renderConceptStructure(concept.structure, `${prefix}    `, language));
+  }
+  if (concept.examples?.length > 0) {
+    lines.push(`${prefix}  - 正反例与实例：`);
+    lines.push(...renderConceptExamples(concept.examples, `${prefix}    `, language));
+  }
+  if (concept.source_claims?.length > 0) {
+    lines.push(`${prefix}  - 直接来源主张：`);
+    lines.push(...renderSourceClaims(concept.source_claims, `${prefix}    `));
+  }
   for (const childId of childrenByParent.get(concept.id) ?? []) {
     const child = conceptById.get(childId);
     if (!child || child.module_id !== moduleId) continue;
-    const primary = child.primary_parent_relation_id
-      ? relationById.get(child.primary_parent_relation_id)
-      : null;
-    if (primary?.target_id !== concept.id) continue;
+    const primary = primaryBackboneByChild.get(child.id);
+    if (primary?.layout_parent_id !== concept.id) continue;
     lines.push(
       renderConcept({
         concept: child,
@@ -398,7 +502,7 @@ const renderConcept = ({
         moduleId,
         childrenByParent,
         conceptById,
-        relationById,
+        primaryBackboneByChild,
         language,
       }),
     );
@@ -408,12 +512,17 @@ const renderConcept = ({
 
 export const generateCanonicalMarkdown = (canonical, generatedAt) => {
   const conceptById = new Map(canonical.classes.map((concept) => [concept.id, concept]));
-  const relationById = new Map(canonical.relations.map((relation) => [relation.id, relation]));
+  const primaryBackboneByChild = new Map(
+    canonical.relations
+      .filter(
+        ({ layout_role: layoutRole, status }) =>
+          layoutRole === "primary-backbone" && status !== "deprecated",
+      )
+      .map((relation) => [relation.layout_child_id, relation]),
+  );
   const childrenByParent = new Map(canonical.classes.map(({ id }) => [id, []]));
-  for (const relation of canonical.relations) {
-    if (relation.predicate === "is_a" && relation.status !== "deprecated") {
-      childrenByParent.get(relation.target_id)?.push(relation.source_id);
-    }
+  for (const relation of primaryBackboneByChild.values()) {
+    childrenByParent.get(relation.layout_parent_id)?.push(relation.layout_child_id);
   }
   childrenByParent.forEach((ids) => ids.sort());
   const moduleByPlane = new Map(canonical.planes.map(({ id }) => [id, []]));
@@ -426,7 +535,9 @@ export const generateCanonicalMarkdown = (canonical, generatedAt) => {
     "",
     "> generated: true",
     "> do_not_edit: true",
-    "> generated_from: `ontology/source/**`",
+    ...canonical.artifact_metadata.generated_from.map(
+      (path) => `> generated_from: \`${path}\``,
+    ),
     `> source_fingerprint: \`${canonical.artifact_metadata.source_tree_sha256}\``,
     `> generator_version: \`${canonical.artifact_metadata.generator_version}\``,
     `> generated_at: \`${generatedAt}\``,
@@ -444,13 +555,8 @@ export const generateCanonicalMarkdown = (canonical, generatedAt) => {
       const concepts = conceptsByModule.get(module.id) ?? [];
       const moduleConceptIds = new Set(concepts.map(({ id }) => id));
       const roots = concepts.filter((concept) => {
-        const parents = canonical.relations.filter(
-          (relation) =>
-            relation.predicate === "is_a" &&
-            relation.status !== "deprecated" &&
-            relation.source_id === concept.id,
-        );
-        return parents.every((relation) => !moduleConceptIds.has(relation.target_id));
+        const primaryParentId = primaryBackboneByChild.get(concept.id)?.layout_parent_id;
+        return primaryParentId === undefined || !moduleConceptIds.has(primaryParentId);
       });
       for (const root of roots.sort((left, right) => left.id.localeCompare(right.id))) {
         lines.push(
@@ -460,7 +566,7 @@ export const generateCanonicalMarkdown = (canonical, generatedAt) => {
             moduleId: module.id,
             childrenByParent,
             conceptById,
-            relationById,
+            primaryBackboneByChild,
             language: "zh",
           }),
           "",
@@ -470,12 +576,9 @@ export const generateCanonicalMarkdown = (canonical, generatedAt) => {
   }
   lines.push("## 关系合同", "");
   for (const relation of canonical.relations) {
-    lines.push(
-      `- \`${relation.source_id}\` — **${relation.predicate}** → \`${relation.target_id}\` (\`${relation.id}\`)`,
-      relation.definitions ? `  - ${localized(relation.definitions, "zh")}` : "",
-    );
+    lines.push(renderRelation(relation, "zh"), "");
   }
-  return `${lines.join("\n").replace(/\n{3,}/gu, "\n\n")}\n`;
+  return `${lines.join("\n").replace(/\n{3,}/gu, "\n\n").trimEnd()}\n`;
 };
 
 const generatedMetadata = (canonical, generatedAt) => ({

@@ -19,6 +19,19 @@ export type OntologyEntityRef = `${OntologyEntityKind}:${string}`;
 
 export type OntologyLanguage = "zh" | "en" | "ja";
 
+export type RelationLayoutRole =
+  | "primary-backbone"
+  | "secondary-backbone"
+  | "cross-link"
+  | "none";
+
+export interface IndexedBackboneRelation {
+  readonly relation: CanonicalRelation;
+  readonly parentRef: OntologyEntityRef;
+  readonly childRef: OntologyEntityRef;
+  readonly role: "primary-backbone" | "secondary-backbone";
+}
+
 export type LocalizedText = GeneratedLocalizedText;
 export type CanonicalSourceClaim = SourceClaim;
 export type CanonicalExample = Example;
@@ -83,7 +96,10 @@ export interface OntologyDataDiagnostic {
     | "missing-plane"
     | "missing-module"
     | "missing-relation-endpoint"
-    | "invalid-primary-parent";
+    | "invalid-primary-parent"
+    | "invalid-backbone-endpoint"
+    | "duplicate-primary-backbone"
+    | "primary-backbone-cycle";
   readonly ownerId: string;
   readonly missingId: string;
   readonly message: string;
@@ -96,6 +112,10 @@ export interface OntologyIndex {
   readonly planesById: ReadonlyMap<string, CanonicalPlane>;
   readonly modulesById: ReadonlyMap<string, CanonicalModule>;
   readonly conceptsById: ReadonlyMap<string, CanonicalConcept>;
+  readonly deprecatedPredecessorsByReplacementConceptId: ReadonlyMap<
+    string,
+    readonly CanonicalConcept[]
+  >;
   readonly relationsById: ReadonlyMap<string, CanonicalRelation>;
   readonly sourcesById: ReadonlyMap<string, OntologySourceMetadata>;
   readonly examplesById: ReadonlyMap<string, CanonicalExample>;
@@ -112,6 +132,15 @@ export interface OntologyIndex {
   readonly directChildRelationsByConceptId: ReadonlyMap<string, readonly CanonicalRelation[]>;
   readonly incomingRelationsByConceptId: ReadonlyMap<string, readonly CanonicalRelation[]>;
   readonly outgoingRelationsByConceptId: ReadonlyMap<string, readonly CanonicalRelation[]>;
+  readonly primaryBackboneChildrenByRef: ReadonlyMap<OntologyEntityRef, readonly IndexedBackboneRelation[]>;
+  readonly secondaryBackboneChildrenByRef: ReadonlyMap<OntologyEntityRef, readonly IndexedBackboneRelation[]>;
+  readonly backboneParentByRef: ReadonlyMap<OntologyEntityRef, IndexedBackboneRelation>;
+  readonly semanticIncomingByRef: ReadonlyMap<OntologyEntityRef, readonly CanonicalRelation[]>;
+  readonly semanticOutgoingByRef: ReadonlyMap<OntologyEntityRef, readonly CanonicalRelation[]>;
+  readonly relationsByPredicate: ReadonlyMap<string, readonly CanonicalRelation[]>;
+  readonly directChildCountByRef: ReadonlyMap<OntologyEntityRef, number>;
+  readonly semanticDegreeByRef: ReadonlyMap<OntologyEntityRef, number>;
+  readonly moduleKeyNotionById: ReadonlyMap<string, CanonicalConcept>;
   readonly effectiveFieldsByConceptId: ReadonlyMap<string, readonly EffectiveOntologyField[]>;
   readonly dataDiagnostics: readonly OntologyDataDiagnostic[];
 }
@@ -123,6 +152,11 @@ const appendToMap = <T>(map: Map<string, T[]>, key: string, value: T): void => {
 };
 
 const freezeMapArrays = <T>(map: Map<string, T[]>): ReadonlyMap<string, readonly T[]> =>
+  new Map([...map].map(([key, values]) => [key, Object.freeze([...values])]));
+
+const freezeRefMapArrays = <T>(
+  map: Map<OntologyEntityRef, T[]>,
+): ReadonlyMap<OntologyEntityRef, readonly T[]> =>
   new Map([...map].map(([key, values]) => [key, Object.freeze([...values])]));
 
 const stableValue = (value: unknown): unknown => {
@@ -140,20 +174,8 @@ const fieldSemanticSignature = (field: CanonicalField): string => {
   return JSON.stringify(stableValue(semanticField));
 };
 
-const fieldInvariantSignature = (field: CanonicalField): string => {
-  const {
-    source_claims: _sourceClaims,
-    example_value: _exampleValue,
-    allowed_values: _allowedValues,
-    cardinality: _cardinality,
-    required: _required,
-    pattern: _pattern,
-    ...invariantField
-  } = field;
-  return JSON.stringify(stableValue(invariantField));
-};
-
-const allowedValueSignature = (value: unknown): string => JSON.stringify(stableValue(value));
+const allowedValueSignature = (allowedValue: CanonicalField["allowed_values"][number]): string =>
+  JSON.stringify(stableValue(allowedValue.value));
 
 /**
  * A subtype may strengthen an inherited field contract, but it may not silently
@@ -163,7 +185,10 @@ const isCompatibleFieldRefinement = (
   subtypeField: CanonicalField,
   parentField: CanonicalField,
 ): boolean => {
-  if (fieldInvariantSignature(subtypeField) !== fieldInvariantSignature(parentField)) return false;
+  if (
+    subtypeField.id !== parentField.id ||
+    subtypeField.datatype !== parentField.datatype
+  ) return false;
   if (parentField.required && !subtypeField.required) return false;
   const parentMin = parentField.cardinality?.min ?? (parentField.required ? 1 : 0);
   const subtypeMin = subtypeField.cardinality?.min ?? (subtypeField.required ? 1 : 0);
@@ -195,6 +220,15 @@ export const buildOntologyIndex = (
   const planesById = new Map(ontology.planes.map((plane) => [plane.id, plane]));
   const modulesById = new Map(ontology.modules.map((module) => [module.id, module]));
   const conceptsById = new Map(ontology.classes.map((concept) => [concept.id, concept]));
+  const deprecatedPredecessorsByReplacementConceptId = new Map<string, CanonicalConcept[]>();
+  for (const concept of ontology.classes) {
+    if (concept.status !== "deprecated") continue;
+    for (const replacementId of concept.replaced_by_ids) {
+      if (conceptsById.has(replacementId)) {
+        appendToMap(deprecatedPredecessorsByReplacementConceptId, replacementId, concept);
+      }
+    }
+  }
   const relationsById = new Map<string, CanonicalRelation>();
   const sourcesById = new Map((sourceIndex?.sources ?? []).map((source) => [source.id, source]));
   const examplesById = new Map<string, CanonicalExample>();
@@ -208,6 +242,7 @@ export const buildOntologyIndex = (
   const incoming = new Map<string, CanonicalRelation[]>();
   const outgoing = new Map<string, CanonicalRelation[]>();
   const directChildren = new Map<string, CanonicalRelation[]>();
+  const relationsByPredicate = new Map<string, CanonicalRelation[]>();
   const dataDiagnostics: OntologyDataDiagnostic[] = [];
 
   entitiesByRef.set(rootRef, {
@@ -296,6 +331,7 @@ export const buildOntologyIndex = (
     relationsById.set(relation.id, relation);
     appendToMap(outgoing, relation.source_id, relation);
     appendToMap(incoming, relation.target_id, relation);
+    appendToMap(relationsByPredicate, relation.predicate, relation);
     if (relation.predicate === "is_a" && relation.relation_kind === "hierarchy") {
       appendToMap(directChildren, relation.target_id, relation);
     }
@@ -335,15 +371,111 @@ export const buildOntologyIndex = (
     );
   }
 
+  const primaryBackboneChildren = new Map<OntologyEntityRef, IndexedBackboneRelation[]>();
+  const secondaryBackboneChildren = new Map<OntologyEntityRef, IndexedBackboneRelation[]>();
+  const backboneParentByRef = new Map<OntologyEntityRef, IndexedBackboneRelation>();
+  const relationLayout = (relation: CanonicalRelation): IndexedBackboneRelation | null => {
+    const candidate = relation as CanonicalRelation & {
+      readonly layout_role?: RelationLayoutRole;
+      readonly layout_parent_id?: string | null;
+      readonly layout_child_id?: string | null;
+    };
+    const isPrimaryTaxonomy =
+      primaryParents.get(relation.source_id)?.id === relation.id;
+    const role = candidate.layout_role ?? (
+      relation.predicate === "is_a"
+        ? isPrimaryTaxonomy
+          ? "primary-backbone"
+          : "secondary-backbone"
+        : "cross-link"
+    );
+    if (role !== "primary-backbone" && role !== "secondary-backbone") return null;
+    const parentId = candidate.layout_parent_id ?? (
+      relation.predicate === "is_a" ? relation.target_id : relation.source_id
+    );
+    const childId = candidate.layout_child_id ?? (
+      relation.predicate === "is_a" ? relation.source_id : relation.target_id
+    );
+    if (
+      !conceptsById.has(parentId) ||
+      !conceptsById.has(childId) ||
+      ![relation.source_id, relation.target_id].includes(parentId) ||
+      ![relation.source_id, relation.target_id].includes(childId) ||
+      parentId === childId
+    ) {
+      dataDiagnostics.push({
+        code: "invalid-backbone-endpoint",
+        ownerId: relation.id,
+        missingId: `${parentId}->${childId}`,
+        message: `Relation ${relation.id} has invalid layout backbone endpoints ${parentId} -> ${childId}`,
+      });
+      return null;
+    }
+    return {
+      relation,
+      parentRef: entityRef("concept", parentId),
+      childRef: entityRef("concept", childId),
+      role,
+    };
+  };
+
+  for (const relation of ontology.relations) {
+    const backbone = relationLayout(relation);
+    if (!backbone) continue;
+    const children = backbone.role === "primary-backbone"
+      ? primaryBackboneChildren
+      : secondaryBackboneChildren;
+    children.set(backbone.parentRef, [
+      ...(children.get(backbone.parentRef) ?? []),
+      backbone,
+    ]);
+    if (backbone.role !== "primary-backbone") continue;
+    const existing = backboneParentByRef.get(backbone.childRef);
+    if (existing) {
+      dataDiagnostics.push({
+        code: "duplicate-primary-backbone",
+        ownerId: backbone.relation.id,
+        missingId: existing.relation.id,
+        message: `Concept ${backbone.childRef} has duplicate primary backbone relations ${existing.relation.id} and ${backbone.relation.id}`,
+      });
+      continue;
+    }
+    backboneParentByRef.set(backbone.childRef, backbone);
+  }
+
+  const backboneCycleNodes = new Set<OntologyEntityRef>();
+  for (const start of backboneParentByRef.keys()) {
+    const path: OntologyEntityRef[] = [];
+    const position = new Map<OntologyEntityRef, number>();
+    let current: OntologyEntityRef | undefined = start;
+    while (current && !position.has(current) && !backboneCycleNodes.has(current)) {
+      position.set(current, path.length);
+      path.push(current);
+      current = backboneParentByRef.get(current)?.parentRef;
+    }
+    if (!current || !position.has(current)) continue;
+    const cycle = path.slice(position.get(current));
+    cycle.forEach((ref) => backboneCycleNodes.add(ref));
+    dataDiagnostics.push({
+      code: "primary-backbone-cycle",
+      ownerId: start,
+      missingId: cycle.join(" -> "),
+      message: `Primary backbone cycle: ${[...cycle, current].join(" -> ")}`,
+    });
+  }
+
   const rootConceptRefsByModuleId = new Map<string, OntologyEntityRef[]>();
   for (const module of ontology.modules) rootConceptRefsByModuleId.set(module.id, []);
   for (const concept of ontology.classes) {
     const module = modulesById.get(concept.module_id);
     if (!module) continue;
-    const primary = primaryParents.get(concept.id);
-    const primaryParent = primary ? conceptsById.get(primary.target_id) : undefined;
-    const hasModuleLocalPrimaryParent = primaryParent?.module_id === concept.module_id;
     const conceptRef = entityRef("concept", concept.id);
+    const backboneParent = backboneParentByRef.get(conceptRef);
+    const parentConceptId = backboneParent?.parentRef.startsWith("concept:")
+      ? backboneParent.parentRef.slice("concept:".length)
+      : null;
+    const primaryParent = parentConceptId ? conceptsById.get(parentConceptId) : undefined;
+    const hasModuleLocalPrimaryParent = primaryParent?.module_id === concept.module_id;
     if (!hasModuleLocalPrimaryParent) {
       rootConceptRefsByModuleId.set(concept.module_id, [
         ...(rootConceptRefsByModuleId.get(concept.module_id) ?? []),
@@ -453,6 +585,45 @@ export const buildOntologyIndex = (
   };
   for (const concept of ontology.classes) projectEffectiveFields(concept.id);
 
+  const semanticIncomingByRef = new Map<OntologyEntityRef, readonly CanonicalRelation[]>();
+  const semanticOutgoingByRef = new Map<OntologyEntityRef, readonly CanonicalRelation[]>();
+  const semanticDegreeByRef = new Map<OntologyEntityRef, number>();
+  const directChildCountByRef = new Map<OntologyEntityRef, number>();
+  for (const concept of ontology.classes) {
+    const ref = entityRef("concept", concept.id);
+    const semanticIncoming = (incoming.get(concept.id) ?? []).filter(
+      ({ predicate, status }) => status === "accepted" && predicate !== "is_a",
+    );
+    const semanticOutgoing = (outgoing.get(concept.id) ?? []).filter(
+      ({ predicate, status }) => status === "accepted" && predicate !== "is_a",
+    );
+    semanticIncomingByRef.set(ref, Object.freeze([...semanticIncoming]));
+    semanticOutgoingByRef.set(ref, Object.freeze([...semanticOutgoing]));
+    semanticDegreeByRef.set(
+      ref,
+      new Set([...semanticIncoming, ...semanticOutgoing].map(({ id }) => id)).size,
+    );
+    directChildCountByRef.set(ref, organizationalChildrenByRef.get(ref)?.length ?? 0);
+  }
+  for (const entity of entitiesByRef.values()) {
+    if (entity.kind === "concept") continue;
+    directChildCountByRef.set(
+      entity.ref,
+      organizationalChildrenByRef.get(entity.ref)?.length ?? 0,
+    );
+    semanticDegreeByRef.set(entity.ref, 0);
+  }
+
+  const moduleKeyNotionById = new Map<string, CanonicalConcept>();
+  for (const module of ontology.modules) {
+    const taxonomy = module.taxonomy_contract as typeof module.taxonomy_contract & {
+      readonly key_root_concept_ids?: readonly string[];
+    };
+    const keyId = taxonomy.key_root_concept_ids?.[0];
+    const keyConcept = keyId ? conceptsById.get(keyId) : undefined;
+    if (keyConcept?.module_id === module.id) moduleKeyNotionById.set(module.id, keyConcept);
+  }
+
   return {
     ontology,
     rootRef,
@@ -460,6 +631,9 @@ export const buildOntologyIndex = (
     planesById,
     modulesById,
     conceptsById,
+    deprecatedPredecessorsByReplacementConceptId: freezeMapArrays(
+      deprecatedPredecessorsByReplacementConceptId,
+    ),
     relationsById,
     sourcesById,
     examplesById,
@@ -476,6 +650,15 @@ export const buildOntologyIndex = (
     directChildRelationsByConceptId: freezeMapArrays(directChildren),
     incomingRelationsByConceptId: freezeMapArrays(incoming),
     outgoingRelationsByConceptId: freezeMapArrays(outgoing),
+    primaryBackboneChildrenByRef: freezeRefMapArrays(primaryBackboneChildren),
+    secondaryBackboneChildrenByRef: freezeRefMapArrays(secondaryBackboneChildren),
+    backboneParentByRef,
+    semanticIncomingByRef,
+    semanticOutgoingByRef,
+    relationsByPredicate: freezeMapArrays(relationsByPredicate),
+    directChildCountByRef,
+    semanticDegreeByRef,
+    moduleKeyNotionById,
     effectiveFieldsByConceptId,
     dataDiagnostics: Object.freeze([...dataDiagnostics]),
   };
@@ -565,7 +748,7 @@ export const ontologyPrimaryPath = (
   return path;
 };
 
-/** Logical specialization depth is independent from the non-duplicating directory ownership path. */
+/** Unified primary-backbone depth is independent from the directory ownership path. */
 export const ontologyLogicalDepth = (
   index: OntologyIndex,
   ref: OntologyEntityRef,
@@ -577,14 +760,14 @@ export const ontologyLogicalDepth = (
   if (entity.kind === "module") return 2;
 
   let depth = 3;
-  let currentId = entity.id;
-  const visited = new Set<string>();
-  while (!visited.has(currentId)) {
-    visited.add(currentId);
-    const parent = index.primaryParentRelationByConceptId.get(currentId);
-    if (!parent || !index.conceptsById.has(parent.target_id)) break;
+  let currentRef = ref;
+  const visited = new Set<OntologyEntityRef>();
+  while (!visited.has(currentRef)) {
+    visited.add(currentRef);
+    const parentRef = index.backboneParentByRef.get(currentRef)?.parentRef;
+    if (!parentRef?.startsWith("concept:")) break;
     depth += 1;
-    currentId = parent.target_id;
+    currentRef = parentRef;
   }
   return depth;
 };

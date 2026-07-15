@@ -70,7 +70,7 @@ const isArtifactMetadata = (value: unknown): boolean => {
   if (!isRecord(value)) return false;
   if (
     value.artifact_kind !== "canonical-agent-ontology" ||
-    value.contract_version !== "1.0.0" ||
+    value.contract_version !== "2.0.0" ||
     !isNonEmptyString(value.canonical_version) ||
     value.generated !== true ||
     value.do_not_edit !== true ||
@@ -153,4 +153,7 @@ export const ontologyMetricValue = (
   runtime: OntologyRuntime,
   name: keyof NonNullable<CanonicalOntology["ontology_metrics"]>,
   fallback: number,
-): number => runtime.ontology.ontology_metrics?.[name] ?? fallback;
+): number => {
+  const value = runtime.ontology.ontology_metrics?.[name];
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+};

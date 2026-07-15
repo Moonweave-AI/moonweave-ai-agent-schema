@@ -46,9 +46,11 @@ export function assertPublishedContentSecurity(input: {
 export function validateSourceUrlPolicy(
   sources: readonly SourceUrlRecord[],
   httpAllowlist: readonly HttpSourceAllowlistEntry[],
+  options?: { readonly now?: Date | string | number },
 ): readonly SourceUrlPolicyViolation[];
 
 export function assertSourceUrlPolicy(
   sources: readonly SourceUrlRecord[],
   httpAllowlist: readonly HttpSourceAllowlistEntry[],
+  options?: { readonly now?: Date | string | number },
 ): void;

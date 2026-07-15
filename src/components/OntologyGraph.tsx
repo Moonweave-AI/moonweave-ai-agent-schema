@@ -1,592 +1,388 @@
-import cytoscape from "cytoscape";
-import cytoscapeFcose from "cytoscape-fcose";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { uiText, type Language } from "../i18n/ui-text";
+import communityGraphData from "../generated/ontology-community-graph.json";
+import type { Language } from "../i18n/ui-text";
 import {
-  localizedOntologyText,
-  ontologyEntityLabel,
-  ontologyLogicalDepth,
-  resolveCanonicalCasePath,
-  type CanonicalRelation,
-  type OntologyEntityRef,
-  type OntologyIndex,
-} from "../lib/ontology-index";
-import type {
-  VisibleOntologyEdge,
-  VisibleOntologyGraph,
-} from "../lib/ontology-view-model";
+  buildOntologyCommunityNetworkModel,
+  validateOntologyCommunityGraph,
+  type OntologyCommunityGraphArtifact,
+  type OntologyGraphTheme,
+} from "../lib/ontology-community-network";
+import type { OntologyEntityRef, OntologyIndex } from "../lib/ontology-index";
+import {
+  createOntologyNetworkRuntime,
+  type OntologyNetworkRuntime,
+} from "../lib/ontology-network-runtime";
 
-cytoscape.use(cytoscapeFcose);
-
-export type ThemeMode = "dark" | "light";
+export type ThemeMode = OntologyGraphTheme;
 
 export interface OntologyGraphProps {
   readonly index: OntologyIndex;
-  readonly view: VisibleOntologyGraph;
   readonly language: Language;
   readonly theme: ThemeMode;
-  readonly graphRootRef: OntologyEntityRef;
+  readonly canonicalFingerprint: string;
   readonly focusedEntityRef: OntologyEntityRef;
   readonly focusedRelationId: string | null;
-  readonly highlightedScenarioId?: string | null;
   readonly onFocusEntity: (ref: OntologyEntityRef) => void;
-  readonly onFocusRelation: (relationId: string) => void;
-  readonly onExpandEntity: (ref: OntologyEntityRef) => void;
+  readonly onFocusRelation: (relationId: string | null) => void;
+  readonly communityGraph?: unknown;
 }
 
-const themeColors = {
-  dark: {
-    panel: "#10162a",
-    text: "#fff8e8",
-    muted: "#a6aed0",
-    cyan: "#74ecff",
-    lilac: "#cba9ff",
-    thread: "#8ddcff",
-    mint: "#69efae",
-    blush: "#f5a5cb",
+type StabilizationStatus = "loading" | "stabilizing" | "stable" | "error";
+
+const NETWORK_TEXT: Readonly<Record<Language, Readonly<Record<string, string>>>> = {
+  zh: {
+    title: "关系社区图谱",
+    subtitle: "颜色表示结构社区，大小表示连接度；关系名称悬停可见。",
+    search: "搜索图中节点",
+    searchPlaceholder: "输入节点名称…",
+    fit: "适应画布",
+    stabilize: "重新排布",
+    communities: "结构社区",
+    showAll: "显示全部",
+    hideAll: "隐藏全部",
+    loading: "正在加载图谱引擎…",
+    stabilizing: "正在稳定布局…",
+    stable: "布局已稳定",
+    error: "图谱无法初始化",
+    noResults: "没有匹配节点",
+    accessibility: "交互式本体关系社区图。可使用搜索定位节点，或使用左侧目录完整浏览。",
   },
-  light: {
-    panel: "#ffffff",
-    text: "#1d2440",
-    muted: "#68708d",
-    cyan: "#067fa4",
-    lilac: "#7c56c4",
-    thread: "#1772b8",
-    mint: "#158953",
-    blush: "#b94d82",
+  en: {
+    title: "Relation community graph",
+    subtitle: "Color indicates structural community and size indicates degree; relations appear on hover.",
+    search: "Search graph nodes",
+    searchPlaceholder: "Type a node label…",
+    fit: "Fit graph",
+    stabilize: "Reflow",
+    communities: "Structural communities",
+    showAll: "Show all",
+    hideAll: "Hide all",
+    loading: "Loading graph engine…",
+    stabilizing: "Stabilizing layout…",
+    stable: "Layout stabilized",
+    error: "Graph initialization failed",
+    noResults: "No matching nodes",
+    accessibility: "Interactive ontology relation community graph. Use search to focus a node or the directory for complete keyboard navigation.",
   },
-} as const;
-
-const relationLabel = (
-  edge: VisibleOntologyEdge,
-  relation: CanonicalRelation | undefined,
-  language: Language,
-): string => relation
-  ? localizedOntologyText(relation.labels, language, edge.predicate)
-  : uiText[language].derivedRelationLabels[edge.predicate] ?? edge.predicate;
-
-const relationDefinition = (
-  edge: VisibleOntologyEdge,
-  relation: CanonicalRelation | undefined,
-  language: Language,
-): string => relation
-  ? localizedOntologyText(relation.definitions, language, edge.predicate)
-  : uiText[language].derivedRelationDefinitions[edge.predicate] ??
-    uiText[language].derivedRelation;
-
-const edgeClasses = (
-  edge: VisibleOntologyEdge,
-  focusedEntityRef: OntologyEntityRef,
-  focusedRelationId: string | null,
-  caseHighlighted: boolean,
-): string => {
-  const classes = [
-    edge.derived ? "is-derived-edge" : "is-canonical-edge",
-    edge.hierarchyRole === "primary-parent" ? "is-primary-parent-edge" : "",
-    edge.hierarchyRole === "additional-parent" ? "is-additional-parent-edge" : "",
-    edge.source === focusedEntityRef ? "is-outgoing-edge" : "",
-    edge.target === focusedEntityRef ? "is-incoming-edge" : "",
-    edge.id === focusedRelationId ? "is-focused-edge" : "",
-    caseHighlighted ? "case-path-highlight" : "",
-  ];
-  return classes.filter(Boolean).join(" ");
+  ja: {
+    title: "関係コミュニティグラフ",
+    subtitle: "色は構造コミュニティ、サイズは次数を示し、関係名はホバーで表示されます。",
+    search: "グラフのノードを検索",
+    searchPlaceholder: "ノード名を入力…",
+    fit: "全体表示",
+    stabilize: "再配置",
+    communities: "構造コミュニティ",
+    showAll: "すべて表示",
+    hideAll: "すべて非表示",
+    loading: "グラフエンジンを読み込み中…",
+    stabilizing: "レイアウトを安定化中…",
+    stable: "レイアウト安定済み",
+    error: "グラフを初期化できません",
+    noResults: "一致するノードはありません",
+    accessibility: "インタラクティブなオントロジー関係コミュニティグラフです。検索または左側のディレクトリで移動できます。",
+  },
 };
 
-const staticEdgeClasses = (edge: VisibleOntologyEdge): string =>
-  [
-    edge.derived ? "is-derived-edge" : "is-canonical-edge",
-    edge.hierarchyRole === "primary-parent" ? "is-primary-parent-edge" : "",
-    edge.hierarchyRole === "additional-parent" ? "is-additional-parent-edge" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+const defaultCommunityGraph: unknown = communityGraphData;
+const EMPTY_NETWORK_MODEL = Object.freeze({
+  nodes: Object.freeze([]),
+  edges: Object.freeze([]),
+  communities: Object.freeze([]),
+  maximumDegree: 0,
+  algorithmLabel: "",
+});
 
-const hasScenario = (value: unknown, scenarioId: string | null | undefined): boolean => {
-  if (!scenarioId || !value || typeof value !== "object") return false;
-  const examples = (value as { examples?: unknown }).examples;
-  return Array.isArray(examples)
-    ? examples.some(
-        (example) =>
-          example &&
-          typeof example === "object" &&
-          (example as { scenario_id?: unknown }).scenario_id === scenarioId,
-      )
-    : false;
-};
-
-export const hierarchicalRingPositions = (
-  index: OntologyIndex,
-  nodes: VisibleOntologyGraph["nodes"],
-): ReadonlyMap<OntologyEntityRef, Readonly<{ x: number; y: number }>> => {
-  if (nodes.length === 0) return new Map();
-  const depthByRef = new Map(
-    nodes.map((node) => [node.ref, ontologyLogicalDepth(index, node.ref)] as const),
-  );
-  const minimumDepth = Math.min(...depthByRef.values());
-  const refsByLayer = new Map<number, OntologyEntityRef[]>();
-  for (const [ref, depth] of depthByRef) {
-    const layer = depth - minimumDepth;
-    refsByLayer.set(layer, [...(refsByLayer.get(layer) ?? []), ref]);
-  }
-  const positions = new Map<OntologyEntityRef, Readonly<{ x: number; y: number }>>();
-  for (const [layer, refs] of refsByLayer) {
-    const orderedRefs = [...refs].sort();
-    const radius = layer === 0 ? (orderedRefs.length === 1 ? 0 : 54) : 118 + layer * 142;
-    orderedRefs.forEach((ref, position) => {
-      const angle = -Math.PI / 2 + (2 * Math.PI * position) / orderedRefs.length;
-      positions.set(ref, {
-        x: Math.cos(angle) * radius,
-        y: Math.sin(angle) * radius,
-      });
-    });
-  }
-  return positions;
-};
+const reducedMotionPreference = (): boolean =>
+  typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 export const OntologyGraph = ({
   index,
-  view,
   language,
   theme,
-  graphRootRef,
+  canonicalFingerprint,
   focusedEntityRef,
   focusedRelationId,
-  highlightedScenarioId,
   onFocusEntity,
   onFocusRelation,
-  onExpandEntity,
+  communityGraph = defaultCommunityGraph,
 }: OntologyGraphProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const graphRef = useRef<cytoscape.Core | null>(null);
-  const latestTapRef = useRef<{ readonly ref: OntologyEntityRef; readonly at: number } | null>(null);
-  const text = uiText[language];
-  const colors = themeColors[theme];
-  const reducedMotion =
-    typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-  const scenarioHighlights = useMemo(() => {
-    const highlightedCaseNodes = new Set<OntologyEntityRef>();
-    const highlightedCaseRelations = new Set<string>();
-    if (highlightedScenarioId) {
-      for (const path of index.casePathsById.values()) {
-        const matches =
-          path.id === highlightedScenarioId ||
-          path.steps.some(
-            (step) =>
-              index.examplesById.get(step.case_fragment_example_id)?.scenario_id ===
-              highlightedScenarioId,
-          );
-        if (!matches) continue;
-        for (const step of path.steps) {
-          const owner = index.exampleOwnerEntityRefById.get(step.case_fragment_example_id);
-          if (owner) highlightedCaseNodes.add(owner);
-          const ownerRelation = index.exampleOwnerRelationIdById.get(
-            step.case_fragment_example_id,
-          );
-          if (ownerRelation) highlightedCaseRelations.add(ownerRelation);
-          if (step.traversal_relation_id) highlightedCaseRelations.add(step.traversal_relation_id);
-        }
-      }
-    }
-    return {
-      nodeRefs: highlightedCaseNodes,
-      relationIds: highlightedCaseRelations,
-    };
-  }, [highlightedScenarioId, index]);
-
-  const topologySignature = useMemo(
-    () =>
-      [
-        view.nodes.map(({ ref }) => ref).sort().join("|"),
-        view.edges
-          .map(({ id, source, target }) => `${id}:${source}:${target}`)
-          .sort()
-          .join("|"),
-      ].join("::"),
-    [view.edges, view.nodes],
+  const runtimeRef = useRef<OntologyNetworkRuntime | null>(null);
+  const callbacksRef = useRef({ onFocusEntity, onFocusRelation });
+  const modelRef = useRef<ReturnType<typeof buildOntologyCommunityNetworkModel> | null>(null);
+  const [status, setStatus] = useState<StabilizationStatus>("loading");
+  const [query, setQuery] = useState("");
+  const [hiddenCommunityIds, setHiddenCommunityIds] = useState<ReadonlySet<number>>(
+    () => new Set(),
   );
+  const hiddenCommunityIdsRef = useRef(hiddenCommunityIds);
+  const focusedEntityRefRef = useRef(focusedEntityRef);
+  const reducedMotion = reducedMotionPreference();
+  const text = NETWORK_TEXT[language];
+  callbacksRef.current = { onFocusEntity, onFocusRelation };
+  hiddenCommunityIdsRef.current = hiddenCommunityIds;
+  focusedEntityRefRef.current = focusedEntityRef;
 
-  const graphPositions = useMemo(
-    () => hierarchicalRingPositions(index, view.nodes),
-    [index, topologySignature],
+  const validationErrors = useMemo(
+    () => validateOntologyCommunityGraph(
+      index,
+      communityGraph as OntologyCommunityGraphArtifact,
+      canonicalFingerprint,
+    ),
+    [canonicalFingerprint, communityGraph, index],
   );
+  const validatedArtifact = validationErrors.length === 0
+    ? communityGraph as OntologyCommunityGraphArtifact
+    : null;
+  const model = useMemo(
+    () => validatedArtifact
+      ? buildOntologyCommunityNetworkModel(index, validatedArtifact, language, theme)
+      : EMPTY_NETWORK_MODEL,
+    [index, language, theme, validatedArtifact],
+  );
+  modelRef.current = model;
 
-  const graphElements = useMemo<cytoscape.ElementDefinition[]>(() => {
-    const nodes: cytoscape.ElementDefinition[] = view.nodes.map((node) => ({
-      data: {
-        id: node.ref,
-        entityRef: node.ref,
-        label: ontologyEntityLabel(node.entity, language),
-        kind: node.kind,
-        layoutDepth: ontologyLogicalDepth(index, node.ref),
-      },
-      position: graphPositions.get(node.ref),
-    }));
-    const edges: cytoscape.ElementDefinition[] = view.edges.map((edge) => {
-      const relation = edge.canonicalRelationId
-        ? index.relationsById.get(edge.canonicalRelationId)
-        : undefined;
-      return {
-        data: {
-          id: edge.id,
-          source: edge.source,
-          target: edge.target,
-          predicate: edge.predicate,
-          label: relationLabel(edge, relation, language),
-          definition: relationDefinition(edge, relation, language),
-          derived: edge.derived,
-        },
-        classes: staticEdgeClasses(edge),
-      };
-    });
-    return [...nodes, ...edges];
-    // The signature deliberately separates topology changes from focus/highlight changes.
-    // Focus styles are applied in-place below so a click never destroys and relayouts the graph.
-  }, [graphPositions, index, language, topologySignature]);
-
-  const visibleRefs = new Set(view.nodes.map(({ ref }) => ref));
-  const visibleRelationIds = new Set(view.edges.map(({ id }) => id));
-  const hiddenCaseSteps = new Set<string>();
-  if (highlightedScenarioId) {
-    for (const path of index.casePathsById.values()) {
-      const matches =
-        path.id === highlightedScenarioId ||
-        path.steps.some(
-          (step) =>
-            index.examplesById.get(step.case_fragment_example_id)?.scenario_id ===
-            highlightedScenarioId,
-        );
-      if (!matches) continue;
-      for (const resolved of resolveCanonicalCasePath(index, path)) {
-        const hidden =
-          resolved.missingReferenceIds.length > 0 ||
-          Boolean(resolved.ownerEntityRef && !visibleRefs.has(resolved.ownerEntityRef)) ||
-          Boolean(resolved.ownerRelationId && !visibleRelationIds.has(resolved.ownerRelationId)) ||
-          Boolean(
-            resolved.step.traversal_relation_id &&
-            !visibleRelationIds.has(resolved.step.traversal_relation_id),
-          );
-        if (hidden) hiddenCaseSteps.add(`${path.id}:${resolved.step.order}`);
-      }
-    }
-  }
+  const matches = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase(language);
+    if (!normalized) return [];
+    return model.nodes
+      .filter(({ label }) => label.toLocaleLowerCase(language).includes(normalized))
+      .slice(0, 20);
+  }, [language, model.nodes, query]);
 
   useEffect(() => {
-    if (!containerRef.current || view.nodes.length === 0) return undefined;
-    const graph = cytoscape({
-      container: containerRef.current,
-      elements: graphElements,
-      minZoom: 0.24,
-      maxZoom: 2.2,
-      style: [
-        {
-          selector: "node",
-          style: {
-            width: 18,
-            height: 18,
-            "background-color": colors.lilac,
-            "border-width": 2,
-            "border-color": colors.panel,
-            label: "data(label)",
-            color: colors.text,
-            "font-size": 11,
-            "font-weight": 600,
-            "text-margin-y": -14,
-            "text-wrap": "wrap",
-            "text-max-width": "160px",
-          },
-        },
-        { selector: 'node[kind = "root"]', style: { width: 25, height: 25, "background-color": colors.cyan } },
-        { selector: 'node[kind = "plane"]', style: { width: 21, height: 21, "background-color": colors.lilac } },
-        { selector: 'node[kind = "module"]', style: { width: 19, height: 19, "background-color": colors.mint } },
-        { selector: "node.is-focused-node", style: { "border-width": 5, "border-color": colors.blush, "z-index": 20 } },
-        { selector: "node.case-path-highlight", style: { "border-width": 5, "border-color": colors.mint } },
-        {
-          selector: "edge",
-          style: {
-            width: 1.5,
-            "line-color": colors.thread,
-            "target-arrow-color": colors.thread,
-            "target-arrow-shape": "triangle",
-            "curve-style": "bezier",
-            label: "data(label)",
-            color: colors.muted,
-            "font-size": 8,
-            "text-background-color": colors.panel,
-            "text-background-opacity": 0.88,
-            "text-background-padding": "2px",
-            "text-rotation": "autorotate",
-            "arrow-scale": 0.72,
-          },
-        },
-        { selector: "edge.is-derived-edge", style: { "line-style": "dotted", opacity: 0.72 } },
-        { selector: "edge.is-primary-parent-edge", style: { width: 2.5, "line-color": colors.cyan, "target-arrow-color": colors.cyan } },
-        { selector: "edge.is-additional-parent-edge", style: { "line-style": "dashed", "line-color": colors.lilac, "target-arrow-color": colors.lilac } },
-        { selector: "edge.is-incoming-edge", style: { width: 2.8, "line-color": colors.mint, "target-arrow-color": colors.mint, opacity: 1 } },
-        { selector: "edge.is-outgoing-edge", style: { width: 2.8, "line-color": colors.cyan, "target-arrow-color": colors.cyan, opacity: 1 } },
-        { selector: "edge.is-focused-edge", style: { width: 4, "line-color": colors.blush, "target-arrow-color": colors.blush, color: colors.text, "font-size": 10, "z-index": 30 } },
-        { selector: "edge.case-path-highlight", style: { width: 4, "line-color": colors.mint, "target-arrow-color": colors.mint } },
-        { selector: ".is-hover-related", style: { opacity: 1, "z-index": 24 } },
-      ],
-    });
-    graphRef.current = graph;
-
-    graph.on("tap", "node", (event) => {
-      const ref = event.target.data("entityRef") as OntologyEntityRef;
-      const now = Date.now();
-      const previous = latestTapRef.current;
-      if (previous?.ref === ref && now - previous.at <= 360) {
-        onExpandEntity(ref);
-        latestTapRef.current = null;
-      } else {
-        latestTapRef.current = { ref, at: now };
-        onFocusEntity(ref);
+    const container = containerRef.current;
+    if (!container || !validatedArtifact) return undefined;
+    let cancelled = false;
+    let ownedRuntime: OntologyNetworkRuntime | null = null;
+    const runtimeHost = document.createElement("div");
+    runtimeHost.className = "ontology-network-runtime-host";
+    container.append(runtimeHost);
+    setStatus("loading");
+    void createOntologyNetworkRuntime(runtimeHost, modelRef.current ?? model, {
+      onNodeFocus: (ref) => callbacksRef.current.onFocusEntity(ref),
+      onRelationFocus: (id) => callbacksRef.current.onFocusRelation(id),
+      onStabilizing: () => { if (!cancelled) setStatus("stabilizing"); },
+      onStable: () => { if (!cancelled) setStatus("stable"); },
+    }).then((runtime) => {
+      ownedRuntime = runtime;
+      if (cancelled) {
+        runtime.destroy();
+        runtimeHost.remove();
+        return;
+      }
+      runtimeRef.current = runtime;
+      runtime.updateModel(modelRef.current ?? model);
+      runtime.setHiddenCommunities(hiddenCommunityIdsRef.current);
+      runtime.setFocusedNode(focusedEntityRefRef.current);
+    }).catch((error: unknown) => {
+      runtimeHost.remove();
+      if (!cancelled) {
+        console.error("Ontology graph runtime initialization failed.", error);
+        setStatus("error");
       }
     });
-    graph.on("tap", "edge", (event) => onFocusRelation(event.target.id()));
-    graph.on("mouseover", "node", (event) => event.target.connectedEdges().addClass("is-hover-related"));
-    graph.on("mouseout", "node", (event) => event.target.connectedEdges().removeClass("is-hover-related"));
-
-    const layout = graph.layout({
-      name: "fcose",
-      quality: "default",
-      randomize: false,
-      animate: !reducedMotion,
-      animationDuration: reducedMotion ? 0 : 420,
-      fit: true,
-      padding: 56,
-      nodeRepulsion: 8200,
-      idealEdgeLength: 120,
-      edgeElasticity: 0.34,
-      gravity: 0.28,
-      numIter: 1800,
-      fixedNodeConstraint: [...graphPositions].map(([nodeId, position]) => ({
-        nodeId,
-        position,
-      })),
-    } as cytoscape.LayoutOptions);
-    layout.one("layoutstop", () => {
-      const invariantHolds = graph.nodes().toArray().every((node) => {
-        const expected = graphPositions.get(node.id() as OntologyEntityRef);
-        if (!expected) return false;
-        const actual = node.position();
-        return Math.hypot(actual.x - expected.x, actual.y - expected.y) <= 1;
-      });
-      if (containerRef.current) {
-        containerRef.current.dataset.layoutInvariant = invariantHolds ? "true" : "false";
-      }
-    });
-    layout.run();
     return () => {
-      if (graphRef.current === graph) graphRef.current = null;
-      graph.destroy();
+      cancelled = true;
+      ownedRuntime?.destroy();
+      if (runtimeRef.current === ownedRuntime) runtimeRef.current = null;
+      runtimeHost.remove();
     };
-  }, [
-    colors,
-    graphElements,
-    graphPositions,
-    onExpandEntity,
-    onFocusEntity,
-    onFocusRelation,
-    reducedMotion,
-    view.nodes.length,
-  ]);
+    // The generated topology and index identity own the runtime. Language and
+    // theme update the existing datasets without re-running physics.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, validatedArtifact]);
 
   useEffect(() => {
-    const graph = graphRef.current;
-    if (!graph) return;
-    graph.batch(() => {
-      graph.nodes().removeClass("is-focused-node case-path-highlight");
-      graph
-        .edges()
-        .removeClass(
-          "is-incoming-edge is-outgoing-edge is-focused-edge case-path-highlight",
-        );
-      graph.getElementById(focusedEntityRef).addClass("is-focused-node");
-      for (const node of view.nodes) {
-        if (
-          hasScenario(node.entity.data, highlightedScenarioId) ||
-          scenarioHighlights.nodeRefs.has(node.ref)
-        ) {
-          graph.getElementById(node.ref).addClass("case-path-highlight");
-        }
-      }
-      for (const edge of view.edges) {
-        const element = graph.getElementById(edge.id);
-        if (edge.source === focusedEntityRef) element.addClass("is-outgoing-edge");
-        if (edge.target === focusedEntityRef) element.addClass("is-incoming-edge");
-        if (edge.id === focusedRelationId) element.addClass("is-focused-edge");
-        const relation = edge.canonicalRelationId
-          ? index.relationsById.get(edge.canonicalRelationId)
-          : undefined;
-        if (
-          hasScenario(relation, highlightedScenarioId) ||
-          scenarioHighlights.relationIds.has(edge.id)
-        ) {
-          element.addClass("case-path-highlight");
-        }
-      }
-    });
-  }, [
-    focusedEntityRef,
-    focusedRelationId,
-    graphElements,
-    highlightedScenarioId,
-    index,
-    scenarioHighlights,
-    theme,
-    view.edges,
-    view.nodes,
-  ]);
+    runtimeRef.current?.updateModel(model);
+  }, [model]);
 
-  const focusedEntity = index.entitiesByRef.get(focusedEntityRef);
-  const focusedEdge = focusedRelationId
-    ? view.edges.find(({ id }) => id === focusedRelationId)
-    : undefined;
-  const focusedCanonicalRelation = focusedEdge?.canonicalRelationId
-    ? index.relationsById.get(focusedEdge.canonicalRelationId)
-    : undefined;
-  const focusedEdgeLabel = focusedEdge
-    ? relationLabel(focusedEdge, focusedCanonicalRelation, language)
-    : "";
-  const focusedEdgeSource = focusedEdge
-    ? index.entitiesByRef.get(focusedEdge.source)
-    : undefined;
-  const focusedEdgeTarget = focusedEdge
-    ? index.entitiesByRef.get(focusedEdge.target)
-    : undefined;
+  useEffect(() => {
+    runtimeRef.current?.setHiddenCommunities(hiddenCommunityIds);
+  }, [hiddenCommunityIds]);
+
+  useEffect(() => {
+    const focusedNode = model.nodes.find(({ id }) => id === focusedEntityRef);
+    if (!focusedNode) return;
+    if (hiddenCommunityIds.has(focusedNode.communityId)) {
+      setHiddenCommunityIds((previous) => {
+        const next = new Set(previous);
+        next.delete(focusedNode.communityId);
+        return next;
+      });
+    }
+    runtimeRef.current?.setFocusedNode(focusedEntityRef);
+  }, [focusedEntityRef, hiddenCommunityIds, model.nodes]);
+
+  useEffect(() => {
+    if (!focusedRelationId) return;
+    const edge = model.edges.find(({ canonicalRelationId }) =>
+      canonicalRelationId === focusedRelationId);
+    if (!edge) return;
+    runtimeRef.current?.focusNode(edge.from, !reducedMotion);
+  }, [focusedRelationId, model.edges, reducedMotion]);
+
+  const selectSearchMatch = (ref: OntologyEntityRef, communityId: number): void => {
+    const nextHidden = new Set(hiddenCommunityIds);
+    nextHidden.delete(communityId);
+    setHiddenCommunityIds(nextHidden);
+    runtimeRef.current?.setHiddenCommunities(nextHidden);
+    runtimeRef.current?.focusNode(ref, !reducedMotion);
+    callbacksRef.current.onFocusEntity(ref);
+    setQuery("");
+  };
+
+  const toggleCommunity = (communityId: number): void => {
+    setHiddenCommunityIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(communityId)) next.delete(communityId);
+      else next.add(communityId);
+      return next;
+    });
+  };
+
+  const statusText = text[status];
+  const visibleCounts = useMemo(() => {
+    const communityByNode = new Map(model.nodes.map(({ id, communityId }) => [id, communityId]));
+    const nodeCount = model.nodes.filter(
+      ({ communityId }) => !hiddenCommunityIds.has(communityId),
+    ).length;
+    const edgeCount = model.edges.filter((edge) => {
+      const sourceCommunity = communityByNode.get(edge.from);
+      const targetCommunity = communityByNode.get(edge.to);
+      return sourceCommunity !== undefined && targetCommunity !== undefined &&
+        !hiddenCommunityIds.has(sourceCommunity) &&
+        !hiddenCommunityIds.has(targetCommunity);
+    }).length;
+    return Object.freeze({ nodeCount, edgeCount });
+  }, [hiddenCommunityIds, model.edges, model.nodes]);
 
   return (
-    <section className="viewer-canvas" data-testid="ontology-canvas" aria-label={text.ontologyGraph}>
-      <div className="section-heading">
+    <section className="viewer-canvas ontology-network-view" data-testid="ontology-canvas">
+      <header className="section-heading ontology-network-heading">
         <div>
-          <p className="eyebrow">{text.ontologyGraph}</p>
-          <h3>{text.hierarchy}</h3>
+          <p className="eyebrow">ONTOLOGY GRAPH</p>
+          <h3>{text.title}</h3>
+          <p>{text.subtitle}</p>
         </div>
-        <div className="graph-heading-actions">
-          {hiddenCaseSteps.size > 0 ? (
-            <span className="case-next-step">{text.caseNextSteps(hiddenCaseSteps.size)}</span>
-          ) : null}
-          {view.hiddenAdjacentRefs.length > 0 ? (
-            <button
-              type="button"
-              className="graph-expand-button"
-              onClick={() => onExpandEntity(focusedEntityRef)}
-            >
-              {text.expandAdjacentNodes(view.hiddenAdjacentRefs.length)}
-            </button>
-          ) : null}
-          <span
-            data-testid="graph-count"
-            data-node-count={view.counts.visibleNodes}
-            data-edge-count={view.counts.visibleEdges}
+        <div className="ontology-network-actions">
+          <label className="ontology-network-search">
+            <span>{text.search}</span>
+            <input
+              type="search"
+              value={query}
+              placeholder={text.searchPlaceholder}
+              autoComplete="off"
+              onChange={(event) => setQuery(event.currentTarget.value)}
+              data-testid="graph-node-search"
+            />
+            {query ? (
+              <div className="ontology-network-search-results" role="listbox">
+                {matches.length > 0 ? matches.map((node) => (
+                  <button
+                    key={node.id}
+                    type="button"
+                    role="option"
+                    onClick={() => selectSearchMatch(node.id, node.communityId)}
+                  >
+                    <span style={{ backgroundColor: node.color.background }} aria-hidden="true" />
+                    {node.label}
+                    <small>{node.communityLabel}</small>
+                  </button>
+                )) : <p>{text.noResults}</p>}
+              </div>
+            ) : null}
+          </label>
+          <button type="button" onClick={() => runtimeRef.current?.fit(!reducedMotion)}>
+            {text.fit}
+          </button>
+          <button
+            type="button"
+            disabled={status !== "stable"}
+            onClick={() => runtimeRef.current?.stabilize()}
           >
-            {view.counts.visibleNodes} {text.visibleConcepts} / {view.counts.visibleEdges} {text.visibleEdges}
+            {text.stabilize}
+          </button>
+          <span
+            className={`ontology-network-status is-${status}`}
+            role="status"
+            aria-live="polite"
+            data-testid="graph-stabilization-status"
+          >
+            {statusText}
           </span>
         </div>
-      </div>
-      {view.nodes.length > 0 && (view.edges.length > 0 || view.nodes.length === 1) ? (
-        <div className="cytoscape-wrap">
-          <div
-            ref={containerRef}
-            className="cytoscape-graph"
-            data-testid="cytoscape-graph"
-            data-layout-engine="fcose-force"
-            data-layout-policy="canonical-primary-path-rings"
-            data-layout-invariant="pending"
-            data-hover-relations="incoming-and-outgoing"
-            data-drag-layout="continuous-local-force"
-            data-crossing-policy="label-collision-and-crossing-relaxation"
-            data-pan-during-drag="locked"
-            data-graph-root={graphRootRef}
-            data-reduced-motion={reducedMotion ? "true" : "false"}
-            role="img"
-            aria-label={`${text.hierarchy}: ${focusedEntity ? ontologyEntityLabel(focusedEntity, language) : graphRootRef}`}
-          />
-          {focusedEdge ? (
-            <aside className="graph-edge-tooltip" role="tooltip">
-              <strong>{focusedEdgeSource ? ontologyEntityLabel(focusedEdgeSource, language) : focusedEdge.source} — {focusedEdgeLabel} → {focusedEdgeTarget ? ontologyEntityLabel(focusedEdgeTarget, language) : focusedEdge.target}</strong>
-              <span>{relationDefinition(focusedEdge, focusedCanonicalRelation, language)}</span>
-            </aside>
-          ) : null}
-          <div className="graph-keyboard-controls" role="group" aria-label={text.hierarchy}>
-            {view.nodes.map((node) => (
-              <button
-                key={node.ref}
-                type="button"
-                data-graph-node={node.ref}
-                data-layout-depth={ontologyLogicalDepth(index, node.ref)}
-                className={[
-                  node.ref === focusedEntityRef ? "is-focused-node" : "",
-                  hasScenario(node.entity.data, highlightedScenarioId) ||
-                  scenarioHighlights.nodeRefs.has(node.ref)
-                    ? "case-path-highlight"
-                    : "",
-                ].filter(Boolean).join(" ") || undefined}
-                aria-pressed={node.ref === focusedEntityRef}
-                onClick={() => onFocusEntity(node.ref)}
-                onDoubleClick={() => onExpandEntity(node.ref)}
-                onKeyDown={(event) => {
-                  if (event.key === " ") {
-                    event.preventDefault();
-                    onExpandEntity(node.ref);
-                  } else if (event.key === "Escape") {
-                    event.preventDefault();
-                    onFocusEntity(graphRootRef);
-                  }
-                }}
-                onKeyUp={(event) => {
-                  if (event.key === " ") event.preventDefault();
-                }}
-              >
-                {ontologyEntityLabel(node.entity, language)}
-              </button>
-            ))}
-            {view.edges.map((edge) => {
-              const relation = edge.canonicalRelationId
-                ? index.relationsById.get(edge.canonicalRelationId)
-                : undefined;
-              const source = index.entitiesByRef.get(edge.source);
-              const target = index.entitiesByRef.get(edge.target);
-              const label = relationLabel(edge, relation, language);
-              return (
-                <button
-                  key={edge.id}
-                  type="button"
-                  data-graph-edge={edge.id}
-                  data-source={edge.source}
-                  data-target={edge.target}
-                  data-predicate={edge.predicate}
-                  data-direction="source-to-target"
-                  className={edgeClasses(
-                    edge,
-                    focusedEntityRef,
-                    focusedRelationId,
-                    hasScenario(relation, highlightedScenarioId) ||
-                      scenarioHighlights.relationIds.has(edge.id),
-                  )}
-                  aria-pressed={edge.id === focusedRelationId}
-                  title={relationDefinition(edge, relation, language)}
-                  aria-label={`${source ? ontologyEntityLabel(source, language) : edge.source} — ${label} → ${target ? ontologyEntityLabel(target, language) : edge.target}`}
-                  onClick={() => onFocusRelation(edge.id)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Escape") {
-                      event.preventDefault();
-                      onFocusEntity(graphRootRef);
-                    }
-                  }}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
+      </header>
+
+      {validationErrors.length > 0 ? (
+        <div className="graph-empty-state" role="alert" data-testid="community-graph-invalid">
+          <h3>{text.error}</h3>
+          <p>{validationErrors.join("; ")}</p>
         </div>
       ) : (
-        <div className="graph-empty-state" data-testid="graph-empty-state" role="status">
-          <h3>{text.graphEmptyTitle}</h3>
-          <p>{text.graphEmptyBody}</p>
+        <div className="ontology-network-stage">
+          <div
+            ref={containerRef}
+            className="ontology-network-canvas"
+            role="region"
+            aria-label={text.accessibility}
+            data-testid="ontology-network-graph"
+            data-layout-engine="vis-network-forceatlas2"
+            data-layout-status={status}
+            data-physics-enabled={status === "stable" ? "false" : "true"}
+            data-community-engine={validatedArtifact!.algorithm.engine}
+            data-community-seed={validatedArtifact!.algorithm.seed}
+            data-node-color-policy="community"
+            data-node-size-policy="degree-linear-10-40"
+            data-edge-label-policy="hover-only"
+            data-node-count={visibleCounts.nodeCount}
+            data-edge-count={visibleCounts.edgeCount}
+            data-community-count={model.communities.length}
+            data-source-sha256={validatedArtifact!.source_sha256}
+            data-projection-sha256={validatedArtifact!.projection_sha256}
+          />
+          <aside className="ontology-community-legend" aria-label={text.communities}>
+            <div className="ontology-community-legend-heading">
+              <div>
+                <strong>{text.communities}</strong>
+                <small>{model.algorithmLabel}</small>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHiddenCommunityIds(
+                  hiddenCommunityIds.size === 0
+                    ? new Set(model.communities.map(({ id }) => id))
+                    : new Set(),
+                )}
+              >
+                {hiddenCommunityIds.size === 0 ? text.hideAll : text.showAll}
+              </button>
+            </div>
+            <ul>
+              {model.communities.map((community) => (
+                <li key={community.id}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={!hiddenCommunityIds.has(community.id)}
+                      onChange={() => toggleCommunity(community.id)}
+                    />
+                    <span
+                      className="ontology-community-dot"
+                      style={{ backgroundColor: community.color }}
+                      aria-hidden="true"
+                    />
+                    <span>{community.label}</span>
+                    <small>{community.count}</small>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </aside>
+          <div className="ontology-network-count" data-testid="graph-count">
+            <strong>{visibleCounts.nodeCount}</strong> nodes · <strong>{visibleCounts.edgeCount}</strong> edges
+          </div>
         </div>
       )}
     </section>

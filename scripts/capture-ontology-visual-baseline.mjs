@@ -13,7 +13,7 @@ const result = spawnSync(
     playwrightCli,
     "test",
     "--grep",
-    "visual baselines",
+    "Graphify visual baseline",
     "--update-snapshots",
     "--workers=1",
   ],

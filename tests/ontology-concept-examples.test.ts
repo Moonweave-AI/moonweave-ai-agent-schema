@@ -6,9 +6,13 @@ import { describe, expect, it } from "vitest";
 import { enrichConceptExamplesWithRelations } from "../scripts/lib/ontology-concept-examples.mjs";
 
 const text = (value: string) => ({ zh: value, en: value, ja: value });
+const withoutTerminalPunctuation = (value: string) =>
+  value.trim().replace(/[。．.!?！？]+$/gu, "");
 const example = (kind: "positive" | "boundary") => ({
   id: `Child-example-${kind}`,
   kind,
+  scenario_id: null,
+  synthetic: true,
   descriptions: text("base"),
   field_values: {},
   related_node_ids: ["Child"],
@@ -170,6 +174,105 @@ describe("Concept examples anchored to the unified graph", () => {
     expect(JSON.stringify(child)).not.toMatch(/synthetic audit scenario|classified as .*under the reviewed definition|definition boundary and ownership conditions/iu);
   });
 
+  it("writes concrete trilingual Agent scenarios for all eight ontology domains", () => {
+    const modules = [
+      "info-content-block-modality",
+      "orchestration-delegation-handoff",
+      "runtime-execution-attempts",
+      "adapter-frameworks",
+      "tool-invocation-execution",
+      "safety-permission-policy",
+      "feedback-metrics-evaluation",
+      "memory-retrieval-ranking",
+    ];
+    const concepts = modules.flatMap((moduleId, index) => {
+      const conceptId = `ScenarioConcept${index}`;
+      const targetId = `ScenarioTarget${index}`;
+      return [
+        {
+          id: conceptId,
+          module_id: moduleId,
+          labels: text(`scenario concept ${index}`),
+          short_definitions: text(`scenario concept ${index} has a reviewed operational identity`),
+          definitions: text(`Scenario concept ${index} is distinguished in a concrete Agent operation.`),
+          why_needed: text("placeholder"),
+          includes: [text("placeholder")],
+          excludes: [text("placeholder")],
+          semantic_kind: "information",
+          primary_parent_relation_id: null,
+          structure: {
+            fields: [{ id: "sample", required: true, example_value: `value-${index}` }],
+          },
+          examples: [{ ...example("positive"), synthetic: true }],
+          source_claims: [],
+        },
+        {
+          id: targetId,
+          module_id: moduleId,
+          labels: text(`scenario target ${index}`),
+          short_definitions: text(`scenario target ${index} is the reviewed destination`),
+          definitions: text(`Scenario target ${index} is a concrete relation destination.`),
+          why_needed: text("placeholder"),
+          includes: [text("placeholder")],
+          excludes: [text("placeholder")],
+          semantic_kind: "information",
+          primary_parent_relation_id: null,
+          structure: { fields: [] },
+          examples: [],
+          source_claims: [],
+        },
+      ];
+    });
+    const relations = modules.map((_, index) => ({
+      ...relation,
+      id: `ScenarioConcept${index}-records-ScenarioTarget${index}`,
+      predicate: "records",
+      source_id: `ScenarioConcept${index}`,
+      target_id: `ScenarioTarget${index}`,
+    }));
+
+    const enriched = enrichConceptExamplesWithRelations({ concepts, relations });
+    const forbidden = /verifiable graph fragment|occupies the (?:source|target) endpoint|satisfies the identity conditions.*participates|in an auditable agent run/iu;
+    const expectedScenarioCues = [
+      "multimodal assistant run",
+      "coordinator run",
+      "traced task execution",
+      "integration build",
+      "agent tool-use run",
+      "guarded agent run",
+      "evaluation and correction cycle",
+      "retrieval-augmented memory run",
+    ];
+    for (const [index, cue] of expectedScenarioCues.entries()) {
+      const concept = enriched.find(({ id }) => id === `ScenarioConcept${index}`);
+      const positive = concept?.examples.find(({ kind }) => kind === "positive");
+      expect(positive, `domain scenario ${index}`).toBeDefined();
+      expect(positive?.scenario_id).toBeNull();
+      expect(positive?.descriptions.en).toContain(cue);
+      expect(positive?.descriptions.en).toContain(
+        `ScenarioConcept${index} records ScenarioTarget${index}`,
+      );
+      expect(positive?.descriptions.en).toContain(`value-${index}`);
+      expect(positive?.descriptions.en).toContain(
+        `Scenario concept ${index} is distinguished in a concrete Agent operation`,
+      );
+      expect(positive?.descriptions.en).toMatch(/^During .+, the system records /u);
+      expect(positive?.descriptions.en).toContain("Its reviewed definition is “");
+      expect(positive?.descriptions.en).toContain('. Its reviewed definition is “');
+      expect(positive?.descriptions.en).not.toMatch(/while the system/u);
+      expect(positive?.descriptions.zh).toMatch(/^在一次.+中，系统将/u);
+      expect(positive?.descriptions.zh).toContain("其已审查定义是“");
+      expect(positive?.descriptions.zh).not.toMatch(/系统正在.+时，系统/u);
+      expect(positive?.descriptions.ja).toContain("審査済み定義は「");
+      expect(positive?.descriptions.zh).not.toMatch(/[。．.!?！？]”[。．.!?！？]/u);
+      expect(positive?.descriptions.en).not.toMatch(/[.!?]”[.!?]/u);
+      expect(positive?.descriptions.ja).not.toMatch(/[。．.!?！？]」/u);
+      expect(positive?.descriptions.en).not.toMatch(forbidden);
+      expect(positive?.descriptions.zh).not.toBe(positive?.descriptions.en);
+      expect(positive?.descriptions.ja).not.toBe(positive?.descriptions.en);
+    }
+  });
+
   it("ensures every accepted source Concept with an incident relation cites a real fact", () => {
     const sourceRoot = resolve(import.meta.dirname, "../ontology/source");
     const moduleFiles = readdirSync(sourceRoot, { withFileTypes: true })
@@ -199,6 +302,82 @@ describe("Concept examples anchored to the unified graph", () => {
             fact.source_id === concept.id || fact.target_id === concept.id,
             `${concept.id}/${item.id}/${relationId}`,
           ).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("keeps every accepted source Concept positive example in a concrete Agent scenario", () => {
+    const sourceRoot = resolve(import.meta.dirname, "../ontology/source");
+    const moduleFiles = readdirSync(sourceRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .flatMap((plane) =>
+        readdirSync(resolve(sourceRoot, plane.name))
+          .filter((name) => name.endsWith(".json"))
+          .map((name) => resolve(sourceRoot, plane.name, name)),
+      );
+    const modules = moduleFiles.map((path) => JSON.parse(readFileSync(path, "utf8")));
+    const concepts = modules.flatMap(({ classes }) => classes);
+    const relations = modules.flatMap(({ relations: facts }) => facts);
+    const relationById = new Map(relations.map((fact) => [fact.id, fact]));
+    const forbidden = /verifiable graph fragment|occupies the (?:source|target) endpoint|satisfies the identity conditions.*participates|in an auditable agent run/iu;
+    const scenarioCue = /multimodal assistant run|coordinator run|traced task execution|integration build|agent tool-use run|guarded agent run|evaluation and correction cycle|retrieval-augmented memory run/iu;
+
+    for (const concept of concepts.filter(({ status }) => status === "accepted")) {
+      const positives = concept.examples.filter(({ kind }: { kind: string }) => kind === "positive");
+      expect(positives.length, concept.id).toBeGreaterThan(0);
+      for (const positive of positives) {
+        expect(positive.scenario_id, `${concept.id}/${positive.id}`).toBeNull();
+        expect(positive.synthetic, `${concept.id}/${positive.id}`).toBe(true);
+        expect(positive.descriptions.en, `${concept.id}/${positive.id}`).toMatch(scenarioCue);
+        expect(positive.descriptions.en, `${concept.id}/${positive.id}`).not.toMatch(forbidden);
+        expect(positive.descriptions.en, `${concept.id}/${positive.id}`).toMatch(
+          /^During .+, the system records /u,
+        );
+        expect(positive.descriptions.en, `${concept.id}/${positive.id}`).toContain(
+          "Its reviewed definition is “",
+        );
+        expect(positive.descriptions.en, `${concept.id}/${positive.id}`).toContain(
+          '. Its reviewed definition is “',
+        );
+        expect(positive.descriptions.en, `${concept.id}/${positive.id}`).not.toMatch(/while the system/u);
+        expect(positive.descriptions.zh, `${concept.id}/${positive.id}`).toMatch(
+          /^在一次.+中，系统将/u,
+        );
+        expect(positive.descriptions.zh, `${concept.id}/${positive.id}`).toContain(
+          "其已审查定义是“",
+        );
+        expect(positive.descriptions.zh, `${concept.id}/${positive.id}`).not.toMatch(
+          /系统正在.+时，系统/u,
+        );
+        expect(positive.descriptions.ja, `${concept.id}/${positive.id}`).toContain(
+          "審査済み定義は「",
+        );
+        const relationId = positive.related_relation_ids[0];
+        const fact = relationById.get(relationId);
+        expect(fact, `${concept.id}/${positive.id}/${relationId}`).toBeDefined();
+        expect(positive.descriptions.en).toContain(
+          `${fact.source_id} ${fact.predicate} ${fact.target_id}`,
+        );
+        for (const language of ["zh", "en", "ja"] as const) {
+          expect(positive.descriptions[language]).toContain(
+            withoutTerminalPunctuation(concept.definitions[language]),
+          );
+        }
+        expect(positive.descriptions.zh, `${concept.id}/${positive.id}`).not.toMatch(
+          /[。．.!?！？]”[。．.!?！？]/u,
+        );
+        expect(positive.descriptions.en, `${concept.id}/${positive.id}`).not.toMatch(
+          /[.!?]”[.!?]/u,
+        );
+        expect(positive.descriptions.ja, `${concept.id}/${positive.id}`).not.toMatch(
+          /[。．.!?！？]」/u,
+        );
+        for (const value of Object.values(positive.field_values ?? {})) {
+          const serialized = JSON.stringify(value);
+          expect(positive.descriptions.en, `${concept.id}/${positive.id}/${serialized}`).toContain(
+            serialized.length > 80 ? serialized.slice(0, 77) : serialized,
+          );
         }
       }
     }

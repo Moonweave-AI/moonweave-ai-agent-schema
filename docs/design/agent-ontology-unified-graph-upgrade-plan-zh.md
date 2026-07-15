@@ -1,6 +1,8 @@
 # Moonweave Agent Ontology 统一图谱层级深化升级计划
 
-> 后续校正（2026-07-14）：本文件记录 v2 的实施合同与历史验收，不再作为模块边界、概念纵深和图谱布局的最新实施依据。用户二次反馈与当前 622 个 Concept 的复审表明，v2 仍有大量平铺根节点、模块文字模板和伪 fCoSE 同心圆布局。后续升级以 [语义纵深、模块边界与图谱呈现二次升级计划](./agent-ontology-semantic-depth-and-graph-visualization-upgrade-plan-zh.md) 为准；本文件关于单一图谱、节点内信息和不新增 ABox/TBox/Schema/Instance 平行页面的决定继续有效。
+> **最终校正（2026-07-15）：** 本文件仅记录 v2 的历史实施合同，不再作为模块边界、概念纵深或前端图谱的现行实施依据。后续本体语义以 [语义纵深、模块边界与图谱呈现二次升级计划](./agent-ontology-semantic-depth-and-graph-visualization-upgrade-plan-zh.md) 的非可视化合同为准；该文顶部“最终可视化校正”又优先于其全部旧 ELK/fCoSE 章节。本文出现的 Cytoscape、fCoSE、固定层级布局、双模式、方向控制和旧控件均为历史记录，不得恢复。
+>
+> 仍然有效的产品不变量只有这些：对外只有一张 canonical 概念图；NetworkX `MultiDiGraph` 保留完整定向、多谓词、多重语义，简单无向投影只用于确定性社区发现；前端只有一套本地 `vis-network` `ForceAtlas2Based` 呈现；社区只是颜色和聚类提示，不是新本体层；schema、实例、来源、解释和案例附着在原节点或原关系的同页信息中，不新增 ABox/TBox/Schema/Instance 平行页面、影子节点或第二套图。
 
 > 版本：Draft 1.0
 > 日期：2026-07-13
@@ -9,8 +11,8 @@
 > 输入一：2026-07-03 快速会议记录
 > 输入二：`research/agent-ontology-hierarchical-closure-audit-zh.md`
 > 输入三：2026-07-13 用户关于统一图谱、逻辑层级和内嵌信息的四点反馈
-> 文档性质：后续升级的实施合同；本文件本身不授权改写 ontology 或 UI
-> 交付状态：已按本计划完成 TDD 实施、正式 v2 原子发布与全量验收（2026-07-13）
+> 文档性质：v2 统一图谱升级的历史实施合同；v3 语义纵深、模块边界和布局以二次计划为准
+> 交付状态：v2 已完成；v3 实施与发布状态见二次计划
 
 ## 0. CAPABILITY：升级后究竟获得什么能力
 

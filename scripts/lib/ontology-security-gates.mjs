@@ -111,7 +111,22 @@ export const assertPublishedContentSecurity = (input) => {
   );
 };
 
-const validateAllowlistEntry = (entry) => {
+const ISO_CALENDAR_DATE = /^\d{4}-\d{2}-\d{2}$/u;
+
+const parseCalendarDate = (value) => {
+  if (!ISO_CALENDAR_DATE.test(value)) return null;
+  const timestamp = Date.parse(`${value}T00:00:00.000Z`);
+  if (!Number.isFinite(timestamp)) return null;
+  return new Date(timestamp).toISOString().slice(0, 10) === value ? timestamp : null;
+};
+
+const todayUtc = (now) => {
+  const value = now instanceof Date ? new Date(now.getTime()) : new Date(now);
+  if (!Number.isFinite(value.getTime())) throw new Error("Source URL policy now must be a valid date");
+  return Date.parse(`${value.toISOString().slice(0, 10)}T00:00:00.000Z`);
+};
+
+const validateAllowlistEntry = (entry, nowTimestamp) => {
   if (!entry || typeof entry !== "object") return "allowlist entry must be an object";
   const required = ["source_id", "url", "reason", "approved_by", "approved_on", "review_by"];
   const missing = required.filter((key) => typeof entry[key] !== "string" || !entry[key].trim());
@@ -124,14 +139,26 @@ const validateAllowlistEntry = (entry) => {
   } catch {
     return "allowlist entry contains an invalid URL";
   }
+  const approvedOn = parseCalendarDate(entry.approved_on);
+  if (approvedOn === null) return "approved_on must be a valid YYYY-MM-DD calendar date";
+  const reviewBy = parseCalendarDate(entry.review_by);
+  if (reviewBy === null) return "review_by must be a valid YYYY-MM-DD calendar date";
+  if (approvedOn > nowTimestamp) return "approved_on must not be in the future";
+  if (reviewBy < approvedOn) return "review_by must be on or after approved_on";
+  if (reviewBy < nowTimestamp) return "review_by approval window has expired";
   return null;
 };
 
-export const validateSourceUrlPolicy = (sources, httpAllowlist) => {
+export const validateSourceUrlPolicy = (
+  sources,
+  httpAllowlist,
+  { now = new Date() } = {},
+) => {
   const violations = [];
   const allowlistById = new Map();
+  const nowTimestamp = todayUtc(now);
   for (const entry of httpAllowlist) {
-    const issue = validateAllowlistEntry(entry);
+    const issue = validateAllowlistEntry(entry, nowTimestamp);
     if (issue) {
       violations.push({ sourceId: String(entry?.source_id ?? "<unknown>"), message: issue });
       continue;
@@ -192,8 +219,8 @@ export const validateSourceUrlPolicy = (sources, httpAllowlist) => {
   return violations;
 };
 
-export const assertSourceUrlPolicy = (sources, httpAllowlist) => {
-  const violations = validateSourceUrlPolicy(sources, httpAllowlist);
+export const assertSourceUrlPolicy = (sources, httpAllowlist, options) => {
+  const violations = validateSourceUrlPolicy(sources, httpAllowlist, options);
   if (violations.length === 0) return;
   throw new Error(
     `Source URL policy failed:\n${violations

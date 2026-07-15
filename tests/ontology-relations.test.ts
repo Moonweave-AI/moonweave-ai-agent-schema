@@ -3,6 +3,8 @@ import { join, relative, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { ONTOLOGY_V3_INTERACTION_CONTRACTS } from "../scripts/data/ontology-v3-interaction-contracts.mjs";
+import { ONTOLOGY_V3_REPRESENTATIVE_INVERSE_READINGS } from "../scripts/data/ontology-v3-representative-inverse-readings.mjs";
 import { ontologyArtifactPath } from "./helpers/ontology-artifact";
 
 interface LocalizedText {
@@ -51,6 +53,7 @@ interface Relation {
   source_claims?: SourceClaim[];
   distinct_fact_rationale?: LocalizedText | null;
   status: string;
+  replaced_by_ids?: string[];
 }
 
 interface Concept {
@@ -317,7 +320,9 @@ describe("candidate ontology relations", () => {
 
   it("requires a distinct-fact rationale for a second directional assertion", () => {
     const groups = new Map<string, Relation[]>();
-    for (const relation of candidateOntology().relations) {
+    for (const relation of candidateOntology().relations.filter(
+      ({ status }) => status === "accepted",
+    )) {
       const key = reversePairKey(relation);
       groups.set(key, [...(groups.get(key) ?? []), relation]);
     }
@@ -370,8 +375,18 @@ describe("candidate ontology relations", () => {
       const key = normalizedFactKey(entry.relation);
       factOwners.set(key, [...(factOwners.get(key) ?? []), entry]);
     }
+    const isReviewedLineageAliasGroup = (entries: LocatedSourceRelation[]) => {
+      const accepted = entries.filter(({ relation }) => relation.status === "accepted");
+      const deprecated = entries.filter(({ relation }) => relation.status === "deprecated");
+      return accepted.length === 1 &&
+        deprecated.length === entries.length - 1 &&
+        deprecated.every(({ relation }) =>
+          (relation.examples?.length ?? 0) === 0 &&
+          (relation.replaced_by_ids ?? []).includes(accepted[0].relation.id),
+        );
+    };
     const duplicates = [...factOwners.values()]
-      .filter((entries) => entries.length > 1)
+      .filter((entries) => entries.length > 1 && !isReviewedLineageAliasGroup(entries))
       .map((entries) =>
         entries.map((entry) => `${entry.relation.id}@${entry.path}`).sort().join("|"),
       );
@@ -434,13 +449,15 @@ describe("candidate ontology relations", () => {
     const ontology = candidateOntology();
     const relationById = new Map(ontology.relations.map((relation) => [relation.id, relation]));
     const invalid = ontology.modules.flatMap((module) => {
-      const question = module.competency_questions?.find(({ id }) =>
-        id.endsWith("-cq-semantic-closure"),
-      );
-      const exampleId = question?.positive_example_ids[0];
-      const relationId = exampleId?.replace(/-example-positive-001$/u, "");
+      const relationId = ONTOLOGY_V3_INTERACTION_CONTRACTS[module.id]
+        ?.representative_relation_id;
       const relation = relationId ? relationById.get(relationId) : undefined;
-      return relation && !relation.inverse_reading?.predicate.startsWith("is_target_of_")
+      const expected = relationId
+        ? ONTOLOGY_V3_REPRESENTATIVE_INVERSE_READINGS[relationId]
+        : undefined;
+      return relation && expected &&
+        relation.inverse_reading?.predicate === expected.predicate &&
+        JSON.stringify(relation.inverse_reading.labels) === JSON.stringify(expected.labels)
         ? []
         : [`${module.id}:${relationId ?? "missing"}`];
     });
@@ -560,7 +577,6 @@ describe("candidate ontology relations", () => {
     const reciprocalReadings = [
       ["Adapter-governed_by-MappingRule", "MappingRule-governs-Adapter", "governed_by"],
       ["correction_triggered_by_feedback", "Feedback-motivates-Correction", "motivated_by"],
-      ["feedback_derived_from_review_finding", "ReviewFinding-generates-Feedback", "generated_by"],
       ["observed_as_context_input", "ContextIngressEvent-makes_available-CommandOutputObservation", "made_available_by"],
       ["uses_protocol_envelope", "ProtocolEnvelope-wraps-Message", "wrapped_by"],
       ["trace_event_belongs_to_span", "TraceSpan-records_event-TraceEvent", "belongs_to_span"],

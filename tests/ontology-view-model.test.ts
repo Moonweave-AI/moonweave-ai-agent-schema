@@ -194,6 +194,9 @@ describe("canonical ontology visible-graph projection", () => {
       "finalizes",
       "produces",
     ]);
+    expect(parallelEdges.map(({ parallelCount }) => parallelCount)).toEqual([2, 2]);
+    expect(parallelEdges.map(({ parallelIndex }) => parallelIndex)).toEqual([0, 1]);
+    expect(new Set(parallelEdges.map(({ parallelGroupKey }) => parallelGroupKey)).size).toBe(1);
   });
 
   it("keeps a semantic leaf visible through its canonical parent edge", () => {
@@ -335,6 +338,37 @@ describe("canonical ontology visible-graph projection", () => {
 });
 
 describe("ontology view hash contract", () => {
+  it("round-trips a concept root whose focus is a multi-level primary-backbone descendant", () => {
+    const index = buildFixtureIndex();
+    const state = createOntologyViewState(index, {
+      graphRootRef: fixtureRefs.runtimeEntity,
+      focusedEntityRef: fixtureRefs.leafRun,
+    });
+    const hash = serializeOntologyViewHash(state);
+    const restored = restoreOntologyViewHash(hash, index);
+
+    expect(hash).toBe("#root=concept%3ARuntimeEntity&focus=node:LeafRun");
+    expect(restored.repairedRoot).toBe(false);
+    expect(restored.state.graphRootRef).toBe(fixtureRefs.runtimeEntity);
+    expect(restored.state.focusedEntityRef).toBe(fixtureRefs.leafRun);
+    expect(restored.normalizedHash).toBe(hash);
+  });
+
+  it("does not mistake a pure semantic neighbor for a concept-root descendant", () => {
+    const index = buildFixtureIndex();
+    const restored = restoreOntologyViewHash(
+      "#root=concept%3AAgentRun&focus=node:RunResult",
+      index,
+    );
+
+    expect(restored.repairedRoot).toBe(true);
+    expect(restored.state.graphRootRef).toBe(fixtureRefs.runLifecycleModule);
+    expect(restored.state.focusedEntityRef).toBe(fixtureRefs.runResult);
+    expect(restored.normalizedHash).toBe(
+      "#root=module%3Arun-lifecycle&focus=node:RunResult",
+    );
+  });
+
   it("round-trips and normalizes a node focus with root before focus", () => {
     const index = buildFixtureIndex();
     const state = createOntologyViewState(index, {
@@ -353,6 +387,91 @@ describe("ontology view hash contract", () => {
     expect(restored.state.focusedRelationId).toBeNull();
     expect(restored.normalizedHash).toBe(serialized);
     expect(restored.repairedRoot).toBe(false);
+  });
+
+  it("round-trips an explicitly controlled graph mode and layout direction", () => {
+    const index = buildFixtureIndex();
+    const state = createOntologyViewState(index, {
+      graphRootRef: fixtureRefs.agentRun,
+      focusedEntityRef: fixtureRefs.agentRun,
+    });
+    const serialized = serializeOntologyViewHash(state, {
+      mode: "relations",
+      direction: "RIGHT",
+    });
+    const restored = restoreOntologyViewHash(serialized, index);
+
+    expect(serialized).toBe(
+      "#root=concept%3AAgentRun&focus=node:AgentRun&mode=relations&direction=RIGHT",
+    );
+    expect(restored.layoutMode).toBe("relations");
+    expect(restored.layoutDirection).toBe("RIGHT");
+  });
+
+  it("sorts and deduplicates relation predicates in the shareable graph hash", () => {
+    const index = buildFixtureIndex();
+    const knownPredicates = [...index.relationsByPredicate.keys()]
+      .filter((predicate) => predicate !== "is_a")
+      .sort()
+      .slice(0, 2);
+    expect(knownPredicates).toHaveLength(2);
+    const state = createOntologyViewState(index, {
+      graphRootRef: fixtureRefs.agentRun,
+      focusedEntityRef: fixtureRefs.agentRun,
+    });
+    const serialized = serializeOntologyViewHash(state, {
+      mode: "relations",
+      direction: "DOWN",
+      predicates: [knownPredicates[1]!, knownPredicates[0]!, knownPredicates[1]!],
+    });
+    const restored = restoreOntologyViewHash(serialized, index);
+
+    expect(new URLSearchParams(serialized.slice(1)).getAll("predicate"))
+      .toEqual(knownPredicates);
+    expect(restored.relationPredicates).toEqual(knownPredicates);
+    expect(restored.normalizedHash).toBe(serialized);
+  });
+
+  it("filters unknown predicates and bounds predicate serialization", () => {
+    const index = buildFixtureIndex();
+    const state = createOntologyViewState(index, {
+      graphRootRef: fixtureRefs.agentRun,
+      focusedEntityRef: fixtureRefs.agentRun,
+    });
+    const serialized = serializeOntologyViewHash(state, {
+      mode: "relations",
+      direction: "DOWN",
+      predicates: Array.from({ length: 100 }, (_, position) => `valid_name_${position}`),
+    });
+    expect(new URLSearchParams(serialized.slice(1)).getAll("predicate")).toHaveLength(32);
+
+    const restored = restoreOntologyViewHash(
+      "#root=concept%3AAgentRun&focus=node:AgentRun&predicate=unknown_predicate" +
+      "&predicate=produces",
+      index,
+    );
+    expect(restored.relationPredicates).toEqual(["produces"]);
+    expect(restored.normalizedHash).not.toContain("unknown_predicate");
+  });
+
+  it("fails closed without parsing an oversized hash fragment", () => {
+    const index = buildFixtureIndex();
+    const restored = restoreOntologyViewHash(`#${"x".repeat(100_000)}`, index);
+
+    expect(restored.state.graphRootRef).toBe(fixtureRefs.root);
+    expect(restored.state.focusedEntityRef).toBe(fixtureRefs.root);
+    expect(restored.normalizedHash.length).toBeLessThanOrEqual(8_192);
+  });
+
+  it("fails closed to hierarchy/DOWN for unknown graph hash options", () => {
+    const index = buildFixtureIndex();
+    const restored = restoreOntologyViewHash(
+      "#root=concept%3AAgentRun&focus=node:AgentRun&mode=radial&direction=SIDEWAYS",
+      index,
+    );
+
+    expect(restored.layoutMode).toBe("hierarchy");
+    expect(restored.layoutDirection).toBe("DOWN");
   });
 
   it("infers the primary expansion path so a deep focus stays visible after refresh", () => {

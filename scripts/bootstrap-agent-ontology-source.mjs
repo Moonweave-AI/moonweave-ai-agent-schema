@@ -300,6 +300,7 @@ for (const module of canonical.modules) {
   writeFileSync(resolve(directory, `${module.id}.json`), stableJson(source), "utf8");
 }
 
-if (moduleById.size !== 41) {
-  throw new Error(`Expected 41 frozen Modules, found ${moduleById.size}`);
+const legacyModuleCount = 41;
+if (moduleById.size !== legacyModuleCount) {
+  throw new Error(`Expected ${legacyModuleCount} frozen v1 Modules, found ${moduleById.size}`);
 }

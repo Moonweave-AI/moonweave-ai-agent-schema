@@ -114,6 +114,27 @@ describe("canonical ontology index", () => {
     expect(ontologyLogicalDepth(index, fixtureRefs.agentRun)).toBe(4);
   });
 
+  it("derives logical depth from the unified primary backbone, including semantic edges", () => {
+    const ontology = {
+      ...ontologyViewModelFixture,
+      relations: ontologyViewModelFixture.relations.map((relation) =>
+        relation.id === "AgentRun-produces-RunResult"
+          ? {
+              ...relation,
+              layout_role: "primary-backbone",
+              layout_parent_id: "AgentRun",
+              layout_child_id: "RunResult",
+            }
+          : relation),
+    };
+    const index = buildOntologyIndex(
+      ontology as unknown as Parameters<typeof buildOntologyIndex>[0],
+    );
+
+    expect(ontologyLogicalDepth(index, fixtureRefs.agentRun)).toBe(4);
+    expect(ontologyLogicalDepth(index, fixtureRefs.runResult)).toBe(5);
+  });
+
   it("preserves canonical incoming and outgoing directions, including hierarchy edges", () => {
     const index = buildFixtureIndex();
 

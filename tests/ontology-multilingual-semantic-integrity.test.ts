@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 
 type Locale = "zh" | "en" | "ja";
 type LocalizedText = Readonly<Record<Locale, string>>;
+const withoutTerminalPunctuation = (value: string) =>
+  value.trim().replace(/[。．.!?！？]+$/gu, "");
 
 interface SourceExample {
   id: string;
@@ -20,6 +22,7 @@ interface SourceExample {
 interface SourceConcept {
   id: string;
   status: string;
+  replaced_by_ids?: readonly string[];
   short_definitions: LocalizedText;
   definitions: LocalizedText;
   includes: readonly LocalizedText[];
@@ -38,99 +41,94 @@ interface SourceRelation {
 
 const reviewedDefinitions = {
   ToolCandidate: {
-    en: "A ToolCandidate is a Candidate whose considered object is a Tool and whose matching evidence is represented by ToolMatch-assesses-ToolCandidate.",
+    en: "A Tool Candidate is a Candidate Record (Candidate) whose considered object is a Tool and whose matching evidence is represented by ToolMatch-assesses-ToolCandidate.",
     zh: "工具候选是一种候选记录（Candidate），其被考虑对象限定为工具（Tool），并由 ToolMatch-assesses-ToolCandidate 关系承载匹配证据。",
     ja: "ツール候補は候補レコード（Candidate）の一種で、検討対象をツール（Tool）に限定し、照合根拠を ToolMatch-assesses-ToolCandidate 関係で表します。",
   },
   ToolCandidateSet: {
-    en: "A ToolCandidateSet is a DiscoveryCandidateSet whose members are ToolCandidate records connected through ToolCandidateSet-contains-ToolCandidate.",
-    zh: "工具候选集是一种发现候选集（DiscoveryCandidateSet），其成员限定为通过 ToolCandidateSet-contains-ToolCandidate 关系连接的工具候选（ToolCandidate）。",
+    en: "A Tool Candidate Set is a Discovery Candidate Set (DiscoveryCandidateSet) whose members are ToolCandidate records connected through ToolCandidateSet-contains-ToolCandidate.",
+    zh: "工具候选集是一种发现候选集合（DiscoveryCandidateSet），其成员限定为通过 ToolCandidateSet-contains-ToolCandidate 关系连接的工具候选（ToolCandidate）。",
     ja: "ツール候補集合は発見候補集合（DiscoveryCandidateSet）の一種で、ToolCandidateSet-contains-ToolCandidate 関係で結ばれたツール候補（ToolCandidate）だけをメンバーとします。",
   },
   ToolEmbeddingMatch: {
-    en: "A ToolEmbeddingMatch is a ToolMatch whose evidence is vector similarity between a search query and a tool representation.",
-    zh: "工具嵌入匹配是一种工具匹配（ToolMatch），其判定证据限定为搜索查询与工具表征之间的向量相似度。",
-    ja: "ツール埋め込み照合はツール照合（ToolMatch）の一種で、検索クエリとツール表現のベクトル類似度を判定根拠とします。",
+    en: "A Tool Embedding Match is a Tool Match Assessment (ToolMatch) whose evidence is vector similarity between a search query and a tool representation.",
+    zh: "工具嵌入匹配是一种工具匹配评估（ToolMatch），其判定证据限定为搜索查询与工具表征之间的向量相似度。",
+    ja: "ツール埋め込み照合はツール適合評価（ToolMatch）の一種で、検索クエリとツール表現のベクトル類似度を判定根拠とします。",
   },
   ToolMatch: {
-    en: "A ToolMatch is a MatchAssessment that evaluates a ToolCandidate against a Tool using name, signature, embedding, regular-expression, or task-fit evidence.",
-    zh: "工具匹配是一种匹配评估（MatchAssessment），它使用名称、签名、嵌入、正则表达式或任务适配证据，评估工具候选（ToolCandidate）与工具（Tool）的匹配程度。",
-    ja: "ツール照合は照合評価（MatchAssessment）の一種で、名前、シグネチャ、埋め込み、正規表現、またはタスク適合性の根拠を用いてツール候補（ToolCandidate）とツール（Tool）の適合度を評価します。",
+    en: "A Tool Match Assessment is a Match Assessment (MatchAssessment) that evaluates a ToolCandidate against a Tool using name, signature, embedding, regular-expression, or task-fit evidence.",
+    zh: "工具匹配评估是一种匹配评估（MatchAssessment），使用名称、签名、嵌入、正则表达式或任务适配证据，评估工具候选（ToolCandidate）与工具（Tool）的匹配程度。",
+    ja: "ツール適合評価は適合評価（MatchAssessment）の一種で、名前、シグネチャ、埋め込み、正規表現、またはタスク適合性の根拠を用いてツール候補（ToolCandidate）とツール（Tool）の適合度を評価します。",
   },
   ToolRegexMatch: {
-    en: "A ToolRegexMatch is a ToolMatch whose evidence is a regular-expression match over a query and tool metadata.",
-    zh: "工具正则匹配是一种工具匹配（ToolMatch），其判定证据限定为查询与工具元数据之间的正则表达式匹配。",
-    ja: "ツール正規表現照合はツール照合（ToolMatch）の一種で、クエリとツールメタデータに対する正規表現の一致を判定根拠とします。",
+    en: "A Tool Regex Match is a Tool Match Assessment (ToolMatch) whose evidence is a regular-expression match over a query and tool metadata.",
+    zh: "工具正则匹配是一种工具匹配评估（ToolMatch），其判定证据限定为查询与工具元数据之间的正则表达式匹配。",
+    ja: "ツール正規表現照合はツール適合評価（ToolMatch）の一種で、クエリとツールメタデータに対する正規表現の一致を判定根拠とします。",
   },
   ToolSearch: {
-    en: "A ToolSearch is a DiscoveryActivity that consumes a ToolSearchQuery and produces a ToolCandidateSet by retrieving ToolDefinition records.",
-    zh: "工具搜索是一种发现活动（DiscoveryActivity），它消费工具搜索查询（ToolSearchQuery），检索工具定义（ToolDefinition），并产出工具候选集（ToolCandidateSet）。",
+    en: "A Tool Search is a Discovery activity (DiscoveryActivity) that consumes a ToolSearchQuery and produces a ToolCandidateSet by retrieving ToolDefinition records.",
+    zh: "工具检索是一种发现活动（DiscoveryActivity），消费工具搜索查询（ToolSearchQuery），检索工具定义（ToolDefinition），并产出工具候选集（ToolCandidateSet）。",
     ja: "ツール検索は発見活動（DiscoveryActivity）の一種で、ツール検索クエリ（ToolSearchQuery）を消費し、ツール定義（ToolDefinition）を検索してツール候補集合（ToolCandidateSet）を生成します。",
   },
   ToolSelectionDecision: {
     en: "A ToolSelectionDecision is a SelectionDecision that considers ToolMatch evidence and either selects a Tool or rejects a ToolCandidate.",
     zh: "工具选择决策是一种选择决策（SelectionDecision），它审议工具匹配（ToolMatch）证据，并据此选择工具（Tool）或拒绝工具候选（ToolCandidate）。",
-    ja: "ツール選択判断は選択判断（SelectionDecision）の一種で、ツール照合（ToolMatch）の根拠を検討し、ツール（Tool）を選択するかツール候補（ToolCandidate）を棄却します。",
-  },
-  ExecutionRequest: {
-    en: "An ExecutionRequest is an InvocationSpecification that asks a runtime to run a command, call a service, access a resource, or execute a tool operation.",
-    zh: "执行请求是一种调用规约（InvocationSpecification），用于要求运行时执行命令、调用服务、访问资源或执行工具操作。",
-    ja: "実行要求は呼び出し仕様（InvocationSpecification）の一種で、ランタイムにコマンド実行、サービス呼び出し、リソースアクセス、またはツール操作の実行を要求します。",
+    ja: "ツール選択決定は選択決定（SelectionDecision）の一種で、ツール適合評価（ToolMatch）の根拠を検討し、ツール（Tool）を選択するかツール候補（ToolCandidate）を棄却します。",
   },
   ExecutionResult: {
     en: "An ExecutionResult is an InvocationResult for an ExecutionRequest that carries observable output, error stream, exit status, or artifact references without asserting task success.",
-    zh: "执行结果是一种调用结果（InvocationResult），对应一次执行请求（ExecutionRequest），承载可观测输出、错误流、退出状态或产物引用，但不据此断言任务成功。",
-    ja: "実行結果は実行要求（ExecutionRequest）に対する呼び出し結果（InvocationResult）の一種で、観測可能な出力、エラーストリーム、終了状態、または成果物参照を保持しますが、タスク成功を表明しません。",
+    zh: "执行结果是一种调用返回记录（InvocationResult），对应一次执行请求（ExecutionRequest），承载可观测输出、错误流、退出状态或产物引用，但不据此断言任务成功。",
+    ja: "実行結果は呼び出し返却記録（InvocationResult）の一種で、実行要求（ExecutionRequest）に対応し、観測可能な出力、エラーストリーム、終了状態、または成果物参照を保持しますが、タスク成功を表明しません。",
   },
   ProgrammaticToolCall: {
     en: "A ProgrammaticToolCall is a ToolCall initiated by generated code, runtime orchestration, or explicit API logic rather than direct natural-language selection.",
     zh: "程序化工具调用是一种工具调用（ToolCall），其发起源限定为生成代码、运行时编排或显式 API 逻辑，而非直接的自然语言选择。",
-    ja: "プログラム的ツール呼び出しはツール呼び出し（ToolCall）の一種で、直接の自然言語選択ではなく、生成コード、ランタイム編成、または明示的な API ロジックから開始されます。",
+    ja: "プログラム型ツール呼び出しはツール呼び出し（ToolCall）の一種で、直接の自然言語選択ではなく、生成コード、ランタイム編成、または明示的な API ロジックから開始されます。",
   },
   ToolCall: {
     en: "A ToolCall is an Invocation that identifies a caller and operation, supplies arguments, and requests a selected Tool; call_id, requested_at, operation_id, and idempotency_key make the request traceable and replay-safe.",
-    zh: "工具调用是一种调用（Invocation），它标识调用者与操作、提供参数并请求已选择的工具（Tool）；call_id、requested_at、operation_id 与 idempotency_key 使该请求可追踪且可安全重放。",
-    ja: "ツール呼び出しは呼び出し（Invocation）の一種で、呼び出し元と操作を識別し、引数を渡して選択済みツール（Tool）を要求します。call_id、requested_at、operation_id、idempotency_key により追跡可能性と安全な再実行を確保します。",
+    zh: "工具调用是一种调用活动（Invocation），标识调用者与操作、提供参数并请求已选择的工具（Tool）；call_id、requested_at、operation_id 与 idempotency_key 使该请求可追踪且可安全重放。",
+    ja: "ツール呼び出しは呼び出し活動（Invocation）の一種で、呼び出し元と操作を識別し、引数を渡して選択済みツール（Tool）を要求し、call_id、requested_at、operation_id、idempotency_key により追跡可能性と安全な再実行を確保します。",
   },
   ToolCallAttempt: {
     en: "A ToolCallAttempt is an InvocationAttempt that records one execution attempt of a ToolCall, identified by attempt_id and attempt_number, with status, timing, authorization, sandbox, and result context.",
     zh: "工具调用尝试是一种调用尝试（InvocationAttempt），记录某个工具调用（ToolCall）的一次执行；attempt_id 与 attempt_number 标识该次尝试，并附带状态、时间、授权、沙箱和结果上下文。",
-    ja: "ツール呼び出し試行は呼び出し試行（InvocationAttempt）の一種で、ツール呼び出し（ToolCall）の一回の実行を記録します。attempt_id と attempt_number で試行を識別し、状態、時刻、認可、サンドボックス、結果の文脈を保持します。",
+    ja: "ツール呼び出し試行は呼び出し試行（InvocationAttempt）の一種で、ツール呼び出し（ToolCall）の一回の実行を記録し、attempt_id と attempt_number で試行を識別して状態、時刻、認可、サンドボックス、結果の文脈を保持します。",
   },
   ToolCallRetry: {
-    en: "A ToolCallRetry is a ToolCallAttempt initiated to retry a prior ToolCallAttempt after a retryable failure or policy decision and linked by ToolCallRetry-retries-ToolCallAttempt.",
+    en: "A Tool Call Retry is a Tool Call Attempt (ToolCallAttempt) initiated to retry a prior ToolCallAttempt after a retryable failure or policy decision and linked by ToolCallRetry-retries-ToolCallAttempt.",
     zh: "工具调用重试是一种工具调用尝试（ToolCallAttempt），在可重试失败或策略决策后再次执行先前尝试，并通过 ToolCallRetry-retries-ToolCallAttempt 关系指向被重试的尝试。",
     ja: "ツール呼び出し再試行はツール呼び出し試行（ToolCallAttempt）の一種で、再試行可能な失敗またはポリシー判断の後に先行試行を再実行し、ToolCallRetry-retries-ToolCallAttempt 関係で再試行対象を指します。",
   },
   ToolResult: {
     en: "A ToolResult is an InvocationResult produced by a ToolCallAttempt, identified by result_id, status, received_at, and payload_digest, and carrying output, error, warning, or metadata without asserting task success.",
-    zh: "工具结果是一种调用结果（InvocationResult），由工具调用尝试（ToolCallAttempt）产生，以 result_id、status、received_at 与 payload_digest 标识，并承载输出、错误、警告或元数据，但不据此断言任务成功。",
-    ja: "ツール結果はツール呼び出し試行（ToolCallAttempt）が生成する呼び出し結果（InvocationResult）の一種で、result_id、status、received_at、payload_digest で識別され、出力、エラー、警告、メタデータを保持しますが、タスク成功を表明しません。",
+    zh: "工具结果是一种调用返回记录（InvocationResult），由工具调用尝试（ToolCallAttempt）产生，以 result_id、status、received_at 与 payload_digest 标识，并承载输出、错误、警告或元数据，但不据此断言任务成功。",
+    ja: "ツール結果は呼び出し返却記録（InvocationResult）の一種で、ツール呼び出し試行（ToolCallAttempt）が生成し、result_id、status、received_at、payload_digest で識別され、出力、エラー、警告、メタデータを保持しますが、タスク成功を表明しません。",
   },
   Tool: {
-    en: "A Tool is a callable capability that exposes an APIOperation, accepts arguments under its definition and permission constraints, and yields an observable result when invoked.",
-    zh: "工具是一种可调用能力，它公开 API 操作（APIOperation），在工具定义与权限约束下接收参数，并在被调用时产生可观测结果。",
-    ja: "ツールは呼び出し可能な能力で、API 操作（APIOperation）を公開し、ツール定義と権限制約の下で引数を受け取り、呼び出し時に観測可能な結果を生成します。",
+    en: "A Tool is an entity that exposes an APIOperation as a callable capability, accepts arguments under its tool definition and permission constraints, and yields an observable result when invoked.",
+    zh: "工具是一种实体，以可调用能力的形式公开 API 操作（APIOperation），在工具定义与权限约束下接收参数，并在被调用时产生可观测结果。",
+    ja: "ツールは実体の一種で、呼び出し可能な能力として API 操作（APIOperation）を公開し、ツール定義と権限制約の下で引数を受け取り、呼び出し時に観測可能な結果を生成します。",
   },
   MCPElicitation: {
-    en: "MCPElicitation is an MCPInteraction in which an MCP server requests AdditionalInput from a client or user during an active interaction, subject to client consent and policy.",
-    zh: "MCP 补充请求是一种 MCP 交互（MCPInteraction），其中 MCP 服务器在进行中的交互内请求客户端或用户提供附加输入（AdditionalInput），并受客户端同意与策略约束。",
-    ja: "MCP 補足要求は MCP インタラクション（MCPInteraction）の一種で、進行中の対話において MCP サーバーがクライアントまたはユーザーへ追加入力（AdditionalInput）を要求し、クライアントの同意とポリシーに従います。",
+    en: "MCP Elicitation is an MCP request (MCPRequest) in which an MCP server asks a client or user for AdditionalInput during an active MCPInteraction, subject to client consent and policy.",
+    zh: "MCP 引导交互是一种 MCP 请求（MCPRequest），用于在进行中的协议交互内，由 MCP 服务器请求客户端或用户提供附加输入（AdditionalInput）；该请求发生于 MCPInteraction 中，并受客户端同意与策略约束。",
+    ja: "MCP 誘導対話は MCP 要求（MCPRequest）の一種であり、進行中の MCPInteraction 内で MCP サーバーがクライアントまたはユーザーへ追加入力（AdditionalInput）を求め、クライアントの同意とポリシーに従う要求です。",
   },
   ToolDeprecationNotice: {
     en: "A ToolDeprecationNotice is ToolMetadata that identifies a deprecated ToolDefinition and records lifecycle or replacement guidance rather than describing the callable capability itself.",
-    zh: "工具弃用通知是一种工具元数据（ToolMetadata），用于标识被弃用的工具定义（ToolDefinition）并记录生命周期或替代指引，而不是描述可调用能力本身。",
-    ja: "ツール非推奨通知はツールメタデータ（ToolMetadata）の一種で、非推奨となるツール定義（ToolDefinition）を識別し、ライフサイクルまたは代替指針を記録しますが、呼び出し可能な能力自体は記述しません。",
+    zh: "工具弃用通知是一种工具元数据记录（ToolMetadata），用于标识被弃用的工具定义（ToolDefinition）并记录生命周期或替代指引，而不是描述可调用能力本身。",
+    ja: "ツール非推奨通知はツールメタデータ記録（ToolMetadata）の一種で、非推奨となるツール定義（ToolDefinition）を識別し、ライフサイクルまたは代替指針を記録しますが、呼び出し可能な能力自体は記述しません。",
   },
   InjectionSignature: {
-    en: "An InjectionSignature is a detection pattern representing indicators of prompt injection, tool-stream manipulation, or malicious instruction propagation and used as the target of scans_for_signature.",
-    zh: "注入签名是一种检测模式，表示提示注入、工具流操纵或恶意指令传播的可识别指标，并作为 scans_for_signature 关系的检测目标。",
-    ja: "注入シグネチャは、プロンプトインジェクション、ツールストリーム操作、または悪意ある指示伝播の識別可能な兆候を表す検出パターンで、scans_for_signature 関係の検出対象です。",
+    en: "An Injection signature specification is a specification that defines a detection pattern for indicators of prompt injection, tool-stream manipulation, or malicious instruction propagation and serves as the target of scans_for_signature.",
+    zh: "注入特征规范是一种规范，定义用于识别提示注入、工具流操纵或恶意指令传播的检测模式，并作为 scans_for_signature 关系的检测目标。",
+    ja: "注入シグネチャ仕様は仕様の一種で、プロンプトインジェクション、ツールストリーム操作、または悪意ある指示伝播を識別する検出パターンを定義し、scans_for_signature 関係の検出対象となります。",
   },
   PatternScan: {
     en: "A PatternScan is a DetectionActivity that examines messages, retrieved chunks, tool results, or other untrusted content for InjectionSignature indicators or policy violations and produces an InjectionScanResult.",
     zh: "模式扫描是一种检测活动（DetectionActivity），检查消息、检索分块、工具结果或其他不可信内容中的注入签名（InjectionSignature）指标或策略违规，并产出注入扫描结果（InjectionScanResult）。",
-    ja: "パターンスキャンは検出活動（DetectionActivity）の一種で、メッセージ、検索チャンク、ツール結果、その他の未信頼コンテンツにある注入シグネチャ（InjectionSignature）の兆候またはポリシー違反を検査し、注入スキャン結果（InjectionScanResult）を生成します。",
+    ja: "パターン走査は検出活動（DetectionActivity）の一種で、メッセージ、検索チャンク、ツール結果、その他の未信頼コンテンツにある注入シグネチャ（InjectionSignature）の兆候またはポリシー違反を検査し、注入スキャン結果（InjectionScanResult）を生成します。",
   },
   ExternalBoundary: {
     en: "An ExternalBoundary is a TrustBoundary that separates the controlled agent runtime from outside organizations, services, users, or systems.",
@@ -154,8 +152,8 @@ const reviewedDefinitions = {
   },
   ToolTranscript: {
     en: "A ToolTranscript is a LogArtifact that preserves the ordered record of tool requests, permission prompts, ToolCallAttempt executions, results, warnings, and follow-up observations.",
-    zh: "工具转录是一种日志产物（LogArtifact），按顺序保存工具请求、权限提示、工具调用尝试（ToolCallAttempt）的执行、结果、警告与后续观察。",
-    ja: "ツール転写はログ成果物（LogArtifact）の一種で、ツール要求、権限プロンプト、ツール呼び出し試行（ToolCallAttempt）の実行、結果、警告、後続観測を順序どおり保持します。",
+    zh: "工具调用记录是一种日志产物（LogArtifact），按顺序保存工具请求、权限提示、工具调用尝试（ToolCallAttempt）的执行、结果、警告与后续观察。",
+    ja: "ツール呼び出し記録はログ情報成果物（LogArtifact）の一種で、ツール要求、権限プロンプト、ツール呼び出し試行（ToolCallAttempt）の実行、結果、警告、後続観測を順序どおり保持します。",
   },
 } as const satisfies Readonly<Record<string, LocalizedText>>;
 
@@ -163,7 +161,7 @@ const migratedInfoRelationExamples = {
   has_access_path: "SourceReference-accessed_via-AccessPath",
   has_source_location: "SourceReference-located_at-SourceLocation",
   ranked_by_score: "RetrievedContextCandidate-scored_by-RetrievalScore",
-  excluded_from_context: "ContextSelectionDecision-suppresses-SuppressedContext",
+  excluded_from_context: "DisclosureSuppressionActivity-suppresses-SuppressedContext",
   has_exit_status:
     "CommandOutputObservation-has_exit_status_observation-ExitStatusObservation",
   overrides_instruction: "InstructionOverride-overrides-Instruction",
@@ -193,7 +191,7 @@ const reviewedInfoRelationDefinitions = {
   },
   ingested_into_context: {
     en: "links an observable context-ingress event to the context package made visible to a model call or agent step.",
-    zh: "将可观察的上下文摄入事件连接到对模型调用或智能体步骤可见的上下文包。",
+    zh: "将可观察的上下文进入事件连接到对模型调用或智能体步骤可见的上下文包。",
     ja: "観測可能なコンテキスト取り込みイベントを、モデル呼び出しまたはエージェントステップに可視化されたコンテキストパッケージへ結び付けます。",
   },
   produced_by_command_execution: {
@@ -333,8 +331,8 @@ const conceptById = new Map(sourceConcepts().map((concept) => [concept.id, conce
 const relationById = new Map(sourceRelations().map((relation) => [relation.id, relation]));
 
 describe("reviewed multilingual Concept semantics", () => {
-  it("keeps the 24 repaired Concepts aligned to one genus-differentia meaning", () => {
-    expect(Object.keys(reviewedDefinitions)).toHaveLength(24);
+  it("keeps the 23 accepted repaired Concepts aligned to one genus-differentia meaning", () => {
+    expect(Object.keys(reviewedDefinitions)).toHaveLength(23);
 
     for (const [conceptId, definition] of Object.entries(reviewedDefinitions)) {
       const concept = conceptById.get(conceptId);
@@ -352,12 +350,24 @@ describe("reviewed multilingual Concept semantics", () => {
           concept?.examples.some(
             (example) =>
               example.kind === "positive" &&
-              example.descriptions[locale].includes(definition[locale]),
+              example.descriptions[locale].includes(
+                withoutTerminalPunctuation(definition[locale]),
+              ),
           ),
           `${conceptId}/positive-example/${locale}`,
         ).toBe(true);
       }
     }
+  });
+
+  it("keeps ExecutionRequest as a deprecated alias of InvocationExecutionRequest", () => {
+    expect(conceptById.get("ExecutionRequest")).toMatchObject({
+      status: "deprecated",
+      replaced_by_ids: ["InvocationExecutionRequest"],
+    });
+    expect(conceptById.get("InvocationExecutionRequest")).toMatchObject({
+      status: "accepted",
+    });
   });
 
   it("propagates repaired peer definitions into exclusions and boundary examples", () => {
