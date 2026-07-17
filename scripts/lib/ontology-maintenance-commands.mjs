@@ -71,9 +71,21 @@ export const classifySourceLinkFailures = (failures) => {
   };
 };
 
+const collectAllSources = (nodes) => {
+  const seen = new Map();
+  for (const node of nodes) {
+    for (const source of node.sources ?? []) {
+      if (source && typeof source === "object" && source.id && !seen.has(source.id)) {
+        seen.set(source.id, source);
+      }
+    }
+  }
+  return [...seen.values()];
+};
+
 const loadYamlSourceInputs = async (repositoryRoot) => {
   const tree = await loadOntologyTree({ sourceDir: resolve(repositoryRoot, "ontology") });
-  const sources = Array.isArray(tree.root.sources) ? tree.root.sources : [];
+  const sources = collectAllSources(tree.nodes);
   const referencedIds = new Set(tree.nodes.flatMap((node) =>
     (node.source_claims ?? []).map((claim) => claim.source).filter(Boolean)));
   return { tree, sources, referencedIds };

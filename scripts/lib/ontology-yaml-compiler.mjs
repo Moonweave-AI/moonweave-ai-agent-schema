@@ -46,7 +46,7 @@ const hasManualNodeAcceptance = (node) =>
   hasAcceptedReviewClosure(node);
 
 const isTreeReleasable = (tree) => {
-  const sources = Array.isArray(tree.root.sources) ? tree.root.sources : [];
+  const sources = collectAllSources(tree.nodes);
   const sourceIds = new Set(sources.map(({ id }) => id));
   const sourcesAccepted = sources.every((source) =>
     typeof source.id === "string" &&
@@ -546,9 +546,20 @@ const compileCommunityGraph = (canonical, tree) => {
   };
 };
 
-const compileSourceIndex = (root, sourceTreeSha256, sourceFiles) => {
-  const sources = [...(root.sources ?? [])]
-    .sort((left, right) => left.id.localeCompare(right.id));
+const collectAllSources = (nodes) => {
+  const seen = new Map();
+  for (const node of nodes) {
+    for (const source of node.sources ?? []) {
+      if (source && typeof source === "object" && source.id && !seen.has(source.id)) {
+        seen.set(source.id, source);
+      }
+    }
+  }
+  return [...seen.values()].sort((left, right) => left.id.localeCompare(right.id));
+};
+
+const compileSourceIndex = (tree, sourceTreeSha256, sourceFiles) => {
+  const sources = collectAllSources(tree.nodes);
   return {
     schema_version: "1.0.0",
     generated_from: sourceFiles.map((path) => `ontology/${path}`),
@@ -561,7 +572,7 @@ const compileSourceIndex = (root, sourceTreeSha256, sourceFiles) => {
 export const compileOntologyBundle = async ({ sourceDir, limits } = {}) => {
   const tree = await loadOntologyTree({ sourceDir, limits });
   const canonical = compileCanonical(tree);
-  const sourceIndex = compileSourceIndex(tree.root, tree.sourceTreeSha256, tree.sourceFiles);
+  const sourceIndex = compileSourceIndex(tree, tree.sourceTreeSha256, tree.sourceFiles);
   const communityGraph = compileCommunityGraph(canonical, tree);
   return deepFreeze({
     canonical,
