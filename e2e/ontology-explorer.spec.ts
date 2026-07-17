@@ -36,7 +36,7 @@ test.describe("Moonweave Graphify ontology explorer interactions", () => {
     const sourceHash = await graph.getAttribute("data-source-sha256");
 
     await switchToEnglish(page);
-    await expect(page.getByRole("heading", { name: "Relation community graph" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Ontology relation graph" })).toBeVisible();
     await page.getByTestId("theme-light").click();
     await expect(page.getByTestId("theme-light")).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");

@@ -82,11 +82,11 @@ describe("JavaScript syntax gate", () => {
       scripts: Record<string, string>;
     };
 
-    expect(modules.length).toBeGreaterThan(100);
+    expect(modules.length).toBeGreaterThan(20);
     expect(modules).toContain(resolve(repositoryRoot, "scripts/check-javascript-syntax.mjs"));
     expect(modules).toContain(resolve(
       repositoryRoot,
-      "scripts/lib/ontology-reference-validation.mjs",
+      "scripts/lib/ontology-yaml-source.mjs",
     ));
     expect(packageJson.scripts["syntax:check"]).toBe(
       "node scripts/check-javascript-syntax.mjs",

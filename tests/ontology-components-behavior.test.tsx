@@ -173,7 +173,7 @@ describe("recursive directory and attached node information", () => {
       },
       artifact_metadata: {
         ...ontologyViewModelFixture.artifact_metadata,
-        generated_from: ["ontology/source/product.json", "ontology/source/modules/runtime.json"],
+        generated_from: ["ontology/node.yaml", "ontology/runtime-plane/node.yaml"],
         release_channel: "stable",
       },
       hygiene_gates: [{ id: "no-shadow", enabled: true }],
@@ -328,9 +328,12 @@ describe("recursive directory and attached node information", () => {
 
   it("walks every logical level once, handles search states, and invokes directory controls", () => {
     const treeHosts = evaluate(OntologyDirectory(directoryProps()));
-    expect(treeHosts.filter(({ props }) => props.role === "treeitem").length).toBe(
+    expect(treeHosts.filter(({ props }) => typeof props["data-directory-ref"] === "string").length).toBe(
       index.entitiesByRef.size,
     );
+    expect(treeHosts.some(({ props }) =>
+      props.role === "tree" || props.role === "treeitem" || props.role === "group"))
+      .toBe(false);
     invokeHostControls(treeHosts);
     expect(onNavigate).toHaveBeenCalled();
     expect(onToggleExpanded).toHaveBeenCalled();
@@ -347,7 +350,8 @@ describe("recursive directory and attached node information", () => {
     cyclicChildren.set(index.rootRef, [index.rootRef, "concept:MissingConcept"]);
     const cyclicIndex = { ...index, organizationalChildrenByRef: cyclicChildren };
     const cycleHosts = evaluate(OntologyDirectory(directoryProps({ index: cyclicIndex })));
-    expect(cycleHosts.filter(({ props }) => props.role === "treeitem")).toHaveLength(1);
+    expect(cycleHosts.filter(({ props }) =>
+      typeof props["data-directory-ref"] === "string")).toHaveLength(1);
   });
 
   it("keeps all concept information attached and makes only visible relations focusable", () => {

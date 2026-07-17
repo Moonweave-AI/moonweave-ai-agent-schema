@@ -56,7 +56,7 @@ const temporaryRoot = (): string => {
 };
 
 const writeCanonical = (root: string, overrides: Record<string, unknown> = {}): Buffer => {
-  mkdirSync(resolve(root, "ontology"), { recursive: true });
+  mkdirSync(resolve(root, "src/generated"), { recursive: true });
   const canonical = {
     id: manifest.canonical_version,
     artifact_metadata: {
@@ -82,8 +82,7 @@ const writeCanonical = (root: string, overrides: Record<string, unknown> = {}): 
     ...overrides,
   };
   const bytes = Buffer.from(`${JSON.stringify(canonical, null, 2)}\n`);
-  writeFileSync(resolve(root, "ontology/agent-ontology.json"), bytes);
-  mkdirSync(resolve(root, "src/generated"), { recursive: true });
+  writeFileSync(resolve(root, "src/generated/agent-ontology.json"), bytes);
   writeFileSync(resolve(root, "src/generated/ontology-community-graph.json"), JSON.stringify({
     source_sha256: sha256Bytes(bytes),
     projection_sha256: "d".repeat(64),
@@ -145,7 +144,7 @@ describe("site build metadata", () => {
     expect(readCanonicalIdentity(root).canonicalBytes).toEqual(canonicalBytes);
   });
 
-  it("counts only accepted relations while preserving deprecated lineage records", () => {
+  it("counts every current relation while excluding deprecated records", () => {
     const root = temporaryRoot();
     writeCanonical(root);
 
@@ -221,7 +220,7 @@ describe("site build manifest publication and artifact verification", () => {
     expect(verified.javascriptBytes).toBeGreaterThan(0);
   });
 
-  it("rejects obsolete layout workers and a stale NetworkX projection", () => {
+  it("rejects obsolete layout workers and a stale community projection", () => {
     const obsoleteWorker = temporaryRoot();
     writeDist(obsoleteWorker);
     writeFileSync(resolve(obsoleteWorker, "dist/build-manifest.json"), JSON.stringify(manifest));
@@ -236,7 +235,7 @@ describe("site build manifest publication and artifact verification", () => {
     writeDist(staleProjection, "vis-network-forceatlas2 forceAtlas2Based 委派与移交 网络访问控制 优化与学习");
     writeFileSync(resolve(staleProjection, "dist/build-manifest.json"), JSON.stringify(manifest));
     expect(() => verifySiteArtifact({ root: staleProjection, expectedManifest: manifest }))
-      .toThrow(/current NetworkX community projection/u);
+      .toThrow(/current ontology community projection/u);
 
     const unreachableProjection = temporaryRoot();
     writeDist(
@@ -304,7 +303,7 @@ describe("site build manifest publication and artifact verification", () => {
     writeFileSync(resolve(driftedCanonical, "dist/build-manifest.json"), JSON.stringify(manifest));
     writeFileSync(
       resolve(driftedCanonical, "dist/assets/agent-ontology-12345678.json"),
-      `${readFileSync(resolve(driftedCanonical, "ontology/agent-ontology.json"), "utf8")} `,
+      `${readFileSync(resolve(driftedCanonical, "src/generated/agent-ontology.json"), "utf8")} `,
     );
     expect(() => verifySiteArtifact({
       root: driftedCanonical,

@@ -178,7 +178,7 @@ export const validateSourceUrlPolicy = (
     if (!sourceIds.has(entry.source_id)) {
       violations.push({
         sourceId: entry.source_id,
-        message: "approved HTTP exception does not resolve to a source-registry row",
+        message: "approved HTTP exception does not resolve to a source catalog entry",
       });
     }
   }

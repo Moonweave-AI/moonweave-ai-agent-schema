@@ -315,6 +315,7 @@ export type ModuleBoundaryDecision = {
   readonly rationale: LocalizedText;
   readonly relation_ids: ReadonlyArray<Identifier>;
   readonly relation_not_applicable_reason: LocalizedText | null;
+  readonly overlap_not_applicable_reason?: LocalizedText | null;
   readonly source_claims: SourceClaims;
   readonly review: Review;
 };
@@ -447,7 +448,7 @@ export type ConceptStructure = {
 export type LexicalAlias = {
   readonly language: "zh" | "en" | "ja";
   readonly value: NonEmptyString;
-  readonly alias_kind: "synonym" | "abbreviation" | "legacy-label";
+  readonly alias_kind: "synonym" | "abbreviation";
 };
 export type SiblingDifferentiation = {
   readonly sibling_concept_id: Identifier;
@@ -827,9 +828,6 @@ export type OntologyMetrics = {
   readonly constraints: number;
   readonly source_claims: number;
   readonly case_paths: number;
-  readonly legacy_individuals_remaining: number;
-  readonly legacy_data_properties_remaining: number;
-  readonly legacy_axioms_remaining: number;
   readonly module_count_by_domain: Readonly<Record<string, unknown>>;
   readonly root_status_counts: Readonly<Record<string, unknown>>;
   readonly concept_depth_histogram: Readonly<Record<string, unknown>>;

@@ -38,8 +38,8 @@ export type CanonicalIdentity = Readonly<{
   relationCount: number;
 }>;
 
-const acceptedRelationCount = (canonical: CanonicalOntology): number =>
-  canonical.relations.filter((relation) => relation.status === "accepted").length;
+const currentRelationCount = (canonical: CanonicalOntology): number =>
+  canonical.relations.filter((relation) => relation.status !== "deprecated").length;
 
 export const canonicalIdentityForOntology = (
   canonical: CanonicalOntology,
@@ -53,7 +53,7 @@ export const canonicalIdentityForOntology = (
   communityProjectionFingerprint,
   moduleCount: canonical.modules.length,
   conceptCount: canonical.classes.length,
-  relationCount: acceptedRelationCount(canonical),
+  relationCount: currentRelationCount(canonical),
 });
 
 export class SiteBuildManifestMismatchError extends Error {

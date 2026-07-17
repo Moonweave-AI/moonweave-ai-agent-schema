@@ -19,7 +19,7 @@ const manifest = {
   source_fingerprint: "b".repeat(64),
   canonical_fingerprint: `sha256:${"e".repeat(64)}`,
   community_projection_fingerprint: `sha256:${"d".repeat(64)}`,
-  module_count: 47,
+  module_count: 45,
   concept_count: 627,
   relation_count: 926,
 };

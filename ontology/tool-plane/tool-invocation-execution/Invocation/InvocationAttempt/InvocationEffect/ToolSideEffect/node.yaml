@@ -1,0 +1,548 @@
+schema: moonweave.ai/ontology-node/v1
+id: ToolSideEffect
+kind: concept
+status: review
+labels:
+  zh: 工具副作用
+  en: Tool Side Effect
+  ja: ツール副作用
+semantics:
+  short_definition:
+    zh: 工具副作用是由某次工具调用尝试造成并有证据确认的外部状态变化。
+    en: A Tool Side Effect is an evidenced external-state change caused by one tool-call attempt.
+    ja: ツール副作用は一 tool-call attempt が起こし evidence で確認された external-state change です。
+  definition:
+    zh: 工具副作用是 InvocationEffect 的子类，表示外部状态已经改变，并继承同一 side_effect_id、致因操作、变化类型、受影响资源、观测变化和发生时间。它的工具特有种差是可核验的提交回执与可选幂等键，而不是第二套 effect_id、工具尝试或外部目标身份。需要 CommitGate 时，允许决定必须先于该事件；重放同一幂等结果而未产生新变化时不得创建新副作用。
+    en: A ToolSideEffect is an InvocationEffect subtype inheriting the same side_effect_id, causal operation, change kind, affected resources, observed change, and occurrence time. Its tool-specific differentia is a verifiable commit receipt and optional idempotency key, not a second effect ID, tool-attempt identity, or external-target identity. When a CommitGate is required, an allowing decision precedes the event; replaying an idempotent result without a new change creates no new side effect.
+    ja: ToolSideEffect は InvocationEffect subtype で、同じ side_effect_id・causal operation・change kind・affected resources・observed change・occurrence time を継承します。tool-specific 種差は verifiable commit receipt と optional idempotency key であり、第二の effect ID・tool attempt identity・external target identity ではありません。CommitGate 必須時は allow decision が先行し、新 change のない idempotent replay は新 side effect を作りません。
+  why_needed:
+    zh: 工具专化层可连接工具尝试、提交门、通用 SideEffect 与恢复动作，同时不把结果文本误认作已生效副作用。
+    en: The tool specialization connects the attempt, commit gate, generic SideEffect, and recovery action without mistaking result text for an enacted effect.
+    ja: tool specialization が attempt・commit gate・generic SideEffect・recovery action を結び result text を enacted effect と誤認しません。
+  includes:
+    - zh: 纳入可定位到 ToolCallAttempt 且有外部回执或独立观测的实际写入、发送、删除、收费等变化。
+      en: Includes actual writes, sends, deletes, charges, or other changes locatable to a ToolCallAttempt with an external receipt or independent observation.
+      ja: ToolCallAttempt へ定位でき external receipt/independent observation を持つ actual write/send/delete/charge 等を含みます。
+  excludes:
+    - zh: 排除只读工具结果、效果声明、预览、CommitRequest、被拒绝的写入和没有证据的成功消息。
+      en: Excludes read-only tool results, effect declarations, previews, CommitRequest, rejected writes, and success messages without evidence.
+      ja: read-only tool result・effect declaration・preview・CommitRequest・rejected write・evidence なし success message を除きます。
+  semantic_kind: event
+  aliases: []
+structure:
+  identity_keys: []
+  fields:
+    - id: commit_receipt_ref
+      labels:
+        zh: 提交回执引用
+        en: commit-receipt reference
+        ja: commit receipt 参照
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 引用证明提交已生效的服务回执。
+        en: References the service receipt proving the commit took effect.
+        ja: commit effect を証明する service receipt を参照します。
+      allowed_values: []
+      pattern: null
+      example_value: receipt:ticket-778
+      source_claims:
+        - claim-tool-side-effect-004
+        - claim-tool-side-effect-005
+        - claim-tool-side-effect-006
+    - id: idempotency_key
+      labels:
+        zh: 幂等键
+        en: idempotency key
+        ja: 冪等 key
+      datatype: string
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      definitions:
+        zh: 关联安全重放并帮助检测重复副作用。
+        en: Correlates safe replay and helps detect duplicate effects.
+        ja: safe replay を相関し duplicate effect detection を助けます。
+      allowed_values: []
+      pattern: null
+      example_value: ticket-create-778
+      source_claims:
+        - claim-tool-side-effect-007
+        - claim-tool-side-effect-008
+        - claim-tool-side-effect-009
+  constraints:
+    - id: tool-side-effect-idempotent-replay-is-not-new-effect
+      severity: error
+      expression_language: plain
+      expression: reusing idempotency_key without a new externally observed change preserves the existing side_effect_id and does not create another ToolSideEffect
+      explanations:
+        zh: 幂等重放是同一结果的重取，不是新的外部变化事件。
+        en: An idempotent replay retrieves the same outcome and is not a new external-change event.
+        ja: idempotent replay は同じ outcome の再取得であり、新 external-change event ではありません。
+      source_claims:
+        - claim-tool-side-effect-010
+  required_relation_constraints:
+    - id: tool-side-effect-caused-by-one-tool-attempt
+      direction: incoming
+      predicate: may_cause
+      target_concept_id: ToolCallAttempt
+      cardinality:
+        min: 1
+        max: 1
+      explanations:
+        zh: 每个已实现效应恰好归因于一个直接的 ToolCallAttempt；重试但未产生新变化的尝试不创建新效应。
+        en: Each realized effect is attributed to exactly one directly causal ToolCallAttempt; a retry that creates no new change creates no new effect.
+        ja: 各 realized effect は一つの directly causal ToolCallAttempt に帰属し、新 change を生じない retry は新 effect を作りません。
+      source_claims:
+        - claim-tool-side-effect-011
+examples:
+  - id: ToolSideEffect-example-positive-manual-001
+    kind: positive
+    labels:
+      zh: 工具副作用正例
+      en: Tool Side Effect positive case
+      ja: ツール副作用正例
+    scenario_id: null
+    descriptions:
+      zh: 获批的 create_ticket 尝试返回真实工单回执 INC-778；节点关联尝试、目标和提交回执。
+      en: An approved create_ticket attempt returns actual receipt INC-778; the node links the attempt, target, and commit receipt.
+      ja: approved create_ticket attempt が actual receipt INC-778 を返し node が attempt・target・commit receipt を結びます。
+    field_values:
+      side_effect_id: side-effect:ticket-system/INC-778
+      operation_ref: tool-attempt-ticket-17
+      effect_kind: create
+      affected_resource_refs:
+        - ticket-system:INC-778
+      observed_change:
+        created_resource_ref: ticket-system:INC-778
+      occurred_at: 2026-07-16T02:10:01Z
+      commit_receipt_ref: receipt:ticket-778
+      idempotency_key: ticket-create-778
+    related_node_ids:
+      - ToolSideEffect
+      - InvocationEffect
+      - ToolCallAttempt
+      - CommitGate
+    related_relation_ids:
+      - ToolSideEffect-is_a-InvocationEffect
+      - ToolCallAttempt-may_cause-ToolSideEffect
+      - tool_side_effect_requires_commit_gate
+    expected_result:
+      zh: 建立 ToolSideEffect，并保留它与相邻规范、尝试或结果的独立身份。
+      en: Create ToolSideEffect while preserving its identity from adjacent specifications, attempts, or results.
+      ja: ToolSideEffect を作成し adjacent specification・attempt・result との separate identity を保持します。
+    why_valid_or_invalid:
+      zh: 纳入可定位到 ToolCallAttempt 且有外部回执或独立观测的实际写入、发送、删除、收费等变化。
+      en: Includes actual writes, sends, deletes, charges, or other changes locatable to a ToolCallAttempt with an external receipt or independent observation.
+      ja: ToolCallAttempt へ定位でき external receipt/independent observation を持つ actual write/send/delete/charge 等を含みます。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+    source_claims:
+      - claim-tool-side-effect-012
+      - claim-tool-side-effect-013
+      - claim-tool-side-effect-014
+  - id: ToolSideEffect-example-boundary-manual-001
+    kind: boundary
+    labels:
+      zh: 工具副作用边界例
+      en: Tool Side Effect boundary case
+      ja: ツール副作用境界例
+    scenario_id: null
+    descriptions:
+      zh: create_ticket 的预览结果只展示拟写字段，CommitGate 随后拒绝；外部系统未变化，不能建立 ToolSideEffect。
+      en: A create_ticket preview shows proposed fields and the CommitGate later rejects it; external state never changes, so no ToolSideEffect exists.
+      ja: create_ticket preview 後 CommitGate reject で external state unchanged のため ToolSideEffect は存在しません。
+    field_values:
+      proposed_operation_ref: tool-attempt-ticket-preview
+      commit_gate_state: pending
+      external_change_observed: false
+    related_node_ids:
+      - ToolSideEffect
+      - InvocationEffect
+    related_relation_ids:
+      - ToolSideEffect-is_a-InvocationEffect
+    expected_result:
+      zh: 不建立 ToolSideEffect；按边界例所示保留在更准确的概念中。
+      en: Do not create ToolSideEffect; keep the record in the more accurate concept identified by the boundary.
+      ja: ToolSideEffect を作らず boundary が示す accurate concept に保持します。
+    why_valid_or_invalid:
+      zh: 排除只读工具结果、效果声明、预览、CommitRequest、被拒绝的写入和没有证据的成功消息。
+      en: Excludes read-only tool results, effect declarations, previews, CommitRequest, rejected writes, and success messages without evidence.
+      ja: read-only tool result・effect declaration・preview・CommitRequest・rejected write・evidence なし success message を除きます。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+    source_claims:
+      - claim-tool-side-effect-015
+      - claim-tool-side-effect-016
+      - claim-tool-side-effect-017
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation: []
+parent_relation:
+  id: ToolSideEffect-is_a-InvocationEffect
+  predicate: is_a
+  direction: source-to-target
+  relation_kind: hierarchy
+  labels:
+    zh: 属于
+    en: is a
+    ja: 一種である
+  definitions:
+    zh: ToolSideEffect 继承 InvocationEffect 的实际变化身份，并把原因限定为 ToolCallAttempt。
+    en: ToolSideEffect inherits InvocationEffect actual-change identity and restricts its cause to a ToolCallAttempt.
+    ja: ToolSideEffect は InvocationEffect actual-change identity を継承し cause を ToolCallAttempt に限定します。
+  cardinality: null
+  cardinality_not_applicable_reason:
+    zh: 分类继承不使用实例关系基数。
+    en: Taxonomic inheritance does not use instance-relation cardinality.
+    ja: 分類継承には instance relation cardinality を使いません。
+  inverse_reading:
+    predicate: has_subtype
+    labels:
+      zh: 反向：是一种
+      en: has subtype
+      ja: 逆方向：の一種である
+  conditions: []
+  temporal_scope: timeless
+  boundary_context: null
+  constraints: []
+  examples:
+    - id: ToolSideEffect-is_a-InvocationEffect-example-positive-manual-001
+      kind: positive
+      labels:
+        zh: ToolSideEffect-is_a-InvocationEffect 正例
+        en: ToolSideEffect-is_a-InvocationEffect positive case
+        ja: ToolSideEffect-is_a-InvocationEffect 正例
+      scenario_id: null
+      descriptions:
+        zh: 获批的 create_ticket 尝试返回真实工单回执 INC-778；节点关联尝试、目标和提交回执。
+        en: An approved create_ticket attempt returns actual receipt INC-778; the node links the attempt, target, and commit receipt.
+        ja: approved create_ticket attempt が actual receipt INC-778 を返し node が attempt・target・commit receipt を結びます。
+      field_values: {}
+      related_node_ids:
+        - ToolSideEffect
+        - InvocationEffect
+      related_relation_ids:
+        - ToolSideEffect-is_a-InvocationEffect
+      expected_result:
+        zh: 建立 ToolSideEffect —is_a→ InvocationEffect，并保持规范方向。
+        en: Assert ToolSideEffect —is_a→ InvocationEffect in the reviewed direction.
+        ja: ToolSideEffect —is_a→ InvocationEffect を reviewed direction で成立させます。
+      why_valid_or_invalid:
+        zh: 正例同时满足两个端点身份和该谓词的成立条件。
+        en: The positive case satisfies both endpoint identities and the predicate's conditions.
+        ja: positive case は両 endpoint identity と predicate condition を満たします。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+      source_claims:
+        - claim-tool-side-effect-018
+    - id: ToolSideEffect-is_a-InvocationEffect-example-boundary-manual-001
+      kind: boundary
+      labels:
+        zh: ToolSideEffect-is_a-InvocationEffect 边界例
+        en: ToolSideEffect-is_a-InvocationEffect boundary case
+        ja: ToolSideEffect-is_a-InvocationEffect 境界例
+      scenario_id: null
+      descriptions:
+        zh: create_ticket 的预览结果只展示拟写字段，CommitGate 随后拒绝；外部系统未变化，不能建立 ToolSideEffect。
+        en: A create_ticket preview shows proposed fields and the CommitGate later rejects it; external state never changes, so no ToolSideEffect exists.
+        ja: create_ticket preview 後 CommitGate reject で external state unchanged のため ToolSideEffect は存在しません。
+      field_values: {}
+      related_node_ids:
+        - ToolSideEffect
+        - InvocationEffect
+      related_relation_ids:
+        - ToolSideEffect-is_a-InvocationEffect
+      expected_result:
+        zh: 不建立该边；边界例缺少 is_a 所要求的事实。
+        en: Do not assert the edge because the boundary case lacks the fact required by is_a.
+        ja: boundary case は is_a required fact がなく edge を成立させません。
+      why_valid_or_invalid:
+        zh: 端点共现、类型相近或时间相邻都不足以推断该关系。
+        en: Endpoint co-occurrence, similar types, or temporal proximity alone cannot infer this relation.
+        ja: endpoint co-occurrence・similar type・temporal proximity だけでは relation を推論できません。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+      source_claims:
+        - claim-tool-side-effect-019
+  source_claims:
+    - claim-tool-side-effect-020
+  distinct_fact_rationale: null
+  layout_role: primary-backbone
+  review_status: pending
+  endpoint_order: child-to-parent
+relations:
+  - id: ToolSideEffect-recovered_by-RecoveryAction
+    predicate: recovered_by
+    direction: source-to-target
+    relation_kind: causal
+    labels:
+      zh: 由其恢复
+      en: recovered by
+      ja: 復旧される
+    definitions:
+      zh: ToolSideEffect 仅在针对同一个已生效变化的 RecoveryAction 实际完成补偿、回滚或修复，并由后置条件核验恢复结果与残留影响时指向该动作；未执行的建议或仅启动但未核验的动作不构成 recovered_by。
+      en: ToolSideEffect is recovered_by a RecoveryAction only when that action actually completed compensation, rollback, or repair against the same enacted change and postcondition verification recorded the recovery outcome and residual effects; an unexecuted suggestion or an action merely started without verification does not establish recovered_by.
+      ja: ToolSideEffect は同一 enacted change に対する RecoveryAction が compensation/rollback/repair を actually completed し postcondition verification が recovery outcome と residual effects を記録した場合のみ recovered_by で結び unexecuted suggestion や verification なしの started action では成立しません。
+    cardinality:
+      source:
+        min: 0
+        max: null
+      target:
+        min: 0
+        max: null
+    cardinality_not_applicable_reason: null
+    inverse_reading:
+      predicate: is_target_of_recovered_by
+      labels:
+        zh: 反向：recovered by
+        en: is target of recovered by
+        ja: 逆方向：recovered by
+    conditions:
+      - id: ToolSideEffect-recovered_by-RecoveryAction-condition-manual-20260717
+        severity: error
+        expression_language: plain
+        expression: Assert only when the RecoveryAction actually completed, its target_effect_ref matches the same ToolSideEffect identity, and postcondition verification records the recovered state plus any residual effects; a proposal, queued action, or unverified execution is insufficient.
+        explanations:
+          zh: 仅当 RecoveryAction 已实际完成、target_effect_ref 匹配同一个 ToolSideEffect 身份，并且后置条件核验记录恢复状态及任何残留影响时成立；提案、排队动作或未核验执行不足。
+          en: Assert only when the RecoveryAction actually completed, its target_effect_ref matches the same ToolSideEffect identity, and postcondition verification records the recovered state plus any residual effects; a proposal, queued action, or unverified execution is insufficient.
+          ja: RecoveryAction が actually completed し target_effect_ref が same ToolSideEffect identity と一致し postcondition verification が recovered state と residual effects を記録する場合のみ成立し proposal・queued action・unverified execution は不十分です。
+        source_claims:
+          - claim-tool-side-effect-021
+    temporal_scope: valid-time
+    boundary_context: null
+    constraints: []
+    examples:
+      - id: ToolSideEffect-recovered_by-RecoveryAction-example-positive-manual-001
+        kind: positive
+        labels:
+          zh: ToolSideEffect-recovered_by-RecoveryAction 正例
+          en: ToolSideEffect-recovered_by-RecoveryAction positive case
+          ja: ToolSideEffect-recovered_by-RecoveryAction 正例
+        scenario_id: null
+        descriptions:
+          zh: 误建工单 INC-778 后，recovery-7 实际完成 delete-ticket，并以查询结果核验工单不存在且记录通知邮件仍不可撤销。
+          en: After ticket INC-778 is created in error, recovery-7 actually completes delete-ticket, verifies by query that the ticket is absent, and records that the notification email remains irreversible.
+          ja: ticket INC-778 の誤作成後 recovery-7 が delete-ticket を actually completed し query で ticket 不在を検証し notification email は不可逆と記録します。
+        field_values: {}
+        related_node_ids:
+          - ToolSideEffect
+          - RecoveryAction
+        related_relation_ids:
+          - ToolSideEffect-recovered_by-RecoveryAction
+        expected_result:
+          zh: 建立该 recovered_by 边，并保留恢复后状态与残留效应。
+          en: Assert recovered_by and retain the recovered post-state and residual effects.
+          ja: recovered_by を成立させ recovered post-state と residual effects を保持します。
+        why_valid_or_invalid:
+          zh: 同一效应、已完成动作和后置条件核验共同满足成立条件。
+          en: The same effect, completed action, and postcondition verification jointly satisfy the assertion condition.
+          ja: same effect・completed action・postcondition verification が assertion condition を共同で満たします。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+        source_claims:
+          - claim-tool-side-effect-021
+      - id: ToolSideEffect-recovered_by-RecoveryAction-example-boundary-manual-001
+        kind: boundary
+        labels:
+          zh: ToolSideEffect-recovered_by-RecoveryAction 边界例
+          en: ToolSideEffect-recovered_by-RecoveryAction boundary case
+          ja: ToolSideEffect-recovered_by-RecoveryAction 境界例
+        scenario_id: null
+        descriptions:
+          zh: 尚未执行的回滚建议不是 RecoveryAction，不能声称已恢复副作用。
+          en: An unexecuted rollback suggestion is not a RecoveryAction and cannot claim recovery.
+          ja: unexecuted rollback suggestion は RecoveryAction でなく recovery を主張できません。
+        field_values: {}
+        related_node_ids:
+          - ToolSideEffect
+          - RecoveryAction
+        related_relation_ids:
+          - ToolSideEffect-recovered_by-RecoveryAction
+        expected_result:
+          zh: 不建立该边；边界例缺少 recovered_by 所要求的事实。
+          en: Do not assert the edge because the boundary case lacks the fact required by recovered_by.
+          ja: boundary case は recovered_by required fact がなく edge を成立させません。
+        why_valid_or_invalid:
+          zh: 端点共现、类型相近或时间相邻都不足以推断该关系。
+          en: Endpoint co-occurrence, similar types, or temporal proximity alone cannot infer this relation.
+          ja: endpoint co-occurrence・similar type・temporal proximity だけでは relation を推論できません。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+        source_claims:
+          - claim-tool-side-effect-021
+    source_claims:
+      - claim-tool-side-effect-021
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: pending
+    target: concept:RecoveryAction
+review:
+  status: pending
+  method: manual-semantic
+  reviewer: null
+  reviewed_on: null
+  note:
+    zh: 该节点仅完成了从现行候选数据到唯一 YAML 树的无损转录；尚未逐项完成人工语义核验，不得据此宣称已审定。
+    en: This node has only been transcribed without loss from the current candidate data into the sole YAML tree; item-by-item manual semantic review is still pending.
+    ja: このノードは現行候補データから唯一の YAML ツリーへ欠落なく転記した段階であり、項目別の手動意味審査は未完了です。
+  sections:
+    semantics: pending
+    hierarchy: pending
+    relations: pending
+    structure: pending
+    examples: pending
+    source_claims: []
+source_claims:
+  - id: claim-tool-side-effect-001
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. Moonweave uses this primary evidence to delimit ToolSideEffect as event with the reviewed boundary stated in its definition.
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-tool-side-effect-002
+    source: eng-fw-openai-hitl
+    supports: OpenAI HITL records a pending tool call, a per-call approval or rejection, and later resumption of the original run. Moonweave uses this primary evidence to delimit ToolSideEffect as event with the reviewed boundary stated in its definition.
+    locator: Human-in-the-loop > Tool approval requests; approve, reject and resume
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-tool-side-effect-003
+    source: eng-api-stripe-idempotency
+    supports: Stripe documents that retrying a mutation with the same idempotency key replays the first saved response instead of repeating the external effect. Moonweave uses this primary evidence to delimit ToolSideEffect as event with the reviewed boundary stated in its definition.
+    locator: API Reference > Idempotent requests > replaying a request with the same key
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-tool-side-effect-004
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: "MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. Moonweave stores ToolSideEffect.commit_receipt_ref because this field specifically records: References the service receipt proving the commit took effect."
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-tool-side-effect-005
+    source: eng-fw-openai-hitl
+    supports: "OpenAI HITL records a pending tool call, a per-call approval or rejection, and later resumption of the original run. Moonweave stores ToolSideEffect.commit_receipt_ref because this field specifically records: References the service receipt proving the commit took effect."
+    locator: Human-in-the-loop > Tool approval requests; approve, reject and resume
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-tool-side-effect-006
+    source: eng-api-stripe-idempotency
+    supports: "Stripe documents that retrying a mutation with the same idempotency key replays the first saved response instead of repeating the external effect. Moonweave stores ToolSideEffect.commit_receipt_ref because this field specifically records: References the service receipt proving the commit took effect."
+    locator: API Reference > Idempotent requests > replaying a request with the same key
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-tool-side-effect-007
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: "MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. Moonweave stores ToolSideEffect.idempotency_key because this field specifically records: Correlates safe replay and helps detect duplicate effects."
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-tool-side-effect-008
+    source: eng-fw-openai-hitl
+    supports: "OpenAI HITL records a pending tool call, a per-call approval or rejection, and later resumption of the original run. Moonweave stores ToolSideEffect.idempotency_key because this field specifically records: Correlates safe replay and helps detect duplicate effects."
+    locator: Human-in-the-loop > Tool approval requests; approve, reject and resume
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-tool-side-effect-009
+    source: eng-api-stripe-idempotency
+    supports: "Stripe documents that retrying a mutation with the same idempotency key replays the first saved response instead of repeating the external effect. Moonweave stores ToolSideEffect.idempotency_key because this field specifically records: Correlates safe replay and helps detect duplicate effects."
+    locator: API Reference > Idempotent requests > replaying a request with the same key
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-tool-side-effect-010
+    source: eng-api-stripe-idempotency
+    supports: "Direct source premise: Stripe replays the first saved status and body when a mutation is retried with the same idempotency key instead of executing a second mutation. Moonweave design inference: idempotency_key and commit_receipt_ref are tool-specific evidence on one inherited SideEffect occurrence and do not create a new ToolSideEffect identity."
+    locator: Stripe API Reference > Idempotent requests > replaying the first saved response for a reused key
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-tool-side-effect-011
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: "Direct source premise: MCP distinguishes one tools/call request from its Tool Result and reports execution errors in that result. Moonweave design inference: an InvocationEffect is the same externally realized SideEffect occurrence, not a second effect record, and exactly one InvocationAttempt is recorded as its direct causal attempt."
+    locator: MCP 2025-06-18 > Server Features > Tools > Calling Tools, Tool Result, and Error Handling
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-tool-side-effect-012
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. The ToolSideEffect positive case applies that documented distinction to the concrete occurrence described here.
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-tool-side-effect-013
+    source: eng-fw-openai-hitl
+    supports: OpenAI HITL records a pending tool call, a per-call approval or rejection, and later resumption of the original run. The ToolSideEffect positive case applies that documented distinction to the concrete occurrence described here.
+    locator: Human-in-the-loop > Tool approval requests; approve, reject and resume
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-tool-side-effect-014
+    source: eng-api-stripe-idempotency
+    supports: Stripe documents that retrying a mutation with the same idempotency key replays the first saved response instead of repeating the external effect. The ToolSideEffect positive case applies that documented distinction to the concrete occurrence described here.
+    locator: API Reference > Idempotent requests > replaying a request with the same key
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-tool-side-effect-015
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. The ToolSideEffect boundary case applies that documented distinction to the concrete occurrence described here.
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-tool-side-effect-016
+    source: eng-fw-openai-hitl
+    supports: OpenAI HITL records a pending tool call, a per-call approval or rejection, and later resumption of the original run. The ToolSideEffect boundary case applies that documented distinction to the concrete occurrence described here.
+    locator: Human-in-the-loop > Tool approval requests; approve, reject and resume
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-tool-side-effect-017
+    source: eng-api-stripe-idempotency
+    supports: Stripe documents that retrying a mutation with the same idempotency key replays the first saved response instead of repeating the external effect. The ToolSideEffect boundary case applies that documented distinction to the concrete occurrence described here.
+    locator: API Reference > Idempotent requests > replaying a request with the same key
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-tool-side-effect-018
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. The ToolSideEffect-is_a-InvocationEffect positive case applies the documented distinction to the concrete endpoints and direction described here.
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-tool-side-effect-019
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. The ToolSideEffect-is_a-InvocationEffect boundary case applies the documented distinction to the concrete endpoints and direction described here.
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-tool-side-effect-020
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. Moonweave uses that primary evidence to justify ToolSideEffect —is_a→ InvocationEffect with the reviewed direction and boundary.
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-tool-side-effect-021
+    source: eng-fw-langgraph-fault-tolerance
+    supports: LangGraph fault-tolerance guidance distinguishes retry attempts, exhaustion, and recovery handling. Moonweave adds the requirement that an executed compensation action name the same side effect and retain postcondition and residual-effect evidence; those fields are an explicit design inference.
+    locator: Fault tolerance > retries, exhaustion, and recovery handling
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending

@@ -91,6 +91,7 @@ const edgeData = (model: OntologyCommunityNetworkModel): readonly Edge[] =>
     to: edge.to,
     label: "",
     title: safeTooltipElement(edge.titleText),
+    physics: edge.physics,
     dashes: edge.dashes,
     width: edge.width,
     color: {

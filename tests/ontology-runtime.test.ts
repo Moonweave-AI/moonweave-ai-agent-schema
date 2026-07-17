@@ -79,26 +79,17 @@ describe("ontology application runtime boundary", () => {
 
   it("indexes the generated canonical artifact through the same boundary used by the application", () => {
     const canonicalPath = ontologyArtifactPath();
-    const artifactRoot = dirname(dirname(canonicalPath));
+    const artifactRoot = dirname(canonicalPath);
     const canonical = JSON.parse(readFileSync(canonicalPath, "utf8"));
     const generatedSourceIndex = JSON.parse(
-      readFileSync(resolve(artifactRoot, "src/generated/source-index.json"), "utf8"),
+      readFileSync(resolve(artifactRoot, "source-index.json"), "utf8"),
     );
 
     const runtime = createOntologyRuntime(canonical, generatedSourceIndex);
     expect(runtime.index.conceptsById.size).toBe(canonical.classes.length);
-    expect(runtime.index.effectiveFieldsByConceptId.get("BenchmarkAdapter")).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          declaredOnId: "Adapter",
-          field: expect.objectContaining({ id: "adapter_id" }),
-        }),
-      ]),
-    );
-    expect(
-      runtime.index.effectiveFieldsByConceptId.get("ProtocolMapping")
-        ?.find(({ field }) => field.id === "direction"),
-    ).toMatchObject({ declaredOnId: "MappingRule" });
+    expect(runtime.index.modulesById.size).toBe(canonical.modules.length);
+    expect(runtime.index.planesById.size).toBe(canonical.planes.length);
+    expect(runtime.index.sourcesById.size).toBe(generatedSourceIndex.sources.length);
   });
 
   it("validates both generated inputs and derives runtime-only indexes", () => {

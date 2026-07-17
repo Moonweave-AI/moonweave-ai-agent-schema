@@ -1,6 +1,6 @@
 # Ontology Explorer Art Direction
 
-Status: accepted v2 (Graphify-style single graph)
+Status: current (Graphify-style single graph)
 Created: 2026-06-30
 Revised: 2026-07-15
 
@@ -91,13 +91,13 @@ Cards are limited to repeated rows within the single inline characteristics area
 
 ## Graph Data And Visual Contract
 
-- NetworkX `MultiDiGraph` is the offline graph record for complete directed, multi-predicate, parallel relation facts.
-- Community detection consumes a deterministic simple undirected projection only. Prefer Leiden when available and fall back to seeded Louvain; this projection must never rewrite canonical semantics.
-- Community identity controls node color. It does not encode node type, ontology level, ownership, acceptance status, or business importance.
+- The generated community graph is a deterministic projection of canonical Module ownership and complete directed ontology relations.
+- Released community assignment follows the canonical Module owner. Statistical clustering or force layout must never move a Concept across an ownership boundary.
+- Community identity controls node color and reflects the owning Module in the released artifact. It does not encode node type, ontology level, acceptance status, or business importance.
 - Node size scales with graph degree to reveal structural hubs. It must be described as connectivity, not semantic priority.
 - Only sufficiently connected nodes keep permanent labels. Every node remains discoverable through search, hover, selection, and the inline characteristics area.
 - The browser uses locally bundled `vis-network` `ForceAtlas2Based`, stabilizes once, then disables physics. There are no hierarchy/relationship modes, layout direction controls, or user-selectable layout engines.
-- Schema, fields, constraints, examples, instances, case paths, sources, mappings, and governance remain information on their original node or relation. They do not enter community detection as extra nodes.
+- Schema, fields, constraints, examples, instances, case paths, sources, mappings, and governance remain information on their original node or relation. They do not enter released community assignment as extra nodes.
 
 ## Wireframes
 

@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { isMainModule } from "./lib/cli-entrypoint.mjs";
 import {
-  acceptedRelationCount,
+  currentRelationCount,
   expectedSiteBuildManifest,
 } from "./lib/site-build-metadata.mjs";
 import { stableJson } from "./lib/stable-json.mjs";
@@ -125,10 +125,10 @@ export const verifySiteArtifact = ({
   }
   const canonicalAssetPath = `assets/${canonicalAssetName}`;
   const canonicalBytes = fs.readFileSync(path.join(dist, canonicalAssetPath));
-  const publishedCanonicalPath = path.join(root, "ontology", "agent-ontology.json");
+  const publishedCanonicalPath = path.join(root, "src", "generated", "agent-ontology.json");
   if (!canonicalBytes.equals(fs.readFileSync(publishedCanonicalPath))) {
     throw new Error(
-      "Production canonical ontology asset must be byte-identical to ontology/agent-ontology.json",
+      "Production canonical ontology asset must be byte-identical to src/generated/agent-ontology.json",
     );
   }
   let canonical;
@@ -144,7 +144,7 @@ export const verifySiteArtifact = ({
     ["source_fingerprint", canonicalMetadata.source_tree_sha256, actual.source_fingerprint],
     ["module_count", canonical?.modules?.length, actual.module_count],
     ["concept_count", canonical?.classes?.length, actual.concept_count],
-    ["relation_count", acceptedRelationCount(canonical?.relations), actual.relation_count],
+    ["relation_count", currentRelationCount(canonical?.relations), actual.relation_count],
   ];
   const canonicalMismatch = canonicalComparisons.find(([, value, expected]) => value !== expected);
   if (canonicalMismatch) {
@@ -156,7 +156,7 @@ export const verifySiteArtifact = ({
     throw new Error("build-manifest has a stale community projection fingerprint");
   }
   if (!entryJavascript.includes(communityGraph.sourceSha256)) {
-    throw new Error("Production JavaScript does not contain the current NetworkX community projection");
+    throw new Error("Production JavaScript does not contain the current ontology community projection");
   }
   if (!entryJavascript.includes(communityGraph.projectionSha256)) {
     throw new Error("Production entry JavaScript does not contain the current community graph fingerprint");
@@ -186,6 +186,6 @@ if (isMainModule(import.meta.url)) {
   const result = verifySiteArtifact();
   console.log(
     `Verified dist site artifact for ${result.actual.commit_sha} with ` +
-    `${result.communityGraph.communityCount} NetworkX communities`,
+    `${result.communityGraph.communityCount} ontology communities`,
   );
 }

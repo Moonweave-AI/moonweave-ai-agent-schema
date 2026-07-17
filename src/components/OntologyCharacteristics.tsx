@@ -446,9 +446,10 @@ const EntityDetailsRows = ({
   const entity = details?.entity ?? index.entitiesByRef.get(focusedEntityRef)!;
   const data = entity.data as unknown as OntologyInformationView;
   const path = ontologyPrimaryPath(index, entity.ref);
-  const primaryCandidate = entity.kind === "concept"
-    ? index.primaryParentRelationByConceptId.get(entity.id)
+  const primaryBackbone = entity.kind === "concept"
+    ? index.backboneParentByRef.get(entity.ref)
     : undefined;
+  const primaryCandidate = primaryBackbone?.relation;
   const primary = primaryCandidate && isDefaultVisibleOntologyRelation(index, primaryCandidate)
     ? primaryCandidate
     : undefined;
@@ -457,21 +458,21 @@ const EntityDetailsRows = ({
       .filter((relation) => isDefaultVisibleOntologyRelation(index, relation))
     : [];
   const children = entity.kind === "concept"
-    ? (index.directChildRelationsByConceptId.get(entity.id) ?? [])
-      .filter((relation) => isDefaultVisibleOntologyRelation(index, relation))
+    ? (index.primaryBackboneChildrenByRef.get(entity.ref) ?? [])
+      .filter(({ relation }) => isDefaultVisibleOntologyRelation(index, relation))
     : [];
   const primaryEntity = primary
-    ? entityForConcept(index, primary.target_id)
+    ? index.entitiesByRef.get(primaryBackbone?.parentRef ?? "")
     : index.entitiesByRef.get(index.organizationalParentByRef.get(entity.ref) ?? "");
   const directChildEntities =
     entity.kind === "concept"
-      ? children.flatMap((relation) => {
-          const child = entityForConcept(index, relation.source_id);
+      ? children.flatMap(({ childRef }) => {
+          const child = index.entitiesByRef.get(childRef);
           return child ? [child] : [];
         })
       : (index.organizationalChildrenByRef.get(entity.ref) ?? []).flatMap((ref) => {
           const child = index.entitiesByRef.get(ref);
-          return child?.data.status === "accepted" ? [child] : [];
+          return child?.data.status !== "deprecated" ? [child] : [];
         });
   const deprecatedPredecessors = details?.collections.deprecatedPredecessors.items ?? [];
   const examples = arrayValue<CanonicalExample>(data.examples);

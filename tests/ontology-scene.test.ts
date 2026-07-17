@@ -118,8 +118,8 @@ describe("ontology visible scene", () => {
         ...ontologyViewModelFixture.relations,
         {
           ...relationTemplate,
-          id: "AgentRun-legacy_links-Tool",
-          predicate: "legacy_links",
+          id: "AgentRun-internal_links-Tool",
+          predicate: "internal_links",
           target_id: "Tool",
           status: "deprecated",
         },
@@ -127,7 +127,7 @@ describe("ontology visible scene", () => {
     } as unknown as Parameters<typeof buildOntologyIndex>[0]);
 
     expect(index.semanticOutgoingByRef.get(fixtureRefs.agentRun)?.map(({ predicate }) => predicate))
-      .not.toContain("legacy_links");
+      .not.toContain("internal_links");
     expect(hiddenSemanticNeighborRefs(
       index,
       fixtureRefs.agentRun,
@@ -144,7 +144,7 @@ describe("ontology visible scene", () => {
       index,
       fixtureRefs.agentRun,
       new Set([fixtureRefs.agentRun]),
-      ["legacy_links"],
+      ["internal_links"],
     )).toEqual([]);
     const view = buildVisibleSceneGraph(
       index,

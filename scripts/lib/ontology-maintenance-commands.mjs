@@ -1,28 +1,14 @@
 import { spawnSync } from "node:child_process";
-import {
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  writeFileSync,
-} from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { parseCsv } from "./csv.mjs";
-import {
-  deterministicGeneratedAt,
-  ONTOLOGY_GENERATOR_VERSION,
-} from "./generation-metadata.mjs";
-import { auditLegacyMigration } from "./ontology-legacy-audit.mjs";
-import { runNodeCommand } from "./ontology-release-command.mjs";
-import { validateOntologyDecisionBundles } from "./ontology-decision-validation.mjs";
+import { loadOntologyTree } from "./ontology-yaml-source.mjs";
 import {
   assertPublishedContentSecurity,
   assertSourceUrlPolicy,
 } from "./ontology-security-gates.mjs";
-import { buildSourceIndexData } from "./source-index.mjs";
 import { checkSourceLinks } from "./source-link-checker.mjs";
-import { stableJson } from "./stable-json.mjs";
 
 const defaultRepositoryRoot = resolve(import.meta.dirname, "../..");
 
@@ -73,115 +59,8 @@ const listFiles = (root, predicate = () => true) =>
     const path = resolve(root, entry.name);
     return entry.isDirectory()
       ? listFiles(path, predicate)
-      : predicate(path)
-        ? [path]
-        : [];
+      : predicate(path) ? [path] : [];
   });
-
-const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
-
-export const loadProductSource = (repositoryRoot = defaultRepositoryRoot) =>
-  readJson(resolve(repositoryRoot, "ontology/source/agent-ontology.product.json"));
-
-export const loadRegistryAndAllowlist = (repositoryRoot = defaultRepositoryRoot) => ({
-  registry: parseCsv(
-    readFileSync(resolve(repositoryRoot, "research/source-registry.csv")),
-  ).map(({ id, url }) => ({ id, url })),
-  allowlist: readJson(resolve(repositoryRoot, "research/source-http-allowlist.json")),
-});
-
-const collectSourceClaims = (value, target) => {
-  if (Array.isArray(value)) {
-    value.forEach((item) => collectSourceClaims(item, target));
-    return;
-  }
-  if (!value || typeof value !== "object") return;
-  if (Array.isArray(value.source_claims)) {
-    value.source_claims.forEach(({ source_id: sourceId }) => target.add(sourceId));
-  }
-  Object.values(value).forEach((item) => collectSourceClaims(item, target));
-};
-
-export const loadReferencedSourceIds = (repositoryRoot = defaultRepositoryRoot) => {
-  const referencedIds = new Set();
-  for (const path of listFiles(
-    resolve(repositoryRoot, "ontology/source"),
-    (filePath) => filePath.endsWith(".json"),
-  )) {
-    collectSourceClaims(readJson(path), referencedIds);
-  }
-  return referencedIds;
-};
-
-export const loadDecisionInputs = (repositoryRoot = defaultRepositoryRoot) => {
-  const decisionRoot = resolve(
-    repositoryRoot,
-    "ontology/migration/legacy-v1/domain-decisions",
-  );
-  const legacy = readJson(
-    resolve(
-      repositoryRoot,
-      "ontology/migration/legacy-v1/frozen-release/ontology/agent-ontology.json",
-    ),
-  );
-  const bundles = readdirSync(decisionRoot)
-    .filter((name) => name.endsWith(".json"))
-    .sort()
-    .map((name) => readJson(resolve(decisionRoot, name)));
-  const sourceIds = parseCsv(
-    readFileSync(resolve(repositoryRoot, "research/source-registry.csv")),
-  ).map(({ id }) => id);
-  return { legacy, bundles, sourceIds };
-};
-
-const relativeLabel = (repositoryRoot, path) =>
-  relative(repositoryRoot, path).replaceAll("\\", "/");
-
-const readJsonDocuments = (repositoryRoot, directory) =>
-  listFiles(directory, (path) => path.endsWith(".json")).map((path) => ({
-    label: relativeLabel(repositoryRoot, path),
-    value: readJson(path),
-  }));
-
-export const loadSecurityInputs = (repositoryRoot = defaultRepositoryRoot) => {
-  const sourceDocuments = readJsonDocuments(
-    repositoryRoot,
-    resolve(repositoryRoot, "ontology/source"),
-  );
-  const fixtureDocuments = readJsonDocuments(
-    repositoryRoot,
-    resolve(repositoryRoot, "fixtures"),
-  );
-  const generatedUiDocuments = readJsonDocuments(
-    repositoryRoot,
-    resolve(repositoryRoot, "src"),
-  );
-  const publishedCanonical = {
-    label: "ontology/agent-ontology.json",
-    value: readJson(resolve(repositoryRoot, "ontology/agent-ontology.json")),
-  };
-  const uiFiles = listFiles(
-    resolve(repositoryRoot, "src"),
-    (path) => /\.(?:ts|tsx)$/u.test(path),
-  ).map((path) => ({
-    label: relativeLabel(repositoryRoot, path),
-    text: readFileSync(path, "utf8"),
-  }));
-  const { registry: sources, allowlist } = loadRegistryAndAllowlist(repositoryRoot);
-  return {
-    documents: [
-      ...sourceDocuments,
-      publishedCanonical,
-      ...fixtureDocuments,
-      ...generatedUiDocuments,
-    ],
-    sourceDocumentCount: sourceDocuments.length,
-    fixtureDocumentCount: fixtureDocuments.length,
-    uiFiles,
-    sources,
-    allowlist,
-  };
-};
 
 export const classifySourceLinkFailures = (failures) => {
   const isInconclusive = ({ status }) =>
@@ -192,46 +71,12 @@ export const classifySourceLinkFailures = (failures) => {
   };
 };
 
-export const runBuildSourceIndexCommand = ({
-  arguments_ = [],
-  repositoryRoot = defaultRepositoryRoot,
-  readProductSource = loadProductSource,
-  generatedAt = deterministicGeneratedAt,
-  generatorVersion = ONTOLOGY_GENERATOR_VERSION,
-  buildSourceIndex = buildSourceIndexData,
-  stable = stableJson,
-  mkdir = mkdirSync,
-  write = writeFileSync,
-} = {}) => {
-  parseNoArguments(arguments_, "build-source-index");
-  const outputPath = resolve(repositoryRoot, "src/generated/source-index.json");
-  const productSource = readProductSource(repositoryRoot);
-  const data = buildSourceIndex(repositoryRoot, {
-    generatedAt: generatedAt(productSource.product.date),
-    generatorVersion,
-  });
-  mkdir(resolve(outputPath, ".."), { recursive: true });
-  write(outputPath, stable(data), "utf8");
-  return { outputPath };
-};
-
-export const runGeneratedCheckCommand = ({
-  arguments_ = [],
-  repositoryRoot = defaultRepositoryRoot,
-  spawn = spawnSync,
-  processObject = process,
-  logger = console.log,
-} = {}) => {
-  parseNoArguments(arguments_, "check-agent-ontology-generated");
-  runNodeCommand({
-    label: "Check generated ontology artifacts",
-    script: resolve(repositoryRoot, "scripts/release-agent-ontology.mjs"),
-    args: ["--check"],
-    cwd: repositoryRoot,
-    spawn,
-    processObject,
-    logger,
-  });
+const loadYamlSourceInputs = async (repositoryRoot) => {
+  const tree = await loadOntologyTree({ sourceDir: resolve(repositoryRoot, "ontology") });
+  const sources = Array.isArray(tree.root.sources) ? tree.root.sources : [];
+  const referencedIds = new Set(tree.nodes.flatMap((node) =>
+    (node.source_claims ?? []).map((claim) => claim.source).filter(Boolean)));
+  return { tree, sources, referencedIds };
 };
 
 export const runCleanWorktreeCommand = ({
@@ -257,98 +102,70 @@ export const runCleanWorktreeCommand = ({
 export const runSourceLinkCheckCommand = async ({
   arguments_ = [],
   repositoryRoot = defaultRepositoryRoot,
-  loadRegistry = loadRegistryAndAllowlist,
-  loadReferencedIds = loadReferencedSourceIds,
-  assertUrlPolicy = assertSourceUrlPolicy,
   checkLinks = checkSourceLinks,
   log = console.log,
   warn = console.warn,
   error = console.error,
 } = {}) => {
   const options = parseSourceLinkArguments(arguments_);
-  const { registry, allowlist } = loadRegistry(repositoryRoot);
-  assertUrlPolicy(registry, allowlist);
-  const referencedIds = options.referencedOnly
-    ? loadReferencedIds(repositoryRoot)
-    : new Set();
+  const { sources, referencedIds } = await loadYamlSourceInputs(repositoryRoot);
+  assertSourceUrlPolicy(sources, []);
   const missingReferenced = [...referencedIds].filter(
-    (id) => !registry.some((source) => source.id === id),
+    (id) => !sources.some((source) => source.id === id),
   );
   if (missingReferenced.length > 0) {
-    throw new Error(
-      `Referenced source IDs are absent from the registry: ${missingReferenced.join(", ")}`,
-    );
+    throw new Error(`Referenced source IDs are absent from ontology/node.yaml: ${missingReferenced.join(", ")}`);
   }
   const selected = options.referencedOnly
-    ? registry.filter(({ id }) => referencedIds.has(id))
-    : registry;
+    ? sources.filter(({ id }) => referencedIds.has(id))
+    : sources;
   const report = await checkLinks(selected, {
     concurrency: options.concurrency,
     timeoutMs: options.timeoutMs,
   });
   const { broken, inconclusive } = classifySourceLinkFailures(report.failures);
-  if (options.json) {
-    log(JSON.stringify({ ...report, broken, inconclusive }, null, 2));
-  } else {
-    log(
-      `Checked ${report.checked} ${options.referencedOnly ? "referenced " : ""}source links; ${broken.length} broken and ${inconclusive.length} inconclusive.`,
-    );
-    broken.forEach(({ id, url, diagnostic }) =>
-      error(`- ${id} ${url}: ${diagnostic}`),
-    );
-    inconclusive.forEach(({ id, url, diagnostic }) =>
-      warn(`? ${id} ${url}: ${diagnostic}`),
-    );
+  if (options.json) log(JSON.stringify({ ...report, broken, inconclusive }, null, 2));
+  else {
+    log(`Checked ${report.checked} ontology source links; ${broken.length} broken and ${inconclusive.length} inconclusive.`);
+    broken.forEach(({ id, url, diagnostic }) => error(`- ${id} ${url}: ${diagnostic}`));
+    inconclusive.forEach(({ id, url, diagnostic }) => warn(`? ${id} ${url}: ${diagnostic}`));
   }
   if (broken.length > 0 || (!options.allowInconclusive && inconclusive.length > 0)) {
-    throw new Error(
-      `Source link check failed with ${broken.length} broken source link${broken.length === 1 ? "" : "s"} and ${inconclusive.length} inconclusive result${inconclusive.length === 1 ? "" : "s"}`,
-    );
+    throw new Error(`Source link check failed with ${broken.length} broken and ${inconclusive.length} inconclusive result(s)`);
   }
   return { ...report, broken, inconclusive };
 };
 
-export const runOntologyDecisionCommand = ({
+export const runOntologySecurityCommand = async ({
   arguments_ = [],
   repositoryRoot = defaultRepositoryRoot,
-  loadInputs = loadDecisionInputs,
-  validate = validateOntologyDecisionBundles,
-  log = console.log,
-} = {}) => {
-  parseNoArguments(arguments_, "validate-ontology-domain-decisions");
-  const inputs = loadInputs(repositoryRoot);
-  const result = validate(inputs);
-  log(JSON.stringify(result, null, 2));
-  return result;
-};
-
-export const runLegacyMigrationAuditCommand = ({
-  arguments_ = [],
-  repositoryRoot = defaultRepositoryRoot,
-  audit = auditLegacyMigration,
-  log = console.log,
-} = {}) => {
-  parseNoArguments(arguments_, "verify-legacy-ontology-migration-audit");
-  const result = audit({ repositoryRoot });
-  log(JSON.stringify({ mode: "source-first-read-only-audit", ...result }, null, 2));
-  return result;
-};
-
-export const runOntologySecurityCommand = ({
-  arguments_ = [],
-  repositoryRoot = defaultRepositoryRoot,
-  loadInputs = loadSecurityInputs,
-  assertContent = assertPublishedContentSecurity,
-  assertUrls = assertSourceUrlPolicy,
   log = console.log,
 } = {}) => {
   parseNoArguments(arguments_, "verify-ontology-security");
-  const inputs = loadInputs(repositoryRoot);
-  assertContent({ documents: inputs.documents, uiFiles: inputs.uiFiles });
-  assertUrls(inputs.sources, inputs.allowlist);
-  log(
-    `Ontology security gate passed: ${inputs.sourceDocumentCount} source documents, ${inputs.fixtureDocumentCount} fixtures, ${inputs.uiFiles.length} UI source files, and ${inputs.sources.length} registry URLs checked.`,
-  );
+  const { tree, sources } = await loadYamlSourceInputs(repositoryRoot);
+  const generatedDocuments = listFiles(
+    resolve(repositoryRoot, "src/generated"),
+    (path) => path.endsWith(".json"),
+  ).map((path) => ({
+    label: relative(repositoryRoot, path).replaceAll("\\", "/"),
+    value: JSON.parse(readFileSync(path, "utf8")),
+  }));
+  const uiFiles = listFiles(
+    resolve(repositoryRoot, "src"),
+    (path) => /\.(?:ts|tsx)$/u.test(path),
+  ).map((path) => ({
+    label: relative(repositoryRoot, path).replaceAll("\\", "/"),
+    text: readFileSync(path, "utf8"),
+  }));
+  assertPublishedContentSecurity({
+    documents: [
+      ...tree.nodes.map((value) => ({ label: value.source_path, value })),
+      ...generatedDocuments,
+    ],
+    uiFiles,
+  });
+  assertSourceUrlPolicy(sources, []);
+  log(`Ontology security gate passed: ${tree.nodes.length} YAML nodes, ${generatedDocuments.length} generated artifacts, ${uiFiles.length} UI files, and ${sources.length} source URLs checked.`);
 };
 
 export const runCliAdapter = async ({
@@ -358,14 +175,13 @@ export const runCliAdapter = async ({
   consoleObject = console,
   processObject = process,
 }) => {
-  if (scriptPath === undefined || moduleUrl !== pathToFileURL(resolve(scriptPath)).href) {
-    return false;
-  }
+  if (scriptPath === undefined || moduleUrl !== pathToFileURL(resolve(scriptPath)).href) return false;
   try {
     await main();
-  } catch (error_) {
-    consoleObject.error(error_ instanceof Error ? error_.message : String(error_));
+  } catch (error) {
+    consoleObject.error(error instanceof Error ? error.message : String(error));
     processObject.exitCode = 1;
   }
   return true;
 };
+

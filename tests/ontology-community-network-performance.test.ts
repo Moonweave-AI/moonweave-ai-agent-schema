@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import canonicalOntology from "../ontology/agent-ontology.json";
+import canonicalOntology from "../src/generated/agent-ontology.json";
 import communityGraph from "../src/generated/ontology-community-graph.json";
 import {
   buildOntologyCommunityNetworkModel,
@@ -20,14 +20,14 @@ const percentile95 = (values: readonly number[]): number => {
 };
 
 describe("full community graph projection performance", () => {
-  it("validates and maps the 753-node graph without blocking the UI budget", () => {
+  it("validates and maps the complete graph without blocking the UI budget", () => {
     expect(validateOntologyCommunityGraph(index, artifact)).toEqual([]);
     buildOntologyCommunityNetworkModel(index, artifact, "zh", "dark");
     const durations = Array.from({ length: 20 }, () => {
       const startedAt = performance.now();
       const model = buildOntologyCommunityNetworkModel(index, artifact, "zh", "dark");
-      expect(model.nodes).toHaveLength(753);
-      expect(model.edges).toHaveLength(1300);
+      expect(model.nodes).toHaveLength(artifact.metrics.node_count);
+      expect(model.edges).toHaveLength(artifact.metrics.edge_count);
       return performance.now() - startedAt;
     });
 

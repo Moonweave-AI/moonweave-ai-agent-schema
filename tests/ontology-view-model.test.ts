@@ -27,6 +27,32 @@ const visibleEdgeIds = (
 ) => graph.edges.map(({ id }) => id).sort();
 
 describe("canonical ontology visible-graph projection", () => {
+  it("keeps current review candidates visible for human adjudication", () => {
+    const candidate = structuredClone(ontologyViewModelFixture) as typeof ontologyViewModelFixture & {
+      modules: Array<Record<string, unknown>>;
+      classes: Array<Record<string, unknown>>;
+      relations: Array<Record<string, unknown>>;
+    };
+    const module = candidate.modules.find(({ id }) => id === "run-lifecycle");
+    const concept = candidate.classes.find(({ id }) => id === "AgentRun");
+    const primary = candidate.relations.find(({ id }) =>
+      id === "AgentRun-is_a-RuntimeEntity");
+    if (!module || !concept || !primary) throw new Error("Missing review visibility fixture");
+    module.status = "review";
+    concept.status = "review";
+    primary.status = "review";
+
+    const index = buildOntologyIndex(
+      candidate as unknown as Parameters<typeof buildOntologyIndex>[0],
+    );
+    const graph = buildVisibleConceptGraph(index, createOntologyViewState(index, {
+      graphRootRef: "concept:AgentRun",
+    }));
+
+    expect(visibleNodeRefs(graph)).toContain("concept:AgentRun");
+    expect(visibleEdgeIds(graph)).toContain("AgentRun-is_a-RuntimeEntity");
+  });
+
   it("keeps the valid graph browsable and reports unresolved references without guessing replacements", () => {
     const malformed = structuredClone(ontologyViewModelFixture) as typeof ontologyViewModelFixture & {
       modules: Array<Record<string, unknown>>;
@@ -103,7 +129,7 @@ describe("canonical ontology visible-graph projection", () => {
     expect(graph.edges.filter(({ derived }) => derived)).toHaveLength(3);
   });
 
-  it("builds a module graph from its domain and concepts with no reviewed is_a parent", () => {
+  it("builds a module graph from its domain and concepts with no current is_a parent", () => {
     const index = buildFixtureIndex();
     const state = createOntologyViewState(index, {
       graphRootRef: fixtureRefs.runLifecycleModule,

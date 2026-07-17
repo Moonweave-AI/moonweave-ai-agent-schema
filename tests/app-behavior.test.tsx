@@ -1,15 +1,14 @@
-import type { ReactElement, ReactNode } from "react";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ComponentType, ReactElement, ReactNode } from "react";
+import {
+  act,
+  create,
+  type ReactTestInstance,
+  type ReactTestRenderer,
+} from "react-test-renderer";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { compiledBuildCommitSha } from "../src/lib/site-build-identity";
 import type { OntologyRuntime } from "../src/lib/ontology-runtime";
 import { uiText } from "../src/i18n/ui-text";
-
-const hookHarness = vi.hoisted(() => ({
-  cursor: 0,
-  states: [] as unknown[],
-  setters: [] as Array<(next: unknown) => void>,
-  effects: [] as Array<() => void | (() => void)>,
-}));
 
 const buildManifestHarness = vi.hoisted(() => {
   class MismatchError extends Error {}
@@ -25,53 +24,9 @@ const buildManifestFixture = Object.freeze({
   source_fingerprint: "b".repeat(64),
   canonical_fingerprint: `sha256:${"e".repeat(64)}`,
   community_projection_fingerprint: `sha256:${"d".repeat(64)}`,
-  module_count: 47,
+  module_count: 45,
   concept_count: 705,
   relation_count: 1153,
-});
-
-vi.mock("react", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("react")>();
-  return {
-    ...actual,
-    useState: (initial: unknown) => {
-      const position = hookHarness.cursor;
-      hookHarness.cursor += 1;
-      if (!(position in hookHarness.states)) {
-        hookHarness.states[position] = typeof initial === "function"
-          ? (initial as () => unknown)()
-          : initial;
-      }
-      const setter = (next: unknown) => {
-        hookHarness.states[position] = typeof next === "function"
-          ? (next as (current: unknown) => unknown)(hookHarness.states[position])
-          : next;
-      };
-      hookHarness.setters[position] = setter;
-      return [hookHarness.states[position], setter];
-    },
-    useReducer: (
-      reducer: (state: unknown, action: unknown) => unknown,
-      initialArg: unknown,
-      initializer?: (value: unknown) => unknown,
-    ) => {
-      const position = hookHarness.cursor;
-      hookHarness.cursor += 1;
-      if (!(position in hookHarness.states)) {
-        hookHarness.states[position] = initializer ? initializer(initialArg) : initialArg;
-      }
-      const dispatch = (action: unknown) => {
-        hookHarness.states[position] = reducer(hookHarness.states[position], action);
-      };
-      hookHarness.setters[position] = dispatch;
-      return [hookHarness.states[position], dispatch];
-    },
-    useMemo: (factory: () => unknown) => factory(),
-    useCallback: (callback: unknown) => callback,
-    useEffect: (effect: () => void | (() => void)) => {
-      hookHarness.effects.push(effect);
-    },
-  };
 });
 
 vi.mock("../src/components/OntologyDirectory", () => ({
@@ -83,43 +38,6 @@ vi.mock("../src/components/OntologyGraph", () => ({
 vi.mock("../src/components/OntologyCharacteristics", () => ({
   OntologyCharacteristics: "mock-ontology-characteristics",
 }));
-vi.mock("../ontology/agent-ontology.json", async () => {
-  const { ontologyViewModelFixture } = await import("./fixtures/ontology-view-model.fixture");
-  return {
-    default: {
-      ...ontologyViewModelFixture,
-      review: {
-        review_status: "accepted",
-        reviewers: [],
-      },
-      artifact_metadata: {
-        ...ontologyViewModelFixture.artifact_metadata,
-        artifact_kind: "canonical-agent-ontology",
-        contract_version: "2.0.0",
-        release_channel: "candidate",
-        releasable: false,
-        generated_at: "2026-07-13T00:00:00.000Z",
-        source_tree_sha256: "0".repeat(64),
-      },
-      relations: [
-        ...ontologyViewModelFixture.relations,
-        {
-          ...ontologyViewModelFixture.relations[0],
-          id: "AgentRun-points_to-MissingConcept",
-          predicate: "points_to",
-          relation_kind: "semantic",
-          source_id: "AgentRun",
-          target_id: "MissingConcept",
-        },
-        {
-          ...ontologyViewModelFixture.relations[0],
-          id: "DeprecatedAgentRunRelation",
-          status: "deprecated",
-        },
-      ],
-    },
-  };
-});
 vi.mock("../src/generated/source-index.json", () => ({
   default: { registry_fingerprint: "test-registry", sources: [] },
 }));
@@ -153,6 +71,11 @@ interface ElementRecord {
   readonly props: Readonly<Record<string, unknown>>;
 }
 
+const renderedElements = (root: ReactTestInstance): ElementRecord[] => [
+  root,
+  ...root.findAll(() => true),
+].map(({ type, props }) => ({ type, props }));
+
 const collectElements = (node: ReactNode, result: ElementRecord[] = []): ElementRecord[] => {
   if (Array.isArray(node)) {
     node.forEach((child) => collectElements(child, result));
@@ -179,25 +102,41 @@ const byTestId = (elements: readonly ElementRecord[], testId: string): ElementRe
   return element;
 };
 
-const click = (element: ElementRecord): void => {
-  (element.props.onClick as () => void)();
+const createDeferred = <T,>() => {
+  let resolve: (value: T | PromiseLike<T>) => void = () => undefined;
+  let reject: (reason?: unknown) => void = () => undefined;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject } as const;
 };
 
 describe("App state and URL recovery behavior", () => {
   let App: () => ReactElement;
-  let AppComponent: (props: Readonly<{
+  let AppComponent: ComponentType<Readonly<{
     ontologyRuntime: OntologyRuntime;
     canonicalFingerprint: string;
-  }>) => ReactElement;
+  }>>;
+  let renderer: ReactTestRenderer | null = null;
   let baseOntologyRuntime: OntologyRuntime;
   let activeOntologyRuntime: OntologyRuntime;
+  let primaryModuleRef: string;
+  let primaryConceptRef: string;
+  let foreignConceptRef: string;
+  let primaryPlaneRef: string;
+  let currentRelationId: string;
+  let currentRelationTargetRef: string;
   let hashListener: (() => void) | undefined;
+  let resizeListener: (() => void) | undefined;
   let scheduledTimeout: (() => void) | undefined;
+  const directoryHeightProperty = vi.fn();
   const replaceState = vi.fn((_state: unknown, _title: string, hash: string) => {
     fakeWindow.location.hash = hash;
   });
   const addEventListener = vi.fn((name: string, listener: () => void) => {
     if (name === "hashchange") hashListener = listener;
+    if (name === "resize") resizeListener = listener;
   });
   const removeEventListener = vi.fn();
   const clearTimeout = vi.fn();
@@ -205,6 +144,8 @@ describe("App state and URL recovery behavior", () => {
   const createObjectURL = vi.fn(() => "blob:canonical-ontology");
   const revokeObjectURL = vi.fn();
   const fakeWindow = {
+    innerHeight: 900,
+    scrollY: 20,
     location: {
       hash: "#root=module%3Arun-lifecycle&focus=node%3AMissingConcept",
     },
@@ -218,13 +159,45 @@ describe("App state and URL recovery behavior", () => {
     removeEventListener,
   };
 
-  const renderApp = (): ElementRecord[] => {
-    hookHarness.cursor = 0;
-    hookHarness.effects = [];
-    return collectElements(App());
+  const createNodeMock = () => ({
+    getBoundingClientRect: () => ({ top: 200 }),
+    style: { setProperty: directoryHeightProperty },
+  });
+
+  const readElements = (): ElementRecord[] => {
+    if (!renderer) throw new Error("App is not mounted");
+    return renderedElements(renderer.root);
+  };
+
+  const renderApp = async (): Promise<ElementRecord[]> => {
+    await act(async () => {
+      if (renderer) renderer.update(App());
+      else renderer = create(App(), { createNodeMock });
+      await Promise.resolve();
+    });
+    return readElements();
+  };
+
+  const invoke = async (callback: () => void): Promise<void> => {
+    await act(async () => {
+      callback();
+      await Promise.resolve();
+    });
+  };
+
+  const unmountApp = async (): Promise<void> => {
+    if (!renderer) return;
+    const mountedRenderer = renderer;
+    renderer = null;
+    await act(async () => {
+      mountedRenderer.unmount();
+      await Promise.resolve();
+    });
   };
 
   beforeAll(async () => {
+    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
+      .IS_REACT_ACT_ENVIRONMENT = true;
     vi.stubGlobal("window", fakeWindow);
     vi.stubGlobal("document", {
       documentElement: { dataset: {} as Record<string, string> },
@@ -236,40 +209,62 @@ describe("App state and URL recovery behavior", () => {
     });
     Object.defineProperty(URL, "createObjectURL", { configurable: true, value: createObjectURL });
     Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: revokeObjectURL });
-    const canonical = (await import("../ontology/agent-ontology.json")).default;
+    const canonical = (await import("../src/generated/agent-ontology.json")).default;
     const sourceIndex = (await import("../src/generated/source-index.json")).default;
     const { createOntologyRuntime } = await import("../src/lib/ontology-runtime");
     AppComponent = (await import("../src/App")).default;
     baseOntologyRuntime = createOntologyRuntime(canonical, sourceIndex);
+    const moduleWithRoots = [...baseOntologyRuntime.index.rootConceptRefsByModuleId]
+      .find(([, refs]) => refs.length > 0);
+    if (!moduleWithRoots) throw new Error("Generated ontology has no navigable module root");
+    const [moduleId, rootConcepts] = moduleWithRoots;
+    primaryModuleRef = `module:${moduleId}`;
+    primaryConceptRef = rootConcepts[0]!;
+    const primaryPlane = baseOntologyRuntime.index.planeByModuleId.get(moduleId);
+    if (!primaryPlane) throw new Error(`Module ${moduleId} has no domain`);
+    primaryPlaneRef = `plane:${primaryPlane.id}`;
+    const foreignModule = [...baseOntologyRuntime.index.rootConceptRefsByModuleId]
+      .find(([candidateId, refs]) => candidateId !== moduleId && refs.length > 0);
+    if (!foreignModule) throw new Error("Generated ontology has no second navigable module");
+    foreignConceptRef = foreignModule[1][0]!;
+    const currentRelation = [...baseOntologyRuntime.index.relationsById.values()]
+      .find(({ status }) => status !== "deprecated");
+    if (!currentRelation) throw new Error("Generated ontology has no current relation");
+    currentRelationId = currentRelation.id;
+    currentRelationTargetRef = `concept:${currentRelation.target_id}`;
     activeOntologyRuntime = baseOntologyRuntime;
-    App = () => AppComponent({
-      ontologyRuntime: activeOntologyRuntime,
-      canonicalFingerprint: buildManifestFixture.canonical_fingerprint,
-    });
+    App = () => (
+      <AppComponent
+        ontologyRuntime={activeOntologyRuntime}
+        canonicalFingerprint={buildManifestFixture.canonical_fingerprint}
+      />
+    );
   });
 
-  beforeEach(() => {
-    hookHarness.cursor = 0;
-    hookHarness.states = [];
-    hookHarness.setters = [];
-    hookHarness.effects = [];
-    fakeWindow.location.hash = "#root=module%3Arun-lifecycle&focus=node%3AMissingConcept";
+  beforeEach(async () => {
+    await unmountApp();
+    fakeWindow.scrollY = 20;
+    fakeWindow.location.hash = `#root=${encodeURIComponent(primaryModuleRef)}&focus=node%3AMissingConcept`;
     hashListener = undefined;
+    resizeListener = undefined;
     scheduledTimeout = undefined;
     activeOntologyRuntime = baseOntologyRuntime;
     vi.clearAllMocks();
     buildManifestHarness.load.mockResolvedValue(buildManifestFixture);
   });
 
+  afterAll(async () => {
+    await unmountApp();
+    delete (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
+      .IS_REACT_ACT_ENVIRONMENT;
+    vi.unstubAllGlobals();
+  });
+
   it("shows the independently compiled commit and the runtime ontology fingerprint", async () => {
     const communityGraph = (await import(
       "../src/generated/ontology-community-graph.json"
     )).default;
-    let elements = renderApp();
-    const cleanup = hookHarness.effects[0]?.();
-    await Promise.resolve();
-
-    elements = renderApp();
+    const elements = await renderApp();
     const identity = byTestId(elements, "build-identity");
     expect(identity.props["data-build-commit"]).toBe(compiledBuildCommitSha);
     expect(identity.props["data-ontology-fingerprint"]).toBe(
@@ -288,34 +283,25 @@ describe("App state and URL recovery behavior", () => {
       }),
       signal: expect.any(AbortSignal),
     }));
-
-    if (typeof cleanup === "function") cleanup();
   });
 
   it("shows loading and identity-mismatch diagnostics without replacing the ontology", async () => {
-    let elements = renderApp();
+    const manifest = createDeferred<typeof buildManifestFixture>();
+    buildManifestHarness.load.mockReturnValueOnce(manifest.promise);
+    let elements = await renderApp();
     expect(byTestId(elements, "build-identity-loading").props.role).toBe("status");
 
-    buildManifestHarness.load.mockRejectedValueOnce(
+    await invoke(() => manifest.reject(
       new buildManifestHarness.MismatchError("bundle mismatch"),
-    );
-    hookHarness.effects = [];
-    elements = renderApp();
-    hookHarness.effects[0]?.();
-    await Promise.resolve();
-
-    elements = renderApp();
+    ));
+    elements = readElements();
     expect(byTestId(elements, "build-identity-mismatch").props.role).toBe("status");
     expect(byType(elements, "mock-ontology-graph")).toBeDefined();
   });
 
   it("keeps the ontology usable when runtime build information is unavailable", async () => {
     buildManifestHarness.load.mockRejectedValueOnce(new Error("manifest offline"));
-    let elements = renderApp();
-    hookHarness.effects[0]?.();
-    await Promise.resolve();
-
-    elements = renderApp();
+    const elements = await renderApp();
     const identity = byTestId(elements, "build-identity-unavailable");
     expect(identity.props.role).toBe("status");
     expect(byType(elements, "mock-ontology-graph")).toBeDefined();
@@ -323,59 +309,80 @@ describe("App state and URL recovery behavior", () => {
 
   it("normalizes a non-Error manifest failure into an unavailable state reason", async () => {
     buildManifestHarness.load.mockRejectedValueOnce("manifest gateway offline");
-    renderApp();
-    hookHarness.effects[0]?.();
-    await Promise.resolve();
+    const { useSiteBuildManifestState } = await import(
+      "../src/hooks/useSiteBuildManifestState"
+    );
+    let observedState: unknown;
+    const identity = Object.freeze({
+      canonicalVersion: buildManifestFixture.canonical_version,
+      generatorVersion: buildManifestFixture.generator_version,
+      sourceFingerprint: buildManifestFixture.source_fingerprint,
+      canonicalFingerprint: buildManifestFixture.canonical_fingerprint,
+      communityProjectionFingerprint:
+        buildManifestFixture.community_projection_fingerprint,
+      moduleCount: buildManifestFixture.module_count,
+      conceptCount: buildManifestFixture.concept_count,
+      relationCount: buildManifestFixture.relation_count,
+    });
+    const ManifestStateProbe = () => {
+      observedState = useSiteBuildManifestState(identity);
+      return null;
+    };
+    let probeRenderer: ReactTestRenderer | null = null;
+    await act(async () => {
+      probeRenderer = create(<ManifestStateProbe />);
+      await Promise.resolve();
+    });
 
-    expect(hookHarness.states).toContainEqual({
+    expect(observedState).toEqual({
       status: "unavailable",
       reason: "manifest gateway offline",
     });
-    expect(byTestId(renderApp(), "build-identity-unavailable").props.role).toBe("status");
+    await act(async () => {
+      probeRenderer?.unmount();
+      await Promise.resolve();
+    });
   });
 
   it("does not publish a late manifest failure after the component is unmounted", async () => {
-    let rejectManifest: (reason: unknown) => void = () => undefined;
-    buildManifestHarness.load.mockReturnValueOnce(new Promise((_resolve, reject) => {
-      rejectManifest = reject;
-    }));
-    renderApp();
-    const cleanup = hookHarness.effects[0]?.();
-    if (typeof cleanup !== "function") throw new Error("Missing manifest cleanup");
-    cleanup();
-    rejectManifest(new Error("late failure"));
-    await Promise.resolve();
+    const manifest = createDeferred<typeof buildManifestFixture>();
+    buildManifestHarness.load.mockReturnValueOnce(manifest.promise);
+    await renderApp();
+    const request = buildManifestHarness.load.mock.calls.at(-1)?.[0] as
+      | { readonly signal: AbortSignal }
+      | undefined;
+    expect(request?.signal.aborted).toBe(false);
 
-    expect(hookHarness.states).toContainEqual({ status: "loading" });
-    expect(hookHarness.states).not.toContainEqual(expect.objectContaining({
-      reason: "late failure",
-    }));
+    await unmountApp();
+    expect(request?.signal.aborted).toBe(true);
+    await invoke(() => manifest.reject(new Error("late failure")));
+    expect(renderer).toBeNull();
   });
 
-  it("renders a valid location without a repair notice", () => {
-    fakeWindow.location.hash = "#root=module%3Arun-lifecycle&focus=node%3AAgentRun";
-    const elements = renderApp();
+  it("renders a valid location without a repair notice", async () => {
+    fakeWindow.location.hash = `#root=${encodeURIComponent(primaryModuleRef)}&focus=${encodeURIComponent(primaryConceptRef.replace("concept:", "node:"))}`;
+    const elements = await renderApp();
 
     expect(elements.some(({ props }) =>
       props.className === "context-repair-notice" && props.role === "status")).toBe(false);
     expect(byType(elements, "mock-ontology-graph").props.focusedEntityRef).toBe(
-      "concept:AgentRun",
+      primaryConceptRef,
     );
   });
 
-  it("explains when a valid focus forces repair of an incompatible graph root", () => {
-    fakeWindow.location.hash = "#root=module%3Arun-lifecycle&focus=node%3ATrace";
-    const elements = renderApp();
+  it("explains when a valid focus forces repair of an incompatible graph root", async () => {
+    fakeWindow.location.hash = `#root=${encodeURIComponent(primaryModuleRef)}&focus=${encodeURIComponent(foreignConceptRef.replace("concept:", "node:"))}`;
+    const elements = await renderApp();
     const notice = elements.find(({ props }) =>
       props.className === "context-repair-notice" && props.role === "status");
 
     expect(notice?.props.children).toBe(uiText.zh.rootRepairNotice);
     expect(byType(elements, "mock-ontology-graph").props.focusedEntityRef).toBe(
-      "concept:Trace",
+      foreignConceptRef,
     );
   });
 
-  it("uses explicit display fallbacks when optional runtime annotations are absent", () => {
+  it("uses explicit display fallbacks when optional runtime annotations are absent", async () => {
     const rootRef = baseOntologyRuntime.index.rootRef;
     const rootEntity = baseOntologyRuntime.index.entitiesByRef.get(rootRef);
     if (!rootEntity) throw new Error("Missing ontology root fixture");
@@ -403,7 +410,7 @@ describe("App state and URL recovery behavior", () => {
     };
     fakeWindow.location.hash = `#root=${encodeURIComponent(rootRef)}`;
 
-    const elements = renderApp();
+    const elements = await renderApp();
     expect(elements.some(({ props }) => props["data-testid"] === "data-integrity-error")).toBe(false);
     const definitionValues = elements
       .filter(({ type }) => type === "dd")
@@ -413,13 +420,15 @@ describe("App state and URL recovery behavior", () => {
     expect(byTestId(elements, "left-statistics")).toBeDefined();
   });
 
-  it("falls back to the ontology root when navigation receives a stale entity reference", () => {
-    let elements = renderApp();
-    (byType(elements, "mock-ontology-directory").props.onNavigate as (ref: string) => void)(
-      "concept:RemovedConcept",
-    );
+  it("falls back to the ontology root when navigation receives a stale entity reference", async () => {
+    let elements = await renderApp();
+    await invoke(() => {
+      (byType(elements, "mock-ontology-directory").props.onNavigate as (ref: string) => void)(
+        "concept:RemovedConcept",
+      );
+    });
 
-    elements = renderApp();
+    elements = readElements();
     expect(byType(elements, "mock-ontology-graph").props.focusedEntityRef).toBe(
       "concept:RemovedConcept",
     );
@@ -432,8 +441,8 @@ describe("App state and URL recovery behavior", () => {
       type === "h2" && props.children === rootLabel)).toBe(true);
   });
 
-  it("uses the relation predicate when an optional localized label is unavailable", () => {
-    const relationId = "AgentRun-produces-RunResult";
+  it("uses the relation predicate when an optional localized label is unavailable", async () => {
+    const relationId = currentRelationId;
     const relation = baseOntologyRuntime.index.relationsById.get(relationId);
     if (!relation) throw new Error("Missing relation fixture");
     const relationsById = new Map(baseOntologyRuntime.index.relationsById);
@@ -445,90 +454,106 @@ describe("App state and URL recovery behavior", () => {
       ...baseOntologyRuntime,
       index: { ...baseOntologyRuntime.index, relationsById },
     };
-    let elements = renderApp();
+    let elements = await renderApp();
     const graph = byType(elements, "mock-ontology-graph").props;
-    (graph.onFocusRelation as (id: string | null) => void)(null);
-    (graph.onFocusRelation as (id: string | null) => void)(relationId);
+    await invoke(() => {
+      (graph.onFocusRelation as (id: string | null) => void)(null);
+      (graph.onFocusRelation as (id: string | null) => void)(relationId);
+    });
 
-    elements = renderApp();
+    elements = readElements();
     expect(elements.some(({ props }) =>
       props.className === "sr-live-selection" &&
       props.children === uiText.zh.focusRelation(relation.predicate))).toBe(true);
   });
 
-  it("omits a stale breadcrumb segment while retaining the focused concept", () => {
+  it("omits a stale breadcrumb segment while retaining the focused concept", async () => {
     const entitiesByRef = new Map(baseOntologyRuntime.index.entitiesByRef);
-    entitiesByRef.delete("plane:runtime-plane");
+    entitiesByRef.delete(primaryPlaneRef);
     activeOntologyRuntime = {
       ...baseOntologyRuntime,
       index: { ...baseOntologyRuntime.index, entitiesByRef },
     };
-    fakeWindow.location.hash = "#root=concept%3AAgentRun&focus=node%3AAgentRun";
+    fakeWindow.location.hash = `#root=${encodeURIComponent(primaryConceptRef)}&focus=${encodeURIComponent(primaryConceptRef.replace("concept:", "node:"))}`;
 
-    const elements = renderApp();
+    const elements = await renderApp();
     const breadcrumb = elements.find(({ props }) => props.className === "breadcrumb");
     if (!breadcrumb) throw new Error("Missing breadcrumb");
     expect(collectElements(breadcrumb.props.children as ReactNode).some(({ props }) =>
-      props.children === "runtime-plane")).toBe(false);
+      props.children === primaryPlaneRef.slice("plane:".length))).toBe(false);
     expect(byType(elements, "mock-ontology-graph").props.focusedEntityRef).toBe(
-      "concept:AgentRun",
+      primaryConceptRef,
     );
   });
 
-  it("runs the primary controls while keeping the graph interaction surface minimal", () => {
-    let elements = renderApp();
+  it("runs the primary controls while keeping the graph interaction surface minimal", async () => {
+    let elements = await renderApp();
     expect(elements.some(({ props }) => props.role === "status")).toBe(true);
 
-    click(byTestId(elements, "language-zh"));
-    click(byTestId(elements, "language-en"));
-    click(byTestId(elements, "language-ja"));
-    click(byTestId(elements, "theme-dark"));
-    click(byTestId(elements, "theme-light"));
+    await invoke(() => {
+      (byTestId(elements, "language-zh").props.onClick as () => void)();
+      (byTestId(elements, "language-en").props.onClick as () => void)();
+      (byTestId(elements, "language-ja").props.onClick as () => void)();
+      (byTestId(elements, "theme-dark").props.onClick as () => void)();
+      (byTestId(elements, "theme-light").props.onClick as () => void)();
+    });
+    elements = readElements();
 
     const directory = byType(elements, "mock-ontology-directory").props;
-    (directory.onSearchQueryChange as (query: string) => void)("AgentRun");
-    (directory.onToggleExpanded as (ref: string) => void)("module:run-lifecycle");
-    (directory.onToggleExpanded as (ref: string) => void)("module:run-lifecycle");
+    await invoke(() => {
+      (directory.onSearchQueryChange as (query: string) => void)(primaryConceptRef);
+      (directory.onToggleExpanded as (ref: string) => void)(primaryModuleRef);
+      (directory.onToggleExpanded as (ref: string) => void)(primaryModuleRef);
+    });
+    elements = readElements();
 
     const graph = byType(elements, "mock-ontology-graph").props;
     expect(graph.onExpandEntity).toBeUndefined();
     expect(graph.onSelectionChange).toBeUndefined();
     expect(graph.layoutMode).toBeUndefined();
     expect(graph.layoutDirection).toBeUndefined();
-    (graph.onFocusEntity as (ref: string) => void)("concept:MissingConcept");
-    (graph.onFocusEntity as (ref: string) => void)("concept:AgentRun");
-    (graph.onFocusRelation as (id: string) => void)("missing-relation");
-    (graph.onFocusRelation as (id: string) => void)("AgentRun-produces-RunResult");
+    await invoke(() => {
+      (graph.onFocusEntity as (ref: string) => void)("concept:MissingConcept");
+      (graph.onFocusEntity as (ref: string) => void)(primaryConceptRef);
+      (graph.onFocusRelation as (id: string) => void)("missing-relation");
+      (graph.onFocusRelation as (id: string) => void)(currentRelationId);
+    });
 
-    elements = renderApp();
+    elements = readElements();
     expect(byType(elements, "mock-ontology-graph").props.focusedRelationId).toBe(
-      "AgentRun-produces-RunResult",
+      currentRelationId,
     );
 
     const characteristics = byType(elements, "mock-ontology-characteristics").props;
-    (characteristics.onBackToNode as () => void)();
-    (characteristics.onHighlightScenario as (id: string | null) => void)("case-one");
-    (characteristics.onExpandAdjacent as (ref: string) => void)("concept:RunResult");
-    (characteristics.onFocusEntity as (ref: string) => void)("concept:RunResult");
-    (characteristics.onNavigateEntity as (ref: string) => void)("plane:runtime-plane");
-    elements = renderApp();
+    await invoke(() => {
+      (characteristics.onBackToNode as () => void)();
+      (characteristics.onHighlightScenario as (id: string | null) => void)("case-one");
+      (characteristics.onExpandAdjacent as (ref: string) => void)(currentRelationTargetRef);
+      (characteristics.onFocusEntity as (ref: string) => void)(currentRelationTargetRef);
+      (characteristics.onNavigateEntity as (ref: string) => void)(primaryPlaneRef);
+    });
+    elements = readElements();
     expect(byType(elements, "mock-ontology-directory").props.graphRootRef).toBe(
-      "module:run-lifecycle",
+      primaryModuleRef,
     );
 
-    (byType(elements, "mock-ontology-directory").props.onNavigate as (ref: string) => void)(
-      "root:agent-system-ontology",
-    );
-    elements = renderApp();
-    (byType(elements, "mock-ontology-directory").props.onNavigate as (ref: string) => void)(
-      "concept:AgentRun",
-    );
-    elements = renderApp();
+    await invoke(() => {
+      (byType(elements, "mock-ontology-directory").props.onNavigate as (ref: string) => void)(
+        baseOntologyRuntime.index.rootRef,
+      );
+    });
+    elements = readElements();
+    await invoke(() => {
+      (byType(elements, "mock-ontology-directory").props.onNavigate as (ref: string) => void)(
+        primaryConceptRef,
+      );
+    });
+    elements = readElements();
 
     const collapseButton = elements.find(({ props }) => typeof props["aria-expanded"] === "boolean");
     if (!collapseButton) throw new Error("Missing directory collapse control");
-    click(collapseButton);
-    elements = renderApp();
+    await invoke(() => (collapseButton.props.onClick as () => void)());
+    elements = readElements();
     expect(elements.some(({ props }) => props.className === "viewer-grid is-left-collapsed")).toBe(true);
 
     const breadcrumbButtons = elements.filter(
@@ -536,78 +561,98 @@ describe("App state and URL recovery behavior", () => {
         props.className === undefined && props["data-testid"] === undefined &&
         props["aria-expanded"] === undefined,
     );
-    breadcrumbButtons.at(-1)?.props.onClick &&
-      (breadcrumbButtons.at(-1)!.props.onClick as () => void)();
+    const lastBreadcrumbButton = breadcrumbButtons.at(-1);
+    if (lastBreadcrumbButton?.props.onClick) {
+      await invoke(() => (lastBreadcrumbButton.props.onClick as () => void)());
+    }
 
     const download = elements.find(({ props }) => props.className === "download-link");
     if (!download) throw new Error("Missing download action");
-    click(download);
+    await invoke(() => (download.props.onClick as () => void)());
     expect(createObjectURL).toHaveBeenCalledOnce();
     expect(anchorClick).toHaveBeenCalledOnce();
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:canonical-ontology");
   });
 
-  it("shows one inline data error while keeping the valid graph surface mounted", () => {
-    const elements = renderApp();
+  it("shows one inline data error while keeping the valid graph surface mounted", async () => {
+    const diagnosticId = "test-relation-points-to-missing-concept";
+    activeOntologyRuntime = {
+      ...baseOntologyRuntime,
+      index: {
+        ...baseOntologyRuntime.index,
+        dataDiagnostics: [{
+          code: "missing-relation-endpoint",
+          ownerId: diagnosticId,
+          missingId: "MissingConcept",
+          message: `${diagnosticId} references MissingConcept`,
+        }],
+      },
+    };
+    const elements = await renderApp();
     const dataErrors = elements.filter(
       ({ props }) => props["data-testid"] === "data-integrity-error" && props.role === "alert",
     );
 
     expect(dataErrors).toHaveLength(1);
-    expect(dataErrors[0]?.props.children).toContain("AgentRun-points_to-MissingConcept");
+    expect(dataErrors[0]?.props.children).toContain(diagnosticId);
     expect(byType(elements, "mock-ontology-graph")).toBeDefined();
   });
 
-  it("uses a single focused entity without exposing the superseded multi-selection contract", () => {
-    let elements = renderApp();
+  it("uses a single focused entity without exposing the superseded multi-selection contract", async () => {
+    let elements = await renderApp();
     const graph = byType(elements, "mock-ontology-graph").props;
     expect(graph.onSelectionChange).toBeUndefined();
     expect(graph.selectedEntityRefs).toBeUndefined();
-    (graph.onFocusEntity as (ref: string) => void)("concept:RunResult");
+    await invoke(() => {
+      (graph.onFocusEntity as (ref: string) => void)(currentRelationTargetRef);
+    });
 
-    elements = renderApp();
+    elements = readElements();
     expect(byType(elements, "mock-ontology-graph").props.focusedEntityRef).toBe(
-      "concept:RunResult",
+      currentRelationTargetRef,
     );
   });
 
-  it("applies effects, normalizes hashes, restores location state, and cleans up listeners", () => {
-    let elements = renderApp();
-    expect(hookHarness.effects).toHaveLength(6);
-
-    const cancelManifest = hookHarness.effects[0]?.();
-    if (typeof cancelManifest === "function") cancelManifest();
-
-    hookHarness.effects[1]?.();
+  it("applies effects, normalizes hashes, restores location state, and cleans up listeners", async () => {
+    let elements = await renderApp();
     expect((document.documentElement as HTMLElement).dataset.theme).toBe("dark");
+    expect(directoryHeightProperty).toHaveBeenCalledWith(
+      "--directory-viewport-height",
+      "684px",
+    );
+    fakeWindow.scrollY = 500;
+    await invoke(() => resizeListener?.());
+    expect(directoryHeightProperty).toHaveBeenLastCalledWith(
+      "--directory-viewport-height",
+      "684px",
+    );
+    expect(addEventListener).toHaveBeenCalledWith("resize", expect.any(Function));
 
-    const cancelNotice = hookHarness.effects[2]?.();
     expect(fakeWindow.setTimeout).toHaveBeenCalledWith(expect.any(Function), 6000);
-    scheduledTimeout?.();
-    if (typeof cancelNotice === "function") cancelNotice();
+    await invoke(() => scheduledTimeout?.());
     expect(clearTimeout).toHaveBeenCalledWith(17);
+    elements = readElements();
+    expect(elements.some(({ props }) =>
+      props.className === "context-repair-notice" && props.role === "status")).toBe(false);
 
-    elements = renderApp();
-    expect(hookHarness.effects[2]?.()).toBeUndefined();
-
-    hookHarness.effects[3]?.();
     expect(replaceState).toHaveBeenCalled();
     expect(fakeWindow.location.hash).not.toMatch(/(?:mode|direction|predicate)=/u);
-    hookHarness.effects[3]?.();
-    expect(hookHarness.effects[4]?.()).toBeUndefined();
+    await invoke(() => resizeListener?.());
+    expect(directoryHeightProperty).toHaveBeenCalledTimes(3);
 
-    const removeHashListener = hookHarness.effects[5]?.();
     expect(addEventListener).toHaveBeenCalledWith("hashchange", expect.any(Function));
     fakeWindow.location.hash = "#root=plane%3Aruntime-plane&focus=node%3AAgentRun";
-    hashListener?.();
+    await invoke(() => hashListener?.());
     fakeWindow.location.hash = "#root=missing&focus=invalid";
-    hashListener?.();
-    if (typeof removeHashListener === "function") removeHashListener();
-    expect(removeEventListener).toHaveBeenCalledWith("hashchange", expect.any(Function));
+    await invoke(() => hashListener?.());
 
-    elements = renderApp();
+    elements = readElements();
     expect(byType(elements, "mock-ontology-directory").props.graphRootRef).toBe(
       "root:agent-system-ontology",
     );
+
+    await unmountApp();
+    expect(removeEventListener).toHaveBeenCalledWith("hashchange", expect.any(Function));
+    expect(removeEventListener).toHaveBeenCalledWith("resize", expect.any(Function));
   });
 });

@@ -279,9 +279,6 @@ export const ontologyViewModelFixture = {
     constraints: 6,
     source_claims: 39,
     case_paths: 1,
-    legacy_individuals_remaining: 0,
-    legacy_data_properties_remaining: 0,
-    legacy_axioms_remaining: 0,
   },
 };
 

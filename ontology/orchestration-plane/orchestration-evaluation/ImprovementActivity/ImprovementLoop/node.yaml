@@ -1,0 +1,804 @@
+schema: moonweave.ai/ontology-node/v1
+id: ImprovementLoop
+kind: concept
+status: review
+labels:
+  zh: 改进循环
+  en: improvement loop
+  ja: 改善ループ
+semantics:
+  short_definition:
+    zh: 按停止条件反复安排改进尝试，并在每轮更新状态的有界控制活动。
+    en: A bounded control activity that repeatedly schedules improvement attempts and updates state until a stop condition holds.
+    ja: stop condition まで improvement attempt を反復配置し state を更新する bounded control activity です。
+  definition:
+    zh: ImprovementLoop 是 ImprovementActivity 的一种运行时控制活动，由循环 ID、目标修订版本、开始时间和终止结果识别。它编排一个或多个 ImprovementAttempt、使用 RevisionPlan，并仅在显式 StopCondition 接受结果、耗尽预算或要求停止时结束；它既不是单次尝试，也不是可复用的工作流规范。
+    en: ImprovementLoop is a runtime control activity and an ImprovementActivity identified by loop ID, target revision, start time, and termination outcome. It coordinates one or more ImprovementAttempts, uses RevisionPlans, and ends only when an explicit StopCondition accepts the result, exhausts budget, or stops execution; it is neither one attempt nor a reusable workflow specification.
+    ja: ImprovementLoop は loop ID、対象 revision、開始時刻、終了結果で識別される ImprovementActivity の runtime control activity です。一つ以上の ImprovementAttempt を編成し RevisionPlan を使用し、明示的な StopCondition が受理、budget 枯渇、停止を判断した場合だけ終了します。単一 attempt でも再利用可能 workflow specification でもありません。
+  why_needed:
+    zh: 该层把“循环控制”与其中的评估、修订和路由发生分开，使重试次数、停止理由与各轮状态都可追溯。
+    en: This layer separates loop control from the evaluation, revision, and routing occurrences inside it, making attempt count, stop reason, and per-round state traceable.
+    ja: loop control と内部の evaluation・revision・routing occurrence を分離し、attempt count・stop reason・round state を追跡可能にします。
+  includes:
+    - zh: 具有明确目标、尝试序列、剩余预算、状态演进和停止判定的一次 evaluator-optimizer 或 review-revision 运行。
+      en: One evaluator-optimizer or review-revision execution with an explicit target, attempt sequence, remaining budget, state evolution, and stop decision.
+      ja: explicit target・attempt sequence・remaining budget・state evolution・stop decision を持つ evaluator-optimizer/review-revision execution。
+  excludes:
+    - zh: 单次 EvaluationAttempt、单次 RevisionAttempt、循环模板、ReviewActivity、EvaluationRun 和静态 OptimizerState 快照。
+      en: A single EvaluationAttempt or RevisionAttempt, loop templates, ReviewActivity, EvaluationRun, and static OptimizerState snapshots.
+      ja: single EvaluationAttempt/RevisionAttempt・loop template・ReviewActivity・EvaluationRun・static OptimizerState snapshot。
+  semantic_kind: activity
+  aliases: []
+structure:
+  identity_keys: []
+  fields:
+    - id: target_ref
+      labels:
+        zh: 循环目标引用
+        en: loop-target reference
+        ja: loop target ref
+      datatype: reference
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 引用所有尝试共同评估和修改的对象版本。
+        en: References the object revision jointly evaluated and revised by the attempts.
+        ja: attempt が jointly evaluate/revise する object revision を参照します。
+      allowed_values: []
+      pattern: null
+      example_value: artifact-report@7
+      source_claims:
+        - claim-improvement-loop-004
+    - id: started_at
+      labels:
+        zh: 循环开始时间
+        en: loop start time
+        ja: loop 開始時刻
+      datatype: datetime
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 记录循环控制活动开始承接首个 ImprovementAttempt 的有效时间；它属于本次循环发生，不属于循环模板或目标对象。
+        en: Records the valid time when this loop-control activity begins governing its first ImprovementAttempt. It belongs to the loop occurrence, not the loop template or target object.
+        ja: この loop-control activity が最初の ImprovementAttempt を統括し始める valid time を記録します。loop template や target object ではなく loop occurrence に属します。
+      allowed_values: []
+      pattern: null
+      example_value: 2026-07-16T10:00:00Z
+      source_claims:
+        - claim-improvement-loop-005
+    - id: ended_at
+      labels:
+        zh: 循环结束时间
+        en: loop end time
+        ja: loop 終了時刻
+      datatype: datetime
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      definitions:
+        zh: 记录循环达到终止结果的有效时间；进行中的循环保持为空，已经终止的循环必须填入且不得早于 started_at。
+        en: Records the valid time at which the loop reaches its termination outcome. It remains absent while the loop is active and is required for a terminated loop, never earlier than started_at.
+        ja: loop が termination outcome に到達した valid time を記録します。active 中は空で、終了済み loop では必須となり started_at より前にはできません。
+      allowed_values: []
+      pattern: null
+      example_value: 2026-07-16T10:04:05Z
+      source_claims:
+        - claim-improvement-loop-006
+    - id: termination_outcome
+      labels:
+        zh: 循环终止结果
+        en: loop termination outcome
+        ja: loop 終了結果
+      datatype: string
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      definitions:
+        zh: 记录循环为何不再安排下一尝试：候选已被接受、尝试预算耗尽、显式停止条件成立，或外部取消。进行中的循环保持为空，结果不得代替具体 StopCondition 或取消事实。
+        en: "Records why the loop schedules no further attempt: the candidate was accepted, the attempt budget was exhausted, an explicit stop condition held, or an external cancellation occurred. It remains absent while active and never replaces the concrete StopCondition or cancellation fact."
+        ja: loop が次の attempt を配置しない理由、すなわち candidate accepted、attempt budget exhausted、explicit stop condition satisfied、または external cancellation を記録します。active 中は空で、具体的 StopCondition や cancellation fact を置き換えません。
+      allowed_values:
+        - id: ImprovementLoopOutcomeAccepted
+          value: accepted
+          labels:
+            zh: 候选已接受
+            en: accepted
+            ja: accepted
+          definitions:
+            zh: 显式成功判据接受当前候选，循环正常成功结束。
+            en: An explicit success criterion accepts the current candidate and the loop ends successfully.
+            ja: 明示的 success criterion が current candidate を受理し loop が正常終了します。
+          status: accepted
+          source_claims:
+            - claim-improvement-loop-007
+        - id: ImprovementLoopOutcomeBudgetExhausted
+          value: budget_exhausted
+          labels:
+            zh: 尝试预算耗尽
+            en: budget exhausted
+            ja: budget exhausted
+          definitions:
+            zh: 允许的尝试数量或成本预算已耗尽，即使候选尚未达到接受判据也不再自动继续。
+            en: The permitted attempt-count or cost budget is exhausted, so automatic iteration stops even though the candidate has not met acceptance criteria.
+            ja: 許可された attempt count または cost budget が尽き、candidate が acceptance criteria を満たしていなくても自動反復を停止します。
+          status: accepted
+          source_claims:
+            - claim-improvement-loop-008
+        - id: ImprovementLoopOutcomeStopped
+          value: stopped
+          labels:
+            zh: 停止条件成立
+            en: stopped
+            ja: stopped
+          definitions:
+            zh: 某个非接受类的版本化 StopCondition 已求值为真并结束循环。
+            en: A versioned non-acceptance StopCondition evaluated true and ended the loop.
+            ja: versioned non-acceptance StopCondition が true と評価され loop を終了しました。
+          status: accepted
+          source_claims:
+            - claim-improvement-loop-009
+        - id: ImprovementLoopOutcomeCancelled
+          value: cancelled
+          labels:
+            zh: 外部取消
+            en: cancelled
+            ja: cancelled
+          definitions:
+            zh: 循环由外部取消事实结束；不得把一个未求值或求值为假的 StopCondition 伪记为终止原因。
+            en: An external cancellation fact ends the loop; an unevaluated or false StopCondition must not be recorded as the termination cause.
+            ja: external cancellation fact が loop を終了します。未評価または false の StopCondition を termination cause として記録してはなりません。
+          status: accepted
+          source_claims:
+            - claim-improvement-loop-010
+      pattern: null
+      example_value: accepted
+      source_claims:
+        - claim-improvement-loop-011
+    - id: stop_condition_ref
+      labels:
+        zh: 实际终止条件引用
+        en: evaluated stop-condition reference
+        ja: 評価済み stop condition 参照
+      datatype: reference
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      definitions:
+        zh: 引用实际参与本次终止判定的版本化 StopCondition；不得仅因某条件适用于该循环就把它记为终止原因，外部取消时可为空。
+        en: References the versioned StopCondition actually evaluated in this termination decision. Mere applicability to the loop does not make a condition causal; it may be absent for external cancellation.
+        ja: この termination decision で実際に評価された versioned StopCondition を参照します。loop に applicable であるだけでは causal ではなく、external cancellation では空にできます。
+      allowed_values: []
+      pattern: null
+      example_value: quality-threshold@4
+      source_claims:
+        - claim-improvement-loop-012
+  constraints:
+    - id: improvement-loop-terminal-interval-and-basis
+      severity: error
+      expression_language: plain
+      expression: ended_at IS PRESENT IFF termination_outcome IS PRESENT; ended_at IS PRESENT IMPLIES ended_at >= started_at; termination_outcome IN {accepted, budget_exhausted, stopped} IMPLIES stop_condition_ref IS PRESENT
+      explanations:
+        zh: 终止结果与结束时间必须同时出现，结束不得早于开始；由接受、预算或停止判据结束时还必须固定实际求值的条件版本。
+        en: Termination outcome and end time occur together, end cannot precede start, and acceptance-, budget-, or stop-based termination must fix the condition revision actually evaluated.
+        ja: termination outcome と end time は同時に存在し、end は start より前にできません。acceptance・budget・stop による終了では実際に評価した condition revision も固定します。
+      source_claims:
+        - claim-improvement-loop-013
+  required_relation_constraints: []
+examples:
+  - id: ImprovementLoop-example-positive-manual-20260716
+    kind: positive
+    labels:
+      zh: 报告质量循环
+      en: Report-quality loop
+      ja: report quality loop
+    scenario_id: null
+    descriptions:
+      zh: loop-42 对 report@7 先评估、再修订、再次评估，并因 quality≥0.9 在第二轮停止。
+      en: loop-42 evaluates report@7, revises it, evaluates again, and stops in round two because quality is at least 0.9.
+      ja: loop-42 は report@7 を evaluate・revise・再evaluate し quality≥0.9 で round two に停止します。
+    field_values:
+      improvement_activity_id: loop-42
+      status: completed
+      target_ref: report@7
+      started_at: 2026-07-16T10:00:00Z
+      ended_at: 2026-07-16T10:04:05Z
+      termination_outcome: accepted
+      stop_condition_ref: quality-threshold@4
+    related_node_ids:
+      - ImprovementLoop
+      - ImprovementAttempt
+      - StopCondition
+    related_relation_ids:
+      - ImprovementLoop-contains_attempt-ImprovementAttempt
+      - ImprovementLoop-terminates_on-StopCondition
+    expected_result:
+      zh: 返回一个包含两次尝试并带成功停止依据的循环。
+      en: Return one loop containing two attempts with an explicit successful stop basis.
+      ja: two attempts と explicit successful stop basis を持つ one loop を返します。
+    why_valid_or_invalid:
+      zh: 该对象从 10:00 跨越两轮到 10:04:05，并把 accepted 与实际求值的 quality-threshold@4 绑定为整体终止依据，符合循环而非单次尝试身份。
+      en: The object spans two rounds from 10:00 to 10:04:05 and binds accepted to the actually evaluated quality-threshold@4 as its overall termination basis, so it is a loop rather than one attempt.
+      ja: この object は 10:00 から 10:04:05 まで two rounds を跨ぎ、accepted と実際に評価した quality-threshold@4 を overall termination basis に結びます。したがって single attempt ではなく loop です。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-improvement-loop-001
+      - claim-improvement-loop-002
+  - id: ImprovementLoop-example-boundary-manual-20260716
+    kind: boundary
+    labels:
+      zh: 第二轮评估尝试
+      en: Second-round evaluation attempt
+      ja: second-round evaluation attempt
+    scenario_id: improvement-review-improvementloop-boundary
+    descriptions:
+      zh: evaluation-attempt-2 只在 10:05 执行一次评分并返回 accept，没有包含前一轮修订。
+      en: evaluation-attempt-2 performs one scoring occurrence at 10:05 and returns accept; it does not contain the prior revision.
+      ja: evaluation-attempt-2 は 10:05 に one score を返し prior revision を含みません。
+    field_values: {}
+    related_node_ids:
+      - ImprovementLoop
+      - EvaluationAttempt
+    related_relation_ids: []
+    expected_result:
+      zh: 分类为 EvaluationAttempt，并通过 contains_attempt 连接到 loop-42。
+      en: Classify it as EvaluationAttempt and attach it to loop-42 through contains_attempt.
+      ja: EvaluationAttempt とし contains_attempt で loop-42 に接続します。
+    why_valid_or_invalid:
+      zh: 一次有序尝试没有跨轮控制、预算和整体终止身份。
+      en: One ordered attempt lacks cross-round control, budget, and overall termination identity.
+      ja: one ordered attempt には cross-round control・budget・overall termination identity がありません。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-improvement-loop-001
+      - claim-improvement-loop-003
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation: []
+parent_relation:
+  id: ImprovementLoop-is_a-ImprovementActivity
+  predicate: is_a
+  direction: source-to-target
+  relation_kind: hierarchy
+  labels:
+    zh: 是一种
+    en: is a
+    ja: の一種
+  definitions:
+    zh: ImprovementLoop 是一种 ImprovementActivity；其必要种差是跨一个以上尝试维持预算、状态与停止判定。
+    en: ImprovementLoop is a ImprovementActivity whose necessary differentia is maintaining budget, state, and a stop decision across one or more attempts.
+    ja: ImprovementLoop は ImprovementActivity の一種で、必要種差は one or more attempts を跨いで budget・state・stop decision を維持すること です。
+  cardinality: null
+  cardinality_not_applicable_reason:
+    zh: 实例基数由具体循环规范和运行记录约束，本体边只声明可核验的有向事实。
+    en: Instance cardinality is constrained by the concrete loop specification and run record; this ontology edge states only a verifiable directed fact.
+    ja: instance cardinality は concrete loop specification/run record が制約し ontology edge は verifiable directed fact のみを宣言します。
+  inverse_reading:
+    predicate: inverse_of_is_a
+    labels:
+      zh: 反向 是一种
+      en: inverse is a
+      ja: 逆 の一種
+  conditions:
+    - id: ImprovementLoop-is_a-ImprovementActivity-assertion-condition
+      severity: error
+      expression_language: plain
+      expression: instance SATISFIES ImprovementActivity AND count(instance.attempts) >= 1 AND instance MAINTAINS budget, state, and a stop decision across attempts
+      explanations:
+        zh: 仅当对象既满足 ImprovementActivity 的完整定义，又满足“跨一个以上尝试维持预算、状态与停止判定”时断言。
+        en: Assert only when the object satisfies the complete ImprovementActivity definition and maintaining budget, state, and a stop decision across one or more attempts.
+        ja: object が ImprovementActivity の complete definition と「one or more attempts を跨いで budget・state・stop decision を維持すること」を満たす時のみ assert します。
+      source_claims:
+        - claim-improvement-loop-001
+        - claim-improvement-loop-002
+  temporal_scope: timeless
+  boundary_context: null
+  constraints: []
+  examples:
+    - id: ImprovementLoop-is_a-ImprovementActivity-example-positive-manual-20260716
+      kind: positive
+      labels:
+        zh: is_a 正例
+        en: is_a positive case
+        ja: is_a 正例
+      scenario_id: improvement-relation-improvementloop-is_a-improvementactivity-positive
+      descriptions:
+        zh: loop-42 跨两轮尝试维护剩余预算并在 quality≥0.9 时终止。
+        en: loop-42 spans two attempts, maintains remaining budget, and terminates at quality at least 0.9.
+        ja: loop-42 は two attempts を跨ぎ remaining budget を保ち quality≥0.9 で終了します。
+      field_values: {}
+      related_node_ids:
+        - ImprovementLoop
+        - ImprovementActivity
+      related_relation_ids:
+        - ImprovementLoop-is_a-ImprovementActivity
+      expected_result:
+        zh: 类型查询返回 ImprovementLoop→ImprovementActivity 的严格上位路径。
+        en: Type traversal returns the strict ImprovementLoop-to-ImprovementActivity genus path.
+        ja: type traversal は strict ImprovementLoop→ImprovementActivity genus path を返します。
+      why_valid_or_invalid:
+        zh: 该实例同时满足 ImprovementActivity 的共同条件和 ImprovementLoop 的独有种差。
+        en: The instance satisfies both the common ImprovementActivity conditions and the unique ImprovementLoop differentia.
+        ja: instance は ImprovementActivity の common conditions と ImprovementLoop の unique differentia を満たします。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-improvement-loop-001
+        - claim-improvement-loop-002
+    - id: ImprovementLoop-is_a-ImprovementActivity-example-boundary-manual-20260716
+      kind: boundary
+      labels:
+        zh: is_a 边界例
+        en: is_a boundary case
+        ja: is_a 境界例
+      scenario_id: improvement-relation-improvementloop-is_a-improvementactivity-boundary
+      descriptions:
+        zh: evaluation-attempt-2 只执行一次评价并返回结果，不控制其他尝试。
+        en: evaluation-attempt-2 performs one evaluation and controls no other attempt.
+        ja: evaluation-attempt-2 は one evaluation のみで other attempt を control しません。
+      field_values: {}
+      related_node_ids:
+        - ImprovementLoop
+        - ImprovementActivity
+      related_relation_ids:
+        - ImprovementLoop-is_a-ImprovementActivity
+      expected_result:
+        zh: 不得仅因相关或共现就把边界对象分类为 ImprovementLoop。
+        en: Relatedness or co-occurrence must not classify the boundary object as ImprovementLoop.
+        ja: relatedness/co-occurrence だけで boundary object を ImprovementLoop に分類しません。
+      why_valid_or_invalid:
+        zh: 边界对象缺少 ImprovementLoop 的必要种差，至多属于 ImprovementActivity 或相邻类型。
+        en: The boundary object lacks the necessary ImprovementLoop differentia and is at most ImprovementActivity or an adjacent type.
+        ja: boundary object は ImprovementLoop の necessary differentia を欠き ImprovementActivity または adjacent type に留まります。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-improvement-loop-001
+        - claim-improvement-loop-002
+  source_claims:
+    - claim-improvement-loop-001
+    - claim-improvement-loop-002
+  distinct_fact_rationale: null
+  layout_role: primary-backbone
+  review_status: pending
+  endpoint_order: child-to-parent
+relations:
+  - id: ImprovementLoop-contains_attempt-ImprovementAttempt
+    predicate: contains_attempt
+    direction: source-to-target
+    relation_kind: composition
+    labels:
+      zh: 包含改进尝试
+      en: contains improvement attempt
+      ja: 改善試行を含む
+    definitions:
+      zh: ImprovementLoop contains_attempt ImprovementAttempt 表示一次循环运行按轮次组成性地包含特定尝试；尝试不能同时属于两个循环，且仍保留自己的时间与结果身份。
+      en: ImprovementLoop contains_attempt ImprovementAttempt means one loop execution compositionally contains a particular ordered attempt; the attempt cannot belong to two loops and retains its own time and outcome identity.
+      ja: ImprovementLoop contains_attempt ImprovementAttempt は one loop execution が particular ordered attempt を compositionally 含み attempt は two loops に属せず own time/outcome identity を保持することを表します。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 实例基数由具体循环规范和运行记录约束，本体边只声明可核验的有向事实。
+      en: Instance cardinality is constrained by the concrete loop specification and run record; this ontology edge states only a verifiable directed fact.
+      ja: instance cardinality は concrete loop specification/run record が制約し ontology edge は verifiable directed fact のみを宣言します。
+    inverse_reading:
+      predicate: inverse_of_contains_attempt
+      labels:
+        zh: 反向 包含改进尝试
+        en: inverse contains improvement attempt
+        ja: 逆 改善試行を含む
+    conditions:
+      - id: ImprovementLoop-contains_attempt-ImprovementAttempt-assertion-condition
+        severity: error
+        expression_language: plain
+        expression: attempt.containing_loop_ref = loop.improvement_loop_id AND UNIQUE(loop.improvement_loop_id, attempt.round_index)
+        explanations:
+          zh: 仅当 attempt 的 containing_loop_ref 指向该循环且 round_index 在该循环内唯一时成立。
+          en: Assert only when the attempt's containing-loop reference names that loop and its round index is unique within the loop.
+          ja: attempt containing-loop ref が loop を指し round index が loop 内 unique な時のみ assert します。
+        source_claims:
+          - claim-improvement-loop-001
+          - claim-improvement-loop-002
+          - claim-improvement-loop-003
+    temporal_scope: valid-time
+    boundary_context: null
+    constraints: []
+    examples:
+      - id: ImprovementLoop-contains_attempt-ImprovementAttempt-example-positive-manual-20260716
+        kind: positive
+        labels:
+          zh: contains_attempt 正例
+          en: contains_attempt positive case
+          ja: contains_attempt 正例
+        scenario_id: improvement-relation-improvementloop-contains_attempt-improvementattempt-positive
+        descriptions:
+          zh: loop-42 包含 round=1 的 eval-attempt-42-1 和 round=2 的 revision-attempt-42-1。
+          en: loop-42 contains eval-attempt-42-1 at round one and revision-attempt-42-1 at round two.
+          ja: loop-42 は round one eval-attempt-42-1 と round two revision-attempt-42-1 を含みます。
+        field_values: {}
+        related_node_ids:
+          - ImprovementLoop
+          - ImprovementAttempt
+        related_relation_ids:
+          - ImprovementLoop-contains_attempt-ImprovementAttempt
+        expected_result:
+          zh: 查询返回 ImprovementLoop —contains_attempt→ ImprovementAttempt 的有向事实及其证据。
+          en: The query returns the directed ImprovementLoop —contains_attempt→ ImprovementAttempt fact with its evidence.
+          ja: query は ImprovementLoop —contains_attempt→ ImprovementAttempt の directed fact と evidence を返します。
+        why_valid_or_invalid:
+          zh: 来源、目标和 contains_attempt 的运行依据均明确，且两个端点保留独立身份。
+          en: Source, target, and operational basis for contains_attempt are explicit while both endpoints retain independent identity.
+          ja: source・target・contains_attempt basis が explicit で both endpoints は independent identity を保持します。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-improvement-loop-001
+          - claim-improvement-loop-002
+          - claim-improvement-loop-003
+      - id: ImprovementLoop-contains_attempt-ImprovementAttempt-example-boundary-manual-20260716
+        kind: boundary
+        labels:
+          zh: contains_attempt 边界例
+          en: contains_attempt boundary case
+          ja: contains_attempt 境界例
+        scenario_id: improvement-relation-improvementloop-contains_attempt-improvementattempt-boundary
+        descriptions:
+          zh: eval-attempt-51-1 作用于同一报告，但 containing_loop_ref 指向 loop-51。
+          en: eval-attempt-51-1 targets the same report but its containing-loop reference points to loop-51.
+          ja: eval-attempt-51-1 は same report でも containing-loop ref は loop-51 を指します。
+        field_values: {}
+        related_node_ids:
+          - ImprovementLoop
+          - ImprovementAttempt
+        related_relation_ids:
+          - ImprovementLoop-contains_attempt-ImprovementAttempt
+        expected_result:
+          zh: 不得仅凭共现、相邻时间或字段相似推导 contains_attempt。
+          en: Co-occurrence, nearby time, or similar fields must not imply contains_attempt.
+          ja: co-occurrence・nearby time・similar fields だけで contains_attempt を推論しません。
+        why_valid_or_invalid:
+          zh: 边界情形缺少能证明 ImprovementLoop 对 ImprovementAttempt 承担 contains_attempt 语义的显式记录。
+          en: The boundary case lacks an explicit record proving that ImprovementLoop bears contains_attempt semantics toward ImprovementAttempt.
+          ja: boundary case は ImprovementLoop が ImprovementAttempt に contains_attempt semantics を持つ explicit record を欠きます。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-improvement-loop-001
+          - claim-improvement-loop-002
+          - claim-improvement-loop-003
+    source_claims:
+      - claim-improvement-loop-001
+      - claim-improvement-loop-002
+      - claim-improvement-loop-003
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: pending
+    target: concept:ImprovementAttempt
+  - id: ImprovementLoop-terminates_on-StopCondition
+    predicate: terminates_on
+    direction: source-to-target
+    relation_kind: governance
+    labels:
+      zh: 依据停止条件终止
+      en: terminates on stop condition
+      ja: 停止条件で終了
+    definitions:
+      zh: ImprovementLoop terminates_on StopCondition 表示一次循环实际求值指定条件并因其为真而结束；条件可以是接受阈值、预算耗尽、超时或人工停止，但必须保留求值证据。
+      en: ImprovementLoop terminates_on StopCondition means one loop evaluates the named condition and ends because it is true; acceptance threshold, budget exhaustion, timeout, or human stop all require evaluation evidence.
+      ja: ImprovementLoop terminates_on StopCondition は loop が named condition を evaluate し true のため終了することを表し threshold・budget・timeout・human stop いずれも evidence を要します。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 实例基数由具体循环规范和运行记录约束，本体边只声明可核验的有向事实。
+      en: Instance cardinality is constrained by the concrete loop specification and run record; this ontology edge states only a verifiable directed fact.
+      ja: instance cardinality は concrete loop specification/run record が制約し ontology edge は verifiable directed fact のみを宣言します。
+    inverse_reading:
+      predicate: inverse_of_terminates_on
+      labels:
+        zh: 反向 依据停止条件终止
+        en: inverse terminates on stop condition
+        ja: 逆 停止条件で終了
+    conditions:
+      - id: ImprovementLoop-terminates_on-StopCondition-assertion-condition
+        severity: error
+        expression_language: plain
+        expression: termination.condition_ref = condition.versioned_id AND termination.observed_value IS RECORDED AND termination.condition_result = true AND loop.ended_at >= termination.evaluated_at
+        explanations:
+          zh: 仅当循环终止记录、条件版本、观测值和判定结果均明确，且结束时间不早于求值时成立。
+          en: Assert only when termination record, condition revision, observed value, and decision are explicit and loop end is not earlier than evaluation.
+          ja: termination record・condition revision・observed value・decision が explicit で loop end≥evaluation time の時のみ assert します。
+        source_claims:
+          - claim-improvement-loop-001
+          - claim-improvement-loop-002
+    temporal_scope: valid-time
+    boundary_context: null
+    constraints: []
+    examples:
+      - id: ImprovementLoop-terminates_on-StopCondition-example-positive-manual-20260716
+        kind: positive
+        labels:
+          zh: terminates_on 正例
+          en: terminates_on positive case
+          ja: terminates_on 正例
+        scenario_id: improvement-relation-improvementloop-terminates_on-stopcondition-positive
+        descriptions:
+          zh: loop-42 在 quality-threshold@4 求值得到 0.92≥0.9 后，以 success 结束。
+          en: loop-42 ends successfully after quality-threshold@4 evaluates 0.92 as at least 0.9.
+          ja: loop-42 は quality-threshold@4 で 0.92≥0.9 を evaluate 後 success 終了します。
+        field_values: {}
+        related_node_ids:
+          - ImprovementLoop
+          - StopCondition
+        related_relation_ids:
+          - ImprovementLoop-terminates_on-StopCondition
+        expected_result:
+          zh: 查询返回 ImprovementLoop —terminates_on→ StopCondition 的有向事实及其证据。
+          en: The query returns the directed ImprovementLoop —terminates_on→ StopCondition fact with its evidence.
+          ja: query は ImprovementLoop —terminates_on→ StopCondition の directed fact と evidence を返します。
+        why_valid_or_invalid:
+          zh: 来源、目标和 terminates_on 的运行依据均明确，且两个端点保留独立身份。
+          en: Source, target, and operational basis for terminates_on are explicit while both endpoints retain independent identity.
+          ja: source・target・terminates_on basis が explicit で both endpoints は independent identity を保持します。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-improvement-loop-001
+          - claim-improvement-loop-002
+      - id: ImprovementLoop-terminates_on-StopCondition-example-boundary-manual-20260716
+        kind: boundary
+        labels:
+          zh: terminates_on 边界例
+          en: terminates_on boundary case
+          ja: terminates_on 境界例
+        scenario_id: improvement-relation-improvementloop-terminates_on-stopcondition-boundary
+        descriptions:
+          zh: max-attempts@2 适用于 loop-42，但本次尚余一次预算且不是实际终止原因。
+          en: max-attempts@2 applies to loop-42, but one attempt remains and it is not the actual termination cause.
+          ja: max-attempts@2 は loop-42 に applicable でも one attempt remains で actual termination cause ではありません。
+        field_values: {}
+        related_node_ids:
+          - ImprovementLoop
+          - StopCondition
+        related_relation_ids:
+          - ImprovementLoop-terminates_on-StopCondition
+        expected_result:
+          zh: 不得仅凭共现、相邻时间或字段相似推导 terminates_on。
+          en: Co-occurrence, nearby time, or similar fields must not imply terminates_on.
+          ja: co-occurrence・nearby time・similar fields だけで terminates_on を推論しません。
+        why_valid_or_invalid:
+          zh: 边界情形缺少能证明 ImprovementLoop 对 StopCondition 承担 terminates_on 语义的显式记录。
+          en: The boundary case lacks an explicit record proving that ImprovementLoop bears terminates_on semantics toward StopCondition.
+          ja: boundary case は ImprovementLoop が StopCondition に terminates_on semantics を持つ explicit record を欠きます。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-improvement-loop-001
+          - claim-improvement-loop-002
+    source_claims:
+      - claim-improvement-loop-001
+      - claim-improvement-loop-002
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: pending
+    target: concept:StopCondition
+  - id: ImprovementLoop-uses_revision-RevisionPlan
+    predicate: uses_revision
+    direction: source-to-target
+    relation_kind: governance
+    labels:
+      zh: 使用修订计划
+      en: uses revision plan
+      ja: 改訂計画を使用
+    definitions:
+      zh: ImprovementLoop uses_revision RevisionPlan 表示指定循环在至少一次修订尝试中采用某一版本化计划约束修改目标、步骤与完成条件，计划仍由反馈域拥有。
+      en: ImprovementLoop uses_revision RevisionPlan means the loop applies a particular versioned plan to constrain change target, steps, and completion conditions in at least one revision attempt while the plan remains feedback-owned.
+      ja: ImprovementLoop uses_revision RevisionPlan は loop が one revision attempt 以上で versioned plan を適用し target・steps・completion を制約し plan ownership は feedback domain に残ることを表します。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 实例基数由具体循环规范和运行记录约束，本体边只声明可核验的有向事实。
+      en: Instance cardinality is constrained by the concrete loop specification and run record; this ontology edge states only a verifiable directed fact.
+      ja: instance cardinality は concrete loop specification/run record が制約し ontology edge は verifiable directed fact のみを宣言します。
+    inverse_reading:
+      predicate: inverse_of_uses_revision
+      labels:
+        zh: 反向 使用修订计划
+        en: inverse uses revision plan
+        ja: 逆 改訂計画を使用
+    conditions:
+      - id: ImprovementLoop-uses_revision-RevisionPlan-assertion-condition
+        severity: error
+        expression_language: plain
+        expression: loop OR one contained RevisionAttempt REFERENCES plan.versioned_id AND execution evidence SHOWS that plan constrained target, steps, and completion
+        explanations:
+          zh: 仅当循环或其 RevisionAttempt 明确引用计划版本且执行记录证明该计划被采用时成立。
+          en: Assert only when the loop or its RevisionAttempt explicitly references a plan revision and execution records show it was applied.
+          ja: loop/RevisionAttempt が plan revision を明示参照し execution record が applied を示す時のみ assert します。
+        source_claims:
+          - claim-improvement-loop-001
+          - claim-improvement-loop-003
+    temporal_scope: valid-time
+    boundary_context: null
+    constraints: []
+    examples:
+      - id: ImprovementLoop-uses_revision-RevisionPlan-example-positive-manual-20260716
+        kind: positive
+        labels:
+          zh: uses_revision 正例
+          en: uses_revision positive case
+          ja: uses_revision 正例
+        scenario_id: improvement-relation-improvementloop-uses_revision-revisionplan-positive
+        descriptions:
+          zh: loop-42 的 revision-attempt-42-1 引用 add-fact-plan@2 并按其步骤生成 report@8。
+          en: revision-attempt-42-1 in loop-42 references add-fact-plan@2 and follows it to produce report@8.
+          ja: loop-42 の revision-attempt は add-fact-plan@2 を参照し steps に従い report@8 を生成します。
+        field_values: {}
+        related_node_ids:
+          - ImprovementLoop
+          - RevisionPlan
+        related_relation_ids:
+          - ImprovementLoop-uses_revision-RevisionPlan
+        expected_result:
+          zh: 查询返回 ImprovementLoop —uses_revision→ RevisionPlan 的有向事实及其证据。
+          en: The query returns the directed ImprovementLoop —uses_revision→ RevisionPlan fact with its evidence.
+          ja: query は ImprovementLoop —uses_revision→ RevisionPlan の directed fact と evidence を返します。
+        why_valid_or_invalid:
+          zh: 来源、目标和 uses_revision 的运行依据均明确，且两个端点保留独立身份。
+          en: Source, target, and operational basis for uses_revision are explicit while both endpoints retain independent identity.
+          ja: source・target・uses_revision basis が explicit で both endpoints は independent identity を保持します。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-improvement-loop-001
+          - claim-improvement-loop-003
+      - id: ImprovementLoop-uses_revision-RevisionPlan-example-boundary-manual-20260716
+        kind: boundary
+        labels:
+          zh: uses_revision 边界例
+          en: uses_revision boundary case
+          ja: uses_revision 境界例
+        scenario_id: improvement-relation-improvementloop-uses_revision-revisionplan-boundary
+        descriptions:
+          zh: tone-plan@1 存在于同一计划库，但 loop-42 没有选择或执行它。
+          en: tone-plan@1 exists in the same plan library but loop-42 neither selects nor executes it.
+          ja: tone-plan@1 は same library にありますが loop-42 は select/execute しません。
+        field_values: {}
+        related_node_ids:
+          - ImprovementLoop
+          - RevisionPlan
+        related_relation_ids:
+          - ImprovementLoop-uses_revision-RevisionPlan
+        expected_result:
+          zh: 不得仅凭共现、相邻时间或字段相似推导 uses_revision。
+          en: Co-occurrence, nearby time, or similar fields must not imply uses_revision.
+          ja: co-occurrence・nearby time・similar fields だけで uses_revision を推論しません。
+        why_valid_or_invalid:
+          zh: 边界情形缺少能证明 ImprovementLoop 对 RevisionPlan 承担 uses_revision 语义的显式记录。
+          en: The boundary case lacks an explicit record proving that ImprovementLoop bears uses_revision semantics toward RevisionPlan.
+          ja: boundary case は ImprovementLoop が RevisionPlan に uses_revision semantics を持つ explicit record を欠きます。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-improvement-loop-001
+          - claim-improvement-loop-003
+    source_claims:
+      - claim-improvement-loop-001
+      - claim-improvement-loop-003
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: pending
+    target: concept:RevisionPlan
+review:
+  status: pending
+  method: manual-semantic
+  reviewer: null
+  reviewed_on: null
+  note:
+    zh: 该节点仅完成了从现行候选数据到唯一 YAML 树的无损转录；尚未逐项完成人工语义核验，不得据此宣称已审定。
+    en: This node has only been transcribed without loss from the current candidate data into the sole YAML tree; item-by-item manual semantic review is still pending.
+    ja: このノードは現行候補データから唯一の YAML ツリーへ欠落なく転記した段階であり、項目別の手動意味審査は未完了です。
+  sections:
+    semantics: pending
+    hierarchy: pending
+    relations: pending
+    structure: pending
+    examples: pending
+    source_claims: []
+source_claims:
+  - id: claim-improvement-loop-001
+    source: eng-fw-langgraph-workflows-agents
+    supports: LangGraph's official evaluator-optimizer pattern separates a generator occurrence from an evaluator occurrence, routes rejected output back with feedback, and stops when explicit success criteria accept the output. Moonweave uses that operational distinction for improvement loops, attempts, state, and stop control without modeling LangGraph itself as a graph node.
+    locator: "Workflows and agents > Evaluator-optimizer: generator, evaluator, structured feedback, conditional routing, accepted end, and rejected regeneration"
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-improvement-loop-002
+    source: eng-fw-langgraph-graph-api
+    supports: LangGraph's Graph API treats state snapshots, executable nodes, and fixed or conditional edges as separate workflow elements. Moonweave uses this evidence to distinguish ImprovementState from ImprovementActivity and to keep containment, dispatch, updates, and termination as cross-facts rather than type parents.
+    locator: Graph API overview > Graphs, State, Nodes, Edges, conditional edges, and state updates
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-improvement-loop-003
+    source: eng-ont-prov-o
+    supports: W3C PROV-O distinguishes time-bounded Activities from Entities and Plans and supports usage, generation, association, and derivation. Moonweave uses those distinctions for improvement activities, control specifications, role responsibility, mutable state snapshots, and immutable control-lineage records.
+    locator: "PROV-O Recommendation Sections 3.1 and 3.2: Activity, Entity, Plan, Agent, usage, generation, association, and derivation"
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-improvement-loop-004
+    source: eng-api-openai-evals
+    supports: OpenAI's Evals API separates reusable evaluation structure and testing criteria from distinct evaluation runs and run outputs. Moonweave uses that distinction to keep EvaluationAttempt, the feedback-owned EvaluationRun it coordinates, and reusable ReviewAssignment or RevisionPlan specifications as different objects.
+    locator: "Evals API > Create an eval and Runs: reusable evaluation structure, testing criteria, data-source schema, and separate run resources"
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-improvement-loop-005
+    source: eng-ont-prov-o
+    supports: PROV-O defines an Activity as occurring over time and provides prov:startedAtTime and prov:endedAtTime. Moonweave records the loop occurrence's start explicitly.
+    locator: "PROV-O Recommendation Section 3.1: Activity, startedAtTime, and endedAtTime"
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-improvement-loop-006
+    source: eng-ont-prov-o
+    supports: PROV-O uses an activity end event and prov:endedAtTime to delimit the end of an Activity. Moonweave uses that boundary for a completed improvement-loop occurrence.
+    locator: PROV-O Recommendation Section 3.1 and PROV Constraints activity end event
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-improvement-loop-007
+    source: eng-fw-langgraph-workflows-agents
+    supports: LangGraph's evaluator-optimizer workflow routes an accepted candidate to END. Moonweave names that loop-level outcome accepted.
+    locator: "Workflows and agents > Evaluator-optimizer: Accepted path to END"
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-improvement-loop-008
+    source: eng-fw-langgraph-graph-api
+    supports: LangGraph conditional routing can terminate from current graph state. Moonweave infers an explicit attempt-budget condition so termination is bounded and auditable.
+    locator: Graph API overview > Conditional edges may route to END based on state
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-improvement-loop-009
+    source: eng-fw-langgraph-graph-api
+    supports: LangGraph edges determine both routing and graph termination. Moonweave keeps the reusable stop condition distinct from its occurrence-level stopped outcome.
+    locator: Graph API overview > Edges define routing and how the graph decides to stop
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-improvement-loop-010
+    source: eng-ont-prov-o
+    supports: PROV-O allows an Activity to be ended by an Entity or Agent-associated event. Moonweave distinguishes such external cancellation from a stop-condition evaluation.
+    locator: "PROV-O Recommendation Section 3.2: wasEndedBy and qualified End"
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-improvement-loop-011
+    source: eng-fw-langgraph-workflows-agents
+    supports: The evaluator-optimizer pattern iterates on rejected feedback and ends on acceptance. Moonweave generalizes the loop-level terminal state into explicit, non-overlapping outcomes.
+    locator: Workflows and agents > Evaluator-optimizer conditional routing
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-improvement-loop-012
+    source: eng-fw-langgraph-graph-api
+    supports: A LangGraph conditional edge evaluates current state to choose a destination or END. Moonweave records the exact versioned condition used in that occurrence rather than inferring it from graph adjacency.
+    locator: Graph API overview > Conditional edges and routing functions
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-improvement-loop-013
+    source: eng-ont-prov-o
+    supports: PROV-O and PROV Constraints delimit an Activity with start and end events. Moonweave adds the domain-specific requirement that a control-loop end preserve its evaluated decision basis.
+    locator: PROV-O Section 3.1 and PROV Constraints activity start/end events
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending

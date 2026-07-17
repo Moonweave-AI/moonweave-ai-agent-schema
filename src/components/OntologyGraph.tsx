@@ -32,55 +32,64 @@ type StabilizationStatus = "loading" | "stabilizing" | "stable" | "error";
 
 const NETWORK_TEXT: Readonly<Record<Language, Readonly<Record<string, string>>>> = {
   zh: {
-    title: "关系社区图谱",
-    subtitle: "颜色表示结构社区，大小表示连接度；关系名称悬停可见。",
+    title: "本体关系图谱",
+    subtitle: "颜色表示规范模块归属，大小表示连接度；关系名称悬停可见。Graphify 聚类仅用于离线诊断。",
     search: "搜索图中节点",
     searchPlaceholder: "输入节点名称…",
     fit: "适应画布",
     stabilize: "重新排布",
-    communities: "结构社区",
+    communities: "规范模块社区",
     showAll: "显示全部",
-    hideAll: "隐藏全部",
+    hideAll: "隐藏其他社区",
+    focusLocked: "当前节点所属社区需保持可见",
     loading: "正在加载图谱引擎…",
     stabilizing: "正在稳定布局…",
     stable: "布局已稳定",
     error: "图谱无法初始化",
     noResults: "没有匹配节点",
-    accessibility: "交互式本体关系社区图。可使用搜索定位节点，或使用左侧目录完整浏览。",
+    nodes: "节点",
+    edges: "关系",
+    accessibility: "交互式本体关系图。节点颜色表示经过审计的规范模块归属；可使用搜索定位节点，或使用左侧目录完整浏览。",
   },
   en: {
-    title: "Relation community graph",
-    subtitle: "Color indicates structural community and size indicates degree; relations appear on hover.",
+    title: "Ontology relation graph",
+    subtitle: "Color indicates canonical Module ownership and size indicates degree; relations appear on hover. Graphify clustering is diagnostic only.",
     search: "Search graph nodes",
     searchPlaceholder: "Type a node label…",
     fit: "Fit graph",
     stabilize: "Reflow",
-    communities: "Structural communities",
+    communities: "Canonical Module communities",
     showAll: "Show all",
-    hideAll: "Hide all",
+    hideAll: "Hide other communities",
+    focusLocked: "The community containing the focused node remains visible",
     loading: "Loading graph engine…",
     stabilizing: "Stabilizing layout…",
     stable: "Layout stabilized",
     error: "Graph initialization failed",
     noResults: "No matching nodes",
-    accessibility: "Interactive ontology relation community graph. Use search to focus a node or the directory for complete keyboard navigation.",
+    nodes: "nodes",
+    edges: "edges",
+    accessibility: "Interactive ontology relation graph colored by canonical Module ownership. Use search to focus a node or the directory for complete keyboard navigation.",
   },
   ja: {
-    title: "関係コミュニティグラフ",
-    subtitle: "色は構造コミュニティ、サイズは次数を示し、関係名はホバーで表示されます。",
+    title: "オントロジー関係グラフ",
+    subtitle: "色は正規モジュールへの所属、サイズは次数を示し、関係名はホバーで表示されます。Graphify のクラスタリングは診断専用です。",
     search: "グラフのノードを検索",
     searchPlaceholder: "ノード名を入力…",
     fit: "全体表示",
     stabilize: "再配置",
-    communities: "構造コミュニティ",
+    communities: "正規モジュールコミュニティ",
     showAll: "すべて表示",
-    hideAll: "すべて非表示",
+    hideAll: "他のコミュニティを非表示",
+    focusLocked: "選択中ノードのコミュニティは表示を維持します",
     loading: "グラフエンジンを読み込み中…",
     stabilizing: "レイアウトを安定化中…",
     stable: "レイアウト安定済み",
     error: "グラフを初期化できません",
     noResults: "一致するノードはありません",
-    accessibility: "インタラクティブなオントロジー関係コミュニティグラフです。検索または左側のディレクトリで移動できます。",
+    nodes: "ノード",
+    edges: "関係",
+    accessibility: "レビュー済みの正規モジュール所属で色分けしたオントロジー関係グラフです。検索または左側のディレクトリで移動できます。",
   },
 };
 
@@ -243,6 +252,10 @@ export const OntologyGraph = ({
   };
 
   const statusText = text[status];
+  const focusedCommunityId = useMemo(
+    () => model.nodes.find(({ id }) => id === focusedEntityRef)?.communityId ?? null,
+    [focusedEntityRef, model.nodes],
+  );
   const visibleCounts = useMemo(() => {
     const communityByNode = new Map(model.nodes.map(({ id, communityId }) => [id, communityId]));
     const nodeCount = model.nodes.filter(
@@ -267,9 +280,10 @@ export const OntologyGraph = ({
           <p>{text.subtitle}</p>
         </div>
         <div className="ontology-network-actions">
-          <label className="ontology-network-search">
-            <span>{text.search}</span>
+          <div className="ontology-network-search">
+            <label htmlFor="ontology-network-search-input">{text.search}</label>
             <input
+              id="ontology-network-search-input"
               type="search"
               value={query}
               placeholder={text.searchPlaceholder}
@@ -277,23 +291,26 @@ export const OntologyGraph = ({
               onChange={(event) => setQuery(event.currentTarget.value)}
               data-testid="graph-node-search"
             />
-            {query ? (
-              <div className="ontology-network-search-results" role="listbox">
-                {matches.length > 0 ? matches.map((node) => (
-                  <button
-                    key={node.id}
-                    type="button"
-                    role="option"
-                    onClick={() => selectSearchMatch(node.id, node.communityId)}
-                  >
-                    <span style={{ backgroundColor: node.color.background }} aria-hidden="true" />
-                    {node.label}
-                    <small>{node.communityLabel}</small>
-                  </button>
-                )) : <p>{text.noResults}</p>}
-              </div>
+            {query && matches.length > 0 ? (
+              <ul className="ontology-network-search-results">
+                {matches.map((node) => (
+                  <li key={node.id}>
+                    <button
+                      type="button"
+                      onClick={() => selectSearchMatch(node.id, node.communityId)}
+                    >
+                      <span style={{ backgroundColor: node.color.background }} aria-hidden="true" />
+                      {node.label}
+                      <small>{node.communityLabel}</small>
+                    </button>
+                  </li>
+                ))}
+              </ul>
             ) : null}
-          </label>
+            {query && matches.length === 0 ? (
+              <p className="ontology-network-search-results">{text.noResults}</p>
+            ) : null}
+          </div>
           <button type="button" onClick={() => runtimeRef.current?.fit(!reducedMotion)}>
             {text.fit}
           </button>
@@ -332,8 +349,10 @@ export const OntologyGraph = ({
             data-layout-status={status}
             data-physics-enabled={status === "stable" ? "false" : "true"}
             data-community-engine={validatedArtifact!.algorithm.engine}
+            data-community-assignment-policy={validatedArtifact!.algorithm.assignment_policy}
+            data-community-diagnostic-engine={validatedArtifact!.algorithm.diagnostic_engine}
             data-community-seed={validatedArtifact!.algorithm.seed}
-            data-node-color-policy="community"
+            data-node-color-policy="canonical-module-owner"
             data-node-size-policy="degree-linear-10-40"
             data-edge-label-policy="hover-only"
             data-node-count={visibleCounts.nodeCount}
@@ -352,7 +371,9 @@ export const OntologyGraph = ({
                 type="button"
                 onClick={() => setHiddenCommunityIds(
                   hiddenCommunityIds.size === 0
-                    ? new Set(model.communities.map(({ id }) => id))
+                    ? new Set(model.communities
+                      .filter(({ id }) => id !== focusedCommunityId)
+                      .map(({ id }) => id))
                     : new Set(),
                 )}
               >
@@ -362,10 +383,11 @@ export const OntologyGraph = ({
             <ul>
               {model.communities.map((community) => (
                 <li key={community.id}>
-                  <label>
+                  <label title={community.id === focusedCommunityId ? text.focusLocked : undefined}>
                     <input
                       type="checkbox"
                       checked={!hiddenCommunityIds.has(community.id)}
+                      disabled={community.id === focusedCommunityId}
                       onChange={() => toggleCommunity(community.id)}
                     />
                     <span
@@ -381,7 +403,7 @@ export const OntologyGraph = ({
             </ul>
           </aside>
           <div className="ontology-network-count" data-testid="graph-count">
-            <strong>{visibleCounts.nodeCount}</strong> nodes · <strong>{visibleCounts.edgeCount}</strong> edges
+            <strong>{visibleCounts.nodeCount}</strong> {text.nodes} · <strong>{visibleCounts.edgeCount}</strong> {text.edges}
           </div>
         </div>
       )}

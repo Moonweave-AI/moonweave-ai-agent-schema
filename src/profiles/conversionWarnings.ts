@@ -10,7 +10,7 @@ export interface DerivedConversionWarning {
   readonly message: string;
 }
 
-/** Derives warnings only from reviewed canonical constraints and lossy mappings. */
+/** Derives warnings only from canonical constraints and lossy mappings. */
 export const deriveConversionWarnings = (
   ontology: CanonicalOntology,
 ): readonly DerivedConversionWarning[] =>

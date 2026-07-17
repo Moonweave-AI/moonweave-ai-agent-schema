@@ -35,6 +35,8 @@ describe("community graph keyboard accessibility", () => {
     expect(html).toContain("Use search to focus a node or the directory");
     expect(html).toContain('type="search"');
     expect(html).toContain('data-testid="graph-node-search"');
+    expect(html).toContain('for="ontology-network-search-input"');
+    expect(html).toContain('id="ontology-network-search-input"');
   });
 
   it("announces stabilization and keeps community filters native", () => {

@@ -1,9 +1,25 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { expect, type Locator, type Page } from "@playwright/test";
 
+interface GeneratedCommunityGraphMetrics {
+  readonly metrics: {
+    readonly node_count: number;
+    readonly edge_count: number;
+    readonly community_count: number;
+  };
+}
+
+const communityGraph = JSON.parse(readFileSync(resolve(
+  import.meta.dirname,
+  "../../src/generated/ontology-community-graph.json",
+), "utf8")) as GeneratedCommunityGraphMetrics;
+
 export const FULL_GRAPH_METRICS = Object.freeze({
-  nodes: 753,
-  edges: 1_300,
-  communities: 36,
+  nodes: communityGraph.metrics.node_count,
+  edges: communityGraph.metrics.edge_count,
+  communities: communityGraph.metrics.community_count,
 });
 
 export const ontologyNetwork = (page: Page): Locator =>

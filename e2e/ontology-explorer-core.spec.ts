@@ -14,9 +14,20 @@ test.describe("Moonweave Graphify ontology explorer core", () => {
 
     const graph = await waitForGraphStable(page);
     await expectFullGraphMetrics(graph);
-    await expect(graph).toHaveAttribute("data-community-engine", /^(networkx-louvain|graspologic-leiden)$/u);
+    await expect(graph).toHaveAttribute(
+      "data-community-engine",
+      "canonical-module-anchors",
+    );
+    await expect(graph).toHaveAttribute(
+      "data-community-assignment-policy",
+      "canonical-module-owner",
+    );
+    await expect(graph).toHaveAttribute(
+      "data-community-diagnostic-engine",
+      "none",
+    );
     await expect(graph).toHaveAttribute("data-community-seed", "42");
-    await expect(graph).toHaveAttribute("data-node-color-policy", "community");
+    await expect(graph).toHaveAttribute("data-node-color-policy", "canonical-module-owner");
     await expect(graph).toHaveAttribute("data-node-size-policy", "degree-linear-10-40");
     await expect(graph).toHaveAttribute("data-edge-label-policy", "hover-only");
     await expect(graph).toHaveAttribute("data-source-sha256", /^[a-f0-9]{64}$/u);
@@ -34,12 +45,14 @@ test.describe("Moonweave Graphify ontology explorer core", () => {
     await expect(page.locator(".ontology-network-stage canvas")).toHaveCount(1);
   });
 
-  test("filters a structural community without changing the canonical graph artifact", async ({ page }) => {
+  test("filters a canonical Module community without changing the canonical graph artifact", async ({ page }) => {
     test.slow();
     await page.goto("/");
     const graph = await waitForGraphStable(page);
     const sourceHash = await graph.getAttribute("data-source-sha256");
-    const firstCommunity = page.locator(".ontology-community-legend li").first();
+    const firstCommunity = page.locator(".ontology-community-legend li")
+      .filter({ has: page.locator('input[type="checkbox"]:not(:disabled)') })
+      .first();
     const checkbox = firstCommunity.getByRole("checkbox");
     const memberCount = Number(await firstCommunity.locator("small").textContent());
 
@@ -70,7 +83,10 @@ test.describe("Moonweave Graphify ontology explorer core", () => {
     expect(bounds!.width).toBeGreaterThan(280);
     expect(bounds!.height).toBeGreaterThan(480);
     await switchToEnglish(page);
-    await expect(graph).toHaveAttribute("aria-label", /interactive ontology relation community graph/i);
+    await expect(graph).toHaveAttribute(
+      "aria-label",
+      /node colors indicate canonical Module ownership/i,
+    );
     await expect(page.getByTestId("graph-node-search")).toBeVisible();
     const stageBounds = await page.locator(".ontology-network-stage").boundingBox();
     const legend = page.locator(".ontology-community-legend");

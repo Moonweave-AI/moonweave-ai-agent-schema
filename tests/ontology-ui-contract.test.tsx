@@ -105,6 +105,22 @@ describe("unified graph UI contract", () => {
     expect(networkStyles).not.toMatch(/graph-mode|layout-direction|graph-expansion/iu);
   });
 
+  it("sizes the desktop directory from its measured viewport instead of height breakpoints", () => {
+    const structureStyles = readFileSync(
+      new URL("../src/styles/ontology-explorer-structure.css", import.meta.url),
+      "utf8",
+    );
+    const responsiveStyles = readFileSync(
+      new URL("../src/styles/ontology-details-responsive.css", import.meta.url),
+      "utf8",
+    );
+
+    expect(structureStyles).toContain("grid-template-rows: auto minmax(0, 1fr);");
+    expect(responsiveStyles).not.toMatch(
+      /@media\s*\(min-width:\s*1181px\)\s*and\s*\(max-height:/u,
+    );
+  });
+
   it("renders the primary directory recursively to arbitrary concept depth", () => {
     const { index, state } = buildFixture();
     const html = renderToStaticMarkup(
@@ -177,7 +193,7 @@ describe("unified graph UI contract", () => {
 
     expect((html.match(/data-testid="ontology-network-graph"/g) ?? [])).toHaveLength(1);
     expect(html).toContain('data-layout-engine="vis-network-forceatlas2"');
-    expect(html).toContain('data-node-color-policy="community"');
+    expect(html).toContain('data-node-color-policy="canonical-module-owner"');
     expect(html).toContain('data-edge-label-policy="hover-only"');
     expect(html).not.toMatch(/Logical hierarchy|Relation exploration|layout-direction/u);
   });
@@ -499,6 +515,8 @@ describe("unified graph UI contract", () => {
       target: planeRef,
       relation: "contains_domain",
       evidence: "derived",
+      relation_kind: "composition",
+      layout_role: "ownership",
     };
     const model = buildOntologyCommunityNetworkModel(index, {
       ...base,

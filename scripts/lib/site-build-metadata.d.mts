@@ -13,7 +13,7 @@ export interface SiteBuildManifest {
 }
 
 export function sha256Bytes(bytes: Uint8Array): string;
-export function acceptedRelationCount(relations: readonly unknown[]): number;
+export function currentRelationCount(relations: readonly unknown[]): number;
 export function gitValue(root: string, args: readonly string[]): string;
 export function currentCommitSha(root: string): string;
 export function currentRef(root: string): string;

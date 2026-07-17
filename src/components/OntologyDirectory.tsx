@@ -161,12 +161,10 @@ const DirectoryBranch = ({
   const nextVisited = new Set(visited).add(entityRef);
   const label = ontologyEntityLabel(entity, language);
   const kind = kindText(entity, language);
+  const childGroupId = `directory-children-${entity.kind}-${entity.id}`;
 
   return (
     <li
-      role="treeitem"
-      aria-expanded={children.length > 0 ? expanded : undefined}
-      aria-selected={focusedEntityRef === entityRef}
       data-directory-ref={entityRef}
       data-directory-depth={depth}
     >
@@ -176,6 +174,8 @@ const DirectoryBranch = ({
             type="button"
             className="tree-toggle"
             aria-label={`${expanded ? uiText[language].collapseList : uiText[language].expandDirectory}: ${label}`}
+            aria-expanded={expanded}
+            aria-controls={childGroupId}
             onClick={() => onToggleExpanded(entityRef)}
           >
             {expanded ? "−" : "+"}
@@ -188,13 +188,15 @@ const DirectoryBranch = ({
           className={`tree-button${graphRootRef === entityRef ? " is-selected" : ""}${focusedEntityRef === entityRef ? " is-focused" : ""}`}
           onClick={() => onNavigate(entityRef)}
           aria-label={`${label} ${kind}`}
+          aria-current={focusedEntityRef === entityRef ? "page" : undefined}
+          title={label}
         >
           <span>{label}</span>
           <small>{kind}</small>
         </button>
       </div>
       {children.length > 0 && expanded ? (
-        <ul role="group">
+        <ul id={childGroupId}>
           {children.map((childRef) => (
             <DirectoryBranch
               key={childRef}
@@ -256,7 +258,7 @@ export const OntologyDirectory = (props: OntologyDirectoryProps) => {
       <nav className="directory-tree" aria-label={text.browseOntology}>
         {normalizedQuery.length > 0 ? (
           searchResults.length > 0 ? (
-            <ul className="tree-root search-results" role="list">
+            <ul className="tree-root search-results">
               {searchResults.map((entity) => (
                 <li key={entity.ref} data-directory-ref={entity.ref} data-directory-depth="0">
                   <button
@@ -264,6 +266,7 @@ export const OntologyDirectory = (props: OntologyDirectoryProps) => {
                     className="tree-button"
                     onClick={() => onNavigate(entity.ref)}
                     aria-label={`${ontologyEntityLabel(entity, language)} ${kindText(entity, language)}`}
+                    title={ontologyEntityLabel(entity, language)}
                   >
                     <span>{ontologyEntityLabel(entity, language)}</span>
                     <small>{kindText(entity, language)}</small>
@@ -275,7 +278,7 @@ export const OntologyDirectory = (props: OntologyDirectoryProps) => {
             <p className="directory-empty">{text.noSearchResults}</p>
           )
         ) : (
-          <ul className="tree-root" role="tree">
+          <ul className="tree-root">
             <DirectoryBranch
               {...props}
               entityRef={index.rootRef}

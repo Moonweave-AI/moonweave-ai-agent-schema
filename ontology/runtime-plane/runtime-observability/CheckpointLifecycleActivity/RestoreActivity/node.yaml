@@ -1,0 +1,544 @@
+schema: moonweave.ai/ontology-node/v1
+id: RestoreActivity
+kind: concept
+status: review
+labels:
+  zh: 恢复活动
+  en: Restore activity
+  ja: 復元活動
+semantics:
+  short_definition:
+    zh: 把已保存检查点重建为可继续运行状态的活动。
+    en: Reinstatement of a saved checkpoint as resumable runtime state.
+    ja: 保存済みチェックポイントを再開可能な実行状態へ戻す活動。
+  definition:
+    zh: 恢复活动是一种检查点生命周期活动：它读取一个已保存检查点，并把其中的状态、位置与必要的运行上下文重新装载为可继续执行的当前状态。恢复以重建可运行状态为止；若随后按历史输入重新执行步骤，则后续部分属于回放。
+    en: A restore activity is a checkpoint lifecycle activity that reads a saved checkpoint and reinstates its state, position, and required runtime context as the current resumable state. Restoration ends when that state is available; subsequent re-execution with recorded inputs is replay.
+    ja: 復元活動はチェックポイント・ライフサイクル活動の一種であり、保存済みチェックポイントを読み、その状態、位置、必要な実行文脈を再開可能な現在状態として戻します。状態が利用可能になった時点で復元は完了し、その後の記録済み入力による再実行は再生です。
+  why_needed:
+    zh: 恢复记录说明系统在崩溃恢复、暂停后继续或人工介入后继续时采用了哪个已保存状态，并允许核验恢复目标是否与检查点一致；若把它并入回放，就无法区分“只恢复”与“恢复后重演”。
+    en: A restore record identifies the saved state used after a crash, pause, or human intervention and supports checking that the reinstated state matches the checkpoint. Keeping it distinct from replay preserves the difference between merely resuming and resuming followed by re-execution.
+    ja: 復元記録は、障害、停止、人手介入後に用いた保存状態を特定し、復元状態がチェックポイントと一致するか検証できるようにします。再生と分けることで、単なる再開と再開後の再実行を区別できます。
+  includes:
+    - zh: 包括从持久化检查点恢复图状态、执行位置、待处理任务和恢复所需上下文，并使运行重新达到可继续状态的操作。
+      en: Includes operations that restore graph state, execution position, pending work, and required context from a persisted checkpoint until the run is resumable.
+      ja: 永続化チェックポイントからグラフ状態、実行位置、保留作業、必要文脈を戻し、実行を再開可能にする操作を含みます。
+  excludes:
+    - zh: 不包括恢复后对步骤的重新执行，也不包括把当前状态写成新检查点的捕获活动。
+      en: Excludes re-executing steps after restoration and writing the current state as a new checkpoint.
+      ja: 復元後のステップ再実行、および現在状態を新しいチェックポイントとして保存する取得活動は含みません。
+  semantic_kind: activity
+  aliases: []
+structure:
+  identity_keys: []
+  fields: []
+  constraints: []
+  required_relation_constraints: []
+examples:
+  - id: RestoreActivity-example-positive-001
+    kind: positive
+    labels:
+      zh: 从持久检查点重建当前状态
+      en: Reinstate current state from a persisted checkpoint
+      ja: 永続チェックポイントから現在状態を復元
+    scenario_id: null
+    descriptions:
+      zh: 进程崩溃后，恢复器读取 cp-42，验证摘要，恢复各通道版本、待处理写入和下一节点，并生成恢复后的 StateSnapshot 及与故障前内存状态的 StateDiff。
+      en: After a process crash, the restorer reads cp-42, validates its digest, reinstates channel versions, pending writes, and the next node, then emits a restored StateSnapshot and a StateDiff against the pre-restore in-memory state.
+      ja: プロセス障害後、復元器がcp-42を読み、ダイジェストを検証し、チャネル版、保留書込み、次ノードを復元し、復元後StateSnapshotと障害前メモリ状態との差分を生成する。
+    field_values:
+      lifecycle_activity_id: restore-activity-cp42
+      lifecycle_operation: restore
+      checkpoint_ref: cp-42
+      session_ref: incident-session-42
+      started_at: 2026-07-16T10:05:00.000Z
+      ended_at: 2026-07-16T10:05:00.080Z
+      outcome: succeeded
+    related_node_ids:
+      - RestoreActivity
+      - Checkpoint
+      - StateSnapshot
+      - StateDiff
+      - CheckpointLifecycleActivity
+    related_relation_ids:
+      - RestoreActivity-is_a-CheckpointLifecycleActivity
+      - RestoreActivity-consumes-Checkpoint
+      - RestoreActivity-produces-StateSnapshot
+      - RestoreActivity-produces-StateDiff
+    expected_result:
+      zh: 全过程被识别为恢复活动；完成条件是保存状态成为当前可继续状态。
+      en: The process is classified as RestoreActivity and completes when the saved state becomes the current resumable state.
+      ja: 過程はRestoreActivityに分類され、保存状態が現在の再開可能状態になった時点で完了する。
+    why_valid_or_invalid:
+      zh: 它读取一个检查点并重建状态、位置和必要运行上下文，具有明确输入、过程和输出。
+      en: It reads a checkpoint and reinstates state, position, and required runtime context with explicit input, process, and outputs.
+      ja: チェックポイントを読み、状態、位置、必要な実行文脈を明示的な入力・過程・出力として復元する。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-restore-activity-001
+  - id: RestoreActivity-example-boundary-001
+    kind: boundary
+    labels:
+      zh: 恢复后继续执行进入重放
+      en: Execution after restore crosses into replay
+      ja: 復元後の再実行はリプレイへ移る
+    scenario_id: null
+    descriptions:
+      zh: 系统恢复 cp-42 后，又按旧输入执行后续三个节点并与原跨度比较。加载和重建部分是恢复；后续重执行部分必须单独建模为重放活动。
+      en: After restoring cp-42, the system executes the next three nodes with recorded inputs and compares their spans with the original run. Loading and reinstatement are restore; subsequent re-execution must be modeled separately as ReplayActivity.
+      ja: cp-42を復元後、記録入力で後続3ノードを実行し元スパンと比較する。読込みと再構成は復元であり、その後の再実行は別のReplayActivityとして表す。
+    field_values: {}
+    related_node_ids:
+      - RestoreActivity
+      - ReplayActivity
+      - Checkpoint
+      - CheckpointLifecycleActivity
+    related_relation_ids:
+      - RestoreActivity-is_a-CheckpointLifecycleActivity
+    expected_result:
+      zh: 图谱在状态可用时结束 RestoreActivity，并为后续重执行建立 ReplayActivity。
+      en: The graph ends RestoreActivity when state is available and opens ReplayActivity for later re-execution.
+      ja: 状態が利用可能になった時点でRestoreActivityを終え、後続再実行にReplayActivityを作成する。
+    why_valid_or_invalid:
+      zh: 恢复的目标是重建保存状态；继续运行并形成新路径属于另一项活动。
+      en: Restore aims to reinstate saved state; continuing execution to form a new path is a different activity.
+      ja: 復元の目的は保存状態の再構成であり、新しい経路を形成する継続実行は別活動である。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-restore-activity-001
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation:
+  - sibling_concept_id: ReplayActivity
+    shared_parent_concept_id: CheckpointLifecycleActivity
+    differentia:
+      zh: 共享真实父节点 CheckpointLifecycleActivity 的对照：RestoreActivity 是由 RestoreActivity-is_a-CheckpointLifecycleActivity 分类的检查点生命周期活动，其区分条件是恢复已保存状态、位置与运行上下文，并在该状态可继续运行时结束；ReplayActivity 由 ReplayActivity-is_a-CheckpointLifecycleActivity 分类，其区分条件是从已保存检查点开始，按记录的输入与顺序重新执行后续步骤。恢复使状态重新可用但不执行后续步骤，重放则必须重新执行；任一条件成立不推出另一端。
+      en: "Contrast under the real shared parent CheckpointLifecycleActivity: RestoreActivity is classified by RestoreActivity-is_a-CheckpointLifecycleActivity and reinstates saved state, position, and runtime context, ending when that state is resumable; ReplayActivity is classified by ReplayActivity-is_a-CheckpointLifecycleActivity and starts from a saved checkpoint to re-execute subsequent steps with recorded inputs and ordering. Restore makes state available without executing later steps, whereas replay requires re-execution; either condition leaves the other unproven."
+      ja: 実在する共通親 CheckpointLifecycleActivity の下での対照：RestoreActivity は RestoreActivity-is_a-CheckpointLifecycleActivity で分類され、保存状態・位置・実行コンテキストを復元し、その状態が再開可能になった時点で終了します。ReplayActivity は ReplayActivity-is_a-CheckpointLifecycleActivity で分類され、保存済みチェックポイントから記録された入力と順序で後続手順を再実行します。復元は後続手順を実行せず状態を利用可能にし、リプレイは再実行を必須とします。一方の条件は他方を証明しません。
+    source_claims:
+      - claim-restore-activity-001
+parent_relation:
+  id: RestoreActivity-is_a-CheckpointLifecycleActivity
+  predicate: is_a
+  direction: source-to-target
+  relation_kind: hierarchy
+  labels:
+    zh: 是一种
+    en: is a
+    ja: の一種
+  definitions:
+    zh: 每个 RestoreActivity 都是 CheckpointLifecycleActivity，其种差是在不重新执行已保存区间的前提下，从既有检查点重建可继续运行的状态。
+    en: Every RestoreActivity is a CheckpointLifecycleActivity distinguished by reconstructing resumable state from an existing checkpoint without re-executing the saved interval.
+    ja: すべての RestoreActivity は CheckpointLifecycleActivity で、保存区間を再実行せず既存 Checkpoint から再開可能状態を再構成する点で区別されます。
+  cardinality: null
+  cardinality_not_applicable_reason:
+    zh: 分类继承不规定实例基数。
+    en: Taxonomic inheritance does not impose instance cardinality.
+    ja: 分類継承は instance 基数を規定しません。
+  inverse_reading:
+    predicate: has_restore_specialization
+    labels:
+      zh: 有恢复特化类
+      en: has restore specialization
+      ja: restore 特殊化を持つ
+  conditions: []
+  temporal_scope: timeless
+  boundary_context: null
+  constraints: []
+  examples:
+    - id: RestoreActivity-is_a-CheckpointLifecycleActivity-example-positive-manual-20260716
+      kind: positive
+      labels:
+        zh: 逐项核实正例
+        en: Point-reviewed positive case
+        ja: 項目別審査の正例
+      scenario_id: null
+      descriptions:
+        zh: 会话从 cp-12 反序列化状态、下一节点和待处理写入，形成可继续运行的状态，但没有重跑步骤 1–12。
+        en: A session loads state, next nodes, and pending writes from cp-12 into resumable state without re-running steps 1–12.
+        ja: session が cp-12 から状態・次 node・pending write を読み、step 1–12 を再実行せず再開可能状態を作ります。
+      field_values: {}
+      related_node_ids:
+        - RestoreActivity
+        - CheckpointLifecycleActivity
+      related_relation_ids:
+        - RestoreActivity-is_a-CheckpointLifecycleActivity
+      expected_result:
+        zh: 仅在所述证据存在时返回这条有向事实。
+        en: Return this directed fact only when the described evidence exists.
+        ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
+      why_valid_or_invalid:
+        zh: 每个 RestoreActivity 都是 CheckpointLifecycleActivity，其种差是在不重新执行已保存区间的前提下，从既有检查点重建可继续运行的状态。
+        en: Every RestoreActivity is a CheckpointLifecycleActivity distinguished by reconstructing resumable state from an existing checkpoint without re-executing the saved interval.
+        ja: すべての RestoreActivity は CheckpointLifecycleActivity で、保存区間を再実行せず既存 Checkpoint から再開可能状態を再構成する点で区別されます。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-restore-activity-002
+    - id: RestoreActivity-is_a-CheckpointLifecycleActivity-example-boundary-manual-20260716
+      kind: boundary
+      labels:
+        zh: 逐项核实边界例
+        en: Point-reviewed boundary case
+        ja: 項目別審査の境界例
+      scenario_id: null
+      descriptions:
+        zh: 调试器从 cp-12 开始重新执行步骤 13–18，并再次调用模型与工具。
+        en: A debugger starts at cp-12 and re-executes steps 13–18, including model and tool calls.
+        ja: debugger が cp-12 から step 13–18 を再実行し、model と tool call も再度行います。
+      field_values: {}
+      related_node_ids:
+        - RestoreActivity
+        - CheckpointLifecycleActivity
+      related_relation_ids:
+        - RestoreActivity-is_a-CheckpointLifecycleActivity
+      expected_result:
+        zh: 不得从该边界情形推断这条关系。
+        en: Do not infer this relation from the boundary case.
+        ja: この境界事例から当該関係を推論しません。
+      why_valid_or_invalid:
+        zh: 重新执行检查点之后的步骤属于 ReplayActivity，不满足仅重建状态的恢复种差。
+        en: Re-executing post-checkpoint steps is ReplayActivity and lacks restore's state-reconstruction-only differentia.
+        ja: checkpoint 後の step 再実行は ReplayActivity であり、状態再構成だけという restore の種差を満たしません。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-restore-activity-002
+  source_claims:
+    - claim-restore-activity-002
+  distinct_fact_rationale: null
+  layout_role: primary-backbone
+  review_status: pending
+  endpoint_order: child-to-parent
+relations:
+  - id: RestoreActivity-consumes-Checkpoint
+    predicate: consumes
+    direction: source-to-target
+    relation_kind: information
+    labels:
+      zh: consumes
+      en: consumes
+      ja: consumes
+    definitions:
+      zh: RestoreActivity 通过 consumes 指向其读取并作为唯一恢复基线的 Checkpoint；活动不就地修改该检查点。
+      en: RestoreActivity consumes the Checkpoint it reads as the recovery baseline, without mutating that checkpoint in place.
+      ja: RestoreActivity は回復 baseline として読む Checkpoint を consumes し、その Checkpoint を in-place 変更しません。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 该语义事实不对所有运行实例施加统一基数。
+      en: This semantic fact does not impose one universal cardinality on every runtime instance.
+      ja: この意味事実はすべての実行インスタンスに一律の基数を課しません。
+    inverse_reading:
+      predicate: consumed_by_restore_activity
+      labels:
+        zh: 由恢复活动消费
+        en: consumed by restore activity
+        ja: 復元活動に消費される
+    conditions: []
+    temporal_scope: timeless
+    boundary_context: null
+    constraints: []
+    examples:
+      - id: RestoreActivity-consumes-Checkpoint-example-positive-manual-20260716
+        kind: positive
+        labels:
+          zh: 逐项核实正例
+          en: Point-reviewed positive case
+          ja: 項目別審査の正例
+        scenario_id: null
+        descriptions:
+          zh: restore-44 读取 cp-12 的 values、next 和 pending writes，随后创建新的可运行状态。
+          en: restore-44 reads cp-12 values, next nodes, and pending writes before creating new resumable state.
+          ja: restore-44 が cp-12 の values・next node・pending write を読み、新しい再開可能状態を作ります。
+        field_values: {}
+        related_node_ids:
+          - RestoreActivity
+          - Checkpoint
+        related_relation_ids:
+          - RestoreActivity-consumes-Checkpoint
+        expected_result:
+          zh: 仅在所述证据存在时返回这条有向事实。
+          en: Return this directed fact only when the described evidence exists.
+          ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
+        why_valid_or_invalid:
+          zh: RestoreActivity 通过 consumes 指向其读取并作为唯一恢复基线的 Checkpoint；活动不就地修改该检查点。
+          en: RestoreActivity consumes the Checkpoint it reads as the recovery baseline, without mutating that checkpoint in place.
+          ja: RestoreActivity は回復 baseline として読む Checkpoint を consumes し、その Checkpoint を in-place 変更しません。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-restore-activity-003
+      - id: RestoreActivity-consumes-Checkpoint-example-boundary-manual-20260716
+        kind: boundary
+        labels:
+          zh: 逐项核实边界例
+          en: Point-reviewed boundary case
+          ja: 項目別審査の境界例
+        scenario_id: null
+        descriptions:
+          zh: restore-44 只收到一份无 checkpoint_id 的手工变量副本，无法解析任何 Checkpoint。
+          en: restore-44 receives only a manually copied variable map with no checkpoint_id and resolves no Checkpoint.
+          ja: restore-44 は checkpoint_id のない手動変数 copy だけを受け、Checkpoint を解決しません。
+        field_values: {}
+        related_node_ids:
+          - RestoreActivity
+          - Checkpoint
+        related_relation_ids:
+          - RestoreActivity-consumes-Checkpoint
+        expected_result:
+          zh: 不得从该边界情形推断这条关系。
+          en: Do not infer this relation from the boundary case.
+          ja: この境界事例から当該関係を推論しません。
+        why_valid_or_invalid:
+          zh: 一般变量副本不是稳定恢复基线；consumes 需要可识别的 Checkpoint。
+          en: A generic variable copy is not a stable recovery baseline; consumes requires an identifiable Checkpoint.
+          ja: 一般 variable copy は安定回復 baseline ではなく consumes には識別可能 Checkpoint が必要です。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-restore-activity-003
+    source_claims:
+      - claim-restore-activity-003
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: pending
+    target: concept:Checkpoint
+  - id: RestoreActivity-produces-StateDiff
+    predicate: produces
+    direction: source-to-target
+    relation_kind: causal
+    labels:
+      zh: produces
+      en: produces
+      ja: produces
+    definitions:
+      zh: RestoreActivity 通过 produces 指向描述恢复前当前状态与恢复后 successor snapshot 之间变化的 StateDiff。
+      en: RestoreActivity produces the StateDiff describing changes between pre-restore current state and the post-restore successor snapshot.
+      ja: RestoreActivity は復元前 current state と復元後 successor snapshot の変化を記述する StateDiff を produces します。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 该语义事实不对所有运行实例施加统一基数。
+      en: This semantic fact does not impose one universal cardinality on every runtime instance.
+      ja: この意味事実はすべての実行インスタンスに一律の基数を課しません。
+    inverse_reading:
+      predicate: inverse_of_produces
+      labels:
+        zh: 反向 produces
+        en: inverse produces
+        ja: 逆 produces
+    conditions: []
+    temporal_scope: timeless
+    boundary_context: null
+    constraints: []
+    examples:
+      - id: RestoreActivity-produces-StateDiff-example-positive-manual-20260716
+        kind: positive
+        labels:
+          zh: 逐项核实正例
+          en: Point-reviewed positive case
+          ja: 項目別審査の正例
+        scenario_id: null
+        descriptions:
+          zh: restore-44 产生 d-current-restored，列出 pending_tool 删除、step 回退和 channel 值恢复。
+          en: restore-44 produces d-current-restored listing pending_tool removal, step rollback, and restored channel values.
+          ja: restore-44 が pending_tool 削除・step rollback・channel 値復元を列挙する d-current-restored を作ります。
+        field_values: {}
+        related_node_ids:
+          - RestoreActivity
+          - StateDiff
+        related_relation_ids:
+          - RestoreActivity-produces-StateDiff
+        expected_result:
+          zh: 仅在所述证据存在时返回这条有向事实。
+          en: Return this directed fact only when the described evidence exists.
+          ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
+        why_valid_or_invalid:
+          zh: RestoreActivity 通过 produces 指向描述恢复前当前状态与恢复后 successor snapshot 之间变化的 StateDiff。
+          en: RestoreActivity produces the StateDiff describing changes between pre-restore current state and the post-restore successor snapshot.
+          ja: RestoreActivity は復元前 current state と復元後 successor snapshot の変化を記述する StateDiff を produces します。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-restore-activity-004
+      - id: RestoreActivity-produces-StateDiff-example-boundary-manual-20260716
+        kind: boundary
+        labels:
+          zh: 逐项核实边界例
+          en: Point-reviewed boundary case
+          ja: 項目別審査の境界例
+        scenario_id: null
+        descriptions:
+          zh: 恢复日志只写“恢复成功”，没有 from_snapshot、to_snapshot 或任何变化项。
+          en: A restore log says only 'restore succeeded' and identifies no from_snapshot, to_snapshot, or changed item.
+          ja: restore log は「成功」とだけ書き from_snapshot・to_snapshot・changed item を示しません。
+        field_values: {}
+        related_node_ids:
+          - RestoreActivity
+          - StateDiff
+        related_relation_ids:
+          - RestoreActivity-produces-StateDiff
+        expected_result:
+          zh: 不得从该边界情形推断这条关系。
+          en: Do not infer this relation from the boundary case.
+          ja: この境界事例から当該関係を推論しません。
+        why_valid_or_invalid:
+          zh: 成功状态不是 StateDiff；缺少快照对与具体变化就不能断言产出差异。
+          en: A success status is not StateDiff; without a snapshot pair and concrete changes no produced diff can be asserted.
+          ja: success status は StateDiff ではなく、snapshot 対と具体変化がなければ produced diff を断言できません。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-restore-activity-004
+    source_claims:
+      - claim-restore-activity-004
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: pending
+    target: concept:StateDiff
+  - id: RestoreActivity-produces-StateSnapshot
+    predicate: produces
+    direction: source-to-target
+    relation_kind: causal
+    labels:
+      zh: produces
+      en: produces
+      ja: produces
+    definitions:
+      zh: RestoreActivity 通过 produces 指向恢复完成后新识别的 successor StateSnapshot，而不是把原检查点快照就地改写。
+      en: RestoreActivity produces a newly identified successor StateSnapshot after restoration rather than overwriting the checkpoint's original snapshot.
+      ja: RestoreActivity は復元後に新 identity の successor StateSnapshot を produces し、元 Checkpoint snapshot を上書きしません。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 该语义事实不对所有运行实例施加统一基数。
+      en: This semantic fact does not impose one universal cardinality on every runtime instance.
+      ja: この意味事実はすべての実行インスタンスに一律の基数を課しません。
+    inverse_reading:
+      predicate: inverse_of_produces
+      labels:
+        zh: 反向 produces
+        en: inverse produces
+        ja: 逆 produces
+    conditions: []
+    temporal_scope: timeless
+    boundary_context: null
+    constraints: []
+    examples:
+      - id: RestoreActivity-produces-StateSnapshot-example-positive-manual-20260716
+        kind: positive
+        labels:
+          zh: 逐项核实正例
+          en: Point-reviewed positive case
+          ja: 項目別審査の正例
+        scenario_id: null
+        descriptions:
+          zh: restore-44 从 cp-12 创建 s-restore-44，后者含恢复后的 values、next 与 created_at。
+          en: restore-44 creates s-restore-44 from cp-12 with restored values, next nodes, and a new created_at.
+          ja: restore-44 が cp-12 から restored values・next node・新 created_at を持つ s-restore-44 を作ります。
+        field_values: {}
+        related_node_ids:
+          - RestoreActivity
+          - StateSnapshot
+        related_relation_ids:
+          - RestoreActivity-produces-StateSnapshot
+        expected_result:
+          zh: 仅在所述证据存在时返回这条有向事实。
+          en: Return this directed fact only when the described evidence exists.
+          ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
+        why_valid_or_invalid:
+          zh: RestoreActivity 通过 produces 指向恢复完成后新识别的 successor StateSnapshot，而不是把原检查点快照就地改写。
+          en: RestoreActivity produces a newly identified successor StateSnapshot after restoration rather than overwriting the checkpoint's original snapshot.
+          ja: RestoreActivity は復元後に新 identity の successor StateSnapshot を produces し、元 Checkpoint snapshot を上書きしません。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-restore-activity-005
+      - id: RestoreActivity-produces-StateSnapshot-example-boundary-manual-20260716
+        kind: boundary
+        labels:
+          zh: 逐项核实边界例
+          en: Point-reviewed boundary case
+          ja: 項目別審査の境界例
+        scenario_id: null
+        descriptions:
+          zh: 恢复服务仅验证 cp-12 可读取，随后退出，没有形成新的可运行状态视图。
+          en: A restore service only verifies that cp-12 is readable and exits without forming a new resumable state view.
+          ja: restore service は cp-12 の読取可能性だけ検証し、新しい再開可能 state view を形成せず終了します。
+        field_values: {}
+        related_node_ids:
+          - RestoreActivity
+          - StateSnapshot
+        related_relation_ids:
+          - RestoreActivity-produces-StateSnapshot
+        expected_result:
+          zh: 不得从该边界情形推断这条关系。
+          en: Do not infer this relation from the boundary case.
+          ja: この境界事例から当該関係を推論しません。
+        why_valid_or_invalid:
+          zh: 验证输入可读不等于产生恢复后快照；必须存在新 successor identity。
+          en: Verifying input readability does not produce a restored snapshot; a new successor identity must exist.
+          ja: 入力読取確認は restored snapshot 生成ではなく、新 successor identity が必要です。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-restore-activity-005
+    source_claims:
+      - claim-restore-activity-005
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: pending
+    target: concept:StateSnapshot
+review:
+  status: pending
+  method: manual-semantic
+  reviewer: null
+  reviewed_on: null
+  note:
+    zh: 该节点仅完成了从现行候选数据到唯一 YAML 树的无损转录；尚未逐项完成人工语义核验，不得据此宣称已审定。
+    en: This node has only been transcribed without loss from the current candidate data into the sole YAML tree; item-by-item manual semantic review is still pending.
+    ja: このノードは現行候補データから唯一の YAML ツリーへ欠落なく転記した段階であり、項目別の手動意味審査は未完了です。
+  sections:
+    semantics: pending
+    hierarchy: pending
+    relations: pending
+    structure: pending
+    examples: pending
+    source_claims: []
+source_claims:
+  - id: claim-restore-activity-001
+    source: eng-fw-langgraph-persistence
+    supports: LangGraph fault tolerance restarts from the last successful persisted state and retains successful pending writes; Moonweave uses RestoreActivity for reinstating resumable state without replaying the saved interval.
+    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-restore-activity-002
+    source: eng-fw-langgraph-persistence
+    supports: Every RestoreActivity is a CheckpointLifecycleActivity distinguished by reconstructing resumable state from an existing checkpoint without re-executing the saved interval. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
+    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-restore-activity-003
+    source: eng-fw-langgraph-persistence
+    supports: RestoreActivity consumes the Checkpoint it reads as the recovery baseline, without mutating that checkpoint in place. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
+    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-restore-activity-004
+    source: eng-fw-langgraph-persistence
+    supports: RestoreActivity produces the StateDiff describing changes between pre-restore current state and the post-restore successor snapshot. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
+    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-restore-activity-005
+    source: eng-fw-langgraph-persistence
+    supports: RestoreActivity produces a newly identified successor StateSnapshot after restoration rather than overwriting the checkpoint's original snapshot. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
+    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending

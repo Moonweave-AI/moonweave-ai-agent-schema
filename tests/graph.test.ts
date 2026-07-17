@@ -54,7 +54,7 @@ describe("canonical ontology index", () => {
     );
   });
 
-  it("derives module root concepts only from reviewed is_a parentage", () => {
+  it("derives module root concepts only from current is_a parentage", () => {
     const index = buildFixtureIndex();
 
     expect(index.rootConceptRefsByModuleId.get("run-lifecycle")).toEqual([
@@ -243,6 +243,44 @@ describe("canonical ontology index", () => {
       { field: { id: "sample_rate_hz" }, declaredOnId: "AudioBlock", inheritanceDepth: 0 },
       { field: { id: "media_type", required: true }, declaredOnId: "MediaBlock", inheritanceDepth: 1 },
     ]);
+  });
+
+  it("keeps deprecated is_a relations as history without using them for active hierarchy or field inheritance", () => {
+    const deprecatedParentRelationId = "AssistantMessage-is_a-Message";
+    const ontology = {
+      ...inheritanceProjectionFixture,
+      relations: inheritanceProjectionFixture.relations.map((relation) =>
+        relation.id === deprecatedParentRelationId
+          ? { ...relation, status: "deprecated" }
+          : relation,
+      ),
+    };
+    const index = buildOntologyIndex(
+      ontology as unknown as Parameters<typeof buildOntologyIndex>[0],
+    );
+
+    expect(index.relationsById.get(deprecatedParentRelationId)?.status).toBe("deprecated");
+    expect(index.outgoingRelationsByConceptId.get("AssistantMessage")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: deprecatedParentRelationId, status: "deprecated" }),
+      ]),
+    );
+    expect(index.primaryParentRelationByConceptId.has("AssistantMessage")).toBe(false);
+    expect(ids(index.directChildRelationsByConceptId.get("Message"))).not.toContain(
+      deprecatedParentRelationId,
+    );
+    expect(index.effectiveFieldsByConceptId.get("AssistantMessage")).toMatchObject([
+      {
+        field: { id: "assistant_role", required: true },
+        declaredOnId: "AssistantMessage",
+        inheritanceDepth: 0,
+      },
+    ]);
+    expect(
+      index.effectiveFieldsByConceptId
+        .get("AssistantMessage")
+        ?.some(({ field }) => field.id === "message_id"),
+    ).toBe(false);
   });
 
   it("accepts a subtype discriminator that narrows an inherited controlled value", () => {

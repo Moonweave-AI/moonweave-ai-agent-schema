@@ -225,7 +225,7 @@ export const hiddenSemanticNeighborRefs = (
     ...(index.semanticIncomingByRef.get(ref) ?? []),
     ...(index.semanticOutgoingByRef.get(ref) ?? []),
   ].filter(({ predicate, status }) =>
-    status === "accepted" &&
+    status !== "deprecated" &&
     (selectedPredicates.size === 0 || selectedPredicates.has(predicate)))
     .filter((relation) => isDefaultVisibleOntologyRelation(index, relation));
   return Object.freeze([...new Set(relations.map((relation) => semanticNeighborRef(ref, relation)))]
