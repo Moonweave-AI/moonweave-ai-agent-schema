@@ -455,19 +455,36 @@ const compileCommunityGraph = (canonical, tree) => {
       layout_role: "ownership",
     });
   }
+  const primaryBackboneParent = new Map();
+  for (const relation of canonical.relations) {
+    if (relation.layout_role !== "primary-backbone") continue;
+    const childId = relation.layout_child_id
+      ?? (relation.predicate === "is_a" ? relation.source_id : relation.target_id);
+    if (!primaryBackboneParent.has(childId)) {
+      primaryBackboneParent.set(childId, relation);
+    }
+  }
   for (const concept of canonical.classes) {
     const parentId = tree.parentById.get(concept.id);
-    if (tree.nodesById.get(parentId)?.kind === "module") {
-      edges.push({
-        id: `derived:module-root:${concept.module_id}:${concept.id}`,
-        source: entityRef("module", concept.module_id),
-        target: entityRef("concept", concept.id),
-        relation: "contains_root_concept",
-        evidence: "derived",
-        relation_kind: "organization",
-        layout_role: "ownership",
-      });
-    }
+    if (tree.nodesById.get(parentId)?.kind !== "module") continue;
+    const backbone = primaryBackboneParent.get(concept.id);
+    const backboneParentId = backbone
+      ? (backbone.layout_parent_id
+        ?? (backbone.predicate === "is_a" ? backbone.target_id : backbone.source_id))
+      : null;
+    const backboneParentModule = backboneParentId
+      ? canonical.classes.find(({ id }) => id === backboneParentId)?.module_id
+      : null;
+    if (backboneParentModule === concept.module_id) continue;
+    edges.push({
+      id: `derived:module-root:${concept.module_id}:${concept.id}`,
+      source: entityRef("module", concept.module_id),
+      target: entityRef("concept", concept.id),
+      relation: "contains_root_concept",
+      evidence: "derived",
+      relation_kind: "organization",
+      layout_role: "ownership",
+    });
   }
   for (const relation of canonical.relations) {
     edges.push({

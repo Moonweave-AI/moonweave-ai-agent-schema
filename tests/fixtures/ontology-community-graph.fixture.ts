@@ -31,7 +31,7 @@ export const buildCommunityGraphFixture = (
     target: `plane:${plane.id}` as OntologyEntityRef,
     relation: "contains_domain",
     evidence: "derived" as const,
-    relation_kind: "composition",
+    relation_kind: "organization",
     layout_role: "ownership" as const,
   }));
   const moduleEdges = [...index.modulesById.values()].map((module) => ({
@@ -40,7 +40,7 @@ export const buildCommunityGraphFixture = (
     target: `module:${module.id}` as OntologyEntityRef,
     relation: "contains_module",
     evidence: "derived" as const,
-    relation_kind: "composition",
+    relation_kind: "organization",
     layout_role: "ownership" as const,
   }));
   const moduleRootEdges = [...index.rootConceptRefsByModuleId.entries()]
@@ -52,7 +52,7 @@ export const buildCommunityGraphFixture = (
         target: rootRef,
         relation: "contains_root_concept",
         evidence: "derived" as const,
-        relation_kind: "composition",
+        relation_kind: "organization",
         layout_role: "ownership" as const,
       })));
   const edges = [...canonicalEdges, ...rootEdges, ...moduleEdges, ...moduleRootEdges]
