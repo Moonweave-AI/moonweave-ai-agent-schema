@@ -59,8 +59,9 @@ describe("OntologyGraph Graphify presentation contract", () => {
     );
     expect(html).not.toContain("graph-keyboard-controls");
     expect(source).toContain('htmlFor="ontology-network-search-input"');
-    expect(source).toContain('<ul className="ontology-network-search-results">');
-    expect(source).not.toMatch(/role="(?:listbox|option)"/u);
+    expect(source).toContain('<ul\n                className="ontology-network-search-results"');
+    expect(source).toMatch(/role="listbox"/u);
+    expect(source).toMatch(/role="option"/u);
   });
 
   it("localizes the visible node and edge count", () => {

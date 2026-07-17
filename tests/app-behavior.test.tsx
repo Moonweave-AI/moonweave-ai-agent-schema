@@ -376,7 +376,7 @@ describe("App state and URL recovery behavior", () => {
     const notice = elements.find(({ props }) =>
       props.className === "context-repair-notice" && props.role === "status");
 
-    expect(notice?.props.children).toBe(uiText.zh.rootRepairNotice);
+    expect(notice?.props.children).toBe(uiText.en.rootRepairNotice);
     expect(byType(elements, "mock-ontology-graph").props.focusedEntityRef).toBe(
       foreignConceptRef,
     );
@@ -415,7 +415,7 @@ describe("App state and URL recovery behavior", () => {
     const definitionValues = elements
       .filter(({ type }) => type === "dd")
       .map(({ props }) => props.children);
-    expect(definitionValues).toContain("不适用");
+    expect(definitionValues).toContain("Not applicable");
     expect(definitionValues).toContain(0);
     expect(byTestId(elements, "left-statistics")).toBeDefined();
   });
@@ -436,7 +436,7 @@ describe("App state and URL recovery behavior", () => {
       baseOntologyRuntime.index.rootRef,
     );
     if (!root) throw new Error("Missing ontology root fixture");
-    const rootLabel = (root.data as { readonly labels: { readonly zh: string } }).labels.zh;
+    const rootLabel = (root.data as { readonly labels: { readonly en: string } }).labels.en;
     expect(elements.some(({ type, props }) =>
       type === "h2" && props.children === rootLabel)).toBe(true);
   });
@@ -464,7 +464,7 @@ describe("App state and URL recovery behavior", () => {
     elements = readElements();
     expect(elements.some(({ props }) =>
       props.className === "sr-live-selection" &&
-      props.children === uiText.zh.focusRelation(relation.predicate))).toBe(true);
+      props.children === uiText.en.focusRelation(relation.predicate))).toBe(true);
   });
 
   it("omits a stale breadcrumb segment while retaining the focused concept", async () => {

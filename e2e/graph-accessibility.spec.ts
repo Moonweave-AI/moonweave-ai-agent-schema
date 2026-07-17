@@ -15,7 +15,7 @@ test.describe("ontology community graph accessibility", () => {
     await expect(graph).toHaveRole("region");
     await expect(graph).toHaveAttribute(
       "aria-label",
-      /node colors indicate canonical Module ownership/i,
+      /colored by canonical Module ownership/i,
     );
     const search = page.getByTestId("graph-node-search");
     await search.focus();

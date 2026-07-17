@@ -8,7 +8,7 @@
   </p>
 
   <p>
-    <a href="https://moonweave-ai.github.io/moonweave-ai-agent-schema/">在线浏览器</a>
+    <a href="https://moonweave-ai.github.io/agent-ontology/">在线浏览器</a>
     · <a href="../README.md">英文文档</a>
     · <a href="README.ja.md">日文文档</a>
     · <a href="../src/generated/agent-ontology.json">生成本体 JSON</a>
@@ -138,6 +138,6 @@ npm run verify
 
 GitHub Pages 发布浏览器：
 
-[https://moonweave-ai.github.io/moonweave-ai-agent-schema/](https://moonweave-ai.github.io/moonweave-ai-agent-schema/)
+[https://moonweave-ai.github.io/agent-ontology/](https://moonweave-ai.github.io/agent-ontology/)
 
 生产站点必须由同一提交生成。本体源指纹、生成规范本体、生成社区图和部署 commit 通过 build manifest 绑定。

@@ -85,7 +85,7 @@ test.describe("Moonweave Graphify ontology explorer core", () => {
     await switchToEnglish(page);
     await expect(graph).toHaveAttribute(
       "aria-label",
-      /node colors indicate canonical Module ownership/i,
+      /colored by canonical Module ownership/i,
     );
     await expect(page.getByTestId("graph-node-search")).toBeVisible();
     const stageBounds = await page.locator(".ontology-network-stage").boundingBox();
