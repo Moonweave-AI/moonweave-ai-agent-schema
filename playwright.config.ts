@@ -9,7 +9,7 @@ export default defineConfig({
   testDir: "./e2e",
   snapshotPathTemplate: resolve(
     import.meta.dirname,
-    "docs/visual-baselines/unified-v3/{platform}/{projectName}/{arg}{ext}",
+    "docs/visual-baselines/current/{platform}/{projectName}/{arg}{ext}",
   ),
   fullyParallel: true,
   forbidOnly: !!process.env.CI,

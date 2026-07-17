@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
 import { OntologyGraph } from "../src/components/OntologyGraph";
@@ -36,21 +37,49 @@ describe("OntologyGraph Graphify presentation contract", () => {
 
     expect((html.match(/data-testid="ontology-network-graph"/gu) ?? [])).toHaveLength(1);
     expect(html).toContain('data-layout-engine="vis-network-forceatlas2"');
-    expect(html).toContain('data-node-color-policy="community"');
+    expect(html).toContain('data-node-color-policy="canonical-module-owner"');
     expect(html).toContain('data-node-size-policy="degree-linear-10-40"');
     expect(html).toContain('data-edge-label-policy="hover-only"');
     expect(html).not.toMatch(/hierarchy|relations mode|top.?down|left.?right/iu);
     expect(html).not.toContain("cytoscape-graph");
   });
 
-  it("provides search and community filters as the keyboard path for the canvas", () => {
+  it("provides search and structural-community filters as the keyboard path for the canvas", () => {
     const html = renderGraph();
+    const source = readFileSync(
+      new URL("../src/components/OntologyGraph.tsx", import.meta.url),
+      "utf8",
+    );
 
     expect(html).toContain('data-testid="graph-node-search"');
     expect(html).toContain("Use search to focus a node or the directory");
-    expect(html).toContain("Structural communities");
-    expect((html.match(/type="checkbox"/gu) ?? [])).toHaveLength(1);
+    expect(html).toContain("Canonical Module communities");
+    expect((html.match(/type="checkbox"/gu) ?? [])).toHaveLength(
+      communityGraph.communities.length,
+    );
     expect(html).not.toContain("graph-keyboard-controls");
+    expect(source).toContain('htmlFor="ontology-network-search-input"');
+    expect(source).toContain('<ul className="ontology-network-search-results">');
+    expect(source).not.toMatch(/role="(?:listbox|option)"/u);
+  });
+
+  it("localizes the visible node and edge count", () => {
+    const graphCount = (language: "zh" | "en" | "ja"): string =>
+      renderGraph({ language }).match(
+        /data-testid="graph-count">([\s\S]*?)<\/div>/u,
+      )?.[1] ?? "";
+    const zh = graphCount("zh");
+    const en = graphCount("en");
+    const ja = graphCount("ja");
+
+    expect(zh).toContain("节点");
+    expect(zh).toContain("关系");
+    expect(zh).not.toMatch(/\bnodes?\b|\bedges?\b/iu);
+    expect(en).toContain("nodes");
+    expect(en).toContain("edges");
+    expect(ja).toContain("ノード");
+    expect(ja).toContain("関係");
+    expect(ja).not.toMatch(/\bnodes?\b|\bedges?\b/iu);
   });
 
   it("does not create schema, example, source, or field nodes", () => {

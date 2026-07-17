@@ -1,0 +1,479 @@
+schema: moonweave.ai/ontology-node/v1
+id: TraceLink
+kind: concept
+status: review
+labels:
+  en: trace link
+  zh: 追踪链接
+  ja: トレースリンク
+semantics:
+  short_definition:
+    zh: 新跨度指向一个非父级 SpanContext 的关联元数据。
+    en: Metadata linking a new span to a non-parent SpanContext.
+    ja: 新スパンを親でない SpanContext へ関連付けるメタデータ。
+  definition:
+    zh: TraceLink 是附着于一个 TraceSpan 的非父关联记录；每条链接只引用一个 SpanContext，并可携带描述该关联的属性。它用于批处理、消息消费、扇入或显式因果等单一父子关系不足的场景；链接不会把被引用跨度变成父级，也不是任意图谱边。
+    en: A TraceLink is a non-parent association record attached to one TraceSpan. Each link references exactly one SpanContext and may carry attributes describing that association. It is used for batch processing, message consumption, fan-in, or explicit causality where one parent is insufficient; a link does not make the referenced span a parent and is not an arbitrary graph edge.
+    ja: TraceLink は一つの TraceSpan に付属する non-parent association record です。各 link は一つの SpanContext を参照し、association attributes を持てます。batch/message consumption/fan-in/explicit causality に使い、参照 span を parent にせず arbitrary graph edge でもありません。
+  why_needed:
+    zh: 链接使一个聚合或消费者跨度能够保留多个输入跨度的来源，而不伪造多个父节点；这对并行智能体结果汇合、队列消息和跨追踪批处理尤其重要。
+    en: Links let an aggregator or consumer span retain provenance from multiple input spans without inventing multiple parents, which is essential for parallel-agent fan-in, queued messages, and cross-trace batches.
+    ja: リンクにより集約・消費スパンは複数親を捏造せず複数入力の来歴を保て、並列エージェント合流、キュー、跨トレースバッチに重要です。
+  includes:
+    - zh: 包括汇总跨度链接三个并行子智能体结果跨度，以及消息消费者跨度链接消息生产者的远程 SpanContext。
+      en: Includes a synthesis span linked to three parallel-agent result spans and a message-consumer span linked to the producer's remote SpanContext.
+      ja: 三つの並列エージェント結果へリンクする統合スパン、生成者の遠隔 SpanContext へリンクするメッセージ消費スパンを含みます。
+  excludes:
+    - zh: 不包括普通父子关系、同一跨度的 SpanAttribute、任意产物引用或仅因两个节点相邻而添加的图谱关联。
+      en: Excludes ordinary parent-child relationships, SpanAttribute values on one span, arbitrary artifact references, and graph associations inferred merely from adjacency.
+      ja: 通常親子関係、一スパンの SpanAttribute、任意成果物参照、隣接だけから作るグラフ関連は含みません。
+  semantic_kind: information
+  aliases: []
+structure:
+  identity_keys:
+    - owning_span_ref
+    - link_index
+  fields:
+    - id: owning_span_ref
+      labels:
+        zh: 所属跨度引用
+        en: owning-span reference
+        ja: 所属 span 参照
+      datatype: reference
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 引用声明该非父关联的 TraceSpan。
+        en: References the TraceSpan that declares this non-parent association.
+        ja: この non-parent association を宣言する TraceSpan を参照します。
+      allowed_values: []
+      pattern: null
+      example_value: trace-span:batch-consumer-7
+      source_claims:
+        - claim-trace-link-002
+    - id: link_index
+      labels:
+        zh: 链接序位
+        en: link index
+        ja: link index
+      datatype: integer
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 该链接在所属跨度有序链接序列中的零基序位。
+        en: The zero-based position of the link in its owning span's ordered link sequence.
+        ja: owning span の ordered link sequence における zero-based position。
+      allowed_values: []
+      pattern: null
+      example_value: 0
+      source_claims:
+        - claim-trace-link-002
+    - id: linked_context_ref
+      labels:
+        zh: 被链接上下文引用
+        en: linked-context reference
+        ja: linked context 参照
+      datatype: reference
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 引用被非父关联指向的一个 TraceContext。
+        en: References the one TraceContext targeted by the non-parent association.
+        ja: non-parent association が指す一つの TraceContext を参照します。
+      allowed_values: []
+      pattern: null
+      example_value: trace-context:producer-a
+      source_claims:
+        - claim-trace-link-002
+    - id: attributes
+      labels:
+        zh: 链接属性
+        en: link attributes
+        ja: link attributes
+      datatype: object
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      definitions:
+        zh: 描述该关联而不修改被引用上下文的有限属性集合。
+        en: A bounded attribute set describing the association without modifying the referenced context.
+        ja: 参照 context を変更せず association を説明する bounded attribute set。
+      allowed_values: []
+      pattern: null
+      example_value:
+        messaging.source.name: orders
+        messaging.batch.message_count: 3
+      source_claims:
+        - claim-trace-link-002
+  constraints:
+    - id: trace-link-does-not-create-parent
+      severity: error
+      expression_language: plain
+      expression: linked_context_ref is not interpreted as the owning span's parent context
+      explanations:
+        zh: 链接保留额外因果来源，但不改变单一父级。
+        en: A link preserves additional causal provenance without changing the single parent.
+        ja: link は追加因果 provenance を保持するが single parent を変更しません。
+      source_claims:
+        - claim-trace-link-002
+    - id: trace-link-index-unique-within-span
+      severity: error
+      expression_language: plain
+      expression: no two TraceLinks with the same owning_span_ref share link_index
+      explanations:
+        zh: 所属跨度内的序位必须唯一。
+        en: The sequence index is unique within the owning span.
+        ja: owning span 内で sequence index は一意です。
+      source_claims:
+        - claim-trace-link-002
+  required_relation_constraints:
+    - id: trace-link-owned-by-one-span
+      direction: incoming
+      predicate: has_link
+      target_concept_id: TraceSpan
+      cardinality:
+        min: 1
+        max: 1
+      explanations:
+        zh: 每个链接附着于一个声明它的跨度。
+        en: Each link is attached to one declaring span.
+        ja: 各 link は一つの declaring span に付属します。
+      source_claims:
+        - claim-trace-link-002
+    - id: trace-link-references-one-context
+      direction: outgoing
+      predicate: references
+      target_concept_id: TraceContext
+      cardinality:
+        min: 1
+        max: 1
+      explanations:
+        zh: 一个 TraceLink 引用一个 SpanContext 对应节点。
+        en: One TraceLink references one SpanContext node.
+        ja: 一つの TraceLink は一つの SpanContext node を参照します。
+      source_claims:
+        - claim-trace-link-002
+examples:
+  - id: TraceLink-example-positive-001
+    kind: positive
+    labels:
+      zh: 批处理跨度关联多个生产者
+      en: Batch span links to multiple producers
+      ja: バッチスパンが複数生成元へリンク
+    scenario_id: null
+    descriptions:
+      zh: 聚合器一次处理来自三个独立消息生产跨度的批次；消费跨度有一个正常父跨度，并额外建立三个带 source.topic 属性的 TraceLink 指向各生产 SpanContext。
+      en: An aggregator processes a batch from three independent message-producing spans. The consumer span has one normal parent and three additional TraceLinks to the producer SpanContexts, each carrying a source.topic attribute.
+      ja: 集約器が3つの独立メッセージ生成スパンから来たバッチを処理する。消費スパンは通常の親を一つ持ち、各生成SpanContextへsource.topic属性付きTraceLinkを3本追加する。
+    field_values:
+      owning_span_ref: trace-span:batch-consumer-7
+      link_index: 0
+      linked_context_ref: trace-context:producer-a
+      attributes:
+        messaging.source.name: orders
+        messaging.batch.message_count: 3
+    related_node_ids:
+      - TraceLink
+      - TraceSpan
+      - TraceContext
+    related_relation_ids:
+      - TraceSpan-has_link-TraceLink
+      - TraceLink-references-TraceContext
+    expected_result:
+      zh: 三个非父关联被识别为 TraceLink，不会为消费跨度制造多父层级。
+      en: The three non-parent associations are classified as TraceLinks and do not create multiple parents for the consumer span.
+      ja: 3本の非親関連はTraceLinkに分類され、消費スパンに複数親を作らない。
+    why_valid_or_invalid:
+      zh: 批次具有多个因果来源，但跨度父关系仍保持单一；链接保存额外来源而不改变父树。
+      en: The batch has multiple causal sources while span parentage remains singular; links preserve extra provenance without rewriting the parent tree.
+      ja: バッチには複数因果元があるが親関係は単一のままで、リンクが親木を変えず追加来歴を保存する。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-trace-link-001
+  - id: TraceLink-example-boundary-001
+    kind: boundary
+    labels:
+      zh: 普通父子关系不重复为链接
+      en: Ordinary parentage is not duplicated as a link
+      ja: 通常の親子関係をリンクとして重複しない
+    scenario_id: null
+    descriptions:
+      zh: 工具跨度由智能体跨度直接启动，只有一个明确父 SpanContext，也没有批处理或跨追踪因果需求。该关联应保留为父子关系，不再创建重复 TraceLink。
+      en: A tool span is directly started by an agent span with one unambiguous parent SpanContext and no batch or cross-trace causality. The association remains parent-child and is not duplicated as a TraceLink.
+      ja: ツールスパンは一意な親SpanContextを持つエージェントスパンから直接開始され、バッチ・トレース横断因果もない。親子関係として保持し、TraceLinkを重複作成しない。
+    field_values: {}
+    related_node_ids:
+      - TraceLink
+      - TraceSpan
+    related_relation_ids:
+      - trace_link_source_span
+      - trace_link_target_span
+    expected_result:
+      zh: 图谱使用跨度父关系表达直接嵌套，不生成无信息增量的 TraceLink。
+      en: The graph uses span parentage for direct nesting and creates no information-free duplicate TraceLink.
+      ja: 直接入れ子はスパン親関係で表し、情報を増やさない重複TraceLinkは作らない。
+    why_valid_or_invalid:
+      zh: TraceLink 用于非父关联；它不是所有跨度边的通用替代品。
+      en: TraceLink represents non-parent associations and is not a generic replacement for every edge between spans.
+      ja: TraceLinkは非親関連を表し、あらゆるスパン間辺の一般代替ではない。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-trace-link-001
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation:
+  - sibling_concept_id: TraceContext
+    shared_parent_concept_id: TraceSpan
+    differentia:
+      zh: 共享逻辑父节点 TraceSpan：TraceLink 由 has_link 记录指向非父级 SpanContext 的关联；TraceContext 由 has_context 承载该跨度自身的传播身份、父上下文与采样状态。链接描述额外关联，上下文定义传播身份，二者都附着于跨度但判定条件不同。
+      en: "Shared logical parent TraceSpan: TraceLink is attached by has_link and records an association to a non-parent SpanContext; TraceContext is attached by has_context and carries the span's own propagation identity, parent context, and sampling state. A link describes an additional association, while context defines propagated identity."
+      ja: 共有 logical parent は TraceSpan です。TraceLink は has_link で非親 SpanContext への関連を記録し、TraceContext は has_context で span 自身の propagation identity・parent context・sampling state を持ちます。link は追加関連、context は伝播 identity を定義します。
+    source_claims:
+      - claim-trace-link-001
+parent_relation:
+  id: TraceSpan-has_link-TraceLink
+  predicate: has_link
+  direction: source-to-target
+  relation_kind: causal
+  labels:
+    zh: trace link source span
+    en: trace link source span
+    ja: trace link source span
+  definitions:
+    zh: TraceSpan 通过 has_link 指向它在创建时或运行中记录的 TraceLink，用于表达父关系之外的因果或批处理关联。
+    en: TraceSpan has_link each TraceLink recorded at creation or during execution to express causal or batch associations beyond parentage.
+    ja: TraceSpan は作成時または実行中に記録した TraceLink を has_link し、parentage 以外の因果・batch 関連を表します。
+  cardinality: null
+  cardinality_not_applicable_reason:
+    zh: 该本体关系记录可查询的语义事实，但不对所有运行实例施加统一基数。
+    en: This ontology relation records a queryable semantic fact without imposing one universal cardinality on all runtime instances.
+    ja: この本体関係は検索可能な意味事実を記録しますが、すべての実行インスタンスに一律の基数を課しません。
+  inverse_reading:
+    predicate: is_target_of_trace_link_source_span
+    labels:
+      zh: 反向：trace link source span
+      en: is target of trace link source span
+      ja: 逆方向：trace link source span
+  conditions: []
+  temporal_scope: valid-time
+  boundary_context: null
+  constraints: []
+  examples:
+    - id: TraceSpan-has_link-TraceLink-example-positive-manual-20260716
+      kind: positive
+      labels:
+        zh: 逐项核实正例
+        en: Point-reviewed positive case
+        ja: 項目別審査の正例
+      scenario_id: null
+      descriptions:
+        zh: consumer span 为三条批量消息各记录一个 Link，以保留三个 producer context。
+        en: A consumer span records one Link for each of three batched messages, preserving all three producer contexts.
+        ja: consumer Span が三 batch message ごとに一 Link を記録し、三 producer context を保持します。
+      field_values: {}
+      related_node_ids:
+        - TraceSpan
+        - TraceLink
+      related_relation_ids:
+        - TraceSpan-has_link-TraceLink
+      expected_result:
+        zh: 仅在所述证据存在时返回这条有向事实。
+        en: Return this directed fact only when the described evidence exists.
+        ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
+      why_valid_or_invalid:
+        zh: TraceSpan 通过 has_link 指向它在创建时或运行中记录的 TraceLink，用于表达父关系之外的因果或批处理关联。
+        en: TraceSpan has_link each TraceLink recorded at creation or during execution to express causal or batch associations beyond parentage.
+        ja: TraceSpan は作成時または実行中に記録した TraceLink を has_link し、parentage 以外の因果・batch 関連を表します。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-trace-link-003
+    - id: TraceSpan-has_link-TraceLink-example-boundary-manual-20260716
+      kind: boundary
+      labels:
+        zh: 逐项核实边界例
+        en: Point-reviewed boundary case
+        ja: 項目別審査の境界例
+      scenario_id: null
+      descriptions:
+        zh: child span 只有 parent_id，未添加任何 Link；父跨度身份已由 parent 结构表达。
+        en: A child span has only parent_id and no Link because parent identity is already expressed by parent structure.
+        ja: child Span は parent_id だけで Link を持たず、parent identity は parent 構造で表されています。
+      field_values: {}
+      related_node_ids:
+        - TraceSpan
+        - TraceLink
+      related_relation_ids:
+        - TraceSpan-has_link-TraceLink
+      expected_result:
+        zh: 不得从该边界情形推断这条关系。
+        en: Do not infer this relation from the boundary case.
+        ja: この境界事例から当該関係を推論しません。
+      why_valid_or_invalid:
+        zh: 普通父子关系不能自动推导额外 Link；Link 必须被显式记录。
+        en: Ordinary parentage does not imply an additional Link; the Link must be recorded explicitly.
+        ja: 通常 parentage から追加 Link は自動推論できず、Link の明示記録が必要です。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-trace-link-003
+  source_claims:
+    - claim-trace-link-003
+  distinct_fact_rationale:
+    zh: source_span 是跨轨迹链接的发出端，target_span 是到达端；交换角色会改变因果读法。
+    en: source_span is the emitting end of a cross-trace link and target_span is its receiving end; swapping them changes the causal reading.
+    ja: source_span は trace link の発信端、target_span は到達端であり、役割交換は因果的読解を変えます。
+  layout_role: primary-backbone
+  review_status: pending
+  endpoint_order: parent-to-child
+relations:
+  - id: TraceLink-references-TraceContext
+    predicate: references
+    direction: source-to-target
+    relation_kind: causal
+    labels:
+      zh: trace link target span
+      en: trace link target span
+      ja: trace link target span
+    definitions:
+      zh: TraceLink 通过 references 指向被关联跨度的 TraceContext；目标跨度记录可以缺失，但被引用上下文的 TraceId 与 SpanId 必须明确。
+      en: TraceLink references the linked span's TraceContext; the target span record may be absent, but the referenced TraceId and SpanId must be explicit.
+      ja: TraceLink は linked Span の TraceContext を references し、target Span record がなくても参照 TraceId と SpanId は明示必須です。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 该本体关系记录可查询的语义事实，但不对所有运行实例施加统一基数。
+      en: This ontology relation records a queryable semantic fact without imposing one universal cardinality on all runtime instances.
+      ja: この本体関係は検索可能な意味事実を記録しますが、すべての実行インスタンスに一律の基数を課しません。
+    inverse_reading:
+      predicate: is_target_of_trace_link_target_span
+      labels:
+        zh: 反向：trace link target span
+        en: is target of trace link target span
+        ja: 逆方向：trace link target span
+    conditions: []
+    temporal_scope: valid-time
+    boundary_context: null
+    constraints: []
+    examples:
+      - id: TraceLink-references-TraceContext-example-positive-manual-20260716
+        kind: positive
+        labels:
+          zh: 逐项核实正例
+          en: Point-reviewed positive case
+          ja: 項目別審査の正例
+        scenario_id: null
+        descriptions:
+          zh: link-3 保存 producer 的 trace_id=aa、span_id=bb 与 tracestate，即使本地未导入 producer span 记录。
+          en: link-3 stores producer trace_id=aa, span_id=bb, and tracestate even though the producer span record is not imported locally.
+          ja: link-3 が producer trace_id=aa・span_id=bb・tracestate を保存し、local に producer Span record はありません。
+        field_values: {}
+        related_node_ids:
+          - TraceLink
+          - TraceContext
+        related_relation_ids:
+          - TraceLink-references-TraceContext
+        expected_result:
+          zh: 仅在所述证据存在时返回这条有向事实。
+          en: Return this directed fact only when the described evidence exists.
+          ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
+        why_valid_or_invalid:
+          zh: TraceLink 通过 references 指向被关联跨度的 TraceContext；目标跨度记录可以缺失，但被引用上下文的 TraceId 与 SpanId 必须明确。
+          en: TraceLink references the linked span's TraceContext; the target span record may be absent, but the referenced TraceId and SpanId must be explicit.
+          ja: TraceLink は linked Span の TraceContext を references し、target Span record がなくても参照 TraceId と SpanId は明示必須です。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-trace-link-004
+      - id: TraceLink-references-TraceContext-example-boundary-manual-20260716
+        kind: boundary
+        labels:
+          zh: 逐项核实边界例
+          en: Point-reviewed boundary case
+          ja: 項目別審査の境界例
+        scenario_id: null
+        descriptions:
+          zh: link-4 只写“related request”，没有 TraceId、SpanId、TraceState 或可解析上下文引用。
+          en: link-4 says only 'related request' and provides no TraceId, SpanId, TraceState, or resolvable context reference.
+          ja: link-4 は 'related request' とだけ書き、TraceId・SpanId・TraceState・解決可能 context reference を持ちません。
+        field_values: {}
+        related_node_ids:
+          - TraceLink
+          - TraceContext
+        related_relation_ids:
+          - TraceLink-references-TraceContext
+        expected_result:
+          zh: 不得从该边界情形推断这条关系。
+          en: Do not infer this relation from the boundary case.
+          ja: この境界事例から当該関係を推論しません。
+        why_valid_or_invalid:
+          zh: 自然语言相似性不是 SpanContext 引用；缺少可解析身份就不能建立 references。
+          en: Natural-language similarity is not a SpanContext reference; without resolvable identity references cannot be asserted.
+          ja: 自然言語類似は SpanContext reference ではなく、解決可能 identity がなければ references を断言できません。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-trace-link-004
+    source_claims:
+      - claim-trace-link-004
+    distinct_fact_rationale:
+      zh: source_span 是跨轨迹链接的发出端，target_span 是到达端；交换角色会改变因果读法。
+      en: source_span is the emitting end of a cross-trace link and target_span is its receiving end; swapping them changes the causal reading.
+      ja: source_span は trace link の発信端、target_span は到達端であり、役割交換は因果的読解を変えます。
+    layout_role: cross-link
+    review_status: pending
+    target: concept:TraceContext
+review:
+  status: pending
+  method: manual-semantic
+  reviewer: null
+  reviewed_on: null
+  note:
+    zh: 该节点仅完成了从现行候选数据到唯一 YAML 树的无损转录；尚未逐项完成人工语义核验，不得据此宣称已审定。
+    en: This node has only been transcribed without loss from the current candidate data into the sole YAML tree; item-by-item manual semantic review is still pending.
+    ja: このノードは現行候補データから唯一の YAML ツリーへ欠落なく転記した段階であり、項目別の手動意味審査は未完了です。
+  sections:
+    semantics: pending
+    hierarchy: pending
+    relations: pending
+    structure: pending
+    examples: pending
+    source_claims: []
+source_claims:
+  - id: claim-trace-link-001
+    source: eng-std-opentelemetry-trace-api
+    supports: OpenTelemetry defines a Link by the referenced SpanContext and optional attributes and allows links across the same or different traces; Moonweave does not reinterpret a Link as a second parent edge.
+    locator: Tracing API > SpanContext, Span creation, Span operations, Events, Status, and Link
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-trace-link-002
+    source: eng-std-opentelemetry-trace-api
+    supports: "Direct source premise: OpenTelemetry defines each Link as one referenced SpanContext plus optional attributes in an ordered link sequence, distinct from the span's zero-or-one parent. Moonweave design inference: owning span plus sequence index identifies the Link record, and a references edge resolves its linked TraceContext without changing parentage."
+    locator: OpenTelemetry Tracing API > Span creation > Links and Link data type
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-trace-link-003
+    source: eng-std-opentelemetry-trace-api
+    supports: TraceSpan has_link each TraceLink recorded at creation or during execution to express causal or batch associations beyond parentage. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
+    locator: Tracing API > SpanContext, Span creation, Span operations, Events, Status, and Link
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-trace-link-004
+    source: eng-std-opentelemetry-trace-api
+    supports: TraceLink references the linked span's TraceContext; the target span record may be absent, but the referenced TraceId and SpanId must be explicit. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
+    locator: Tracing API > SpanContext, Span creation, Span operations, Events, Status, and Link
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending

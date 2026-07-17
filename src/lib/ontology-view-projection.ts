@@ -57,7 +57,6 @@ export const canonicalEdge = (
   relation: CanonicalRelation,
   index: OntologyIndex,
 ): VisibleOntologyEdge => {
-  const primary = index.primaryParentRelationByConceptId.get(relation.source_id)?.id === relation.id;
   const sourceRef = ontologyEntityRef("concept", relation.source_id);
   const targetRef = ontologyEntityRef("concept", relation.target_id);
   const isPrimaryBackbone = [sourceRef, targetRef].some(
@@ -77,9 +76,7 @@ export const canonicalEdge = (
     : family === "secondary-backbone"
       ? "additional-parent"
       : relation.predicate === "is_a"
-        ? primary
-          ? "primary-parent"
-          : "additional-parent"
+        ? "additional-parent"
         : null;
   return {
     id: relation.id,
@@ -134,8 +131,10 @@ const addOrganizationalChildren = (
     if (!child) continue;
     nodeRefs.add(childRef);
     if (parent.kind === "concept" && child.kind === "concept") {
-      const primary = index.primaryParentRelationByConceptId.get(child.id);
-      if (primary?.target_id === parent.id) edges.set(primary.id, canonicalEdge(primary, index));
+      const primary = index.backboneParentByRef.get(childRef);
+      if (primary?.parentRef === parentRef) {
+        edges.set(primary.relation.id, canonicalEdge(primary.relation, index));
+      }
       continue;
     }
     let predicate = "declares_concept";
@@ -302,13 +301,6 @@ export const visibleNode = (
     defaultVisibleOntologyChildren(index, candidateOwnershipParent).includes(entity.ref)
     ? candidateOwnershipParent
     : null;
-  const candidatePrimaryParent = entity.kind === "concept"
-    ? index.primaryParentRelationByConceptId.get(entity.id)
-    : undefined;
-  const primaryParent = candidatePrimaryParent &&
-    isDefaultVisibleOntologyRelation(index, candidatePrimaryParent)
-    ? candidatePrimaryParent
-    : undefined;
   const directChildCount = defaultVisibleOntologyChildren(index, entity.ref).length;
   const visibleChildren = defaultVisibleOntologyChildren(index, entity.ref)
     .filter((ref) => visibleRefs.has(ref)).length;
@@ -328,9 +320,7 @@ export const visibleNode = (
     entity,
     layoutParentRef: backboneParent?.parentRef ?? ownershipParent,
     ownershipParentRef: ownershipParent,
-    semanticPrimaryParentRef: primaryParent
-      ? ontologyEntityRef("concept", primaryParent.target_id)
-      : null,
+    semanticPrimaryParentRef: backboneParent?.parentRef ?? null,
     logicalDepth: ontologyLogicalDepth(index, entity.ref),
     directChildCount,
     hiddenChildCount: Math.max(0, directChildCount - visibleChildren),

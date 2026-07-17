@@ -167,7 +167,12 @@ describe("vis-network runtime lifecycle", () => {
     runtime.setHiddenCommunities(new Set([0]));
     runtime.updateModel(buildOntologyCommunityNetworkModel(index, artifact, "zh", "light"));
 
-    expect([...harness.dataSets[0].values.values()].every(({ hidden }) => hidden === true)).toBe(true);
+    const hiddenNodeIds = new Set<string | number>(model.nodes
+      .filter(({ communityId }) => communityId === 0)
+      .map(({ id }) => id));
+    for (const [nodeId, { hidden }] of harness.dataSets[0].values) {
+      expect(hidden, String(nodeId)).toBe(hiddenNodeIds.has(nodeId));
+    }
     expect(harness.stabilizeCalls).toHaveLength(initialStabilizations);
 
     const curvedEdge = model.edges.find(({ smooth }) => smooth.type !== "continuous");

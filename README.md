@@ -4,144 +4,98 @@
   <h1>Moonweave Agent Ontology</h1>
 
   <p>
-    An evidence-bound ontology engineering framework for agent systems:
-    context ingress, control orchestration, runtime traces, interoperability, capability and resource invocation, trust and safety, observability, memory persistence, schemas, and graph exploration.
+    A single-source ontology engineering workspace for agent systems: recursive YAML source,
+    deterministic JSON projections, and a Graphify-style explorer.
   </p>
 
   <p>
     <a href="https://moonweave-ai.github.io/moonweave-ai-agent-schema/">Explorer</a>
     | <a href="docs/README.zh.md">Chinese docs</a>
     | <a href="docs/README.ja.md">Japanese docs</a>
-    | <a href="ontology/agent-ontology.json">Canonical ontology JSON</a>
-    | <a href="schemas/agent-ontology.schema.json">JSON Schema</a>
+    | <a href="src/generated/agent-ontology.json">Generated ontology JSON</a>
   </p>
 </div>
 
 ## What This Repository Contains
 
-Moonweave Agent Ontology is the canonical ontology product for a structured
-agent-system schema and explorer. It is not a prompt collection, a benchmark
-leaderboard, or a one-off graph mockup. The repository contains:
+Moonweave Agent Ontology is a governed ontology product for agent-system construction. It is not a prompt collection, benchmark list, or graph mockup.
 
-- a canonical agent ontology artifact in `ontology/agent-ontology.json`;
-- a human-readable ontology summary in `ontology/agent-ontology.md`;
-- a JSON Schema Draft 2020-12 contract in `schemas/agent-ontology.schema.json`;
-- valid and invalid fixtures under `fixtures/`;
-- a React + TypeScript ontology explorer under `src/`;
-- Phase 0/1 evidence records, source registries, and RFCs under `research/` and `docs/rfcs/`.
+The repository now has one editable ontology authority:
 
-Domain semantics are edited only under `ontology/source/**`; canonical JSON,
-Markdown, root Schema, TypeScript types, source index, definition ledger, and
-payload fixtures are deterministic generated products.
+- `ontology/node.yaml` is the root node and contains artifact-level governance, source catalog data, and root metadata.
+- Every child node lives in its own directory with exactly one `node.yaml`.
+- Direct child directories are the only source hierarchy. There is no `children/` wrapper and no parallel JSON, CSV, Markdown, migration, ABox, TBox, instance, schema, or evidence source tree.
+- Generated files under `src/generated/` are read-only build products.
+- The React explorer under `src/` renders the generated projection with the current Graphify-style force-directed UI.
 
-Moonweave exposes one canonical ontology graph. Definitions, structure
-constraints, examples, instances, source claims, mappings, and governance are
-information attached to canonical nodes and relations. They do not create
-parallel TBox, ABox, Schema, Instance, or governance browsing surfaces.
+All definitions, examples, fields, constraints, controlled values, source claims, review notes, and relation details are information on the relevant node or relation. They are not graph nodes and must not become a second browsing structure.
 
-## Why Agent Systems Need An Ontology
+## Source Model
 
-Agent systems have moved beyond a single model call. Real systems now combine
-long-running runtime sessions, retrieved context, memory stores, tool calls,
-subagents, handoffs, remote delegation, protocol boundaries, safety decisions,
-human review, benchmark pressure, and deployment-specific adapters.
+The physical source tree mirrors the logical ontology tree:
 
-Without an ontology, those pieces are usually described with framework-specific
-names that do not line up across projects. A "handoff", a "tool call", an
-"agent card", a "checkpoint", and an "evaluation trace" may all be real, but
-they do not belong to the same layer. This repository separates them into
-core, profile, and adapter semantics so schema, graph views, frontend
-inspection, and downstream exports can remain stable.
+```text
+ontology/
+|-- node.yaml
+|-- info-plane/
+|   |-- node.yaml
+|   `-- <module>/
+|       |-- node.yaml
+|       `-- <concept>/
+|           |-- node.yaml
+|           `-- <narrower-concept>/
+|               `-- node.yaml
+|-- runtime-plane/
+|   `-- ...
+`-- tool-plane/
+    `-- ...
+```
 
-The project borrows engineering discipline from mature ontology programs
-without importing their subject matter:
+Rules that are enforced by tests and the compiler:
 
-| Reference program | Pattern borrowed | Consequence for this project |
-|---|---|---|
-| [FIBO](https://github.com/edmcouncil/fibo) and the [FIBO ontology viewer](https://spec.edmcouncil.org/fibo/ontology) | ontology family, stable identifiers, maturity and hygiene discipline, source/product separation | Agent ontology is a governed product, not a flat concept dump. |
-| [Gene Ontology](https://geneontology.org/docs/ontology-documentation/) | orthogonal aspects and acyclic taxonomy/composition relations | Agent planes are separate aspects; taxonomy and composition stay disciplined. |
-| [CIDOC CRM](https://cidoc-crm.org/) | event-centered modeling over people, things, places, and activities | Runtime history is represented as observable events involving actors, tools, resources, and policies. |
-| [Palantir Ontology](https://www.palantir.com/docs/foundry/ontology/overview/) | operational semantic layer joining objects, links, actions, and functions | Agent terms are typed as objects, events, actions, policies, resources, actors, indexes, adapters, and relations. |
-| [DBpedia Ontology](https://www.dbpedia.org/resources/ontology/) and [FOAF](http://xmlns.com/foaf/spec/) | web identifiers and lightweight linked-data vocabulary practice | Terms are exportable through stable IRIs and can be bridged into semantic-web profiles. |
-| [W3C PROV-O](https://www.w3.org/TR/prov-o/) | provenance-oriented accountability | Source IDs, constraints, proposals, review status, and derivation notes are first-class governance data. |
-
-## Ontology Shape
-
-The canonical ontology is an agent-system ontology. Ontology-engineering
-metadata such as "ontology specification", "module", or "class" is governance
-metadata around the artifact, not part of the agent runtime itself.
-
-The release counts are generated as `ontology_metrics` in
-`ontology/agent-ontology.json`; documentation does not duplicate those numbers.
-The metrics distinguish Concepts, `is_a` relations, semantic relations,
-structure fields, controlled values, instance examples, constraints, source
-claims, and case paths instead of presenting legacy parallel collections.
+- exactly one root source: `ontology/`;
+- exactly one file per ontology node: `node.yaml`;
+- arbitrary concept depth is allowed;
+- parent/child placement is the source of the primary hierarchy;
+- cross-links remain relation metadata, not file placement;
+- deprecated or historical material is not retained as a source authority;
+- generated artifacts are rebuilt atomically from YAML and checked with `npm run ontology:check`.
 
 ## Eight Domains
 
-Moonweave Agent Schema organizes agent systems through eight operational concern planes. These planes describe the recurring lifecycle surfaces of an agent system: context ingress and staging, control orchestration, runtime execution, interoperability adaptation, capability and resource invocation, trust and safety mediation, observable feedback, and memory persistence.
+The top level contains eight operational concern domains:
 
-| Plane | Scope |
+| Domain | Scope |
 |---|---|
-| Context Ingress & Staging Domain | Observable content becoming available to an agent step or model call: message and instruction envelopes, source references, content blocks, context windows, lightweight discovery pointers, disclosed output segments, and execution observations staged into context. |
-| Control & Orchestration Domain | Goals, objectives, task plans, delegation ownership, handoffs, agents-as-tools, context isolation, worker selection, routing targets, gates, orchestration topology, prompt chains, parallel composition, synthesis provenance, and bounded feedback/retry loops. |
-| Runtime State & Trace Domain | Runtime execution envelopes and raw provenance evidence: sessions, run attempts, outcomes, actor authority bindings, trace/span/event structure, checkpoints, snapshots, state diffs, replay and restore events, and artifact production, consumption, and derivation lineage. |
-| Interoperability & Adapter Domain | Adapter membrane for protocol, framework, benchmark, statechart, schema/export, language profile, Graph IR, and frontend projections, with directional mapping rules, source/version provenance, conversion warnings, and core-pollution controls. |
-| Capability & Resource Invocation Domain | Capability registries, tool/resource/prompt/API definitions, discovery and selection, schema conformance, tool execution, resource reads, prompt instantiation, MCP protocol surfaces, authorization bridges, diagnostics, trace/context handoff, and auditable side effects. |
-| Trust, Policy & Safety Domain | Auditable safety propagation across trust boundaries, authority scopes, permission prompts, policy decisions, sandbox and network controls, source-sink injection defense, memory poisoning signals, side-effect commit gates, redaction, and audit disclosure. |
-| Observability & Feedback Domain | Diagnostic warnings and errors, logging and telemetry, review findings, corrections, generic metrics and evaluation runs, recovery actions, learning signals, and explicit feedback-flow edges back to orchestration, memory, tool selection, policy, and optimization loops; benchmark-specific semantics remain adapter-owned. |
-| Memory & Context Persistence Domain | Scoped memory stores, memory records and typology, ingestion, chunking, embedding/indexing, retrieval/ranking, context assembly, summaries, preference memory, and lifecycle operations such as write, update, delete, merge, consolidation, expiration, validation, reflection, audit, and memory-poisoning controls. |
+| Context Ingress & Staging | Observable content becoming available to an agent step or model call. |
+| Control & Orchestration | Goals, plans, routing, delegation, handoff, gates, and orchestration composition. |
+| Runtime State & Trace | Sessions, attempts, outcomes, authority bindings, trace events, checkpoints, and artifacts. |
+| Interoperability & Adapter | Protocol, framework, benchmark, statechart, schema/export, language-profile, graph, and frontend adaptation. |
+| Capability & Resource Invocation | Capability registries, tools, resources, prompts, APIs, discovery, invocation, and side-effect evidence. |
+| Trust, Policy & Safety | Trust boundaries, permissions, policies, sandboxing, injection defense, commit gates, redaction, and disclosure. |
+| Observability & Feedback | Diagnostics, logs, metrics, reviews, corrections, evaluations, recovery actions, and feedback loops. |
+| Memory & Context Persistence | Memory stores, records, ingestion, chunking, indexes, retrieval, summaries, lifecycle operations, and poisoning controls. |
 
-## Layer Boundary
+Domain and module nodes are stable navigation boundaries. They are not a depth limit. Concept nodes may continue downward for as many levels as the logic requires.
 
-The ontology uses a strict boundary model. Core/profile/adapter are ownership
-and applicability annotations, not a competing navigation hierarchy; the sole
-Explorer hierarchy is Agent Ontology → Domain → Module → Concept → narrower
-Concept → …; Domain and Module are stable entry boundaries, not a depth limit.
-
-- Core terms must be broadly observable across agent systems.
-- Profile terms describe optional but reusable views such as memory, orchestration, validation, and lifecycle profiles.
-- Adapter terms map external protocols, frameworks, and benchmarks without polluting core.
-- Hidden chain-of-thought is not a required field, fixture, schema object, or UI surface.
-- Benchmark scores and environment pressure are adapter metadata, not ontology core.
-- Cross-boundary relations must reference a trust boundary.
-
-## Repository Layout
-
-```text
-.
-|-- ontology/
-|   |-- agent-ontology.json
-|   `-- agent-ontology.md
-|-- schemas/
-|   `-- agent-ontology.schema.json
-|-- fixtures/
-|   |-- valid/
-|   `-- invalid/
-|-- research/
-|   |-- source-registry.csv
-|   |-- living-source-metadata.csv
-|   |-- pl-pr-core-profile-adapter-matrix.md
-|   `-- source-notes/
-|-- docs/
-|   |-- README.zh.md
-|   |-- README.ja.md
-|   |-- assets/
-|   |-- design/
-|   |-- governance/
-|   `-- rfcs/
-|-- src/
-|-- tests/
-|-- e2e/
-`-- scripts/
-```
-
-## Development
+## Build And Verification
 
 Install dependencies:
 
 ```bash
 npm ci
+```
+
+Build the ontology projections:
+
+```bash
+npm run ontology:build
+```
+
+Verify generated artifacts have not drifted:
+
+```bash
+npm run ontology:check
 ```
 
 Run the local explorer:
@@ -150,85 +104,40 @@ Run the local explorer:
 npm run dev
 ```
 
-Run the verification loop:
+Run the full local verification chain:
 
 ```bash
 npm run verify
-npm run e2e
 ```
 
-Build an unpublished candidate, materialize the reviewed formal artifact tree,
-and verify that generated files have not drifted. Repository publication still
-requires the reviewed runner-specific visual gate and a commit containing both
-the artifacts and baselines:
+Important commands:
 
-```bash
-npm run ontology:legacy:audit
-npm run ontology:build
-npm run ontology:release
-npm run ontology:check-generated
-```
+| Command | Purpose |
+|---|---|
+| `npm run ontology:build` | Compile `ontology/` into `src/generated/agent-ontology.json`, `source-index.json`, and `ontology-community-graph.json`. |
+| `npm run ontology:check` | Read-only drift check for generated artifacts. |
+| `npm run ontology:communities:check` | Verify the generated community graph against canonical module ownership. |
+| `npm run test:unit` | Run unit/integration tests after rebuilding ontology artifacts. |
+| `npm run build` | Typecheck, Vite build, site manifest generation, and site artifact verification. |
+| `npm run e2e` | Browser contract tests. |
 
-The legacy audit is read-only and is the migration preflight used by release.
-The historical reviewed replay code is frozen and excluded from normal build
-and release; only the explicitly exceptional `ontology:legacy:replay` command
-may write its reconstructed source output.
+## Explorer
 
-`npm run ontology:expand` remains only as a deprecated compatibility alias for
-the source-first release builder.
+The explorer keeps one Graphify-style graph surface:
 
-## Evidence And Governance
+- `vis-network` `ForceAtlas2Based` is used for the browser force-directed view.
+- Nodes are colored by canonical module ownership.
+- Node size is a visual hub signal, not a business-importance score.
+- Edge labels are kept out of the default canvas and exposed through details/hover surfaces to reduce visual clutter.
+- Sources, examples, fields, constraints, controlled values, review notes, and relation details appear in node/relation information panels.
+- There are no separate schema, instance, evidence, adapter, ABox, or TBox pages.
 
-The ontology is evidence-bound. Accepted terms and relations trace back to the
-Phase 0 source registry, synthesis constraints, and Phase 1 RFC decisions.
-
-Important governance files:
-
-- `research/source-registry.csv` records the full source registry.
-- `research/living-source-metadata.csv` records living source versions, dates, and normalization status.
-- `research/source-notes/fibo-alignment-review.md` records the FIBO alignment pass.
-- `research/source-notes/cross-domain-ontology-pattern-review.md` records cross-domain ontology pattern corrections.
-- `docs/governance/source-and-schema-governance.md` defines recheck, schema versioning, and trust-boundary policy.
-- `docs/rfcs/0001-ontology-layers.md` freezes ontology layer boundaries.
-- `docs/rfcs/0002-canonical-schema-contract.md` defines the canonical schema contract.
-- `docs/rfcs/0003-statechart-and-protocol-model.md` defines statechart and protocol modeling boundaries.
-- `docs/rfcs/0005-unified-concept-hierarchy-and-node-information.md` fixes the single-graph hierarchy and inline-information contract.
-- `docs/governance/v1-to-v2-canonical-migration-guide.md` maps every removed v1 surface to its v2 owner.
-
-## Current Status
-
-The v3 pipeline is source-first and review-gated. Its eight Domains and the
-capability-bounded Modules reported by `ontology_metrics.modules` share one canonical graph with
-arbitrary-depth reviewed taxonomy and structural backbones; scalar fields, controlled
-values, examples, source claims, mappings, and validation constraints remain
-information on those nodes and relations. Graph IR, payload Schema, fixtures,
-and future semantic exports are projections and never editable truth sources.
-
-The Explorer renders that one graph with a locally bundled `vis-network`
-`ForceAtlas2Based` view inspired by Graphify. An offline NetworkX
-`MultiDiGraph` preserves every directed, multi-predicate relation; its simple
-undirected projection is used only for deterministic Leiden/Louvain community
-discovery. Community color and hub size are visual aids, not ontology types,
-hierarchy, or importance. After initial stabilization the browser freezes the
-physics layout, while search, community filtering, focus, pan, zoom, and drag
-remain interactions on the same graph. There are no hierarchy/relationship
-modes or top-down/left-to-right layout controls. A production build manifest
-binds the deployed commit to the canonical and source fingerprints.
-
-An artifact with `artifact_metadata.release_channel="candidate"` or
-`releasable=false` is an unpublished verification candidate, even when its
-internal review status is `accepted`. Formal v3 publication is established only
-by the atomic cutover of every generated root artifact and a root canonical
-artifact marked `release` and `releasable=true`; documentation must not infer
-publication from a candidate build directory.
+Community assignment is released from the ontology’s module ownership, not from statistical clustering. The visual layout may help humans explore the graph, but it must not rewrite ontology ownership.
 
 ## Publication
 
-The explorer is deployed through GitHub Pages:
+GitHub Pages deploys the built explorer:
 
 [https://moonweave-ai.github.io/moonweave-ai-agent-schema/](https://moonweave-ai.github.io/moonweave-ai-agent-schema/)
 
-The Explorer UI keeps the Moonweave visual language and a FIBO-inspired
-recursive hierarchy while exposing exactly one graph and one inline
-node/relation characteristics table. There are no parallel Schema, ABox, TBox,
-Instance, evidence, or adapter pages.
+Production artifacts must be generated from the same commit that is deployed. The site build manifest binds the deployed commit to the ontology source fingerprint, generated canonical artifact, and generated community graph.

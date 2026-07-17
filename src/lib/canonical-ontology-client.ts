@@ -1,4 +1,4 @@
-import canonicalOntologyAssetUrl from "../../ontology/agent-ontology.json?url";
+import canonicalOntologyAssetUrl from "../generated/agent-ontology.json?url";
 
 export interface CanonicalOntologyLoadOptions {
   readonly assetUrl?: string;

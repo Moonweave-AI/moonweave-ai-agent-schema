@@ -1,34 +1,18 @@
-import {
-  existsSync,
-  realpathSync,
-  readFileSync,
-  readdirSync,
-} from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
 import { writeFileTransaction } from "./lib/atomic-write.mjs";
-import {
-  deterministicGeneratedAt,
-  ONTOLOGY_GENERATOR_VERSION,
-} from "./lib/generation-metadata.mjs";
-import { buildArtifactBytes } from "./lib/ontology-build-artifacts.mjs";
-import {
-  loadAndValidateSources,
-  mergeAndValidateCanonical,
-} from "./lib/ontology-build-validation.mjs";
-import { buildSourceIndexData } from "./lib/source-index.mjs";
+import { compileOntologyBundle } from "./lib/ontology-yaml-compiler.mjs";
+import { loadOntologyTree } from "./lib/ontology-yaml-source.mjs";
+import { sha256, stableJson } from "./lib/stable-json.mjs";
 
 const repositoryRoot = resolve(import.meta.dirname, "..");
+
 const parseArguments = (arguments_) => {
   const options = {
-    sourceRoot: resolve(repositoryRoot, "ontology/source"),
-    outputRoot: resolve(repositoryRoot, "build/agent-ontology-candidate"),
-    artifactContractPath: resolve(
-      repositoryRoot,
-      "schemas/source/agent-ontology-artifact-contract.json",
-    ),
+    sourceDir: resolve(repositoryRoot, "ontology"),
+    outputDir: resolve(repositoryRoot, "src/generated"),
     check: false,
-    releaseChannel: "candidate",
   };
   for (let index = 0; index < arguments_.length; index += 1) {
     const argument = arguments_[index];
@@ -36,17 +20,12 @@ const parseArguments = (arguments_) => {
       options.check = true;
       continue;
     }
-    if (argument === "--release") {
-      options.releaseChannel = "release";
-      continue;
-    }
-    const value = arguments_[index + 1];
-    if (["--source-root", "--output-root", "--artifact-contract"].includes(argument)) {
+    if (argument === "--source-dir" || argument === "--output-dir") {
+      const value = arguments_[index + 1];
       if (!value || value.startsWith("--")) throw new Error(`${argument} requires a path`);
       index += 1;
-      if (argument === "--source-root") options.sourceRoot = resolve(value);
-      if (argument === "--output-root") options.outputRoot = resolve(value);
-      if (argument === "--artifact-contract") options.artifactContractPath = resolve(value);
+      if (argument === "--source-dir") options.sourceDir = resolve(value);
+      else options.outputDir = resolve(value);
       continue;
     }
     throw new Error(`Unknown argument: ${argument}`);
@@ -54,85 +33,58 @@ const parseArguments = (arguments_) => {
   return options;
 };
 
-const listFiles = (root) => {
-  if (!existsSync(root)) return [];
-  return readdirSync(root, { withFileTypes: true })
-    .flatMap((entry) => {
-      const path = resolve(root, entry.name);
-      return entry.isDirectory() ? listFiles(path) : [path];
-    })
-    .sort((left, right) => left.localeCompare(right));
-};
-
-const normalizedRelativeFiles = (root) =>
-  listFiles(root).map((path) => relative(root, path).replaceAll("\\", "/"));
-
-const comparablePath = (path) => {
-  const absolute = resolve(path);
-  const canonical = existsSync(absolute) ? realpathSync.native(absolute) : absolute;
-  return process.platform === "win32" ? canonical.toLowerCase() : canonical;
-};
-
-const checkArtifacts = (outputRoot, artifacts) => {
-  const actualFiles = normalizedRelativeFiles(outputRoot);
-  const expectedFiles = [...artifacts.keys()].sort();
-  if (JSON.stringify(actualFiles) !== JSON.stringify(expectedFiles)) {
-    throw new Error(
-      `Generated artifacts are stale: expected [${expectedFiles.join(", ")}], found [${actualFiles.join(", ")}]`,
-    );
-  }
-  for (const [path, expected] of artifacts) {
-    const actual = readFileSync(resolve(outputRoot, path), "utf8");
-    if (actual !== expected) throw new Error(`Generated artifact is stale: ${path}`);
+const assertOutputOutsideSource = (sourceDir, outputDir) => {
+  const path = relative(sourceDir, outputDir);
+  if (path === "" || (!path.startsWith("..\\") && !path.startsWith("../") && path !== "..")) {
+    throw new Error("Generated output must remain outside the canonical YAML source tree");
   }
 };
 
-const writeArtifacts = (outputRoot, artifacts) => {
+const artifactBytes = (bundle) => {
+  const canonicalBytes = stableJson(bundle.canonical);
+  const communityGraph = {
+    ...bundle.communityGraph,
+    source_sha256: sha256(canonicalBytes),
+  };
+  return new Map([
+    ["agent-ontology.json", canonicalBytes],
+    ["ontology-community-graph.json", stableJson(communityGraph)],
+    ["source-index.json", stableJson(bundle.sourceIndex)],
+  ]);
+};
+
+const verifyArtifacts = (outputDir, artifacts) => {
+  for (const [name, expected] of artifacts) {
+    const path = resolve(outputDir, name);
+    if (!existsSync(path) || readFileSync(path, "utf8") !== expected) {
+      throw new Error(`Generated ontology artifact is stale: ${name}`);
+    }
+  }
+};
+
+const main = async () => {
+  const options = parseArguments(process.argv.slice(2));
+  assertOutputOutsideSource(options.sourceDir, options.outputDir);
+  const bundle = await compileOntologyBundle({ sourceDir: options.sourceDir });
+  const sourceAfterCompile = await loadOntologyTree({ sourceDir: options.sourceDir });
+  if (sourceAfterCompile.sourceTreeSha256 !== bundle.sourceTreeSha256) {
+    throw new Error("Canonical YAML source changed while the read-only build was running");
+  }
+  const artifacts = artifactBytes(bundle);
+  if (options.check) {
+    verifyArtifacts(options.outputDir, artifacts);
+    return;
+  }
   writeFileTransaction(
-    new Map(
-      [...artifacts].map(([path, contents]) => [resolve(outputRoot, path), contents]),
-    ),
+    new Map([...artifacts].map(([name, contents]) => [resolve(options.outputDir, name), contents])),
+    { transactionRoot: options.outputDir },
   );
 };
 
-const main = () => {
-  const options = parseArguments(process.argv.slice(2));
-  if (comparablePath(options.outputRoot) === comparablePath(repositoryRoot)) {
-    throw new Error(
-      "Direct builder writes into the repository root are forbidden; use scripts/release-agent-ontology.mjs so migration, determinism, quality, and rollback gates cannot be bypassed.",
-    );
-  }
-  const loaded = loadAndValidateSources({
-    sourceRoot: options.sourceRoot,
-    artifactContractPath: options.artifactContractPath,
-  });
-  const generatedAt = deterministicGeneratedAt(loaded.productEntry.data.product.date);
-  const sourceIndex = buildSourceIndexData(repositoryRoot, {
-    generatedAt,
-    generatorVersion: ONTOLOGY_GENERATOR_VERSION,
-  });
-  const canonical = mergeAndValidateCanonical({
-    ...loaded,
-    contractVersion: loaded.contract.contract_version,
-    sourceIndex,
-    generatorVersion: ONTOLOGY_GENERATOR_VERSION,
-    generatedAt,
-    releaseChannel: options.releaseChannel,
-  });
-  const artifacts = buildArtifactBytes({
-    canonical,
-    contract: loaded.contract,
-    contractFingerprint: loaded.contractFingerprint,
-    sourceIndex,
-    generatedAt,
-  });
-  if (options.check) checkArtifacts(options.outputRoot, artifacts);
-  else writeArtifacts(options.outputRoot, artifacts);
-};
-
 try {
-  main();
+  await main();
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;
 }
+

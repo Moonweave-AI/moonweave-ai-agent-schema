@@ -1,0 +1,987 @@
+schema: moonweave.ai/ontology-node/v1
+id: Task
+kind: concept
+status: review
+labels:
+  zh: 任务
+  en: task
+  ja: タスク
+semantics:
+  short_definition:
+    zh: 任务是以预期结果为身份、可被执行多次的工作规约。
+    en: A task is a reusable work specification identified by its desired outcome.
+    ja: タスクは、望ましい結果によって識別され、複数回実行できる作業仕様です。
+  definition:
+    zh: Task 是一种面向结果的 WorkSpecification：它规定应从给定输入实现的预期结果、适用约束与完成标准，并独立于当前受派者、调度优先级和某次运行状态。A2A Task 是带标识、状态、历史和产物的有状态生命周期对象，在本体中对齐运行层的 Execution，而不是复用此规范类。
+    en: A Task is an outcome-oriented WorkSpecification that states the desired outcome to be realized from given inputs together with applicable constraints and completion criteria and is independent of its current assignee, scheduling priority, or any run state. An A2A Task is a stateful lifecycle object with identity, status, history, and artifacts; Moonweave aligns that protocol object with runtime Execution rather than reusing this specification class.
+    ja: Task は、入力から実現すべき望ましい結果、適用制約、完了基準を定める結果指向の WorkSpecification であり、現在の担当者、スケジュール優先度、個別実行状態から独立します。A2A Task は識別子・状態・履歴・成果物を持つステートフルなライフサイクル対象なので、この仕様クラスではなく実行層の Execution に対応付けます。
+  why_needed:
+    zh: 稳定的任务规范使计划、分配和执行引用同一个‘要实现什么’，同时允许每次 Execution 拥有独立状态、重试和产物谱系。
+    en: A stable Task lets planning, allocation, and execution refer to the same statement of what must be achieved while each Execution keeps an independent state, retry history, and artifact lineage.
+    ja: 安定した Task により、計画・割当・実行が同じ『何を達成するか』を参照しつつ、各 Execution は独立した状態、再試行履歴、成果物系譜を保持できます。
+  includes:
+    - zh: 稳定任务规范标识、预期结果、输入契约，以及指向 TaskConstraint 与 TaskCompletionCriterion 的规范关系。
+      en: A stable task-specification identifier, desired outcome, input contract, and normative links to TaskConstraint and TaskCompletionCriterion.
+      ja: 安定したタスク仕様識別子、望ましい結果、入力契約、TaskConstraint と TaskCompletionCriterion への規範的リンクを含みます。
+  excludes:
+    - zh: 当前 assignee、priority、queued/running/completed 状态、运行时间、重试次数和实际产物；这些分别属于 WorkItem 或 Execution。
+      en: Current assignee, priority, queued/running/completed state, runtime timestamps, retry count, and actual artifacts; those belong to WorkItem or Execution.
+      ja: 現在の担当者、優先度、queued/running/completed 状態、実行時刻、再試行回数、実成果物は含まず、WorkItem または Execution に属します。
+  semantic_kind: specification
+  aliases: []
+structure:
+  identity_keys: []
+  fields:
+    - id: desired_outcome
+      labels:
+        zh: 预期结果
+        en: desired outcome
+        ja: 望ましい結果
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 以可验收状态描述要实现什么，而不是规定谁执行或记录当前运行状态。
+        en: States the acceptable state to be achieved without assigning a performer or recording current run status.
+        ja: 誰が実行するかや現在の実行状態ではなく、達成すべき受入可能状態を記述します。
+      allowed_values: []
+      pattern: null
+      example_value: Produce a reconciliation report with zero unexplained differences.
+      source_claims:
+        - claim-task-002
+    - id: input_contract
+      labels:
+        zh: 任务输入合同
+        en: task input contract
+        ja: タスク入力契約
+      datatype: object
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 声明开始实现任务所需的信息类型、模式、版本与完整性要求。
+        en: Declares information types, schemas, versions, and integrity requirements needed to begin realizing the Task.
+        ja: Task 実現開始に必要な情報種別・スキーマ・版・完全性要件を宣言します。
+      allowed_values: []
+      pattern: null
+      example_value:
+        type: LedgerSnapshot
+        schema: ledger-snapshot@2
+        authorization_required: true
+      source_claims:
+        - claim-task-003
+    - id: output_contract
+      labels:
+        zh: 任务输出合同
+        en: task output contract
+        ja: タスク出力契約
+      datatype: object
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 声明成功实现时必须提供的结果类型与模式；实际输出实例仍属于运行层。
+        en: Declares the result type and schema required by a successful realization while actual output instances remain in the runtime layer.
+        ja: 成功実現で必要な結果種別とスキーマを宣言し、実際の出力インスタンスは実行層に残します。
+      allowed_values: []
+      pattern: null
+      example_value:
+        type: ReconciliationReport
+        schema: reconciliation-report@3
+      source_claims:
+        - claim-task-004
+  constraints:
+    - id: task-contract-outcome-consistent
+      severity: error
+      expression_language: plain
+      expression: desired_outcome is non-empty and output_contract can provide evidence required by every completion criterion
+      explanations:
+        zh: 预期结果、输出合同与完成判据必须可相互验证，不能只写抽象口号。
+        en: Desired outcome, output contract, and completion criteria must be mutually verifiable rather than an abstract slogan.
+        ja: 望ましい結果・出力契約・完了基準は相互検証可能で、抽象的標語だけでは不十分です。
+      source_claims:
+        - claim-task-005
+    - id: task-dependency-graph-acyclic
+      severity: error
+      expression_language: plain
+      expression: Task-depends_on-Task edges are acyclic within each TaskPlan version
+      explanations:
+        zh: 前置任务依赖必须无环；需要反复执行的流程由路由循环而不是依赖环表示。
+        en: Predecessor Task dependencies are acyclic; repeated execution is represented by routing loops rather than dependency cycles.
+        ja: 先行 Task 依存は非循環で、反復実行は依存循環ではなくルーティングループで表します。
+      source_claims:
+        - claim-task-006
+  required_relation_constraints:
+    - id: task-has-completion-criterion
+      direction: outgoing
+      predicate: has_completion_criterion
+      target_concept_id: TaskCompletionCriterion
+      cardinality:
+        min: 1
+        max: null
+      explanations:
+        zh: 每个可执行 Task 至少具有一个可复算的完成判据。
+        en: Every executable Task has at least one recomputable completion criterion.
+        ja: 各実行可能 Task は少なくとも一つの再計算可能な完了基準を持ちます。
+      source_claims:
+        - claim-task-007
+examples:
+  - id: Task-example-positive-manual-001
+    kind: positive
+    labels:
+      zh: 任务正例
+      en: Positive example for task
+      ja: タスクの正例
+    scenario_id: null
+    descriptions:
+      zh: task-spec-reconcile-7 规定‘把授权账本快照转换为零未解释差异的对账报告’，并引用输入契约与完成标准；它没有绑定执行者或状态。
+      en: task-spec-reconcile-7 requires transforming an authorized ledger snapshot into a reconciliation report with zero unexplained differences and references an input contract and completion criterion, but binds no assignee or state.
+      ja: task-spec-reconcile-7 は、許可済み台帳スナップショットを未説明差異ゼロの照合報告へ変換し、入力契約と完了基準を参照しますが、担当者や状態は束縛しません。
+    field_values:
+      desired_outcome: Produce a reconciliation report with zero unexplained differences.
+      input_contract:
+        type: LedgerSnapshot
+        schema: ledger-snapshot@2
+        authorization_required: true
+      output_contract:
+        type: ReconciliationReport
+        schema: reconciliation-report@3
+      work_specification_id: task-spec-reconcile-7
+      revision: "4"
+      intended_transformation: transform an authorized ledger snapshot into a reconciliation report with zero unexplained differences
+      input_contract_refs:
+        - ledger-snapshot@2
+      output_contract_refs:
+        - reconciliation-report@3
+      acceptance_basis_ref: reconciliation-zero-unexplained-differences@4
+      applicability_boundary:
+        ledger_scope: authorized-snapshot
+        reconciliation_period: 2026-07
+    related_node_ids:
+      - Task
+      - WorkSpecification
+      - TaskCompletionCriterion
+      - WorkItem
+      - Execution
+    related_relation_ids:
+      - Task-is_a-WorkSpecification
+      - Task-has_completion_criterion-TaskCompletionCriterion
+      - WorkItem-allocates-Task
+      - Execution-realizes-Task
+    expected_result:
+      zh: task-spec-reconcile-7 是 Task；多个 WorkItem 可分配它，多个 Execution 可实现它。
+      en: task-spec-reconcile-7 is a Task that multiple WorkItems may allocate and multiple Executions may realize.
+      ja: task-spec-reconcile-7 は Task であり、複数の WorkItem が割り当て、複数の Execution が実現できます。
+    why_valid_or_invalid:
+      zh: 其身份由稳定的预期结果和验收语义决定，而不随人员、优先级或一次运行失败而改变。
+      en: Its identity comes from a stable desired outcome and acceptance semantics and does not change with performer, priority, or one failed run.
+      ja: 同一性が安定した望ましい結果と受入意味で決まり、担当者、優先度、一回の失敗で変わらないためです。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-task-008
+  - id: Task-example-boundary-manual-001
+    kind: boundary
+    labels:
+      zh: 任务边界例
+      en: Boundary case for task
+      ja: タスクの境界例
+    scenario_id: null
+    descriptions:
+      zh: A2A 对象 task-93 当前为 working，包含三条消息历史和 artifact report-12，随后转为 failed。
+      en: A2A object task-93 is currently working, contains three history messages and artifact report-12, and later transitions to failed.
+      ja: A2A オブジェクト task-93 は現在 working で、3件の履歴メッセージと artifact report-12 を持ち、その後 failed へ遷移します。
+    field_values:
+      work_specification_id: task-spec-protocol-lifecycle-copy
+      revision: "1"
+      desired_outcome: working
+      input_contract:
+        a2a_task_id: task-93
+        current_status: working
+      output_contract:
+        actual_artifact_id: report-12
+        terminal_status: failed
+    related_node_ids:
+      - Task
+      - Execution
+    related_relation_ids:
+      - Execution-realizes-Task
+    expected_result:
+      zh: 该有状态对象映射为 Execution；它可以通过 Execution-realizes-Task 指向规范 Task。
+      en: The stateful object maps to Execution and may point to its specification through Execution-realizes-Task.
+      ja: この状態付き対象は Execution に写像し、Execution-realizes-Task により仕様 Task を指せます。
+    why_valid_or_invalid:
+      zh: 状态转换、历史和本次产物都是运行身份，而非独立于运行的预期结果定义。
+      en: State transitions, history, and run artifacts determine runtime identity rather than an execution-independent desired-outcome definition.
+      ja: 状態遷移、履歴、実行成果物は実行の同一性を定め、実行から独立した望ましい結果の定義ではないためです。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-task-009
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation:
+  - sibling_concept_id: TaskPlan
+    shared_parent_concept_id: WorkSpecification
+    differentia:
+      zh: 正向身份比较：父节点 WorkSpecification：Task（semantic kind=specification，骨架 Task-is_a-WorkSpecification）；TaskPlan（semantic kind=specification，骨架 TaskPlan-is_a-WorkSpecification）。双端条件：Task 条件：“任务是一种工作规约（WorkSpecification），以 task_id 标识一项可分派工作，并用状态、优先级、约束与完成标准描述尚待实现的工作；一次具体执行由 RunAttempt 表示”；TaskPlan 条件：“任务计划属于工作规约，区别于其他同类对象的条件是：它把目标组织为有序任务、工作项、依赖、约束和完成准则，使委派与审计有明确结构”。仅依据各自定义与骨架逐端验证。
+      en: "Positive identity comparison: parent WorkSpecification: Task (semantic kind=specification, backbone Task-is_a-WorkSpecification); TaskPlan (semantic kind=specification, backbone TaskPlan-is_a-WorkSpecification). Endpoint conditions: Task condition: “A Task is a WorkSpecification identified by task_id that describes assignable work through status, priority, constraints, and completion criteria; one concrete execution is represented by a RunAttempt”; TaskPlan condition: “Task plan is a work specification whose defining condition is that it organizes a goal into ordered tasks, work items, dependencies, constraints, and completion criteria that can be delegated and audited”. Verify each endpoint from its own definition and backbone."
+      ja: 正の同一性比較：親 WorkSpecification：Task（semantic kind=specification、バックボーン Task-is_a-WorkSpecification）；TaskPlan（semantic kind=specification、バックボーン TaskPlan-is_a-WorkSpecification）。両端条件：Task の条件：「タスクは作業仕様（WorkSpecification）の一種で、task_id により割当可能な作業を識別し、状態、優先度、制約、完了基準によって未実現の作業を記述します」；TaskPlan の条件：「タスク計画は作業仕様のうち、次の事実を定義条件とする対象です：それは目標を順序付きタスク、作業項目、依存、制約、完了基準へ整理し、委任と監査の構造を与えます」。各端を固有の定義とバックボーンで検証します。
+    source_claims:
+      - claim-task-010
+      - claim-task-011
+  - sibling_concept_id: TaskStep
+    shared_parent_concept_id: WorkSpecification
+    differentia:
+      zh: 端点特定对照：父节点 WorkSpecification：Task（semantic kind=specification，骨架 Task-is_a-WorkSpecification）；TaskStep（semantic kind=specification，骨架 TaskStep-is_a-WorkSpecification）。双端条件：Task 条件：“任务是一种工作规约（WorkSpecification），以 task_id 标识一项可分派工作，并用状态、优先级、约束与完成标准描述尚待实现的工作；一次具体执行由 RunAttempt 表示”；TaskStep 条件：“任务步骤是以如下事实为区分特征的工作规约：它规定顺序、依赖、负责人、完成证据以及可选的调用计划；它不执行工具调用，执行身份由 ToolCall 与 ToolCallAttempt 承担”。条件不得互借；各自成立后方可归类。
+      en: "Endpoint-specific contrast: parent WorkSpecification: Task (semantic kind=specification, backbone Task-is_a-WorkSpecification); TaskStep (semantic kind=specification, backbone TaskStep-is_a-WorkSpecification). Endpoint conditions: Task condition: “A Task is a WorkSpecification identified by task_id that describes assignable work through status, priority, constraints, and completion criteria; one concrete execution is represented by a RunAttempt”; TaskStep condition: “Task step is a work specification; its differentiating condition is that it specifies ordering, dependencies, owner, completion evidence, and an optional invocation plan; it does not execute a tool call, whose execution identity belongs to ToolCall and ToolCallAttempt”. Conditions cannot be borrowed; classify each endpoint only from its own evidence."
+      ja: 端点別対照：親 WorkSpecification：Task（semantic kind=specification、バックボーン Task-is_a-WorkSpecification）；TaskStep（semantic kind=specification、バックボーン TaskStep-is_a-WorkSpecification）。両端条件：Task の条件：「タスクは作業仕様（WorkSpecification）の一種で、task_id により割当可能な作業を識別し、状態、優先度、制約、完了基準によって未実現の作業を記述します」；TaskStep の条件：「タスクステップは作業仕様の一種であり、次の条件で区別されます：タスク手順は順序、依存、担当者、完了証拠、任意の呼出し計画を規定します」。条件を流用せず、各端を固有の証拠で分類します。
+    source_claims:
+      - claim-task-012
+      - claim-task-013
+parent_relation:
+  id: Task-is_a-WorkSpecification
+  predicate: is_a
+  direction: source-to-target
+  relation_kind: hierarchy
+  labels:
+    zh: 是一种
+    en: is a
+    ja: の一種である
+  definitions:
+    zh: Task —is_a→ WorkSpecification 表示 Task 继承未实现工作的规范身份，并以稳定预期结果作为种差；受派者、优先级和生命周期状态不属于该继承链。
+    en: Task —is_a→ WorkSpecification classifies Task as normative unrealized work, with a stable desired outcome as its differentia; assignee, priority, and lifecycle state do not belong to this inheritance chain.
+    ja: Task —is_a→ WorkSpecification は、Task を未実現作業の規範として分類し、安定した望ましい結果を種差とします。担当者・優先度・ライフサイクル状態はこの継承鎖に属しません。
+  cardinality: null
+  cardinality_not_applicable_reason:
+    zh: 分类继承不使用实例关系基数。
+    en: Taxonomic inheritance does not use instance-relation cardinality.
+    ja: 分類継承にはインスタンス関係の基数を用いません。
+  inverse_reading:
+    predicate: has_subtype
+    labels:
+      zh: 反向：是一种
+      en: has subtype
+      ja: 逆方向：の一種である
+  conditions: []
+  temporal_scope: timeless
+  boundary_context: null
+  constraints: []
+  examples:
+    - id: Task-is_a-WorkSpecification-example-positive-manual-001
+      kind: positive
+      labels:
+        zh: 是一种正例
+        en: Positive example for is a
+        ja: の一種であるの正例
+      scenario_id: null
+      descriptions:
+        zh: task-spec-audit 规定输入快照、预期差异报告和完成标准，不包含当前运行状态。
+        en: task-spec-audit states an input snapshot, desired difference report, and completion criterion and contains no current run state.
+        ja: task-spec-audit は入力スナップショット、期待差分報告、完了基準を定め、現在の実行状態を含みません。
+      field_values: {}
+      related_node_ids:
+        - Task
+        - WorkSpecification
+      related_relation_ids:
+        - Task-is_a-WorkSpecification
+      expected_result:
+        zh: task-spec-audit 既是 Task，也是 WorkSpecification。
+        en: task-spec-audit is both Task and WorkSpecification.
+        ja: task-spec-audit は Task であり WorkSpecification でもあります。
+      why_valid_or_invalid:
+        zh: 它符合规范性工作属，并以独立于执行的预期结果区分自身。
+        en: It satisfies the normative-work genus and distinguishes itself through an execution-independent desired outcome.
+        ja: 規範的作業という属を満たし、実行から独立した望ましい結果で自身を区別するためです。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-task-014
+    - id: Task-is_a-WorkSpecification-example-boundary-manual-001
+      kind: boundary
+      labels:
+        zh: 是一种边界例
+        en: Boundary case for is a
+        ja: の一種であるの境界例
+      scenario_id: null
+      descriptions:
+        zh: execution-audit-91 当前为 running，含开始时间、重试次数和已生成日志。
+        en: execution-audit-91 is running and contains a start time, retry count, and generated logs.
+        ja: execution-audit-91 は running で、開始時刻、再試行回数、生成ログを含みます。
+      field_values: {}
+      related_node_ids:
+        - Task
+        - WorkSpecification
+      related_relation_ids:
+        - Task-is_a-WorkSpecification
+      expected_result:
+        zh: 该对象是 Execution，不通过此 is_a 边归类为 WorkSpecification。
+        en: The object is Execution and is not classified through this is_a edge as WorkSpecification.
+        ja: この対象は Execution で、この is_a 辺により WorkSpecification へ分類しません。
+      why_valid_or_invalid:
+        zh: 其身份由一次运行的时间线和状态决定，而非未实现的结果规范。
+        en: Its identity comes from one run's timeline and state rather than an unrealized outcome specification.
+        ja: 同一性が未実現結果仕様ではなく、一回の実行時系列と状態で決まるためです。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-task-015
+  source_claims:
+    - claim-task-016
+  distinct_fact_rationale: null
+  layout_role: primary-backbone
+  review_status: pending
+  endpoint_order: child-to-parent
+relations:
+  - id: Task-constrained_by-TaskConstraint
+    predicate: constrained_by
+    direction: source-to-target
+    relation_kind: governance
+    labels:
+      zh: constrained by
+      en: constrained by
+      ja: constrained by
+    definitions:
+      zh: Task —constrained_by→ TaskConstraint 表示该限制适用于这个稳定任务规范及其所有实现执行；它限制允许的方法、资源或权限，但不表达前置依赖或完成判定。
+      en: Task —constrained_by→ TaskConstraint means that the limit governs the stable Task specification and every realizing Execution. It restricts permitted method, resource, or authority but expresses neither a predecessor dependency nor a completion decision.
+      ja: Task —constrained_by→ TaskConstraint は、その制限が安定した Task 仕様と全ての実現 Execution を統制し、許可方法・資源・権限を制限する一方、前提依存や完了判定を表さないことを示します。
+    cardinality:
+      source:
+        min: 0
+        max: null
+      target:
+        min: 1
+        max: null
+    cardinality_not_applicable_reason: null
+    inverse_reading:
+      predicate: constrains
+      labels:
+        zh: 反向：constrained by
+        en: constrains
+        ja: 逆方向：constrained by
+    conditions: []
+    temporal_scope: timeless
+    boundary_context: null
+    constraints: []
+    examples:
+      - id: Task-constrained_by-TaskConstraint-example-positive-manual-001
+        kind: positive
+        labels:
+          zh: constrained by正例
+          en: Positive example for constrained by
+          ja: constrained byの正例
+        scenario_id: null
+        descriptions:
+          zh: task-spec-export 被 constraint-eu-only 限定为只在欧盟区域沙箱内处理数据。
+          en: task-spec-export is constrained by constraint-eu-only to process data only in an EU-region sandbox.
+          ja: task-spec-export は constraint-eu-only により EU 地域サンドボックス内だけでデータ処理するよう制約されます。
+        field_values: {}
+        related_node_ids:
+          - Task
+          - TaskConstraint
+        related_relation_ids:
+          - Task-constrained_by-TaskConstraint
+        expected_result:
+          zh: 建立 Task-constrained_by-TaskConstraint，并把该限制应用于每次 Execution。
+          en: Create Task-constrained_by-TaskConstraint and apply the limit to every Execution.
+          ja: Task-constrained_by-TaskConstraint を作成し、全 Execution へ制限を適用します。
+        why_valid_or_invalid:
+          zh: 限制针对任务可采用的执行环境，且不依赖任何前置工作结果。
+          en: The limit governs the permitted execution environment and depends on no predecessor work result.
+          ja: 制限は許可実行環境を対象とし、前置作業結果に依存しないためです。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-task-017
+      - id: Task-constrained_by-TaskConstraint-example-boundary-manual-001
+        kind: boundary
+        labels:
+          zh: constrained by边界例
+          en: Boundary case for constrained by
+          ja: constrained byの境界例
+        scenario_id: null
+        descriptions:
+          zh: task-review 必须等待 task-draft 产生 schema-v3 后开始。
+          en: task-review must wait until task-draft produces schema-v3.
+          ja: task-review は task-draft が schema-v3 を生成するまで待つ必要があります。
+        field_values: {}
+        related_node_ids:
+          - Task
+          - TaskConstraint
+        related_relation_ids:
+          - Task-constrained_by-TaskConstraint
+        expected_result:
+          zh: 该条件应建模为 TaskDependency，而不是 constrained_by 的 TaskConstraint。
+          en: Model the condition as TaskDependency rather than a constrained_by TaskConstraint.
+          ja: この条件は constrained_by の TaskConstraint ではなく TaskDependency として表します。
+        why_valid_or_invalid:
+          zh: 条件身份由特定前置任务及其产物决定，不是资源或权限边界。
+          en: The condition is identified by specific predecessor work and its artifact, not by a resource or authority boundary.
+          ja: 条件の同一性が特定の前置作業と成果物で決まり、資源・権限境界ではないためです。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-task-018
+    source_claims:
+      - claim-task-019
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: pending
+    target: concept:TaskConstraint
+  - id: Task-has_completion_criterion-TaskCompletionCriterion
+    predicate: has_completion_criterion
+    direction: source-to-target
+    relation_kind: governance
+    labels:
+      zh: has completion criterion
+      en: has completion criterion
+      ja: has completion criterion
+    definitions:
+      zh: Task —has_completion_criterion→ TaskCompletionCriterion 表示该可复用验收谓词决定何种执行证据足以认定此任务的预期结果已实现；它不连接一次实际 RunOutcome。
+      en: Task —has_completion_criterion→ TaskCompletionCriterion means that the reusable acceptance predicate determines which execution evidence is sufficient to recognize the Task's desired outcome as realized; it does not link to one actual RunOutcome.
+      ja: Task —has_completion_criterion→ TaskCompletionCriterion は、再利用可能な受入述語がどの実行証拠で Task の望ましい結果を実現済みと判定できるかを定め、一回の実 RunOutcome へは接続しないことを示します。
+    cardinality:
+      source:
+        min: 0
+        max: null
+      target:
+        min: 1
+        max: null
+    cardinality_not_applicable_reason: null
+    inverse_reading:
+      predicate: is_target_of_has_completion_criterion
+      labels:
+        zh: 反向：has completion criterion
+        en: is target of has completion criterion
+        ja: 逆方向：has completion criterion
+    conditions: []
+    temporal_scope: timeless
+    boundary_context: null
+    constraints: []
+    examples:
+      - id: Task-has_completion_criterion-TaskCompletionCriterion-example-positive-manual-001
+        kind: positive
+        labels:
+          zh: has completion criterion正例
+          en: Positive example for has completion criterion
+          ja: has completion criterionの正例
+        scenario_id: null
+        descriptions:
+          zh: task-spec-repair 引用 criterion-tests-review，要求目标测试通过且补丁获得批准。
+          en: task-spec-repair references criterion-tests-review, requiring target tests to pass and the patch to be approved.
+          ja: task-spec-repair は criterion-tests-review を参照し、対象テスト合格とパッチ承認を要求します。
+        field_values: {}
+        related_node_ids:
+          - Task
+          - TaskCompletionCriterion
+        related_relation_ids:
+          - Task-has_completion_criterion-TaskCompletionCriterion
+        expected_result:
+          zh: 建立 has_completion_criterion，供所有修复 Execution 使用同一验收语义。
+          en: Create has_completion_criterion so every repair Execution uses the same acceptance semantics.
+          ja: has_completion_criterion を作成し、全修復 Execution が同じ受入意味を用います。
+        why_valid_or_invalid:
+          zh: 该标准是可重复应用的规则，而不是某次运行已经成功的记录。
+          en: The criterion is a rule that can be applied repeatedly rather than a record that one run succeeded.
+          ja: 基準は繰り返し適用できる規則で、一回の実行成功記録ではないためです。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-task-020
+      - id: Task-has_completion_criterion-TaskCompletionCriterion-example-boundary-manual-001
+        kind: boundary
+        labels:
+          zh: has completion criterion边界例
+          en: Boundary case for has completion criterion
+          ja: has completion criterionの境界例
+        scenario_id: null
+        descriptions:
+          zh: run-outcome-8 记录测试通过并附批准记录，代表一次实际验收结果。
+          en: run-outcome-8 records passing tests and an approval record, representing one actual acceptance result.
+          ja: run-outcome-8 はテスト合格と承認記録を持ち、一回の実受入結果を表します。
+        field_values: {}
+        related_node_ids:
+          - Task
+          - TaskCompletionCriterion
+        related_relation_ids:
+          - Task-has_completion_criterion-TaskCompletionCriterion
+        expected_result:
+          zh: RunOutcome 不能作为 has_completion_criterion 的目标。
+          en: RunOutcome must not be the target of has_completion_criterion.
+          ja: RunOutcome を has_completion_criterion の対象にしてはいけません。
+        why_valid_or_invalid:
+          zh: 一次结果是标准的应用产物，不能反向变成规范性标准。
+          en: One outcome is the result of applying the criterion and cannot become the normative criterion itself.
+          ja: 一回の結果は基準適用の産物であり、規範基準そのものにはならないためです。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-task-021
+    source_claims:
+      - claim-task-022
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: pending
+    target: concept:TaskCompletionCriterion
+  - id: Task-depends_on-Task
+    predicate: depends_on
+    direction: source-to-target
+    relation_kind: information
+    labels:
+      zh: 依赖于前置任务
+      en: depends on
+      ja: 先行タスクに依存する
+    definitions:
+      zh: Task —depends_on→ Task 是从依赖任务指向前置任务的可遍历 DAG 投影；每条边必须由同一 TaskDependency 的 has_dependent 与 has_predecessor 端点共同支撑。
+      en: Task —depends_on→ Task is a traversable DAG projection directed from dependent Task to predecessor Task. Each edge is supported by the has_dependent and has_predecessor endpoints of the same TaskDependency.
+      ja: Task —depends_on→ Task は依存 Task から先行 Task へ向かう走査可能な DAG 投影です。各辺は同じ TaskDependency の has_dependent と has_predecessor 端点で裏付けます。
+    cardinality:
+      source:
+        min: 0
+        max: null
+      target:
+        min: 0
+        max: null
+    cardinality_not_applicable_reason: null
+    inverse_reading:
+      predicate: is_predecessor_of
+      labels:
+        zh: 是前置任务
+        en: is predecessor of
+        ja: 先行タスクである
+    conditions: []
+    temporal_scope: valid-time
+    boundary_context: null
+    constraints:
+      - id: task-depends-on-backed-and-acyclic
+        severity: error
+        expression_language: plain
+        expression: source != target; a matching TaskDependency names source as dependent and target as predecessor; all such edges are acyclic within one TaskPlan version
+        explanations:
+          zh: 直接边必须有双端点依赖条件作证且无环，不能成为另一套互相矛盾的依赖数据。
+          en: The direct edge is backed by a two-endpoint dependency and remains acyclic rather than becoming a contradictory second dependency store.
+          ja: 直接辺は二端点依存に裏付けられ非循環であり、矛盾する第二の依存データになってはなりません。
+        source_claims:
+          - claim-task-023
+          - claim-task-024
+    examples:
+      - id: Task-depends_on-Task-example-positive-manual-001
+        kind: positive
+        labels:
+          zh: 任务 DAG 边正例
+          en: Positive Task DAG edge
+          ja: Task DAG 辺の正例
+        scenario_id: null
+        descriptions:
+          zh: task-schema-review depends_on task-schema-draft，并由 dependency-schema-review-after-draft 的两个端点与证据谓词支撑。
+          en: task-schema-review depends_on task-schema-draft, backed by both endpoints and the evidence predicate of dependency-schema-review-after-draft.
+          ja: task-schema-review depends_on task-schema-draft は dependency-schema-review-after-draft の二端点と証拠述語で裏付けられます。
+        field_values:
+          dependent: task-schema-review
+          predecessor: task-schema-draft
+          dependency_id: dependency-schema-review-after-draft
+        related_node_ids:
+          - Task
+        related_relation_ids:
+          - Task-depends_on-Task
+        expected_result:
+          zh: 从依赖 Task 沿边到达前置 Task，并可回查完整 TaskDependency。
+          en: Traverse from dependent Task to predecessor Task and recover the complete TaskDependency.
+          ja: 依存 Task から先行 Task へ走査し、完全な TaskDependency を回収できます。
+        why_valid_or_invalid:
+          zh: 方向、双端点条件和满足证据一致，且未形成自环或循环。
+          en: Direction, two-endpoint condition, and satisfaction evidence agree, with neither a self-loop nor a cycle.
+          ja: 方向・二端点条件・充足証拠が一致し、自己辺や循環を形成しないためです。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-task-023
+          - claim-task-024
+      - id: Task-depends_on-Task-example-boundary-manual-001
+        kind: boundary
+        labels:
+          zh: 任务 DAG 边边界例
+          en: Boundary Task DAG edge
+          ja: Task DAG 辺の境界例
+        scenario_id: null
+        descriptions:
+          zh: task-schema-draft depends_on task-schema-review 与已有反向边共同形成二节点循环，且没有对应 TaskDependency。
+          en: task-schema-draft depends_on task-schema-review forms a two-node cycle with the existing reverse edge and has no matching TaskDependency.
+          ja: task-schema-draft depends_on task-schema-review は既存逆辺と二ノード循環を作り、対応 TaskDependency もありません。
+        field_values:
+          creates_cycle: true
+          dependency_id: null
+        related_node_ids:
+          - Task
+        related_relation_ids:
+          - Task-depends_on-Task
+        expected_result:
+          zh: 拒绝该边；循环流程必须迁移为运行时 Route 或 Retry。
+          en: Reject the edge and represent intentional repetition with runtime Route or Retry control.
+          ja: この辺を拒否し、意図的反復は実行時 Route または Retry で表します。
+        why_valid_or_invalid:
+          zh: 无证据条件的依赖环无法建立就绪顺序，并把运行控制错误写入规划前件。
+          en: An unevidenced dependency cycle cannot establish readiness order and incorrectly embeds runtime control in planning prerequisites.
+          ja: 証拠条件のない依存循環は実行準備順を確立できず、実行制御を計画前提へ誤記するためです。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-task-023
+          - claim-task-024
+    source_claims:
+      - claim-task-023
+      - claim-task-024
+    distinct_fact_rationale:
+      zh: 该边提供任务级快速拓扑查询，TaskDependency 则保存条件身份、类型与证据；二者职责互补。
+      en: This edge provides fast Task-level topology traversal, while TaskDependency preserves condition identity, kind, and evidence; the responsibilities are complementary.
+      ja: この辺は Task レベルの高速トポロジ走査を提供し、TaskDependency は条件同一性・種別・証拠を保持する補完関係です。
+    layout_role: cross-link
+    review_status: pending
+    target: concept:Task
+  - id: Task-decomposes_into-TaskStep
+    predicate: decomposes_into
+    direction: source-to-target
+    relation_kind: information
+    labels:
+      zh: 分解为任务步骤
+      en: decomposes into
+      ja: タスクステップへ分解する
+    definitions:
+      zh: Task —decomposes_into→ TaskStep 表示某个计划位置细化该稳定 Task 的一部分工作；每个 TaskStep 恰好细化一个 Task，但一个 Task 可在不同 TaskPlan 版本中拥有零个或多个步骤分解。
+      en: Task —decomposes_into→ TaskStep means that a plan position refines part of the stable Task. Each TaskStep refines exactly one Task, while one Task may have zero or many step decompositions across TaskPlan versions.
+      ja: Task —decomposes_into→ TaskStep は計画位置が安定 Task の一部作業を細化することを示します。各 TaskStep は一つの Task だけを細化し、一つの Task は TaskPlan 版をまたいでゼロ個以上のステップ分解を持てます。
+    cardinality:
+      source:
+        min: 1
+        max: 1
+      target:
+        min: 0
+        max: null
+    cardinality_not_applicable_reason: null
+    inverse_reading:
+      predicate: refines_task
+      labels:
+        zh: 细化任务
+        en: refines task
+        ja: タスクを細化する
+    conditions: []
+    temporal_scope: valid-time
+    boundary_context: null
+    constraints:
+      - id: task-decomposition-same-plan-closure
+        severity: error
+        expression_language: plain
+        expression: the TaskStep belongs to a TaskPlan that specifies the source Task
+        explanations:
+          zh: 步骤只能细化其所属计划明确规定的 Task，防止跨计划误连。
+          en: A step refines only a Task specified by its containing plan, preventing accidental cross-plan links.
+          ja: ステップは所属計画が指定する Task だけを細化し、計画をまたぐ誤接続を防ぎます。
+        source_claims:
+          - claim-task-025
+    examples:
+      - id: Task-decomposes_into-TaskStep-example-positive-manual-001
+        kind: positive
+        labels:
+          zh: 任务分解正例
+          en: Positive Task decomposition
+          ja: Task 分解の正例
+        scenario_id: null
+        descriptions:
+          zh: task-release-package 分解为 step-verify-signature 与 step-publish；两步骤都属于规定该 Task 的 plan-release-12@3。
+          en: task-release-package decomposes into step-verify-signature and step-publish, both contained by plan-release-12@3, which specifies that Task.
+          ja: task-release-package は step-verify-signature と step-publish に分解され、双方は当該 Task を指定する plan-release-12@3 に含まれます。
+        field_values:
+          task_id: task-release-package
+          task_step_ref: step-verify-signature
+          plan_version: plan-release-12@3
+        related_node_ids:
+          - Task
+          - TaskStep
+        related_relation_ids:
+          - Task-decomposes_into-TaskStep
+        expected_result:
+          zh: 从稳定 Task 到达计划内步骤，并保留步骤的输入—动作—输出合同。
+          en: Traverse from the stable Task to its plan step while retaining the step's input-action-output contract.
+          ja: 安定 Task から計画内ステップへ走査し、ステップの入出力・動作契約を保持します。
+        why_valid_or_invalid:
+          zh: 计划规定 Task 且包含该步骤，因此分解关系在同一计划版本内闭合。
+          en: The plan specifies the Task and contains the step, so the decomposition closes within one plan version.
+          ja: 計画が Task を指定しステップを含むため、分解関係が同一計画版内で閉じるからです。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-task-026
+          - claim-task-027
+      - id: Task-decomposes_into-TaskStep-example-boundary-manual-001
+        kind: boundary
+        labels:
+          zh: 任务分解边界例
+          en: Boundary Task decomposition
+          ja: Task 分解の境界例
+        scenario_id: null
+        descriptions:
+          zh: step-hotfix-approve 属于 plan-hotfix-2@1，却被 task-release-package 在 plan-release-12@3 中声明为分解步骤。
+          en: step-hotfix-approve belongs to plan-hotfix-2@1 but is claimed as a decomposition of task-release-package in plan-release-12@3.
+          ja: step-hotfix-approve は plan-hotfix-2@1 に属するのに、plan-release-12@3 の task-release-package の分解として主張されています。
+        field_values:
+          task_plan: plan-release-12@3
+          step_plan: plan-hotfix-2@1
+        related_node_ids:
+          - Task
+          - TaskStep
+        related_relation_ids:
+          - Task-decomposes_into-TaskStep
+        expected_result:
+          zh: 拒绝跨计划分解；应在步骤所属计划内引用其 Task。
+          en: Reject the cross-plan decomposition and reference the Task within the step's containing plan.
+          ja: 計画をまたぐ分解を拒否し、ステップ所属計画内の Task を参照します。
+        why_valid_or_invalid:
+          zh: 步骤位置和合同只在其 TaskPlan 版本中成立，跨版本连接会破坏身份闭包。
+          en: A step's position and contracts hold only in its TaskPlan version, so a cross-version link breaks identity closure.
+          ja: ステップの位置と契約は所属 TaskPlan 版でのみ成立し、版をまたぐ接続は同一性閉包を壊すためです。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-task-028
+    source_claims:
+      - claim-task-029
+      - claim-task-030
+    distinct_fact_rationale:
+      zh: 该边回答步骤细化哪个 Task；TaskPlan contains_step 只回答步骤属于哪个计划版本。
+      en: This edge answers which Task a step refines, while TaskPlan contains_step answers only which plan version contains the step.
+      ja: この辺はステップがどの Task を細化するかを答え、TaskPlan contains_step はどの計画版に属するかだけを答えます。
+    layout_role: cross-link
+    review_status: pending
+    target: concept:TaskStep
+review:
+  status: pending
+  method: manual-semantic
+  reviewer: null
+  reviewed_on: null
+  note:
+    zh: 该节点仅完成了从现行候选数据到唯一 YAML 树的无损转录；尚未逐项完成人工语义核验，不得据此宣称已审定。
+    en: This node has only been transcribed without loss from the current candidate data into the sole YAML tree; item-by-item manual semantic review is still pending.
+    ja: このノードは現行候補データから唯一の YAML ツリーへ欠落なく転記した段階であり、項目別の手動意味審査は未完了です。
+  sections:
+    semantics: pending
+    hierarchy: pending
+    relations: pending
+    structure: pending
+    examples: pending
+    source_claims: []
+source_claims:
+  - id: claim-task-001
+    source: eng-proto-a2a-spec
+    supports: The A2A specification defines its Task as a stateful unit of work with lifecycle status and artifacts. Moonweave deliberately reserves Task for reusable desired-work specification and maps the protocol lifecycle object to Execution.
+    locator: A2A Protocol specification > Core Concepts > Task lifecycle, status, history, and artifacts
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-002
+    source: eng-fw-crewai-tasks
+    supports: CrewAI task expected_output describes what completion looks like; Moonweave separates that desired outcome from assignment and execution state.
+    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-003
+    source: eng-fw-maf-workflows
+    supports: Agent Framework executors receive typed input messages; Moonweave records the corresponding reusable Task input contract.
+    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-004
+    source: eng-fw-crewai-tasks
+    supports: CrewAI tasks declare expected_output and optional structured output schemas; Moonweave captures those requirements as a Task output contract.
+    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-005
+    source: eng-fw-crewai-tasks
+    supports: CrewAI combines task description, expected_output, structured output, and guardrails; Moonweave requires those normative pieces to be mutually consistent.
+    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-006
+    source: eng-fw-maf-workflows
+    supports: Agent Framework separates directed workflow edges and conditional or dynamic control flow; Moonweave keeps prerequisite Task dependencies acyclic.
+    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-007
+    source: eng-fw-crewai-tasks
+    supports: CrewAI requires expected_output for a task and supports output guardrails; Moonweave requires at least one explicit completion criterion.
+    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-008
+    source: eng-proto-a2a-spec
+    supports: A2A's stateful Task demonstrates why protocol lifecycle state must be separated from Moonweave's reusable desired-work specification.
+    locator: A2A Protocol specification > Core Concepts > Task lifecycle, status, history, and artifacts
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-009
+    source: eng-proto-a2a-spec
+    supports: The A2A core model explicitly assigns status, history, and artifacts to its Task lifecycle object, which Moonweave represents in the runtime Execution layer.
+    locator: A2A Protocol specification > Core Concepts > Task lifecycle, status, history, and artifacts
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-010
+    source: eng-proto-a2a-docs
+    supports: A2A defines Task as the stateful unit of work with a unique identifier and lifecycle. Moonweave uses that boundary for Task; the ordered specification that decomposes work before execution is separately modeled as TaskPlan.
+    locator: Core Concepts and Components > Fundamental Communication Elements > Task
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-011
+    source: eng-fw-crewai-docs
+    supports: CrewAI processes define sequential, hierarchical, or hybrid collaboration patterns across tasks. Moonweave models that pre-execution arrangement of steps and dependencies as TaskPlan, distinct from one stateful Task execution unit.
+    locator: Documentation > Agents, tasks, crews, flows, and processes
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-012
+    source: eng-proto-a2a-docs
+    supports: A2A treats Task as the trackable stateful unit handled by an agent. It does not prescribe Moonweave's internal decomposition into TaskStep specifications, so the source supports Task while the step boundary remains a design inference.
+    locator: Core Concepts and Components > Fundamental Communication Elements > Task
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-013
+    source: eng-fw-crewai-docs
+    supports: CrewAI processes organize tasks in sequential or hierarchical workflows. Moonweave represents one ordered, dependency-aware unit inside such a plan as TaskStep; it remains a specification component rather than the lifecycle-bearing Task itself.
+    locator: Documentation > Agents, tasks, crews, flows, and processes
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-014
+    source: lit-oasis-process-planning
+    supports: The OASIS task-description side of the description/execution distinction supports this taxonomic placement.
+    locator: OASIS process-planning paper > plans, procedures, task descriptions, and plan executions
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-015
+    source: lit-oasis-process-planning
+    supports: OASIS keeps plan execution occurrences distinct from reusable task descriptions.
+    locator: OASIS process-planning paper > plans, procedures, task descriptions, and plan executions
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-016
+    source: lit-oasis-process-planning
+    supports: OASIS distinguishes task descriptions from their executions; Moonweave places outcome-oriented Task under the reusable WorkSpecification genus.
+    locator: OASIS process-planning paper > plans, procedures, task descriptions, and plan executions
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-017
+    source: lit-planning-ontology-2023
+    supports: Explicit planning constraints restrict admissible execution choices for the governed task.
+    locator: Planning Ontology paper > goals, actions, ordering constraints, and plan structure
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-018
+    source: lit-planning-ontology-2023
+    supports: Planning models distinguish ordering dependencies from constraints on admissible actions.
+    locator: Planning Ontology paper > goals, actions, ordering constraints, and plan structure
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-019
+    source: lit-planning-ontology-2023
+    supports: Planning Ontology treats constraints as explicit knowledge restricting admissible plans and actions; constrained_by attaches one such restriction to a Task.
+    locator: Planning Ontology paper > goals, actions, ordering constraints, and plan structure
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-020
+    source: lit-oasis-process-planning
+    supports: Task-description and execution separation supports attaching reusable acceptance criteria to the former.
+    locator: OASIS process-planning paper > plans, procedures, task descriptions, and plan executions
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-021
+    source: lit-oasis-process-planning
+    supports: OASIS distinguishes reusable descriptions from their execution occurrences and results.
+    locator: OASIS process-planning paper > plans, procedures, task descriptions, and plan executions
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-022
+    source: lit-oasis-process-planning
+    supports: OASIS separates task and procedure descriptions from plan executions; Moonweave attaches reusable acceptance semantics to the Task specification.
+    locator: OASIS process-planning paper > plans, procedures, task descriptions, and plan executions
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-023
+    source: eng-fw-crewai-tasks
+    supports: CrewAI task context explicitly identifies upstream task outputs required by a downstream task; Moonweave records that dependency without deriving it from display order.
+    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-024
+    source: eng-fw-maf-workflows
+    supports: Agent Framework sends typed outputs along explicit directed edges to downstream executors; Moonweave separates the prerequisite specification from runtime dispatch.
+    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-025
+    source: eng-fw-maf-workflows
+    supports: Agent Framework workflow executors and edges belong to one directed graph; Moonweave keeps Task-to-step refinement inside the containing plan.
+    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-026
+    source: eng-ont-prov-o
+    supports: PROV-O defines a plan as actions or steps intended to achieve goals; Moonweave makes the Task-to-step decomposition explicit.
+    locator: PROV-O Recommendation > expanded terms > prov:Plan, prov:Activity, prov:Association, prov:hadPlan, and prov:hadRole
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-027
+    source: eng-fw-maf-workflows
+    supports: Agent Framework represents multi-step work with typed executors and directed edges; Moonweave binds each stable step to its originating Task.
+    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-028
+    source: eng-fw-maf-workflows
+    supports: Agent Framework builds one validated workflow graph at a time; Moonweave does not move a TaskStep between plan versions through a decomposition edge.
+    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-029
+    source: eng-ont-prov-o
+    supports: PROV-O defines a Plan as actions or steps intended to achieve goals; Moonweave refines that broad plan content into an explicit Task-to-TaskStep relation.
+    locator: PROV-O Recommendation > expanded terms > prov:Plan, prov:Activity, prov:Association, prov:hadPlan, and prov:hadRole
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-task-030
+    source: lit-oasis-process-planning
+    supports: OASIS 2 represents task descriptions and process or procedure structure separately from execution; Moonweave uses decomposition to connect those stable planning levels.
+    locator: OASIS 2 process-planning paper > process and procedure descriptions, task descriptions, roles, and plan executions
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending

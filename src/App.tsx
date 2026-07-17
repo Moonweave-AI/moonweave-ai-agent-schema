@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { OntologyCharacteristics } from "./components/OntologyCharacteristics";
 import { OntologyDirectory } from "./components/OntologyDirectory";
 import { OntologyGraph, type ThemeMode } from "./components/OntologyGraph";
@@ -34,6 +34,8 @@ import {
 type LocationNotice = "root-repaired" | "invalid-focus" | null;
 export interface AppProps { readonly ontologyRuntime: OntologyRuntime; readonly canonicalFingerprint: string }
 function App({ ontologyRuntime, canonicalFingerprint }: AppProps) {
+  const viewerHeaderRef = useRef<HTMLElement>(null);
+  const viewerGridRef = useRef<HTMLElement>(null);
   const canonicalOntology = ontologyRuntime.ontology;
   const ontologyIndex = ontologyRuntime.index;
   const initialLocation = useMemo(
@@ -126,6 +128,33 @@ function App({ ontologyRuntime, canonicalFingerprint }: AppProps) {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
 
+  useLayoutEffect(() => {
+    const header = viewerHeaderRef.current;
+    const grid = viewerGridRef.current;
+    if (!header || !grid) return undefined;
+
+    const updateDirectoryViewportHeight = (): void => {
+      const gridViewportTop = Math.max(0, grid.getBoundingClientRect().top);
+      const stickyGap = 16;
+      const availableHeight = Math.max(
+        320,
+        window.innerHeight - gridViewportTop - stickyGap,
+      );
+      grid.style.setProperty("--directory-viewport-height", `${availableHeight}px`);
+    };
+    updateDirectoryViewportHeight();
+    window.addEventListener("resize", updateDirectoryViewportHeight);
+    const observer = typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(updateDirectoryViewportHeight);
+    observer?.observe(header);
+
+    return () => {
+      window.removeEventListener("resize", updateDirectoryViewportHeight);
+      observer?.disconnect();
+    };
+  }, []);
+
   useEffect(() => {
     if (!locationNotice) return undefined;
     const timeout = window.setTimeout(() => setLocationNotice(null), 6000);
@@ -211,7 +240,7 @@ function App({ ontologyRuntime, canonicalFingerprint }: AppProps) {
     <div className="app-shell">
       <a className="skip-link" href="#ontology-content">{text.viewer}</a>
       <div className="fibo-viewer">
-        <header className="viewer-header">
+        <header ref={viewerHeaderRef} className="viewer-header">
           <div className="brand-block">
             <div className="brand-mark" aria-hidden="true"><span /></div>
             <div><p className="eyebrow">MOONWEAVE · 智能体本体</p><h1>{text.title}</h1></div>
@@ -240,7 +269,10 @@ function App({ ontologyRuntime, canonicalFingerprint }: AppProps) {
           </div>
         </header>
 
-        <main className={`viewer-grid${directoryCollapsed ? " is-left-collapsed" : ""}`}>
+        <main
+          ref={viewerGridRef}
+          className={`viewer-grid${directoryCollapsed ? " is-left-collapsed" : ""}`}
+        >
           <aside className={`directory-panel${directoryCollapsed ? " is-collapsed" : ""}`}>
             <div className="panel-control">
               <button type="button" aria-expanded={!directoryCollapsed} onClick={() => setDirectoryCollapsed((current) => !current)}>

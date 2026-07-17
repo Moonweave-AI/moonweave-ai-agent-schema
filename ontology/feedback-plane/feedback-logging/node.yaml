@@ -1,0 +1,1283 @@
+schema: moonweave.ai/ontology-node/v1
+id: feedback-logging
+kind: module
+status: review
+labels:
+  zh: 日志、遥测传输与留存
+  en: Logging, telemetry transport, and retention
+  ja: ログ・テレメトリ転送・保持
+semantics:
+  short_definition:
+    zh: 描述运行与治理信息怎样被封装为日志记录、组织成有序流、由消费者订阅，并作为明确批次导出和长期留存。它区分持久日志内容、持续日志流、订阅关系、消费端、导出活动和导出载荷；Trace、Measurement 与诊断事件的原始语义仍由各自模块拥有。
+    en: Describes how runtime and governance information is packaged as log records, organized into ordered streams, subscribed to by consumers, exported in explicit batches, and retained. It separates persistent log content, live streams, subscriptions, consumers, export activities, and export payloads; the source semantics of Traces, Measurements, and diagnostic events remain with their owning modules.
+    ja: 実行・統制情報をログ記録へ封装し、順序付き stream に編成し、consumer が購読し、明示 batch として出力・長期保持する方法を表します。永続ログ内容・継続 stream・subscription・consumer・export activity・export payload を分離し、Trace・Measurement・diagnostic event の元意味は各所有モジュールに残します。
+  definition:
+    zh: 六个直属根承担不同职责：LogArtifact 是可独立引用的日志内容，LogStream 是按稳定流身份组织的有序记录集合，LogSubscription 记录消费者对流的过滤、游标和交付约定，LogConsumer 表示接收端，TelemetryExportActivity 是一次有时界的导出发生，TelemetryExportBatch 是该发生提交的不可变载荷。流的保留期限、删除动作与完整性约束属于本模块的留存机制；隐私、脱敏与法律约束引用安全治理。原始 Trace、Span、Measurement 或 DiagnosticEvent 被记录或导出后并不变成日志本体的语义副本。
+    en: The six direct roots have distinct responsibilities. LogArtifact is independently referenceable log content; LogStream is an ordered record collection under stable stream identity; LogSubscription records a consumer's filter, cursor, and delivery agreement; LogConsumer is the receiving endpoint; TelemetryExportActivity is a time-bounded export occurrence; and TelemetryExportBatch is its immutable submitted payload. Stream retention periods, deletion actions, and integrity constraints belong to this module's retention mechanics, while privacy, redaction, and legal constraints reference safety governance. A source Trace, Span, Measurement, or DiagnosticEvent does not become a semantic duplicate merely because it is logged or exported.
+    ja: 六つの直下根は異なる責務を持ちます。LogArtifact は独立参照可能なログ内容、LogStream は安定 stream 同一性下の順序付き記録集合、LogSubscription は consumer の filter・cursor・delivery 契約、LogConsumer は受信端、TelemetryExportActivity は時間範囲を持つ export 発生、TelemetryExportBatch はその不変送信 payload です。stream の保持期間・削除 action・完全性制約は本モジュールの保持機構、privacy・redaction・法的制約は safety governance を参照します。Trace・Span・Measurement・DiagnosticEvent は記録・出力されても意味的複製にはなりません。
+  why_needed:
+    zh: 在不改变源对象语义的前提下，可靠保存和传输运行证据，并能回答一条记录来自哪里、位于哪个流、由谁订阅、在哪次导出中发送以及按什么规则留存。
+    en: Reliably preserves and transports runtime evidence without changing source semantics and answers where a record came from, which stream contains it, who subscribed, which export sent it, and which retention rules apply.
+    ja: 元対象の意味を変えず実行証拠を確実に保存・転送し、記録の出所・所属 stream・購読者・送信 export・適用保持規則を回答します。
+  includes:
+    - zh: LogArtifact 及 LogRecord、ToolTranscript 等具有稳定内容和出处的日志专门类型。
+      en: LogArtifact and log specializations such as LogRecord and ToolTranscript with stable content and provenance.
+      ja: 安定内容と来歴を持つ LogArtifact、および LogRecord・ToolTranscript などのログ特殊型。
+    - zh: LogStream、AuditLog、LogConsumer、EventSink、LogSubscription，以及流游标、过滤、交付、完整性和留存机制。
+      en: LogStream, AuditLog, LogConsumer, EventSink, LogSubscription, and stream cursor, filtering, delivery, integrity, and retention mechanics.
+      ja: LogStream・AuditLog・LogConsumer・EventSink・LogSubscription と stream cursor・filter・delivery・integrity・retention 機構。
+    - zh: TelemetryExportActivity 与不可变 TelemetryExportBatch，以及批次对 LogRecord、Measurement 或 Trace 数据的成员引用和导出完整性结果。
+      en: TelemetryExportActivity and immutable TelemetryExportBatch, together with batch-member references to LogRecord, Measurement, or Trace data and export-integrity results.
+      ja: TelemetryExportActivity と不変 TelemetryExportBatch、batch 内 LogRecord・Measurement・Trace data 参照、export integrity result。
+  excludes:
+    - zh: 原始 Trace、Span、TraceEvent、Snapshot 与 Checkpoint 归追踪与检查点；日志只引用或导出它们。
+      en: Raw Trace, Span, TraceEvent, Snapshot, and Checkpoint values belong to tracing and checkpoints; logging only references or exports them.
+      ja: 生の Trace、Span、TraceEvent、Snapshot、Checkpoint はトレースとチェックポイントに属し、ログは参照または出力するだけです。
+    - zh: Metric 和 Measurement 的定义及评价含义归评估与度量，日志中的数值只保留引用。
+      en: Metric and Measurement definitions and evaluative meaning belong to evaluation and measurement; numeric log content retains references only.
+      ja: Metric と Measurement の定義・評価意味は評価と測定に属し、ログ中の数値は参照だけを保持します。
+    - zh: ErrorEvent、FailureMode 和处置结论归故障诊断或审查纠正；一条含有 error severity 的 LogRecord 不会自动成为诊断事件。
+      en: ErrorEvent, FailureMode, and remediation conclusions belong to failure diagnosis or review and correction; a LogRecord with error severity does not automatically become a diagnostic event.
+      ja: ErrorEvent・FailureMode・処置結論は failure diagnosis または review/correction に属し、error severity を持つ LogRecord が自動で診断 event になることはありません。
+    - zh: 面向参与者可见顺序的 AgentTranscript 归运行观测；ToolTranscript 仅覆盖一个逻辑工具调用的持久日志链，两者不得按关键词合并。
+      en: AgentTranscript ordered by participant-visible interaction belongs to runtime observability; ToolTranscript covers the durable log chain of one logical tool call, and the two must not be merged by keyword.
+      ja: 参加者可視順の AgentTranscript は runtime observability に属し、ToolTranscript は一つの論理 tool call の永続ログ連鎖だけを扱い、keyword で統合してはなりません。
+  semantic_kind: null
+  aliases: []
+purpose:
+  zh: 在不改变源对象语义的前提下，可靠保存和传输运行证据，并能回答一条记录来自哪里、位于哪个流、由谁订阅、在哪次导出中发送以及按什么规则留存。
+  en: Reliably preserves and transports runtime evidence without changing source semantics and answers where a record came from, which stream contains it, who subscribed, which export sent it, and which retention rules apply.
+  ja: 元対象の意味を変えず実行証拠を確実に保存・転送し、記録の出所・所属 stream・購読者・送信 export・適用保持規則を回答します。
+structure: null
+examples:
+  - id: feedback-logging-cq-record-lineage-v3-example-positive
+    kind: positive
+    labels:
+      zh: 某条审计记录属于哪个审计日志，并经哪个 Sink 完成交付？：正例
+      en: "Which audit log contains an audit record, and through which sink was it delivered?: positive case"
+      ja: ある監査記録はどの監査ログに属し、どの Sink を経て配送されましたか。：正例
+    scenario_id: null
+    descriptions:
+      zh: AuditRecord `audit-record/44` 以 sequence 44 成为 `audit/run-742` 的成员；该 AuditLog 作为 LogStream 经 `sink/compliance` 交付，分别使用 contains 与 delivered_to 的规范方向。
+      en: AuditRecord `audit-record/44` is member 44 of `audit/run-742`; that AuditLog, as a LogStream, is delivered through `sink/compliance`, preserving the canonical contains and delivered_to directions.
+      ja: AuditRecord `audit-record/44` は `audit/run-742` の sequence 44 の要素であり、その AuditLog は LogStream として `sink/compliance` へ配送され、contains と delivered_to の正規方向を保ちます。
+    field_values:
+      record_id: audit-record/44
+      audit_log_id: audit/run-742
+      sequence: 44
+      event_sink_id: sink/compliance
+      delivered: true
+      delivery_receipt_id: delivery/742/44
+    related_node_ids:
+      - AuditLog
+      - AuditRecord
+      - EventSink
+    related_relation_ids:
+      - AuditLog-contains-AuditRecord
+      - log_stream_delivered_to_event_sink
+    expected_result:
+      zh: 查询返回唯一 AuditLog、记录在该日志中的 sequence，以及该日志到 EventSink 的交付事实；AuditRecord 仍由运行可观测域拥有。
+      en: The query returns one AuditLog, the record's sequence in that log, and the log's delivery fact to an EventSink while AuditRecord ownership remains with runtime observability.
+      ja: 照会は一つの AuditLog、記録の sequence、EventSink への配送事実を返し、AuditRecord の所有は runtime observability に残します。
+    why_valid_or_invalid:
+      zh: AuditLog 的 contains 事实给出成员与序号，delivered_to 事实由实际交付回执支持；两条边都不是由同名或共同引用推得。
+      en: AuditLog containment supplies membership and sequence, while an actual delivery receipt supports delivered_to; neither edge is inferred from naming or shared citation.
+      ja: AuditLog の containment が membership と sequence を与え、実際の delivery receipt が delivered_to を支えます。名称や共通引用から edge を推定していません。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-feedback-logging-003
+      - claim-feedback-logging-004
+  - id: feedback-logging-cq-record-lineage-v3-example-counter
+    kind: counterexample
+    labels:
+      zh: 某条审计记录属于哪个审计日志，并经哪个 Sink 完成交付？：反例
+      en: "Which audit log contains an audit record, and through which sink was it delivered?: counterexample"
+      ja: ある監査記録はどの監査ログに属し、どの Sink を経て配送されましたか。：反例
+    scenario_id: null
+    descriptions:
+      zh: AuditRecord 与 AuditLog 只在同一 Review 中被引用，且 EventSink 仅配置为潜在目的地；没有 contains 成员位置或实际 delivered_to 事实。
+      en: An AuditRecord and AuditLog are merely cited by the same Review, and an EventSink is only configured as a possible destination; neither a contains position nor an actual delivered_to fact exists.
+      ja: AuditRecord と AuditLog は同じ Review から参照されるだけで、EventSink も候補宛先として設定されただけです。contains の要素位置も実配送 delivered_to 事実もありません。
+    field_values:
+      record_id: audit-record/45
+      audit_log_id: audit/run-742
+      shared_review_id: review/18
+      configured_sink_id: sink/compliance
+      sequence: null
+      contains_fact: false
+      delivered_fact: false
+    related_node_ids:
+      - AuditLog
+      - AuditRecord
+      - EventSink
+    related_relation_ids:
+      - AuditLog-contains-AuditRecord
+      - log_stream_delivered_to_event_sink
+    expected_result:
+      zh: 查询返回“成员关系与交付事实均未证实”，不得用共现或配置意图补造实际链路。
+      en: The query reports both membership and delivery as unproven and must not turn co-occurrence or configuration intent into an actual path.
+      ja: 照会は要素関係と配送事実を未立証として返し、共起や設定意図から実経路を捏造してはなりません。
+    why_valid_or_invalid:
+      zh: 共同出现在 Review 中不能建立 AuditLog 成员关系，配置过 Sink 也不等于已经交付；缺少两个事实时必须返回未证实。
+      en: Co-occurrence in a Review does not establish AuditLog membership, and a configured sink is not completed delivery; both claims remain unproven.
+      ja: Review 内の共起は AuditLog membership を作らず、設定済み sink は完了 delivery ではありません。両方の claim は未証明です。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-feedback-logging-003
+      - claim-feedback-logging-004
+  - id: feedback-logging-cq-audit-integrity-v3-example-positive
+    kind: positive
+    labels:
+      zh: 审计日志在指定区间内是否连续且未被篡改，缺口或校验失败在哪里？：正例
+      en: "Is an audit log continuous and untampered over a requested interval, and where are any gaps or integrity failures?: positive case"
+      ja: 指定区間の監査ログは連続かつ改ざんされておらず、欠落または完全性検証失敗はどこですか。：正例
+    scenario_id: null
+    descriptions:
+      zh: 订阅 sub-audit-9 请求序号 4100–4120；批次 batch-audit-19 含 21 条连续记录，每条 previous_digest 与前条 digest 相接，且无缺口或保留例外。副作用回执仅作边界对照，不参与完整性推断。
+      en: Subscription sub-audit-9 requests sequences 4100–4120. Batch batch-audit-19 has 21 continuous records whose previous_digest values chain to the prior digest, with no gap or retention exception. Effect receipts are boundary comparison only.
+      ja: subscription sub-audit-9 は sequence 4100–4120 を要求し、batch-audit-19 は previous_digest が前 record の digest へ連なる 21 件を含み gap・retention exception はありません。effect receipt は境界比較だけです。
+    field_values:
+      subscription_id: sub-audit-9
+      batch_id: batch-audit-19
+      sequence_start: 4100
+      sequence_end: 4120
+      expected_count: 21
+      observed_count: 21
+      digest_chain_valid: true
+      gaps: []
+      accepted_retention_events: []
+    related_node_ids:
+      - LogSubscription
+      - EffectReceipt
+      - TelemetryExportBatch
+      - CommitDenial
+    related_relation_ids: []
+    expected_result:
+      zh: 返回 integrity=pass、observed_count=21、gaps=[] 与 digest_chain_valid=true；不得据此声称存在 EffectReceipt 或 CommitDenial。
+      en: Return integrity=pass, observed_count=21, gaps=[], and digest_chain_valid=true; do not infer an EffectReceipt or CommitDenial.
+      ja: integrity=pass、observed_count=21、gaps=[]、digest_chain_valid=true を返し、EffectReceipt や CommitDenial を推定しません。
+    why_valid_or_invalid:
+      zh: 请求区间、记录数、序号链和摘要链四项相互一致；安全域对象没有被当成日志完整性的隐含证据。
+      en: Requested interval, record count, sequence chain, and digest chain agree; safety-domain objects are not treated as implicit log-integrity evidence.
+      ja: requested interval、record count、sequence chain、digest chain が一致し、安全 domain object を暗黙の log-integrity evidence として扱いません。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-feedback-logging-005
+      - claim-feedback-logging-006
+  - id: feedback-logging-cq-audit-integrity-v3-example-counter
+    kind: counterexample
+    labels:
+      zh: 审计日志在指定区间内是否连续且未被篡改，缺口或校验失败在哪里？：反例
+      en: "Is an audit log continuous and untampered over a requested interval, and where are any gaps or integrity failures?: counterexample"
+      ja: 指定区間の監査ログは連続かつ改ざんされておらず、欠落または完全性検証失敗はどこですか。：反例
+    scenario_id: null
+    descriptions:
+      zh: 同一请求区间缺少序号 4112，记录 4113 的 previous_digest 又不等于 4111 的 digest；没有任何已接受保留事件解释该缺口。
+      en: The same interval lacks sequence 4112, and record 4113 has a previous_digest different from record 4111's digest. No accepted retention event explains the gap.
+      ja: 同じ interval で sequence 4112 が欠落し、record 4113 の previous_digest は record 4111 の digest と一致せず、gap を説明する accepted retention event もありません。
+    field_values:
+      subscription_id: sub-audit-9
+      batch_id: batch-audit-20
+      sequence_start: 4100
+      sequence_end: 4120
+      missing_sequences:
+        - 4112
+      digest_mismatch_at: 4113
+      accepted_retention_events: []
+    related_node_ids:
+      - LogSubscription
+      - EffectReceipt
+      - TelemetryExportBatch
+      - CommitDenial
+    related_relation_ids: []
+    expected_result:
+      zh: 返回 integrity=fail、missing_sequences=[4112]、digest_mismatch_at=4113，并说明没有可接受的保留事件。
+      en: Return integrity=fail, missing_sequences=[4112], digest_mismatch_at=4113, and state that no accepted retention event exists.
+      ja: integrity=fail、missing_sequences=[4112]、digest_mismatch_at=4113 を返し、accepted retention event がないと明示します。
+    why_valid_or_invalid:
+      zh: 序号连续性和摘要连续性同时失败，且缺口无治理事件解释，因此不能以批次存在或订阅成功替代完整性证明。
+      en: Both sequence and digest continuity fail and no governance event explains the gap, so batch existence or subscription success cannot substitute for integrity proof.
+      ja: sequence と digest の連続性がともに失敗し governance event も gap を説明しないため、batch 存在や subscription success は integrity proof の代わりになりません。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-feedback-logging-005
+      - claim-feedback-logging-006
+  - id: feedback-logging-cq-export-completeness-v3-example-positive
+    kind: positive
+    labels:
+      zh: 一个遥测导出批次是否包含请求窗口内全部应导出的记录、测量引用和追踪引用？：正例
+      en: "Does a telemetry export batch contain every record, measurement reference, and trace reference required for the requested window?: positive case"
+      ja: テレメトリ出力バッチは要求窓内の全必須記録、測定参照、トレース参照を含みますか。：正例
+    scenario_id: null
+    descriptions:
+      zh: 导出批次 export-2026-07-16T1405 覆盖 14:00–14:05，过滤器要求三个测量引用 mr-801、mr-802、mr-803；批次恰含三者且分别引用 m-801、m-802、m-803，无重复。
+      en: Export batch export-2026-07-16T1405 covers 14:00–14:05. Its filter requires mr-801, mr-802, and mr-803; the batch contains exactly those references to m-801, m-802, and m-803 with no duplicate.
+      ja: export batch export-2026-07-16T1405 は 14:00–14:05 を対象とし、filter は mr-801・mr-802・mr-803 を要求します。batch は m-801・m-802・m-803 を参照する三件だけを重複なく含みます。
+    field_values:
+      batch_id: export-2026-07-16T1405
+      window_start: 2026-07-16T14:00:00Z
+      window_end: 2026-07-16T14:05:00Z
+      expected_reference_ids:
+        - mr-801
+        - mr-802
+        - mr-803
+      actual_reference_ids:
+        - mr-801
+        - mr-802
+        - mr-803
+      measurement_ids:
+        - m-801
+        - m-802
+        - m-803
+      duplicates: []
+    related_node_ids:
+      - MeasurementReference
+      - Measurement
+    related_relation_ids:
+      - MeasurementReference-references-Measurement
+    expected_result:
+      zh: 返回 complete=true、missing=[]、duplicates=[]，并保留三条 MeasurementReference 到 Measurement 的正向引用。
+      en: Return complete=true, missing=[], and duplicates=[], preserving all three forward MeasurementReference-to-Measurement references.
+      ja: complete=true、missing=[]、duplicates=[] を返し、三つの MeasurementReference から Measurement への正方向参照を保持します。
+    why_valid_or_invalid:
+      zh: 应用已声明过滤器后，期望集合与实际集合完全相等，且每个引用都有唯一目标；完整性不是由批次计数近似判断。
+      en: After the declared filter, expected and actual sets are equal and every reference has one target; completeness is not approximated from batch count.
+      ja: declared filter 適用後に expected set と actual set が等しく各 reference は一 target を持ち、batch count の近似で completeness を判断していません。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-feedback-logging-007
+      - claim-feedback-logging-008
+  - id: feedback-logging-cq-export-completeness-v3-example-counter
+    kind: counterexample
+    labels:
+      zh: 一个遥测导出批次是否包含请求窗口内全部应导出的记录、测量引用和追踪引用？：反例
+      en: "Does a telemetry export batch contain every record, measurement reference, and trace reference required for the requested window?: counterexample"
+      ja: テレメトリ出力バッチは要求窓内の全必須記録、測定参照、トレース参照を含みますか。：反例
+    scenario_id: null
+    descriptions:
+      zh: 过滤器仍要求 mr-801、mr-802、mr-803，但批次遗漏 mr-802 并重复写入 mr-803；总条数仍为三，单看 count 会误判完整。
+      en: The filter still requires mr-801, mr-802, and mr-803, but the batch omits mr-802 and writes mr-803 twice. Its count is still three, so count-only validation would be wrong.
+      ja: filter は mr-801・mr-802・mr-803 を要求しますが、batch は mr-802 を欠き mr-803 を二回書きます。count は三のままで count-only validation は誤ります。
+    field_values:
+      batch_id: export-2026-07-16T1410
+      expected_reference_ids:
+        - mr-801
+        - mr-802
+        - mr-803
+      actual_reference_ids:
+        - mr-801
+        - mr-803
+        - mr-803
+      missing:
+        - mr-802
+      duplicates:
+        - mr-803
+    related_node_ids:
+      - MeasurementReference
+      - Measurement
+    related_relation_ids:
+      - MeasurementReference-references-Measurement
+    expected_result:
+      zh: 返回 complete=false、missing=[mr-802]、duplicates=[mr-803]；不得因 expected_count 与 actual_count 都为 3 而通过。
+      en: Return complete=false, missing=[mr-802], and duplicates=[mr-803]; equal expected and actual counts must not pass validation.
+      ja: complete=false、missing=[mr-802]、duplicates=[mr-803] を返し、expected count と actual count が同じでも通過させません。
+    why_valid_or_invalid:
+      zh: 集合不相等且存在重复，计数相等无法证明成员完整；缺失与重复必须分开报告。
+      en: Set equality fails and a duplicate exists; equal counts do not prove complete membership, so missing and duplicate members are reported separately.
+      ja: set equality が失敗し duplicate もあるため、equal count は完全 membership を証明せず、missing と duplicate を別々に報告します。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-feedback-logging-007
+      - claim-feedback-logging-008
+parent_relation: null
+relations: []
+module_contract:
+  interaction_contract:
+    applicability: operational
+    facets:
+      input:
+        applicable: true
+        description:
+          zh: 日志与遥测的输入概念族为遥测事件、日志流、追踪记录；责任交接由已接受事实 事件接收端 —receives→ 遥测事件 (EventSink-receives-TelemetryEvent)；日志消费者 —consumes→ 日志流 (LogConsumer-consumes-LogStream)；轨迹导出活动 —consumes→ 追踪记录 (TraceExportActivity-consumes-TraceRecord) 明确给出。
+          en: The input families for Logging and telemetry are telemetry event, log stream, trace record; the accepted facts event sink —receives→ telemetry event (EventSink-receives-TelemetryEvent); Log Consumer —consumes→ log stream (LogConsumer-consumes-LogStream); Trace export activity —consumes→ trace record (TraceExportActivity-consumes-TraceRecord) make the responsibility handoff explicit.
+          ja: ログとテレメトリの入力概念族はテレメトリイベント、ログストリーム、トレース記録です。責任の受け渡しは承認済み事実 イベントシンク —receives→ テレメトリイベント (EventSink-receives-TelemetryEvent)；ログ消費者 —consumes→ ログストリーム (LogConsumer-consumes-LogStream)；トレース出力活動 —consumes→ トレース記録 (TraceExportActivity-consumes-TraceRecord) により明示されます。
+        family_concept_ids:
+          - TelemetryEvent
+          - LogStream
+          - TraceRecord
+        relation_ids:
+          - EventSink-receives-TelemetryEvent
+          - LogConsumer-consumes-LogStream
+          - TraceExportActivity-consumes-TraceRecord
+        not_applicable_reason: null
+      output:
+        applicable: true
+        description:
+          zh: 日志与遥测的输出还包括日志记录所承载的诊断消息语义：LogRecord —conveys→ DiagnosticMessage 只解释 Body 或 Attributes 中已有的诊断内容；工具调用记录、遥测导出批次与追踪导出仍分别由其已接受关系交付。
+          en: "Logging and telemetry output also exposes diagnostic-message semantics carried by a log record: LogRecord —conveys→ DiagnosticMessage interprets diagnostic content already present in Body or Attributes; tool transcripts, telemetry export batches, and trace exports retain their existing delivery relations."
+          ja: ログとテレメトリの出力にはログ記録が担う診断メッセージ意味も含まれます。LogRecord —conveys→ DiagnosticMessage は Body または Attributes に既存の診断内容だけを解釈し、ツール記録・テレメトリ出力バッチ・トレース出力は既存の受け渡し関係を保ちます。
+        family_concept_ids:
+          - ToolTranscript
+          - TelemetryExportBatch
+          - TraceExport
+          - DiagnosticMessage
+        relation_ids:
+          - ToolTranscript-records-ToolCallAttempt
+          - TelemetryExportActivity-produces-TelemetryExportBatch
+          - TraceExportActivity-produces-TraceExport
+          - LogRecord-conveys-DiagnosticMessage
+        not_applicable_reason: null
+      failure:
+        applicable: true
+        description:
+          zh: 日志与遥测的失败概念族为错误事件、错误监听器；责任交接由已接受事实 错误监听器 —observes→ 错误事件 (ErrorListener-observes-ErrorEvent)；日志监听器 —routes_failure_to→ 错误监听器 (LogListener-routes_failure_to-ErrorListener) 明确给出。
+          en: The failure families for Logging and telemetry are error event, error listener; the accepted facts error listener —observes→ error event (ErrorListener-observes-ErrorEvent); log listener —routes_failure_to→ error listener (LogListener-routes_failure_to-ErrorListener) make the responsibility handoff explicit.
+          ja: ログとテレメトリの失敗概念族はエラーイベント、エラーリスナーです。責任の受け渡しは承認済み事実 エラーリスナー —observes→ エラーイベント (ErrorListener-observes-ErrorEvent)；ログリスナー —routes_failure_to→ エラーリスナー (LogListener-routes_failure_to-ErrorListener) により明示されます。
+        family_concept_ids:
+          - ErrorEvent
+          - ErrorListener
+        relation_ids:
+          - ErrorListener-observes-ErrorEvent
+          - LogListener-routes_failure_to-ErrorListener
+        not_applicable_reason: null
+      recovery:
+        applicable: true
+        description:
+          zh: 日志与遥测的恢复概念族为恢复动作；责任交接由已接受事实 错误监听器 —triggers→ 恢复动作 (ErrorListener-triggers-RecoveryAction) 明确给出。
+          en: The recovery families for Logging and telemetry are recovery action; the accepted facts error listener —triggers→ recovery action (ErrorListener-triggers-RecoveryAction) make the responsibility handoff explicit.
+          ja: ログとテレメトリの回復概念族は復旧アクションです。責任の受け渡しは承認済み事実 エラーリスナー —triggers→ 復旧アクション (ErrorListener-triggers-RecoveryAction) により明示されます。
+        family_concept_ids:
+          - RecoveryAction
+        relation_ids:
+          - ErrorListener-triggers-RecoveryAction
+        not_applicable_reason: null
+    review:
+      review_status: accepted
+      reviewers:
+        - reviewer_id: moonweave-feedback-domain-reviewer
+          reviewer_role: domain
+          reviewer_kind: automated-agent
+          reviewed_on: 2026-07-14
+          decision_note:
+            zh: 日志与遥测与追踪与检查点按唯一 owner 和可判定问题分界。
+            en: Logging and telemetry and Tracing and checkpoints are separated by unique ownership and answerable questions.
+            ja: ログとテレメトリとトレースとチェックポイントは一意の所有者と判定可能な問いで分離されます。
+        - reviewer_id: moonweave-ontology-structure-reviewer
+          reviewer_role: ontology
+          reviewer_kind: automated-agent
+          reviewed_on: 2026-07-14
+          decision_note:
+            zh: 日志与遥测与追踪与检查点按唯一 owner 和可判定问题分界。
+            en: Logging and telemetry and Tracing and checkpoints are separated by unique ownership and answerable questions.
+            ja: ログとテレメトリとトレースとチェックポイントは一意の所有者と判定可能な問いで分離されます。
+  taxonomy_contract:
+    applicability: mixed-backbone
+    not_applicable_reason: null
+    hierarchy_policy: arbitrary-depth-reviewed-backbone
+    key_root_concept_ids:
+      - LogArtifact
+    allowed_backbone_predicates:
+      - contains
+      - is_a
+    flat_root_exception_concept_ids:
+      - LogConsumer
+      - LogStream
+      - LogSubscription
+      - TelemetryExportActivity
+      - TelemetryExportBatch
+    review:
+      review_status: accepted
+      reviewers:
+        - reviewer_id: moonweave-feedback-domain-reviewer
+          reviewer_role: domain
+          reviewer_kind: automated-agent
+          reviewed_on: 2026-07-16
+          decision_note:
+            zh: 逐点核验后，本域保留六条相互关联但身份独立的主轴：LogArtifact 是被保留的记录产物，TelemetryExportActivity 是导出过程，TelemetryExportBatch 是一次导出的信息批次，LogStream 是有稳定身份与顺序的记录集合，LogConsumer 是承担读取责任的角色，LogSubscription 是可先于监听器激活而存在的订阅规范。produces、consumes 与 configures 都只记录可核验运行事实；产物、活动、批次、集合、角色和规范不能互相充当上位概念。
+            en: "Point-by-point review retains six related but identity-independent axes: LogArtifact is a retained record artifact; TelemetryExportActivity is an export process; TelemetryExportBatch is an information batch from one export; LogStream is an ordered collection with stable identity; LogConsumer is the responsible reader role; and LogSubscription is a subscription specification that can exist before listener activation. produces, consumes, and configures record auditable operational facts only; artifact, activity, batch, collection, role, and specification cannot serve as one another's superconcepts."
+            ja: 個別審査後、本域は相互に関連するが同一性の独立した六軸を保持します。LogArtifact は保持記録成果物、TelemetryExportActivity は出力過程、TelemetryExportBatch は一回の出力情報 batch、LogStream は安定 ID と順序を持つ collection、LogConsumer は読取責任を持つ role、LogSubscription は listener 有効化前にも存在できる購読 specification です。produces・consumes・configures は検証可能な運用 fact だけを記録し、artifact・activity・batch・collection・role・specification を互いの上位概念にはしません。
+        - reviewer_id: moonweave-ontology-structure-reviewer
+          reviewer_role: ontology
+          reviewer_kind: automated-agent
+          reviewed_on: 2026-07-16
+          decision_note:
+            zh: 结构审查要求父边表达稳定抽象或真实构成。LogStream、LogConsumer、LogSubscription、TelemetryExportActivity 与 TelemetryExportBatch 因身份条件不同而成为独立入口：前两者分别通过 is_a 展开 AuditLog 以及 EventSink、LogListener；TelemetryExportBatch 通过 contains 组织 MeasurementReference。produces、consumes 与 configures 保持 canonical 方向、条件、正反例和来源，但均使用 cross-link，不参与社区骨架。
+            en: "Structure review requires a parent edge to express stable abstraction or genuine composition. LogStream, LogConsumer, LogSubscription, TelemetryExportActivity, and TelemetryExportBatch are independent entries because their identity conditions differ: the first two expand through is_a to AuditLog and to EventSink and LogListener, while TelemetryExportBatch organizes MeasurementReference through contains. produces, consumes, and configures retain canonical direction, conditions, cases, and sources but use cross-link layout and do not shape the community backbone."
+            ja: 構造審査は親辺が安定 abstraction または真正 composition を表すことを要求します。LogStream・LogConsumer・LogSubscription・TelemetryExportActivity・TelemetryExportBatch は同一性条件が異なるため独立 entry とし、前二者は is_a で AuditLog と EventSink・LogListener を展開し、TelemetryExportBatch は contains で MeasurementReference を編成します。produces・consumes・configures は canonical 方向・条件・事例・出典を保持しつつ cross-link layout とし community backbone を形成しません。
+  competency_questions:
+    - id: feedback-logging-cq-record-lineage-v3
+      semantic_key: feedback-logging.record-lineage
+      primary_owner_module_id: feedback-logging
+      related_module_ids:
+        - runtime-observability
+      questions:
+        zh: 某条审计记录属于哪个审计日志，并经哪个 Sink 完成交付？
+        en: Which audit log contains an audit record, and through which sink was it delivered?
+        ja: ある監査記録はどの監査ログに属し、どの Sink を経て配送されましたか。
+      query: Resolve AuditLog contains AuditRecord by record identity and sequence, then follow the AuditLog-as-LogStream delivery fact to EventSink.
+      expected_assertion: The result names one containing AuditLog, preserves the AuditRecord sequence, and reports only evidenced delivery to an EventSink.
+      evidence_binding:
+        applicability: relation-backed
+        owner_concept_ids:
+          - AuditLog
+        related_concept_ids:
+          - AuditRecord
+          - EventSink
+        relation_ids:
+          - AuditLog-contains-AuditRecord
+          - log_stream_delivered_to_event_sink
+        not_applicable_reason: null
+      positive_example_ids:
+        - feedback-logging-cq-record-lineage-v3-example-positive
+      counterexample_ids:
+        - feedback-logging-cq-record-lineage-v3-example-counter
+      source_claims:
+        - claim-feedback-logging-003
+        - claim-feedback-logging-004
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-feedback-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 日志与遥测与追踪与检查点按唯一 owner 和可判定问题分界。
+              en: Logging and telemetry and Tracing and checkpoints are separated by unique ownership and answerable questions.
+              ja: ログとテレメトリとトレースとチェックポイントは一意の所有者と判定可能な問いで分離されます。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 日志与遥测与追踪与检查点按唯一 owner 和可判定问题分界。
+              en: Logging and telemetry and Tracing and checkpoints are separated by unique ownership and answerable questions.
+              ja: ログとテレメトリとトレースとチェックポイントは一意の所有者と判定可能な問いで分離されます。
+    - id: feedback-logging-cq-audit-integrity-v3
+      semantic_key: feedback-logging.audit-integrity
+      primary_owner_module_id: feedback-logging
+      related_module_ids:
+        - safety-commit-redaction
+      questions:
+        zh: 审计日志在指定区间内是否连续且未被篡改，缺口或校验失败在哪里？
+        en: Is an audit log continuous and untampered over a requested interval, and where are any gaps or integrity failures?
+        ja: 指定区間の監査ログは連続かつ改ざんされておらず、欠落または完全性検証失敗はどこですか。
+      query: Verify sequence continuity, predecessor digests, record signatures, and declared retention exceptions over the requested AuditLog interval.
+      expected_assertion: Integrity passes only when sequence and digest chains are continuous or every gap is explained by an accepted retention event.
+      evidence_binding:
+        applicability: boundary-comparison-only
+        owner_concept_ids:
+          - LogSubscription
+          - TelemetryExportBatch
+        related_concept_ids:
+          - EffectReceipt
+          - CommitDenial
+        relation_ids: []
+        not_applicable_reason:
+          zh: 问题“审计日志在指定区间内是否连续且未被篡改，缺口或校验失败在哪里？”使用相关本体作边界对照，但 canonical 图中没有可支持该问法的已接受非分类跨模块关系；因此例证并列双方候选概念，不声称运行时传递。
+          en: The question “Is an audit log continuous and untampered over a requested interval, and where are any gaps or integrity failures?” uses the related ontology as a boundary comparison, but the canonical graph has no accepted non-taxonomic cross-module relation supporting that reading; the examples therefore juxtapose both candidate families without claiming a runtime handoff.
+          ja: 質問「指定区間の監査ログは連続かつ改ざんされておらず、欠落または完全性検証失敗はどこですか。」は関連オントロジーを境界対照として使いますが、その読みに根拠を与える承認済みの非分類モジュール間関係は canonical グラフにありません。そのため例証は双方の候補概念を並置し、実行時の受け渡しを主張しません。
+      positive_example_ids:
+        - feedback-logging-cq-audit-integrity-v3-example-positive
+      counterexample_ids:
+        - feedback-logging-cq-audit-integrity-v3-example-counter
+      source_claims:
+        - claim-feedback-logging-005
+        - claim-feedback-logging-006
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-feedback-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 日志与遥测与追踪与检查点按唯一 owner 和可判定问题分界。
+              en: Logging and telemetry and Tracing and checkpoints are separated by unique ownership and answerable questions.
+              ja: ログとテレメトリとトレースとチェックポイントは一意の所有者と判定可能な問いで分離されます。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 日志与遥测与追踪与检查点按唯一 owner 和可判定问题分界。
+              en: Logging and telemetry and Tracing and checkpoints are separated by unique ownership and answerable questions.
+              ja: ログとテレメトリとトレースとチェックポイントは一意の所有者と判定可能な問いで分離されます。
+    - id: feedback-logging-cq-export-completeness-v3
+      semantic_key: feedback-logging.export-completeness
+      primary_owner_module_id: feedback-logging
+      related_module_ids:
+        - feedback-metrics-evaluation
+      questions:
+        zh: 一个遥测导出批次是否包含请求窗口内全部应导出的记录、测量引用和追踪引用？
+        en: Does a telemetry export batch contain every record, measurement reference, and trace reference required for the requested window?
+        ja: テレメトリ出力バッチは要求窓内の全必須記録、測定参照、トレース参照を含みますか。
+      query: Compute the requested export set from subscription filters and time bounds, then compare it with batch membership and delivery status.
+      expected_assertion: Completeness requires set equality after declared filters; missing and duplicate members are reported separately.
+      evidence_binding:
+        applicability: relation-backed
+        owner_concept_ids:
+          - MeasurementReference
+        related_concept_ids:
+          - Measurement
+        relation_ids:
+          - TelemetryExportActivity-produces-TelemetryExportBatch
+          - TelemetryExportBatch-contains-MeasurementReference
+          - MeasurementReference-references-Measurement
+        not_applicable_reason: null
+      positive_example_ids:
+        - feedback-logging-cq-export-completeness-v3-example-positive
+      counterexample_ids:
+        - feedback-logging-cq-export-completeness-v3-example-counter
+      source_claims:
+        - claim-feedback-logging-007
+        - claim-feedback-logging-008
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-feedback-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 日志与遥测与追踪与检查点按唯一 owner 和可判定问题分界。
+              en: Logging and telemetry and Tracing and checkpoints are separated by unique ownership and answerable questions.
+              ja: ログとテレメトリとトレースとチェックポイントは一意の所有者と判定可能な問いで分離されます。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 日志与遥测与追踪与检查点按唯一 owner 和可判定问题分界。
+              en: Logging and telemetry and Tracing and checkpoints are separated by unique ownership and answerable questions.
+              ja: ログとテレメトリとトレースとチェックポイントは一意の所有者と判定可能な問いで分離されます。
+  key_notion:
+    zh: 记录、流、订阅与导出链
+    en: record, stream, subscription, and export chain
+    ja: 記録・stream・subscription・export 連鎖
+  owns_when:
+    zh: 当对象是具有日志格式与出处的持久记录、有序日志流、消费者或订阅关系、一次遥测导出活动、其不可变批次载荷，或流的交付/完整性/留存机制时，由本模块拥有。
+    en: Own an object when it is a persistent record with log format and provenance, an ordered log stream, a consumer or subscription relation, one telemetry export activity, its immutable batch payload, or stream delivery, integrity, or retention mechanics.
+    ja: 対象がログ形式と来歴を持つ永続記録・順序付き log stream・consumer／subscription relation・一回の telemetry export activity・不変 batch payload・stream delivery／integrity／retention 機構である場合に所有します。
+  references_when:
+    zh: Trace、Span、Measurement、DiagnosticEvent、AuditEvidence 或运行产物作为被记录、流转或导出的内容时引用其规范所有者；本模块保存成员引用、流位置与传输证据，不复制源对象语义。
+    en: When a Trace, Span, Measurement, DiagnosticEvent, AuditEvidence, or runtime Artifact is logged, streamed, or exported, reference its canonical owner. This module preserves membership references, stream position, and transport evidence without copying source semantics.
+    ja: Trace・Span・Measurement・DiagnosticEvent・AuditEvidence・runtime Artifact が記録・streaming・export 対象になる場合は正規所有者を参照します。本モジュールは要素参照・stream position・transport evidence を保存し、元意味を複製しません。
+  boundary_decisions:
+    - other_module_id: runtime-observability
+      subject_concept_ids:
+        - AuditLog
+        - EventSink
+        - LogRecord
+        - LogStream
+        - TraceExportActivity
+      decision: owns
+      owner_module_id: feedback-logging
+      rationale:
+        zh: 本边界完整投影五条已接受跨模块事实：AuditLog 收纳 AuditRecord，EventSink 接收 TelemetryEvent，TelemetryEvent 进入 LogStream，TraceEvent 记录为 LogRecord，TraceExportActivity 消费 TraceRecord。两条绕过导出活动的 TraceRecord/TraceSpan 到 TraceExport 直接边已经弃用，因此反馈日志侧的 owner 端点严格为 AuditLog、EventSink、LogRecord、LogStream 与 TraceExportActivity。
+        en: "This boundary completely projects five accepted cross-module facts: AuditLog contains AuditRecord, EventSink receives TelemetryEvent, TelemetryEvent is emitted to LogStream, TraceEvent is recorded as LogRecord, and TraceExportActivity consumes TraceRecord. The direct TraceRecord/TraceSpan-to-TraceExport edges that bypassed the export activity are deprecated, so the feedback-logging owner endpoints are exactly AuditLog, EventSink, LogRecord, LogStream, and TraceExportActivity."
+        ja: この境界は五つの承認済みモジュール間事実を完全に投影します。AuditLog は AuditRecord を含み、EventSink は TelemetryEvent を受信し、TelemetryEvent は LogStream に出力され、TraceEvent は LogRecord として記録され、TraceExportActivity は TraceRecord を消費します。出力活動を迂回する TraceRecord/TraceSpan から TraceExport への直接辺は廃止済みであり、feedback-logging 側の owner endpoint は AuditLog、EventSink、LogRecord、LogStream、TraceExportActivity に限られます。
+      relation_ids:
+        - AuditLog-contains-AuditRecord
+        - EventSink-receives-TelemetryEvent
+        - telemetry_event_emitted_to_log_stream
+        - trace_event_recorded_as_log_record
+        - TraceExportActivity-consumes-TraceRecord
+      relation_not_applicable_reason: null
+      source_claims:
+        - claim-feedback-logging-009
+        - claim-feedback-logging-010
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-feedback-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 领域复核确认反馈日志侧的完整端点集合是 AuditLog、EventSink、LogRecord、LogStream 与 TraceExportActivity；TraceExport 是活动产物，不再由已弃用的直接跨界边带入本行。
+              en: Domain review confirms that the complete feedback-logging endpoint set is AuditLog, EventSink, LogRecord, LogStream, and TraceExportActivity; TraceExport is the activity output and is no longer introduced by a deprecated direct boundary edge.
+              ja: ドメイン審査により feedback-logging 側の完全な endpoint 集合は AuditLog、EventSink、LogRecord、LogStream、TraceExportActivity と確認されました。TraceExport は活動の成果物であり、廃止済み直接境界辺から本行へ導入しません。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 本体复核确认五条已接受跨界边均连接 feedback-logging 与 runtime-observability；两条直接 export 旧边为 deprecated，不能参与边界投影。
+              en: Ontology review confirms that all five accepted edges connect feedback-logging with runtime-observability; the two former direct-export edges are deprecated and cannot participate in the boundary projection.
+              ja: 本体審査により五つの承認済み辺はいずれも feedback-logging と runtime-observability を接続し、二つの旧直接 export 辺は deprecated のため境界投影に含めないことを確認しました。
+    - other_module_id: runtime-observability
+      subject_concept_ids:
+        - AuditRecord
+        - TelemetryEvent
+        - TraceEvent
+        - TraceRecord
+      decision: references
+      owner_module_id: runtime-observability
+      rationale:
+        zh: 同一组五条已接受跨模块事实，在 runtime-observability 一侧严格落到 AuditRecord、TelemetryEvent、TraceEvent 与 TraceRecord。TraceSpan 只曾出现在已弃用的 TraceSpan 到 TraceExport 直接边中；当前通过 TraceRecord 的 span 拓扑由 TraceExportActivity 消费，不把 TraceSpan 虚构为本行端点。
+        en: The same complete set of five accepted cross-module facts resolves on the runtime-observability side exactly to AuditRecord, TelemetryEvent, TraceEvent, and TraceRecord. TraceSpan appeared only in the deprecated direct TraceSpan-to-TraceExport edge; TraceExportActivity now consumes span topology through TraceRecord without inventing TraceSpan as an endpoint of this row.
+        ja: 同じ五つの承認済みモジュール間事実は runtime-observability 側で AuditRecord、TelemetryEvent、TraceEvent、TraceRecord に厳密に対応します。TraceSpan は廃止済みの TraceSpan から TraceExport への直接辺にのみ現れており、現在は TraceExportActivity が TraceRecord を通じて span topology を消費するため、本行の endpoint として捏造しません。
+      relation_ids:
+        - AuditLog-contains-AuditRecord
+        - EventSink-receives-TelemetryEvent
+        - telemetry_event_emitted_to_log_stream
+        - trace_event_recorded_as_log_record
+        - TraceExportActivity-consumes-TraceRecord
+      relation_not_applicable_reason: null
+      source_claims:
+        - claim-feedback-logging-011
+        - claim-feedback-logging-012
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-feedback-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 领域复核确认 runtime-observability 一侧的完整端点集合仅为 AuditRecord、TelemetryEvent、TraceEvent 与 TraceRecord；TraceSpan 不由任何当前 accepted 跨界边直接连接。
+              en: Domain review confirms that the complete runtime-observability endpoint set is AuditRecord, TelemetryEvent, TraceEvent, and TraceRecord; no currently accepted cross-boundary edge directly connects TraceSpan.
+              ja: ドメイン審査により runtime-observability 側の完全な endpoint 集合は AuditRecord、TelemetryEvent、TraceEvent、TraceRecord に限られ、現在承認済みの境界辺は TraceSpan を直接接続しないことを確認しました。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 本体复核确认 runtime-observability 端点由五条已接受跨界边的端点并集逐项计算；已弃用的直接 export 边及其 TraceSpan 端点不参与投影。
+              en: Ontology review confirms that the runtime-observability endpoint set is computed from the endpoint union of all five accepted cross-boundary edges; deprecated direct-export edges and their TraceSpan endpoint do not participate.
+              ja: 本体審査により runtime-observability endpoint 集合は五つの承認済み境界辺の endpoint 和集合から算出し、廃止済み直接 export 辺とその TraceSpan endpoint は投影に参加しないことを確認しました。
+    - other_module_id: safety-commit-redaction
+      subject_concept_ids:
+        - LogSubscription
+        - TelemetryExportBatch
+      decision: owns
+      owner_module_id: feedback-logging
+      rationale:
+        zh: 日志与遥测拥有 CommitRequest、Gate 决定和效果回执的持久审计副本、顺序与完整性；提交控制拥有这些决定与外部效果本身。 本条仅记录 LogSubscription、TelemetryExportBatch；其 canonical owner 是日志与遥测（feedback-logging），因此 feedback-logging 在此拥有这些概念。
+        en: Logging and telemetry own durable audit copies, ordering, and integrity for CommitRequest, gate decisions, and effect receipts; commit control owns the decisions and external effects themselves. This record is limited to LogSubscription, TelemetryExportBatch; their canonical owner is Logging and telemetry (feedback-logging), so feedback-logging owns these concepts here.
+        ja: logging/telemetry は CommitRequest・gate decision・effect receipt の永続 audit copy、順序、integrity を所有し、commit control は decision と external effect 自体を所有します。 この記録は LogSubscription、TelemetryExportBatch だけを対象とし、canonical owner はログとテレメトリ（feedback-logging）です。したがって feedback-logging はここでこれらを所有します。
+      relation_ids: []
+      relation_not_applicable_reason:
+        zh: “日志与遥测”与“副作用提交控制”之间没有适用于本 owner 概念组的已接受跨模块事实；该决策只比较明确列出的候选概念，不暗示运行时交互。
+        en: There is no accepted cross-module fact applicable to this owner-homogeneous concept group between Logging and telemetry and Side-effect commit control; the decision compares only the named candidates without implying runtime interaction.
+        ja: 「ログとテレメトリ」と「副作用コミット制御」の間には、この owner 単一概念群に適用できる承認済みモジュール間事実がありません。明示候補だけを比較し、実行時相互作用を示唆しません。
+      source_claims:
+        - claim-feedback-logging-013
+        - claim-feedback-logging-014
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-feedback-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 日志与遥测拥有 CommitRequest、Gate 决定和效果回执的持久审计副本、顺序与完整性；提交控制拥有这些决定与外部效果本身。 本条仅记录 LogSubscription、TelemetryExportBatch；其 canonical owner 是日志与遥测（feedback-logging），因此 feedback-logging 在此拥有这些概念。
+              en: Logging and telemetry own durable audit copies, ordering, and integrity for CommitRequest, gate decisions, and effect receipts; commit control owns the decisions and external effects themselves. This record is limited to LogSubscription, TelemetryExportBatch; their canonical owner is Logging and telemetry (feedback-logging), so feedback-logging owns these concepts here.
+              ja: logging/telemetry は CommitRequest・gate decision・effect receipt の永続 audit copy、順序、integrity を所有し、commit control は decision と external effect 自体を所有します。 この記録は LogSubscription、TelemetryExportBatch だけを対象とし、canonical owner はログとテレメトリ（feedback-logging）です。したがって feedback-logging はここでこれらを所有します。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 日志与遥测拥有 CommitRequest、Gate 决定和效果回执的持久审计副本、顺序与完整性；提交控制拥有这些决定与外部效果本身。 本条仅记录 LogSubscription、TelemetryExportBatch；其 canonical owner 是日志与遥测（feedback-logging），因此 feedback-logging 在此拥有这些概念。
+              en: Logging and telemetry own durable audit copies, ordering, and integrity for CommitRequest, gate decisions, and effect receipts; commit control owns the decisions and external effects themselves. This record is limited to LogSubscription, TelemetryExportBatch; their canonical owner is Logging and telemetry (feedback-logging), so feedback-logging owns these concepts here.
+              ja: logging/telemetry は CommitRequest・gate decision・effect receipt の永続 audit copy、順序、integrity を所有し、commit control は decision と external effect 自体を所有します。 この記録は LogSubscription、TelemetryExportBatch だけを対象とし、canonical owner はログとテレメトリ（feedback-logging）です。したがって feedback-logging はここでこれらを所有します。
+    - other_module_id: safety-commit-redaction
+      subject_concept_ids:
+        - CommitDenial
+        - EffectReceipt
+      decision: references
+      owner_module_id: safety-commit-redaction
+      rationale:
+        zh: 日志与遥测拥有 CommitRequest、Gate 决定和效果回执的持久审计副本、顺序与完整性；提交控制拥有这些决定与外部效果本身。 本条仅记录 CommitDenial、EffectReceipt；其 canonical owner 是副作用提交控制（safety-commit-redaction），因此 feedback-logging 在此引用这些概念。
+        en: Logging and telemetry own durable audit copies, ordering, and integrity for CommitRequest, gate decisions, and effect receipts; commit control owns the decisions and external effects themselves. This record is limited to CommitDenial, EffectReceipt; their canonical owner is Side-effect commit control (safety-commit-redaction), so feedback-logging references these concepts here.
+        ja: logging/telemetry は CommitRequest・gate decision・effect receipt の永続 audit copy、順序、integrity を所有し、commit control は decision と external effect 自体を所有します。 この記録は CommitDenial、EffectReceipt だけを対象とし、canonical owner は副作用コミット制御（safety-commit-redaction）です。したがって feedback-logging はここでこれらを参照します。
+      relation_ids: []
+      relation_not_applicable_reason:
+        zh: “日志与遥测”与“副作用提交控制”之间没有适用于本 owner 概念组的已接受跨模块事实；该决策只比较明确列出的候选概念，不暗示运行时交互。
+        en: There is no accepted cross-module fact applicable to this owner-homogeneous concept group between Logging and telemetry and Side-effect commit control; the decision compares only the named candidates without implying runtime interaction.
+        ja: 「ログとテレメトリ」と「副作用コミット制御」の間には、この owner 単一概念群に適用できる承認済みモジュール間事実がありません。明示候補だけを比較し、実行時相互作用を示唆しません。
+      source_claims:
+        - claim-feedback-logging-015
+        - claim-feedback-logging-016
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-feedback-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 日志与遥测拥有 CommitRequest、Gate 决定和效果回执的持久审计副本、顺序与完整性；提交控制拥有这些决定与外部效果本身。 本条仅记录 CommitDenial、EffectReceipt；其 canonical owner 是副作用提交控制（safety-commit-redaction），因此 feedback-logging 在此引用这些概念。
+              en: Logging and telemetry own durable audit copies, ordering, and integrity for CommitRequest, gate decisions, and effect receipts; commit control owns the decisions and external effects themselves. This record is limited to CommitDenial, EffectReceipt; their canonical owner is Side-effect commit control (safety-commit-redaction), so feedback-logging references these concepts here.
+              ja: logging/telemetry は CommitRequest・gate decision・effect receipt の永続 audit copy、順序、integrity を所有し、commit control は decision と external effect 自体を所有します。 この記録は CommitDenial、EffectReceipt だけを対象とし、canonical owner は副作用コミット制御（safety-commit-redaction）です。したがって feedback-logging はここでこれらを参照します。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 日志与遥测拥有 CommitRequest、Gate 决定和效果回执的持久审计副本、顺序与完整性；提交控制拥有这些决定与外部效果本身。 本条仅记录 CommitDenial、EffectReceipt；其 canonical owner 是副作用提交控制（safety-commit-redaction），因此 feedback-logging 在此引用这些概念。
+              en: Logging and telemetry own durable audit copies, ordering, and integrity for CommitRequest, gate decisions, and effect receipts; commit control owns the decisions and external effects themselves. This record is limited to CommitDenial, EffectReceipt; their canonical owner is Side-effect commit control (safety-commit-redaction), so feedback-logging references these concepts here.
+              ja: logging/telemetry は CommitRequest・gate decision・effect receipt の永続 audit copy、順序、integrity を所有し、commit control は decision と external effect 自体を所有します。 この記録は CommitDenial、EffectReceipt だけを対象とし、canonical owner は副作用コミット制御（safety-commit-redaction）です。したがって feedback-logging はここでこれらを参照します。
+    - other_module_id: feedback-metrics-evaluation
+      subject_concept_ids:
+        - MeasurementReference
+        - MetricExportActivity
+      decision: owns
+      owner_module_id: feedback-logging
+      rationale:
+        zh: 日志与遥测拥有 MeasurementReference 和评估记录在流、批次与 sink 中的传输血缘；评估与度量拥有被引用 Measurement 的数值、单位和评判含义。 本条仅记录 MeasurementReference、MetricExportActivity；其 canonical owner 是日志与遥测（feedback-logging），因此 feedback-logging 在此拥有这些概念。
+        en: Logging and telemetry own transport lineage of MeasurementReference and evaluation records through streams, batches, and sinks; evaluation and measurement own the referenced Measurement's value, unit, and evaluative meaning. This record is limited to MeasurementReference, MetricExportActivity; their canonical owner is Logging and telemetry (feedback-logging), so feedback-logging owns these concepts here.
+        ja: logging/telemetry は MeasurementReference と evaluation record の stream・batch・sink 経由 transport lineage を所有し、evaluation/measurement は参照 Measurement の value・unit・意味を所有します。 この記録は MeasurementReference、MetricExportActivity だけを対象とし、canonical owner はログとテレメトリ（feedback-logging）です。したがって feedback-logging はここでこれらを所有します。
+      relation_ids:
+        - MeasurementReference-references-Measurement
+        - MetricExportActivity-consumes-Measurement
+      relation_not_applicable_reason: null
+      source_claims:
+        - claim-feedback-logging-017
+        - claim-feedback-logging-018
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-feedback-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 日志与遥测拥有 MeasurementReference 和评估记录在流、批次与 sink 中的传输血缘；评估与度量拥有被引用 Measurement 的数值、单位和评判含义。 本条仅记录 MeasurementReference、MetricExportActivity；其 canonical owner 是日志与遥测（feedback-logging），因此 feedback-logging 在此拥有这些概念。
+              en: Logging and telemetry own transport lineage of MeasurementReference and evaluation records through streams, batches, and sinks; evaluation and measurement own the referenced Measurement's value, unit, and evaluative meaning. This record is limited to MeasurementReference, MetricExportActivity; their canonical owner is Logging and telemetry (feedback-logging), so feedback-logging owns these concepts here.
+              ja: logging/telemetry は MeasurementReference と evaluation record の stream・batch・sink 経由 transport lineage を所有し、evaluation/measurement は参照 Measurement の value・unit・意味を所有します。 この記録は MeasurementReference、MetricExportActivity だけを対象とし、canonical owner はログとテレメトリ（feedback-logging）です。したがって feedback-logging はここでこれらを所有します。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 日志与遥测拥有 MeasurementReference 和评估记录在流、批次与 sink 中的传输血缘；评估与度量拥有被引用 Measurement 的数值、单位和评判含义。 本条仅记录 MeasurementReference、MetricExportActivity；其 canonical owner 是日志与遥测（feedback-logging），因此 feedback-logging 在此拥有这些概念。
+              en: Logging and telemetry own transport lineage of MeasurementReference and evaluation records through streams, batches, and sinks; evaluation and measurement own the referenced Measurement's value, unit, and evaluative meaning. This record is limited to MeasurementReference, MetricExportActivity; their canonical owner is Logging and telemetry (feedback-logging), so feedback-logging owns these concepts here.
+              ja: logging/telemetry は MeasurementReference と evaluation record の stream・batch・sink 経由 transport lineage を所有し、evaluation/measurement は参照 Measurement の value・unit・意味を所有します。 この記録は MeasurementReference、MetricExportActivity だけを対象とし、canonical owner はログとテレメトリ（feedback-logging）です。したがって feedback-logging はここでこれらを所有します。
+    - other_module_id: feedback-metrics-evaluation
+      subject_concept_ids:
+        - Measurement
+      decision: references
+      owner_module_id: feedback-metrics-evaluation
+      rationale:
+        zh: 日志与遥测拥有 MeasurementReference 和评估记录在流、批次与 sink 中的传输血缘；评估与度量拥有被引用 Measurement 的数值、单位和评判含义。 本条仅记录 Measurement；其 canonical owner 是评估与度量（feedback-metrics-evaluation），因此 feedback-logging 在此引用这些概念。
+        en: Logging and telemetry own transport lineage of MeasurementReference and evaluation records through streams, batches, and sinks; evaluation and measurement own the referenced Measurement's value, unit, and evaluative meaning. This record is limited to Measurement; their canonical owner is Evaluation and measurement (feedback-metrics-evaluation), so feedback-logging references these concepts here.
+        ja: logging/telemetry は MeasurementReference と evaluation record の stream・batch・sink 経由 transport lineage を所有し、evaluation/measurement は参照 Measurement の value・unit・意味を所有します。 この記録は Measurement だけを対象とし、canonical owner は評価と測定（feedback-metrics-evaluation）です。したがって feedback-logging はここでこれらを参照します。
+      relation_ids:
+        - MeasurementReference-references-Measurement
+        - MetricExportActivity-consumes-Measurement
+      relation_not_applicable_reason: null
+      source_claims:
+        - claim-feedback-logging-019
+        - claim-feedback-logging-020
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-feedback-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 日志与遥测拥有 MeasurementReference 和评估记录在流、批次与 sink 中的传输血缘；评估与度量拥有被引用 Measurement 的数值、单位和评判含义。 本条仅记录 Measurement；其 canonical owner 是评估与度量（feedback-metrics-evaluation），因此 feedback-logging 在此引用这些概念。
+              en: Logging and telemetry own transport lineage of MeasurementReference and evaluation records through streams, batches, and sinks; evaluation and measurement own the referenced Measurement's value, unit, and evaluative meaning. This record is limited to Measurement; their canonical owner is Evaluation and measurement (feedback-metrics-evaluation), so feedback-logging references these concepts here.
+              ja: logging/telemetry は MeasurementReference と evaluation record の stream・batch・sink 経由 transport lineage を所有し、evaluation/measurement は参照 Measurement の value・unit・意味を所有します。 この記録は Measurement だけを対象とし、canonical owner は評価と測定（feedback-metrics-evaluation）です。したがって feedback-logging はここでこれらを参照します。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 日志与遥测拥有 MeasurementReference 和评估记录在流、批次与 sink 中的传输血缘；评估与度量拥有被引用 Measurement 的数值、单位和评判含义。 本条仅记录 Measurement；其 canonical owner 是评估与度量（feedback-metrics-evaluation），因此 feedback-logging 在此引用这些概念。
+              en: Logging and telemetry own transport lineage of MeasurementReference and evaluation records through streams, batches, and sinks; evaluation and measurement own the referenced Measurement's value, unit, and evaluative meaning. This record is limited to Measurement; their canonical owner is Evaluation and measurement (feedback-metrics-evaluation), so feedback-logging references these concepts here.
+              ja: logging/telemetry は MeasurementReference と evaluation record の stream・batch・sink 経由 transport lineage を所有し、evaluation/measurement は参照 Measurement の value・unit・意味を所有します。 この記録は Measurement だけを対象とし、canonical owner は評価と測定（feedback-metrics-evaluation）です。したがって feedback-logging はここでこれらを参照します。
+  overlap_checks:
+    - other_module_id: runtime-observability
+      semantic_area:
+        zh: 遥测记录与原始运行事件
+        en: Telemetry records versus original runtime events
+        ja: テレメトリ記録と元の実行イベント
+      candidate_concept_ids:
+        - AuditLog
+        - EventSink
+      overlap_reason:
+        zh: 两者都携带时间与属性，但 TraceEvent 的身份来自运行发生，LogRecord 的身份来自记录与传输位置。 本条仅记录 AuditLog、EventSink；其 canonical owner 是日志与遥测（feedback-logging），因此 feedback-logging 在此拥有这些概念。
+        en: Both carry time and attributes, but TraceEvent identity comes from runtime occurrence while LogRecord identity comes from recording and transport position. This record is limited to AuditLog, EventSink; their canonical owner is Logging and telemetry (feedback-logging), so feedback-logging owns these concepts here.
+        ja: どちらも時刻と属性を持ちますが、TraceEvent の同一性は実行発生、LogRecord の同一性は記録・転送位置に由来します。 この記録は AuditLog、EventSink だけを対象とし、canonical owner はログとテレメトリ（feedback-logging）です。したがって feedback-logging はここでこれらを所有します。
+      disambiguation_test:
+        zh: 若删除流、分区和 Sink 后事实仍是完整的运行发生记录，则归追踪与检查点；若身份依赖记录序列或导出批次，则归日志与遥测。
+        en: If removing stream, partition, and sink leaves a complete runtime occurrence, it belongs to tracing and checkpoints; if identity depends on record sequence or export batch, it belongs to logging and telemetry.
+        ja: ストリーム、区画、Sink を除いても完全な実行発生記録ならトレースとチェックポイント、同一性が記録列または出力バッチに依存すればログとテレメトリに属します。
+      result: distinct
+      owner_module_id: feedback-logging
+      source_claims:
+        - claim-feedback-logging-021
+        - claim-feedback-logging-022
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-feedback-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 若删除流、分区和 Sink 后事实仍是完整的运行发生记录，则归追踪与检查点；若身份依赖记录序列或导出批次，则归日志与遥测。
+              en: If removing stream, partition, and sink leaves a complete runtime occurrence, it belongs to tracing and checkpoints; if identity depends on record sequence or export batch, it belongs to logging and telemetry.
+              ja: ストリーム、区画、Sink を除いても完全な実行発生記録ならトレースとチェックポイント、同一性が記録列または出力バッチに依存すればログとテレメトリに属します。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 若删除流、分区和 Sink 后事实仍是完整的运行发生记录，则归追踪与检查点；若身份依赖记录序列或导出批次，则归日志与遥测。
+              en: If removing stream, partition, and sink leaves a complete runtime occurrence, it belongs to tracing and checkpoints; if identity depends on record sequence or export batch, it belongs to logging and telemetry.
+              ja: ストリーム、区画、Sink を除いても完全な実行発生記録ならトレースとチェックポイント、同一性が記録列または出力バッチに依存すればログとテレメトリに属します。
+    - other_module_id: runtime-observability
+      semantic_area:
+        zh: 遥测记录与原始运行事件
+        en: Telemetry records versus original runtime events
+        ja: テレメトリ記録と元の実行イベント
+      candidate_concept_ids:
+        - AuditRecord
+        - TelemetryEvent
+      overlap_reason:
+        zh: 两者都携带时间与属性，但 TraceEvent 的身份来自运行发生，LogRecord 的身份来自记录与传输位置。 本条仅记录 AuditRecord、TelemetryEvent；其 canonical owner 是追踪与检查点（runtime-observability），因此 feedback-logging 在此引用这些概念。
+        en: Both carry time and attributes, but TraceEvent identity comes from runtime occurrence while LogRecord identity comes from recording and transport position. This record is limited to AuditRecord, TelemetryEvent; their canonical owner is Tracing and checkpoints (runtime-observability), so feedback-logging references these concepts here.
+        ja: どちらも時刻と属性を持ちますが、TraceEvent の同一性は実行発生、LogRecord の同一性は記録・転送位置に由来します。 この記録は AuditRecord、TelemetryEvent だけを対象とし、canonical owner はトレースとチェックポイント（runtime-observability）です。したがって feedback-logging はここでこれらを参照します。
+      disambiguation_test:
+        zh: 若删除流、分区和 Sink 后事实仍是完整的运行发生记录，则归追踪与检查点；若身份依赖记录序列或导出批次，则归日志与遥测。
+        en: If removing stream, partition, and sink leaves a complete runtime occurrence, it belongs to tracing and checkpoints; if identity depends on record sequence or export batch, it belongs to logging and telemetry.
+        ja: ストリーム、区画、Sink を除いても完全な実行発生記録ならトレースとチェックポイント、同一性が記録列または出力バッチに依存すればログとテレメトリに属します。
+      result: distinct
+      owner_module_id: runtime-observability
+      source_claims:
+        - claim-feedback-logging-023
+        - claim-feedback-logging-024
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-feedback-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 若删除流、分区和 Sink 后事实仍是完整的运行发生记录，则归追踪与检查点；若身份依赖记录序列或导出批次，则归日志与遥测。
+              en: If removing stream, partition, and sink leaves a complete runtime occurrence, it belongs to tracing and checkpoints; if identity depends on record sequence or export batch, it belongs to logging and telemetry.
+              ja: ストリーム、区画、Sink を除いても完全な実行発生記録ならトレースとチェックポイント、同一性が記録列または出力バッチに依存すればログとテレメトリに属します。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 若删除流、分区和 Sink 后事实仍是完整的运行发生记录，则归追踪与检查点；若身份依赖记录序列或导出批次，则归日志与遥测。
+              en: If removing stream, partition, and sink leaves a complete runtime occurrence, it belongs to tracing and checkpoints; if identity depends on record sequence or export batch, it belongs to logging and telemetry.
+              ja: ストリーム、区画、Sink を除いても完全な実行発生記録ならトレースとチェックポイント、同一性が記録列または出力バッチに依存すればログとテレメトリに属します。
+    - other_module_id: safety-commit-redaction
+      semantic_area:
+        zh: 提交审计日志与提交控制事实
+        en: Commit audit logs versus commit-control facts
+        ja: commit audit log と commit-control fact
+      candidate_concept_ids:
+        - LogSubscription
+        - TelemetryExportBatch
+      overlap_reason:
+        zh: 审计日志记录决定但不能授权或撤销效果；原始 gate 事实即使尚未导出到日志仍然存在。 本条仅记录 LogSubscription、TelemetryExportBatch；其 canonical owner 是日志与遥测（feedback-logging），因此 feedback-logging 在此拥有这些概念。
+        en: An audit log records a decision but cannot authorize or revoke an effect; the source gate fact exists even before it is exported to a log. This record is limited to LogSubscription, TelemetryExportBatch; their canonical owner is Logging and telemetry (feedback-logging), so feedback-logging owns these concepts here.
+        ja: audit log は decision を記録しますが effect を authorize/revoke せず、source gate fact は log export 前から存在します。 この記録は LogSubscription、TelemetryExportBatch だけを対象とし、canonical owner はログとテレメトリ（feedback-logging）です。したがって feedback-logging はここでこれらを所有します。
+      disambiguation_test:
+        zh: 由 gate request 或 effect identity 决定的对象归提交控制；由 stream、partition、retention 和 integrity proof 决定的对象归日志与遥测。
+        en: An object determined by gate-request or effect identity belongs to commit control; one determined by stream, partition, retention, and integrity proof belongs to logging and telemetry.
+        ja: gate request/effect identity で決まれば commit control、stream・partition・retention・integrity proof で決まれば logging/telemetry に属します。
+      result: distinct
+      owner_module_id: feedback-logging
+      source_claims:
+        - claim-feedback-logging-025
+        - claim-feedback-logging-026
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-feedback-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 由 gate request 或 effect identity 决定的对象归提交控制；由 stream、partition、retention 和 integrity proof 决定的对象归日志与遥测。
+              en: An object determined by gate-request or effect identity belongs to commit control; one determined by stream, partition, retention, and integrity proof belongs to logging and telemetry.
+              ja: gate request/effect identity で決まれば commit control、stream・partition・retention・integrity proof で決まれば logging/telemetry に属します。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 由 gate request 或 effect identity 决定的对象归提交控制；由 stream、partition、retention 和 integrity proof 决定的对象归日志与遥测。
+              en: An object determined by gate-request or effect identity belongs to commit control; one determined by stream, partition, retention, and integrity proof belongs to logging and telemetry.
+              ja: gate request/effect identity で決まれば commit control、stream・partition・retention・integrity proof で決まれば logging/telemetry に属します。
+    - other_module_id: safety-commit-redaction
+      semantic_area:
+        zh: 提交审计日志与提交控制事实
+        en: Commit audit logs versus commit-control facts
+        ja: commit audit log と commit-control fact
+      candidate_concept_ids:
+        - CommitDenial
+        - EffectReceipt
+      overlap_reason:
+        zh: 审计日志记录决定但不能授权或撤销效果；原始 gate 事实即使尚未导出到日志仍然存在。 本条仅记录 CommitDenial、EffectReceipt；其 canonical owner 是副作用提交控制（safety-commit-redaction），因此 feedback-logging 在此引用这些概念。
+        en: An audit log records a decision but cannot authorize or revoke an effect; the source gate fact exists even before it is exported to a log. This record is limited to CommitDenial, EffectReceipt; their canonical owner is Side-effect commit control (safety-commit-redaction), so feedback-logging references these concepts here.
+        ja: audit log は decision を記録しますが effect を authorize/revoke せず、source gate fact は log export 前から存在します。 この記録は CommitDenial、EffectReceipt だけを対象とし、canonical owner は副作用コミット制御（safety-commit-redaction）です。したがって feedback-logging はここでこれらを参照します。
+      disambiguation_test:
+        zh: 由 gate request 或 effect identity 决定的对象归提交控制；由 stream、partition、retention 和 integrity proof 决定的对象归日志与遥测。
+        en: An object determined by gate-request or effect identity belongs to commit control; one determined by stream, partition, retention, and integrity proof belongs to logging and telemetry.
+        ja: gate request/effect identity で決まれば commit control、stream・partition・retention・integrity proof で決まれば logging/telemetry に属します。
+      result: distinct
+      owner_module_id: safety-commit-redaction
+      source_claims:
+        - claim-feedback-logging-027
+        - claim-feedback-logging-028
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-feedback-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 由 gate request 或 effect identity 决定的对象归提交控制；由 stream、partition、retention 和 integrity proof 决定的对象归日志与遥测。
+              en: An object determined by gate-request or effect identity belongs to commit control; one determined by stream, partition, retention, and integrity proof belongs to logging and telemetry.
+              ja: gate request/effect identity で決まれば commit control、stream・partition・retention・integrity proof で決まれば logging/telemetry に属します。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 由 gate request 或 effect identity 决定的对象归提交控制；由 stream、partition、retention 和 integrity proof 决定的对象归日志与遥测。
+              en: An object determined by gate-request or effect identity belongs to commit control; one determined by stream, partition, retention, and integrity proof belongs to logging and telemetry.
+              ja: gate request/effect identity で決まれば commit control、stream・partition・retention・integrity proof で決まれば logging/telemetry に属します。
+    - other_module_id: feedback-metrics-evaluation
+      semantic_area:
+        zh: 度量引用日志与度量原始语义
+        en: Logged measurement references versus source measurement semantics
+        ja: logged measurement reference と source measurement 意味
+      candidate_concept_ids:
+        - MeasurementReference
+        - MetricExportActivity
+      overlap_reason:
+        zh: 导出批次必须完整引用测量，但复制到日志中的数值不创建新的 Metric 定义或 EvaluationRun。 本条仅记录 MeasurementReference、MetricExportActivity；其 canonical owner 是日志与遥测（feedback-logging），因此 feedback-logging 在此拥有这些概念。
+        en: An export batch must reference measurements completely, but copying a value into a log creates neither a new Metric definition nor a new EvaluationRun. This record is limited to MeasurementReference, MetricExportActivity; their canonical owner is Logging and telemetry (feedback-logging), so feedback-logging owns these concepts here.
+        ja: export batch は measurement を完全参照すべきですが、値の log copy は新 Metric 定義や EvaluationRun を作りません。 この記録は MeasurementReference、MetricExportActivity だけを対象とし、canonical owner はログとテレメトリ（feedback-logging）です。したがって feedback-logging はここでこれらを所有します。
+      disambiguation_test:
+        zh: 若对象由 measurement id、metric 和 subject 识别，归评估与度量；若由 log offset、batch id 或 sink 识别，归日志与遥测。
+        en: If identity comes from measurement ID, metric, and subject, it belongs to evaluation and measurement; if it comes from log offset, batch ID, or sink, it belongs to logging and telemetry.
+        ja: measurement id・metric・subject で識別されれば evaluation/measurement、log offset・batch id・sink で識別されれば logging/telemetry に属します。
+      result: distinct
+      owner_module_id: feedback-logging
+      source_claims:
+        - claim-feedback-logging-029
+        - claim-feedback-logging-030
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-feedback-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 若对象由 measurement id、metric 和 subject 识别，归评估与度量；若由 log offset、batch id 或 sink 识别，归日志与遥测。
+              en: If identity comes from measurement ID, metric, and subject, it belongs to evaluation and measurement; if it comes from log offset, batch ID, or sink, it belongs to logging and telemetry.
+              ja: measurement id・metric・subject で識別されれば evaluation/measurement、log offset・batch id・sink で識別されれば logging/telemetry に属します。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 若对象由 measurement id、metric 和 subject 识别，归评估与度量；若由 log offset、batch id 或 sink 识别，归日志与遥测。
+              en: If identity comes from measurement ID, metric, and subject, it belongs to evaluation and measurement; if it comes from log offset, batch ID, or sink, it belongs to logging and telemetry.
+              ja: measurement id・metric・subject で識別されれば evaluation/measurement、log offset・batch id・sink で識別されれば logging/telemetry に属します。
+    - other_module_id: feedback-metrics-evaluation
+      semantic_area:
+        zh: 度量引用日志与度量原始语义
+        en: Logged measurement references versus source measurement semantics
+        ja: logged measurement reference と source measurement 意味
+      candidate_concept_ids:
+        - Measurement
+        - Score
+      overlap_reason:
+        zh: 导出批次必须完整引用测量，但复制到日志中的数值不创建新的 Metric 定义或 EvaluationRun。 本条仅记录 Measurement、Score；其 canonical owner 是评估与度量（feedback-metrics-evaluation），因此 feedback-logging 在此引用这些概念。
+        en: An export batch must reference measurements completely, but copying a value into a log creates neither a new Metric definition nor a new EvaluationRun. This record is limited to Measurement, Score; their canonical owner is Evaluation and measurement (feedback-metrics-evaluation), so feedback-logging references these concepts here.
+        ja: export batch は measurement を完全参照すべきですが、値の log copy は新 Metric 定義や EvaluationRun を作りません。 この記録は Measurement、Score だけを対象とし、canonical owner は評価と測定（feedback-metrics-evaluation）です。したがって feedback-logging はここでこれらを参照します。
+      disambiguation_test:
+        zh: 若对象由 measurement id、metric 和 subject 识别，归评估与度量；若由 log offset、batch id 或 sink 识别，归日志与遥测。
+        en: If identity comes from measurement ID, metric, and subject, it belongs to evaluation and measurement; if it comes from log offset, batch ID, or sink, it belongs to logging and telemetry.
+        ja: measurement id・metric・subject で識別されれば evaluation/measurement、log offset・batch id・sink で識別されれば logging/telemetry に属します。
+      result: distinct
+      owner_module_id: feedback-metrics-evaluation
+      source_claims:
+        - claim-feedback-logging-031
+        - claim-feedback-logging-032
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-feedback-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 若对象由 measurement id、metric 和 subject 识别，归评估与度量；若由 log offset、batch id 或 sink 识别，归日志与遥测。
+              en: If identity comes from measurement ID, metric, and subject, it belongs to evaluation and measurement; if it comes from log offset, batch ID, or sink, it belongs to logging and telemetry.
+              ja: measurement id・metric・subject で識別されれば evaluation/measurement、log offset・batch id・sink で識別されれば logging/telemetry に属します。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 若对象由 measurement id、metric 和 subject 识别，归评估与度量；若由 log offset、batch id 或 sink 识别，归日志与遥测。
+              en: If identity comes from measurement ID, metric, and subject, it belongs to evaluation and measurement; if it comes from log offset, batch ID, or sink, it belongs to logging and telemetry.
+              ja: measurement id・metric・subject で識別されれば evaluation/measurement、log offset・batch id・sink で識別されれば logging/telemetry に属します。
+review:
+  status: pending
+  method: manual-semantic
+  reviewer: codex-module-boundary-review
+  reviewed_on: 2026-07-17
+  note:
+    zh: 已人工核验六个直属根并重新划清“源语义—日志记录—有序流—订阅—导出活动—批次载荷—留存”的边界。ToolTranscript 与 runtime-observability 的 AgentTranscript 虽有明确范围差异，仍需在概念级关系审计中确认无重复，因此 hierarchy 保持 pending；其余概念字段、关系、示例和来源主张亦待逐项核验。
+    en: The six direct roots were manually checked and the boundary from source semantics through log record, ordered stream, subscription, export activity, batch payload, and retention was redrawn. ToolTranscript and runtime-observability's AgentTranscript have distinct scopes but still need concept-level relation review to exclude duplication, so hierarchy remains pending; remaining concept fields, relations, examples, and source claims also await item-level review.
+    ja: 六つの直下根を手動確認し、source semantics から log record・ordered stream・subscription・export activity・batch payload・retention までの境界を再整理しました。ToolTranscript と runtime-observability の AgentTranscript は範囲差がありますが、重複排除の概念関係審査が必要なため hierarchy は pending とします。残る概念項目・関係・例・出典主張も項目別確認待ちです。
+  sections:
+    semantics: accepted
+    hierarchy: pending
+    relations: pending
+    structure: accepted
+    examples: pending
+    source_claims:
+      - claim-feedback-logging-001
+source_claims:
+  - id: claim-feedback-logging-001
+    source: eng-observe-opentelemetry-logs
+    supports: The OpenTelemetry Logs Data Model defines the record-level boundary for timestamps, trace context, severity, body, resource, instrumentation scope, attributes, and event name across heterogeneous log sources. Moonweave owns LogRecord and related log artifacts here when identity depends on record format or ordered log membership; stream, audit-chain, and ownership taxonomy are explicit design inferences.
+    locator: Logs Data Model > Design Notes; Log and Event Record Definition
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-feedback-logging-002
+    source: eng-proto-opentelemetry-otlp
+    supports: OTLP normatively separates logs, metrics, and traces into signal-specific Export services, requests, and HTTP paths. This supports the TelemetryExportActivity and bounded export-batch boundary without collapsing trace or metric identity into logging; Moonweave's common batch genus, sink/subscription roles, and module ownership remain design inferences.
+    locator: OTLP Specification 1.10.0 > Protocol Details > Signal-specific services and Export request/response; OTLP/HTTP Request > Default URL paths
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-feedback-logging-003
+    source: eng-fw-langsmith-docs
+    supports: Source eng-fw-langsmith-docs at Documentation page > LangSmith docs heading and documented conceptual model supports operational notions used by Moonweave CQ feedback-logging-cq-record-lineage-v3 (feedback-logging.record-lineage), owned by feedback-logging and compared with runtime-observability. The source does not define Moonweave CQ feedback-logging-cq-record-lineage-v3, its query, assertion, owner, or evidence binding. The query "Resolve AuditLog contains AuditRecord by record identity and sequence, then follow the AuditLog-as-LogStream delivery fact to EventSink." and expected assertion "The result names one containing AuditLog, preserves the AuditRecord sequence, and reports only evidenced delivery to an EventSink." are a Moonweave design inference over the registered evidence.
+    locator: Observability concepts > Runs and traces; Evaluation concepts > Targets for online evaluation > Runs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-004
+    source: eng-fw-openai-tracing
+    supports: Source eng-fw-openai-tracing at Tracing guide > Traces, spans, and trace processors supports operational notions used by Moonweave CQ feedback-logging-cq-record-lineage-v3 (feedback-logging.record-lineage), owned by feedback-logging and compared with runtime-observability. The source does not define Moonweave CQ feedback-logging-cq-record-lineage-v3, its query, assertion, owner, or evidence binding. The query "Resolve AuditLog contains AuditRecord by record identity and sequence, then follow the AuditLog-as-LogStream delivery fact to EventSink." and expected assertion "The result names one containing AuditLog, preserves the AuditRecord sequence, and reports only evidenced delivery to an EventSink." are a Moonweave design inference over the registered evidence.
+    locator: Tracing guide > Traces, spans, and trace processors
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-005
+    source: eng-fw-langsmith-docs
+    supports: Source eng-fw-langsmith-docs at Documentation page > LangSmith docs heading and documented conceptual model supports operational notions used by Moonweave CQ feedback-logging-cq-audit-integrity-v3 (feedback-logging.audit-integrity), owned by feedback-logging and compared with safety-commit-redaction. The source does not define Moonweave CQ feedback-logging-cq-audit-integrity-v3, its query, assertion, owner, or evidence binding. The query "Verify sequence continuity, predecessor digests, record signatures, and declared retention exceptions over the requested AuditLog interval." and expected assertion "Integrity passes only when sequence and digest chains are continuous or every gap is explained by an accepted retention event." are a Moonweave design inference over the registered evidence.
+    locator: Observability concepts > Runs and traces; Evaluation concepts > Targets for online evaluation > Runs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-006
+    source: eng-fw-openai-tracing
+    supports: Source eng-fw-openai-tracing at Tracing guide > Traces, spans, and trace processors supports operational notions used by Moonweave CQ feedback-logging-cq-audit-integrity-v3 (feedback-logging.audit-integrity), owned by feedback-logging and compared with safety-commit-redaction. The source does not define Moonweave CQ feedback-logging-cq-audit-integrity-v3, its query, assertion, owner, or evidence binding. The query "Verify sequence continuity, predecessor digests, record signatures, and declared retention exceptions over the requested AuditLog interval." and expected assertion "Integrity passes only when sequence and digest chains are continuous or every gap is explained by an accepted retention event." are a Moonweave design inference over the registered evidence.
+    locator: Tracing guide > Traces, spans, and trace processors
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-007
+    source: eng-fw-langsmith-docs
+    supports: Source eng-fw-langsmith-docs at Documentation page > LangSmith docs heading and documented conceptual model supports operational notions used by Moonweave CQ feedback-logging-cq-export-completeness-v3 (feedback-logging.export-completeness), owned by feedback-logging and compared with feedback-metrics-evaluation. The source does not define Moonweave CQ feedback-logging-cq-export-completeness-v3, its query, assertion, owner, or evidence binding. The query "Compute the requested export set from subscription filters and time bounds, then compare it with batch membership and delivery status." and expected assertion "Completeness requires set equality after declared filters; missing and duplicate members are reported separately." are a Moonweave design inference over the registered evidence.
+    locator: Observability concepts > Runs and traces; Evaluation concepts > Targets for online evaluation > Runs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-008
+    source: eng-fw-openai-tracing
+    supports: Source eng-fw-openai-tracing at Tracing guide > Traces, spans, and trace processors supports operational notions used by Moonweave CQ feedback-logging-cq-export-completeness-v3 (feedback-logging.export-completeness), owned by feedback-logging and compared with feedback-metrics-evaluation. The source does not define Moonweave CQ feedback-logging-cq-export-completeness-v3, its query, assertion, owner, or evidence binding. The query "Compute the requested export set from subscription filters and time bounds, then compare it with batch membership and delivery status." and expected assertion "Completeness requires set equality after declared filters; missing and duplicate members are reported separately." are a Moonweave design inference over the registered evidence.
+    locator: Tracing guide > Traces, spans, and trace processors
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-009
+    source: eng-observe-opentelemetry-logs
+    supports: OpenTelemetry defines the LogRecord data model, trace-context correlation fields, and log processing/export pipeline. Moonweave uses those premises to keep runtime occurrences distinct from AuditLog, EventSink, LogRecord, and LogStream identities; the five canonical graph edges and their owners remain reviewed design inferences.
+    locator: Logs Data Model > Log and Event Record Definition; OpenTelemetry Logging > Logs SDK and exporters
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-010
+    source: eng-fw-openai-tracing
+    supports: OpenAI Agents SDK tracing distinguishes traces and spans from BatchTraceProcessor and BackendSpanExporter behavior. Moonweave therefore models TraceExportActivity consuming TraceRecord instead of asserting a direct TraceSpan-to-TraceExport boundary fact; the activity and endpoint ownership are design inferences.
+    locator: Tracing guide > Traces and spans; Custom tracing processors; BatchTraceProcessor
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-011
+    source: eng-observe-opentelemetry-logs
+    supports: OpenTelemetry keeps log-record structure and trace-context correlation explicit without merging the runtime event, trace record, and emitted log record. Moonweave uses that premise to retain AuditRecord, TelemetryEvent, TraceEvent, and TraceRecord in runtime-observability while the five accepted cross edges point to their feedback-logging representations or consumers.
+    locator: Logs Data Model > Log and Event Record Definition > Trace context fields
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-012
+    source: eng-fw-openai-tracing
+    supports: OpenAI tracing defines traces as composed of spans and exports them through processors in batches. Moonweave keeps the runtime TraceRecord as input to TraceExportActivity and rejects the deprecated shortcut that treated TraceSpan as a direct boundary endpoint to TraceExport.
+    locator: Tracing guide > Traces and spans; Custom tracing processors; BatchTraceProcessor
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-013
+    source: eng-fw-langsmith-docs
+    supports: Source eng-fw-langsmith-docs at Documentation page > LangSmith docs heading and documented conceptual model supports operational notions used to compare feedback-logging with safety-commit-redaction, including LogSubscription, TelemetryExportBatch. The source does not define Moonweave Modules feedback-logging or safety-commit-redaction, their class or relation placement, or their ownership split. Under feedback-logging's owns_when "Own an object when its identity is determined by record format, stream position, audit chain, subscription, sink, or a telemetry export batch.", Moonweave applies the disambiguation test "An object determined by gate-request or effect identity belongs to commit control; one determined by stream, partition, retention, and integrity proof belongs to logging and telemetry."; result=owns and owner=feedback-logging are a Moonweave design inference over the registered evidence.
+    locator: Observability concepts > Runs and traces; Evaluation concepts > Targets for online evaluation > Runs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-014
+    source: eng-fw-openai-tracing
+    supports: Source eng-fw-openai-tracing at Tracing guide > Traces, spans, and trace processors supports operational notions used to compare feedback-logging with safety-commit-redaction, including LogSubscription, TelemetryExportBatch. The source does not define Moonweave Modules feedback-logging or safety-commit-redaction, their class or relation placement, or their ownership split. Under feedback-logging's owns_when "Own an object when its identity is determined by record format, stream position, audit chain, subscription, sink, or a telemetry export batch.", Moonweave applies the disambiguation test "An object determined by gate-request or effect identity belongs to commit control; one determined by stream, partition, retention, and integrity proof belongs to logging and telemetry."; result=owns and owner=feedback-logging are a Moonweave design inference over the registered evidence.
+    locator: Tracing guide > Traces, spans, and trace processors
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-015
+    source: eng-fw-langsmith-docs
+    supports: Source eng-fw-langsmith-docs at Documentation page > LangSmith docs heading and documented conceptual model supports operational notions used to compare feedback-logging with safety-commit-redaction, including CommitDenial, EffectReceipt. The source does not define Moonweave Modules feedback-logging or safety-commit-redaction, their class or relation placement, or their ownership split. Under feedback-logging's owns_when "Own an object when its identity is determined by record format, stream position, audit chain, subscription, sink, or a telemetry export batch.", Moonweave applies the disambiguation test "An object determined by gate-request or effect identity belongs to commit control; one determined by stream, partition, retention, and integrity proof belongs to logging and telemetry."; result=references and owner=safety-commit-redaction are a Moonweave design inference over the registered evidence.
+    locator: Observability concepts > Runs and traces; Evaluation concepts > Targets for online evaluation > Runs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-016
+    source: eng-fw-openai-tracing
+    supports: Source eng-fw-openai-tracing at Tracing guide > Traces, spans, and trace processors supports operational notions used to compare feedback-logging with safety-commit-redaction, including CommitDenial, EffectReceipt. The source does not define Moonweave Modules feedback-logging or safety-commit-redaction, their class or relation placement, or their ownership split. Under feedback-logging's owns_when "Own an object when its identity is determined by record format, stream position, audit chain, subscription, sink, or a telemetry export batch.", Moonweave applies the disambiguation test "An object determined by gate-request or effect identity belongs to commit control; one determined by stream, partition, retention, and integrity proof belongs to logging and telemetry."; result=references and owner=safety-commit-redaction are a Moonweave design inference over the registered evidence.
+    locator: Tracing guide > Traces, spans, and trace processors
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-017
+    source: eng-fw-langsmith-docs
+    supports: Source eng-fw-langsmith-docs at Documentation page > LangSmith docs heading and documented conceptual model supports operational notions used to compare feedback-logging with feedback-metrics-evaluation, including MeasurementReference, MetricExportActivity. The source does not define Moonweave Modules feedback-logging or feedback-metrics-evaluation, their class or relation placement, or their ownership split. Under feedback-logging's owns_when "Own an object when its identity is determined by record format, stream position, audit chain, subscription, sink, or a telemetry export batch.", Moonweave applies the disambiguation test "If identity comes from measurement ID, metric, and subject, it belongs to evaluation and measurement; if it comes from log offset, batch ID, or sink, it belongs to logging and telemetry."; result=owns and owner=feedback-logging are a Moonweave design inference over the registered evidence.
+    locator: Observability concepts > Runs and traces; Evaluation concepts > Targets for online evaluation > Runs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-018
+    source: eng-fw-openai-tracing
+    supports: Source eng-fw-openai-tracing at Tracing guide > Traces, spans, and trace processors supports operational notions used to compare feedback-logging with feedback-metrics-evaluation, including MeasurementReference, MetricExportActivity. The source does not define Moonweave Modules feedback-logging or feedback-metrics-evaluation, their class or relation placement, or their ownership split. Under feedback-logging's owns_when "Own an object when its identity is determined by record format, stream position, audit chain, subscription, sink, or a telemetry export batch.", Moonweave applies the disambiguation test "If identity comes from measurement ID, metric, and subject, it belongs to evaluation and measurement; if it comes from log offset, batch ID, or sink, it belongs to logging and telemetry."; result=owns and owner=feedback-logging are a Moonweave design inference over the registered evidence.
+    locator: Tracing guide > Traces, spans, and trace processors
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-019
+    source: eng-fw-langsmith-docs
+    supports: Source eng-fw-langsmith-docs at Documentation page > LangSmith docs heading and documented conceptual model supports operational notions used to compare feedback-logging with feedback-metrics-evaluation, including Measurement. The source does not define Moonweave Modules feedback-logging or feedback-metrics-evaluation, their class or relation placement, or their ownership split. Under feedback-logging's owns_when "Own an object when its identity is determined by record format, stream position, audit chain, subscription, sink, or a telemetry export batch.", Moonweave applies the disambiguation test "If identity comes from measurement ID, metric, and subject, it belongs to evaluation and measurement; if it comes from log offset, batch ID, or sink, it belongs to logging and telemetry."; result=references and owner=feedback-metrics-evaluation are a Moonweave design inference over the registered evidence.
+    locator: Observability concepts > Runs and traces; Evaluation concepts > Targets for online evaluation > Runs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-020
+    source: eng-fw-openai-tracing
+    supports: Source eng-fw-openai-tracing at Tracing guide > Traces, spans, and trace processors supports operational notions used to compare feedback-logging with feedback-metrics-evaluation, including Measurement. The source does not define Moonweave Modules feedback-logging or feedback-metrics-evaluation, their class or relation placement, or their ownership split. Under feedback-logging's owns_when "Own an object when its identity is determined by record format, stream position, audit chain, subscription, sink, or a telemetry export batch.", Moonweave applies the disambiguation test "If identity comes from measurement ID, metric, and subject, it belongs to evaluation and measurement; if it comes from log offset, batch ID, or sink, it belongs to logging and telemetry."; result=references and owner=feedback-metrics-evaluation are a Moonweave design inference over the registered evidence.
+    locator: Tracing guide > Traces, spans, and trace processors
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-021
+    source: eng-fw-langsmith-docs
+    supports: Source eng-fw-langsmith-docs at Documentation page > LangSmith docs heading and documented conceptual model supports operational notions used to compare feedback-logging with runtime-observability, including AuditLog, EventSink. The source does not define Moonweave Modules feedback-logging or runtime-observability, their class or relation placement, or their ownership split. Under feedback-logging's owns_when "Own an object when its identity is determined by record format, stream position, audit chain, subscription, sink, or a telemetry export batch.", Moonweave applies the disambiguation test "If removing stream, partition, and sink leaves a complete runtime occurrence, it belongs to tracing and checkpoints; if identity depends on record sequence or export batch, it belongs to logging and telemetry."; result=distinct and owner=feedback-logging are a Moonweave design inference over the registered evidence.
+    locator: Observability concepts > Runs and traces; Evaluation concepts > Targets for online evaluation > Runs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-022
+    source: eng-fw-openai-tracing
+    supports: Source eng-fw-openai-tracing at Tracing guide > Traces, spans, and trace processors supports operational notions used to compare feedback-logging with runtime-observability, including AuditLog, EventSink. The source does not define Moonweave Modules feedback-logging or runtime-observability, their class or relation placement, or their ownership split. Under feedback-logging's owns_when "Own an object when its identity is determined by record format, stream position, audit chain, subscription, sink, or a telemetry export batch.", Moonweave applies the disambiguation test "If removing stream, partition, and sink leaves a complete runtime occurrence, it belongs to tracing and checkpoints; if identity depends on record sequence or export batch, it belongs to logging and telemetry."; result=distinct and owner=feedback-logging are a Moonweave design inference over the registered evidence.
+    locator: Tracing guide > Traces, spans, and trace processors
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-023
+    source: eng-fw-langsmith-docs
+    supports: Source eng-fw-langsmith-docs at Documentation page > LangSmith docs heading and documented conceptual model supports operational notions used to compare feedback-logging with runtime-observability, including AuditRecord, TelemetryEvent. The source does not define Moonweave Modules feedback-logging or runtime-observability, their class or relation placement, or their ownership split. Under feedback-logging's owns_when "Own an object when its identity is determined by record format, stream position, audit chain, subscription, sink, or a telemetry export batch.", Moonweave applies the disambiguation test "If removing stream, partition, and sink leaves a complete runtime occurrence, it belongs to tracing and checkpoints; if identity depends on record sequence or export batch, it belongs to logging and telemetry."; result=distinct and owner=runtime-observability are a Moonweave design inference over the registered evidence.
+    locator: Observability concepts > Runs and traces; Evaluation concepts > Targets for online evaluation > Runs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-024
+    source: eng-fw-openai-tracing
+    supports: Source eng-fw-openai-tracing at Tracing guide > Traces, spans, and trace processors supports operational notions used to compare feedback-logging with runtime-observability, including AuditRecord, TelemetryEvent. The source does not define Moonweave Modules feedback-logging or runtime-observability, their class or relation placement, or their ownership split. Under feedback-logging's owns_when "Own an object when its identity is determined by record format, stream position, audit chain, subscription, sink, or a telemetry export batch.", Moonweave applies the disambiguation test "If removing stream, partition, and sink leaves a complete runtime occurrence, it belongs to tracing and checkpoints; if identity depends on record sequence or export batch, it belongs to logging and telemetry."; result=distinct and owner=runtime-observability are a Moonweave design inference over the registered evidence.
+    locator: Tracing guide > Traces, spans, and trace processors
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-025
+    source: eng-fw-langsmith-docs
+    supports: Source eng-fw-langsmith-docs at Documentation page > LangSmith docs heading and documented conceptual model supports operational notions used to compare feedback-logging with safety-commit-redaction, including LogSubscription, TelemetryExportBatch. The source does not define Moonweave Modules feedback-logging or safety-commit-redaction, their class or relation placement, or their ownership split. Under feedback-logging's owns_when "Own an object when its identity is determined by record format, stream position, audit chain, subscription, sink, or a telemetry export batch.", Moonweave applies the disambiguation test "An object determined by gate-request or effect identity belongs to commit control; one determined by stream, partition, retention, and integrity proof belongs to logging and telemetry."; result=distinct and owner=feedback-logging are a Moonweave design inference over the registered evidence.
+    locator: Observability concepts > Runs and traces; Evaluation concepts > Targets for online evaluation > Runs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-026
+    source: eng-fw-openai-tracing
+    supports: Source eng-fw-openai-tracing at Tracing guide > Traces, spans, and trace processors supports operational notions used to compare feedback-logging with safety-commit-redaction, including LogSubscription, TelemetryExportBatch. The source does not define Moonweave Modules feedback-logging or safety-commit-redaction, their class or relation placement, or their ownership split. Under feedback-logging's owns_when "Own an object when its identity is determined by record format, stream position, audit chain, subscription, sink, or a telemetry export batch.", Moonweave applies the disambiguation test "An object determined by gate-request or effect identity belongs to commit control; one determined by stream, partition, retention, and integrity proof belongs to logging and telemetry."; result=distinct and owner=feedback-logging are a Moonweave design inference over the registered evidence.
+    locator: Tracing guide > Traces, spans, and trace processors
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-027
+    source: eng-fw-langsmith-docs
+    supports: Source eng-fw-langsmith-docs at Documentation page > LangSmith docs heading and documented conceptual model supports operational notions used to compare feedback-logging with safety-commit-redaction, including CommitDenial, EffectReceipt. The source does not define Moonweave Modules feedback-logging or safety-commit-redaction, their class or relation placement, or their ownership split. Under feedback-logging's owns_when "Own an object when its identity is determined by record format, stream position, audit chain, subscription, sink, or a telemetry export batch.", Moonweave applies the disambiguation test "An object determined by gate-request or effect identity belongs to commit control; one determined by stream, partition, retention, and integrity proof belongs to logging and telemetry."; result=distinct and owner=safety-commit-redaction are a Moonweave design inference over the registered evidence.
+    locator: Observability concepts > Runs and traces; Evaluation concepts > Targets for online evaluation > Runs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-028
+    source: eng-fw-openai-tracing
+    supports: Source eng-fw-openai-tracing at Tracing guide > Traces, spans, and trace processors supports operational notions used to compare feedback-logging with safety-commit-redaction, including CommitDenial, EffectReceipt. The source does not define Moonweave Modules feedback-logging or safety-commit-redaction, their class or relation placement, or their ownership split. Under feedback-logging's owns_when "Own an object when its identity is determined by record format, stream position, audit chain, subscription, sink, or a telemetry export batch.", Moonweave applies the disambiguation test "An object determined by gate-request or effect identity belongs to commit control; one determined by stream, partition, retention, and integrity proof belongs to logging and telemetry."; result=distinct and owner=safety-commit-redaction are a Moonweave design inference over the registered evidence.
+    locator: Tracing guide > Traces, spans, and trace processors
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-029
+    source: eng-fw-langsmith-docs
+    supports: Source eng-fw-langsmith-docs at Documentation page > LangSmith docs heading and documented conceptual model supports operational notions used to compare feedback-logging with feedback-metrics-evaluation, including MeasurementReference, MetricExportActivity. The source does not define Moonweave Modules feedback-logging or feedback-metrics-evaluation, their class or relation placement, or their ownership split. Under feedback-logging's owns_when "Own an object when its identity is determined by record format, stream position, audit chain, subscription, sink, or a telemetry export batch.", Moonweave applies the disambiguation test "If identity comes from measurement ID, metric, and subject, it belongs to evaluation and measurement; if it comes from log offset, batch ID, or sink, it belongs to logging and telemetry."; result=distinct and owner=feedback-logging are a Moonweave design inference over the registered evidence.
+    locator: Observability concepts > Runs and traces; Evaluation concepts > Targets for online evaluation > Runs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-030
+    source: eng-fw-openai-tracing
+    supports: Source eng-fw-openai-tracing at Tracing guide > Traces, spans, and trace processors supports operational notions used to compare feedback-logging with feedback-metrics-evaluation, including MeasurementReference, MetricExportActivity. The source does not define Moonweave Modules feedback-logging or feedback-metrics-evaluation, their class or relation placement, or their ownership split. Under feedback-logging's owns_when "Own an object when its identity is determined by record format, stream position, audit chain, subscription, sink, or a telemetry export batch.", Moonweave applies the disambiguation test "If identity comes from measurement ID, metric, and subject, it belongs to evaluation and measurement; if it comes from log offset, batch ID, or sink, it belongs to logging and telemetry."; result=distinct and owner=feedback-logging are a Moonweave design inference over the registered evidence.
+    locator: Tracing guide > Traces, spans, and trace processors
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-031
+    source: eng-fw-langsmith-docs
+    supports: Source eng-fw-langsmith-docs at Documentation page > LangSmith docs heading and documented conceptual model supports operational notions used to compare feedback-logging with feedback-metrics-evaluation, including Measurement, Score. The source does not define Moonweave Modules feedback-logging or feedback-metrics-evaluation, their class or relation placement, or their ownership split. Under feedback-logging's owns_when "Own an object when its identity is determined by record format, stream position, audit chain, subscription, sink, or a telemetry export batch.", Moonweave applies the disambiguation test "If identity comes from measurement ID, metric, and subject, it belongs to evaluation and measurement; if it comes from log offset, batch ID, or sink, it belongs to logging and telemetry."; result=distinct and owner=feedback-metrics-evaluation are a Moonweave design inference over the registered evidence.
+    locator: Observability concepts > Runs and traces; Evaluation concepts > Targets for online evaluation > Runs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending
+  - id: claim-feedback-logging-032
+    source: eng-fw-openai-tracing
+    supports: Source eng-fw-openai-tracing at Tracing guide > Traces, spans, and trace processors supports operational notions used to compare feedback-logging with feedback-metrics-evaluation, including Measurement, Score. The source does not define Moonweave Modules feedback-logging or feedback-metrics-evaluation, their class or relation placement, or their ownership split. Under feedback-logging's owns_when "Own an object when its identity is determined by record format, stream position, audit chain, subscription, sink, or a telemetry export batch.", Moonweave applies the disambiguation test "If identity comes from measurement ID, metric, and subject, it belongs to evaluation and measurement; if it comes from log offset, batch ID, or sink, it belongs to logging and telemetry."; result=distinct and owner=feedback-metrics-evaluation are a Moonweave design inference over the registered evidence.
+    locator: Tracing guide > Traces, spans, and trace processors
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: pending

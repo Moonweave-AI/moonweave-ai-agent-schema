@@ -7,19 +7,19 @@ import type {
 const conceptRef = (id: string): OntologyEntityRef => `concept:${id}`;
 
 /**
- * Canonical history stays indexed, while the default explorer surface is an
- * accepted-release projection. Explicit detail navigation can still resolve a
- * deprecated entity by ref without placing it back in the primary hierarchy.
+ * The explorer is the human-review surface for the current YAML tree. A node
+ * remains visible while it is under review; only an explicit deprecation
+ * removes it from the current graph.
  */
 export const isDefaultVisibleOntologyEntity = (
   index: OntologyIndex,
   ref: OntologyEntityRef,
-): boolean => index.entitiesByRef.get(ref)?.data.status === "accepted";
+): boolean => index.entitiesByRef.get(ref)?.data.status !== "deprecated";
 
 export const isDefaultVisibleOntologyRelation = (
   index: OntologyIndex,
   relation: CanonicalRelation,
-): boolean => relation.status === "accepted" &&
+): boolean => relation.status !== "deprecated" &&
   isDefaultVisibleOntologyEntity(index, conceptRef(relation.source_id)) &&
   isDefaultVisibleOntologyEntity(index, conceptRef(relation.target_id));
 

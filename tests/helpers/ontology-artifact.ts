@@ -2,7 +2,7 @@ import { isAbsolute, resolve } from "node:path";
 
 const publishedArtifactPath = resolve(
   process.cwd(),
-  "ontology/agent-ontology.json",
+  "src/generated/agent-ontology.json",
 );
 
 export const ontologyArtifactPath = (): string => {

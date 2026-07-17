@@ -188,7 +188,7 @@ describe("repository dependency-security wiring", () => {
       resolve(repositoryRoot, ".github/workflows/deploy.yml"), "utf8");
 
     expect(packageJson.scripts["dependency:security"]).toBe(
-      "npm run dependency:policy && npm run dependency:audit && npm run dependency:python",
+      "npm run dependency:policy && npm run dependency:audit",
     );
     expect(packageJson.scripts["ontology:preflight"]).toContain("npm run dependency:security");
     expect(validationWorkflow).toMatch(

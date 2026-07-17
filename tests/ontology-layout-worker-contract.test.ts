@@ -3,20 +3,20 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import canonicalOntology from "../src/generated/agent-ontology.json";
 import communityGraph from "../src/generated/ontology-community-graph.json";
 
-describe("NetworkX community and vis-network runtime boundary", () => {
-  it("keeps community discovery offline and browser layout in one seeded engine", () => {
-    const generator = readFileSync(
-      resolve("scripts/generate-ontology-community-graph.py"), "utf8");
+describe("YAML community projection and vis-network runtime boundary", () => {
+  it("compiles deterministic module communities and uses one seeded browser layout", () => {
+    const compiler = readFileSync(
+      resolve("scripts/lib/ontology-yaml-compiler.mjs"), "utf8");
     const graphComponent = readFileSync(resolve("src/components/OntologyGraph.tsx"), "utf8");
     const runtime = readFileSync(resolve("src/lib/ontology-network-runtime.ts"), "utf8");
     const networkModel = readFileSync(resolve("src/lib/ontology-community-network.ts"), "utf8");
 
-    expect(generator).toContain("import networkx as nx");
-    expect(generator).toContain("from graspologic.partition import leiden");
-    expect(generator).toContain("SEED = 42");
-    expect(generator).toContain("nx.community.louvain_communities");
+    expect(compiler).toContain('assignment_policy: "canonical-module-owner"');
+    expect(compiler).toContain("seed: 42");
+    expect(compiler).toContain('diagnostic_engine: "none"');
     expect(graphComponent).toContain("ontology-community-graph.json");
     expect(graphComponent).not.toMatch(/new Worker|cytoscape|elkjs|fcose/iu);
     expect(runtime).toContain('import("vis-network")');
@@ -30,7 +30,7 @@ describe("NetworkX community and vis-network runtime boundary", () => {
       community.member_refs.map((ref) => [ref, community.id] as const));
     const assigned = new Map(memberships);
 
-    expect(communityGraph.schema_version).toBe("1.0.0");
+    expect(communityGraph.schema_version).toBe("2.0.0");
     expect(communityGraph.algorithm.seed).toBe(42);
     expect(communityGraph.nodes).toHaveLength(communityGraph.metrics.node_count);
     expect(communityGraph.edges).toHaveLength(communityGraph.metrics.edge_count);
@@ -39,7 +39,7 @@ describe("NetworkX community and vis-network runtime boundary", () => {
       expect(assigned.get(node.ref)).toBe(node.community_id);
     }
     expect(communityGraph.edges.filter(({ evidence }) => evidence === "canonical"))
-      .toHaveLength(1091);
+      .toHaveLength(canonicalOntology.relations.filter(({ status }) => status !== "deprecated").length);
   });
 
   it("does not use layout communities as schema, example, or source nodes", () => {

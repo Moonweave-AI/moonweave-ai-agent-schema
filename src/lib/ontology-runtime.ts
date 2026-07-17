@@ -39,9 +39,6 @@ const ONTOLOGY_METRIC_FIELDS = [
   "constraints",
   "source_claims",
   "case_paths",
-  "legacy_individuals_remaining",
-  "legacy_data_properties_remaining",
-  "legacy_axioms_remaining",
 ] as const;
 
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>

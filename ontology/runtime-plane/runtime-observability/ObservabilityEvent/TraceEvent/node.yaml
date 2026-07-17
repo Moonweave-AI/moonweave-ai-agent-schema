@@ -1,0 +1,721 @@
+schema: moonweave.ai/ontology-node/v1
+id: TraceEvent
+kind: concept
+status: review
+labels:
+  en: trace event
+  zh: 追踪事件
+  ja: トレースイベント
+semantics:
+  short_definition:
+    zh: 附着于某个追踪跨度的带时间注释事件。
+    en: A timestamped annotation event attached to one trace span.
+    ja: 一つのトレーススパンに付随する時刻付き注釈イベント。
+  definition:
+    zh: 追踪事件是一种 ObservabilityEvent，继承 event_id 作为唯一事件身份；发生时间、事件名称、所属 TraceSpan 与属性描述该瞬时发生项，而不组成第二套身份。它可表示重试、异常或缓存未命中；需要独立持续时间的操作应建模为子跨度。
+    en: A TraceEvent is an ObservabilityEvent and inherits event_id as its sole event identity. Occurrence time, event name, owning TraceSpan, and attributes describe that instant rather than forming a second identity. It may mark a retry, exception, or cache miss; an operation requiring its own duration should be a child span.
+    ja: TraceEvent は ObservabilityEvent の一種で、唯一のイベント同一性として event_id を継承します。発生時刻、イベント名、所属 TraceSpan、属性は瞬間的出来事を記述する種差で、別同一性ではありません。独自の所要時間を持つ操作は子スパンとして表します。
+  why_needed:
+    zh: 跨度只给出操作区间，追踪事件则保存区间内部的关键瞬间，从而无需为每个异常、重试或状态标记创建子跨度；其跨度归属同时保留了发生项所在的因果上下文。
+    en: A span gives an operation interval, while trace events preserve important instants within that interval without creating a child span for every exception, retry, or state marker. Their span attachment retains the causal context of each occurrence.
+    ja: スパンは操作区間を示し、トレースイベントはその内部の重要な瞬間を、例外や再試行ごとに子スパンを作らず保存します。スパンへの付属により発生項の因果文脈も保たれます。
+  includes:
+    - zh: 包括明确附着于跨度的异常记录、重试标记、缓存命中或未命中、模型流式输出首 token 到达等瞬时事件。
+      en: Includes span-attached exception records, retry markers, cache hits or misses, and instantaneous markers such as arrival of the first streamed model token.
+      ja: スパンに付随する例外記録、再試行印、キャッシュヒット／ミス、モデルの最初のストリームトークン到着などの瞬間イベントを含みます。
+  excludes:
+    - zh: 不包括具有开始与结束时间的 TraceSpan，也不包括未绑定到跨度、仅作为独立日志流记录存在的 LogRecord。
+      en: Excludes a TraceSpan with start and end times, and a standalone LogRecord that is not attached to a span.
+      ja: 開始・終了時刻を持つ TraceSpan、およびスパンに付属せず独立ログとしてだけ存在する LogRecord は含みません。
+  semantic_kind: event
+  aliases: []
+structure:
+  identity_keys: []
+  fields: []
+  constraints: []
+  required_relation_constraints: []
+examples:
+  - id: TraceEvent-example-positive-001
+    kind: positive
+    labels:
+      zh: 跨度内带时间戳的异常标记
+      en: Timestamped exception marker within a span
+      ja: スパン内の時刻付き例外マーカー
+    scenario_id: null
+    descriptions:
+      zh: 检索工具跨度在 2026-07-15T10:43:12.418Z 记录名为 exception 的事件，属性包含 exception.type=TimeoutError、retry.ordinal=1 和经过脱敏的 message。
+      en: A retrieval-tool span records an event named exception at 2026-07-15T10:43:12.418Z with exception.type=TimeoutError, retry.ordinal=1, and a redacted message.
+      ja: 検索ツールスパンが2026-07-15T10:43:12.418Zにexceptionというイベントを記録し、exception.type=TimeoutError、retry.ordinal=1、秘匿済みmessageを属性に持つ。
+    field_values:
+      event_id: trace-event-exception-retrieval-1
+      event_kind: trace
+      event_name: exception
+      timestamp: 2026-07-15T10:43:12.418Z
+      attributes:
+        exception.type: TimeoutError
+        retry.ordinal: 1
+        exception.message: "[redacted]"
+      trace_id: 4bf92f3577b34da6a3ce929d0e0e4736
+      span_id: 00f067aa0ba902b7
+    related_node_ids:
+      - TraceEvent
+      - TraceSpan
+      - ObservabilityEvent
+    related_relation_ids:
+      - TraceEvent-is_a-ObservabilityEvent
+      - TraceSpan-records_event-TraceEvent
+    expected_result:
+      zh: 该发生被识别为 TraceEvent，并通过所在跨度保留完整因果上下文。
+      en: The occurrence is classified as TraceEvent and retains causal context through its containing span.
+      ja: 発生はTraceEventに分類され、所属スパンを通じて因果文脈を保持する。
+    why_valid_or_invalid:
+      zh: 它以名称和发生时点标识跨度区间内的一次瞬时事实，没有独立操作时长。
+      en: It identifies one instantaneous fact inside the span interval by name and occurrence time and has no independent operation duration.
+      ja: スパン区間内の一回の瞬時事実を名前と発生時刻で識別し、独立した操作時間を持たない。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-trace-event-002
+  - id: TraceEvent-example-boundary-001
+    kind: boundary
+    labels:
+      zh: 有独立时长的工具调用应建为子跨度
+      en: A duration-bearing tool call should be a child span
+      ja: 独立時間を持つツール呼出しは子スパン
+    scenario_id: null
+    descriptions:
+      zh: 模型跨度内启动一次检索调用，调用有自己的开始、结束、状态、属性和两个内部重试事件。它是一项可测量操作，应建立 TraceSpan，而不是压成父跨度上的单个 TraceEvent。
+      en: Within a model span, a retrieval call has its own start, end, status, attributes, and two internal retry events. It is a measurable operation and should be a child TraceSpan rather than one event on the parent span.
+      ja: モデルスパン内の検索呼出しが独自の開始・終了・状態・属性と2つの再試行イベントを持つ。測定可能な操作なので、親スパン上の単一TraceEventではなく子TraceSpanにする。
+    field_values: {}
+    related_node_ids:
+      - TraceEvent
+      - TraceSpan
+    related_relation_ids:
+      - TraceSpan-records_event-TraceEvent
+    expected_result:
+      zh: 检索调用被建模为子 TraceSpan，其内部重试才作为 TraceEvent。
+      en: The retrieval call is modeled as a child TraceSpan, and only its internal retries become TraceEvents.
+      ja: 検索呼出しは子TraceSpanにし、内部再試行だけをTraceEventにする。
+    why_valid_or_invalid:
+      zh: 事件没有持续区间；能够单独计时和给出结果的工作具有跨度身份。
+      en: An event has no duration interval; independently timed work with an outcome has span identity.
+      ja: イベントは継続区間を持たず、独立計時と結果を持つ作業はスパンの同一性を持つ。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-trace-event-002
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation:
+  - sibling_concept_id: CheckpointRestoreEvent
+    shared_parent_concept_id: ObservabilityEvent
+    differentia:
+      zh: 已审查兄弟区分：父节点 ObservabilityEvent：TraceEvent（semantic kind=event，骨架 TraceEvent-is_a-ObservabilityEvent）；CheckpointRestoreEvent（semantic kind=event，骨架 CheckpointRestoreEvent-is_a-ObservabilityEvent）。双端条件：TraceEvent 条件：“作为可观测运行事件，追踪事件由这一事实区分：它是可观测的运行发生项，例如消息、动作、工具调用、状态更新、警告、策略决策、产物更新或检查点事件”；CheckpointRestoreEvent 条件：“检查点恢复事件属于可观测运行事件，区别于其他同类对象的条件是：它记录从已保存检查点恢复运行会话、参与者、图或工作流的可观测事件，并保存恢复溯源”。任一条件成立不推出另一端。
+      en: "Reviewed sibling distinction: parent ObservabilityEvent: TraceEvent (semantic kind=event, backbone TraceEvent-is_a-ObservabilityEvent); CheckpointRestoreEvent (semantic kind=event, backbone CheckpointRestoreEvent-is_a-ObservabilityEvent). Endpoint conditions: TraceEvent condition: “Trace event belongs to the observability event category and differs from broader members in that it is an observable runtime occurrence such as a message, action, tool call, state update, warning, policy decision, artifact update, or checkpoint event”; CheckpointRestoreEvent condition: “Checkpoint restore event is an observability event whose defining condition is that it is an observable event that restores a runtime session, actor, graph, or workflow from a saved checkpoint and records restore provenance”. Either condition leaves the other unproven."
+      ja: 審査済み兄弟区別：親 ObservabilityEvent：TraceEvent（semantic kind=event、バックボーン TraceEvent-is_a-ObservabilityEvent）；CheckpointRestoreEvent（semantic kind=event、バックボーン CheckpointRestoreEvent-is_a-ObservabilityEvent）。両端条件：TraceEvent の条件：「トレースイベントは観測可能実行イベントとして、次の条件により他の対象と区別されます：それは、メッセージ、行動、ツール呼び出し、状態更新、警告、ポリシー判断、成果物更新、チェックポイントイベントなどの観測可能な実行上の出来事です」；CheckpointRestoreEvent の条件：「チェックポイント復元イベントは観測可能実行イベントのうち、次の事実を定義条件とする対象です：それは、保存済みチェックポイントから実行セッション、アクター、グラフ、ワークフローを復元する観測可能イベントを記録し、復元来歴を残します」。一方の成立は他方を証明しません。
+    source_claims:
+      - claim-trace-event-002
+parent_relation:
+  id: TraceEvent-is_a-ObservabilityEvent
+  predicate: is_a
+  direction: source-to-target
+  relation_kind: hierarchy
+  labels:
+    zh: 是一种
+    en: is a
+    ja: の一種である
+  definitions:
+    zh: 每个 TraceEvent 都是 ObservabilityEvent，其种差是作为名称、时间戳和可选属性组成的瞬时注记被记录到一个 TraceSpan。
+    en: Every TraceEvent is an ObservabilityEvent distinguished by being recorded on one TraceSpan as an instantaneous annotation with name, timestamp, and optional attributes.
+    ja: すべての TraceEvent は ObservabilityEvent で、name・timestamp・任意 attributes を持つ瞬時 annotation として一つの TraceSpan に記録される点が種差です。
+  cardinality: null
+  cardinality_not_applicable_reason:
+    zh: 分类继承不使用实例关系基数。
+    en: Taxonomic inheritance does not use instance-relation cardinality.
+    ja: 分類継承にはインスタンス関係の基数を用いません。
+  inverse_reading:
+    predicate: has_subtype
+    labels:
+      zh: 反向：是一种
+      en: has subtype
+      ja: 逆方向：の一種である
+  conditions: []
+  temporal_scope: timeless
+  boundary_context: null
+  constraints: []
+  examples:
+    - id: TraceEvent-is_a-ObservabilityEvent-example-positive-manual-20260716
+      kind: positive
+      labels:
+        zh: 逐项核实正例
+        en: Point-reviewed positive case
+        ja: 項目別審査の正例
+      scenario_id: null
+      descriptions:
+        zh: span-17 在 10:14:03 记录 cache.miss 事件，并附上 cache.key_hash 与 retryable=true。
+        en: span-17 records cache.miss at 10:14:03 with cache.key_hash and retryable=true attributes.
+        ja: span-17 が 10:14:03 に cache.miss を記録し cache.key_hash と retryable=true を付けます。
+      field_values: {}
+      related_node_ids:
+        - TraceEvent
+        - ObservabilityEvent
+      related_relation_ids:
+        - TraceEvent-is_a-ObservabilityEvent
+      expected_result:
+        zh: 仅在所述证据存在时返回这条有向事实。
+        en: Return this directed fact only when the described evidence exists.
+        ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
+      why_valid_or_invalid:
+        zh: 每个 TraceEvent 都是 ObservabilityEvent，其种差是作为名称、时间戳和可选属性组成的瞬时注记被记录到一个 TraceSpan。
+        en: Every TraceEvent is an ObservabilityEvent distinguished by being recorded on one TraceSpan as an instantaneous annotation with name, timestamp, and optional attributes.
+        ja: すべての TraceEvent は ObservabilityEvent で、name・timestamp・任意 attributes を持つ瞬時 annotation として一つの TraceSpan に記録される点が種差です。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-trace-event-003
+    - id: TraceEvent-is_a-ObservabilityEvent-example-boundary-manual-20260716
+      kind: boundary
+      labels:
+        zh: 逐项核实边界例
+        en: Point-reviewed boundary case
+        ja: 項目別審査の境界例
+      scenario_id: null
+      descriptions:
+        zh: 工具调用从 10:14:03 持续到 10:14:08，拥有子操作、属性和最终状态。
+        en: A tool call runs from 10:14:03 to 10:14:08 and has sub-operations, attributes, and final status.
+        ja: tool call が 10:14:03 から 10:14:08 まで続き、sub-operation・attributes・final status を持ちます。
+      field_values: {}
+      related_node_ids:
+        - TraceEvent
+        - ObservabilityEvent
+      related_relation_ids:
+        - TraceEvent-is_a-ObservabilityEvent
+      expected_result:
+        zh: 不得从该边界情形推断这条关系。
+        en: Do not infer this relation from the boundary case.
+        ja: この境界事例から当該関係を推論しません。
+      why_valid_or_invalid:
+        zh: 有持续时间且代表操作的对象应为 TraceSpan，不是瞬时 TraceEvent。
+        en: A duration-bearing object representing an operation is TraceSpan, not an instantaneous TraceEvent.
+        ja: 継続時間を持ち操作を表す対象は TraceSpan で、瞬時 TraceEvent ではありません。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-trace-event-003
+  source_claims:
+    - claim-trace-event-003
+  distinct_fact_rationale: null
+  layout_role: primary-backbone
+  review_status: pending
+  endpoint_order: child-to-parent
+relations:
+  - id: TraceEvent-records-BoundaryCrossing
+    predicate: records
+    direction: source-to-target
+    relation_kind: information
+    labels:
+      zh: 记录边界跨越
+      en: records boundary crossing
+      ja: boundary crossing を records
+    definitions:
+      zh: TraceEvent records 一个 BoundaryCrossing 时，事件时间、crossing_id、对象摘要、主体、决定和结果必须与跨越一致；方向从观测记录指向被记录发生，BoundaryCrossing 本身不因此成为 TraceEvent。
+      en: TraceEvent records a BoundaryCrossing when event time, crossing ID, object digest, actors, decision, and outcome agree with the crossing. Direction runs from observation record to the recorded occurrence, and BoundaryCrossing does not thereby become a TraceEvent.
+      ja: TraceEvent records BoundaryCrossing は event time・crossing ID・object digest・actor・decision・outcome が一致する場合に成立し direction は observation record→occurrence、BoundaryCrossing は TraceEvent になりません。
+    cardinality:
+      source:
+        min: 0
+        max: null
+      target:
+        min: 0
+        max: null
+    cardinality_not_applicable_reason: null
+    inverse_reading:
+      predicate: is_records_of
+      labels:
+        zh: 反向 records
+        en: is records of
+        ja: records inverse
+    conditions: []
+    temporal_scope: valid-time
+    boundary_context:
+      trust_boundary_concept_id: TrustBoundary
+      authority_basis:
+        zh: TraceEvent 只是对 BoundaryCrossing 的观测记录，不授予跨越权限；只有事件时间、crossing_id、对象摘要、参与者、决定和结果一致时才建立 records。
+        en: A TraceEvent is an observation record of a BoundaryCrossing and grants no crossing authority; records is asserted only when event time, crossing_id, object digest, actors, decision, and outcome agree.
+        ja: TraceEvent は BoundaryCrossing の observation record で crossing authority を与えません。event time・crossing_id・object digest・actor・decision・outcome が一致する場合だけ records を表明します。
+      protocol_or_resource_context:
+        zh: trace_id、span_id、event_id、crossing_id、对象摘要与 occurred_at 必须可验证地相关，单纯共处同一 trace 不足以建立记录关系。
+        en: trace_id, span_id, event_id, crossing_id, object digest, and occurred_at must be verifiably correlated; mere co-membership in one trace is insufficient.
+        ja: trace_id・span_id・event_id・crossing_id・object digest・occurred_at を検証可能に関連付け、同一traceでの共起だけでは不十分です。
+    constraints: []
+    examples:
+      - id: TraceEvent-records-BoundaryCrossing-example-positive-manual-20260716
+        kind: positive
+        labels:
+          zh: PEP 追踪记录跨越
+          en: PEP trace records crossing
+          ja: PEP trace が crossing を record
+        scenario_id: trust-relation-traceevent-records-boundarycrossing-positive
+        descriptions:
+          zh: trace-event-884 保存 crossing-884、03:02:17、相同摘要、decision-884 与 redacted 结果。
+          en: trace-event-884 stores crossing-884, 03:02:17, the same digest, decision-884, and redacted outcome.
+          ja: trace-event-884 は crossing-884・03:02:17・same digest・decision-884・redacted outcome を保存します。
+        field_values: {}
+        related_node_ids:
+          - TraceEvent
+          - BoundaryCrossing
+        related_relation_ids:
+          - TraceEvent-records-BoundaryCrossing
+        expected_result:
+          zh: 建立 trace-event-884 records crossing-884。
+          en: Assert trace-event-884 records crossing-884.
+          ja: trace-event-884 records crossing-884 を主張します。
+        why_valid_or_invalid:
+          zh: 追踪事件中的跨越标识、时间与参与者字段共同指向同一次边界跨越。
+          en: Trace fields correlate completely with crossing identity.
+          ja: trace field が crossing identity と完全 correlate します。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-trace-event-004
+          - claim-trace-event-005
+      - id: TraceEvent-records-BoundaryCrossing-example-boundary-manual-20260716
+        kind: boundary
+        labels:
+          zh: 仅同一时间的无关追踪
+          en: Unrelated trace at same time
+          ja: same time unrelated trace
+        scenario_id: trust-relation-traceevent-records-boundarycrossing-boundary
+        descriptions:
+          zh: trace-event-885 时间接近，但记录不同对象摘要和 policy refresh，没有 crossing_id。
+          en: trace-event-885 is close in time but records another object digest and a policy refresh with no crossing ID.
+          ja: trace-event-885 は time close でも other digest/policy refresh で crossing ID がありません。
+        field_values: {}
+        related_node_ids:
+          - TraceEvent
+          - BoundaryCrossing
+        related_relation_ids:
+          - TraceEvent-records-BoundaryCrossing
+        expected_result:
+          zh: 不得仅按时间接近建立 records。
+          en: Do not assert records from temporal proximity alone.
+          ja: time proximity のみで records を主張しません。
+        why_valid_or_invalid:
+          zh: 观测关联需要跨越身份和载荷一致。
+          en: Observation correlation requires crossing identity and payload agreement.
+          ja: observation correlation は crossing identity/payload agreement を要します。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-trace-event-004
+    source_claims:
+      - claim-trace-event-006
+      - claim-trace-event-007
+    distinct_fact_rationale:
+      zh: 该方向体现追踪记录描述发生，而不是发生生成追踪。
+      en: The direction states that a trace record describes an occurrence rather than the occurrence producing the trace.
+      ja: trace record が occurrence を describe し occurrence が trace を produce する意味ではありません。
+    layout_role: cross-link
+    review_status: pending
+    target: concept:BoundaryCrossing
+  - id: TraceEvent-records_generated_artifact-Artifact
+    predicate: records_generated_artifact
+    direction: source-to-target
+    relation_kind: information
+    labels:
+      zh: 记录已生成产物
+      en: records generated artifact
+      ja: 生成済み成果物を記録
+    definitions:
+      zh: TraceEvent 通过此关系记录某 Artifact 版本已经由其它执行活动生成；事件必须携带产物标识、版本和摘要，但事件本身不是生产活动。
+      en: TraceEvent records that an Artifact revision was generated by another execution activity; the event carries artifact ID, version, and digest but is not itself the producing activity.
+      ja: TraceEvent は別実行 activity が Artifact revision を生成した事実を記録し、artifact ID・version・digest を持ちますが event 自体は生産 activity ではありません。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 事件可以不记录产物，也可以记录一个批次中的多个产物。
+      en: An event may record no artifact or several artifacts in one batch.
+      ja: event は成果物を記録しない場合も batch の複数成果物を記録する場合もあります。
+    inverse_reading:
+      predicate: recorded_as_generated_by_event
+      labels:
+        zh: 生成被事件记录
+        en: generation recorded by event
+        ja: 生成が event に記録される
+    conditions: []
+    temporal_scope: valid-time
+    boundary_context: null
+    constraints: []
+    examples:
+      - id: TraceEvent-records_generated_artifact-Artifact-example-positive-manual-20260716
+        kind: positive
+        labels:
+          zh: 完成事件记录报告摘要
+          en: Completion event records report digest
+          ja: completion event が report digest を記録
+        scenario_id: null
+        descriptions:
+          zh: trace-event-601 记录 attempt-601-1 完成，并携带 report-7@2 的 ID、版本和 digest；生成者仍是该 RunAttempt。
+          en: trace-event-601 records completion of attempt-601-1 and carries report-7@2 ID, version, and digest; the RunAttempt remains the generator.
+          ja: trace-event-601 は attempt-601-1 完了と report-7@2 の ID・version・digest を記録し、generator は RunAttempt のままです。
+        field_values: {}
+        related_node_ids:
+          - TraceEvent
+          - Artifact
+          - RunAttempt
+        related_relation_ids:
+          - TraceEvent-records_generated_artifact-Artifact
+        expected_result:
+          zh: 建立 records_generated_artifact，并另保留 generated_by。
+          en: Assert records_generated_artifact and separately retain generated_by.
+          ja: records_generated_artifact を主張し generated_by を別に保持します。
+        why_valid_or_invalid:
+          zh: 事件拥有充分相关键用于记录，但没有物化内容的活动身份。
+          en: The event has sufficient correlation keys to record generation but no activity identity that materialized content.
+          ja: event は生成記録に十分な correlation key を持ちますが内容を物化した activity 同一性はありません。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-trace-event-008
+      - id: TraceEvent-records_generated_artifact-Artifact-example-boundary-manual-20260716
+        kind: boundary
+        labels:
+          zh: 日志只提到文件名
+          en: Log mentions filename only
+          ja: log が file 名だけ言及
+        scenario_id: null
+        descriptions:
+          zh: trace-event-602 文本含“report.json”，但没有 artifact ID、版本、摘要或生成关联键。
+          en: trace-event-602 text mentions “report.json” but has no artifact ID, version, digest, or generation correlation key.
+          ja: trace-event-602 text は「report.json」を含みますが artifact ID・version・digest・generation correlation key がありません。
+        field_values: {}
+        related_node_ids:
+          - TraceEvent
+          - Artifact
+        related_relation_ids:
+          - TraceEvent-records_generated_artifact-Artifact
+        expected_result:
+          zh: 不得把模糊文件名提及断言为产物生成记录边。
+          en: Do not assert the recording edge.
+          ja: 曖昧な file 名の言及から成果物生成の記録辺を主張しません。
+        why_valid_or_invalid:
+          zh: 文件名相似不能识别具体不可变产物版本。
+          en: Filename similarity cannot identify a specific immutable artifact revision.
+          ja: file 名類似では特定不変 artifact revision を識別できません。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-trace-event-009
+    source_claims:
+      - claim-trace-event-010
+    distinct_fact_rationale:
+      zh: records_generated_artifact 是观测记录；Artifact-generated_by-RunAttempt 是真实生成溯源，二者职责不同。
+      en: records_generated_artifact is an observation record; Artifact-generated_by-RunAttempt is actual generation provenance.
+      ja: records_generated_artifact は観測記録、Artifact-generated_by-RunAttempt は実生成 provenance です。
+    layout_role: cross-link
+    review_status: pending
+    target: concept:Artifact
+  - id: trace_event_recorded_as_log_record
+    predicate: trace_event_recorded_as_log_record
+    direction: source-to-target
+    relation_kind: information
+    labels:
+      zh: trace event recorded as log record
+      en: trace event recorded as log record
+      ja: trace event recorded as log record
+    definitions:
+      zh: TraceEvent 通过 recorded_as 指向保存该发生的结构化 LogRecord；两者可共享 TraceId、SpanId 和时间，但保持各自身份与所有者。
+      en: TraceEvent recorded_as the structured LogRecord preserving that occurrence; they may share TraceId, SpanId, and time while retaining separate identities and owners.
+      ja: TraceEvent は発生を保存する structured LogRecord と recorded_as で結び、TraceId・SpanId・時刻を共有しても別 identity と owner を保ちます。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 该本体关系记录可查询的语义事实，但不对所有运行实例施加统一基数。
+      en: This ontology relation records a queryable semantic fact without imposing one universal cardinality on all runtime instances.
+      ja: この本体関係は検索可能な意味事実を記録しますが、すべての実行インスタンスに一律の基数を課しません。
+    inverse_reading:
+      predicate: is_target_of_trace_event_recorded_as_log_record
+      labels:
+        zh: 反向：trace event recorded as log record
+        en: is target of trace event recorded as log record
+        ja: 逆方向：trace event recorded as log record
+    conditions: []
+    temporal_scope: timeless
+    boundary_context:
+      trust_boundary_concept_id: TrustBoundary
+      authority_basis:
+        zh: TraceEvent 仍由 runtime-plane 拥有，LogRecord 仍由 feedback-plane 拥有；该 information 事实只建立跨域依赖，不转移规范所有权。运行时授权必须由具体 PolicyDecision、AuthorizationGrant 或协议会话证明。
+        en: TraceEvent remains owned by runtime-plane and LogRecord by feedback-plane; this information fact establishes a cross-Domain dependency without transferring canonical ownership. Runtime authority must be evidenced by a concrete PolicyDecision, AuthorizationGrant, or protocol session.
+        ja: TraceEvent は runtime-plane、LogRecord は feedback-plane に引き続き所有されます。この information 事実は正規所有権を移さずドメイン横断依存だけを表し、実行時権限には具体的な PolicyDecision、AuthorizationGrant、またはプロトコルセッションの証拠が必要です。
+      protocol_or_resource_context:
+        zh: 查询必须沿 TraceEvent → LogRecord 的 canonical ID 与该关系自身的来源主张执行；协议版本、资源标识和信任判定保留在两端节点的信息合同中。
+        en: Queries follow the canonical TraceEvent → LogRecord assertion and this relation's own source claims; protocol version, resource identity, and trust decisions remain in the endpoint information contracts.
+        ja: 問い合わせは TraceEvent → LogRecord の canonical ID と当該関係固有の出典主張に従います。プロトコル版、資源識別、信頼判断は両端ノードの情報契約に保持されます。
+    constraints: []
+    examples:
+      - id: trace_event_recorded_as_log_record-example-positive-manual-20260716
+        kind: positive
+        labels:
+          zh: 逐项核实正例
+          en: Point-reviewed positive case
+          ja: 項目別審査の正例
+        scenario_id: null
+        descriptions:
+          zh: exception TraceEvent 被写成 LogRecord lr-88，包含相同 Timestamp、TraceId、SpanId、EventName 与异常属性。
+          en: An exception TraceEvent is written as LogRecord lr-88 with matching Timestamp, TraceId, SpanId, EventName, and exception attributes.
+          ja: exception TraceEvent が同じ Timestamp・TraceId・SpanId・EventName・exception attributes を持つ LogRecord lr-88 として書かれます。
+        field_values: {}
+        related_node_ids:
+          - TraceEvent
+          - LogRecord
+        related_relation_ids:
+          - trace_event_recorded_as_log_record
+        expected_result:
+          zh: 仅在所述证据存在时返回这条有向事实。
+          en: Return this directed fact only when the described evidence exists.
+          ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
+        why_valid_or_invalid:
+          zh: TraceEvent 通过 recorded_as 指向保存该发生的结构化 LogRecord；两者可共享 TraceId、SpanId 和时间，但保持各自身份与所有者。
+          en: TraceEvent recorded_as the structured LogRecord preserving that occurrence; they may share TraceId, SpanId, and time while retaining separate identities and owners.
+          ja: TraceEvent は発生を保存する structured LogRecord と recorded_as で結び、TraceId・SpanId・時刻を共有しても別 identity と owner を保ちます。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-trace-event-011
+      - id: trace_event_recorded_as_log_record-example-boundary-manual-20260716
+        kind: boundary
+        labels:
+          zh: 逐项核实边界例
+          en: Point-reviewed boundary case
+          ja: 項目別審査の境界例
+        scenario_id: null
+        descriptions:
+          zh: LogRecord lr-89 与事件时间相近，但来自另一个 SpanId，正文也描述不同请求。
+          en: LogRecord lr-89 has a nearby timestamp but a different SpanId and describes another request.
+          ja: LogRecord lr-89 は近い timestamp でも別 SpanId を持ち、別 request を記述します。
+        field_values: {}
+        related_node_ids:
+          - TraceEvent
+          - LogRecord
+        related_relation_ids:
+          - trace_event_recorded_as_log_record
+        expected_result:
+          zh: 不得从该边界情形推断这条关系。
+          en: Do not infer this relation from the boundary case.
+          ja: この境界事例から当該関係を推論しません。
+        why_valid_or_invalid:
+          zh: 时间邻近不足以证明记录来源；必须由 trace context 与事件字段建立可核验映射。
+          en: Temporal proximity does not prove recording lineage; trace context and event fields must establish a verifiable mapping.
+          ja: 時刻近接は recording lineage を証明せず、trace context と event fields の検証可能 mapping が必要です。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-trace-event-011
+    source_claims:
+      - claim-trace-event-011
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: pending
+    target: concept:LogRecord
+  - id: trace_event_records_error_event
+    predicate: trace_event_records_error_event
+    direction: source-to-target
+    relation_kind: causal
+    labels:
+      zh: trace event records error event
+      en: trace event records error event
+      ja: trace event records error event
+    definitions:
+      zh: TraceEvent 通过 records_error_event 指向与其原始运行发生相对应的 ErrorEvent，使跨度内证据与故障域解释保持分离。
+      en: TraceEvent records_error_event the ErrorEvent corresponding to its raw runtime occurrence, keeping span-local evidence separate from failure-domain interpretation.
+      ja: TraceEvent は元 runtime occurrence に対応する ErrorEvent を records_error_event し、Span-local evidence と failure-domain 解釈を分離します。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 该本体关系记录可查询的语义事实，但不对所有运行实例施加统一基数。
+      en: This ontology relation records a queryable semantic fact without imposing one universal cardinality on all runtime instances.
+      ja: この本体関係は検索可能な意味事実を記録しますが、すべての実行インスタンスに一律の基数を課しません。
+    inverse_reading:
+      predicate: is_target_of_trace_event_records_error_event
+      labels:
+        zh: 反向：trace event records error event
+        en: is target of trace event records error event
+        ja: 逆方向：trace event records error event
+    conditions: []
+    temporal_scope: valid-time
+    boundary_context:
+      trust_boundary_concept_id: TrustBoundary
+      authority_basis:
+        zh: TraceEvent 仍由 runtime-plane 拥有，ErrorEvent 仍由 feedback-plane 拥有；该 causal 事实只建立跨域依赖，不转移规范所有权。运行时授权必须由具体 PolicyDecision、AuthorizationGrant 或协议会话证明。
+        en: TraceEvent remains owned by runtime-plane and ErrorEvent by feedback-plane; this causal fact establishes a cross-Domain dependency without transferring canonical ownership. Runtime authority must be evidenced by a concrete PolicyDecision, AuthorizationGrant, or protocol session.
+        ja: TraceEvent は runtime-plane、ErrorEvent は feedback-plane に引き続き所有されます。この causal 事実は正規所有権を移さずドメイン横断依存だけを表し、実行時権限には具体的な PolicyDecision、AuthorizationGrant、またはプロトコルセッションの証拠が必要です。
+      protocol_or_resource_context:
+        zh: 查询必须沿 TraceEvent → ErrorEvent 的 canonical ID 与该关系自身的来源主张执行；协议版本、资源标识和信任判定保留在两端节点的信息合同中。
+        en: Queries follow the canonical TraceEvent → ErrorEvent assertion and this relation's own source claims; protocol version, resource identity, and trust decisions remain in the endpoint information contracts.
+        ja: 問い合わせは TraceEvent → ErrorEvent の canonical ID と当該関係固有の出典主張に従います。プロトコル版、資源識別、信頼判断は両端ノードの情報契約に保持されます。
+    constraints: []
+    examples:
+      - id: trace_event_records_error_event-example-positive-manual-20260716
+        kind: positive
+        labels:
+          zh: 逐项核实正例
+          en: Point-reviewed positive case
+          ja: 項目別審査の正例
+        scenario_id: null
+        descriptions:
+          zh: exception TraceEvent 保存 exception.type=TimeoutError 与时刻；ErrorEvent err-44 使用同一 attempt_id 和异常指纹分类为可重试超时。
+          en: An exception TraceEvent records exception.type=TimeoutError and time; ErrorEvent err-44 uses the same attempt_id and exception fingerprint to classify a retryable timeout.
+          ja: exception TraceEvent が exception.type=TimeoutError と時刻を記録し、ErrorEvent err-44 は同じ attempt_id と fingerprint で retryable timeout と分類します。
+        field_values: {}
+        related_node_ids:
+          - TraceEvent
+          - ErrorEvent
+        related_relation_ids:
+          - trace_event_records_error_event
+        expected_result:
+          zh: 仅在所述证据存在时返回这条有向事实。
+          en: Return this directed fact only when the described evidence exists.
+          ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
+        why_valid_or_invalid:
+          zh: TraceEvent 通过 records_error_event 指向与其原始运行发生相对应的 ErrorEvent，使跨度内证据与故障域解释保持分离。
+          en: TraceEvent records_error_event the ErrorEvent corresponding to its raw runtime occurrence, keeping span-local evidence separate from failure-domain interpretation.
+          ja: TraceEvent は元 runtime occurrence に対応する ErrorEvent を records_error_event し、Span-local evidence と failure-domain 解釈を分離します。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-trace-event-012
+      - id: trace_event_records_error_event-example-boundary-manual-20260716
+        kind: boundary
+        labels:
+          zh: 逐项核实边界例
+          en: Point-reviewed boundary case
+          ja: 項目別審査の境界例
+        scenario_id: null
+        descriptions:
+          zh: ErrorEvent err-45 表示预算耗尽，而 TraceEvent 记录的是同一时间附近的 cache.miss。
+          en: ErrorEvent err-45 represents budget exhaustion while the nearby TraceEvent records cache.miss.
+          ja: ErrorEvent err-45 は budget exhaustion を表し、近い TraceEvent は cache.miss を記録します。
+        field_values: {}
+        related_node_ids:
+          - TraceEvent
+          - ErrorEvent
+        related_relation_ids:
+          - trace_event_records_error_event
+        expected_result:
+          zh: 不得从该边界情形推断这条关系。
+          en: Do not infer this relation from the boundary case.
+          ja: この境界事例から当該関係を推論しません。
+        why_valid_or_invalid:
+          zh: 同时发生不等于同一错误；必须由 attempt、异常指纹或明确引用建立对应。
+          en: Co-occurrence is not error identity; attempt, exception fingerprint, or explicit reference must establish correspondence.
+          ja: 同時発生は同一 error を意味せず、attempt・exception fingerprint・明示 reference が対応を確立する必要があります。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-trace-event-012
+    source_claims:
+      - claim-trace-event-012
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: pending
+    target: concept:ErrorEvent
+review:
+  status: pending
+  method: manual-semantic
+  reviewer: null
+  reviewed_on: null
+  note:
+    zh: 该节点仅完成了从现行候选数据到唯一 YAML 树的无损转录；尚未逐项完成人工语义核验，不得据此宣称已审定。
+    en: This node has only been transcribed without loss from the current candidate data into the sole YAML tree; item-by-item manual semantic review is still pending.
+    ja: このノードは現行候補データから唯一の YAML ツリーへ欠落なく転記した段階であり、項目別の手動意味審査は未完了です。
+  sections:
+    semantics: pending
+    hierarchy: pending
+    relations: pending
+    structure: pending
+    examples: pending
+    source_claims: []
+source_claims:
+  - id: claim-trace-event-001
+    source: eng-std-opentelemetry-trace-api
+    supports: The OpenTelemetry Tracing API defines a span Event by name, timestamp, and zero or more attributes and records it on one Span. Moonweave uses TraceEvent for that instantaneous span-scoped occurrence and reserves TraceSpan for duration-bearing operations.
+    locator: Tracing API > Span operations > Add events; Event name, timestamp, and attributes
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-trace-event-002
+    source: eng-std-opentelemetry-trace-api
+    supports: OpenTelemetry defines a span Event by name, timestamp, and zero or more attributes and records it on one Span; Moonweave uses TraceEvent for that instantaneous span-scoped occurrence.
+    locator: Tracing API > SpanContext, Span creation, Span operations, Events, Status, and Link
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-trace-event-003
+    source: eng-std-opentelemetry-trace-api
+    supports: Every TraceEvent is an ObservabilityEvent distinguished by being recorded on one TraceSpan as an instantaneous annotation with name, timestamp, and optional attributes. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
+    locator: Tracing API > SpanContext, Span creation, Span operations, Events, Status, and Link
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-trace-event-004
+    source: eng-std-opentelemetry-spec
+    supports: OpenTelemetry separates traces, spans, events, resources, attributes, and timestamps; Moonweave uses TraceEvent as observability evidence that records a BoundaryCrossing rather than making the crossing itself a trace record.
+    locator: OpenTelemetry Specification Overview, Tracing and Logs data-model sections
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-trace-event-005
+    source: eng-ont-prov-o
+    supports: W3C PROV-O distinguishes Activity, Entity, and Agent, associates responsibility-bearing agents with activities, and records time and influence; Moonweave models BoundaryCrossing as an occurrence initiated and received by Actors rather than treating actors as crossing subtypes.
+    locator: W3C PROV-O Sections 2 and 3.1, Activity, Entity, Agent and association
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-trace-event-006
+    source: eng-std-opentelemetry-spec
+    supports: OpenTelemetry separates traces, spans, events, resources, attributes, and timestamps; Moonweave uses TraceEvent as observability evidence that records a BoundaryCrossing rather than making the crossing itself a trace record. Canonical storage in runtime-observability follows the TraceEvent source endpoint and is a Moonweave design inference.
+    locator: OpenTelemetry Specification Overview, Tracing and Logs data-model sections
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-trace-event-007
+    source: eng-ont-prov-o
+    supports: W3C PROV-O distinguishes Activity, Entity, and Agent, associates responsibility-bearing agents with activities, and records time and influence; Moonweave models BoundaryCrossing as an occurrence initiated and received by Actors rather than treating actors as crossing subtypes. Canonical storage in runtime-observability follows the TraceEvent source endpoint and is a Moonweave design inference.
+    locator: W3C PROV-O Sections 2 and 3.1, Activity, Entity, Agent and association
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-trace-event-008
+    source: eng-ont-prov-o
+    supports: PROV-O separates provenance records about generation from the generating Activity itself; Moonweave preserves that distinction.
+    locator: W3C Recommendation > §5.3 prov:Generation and prov:wasGeneratedBy
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-trace-event-009
+    source: eng-ont-prov-o
+    supports: PROV-O generation references identifiable Entity and Activity records; a filename mention alone is insufficient.
+    locator: W3C Recommendation > §5.3 prov:Generation
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-trace-event-010
+    source: eng-ont-prov-o
+    supports: PROV-O distinguishes an Entity's generation record from the Activity that generated it; Moonweave models TraceEvent as the record, not the producer. Canonical storage in runtime-observability follows the TraceEvent source endpoint and is a Moonweave design inference.
+    locator: W3C Recommendation > §5.3 prov:Generation and prov:wasGeneratedBy
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-trace-event-011
+    source: eng-observe-opentelemetry-logs
+    supports: TraceEvent recorded_as the structured LogRecord preserving that occurrence; they may share TraceId, SpanId, and time while retaining separate identities and owners. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
+    locator: Logs Data Model > Events and Log and Event Record Definition
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending
+  - id: claim-trace-event-012
+    source: eng-std-opentelemetry-semconv-trace
+    supports: TraceEvent records_error_event the ErrorEvent corresponding to its raw runtime occurrence, keeping span-local evidence separate from failure-domain interpretation. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
+    locator: Trace semantic conventions > span attributes and operation representation
+    evidence_kind: design-inference
+    confidence: high
+    review_status: pending

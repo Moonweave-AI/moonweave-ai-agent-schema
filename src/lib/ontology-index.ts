@@ -145,6 +145,16 @@ export interface OntologyIndex {
   readonly dataDiagnostics: readonly OntologyDataDiagnostic[];
 }
 
+/**
+ * `review` means that a current YAML-authored assertion still awaits a human
+ * decision; it does not mean that the assertion has disappeared from the
+ * working ontology.  Only an explicit deprecation removes an assertion from
+ * the navigable graph.  Keeping this rule here (instead of rewriting source
+ * statuses during compilation) lets reviewers inspect candidates in context
+ * without falsely certifying them as accepted.
+ */
+const isCurrentStatus = (status: string): boolean => status !== "deprecated";
+
 const entityRef = (kind: OntologyEntityKind, id: string): OntologyEntityRef => `${kind}:${id}`;
 
 const appendToMap = <T>(map: Map<string, T[]>, key: string, value: T): void => {
@@ -332,7 +342,11 @@ export const buildOntologyIndex = (
     appendToMap(outgoing, relation.source_id, relation);
     appendToMap(incoming, relation.target_id, relation);
     appendToMap(relationsByPredicate, relation.predicate, relation);
-    if (relation.predicate === "is_a" && relation.relation_kind === "hierarchy") {
+    if (
+      isCurrentStatus(relation.status) &&
+      relation.predicate === "is_a" &&
+      relation.relation_kind === "hierarchy"
+    ) {
       appendToMap(directChildren, relation.target_id, relation);
     }
     for (const example of relation.examples ?? []) {
@@ -342,19 +356,34 @@ export const buildOntologyIndex = (
   }
 
   const primaryParents = new Map<string, CanonicalRelation>();
+  const declaredPrimaryRelationIds = new Set(
+    ontology.classes.flatMap((concept) =>
+      concept.primary_parent_relation_id ? [concept.primary_parent_relation_id] : []),
+  );
   const additionalParents = new Map<string, CanonicalRelation[]>();
   for (const concept of ontology.classes) {
     const parentRelations = (outgoing.get(concept.id) ?? []).filter(
-      (relation) => relation.predicate === "is_a" && relation.relation_kind === "hierarchy",
+      (relation) =>
+        isCurrentStatus(relation.status) &&
+        relation.predicate === "is_a" &&
+        relation.relation_kind === "hierarchy",
     );
     const primary = concept.primary_parent_relation_id
       ? relationsById.get(concept.primary_parent_relation_id)
       : undefined;
+    const primaryLayout = primary as (CanonicalRelation & {
+      readonly layout_role?: RelationLayoutRole;
+      readonly layout_child_id?: string | null;
+    }) | undefined;
+    const primaryNamesConceptAsChild = primaryLayout?.layout_child_id
+      ? primaryLayout.layout_child_id === concept.id
+      : primary?.predicate === "is_a" && primary.source_id === concept.id;
     if (
       primary &&
-      primary.source_id === concept.id &&
-      primary.predicate === "is_a" &&
-      primary.relation_kind === "hierarchy"
+      isCurrentStatus(primary.status) &&
+      [primary.source_id, primary.target_id].includes(concept.id) &&
+      primaryNamesConceptAsChild &&
+      (primaryLayout?.layout_role === undefined || primaryLayout.layout_role === "primary-backbone")
     ) {
       primaryParents.set(concept.id, primary);
     } else if (concept.primary_parent_relation_id) {
@@ -375,13 +404,13 @@ export const buildOntologyIndex = (
   const secondaryBackboneChildren = new Map<OntologyEntityRef, IndexedBackboneRelation[]>();
   const backboneParentByRef = new Map<OntologyEntityRef, IndexedBackboneRelation>();
   const relationLayout = (relation: CanonicalRelation): IndexedBackboneRelation | null => {
+    if (!isCurrentStatus(relation.status)) return null;
     const candidate = relation as CanonicalRelation & {
       readonly layout_role?: RelationLayoutRole;
       readonly layout_parent_id?: string | null;
       readonly layout_child_id?: string | null;
     };
-    const isPrimaryTaxonomy =
-      primaryParents.get(relation.source_id)?.id === relation.id;
+    const isPrimaryTaxonomy = declaredPrimaryRelationIds.has(relation.id);
     const role = candidate.layout_role ?? (
       relation.predicate === "is_a"
         ? isPrimaryTaxonomy
@@ -559,7 +588,10 @@ export const buildOntologyIndex = (
     }
     const parentIds = (outgoing.get(concept.id) ?? [])
       .filter(
-        (relation) => relation.predicate === "is_a" && relation.relation_kind === "hierarchy",
+        (relation) =>
+          isCurrentStatus(relation.status) &&
+          relation.predicate === "is_a" &&
+          relation.relation_kind === "hierarchy",
       )
       .map(({ target_id: targetId }) => targetId)
       .sort((left, right) => left.localeCompare(right));
@@ -592,10 +624,10 @@ export const buildOntologyIndex = (
   for (const concept of ontology.classes) {
     const ref = entityRef("concept", concept.id);
     const semanticIncoming = (incoming.get(concept.id) ?? []).filter(
-      ({ predicate, status }) => status === "accepted" && predicate !== "is_a",
+      ({ predicate, status }) => isCurrentStatus(status) && predicate !== "is_a",
     );
     const semanticOutgoing = (outgoing.get(concept.id) ?? []).filter(
-      ({ predicate, status }) => status === "accepted" && predicate !== "is_a",
+      ({ predicate, status }) => isCurrentStatus(status) && predicate !== "is_a",
     );
     semanticIncomingByRef.set(ref, Object.freeze([...semanticIncoming]));
     semanticOutgoingByRef.set(ref, Object.freeze([...semanticOutgoing]));

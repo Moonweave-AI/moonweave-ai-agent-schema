@@ -8,9 +8,9 @@ const GIT_SHA = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 
 export const sha256Bytes = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
-export const acceptedRelationCount = (relations) => (
+export const currentRelationCount = (relations) => (
   Array.isArray(relations)
-    ? relations.filter((relation) => relation?.status === "accepted").length
+    ? relations.filter((relation) => relation?.status !== "deprecated").length
     : 0
 );
 
@@ -49,7 +49,7 @@ export const currentRef = (root) => process.env.GITHUB_REF_NAME
   || "detached-head";
 
 export const readCanonicalIdentity = (root) => {
-  const canonicalPath = path.join(root, "ontology", "agent-ontology.json");
+  const canonicalPath = path.join(root, "src", "generated", "agent-ontology.json");
   const canonicalBytes = fs.readFileSync(canonicalPath);
   const canonical = JSON.parse(canonicalBytes.toString("utf8"));
   const metadata = canonical.artifact_metadata ?? {};
@@ -88,7 +88,7 @@ export const expectedSiteBuildManifest = (root, options = {}) => {
   const actualCounts = {
     modules: identity.canonical.modules.length,
     concepts: identity.canonical.classes.length,
-    relations: acceptedRelationCount(identity.canonical.relations),
+    relations: currentRelationCount(identity.canonical.relations),
   };
   if (
     metrics.modules !== actualCounts.modules ||
