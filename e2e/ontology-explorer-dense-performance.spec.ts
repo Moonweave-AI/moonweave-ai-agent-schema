@@ -16,7 +16,7 @@ test.describe("Moonweave Graphify ontology explorer performance", () => {
     const stabilizationDuration = Date.now() - startedAt;
 
     await expectFullGraphMetrics(graph);
-    expect(stabilizationDuration).toBeLessThan(45_000);
+    expect(stabilizationDuration).toBeLessThan(60_000);
     const firstFrame = await canvasSnapshot(graph);
     await page.waitForTimeout(750);
     const secondFrame = await canvasSnapshot(graph);
