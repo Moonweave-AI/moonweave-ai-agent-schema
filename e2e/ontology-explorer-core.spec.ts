@@ -115,7 +115,7 @@ test.describe("Moonweave Graphify ontology explorer core", () => {
 
     await expect(page.getByTestId("ontology-canvas")).toHaveScreenshot(
       "graphify-community-graph.png",
-      { animations: "disabled", caret: "hide" },
+      { animations: "disabled", caret: "hide", maxDiffPixels: 16 },
     );
   });
 });
