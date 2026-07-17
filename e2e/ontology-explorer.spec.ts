@@ -22,7 +22,7 @@ test.describe("Moonweave Graphify ontology explorer interactions", () => {
     await expect(search).toHaveValue("");
     await expect(page.locator(".entity-hero h2")).toHaveText("Tool");
     await expect(page.getByTestId("ontology-characteristics")).toBeVisible();
-    await expect(page.getByTestId("ontology-characteristics").locator("table")).toBeVisible();
+    await expect(page.getByTestId("ontology-characteristics").locator(":scope > table")).toBeVisible();
     await expect(page).toHaveURL(/focus=node%3ATool|focus=node:Tool/u);
     await expectFullGraphMetrics(graph);
     await expect(graph).toHaveAttribute("data-layout-status", "stable");

@@ -292,11 +292,16 @@ export const OntologyGraph = ({
               data-testid="graph-node-search"
             />
             {query && matches.length > 0 ? (
-              <ul className="ontology-network-search-results">
+              <ul
+                className="ontology-network-search-results"
+                role="listbox"
+                aria-label={text.searchResults}
+              >
                 {matches.map((node) => (
-                  <li key={node.id}>
+                  <li key={node.id} role="presentation">
                     <button
                       type="button"
+                      role="option"
                       onClick={() => selectSearchMatch(node.id, node.communityId)}
                     >
                       <span style={{ backgroundColor: node.color.background }} aria-hidden="true" />

@@ -49,7 +49,7 @@ function App({ ontologyRuntime, canonicalFingerprint }: AppProps) {
     canonicalFingerprint,
     communityProjectionFingerprint(communityGraphData),
   ), [canonicalFingerprint, canonicalOntology]);
-  const [language, setLanguage] = useState<Language>("zh");
+  const [language, setLanguage] = useState<Language>("en");
   const [theme, setTheme] = useState<ThemeMode>("dark");
   const [focusedEntityRef, setFocusedEntityRef] = useState<OntologyEntityRef>(
     initialLocation.state.focusedEntityRef,

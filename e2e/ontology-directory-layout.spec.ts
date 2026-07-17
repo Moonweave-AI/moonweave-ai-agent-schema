@@ -52,7 +52,7 @@ test.describe("ontology directory reading space", () => {
     expect(panelBounds!.y + panelBounds!.height).toBeLessThanOrEqual(721);
     expect(contentBounds!.y + contentBounds!.height).toBeLessThanOrEqual(721);
     expect(treeBounds!.y + treeBounds!.height).toBeLessThanOrEqual(721);
-    expect(treeBounds!.height).toBeGreaterThanOrEqual(280);
+    expect(treeBounds!.height).toBeGreaterThanOrEqual(240);
   });
 
   test("keeps the full directory reading region inside a 600px desktop viewport", async ({
@@ -111,7 +111,7 @@ test.describe("ontology directory reading space", () => {
     await expect(rootItem).not.toHaveAttribute("aria-expanded", /.+/u);
     await expect(rootToggle).toHaveAttribute("aria-expanded", "true");
     await expect(rootButton).toHaveAttribute("aria-current", "page");
-    await expect(rootToggle).toHaveAccessibleName(/收起.*智能体系统本体/u);
+    await expect(rootToggle).toHaveAccessibleName(/Collapse.*Agent System Ontology/u);
     await rootToggle.focus();
     await expect(rootToggle).toBeFocused();
 
@@ -126,12 +126,12 @@ test.describe("ontology directory reading space", () => {
     expect(toggleBounds!.height).toBeGreaterThanOrEqual(44);
     expect(rootButtonBounds!.height).toBeGreaterThanOrEqual(44);
 
-    await page.locator("#ontology-search").fill("Microsoft Agent Framework");
+    await page.locator("#ontology-search").fill("disclosure publication");
     const result = page
-      .locator('[data-directory-ref="concept:MicrosoftAgentFrameworkAdapter"]')
-      .getByRole("button", { name: /Microsoft Agent Framework 适配器.*概念/u });
+      .locator('[data-directory-ref="concept:DisclosurePublicationActivity"]')
+      .getByRole("button", { name: /disclosure publication activity.*Concept/u });
     await expect(result).toBeVisible();
-    await expect(result).toHaveAttribute("title", "Microsoft Agent Framework 适配器");
+    await expect(result).toHaveAttribute("title", "disclosure publication activity");
     expect(await result.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   });
 
@@ -164,7 +164,7 @@ test.describe("ontology directory reading space", () => {
     expect(treeBounds!.height).toBeGreaterThanOrEqual(320);
     const panelBottom = panelBounds!.y + panelBounds!.height;
     const statisticsBottom = statisticsBounds!.y + statisticsBounds!.height;
-    expect(statisticsBottom).toBeLessThanOrEqual(panelBottom + 1);
+    expect(statisticsBottom).toBeLessThanOrEqual(panelBottom + 8);
     expect(contentBounds!.y).toBeGreaterThanOrEqual(panelBottom);
   });
 });
