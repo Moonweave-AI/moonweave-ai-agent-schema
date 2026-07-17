@@ -129,7 +129,7 @@ const normalizedLimits = (limits = {}) => {
 
 const safeDirectoryEntries = (directory, sourceRoot) => {
   const entries = readdirSync(directory, { withFileTypes: true })
-    .sort((left, right) => left.name.localeCompare(right.name));
+    .sort((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0));
   for (const entry of entries) {
     const path = resolve(directory, entry.name);
     const metadata = lstatSync(path);
