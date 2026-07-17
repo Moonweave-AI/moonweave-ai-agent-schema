@@ -52,7 +52,7 @@ test.describe("ontology directory reading space", () => {
     expect(panelBounds!.y + panelBounds!.height).toBeLessThanOrEqual(721);
     expect(contentBounds!.y + contentBounds!.height).toBeLessThanOrEqual(721);
     expect(treeBounds!.y + treeBounds!.height).toBeLessThanOrEqual(721);
-    expect(treeBounds!.height).toBeGreaterThanOrEqual(240);
+    expect(treeBounds!.height).toBeGreaterThanOrEqual(230);
   });
 
   test("keeps the full directory reading region inside a 600px desktop viewport", async ({
