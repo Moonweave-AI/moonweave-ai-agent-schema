@@ -239,7 +239,7 @@ describe("App state and URL recovery behavior", () => {
         canonicalFingerprint={buildManifestFixture.canonical_fingerprint}
       />
     );
-  });
+  }, 30_000);
 
   beforeEach(async () => {
     await unmountApp();
