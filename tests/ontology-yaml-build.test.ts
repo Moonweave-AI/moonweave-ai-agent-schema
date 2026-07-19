@@ -172,6 +172,18 @@ semantics:
   excludes: []
   semantic_kind: information
   aliases: []
+engineering:
+  explanation: {zh: 工程说明由协议契约给出。, en: Engineering guidance is defined by the protocol contract., ja: 工学的な説明はプロトコル契約で定義される。}
+  typical_input:
+    - description: MCP tools/list request
+      format: '{"jsonrpc":"2.0","method":"tools/list","params":{}}'
+  typical_output:
+    - description: MCP tools/list response
+      format: '{"result":{"tools":[]}}'
+  reference_implementations:
+    - name: MCP Tools Specification
+      url: https://modelcontextprotocol.io/specification/server/tools
+      description: Defines the tools/list request and response contract.
 structure:
   identity_keys: []
   fields: []
@@ -313,6 +325,36 @@ const sourceSnapshot = (root: string) => new Map(yamlFiles(root).map((path) => [
   },
 ]));
 
+const retiredGovernanceOutputKeys = new Set([
+  "review",
+  "review_status",
+  "reviewers",
+  "maturity",
+  "maturity_changes",
+  "change_history",
+  "change_log",
+  "adaptation_mapping",
+  "adaptation_mappings",
+  "external_mappings",
+  "axioms",
+  "axiom_validation",
+  "axioms_and_validation",
+  "release_channel",
+  "releasable",
+]);
+
+const retiredGovernanceKeysIn = (value: unknown, path = "$"): readonly string[] => {
+  if (Array.isArray(value)) {
+    return value.flatMap((entry, index) => retiredGovernanceKeysIn(entry, `${path}[${index}]`));
+  }
+  if (!value || typeof value !== "object") return [];
+
+  return Object.entries(value as Record<string, unknown>).flatMap(([key, nested]) => [
+    ...(retiredGovernanceOutputKeys.has(key) ? [`${path}.${key}`] : []),
+    ...retiredGovernanceKeysIn(nested, `${path}.${key}`),
+  ]);
+};
+
 afterEach(() => {
   for (const root of temporaryRoots.splice(0)) {
     rmSync(root, { recursive: true, force: true });
@@ -320,52 +362,24 @@ afterEach(() => {
 });
 
 describe("YAML ontology bundle compiler", () => {
-  it("marks a bundle releasable only when every node, source, and embedded review is accepted", async () => {
+  it("does not emit retired governance, mapping, or maturity data", async () => {
+    const sourceDir = createSourceTree();
+    const { canonical, sourceIndex } = await compile({ sourceDir });
+
+    expect(retiredGovernanceKeysIn({ canonical, sourceIndex })).toEqual([]);
+  });
+
+  it("keeps artifact metadata about generation rather than obsolete review release state", async () => {
     const sourceDir = createSourceTree();
 
-    const accepted = await compile({ sourceDir });
-    expect(accepted.canonical.artifact_metadata).toMatchObject({
-      release_channel: "release",
-      releasable: true,
+    const { canonical } = await compile({ sourceDir });
+    expect(canonical.artifact_metadata).toMatchObject({
+      artifact_kind: "canonical-agent-ontology",
+      generated: true,
+      do_not_edit: true,
     });
-
-    const childPath = join(
-      sourceDir,
-      "information",
-      "context-ingress",
-      "context-container",
-      "context-window",
-      "node.yaml",
-    );
-    writeFileSync(
-      childPath,
-      childConceptNode.replace("  review_status: accepted", "  review_status: pending"),
-      "utf8",
-    );
-    const pendingRelation = await compile({ sourceDir });
-    expect(pendingRelation.canonical.artifact_metadata).toMatchObject({
-      release_channel: "candidate",
-      releasable: false,
-    });
-
-    writeFileSync(childPath, childConceptNode.replace("status: accepted", "status: review"), "utf8");
-    const pendingNode = await compile({ sourceDir });
-    expect(pendingNode.canonical.artifact_metadata).toMatchObject({
-      release_channel: "candidate",
-      releasable: false,
-    });
-
-    writeFileSync(childPath, childConceptNode, "utf8");
-    writeFileSync(
-      join(sourceDir, "node.yaml"),
-      rootNode.replace("      status: accepted", "      status: pending"),
-      "utf8",
-    );
-    const pendingSource = await compile({ sourceDir });
-    expect(pendingSource.canonical.artifact_metadata).toMatchObject({
-      release_channel: "candidate",
-      releasable: false,
-    });
+    expect(canonical.artifact_metadata).not.toHaveProperty("release_channel");
+    expect(canonical.artifact_metadata).not.toHaveProperty("releasable");
   });
 
   it("allows only classification or existential-part relations in an accepted directory backbone", async () => {
@@ -426,6 +440,32 @@ describe("YAML ontology bundle compiler", () => {
         primary_parent_relation_id: "context-window-is-a-context-container",
       }),
     ]));
+    const engineeringConcept = canonical.classes.find(({ id }) => id === "context-container");
+    expect(engineeringConcept).toMatchObject({
+      engineering: {
+        explanation: {
+          en: "Engineering guidance is defined by the protocol contract.",
+        },
+        typical_input: [{
+          description: "MCP tools/list request",
+          format: '{"jsonrpc":"2.0","method":"tools/list","params":{}}',
+        }],
+        typical_output: [{
+          description: "MCP tools/list response",
+          format: '{"result":{"tools":[]}}',
+        }],
+        reference_implementations: [{
+          name: "MCP Tools Specification",
+          url: "https://modelcontextprotocol.io/specification/server/tools",
+        }],
+      },
+    });
+    expect(engineeringConcept).not.toHaveProperty("external_mappings");
+    expect(engineeringConcept).not.toHaveProperty("introduced_in");
+    expect(engineeringConcept).not.toHaveProperty("deprecated_in");
+    expect(engineeringConcept).not.toHaveProperty("replaced_by_ids");
+    expect(canonical.modules[0]).not.toHaveProperty("competency_questions");
+    expect(canonical.modules[0]).not.toHaveProperty("introduced_in");
     expect(canonical.relations).toEqual([
       expect.objectContaining({
         id: "context-window-is-a-context-container",
@@ -438,6 +478,9 @@ describe("YAML ontology bundle compiler", () => {
         layout_child_id: "context-window",
       }),
     ]);
+    expect(canonical.relations[0]).not.toHaveProperty("introduced_in");
+    expect(canonical.relations[0]).not.toHaveProperty("deprecated_in");
+    expect(canonical.relations[0]).not.toHaveProperty("replaced_by_ids");
 
     expect(communityGraph.nodes.map(({ ref }) => ref).sort()).toEqual([
       "concept:context-container",
@@ -473,6 +516,49 @@ describe("YAML ontology bundle compiler", () => {
       }),
     ]));
     expect(communityGraph.communities).toHaveLength(2);
+  });
+
+  it("keeps declared module structure and constraints in the canonical detail contract", async () => {
+    const sourceDir = createSourceTree();
+    const modulePath = join(sourceDir, "information", "context-ingress", "node.yaml");
+    writeFileSync(
+      modulePath,
+      moduleNode.replace(
+        "structure: null",
+        `structure:
+  identity_keys: [ingress-id]
+  fields:
+    - id: ingress-id
+      labels: {zh: 摄入标识, en: Ingress ID, ja: 取り込みID}
+      definition: {zh: 摄入边界的稳定标识。, en: Stable identity of an ingress boundary., ja: 取り込み境界の安定した識別子。}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: ingress-1
+      allowed_values: []
+      source_claims: []
+  constraints:
+    - id: ingress-boundary-required
+      severity: error
+      language: plain
+      expression: ingress_id != null
+      explanation: {zh: 摄入标识不能为空。, en: An ingress ID is required., ja: 取り込みIDは必須です。}
+      source_claims: []
+  required_relations: []`,
+      ),
+      "utf8",
+    );
+
+    const { canonical } = await compile({ sourceDir });
+
+    expect(canonical.modules[0]).toMatchObject({
+      structure: {
+        identity_keys: ["ingress-id"],
+        fields: [expect.objectContaining({ id: "ingress-id" })],
+        constraints: [expect.objectContaining({ id: "ingress-boundary-required" })],
+      },
+    });
   });
 
   it("does not rewrite, normalize, touch, or add YAML source files", async () => {
@@ -518,7 +604,6 @@ describe("YAML ontology bundle compiler", () => {
       },
       examples: [expect.objectContaining({
         id: "context-window-instance-call-842",
-        kind: "instance",
       })],
       source_claims: [expect.objectContaining({
         source_id: "mcp-specification",
@@ -532,11 +617,6 @@ describe("YAML ontology bundle compiler", () => {
       version: "2025-11-25",
       accessed_on: "2026-07-17",
       source_type: "official-specification",
-      review: {
-        status: "accepted",
-        reviewed_on: "2026-07-17",
-        note: "Manually verified against the cited specification.",
-      },
     }]);
 
     const nodeRefs = new Set(communityGraph.nodes.map(({ ref }) => ref));

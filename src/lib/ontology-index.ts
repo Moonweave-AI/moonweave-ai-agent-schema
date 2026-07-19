@@ -1,17 +1,17 @@
 import type {
-  CanonicalArtifact,
+  CanonicalAgentOntology,
+  CanonicalConceptContract,
+  CanonicalModuleContract,
+  CanonicalPlaneContract,
+  CanonicalRelationContract,
+  CanonicalSourceClaim as CanonicalSourceClaimContract,
   CasePath,
   CasePathStep,
-  Concept,
   Constraint,
   Example,
   Field,
   LocalizedDraftText,
   LocalizedText as GeneratedLocalizedText,
-  Module,
-  Plane,
-  Relation,
-  SourceClaim,
 } from "./canonical-ontology-types";
 
 export type OntologyEntityKind = "root" | "plane" | "module" | "concept";
@@ -33,17 +33,17 @@ export interface IndexedBackboneRelation {
 }
 
 export type LocalizedText = GeneratedLocalizedText;
-export type CanonicalSourceClaim = SourceClaim;
+export type CanonicalSourceClaim = CanonicalSourceClaimContract;
 export type CanonicalExample = Example;
 export type CanonicalField = Field;
 export type CanonicalConstraint = Constraint;
 export type CanonicalCasePathStep = CasePathStep;
 export type CanonicalCasePath = CasePath;
-export type CanonicalPlane = Plane;
-export type CanonicalModule = Module;
-export type CanonicalConcept = Concept;
-export type CanonicalRelation = Relation;
-export type CanonicalOntology = CanonicalArtifact;
+export type CanonicalPlane = CanonicalPlaneContract;
+export type CanonicalModule = CanonicalModuleContract;
+export type CanonicalConcept = CanonicalConceptContract;
+export type CanonicalRelation = CanonicalRelationContract;
+export type CanonicalOntology = CanonicalAgentOntology;
 
 type LocalizedOntologyText = GeneratedLocalizedText | LocalizedDraftText;
 
@@ -112,10 +112,6 @@ export interface OntologyIndex {
   readonly planesById: ReadonlyMap<string, CanonicalPlane>;
   readonly modulesById: ReadonlyMap<string, CanonicalModule>;
   readonly conceptsById: ReadonlyMap<string, CanonicalConcept>;
-  readonly deprecatedPredecessorsByReplacementConceptId: ReadonlyMap<
-    string,
-    readonly CanonicalConcept[]
-  >;
   readonly relationsById: ReadonlyMap<string, CanonicalRelation>;
   readonly sourcesById: ReadonlyMap<string, OntologySourceMetadata>;
   readonly examplesById: ReadonlyMap<string, CanonicalExample>;
@@ -146,12 +142,9 @@ export interface OntologyIndex {
 }
 
 /**
- * `review` means that a current YAML-authored assertion still awaits a human
- * decision; it does not mean that the assertion has disappeared from the
- * working ontology.  Only an explicit deprecation removes an assertion from
- * the navigable graph.  Keeping this rule here (instead of rewriting source
- * statuses during compilation) lets reviewers inspect candidates in context
- * without falsely certifying them as accepted.
+ * A node remains in the navigable graph unless its authored lifecycle status
+ * explicitly marks it deprecated.  Compilation preserves the node's current
+ * semantic content rather than synthesizing a separate governance layer.
  */
 const isCurrentStatus = (status: string): boolean => status !== "deprecated";
 
@@ -184,43 +177,6 @@ const fieldSemanticSignature = (field: CanonicalField): string => {
   return JSON.stringify(stableValue(semanticField));
 };
 
-const allowedValueSignature = (allowedValue: CanonicalField["allowed_values"][number]): string =>
-  JSON.stringify(stableValue(allowedValue.value));
-
-/**
- * A subtype may strengthen an inherited field contract, but it may not silently
- * change the field's identity or widen the values accepted by its parent.
- */
-const isCompatibleFieldRefinement = (
-  subtypeField: CanonicalField,
-  parentField: CanonicalField,
-): boolean => {
-  if (
-    subtypeField.id !== parentField.id ||
-    subtypeField.datatype !== parentField.datatype
-  ) return false;
-  if (parentField.required && !subtypeField.required) return false;
-  const parentMin = parentField.cardinality?.min ?? (parentField.required ? 1 : 0);
-  const subtypeMin = subtypeField.cardinality?.min ?? (subtypeField.required ? 1 : 0);
-  const parentMax = parentField.cardinality?.max ?? null;
-  const subtypeMax = subtypeField.cardinality?.max ?? null;
-  if (subtypeMin < parentMin) return false;
-  if (
-    parentMax !== null &&
-    (subtypeMax === null || subtypeMax > parentMax)
-  ) {
-    return false;
-  }
-  if (parentField.pattern && subtypeField.pattern !== parentField.pattern) return false;
-
-  const parentAllowedValues = parentField.allowed_values ?? [];
-  const subtypeAllowedValues = subtypeField.allowed_values ?? [];
-  if (parentAllowedValues.length === 0) return true;
-  if (subtypeAllowedValues.length === 0) return false;
-  const parentValueSignatures = new Set(parentAllowedValues.map(allowedValueSignature));
-  return subtypeAllowedValues.every((value) => parentValueSignatures.has(allowedValueSignature(value)));
-};
-
 export const buildOntologyIndex = (
   ontology: CanonicalOntology,
   sourceIndex?: OntologySourceIndexDocument,
@@ -230,15 +186,6 @@ export const buildOntologyIndex = (
   const planesById = new Map(ontology.planes.map((plane) => [plane.id, plane]));
   const modulesById = new Map(ontology.modules.map((module) => [module.id, module]));
   const conceptsById = new Map(ontology.classes.map((concept) => [concept.id, concept]));
-  const deprecatedPredecessorsByReplacementConceptId = new Map<string, CanonicalConcept[]>();
-  for (const concept of ontology.classes) {
-    if (concept.status !== "deprecated") continue;
-    for (const replacementId of concept.replaced_by_ids) {
-      if (conceptsById.has(replacementId)) {
-        appendToMap(deprecatedPredecessorsByReplacementConceptId, replacementId, concept);
-      }
-    }
-  }
   const relationsById = new Map<string, CanonicalRelation>();
   const sourcesById = new Map((sourceIndex?.sources ?? []).map((source) => [source.id, source]));
   const examplesById = new Map<string, CanonicalExample>();
@@ -554,16 +501,10 @@ export const buildOntologyIndex = (
         return;
       }
       if (signaturesByFieldId.get(candidate.field.id) !== signature) {
-        if (
-          existing.inheritanceDepth < candidate.inheritanceDepth &&
-          isCompatibleFieldRefinement(existing.field, candidate.field)
-        ) {
+        if (existing.inheritanceDepth < candidate.inheritanceDepth) {
           return;
         }
-        if (
-          candidate.inheritanceDepth < existing.inheritanceDepth &&
-          isCompatibleFieldRefinement(candidate.field, existing.field)
-        ) {
+        if (candidate.inheritanceDepth < existing.inheritanceDepth) {
           byFieldId.set(candidate.field.id, candidate);
           signaturesByFieldId.set(candidate.field.id, signature);
           return;
@@ -663,9 +604,6 @@ export const buildOntologyIndex = (
     planesById,
     modulesById,
     conceptsById,
-    deprecatedPredecessorsByReplacementConceptId: freezeMapArrays(
-      deprecatedPredecessorsByReplacementConceptId,
-    ),
     relationsById,
     sourcesById,
     examplesById,

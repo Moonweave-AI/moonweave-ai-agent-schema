@@ -92,7 +92,7 @@ const writeCanonical = (root: string, overrides: Record<string, unknown> = {}): 
 
 const writeDist = (
   root: string,
-  javascript = `vis-network-forceatlas2 forceAtlas2Based 委派与移交 网络访问控制 优化与学习 ${communityGraphFixture.sourceSha256} ${communityGraphFixture.projectionSha256}`,
+  javascript = `vis-network-forceatlas2 forceAtlas2Based 委派与移交 网络访问控制 学习数据、模型分数与变更提议 ${communityGraphFixture.sourceSha256} ${communityGraphFixture.projectionSha256}`,
 ): void => {
   const canonicalBytes = writeCanonical(root);
   mkdirSync(resolve(root, "dist/assets"), { recursive: true });
@@ -232,7 +232,7 @@ describe("site build manifest publication and artifact verification", () => {
       .toThrow(/superseded ontology layout Worker/u);
 
     const staleProjection = temporaryRoot();
-    writeDist(staleProjection, "vis-network-forceatlas2 forceAtlas2Based 委派与移交 网络访问控制 优化与学习");
+    writeDist(staleProjection, "vis-network-forceatlas2 forceAtlas2Based 委派与移交 网络访问控制 学习数据、模型分数与变更提议");
     writeFileSync(resolve(staleProjection, "dist/build-manifest.json"), JSON.stringify(manifest));
     expect(() => verifySiteArtifact({ root: staleProjection, expectedManifest: manifest }))
       .toThrow(/current ontology community projection/u);
@@ -240,7 +240,7 @@ describe("site build manifest publication and artifact verification", () => {
     const unreachableProjection = temporaryRoot();
     writeDist(
       unreachableProjection,
-      `vis-network-forceatlas2 forceAtlas2Based 委派与移交 网络访问控制 优化与学习 ${communityGraphFixture.sourceSha256}`,
+      `vis-network-forceatlas2 forceAtlas2Based 委派与移交 网络访问控制 学习数据、模型分数与变更提议 ${communityGraphFixture.sourceSha256}`,
     );
     writeFileSync(
       resolve(unreachableProjection, "dist/assets/unreachable-12345678.js"),
@@ -311,7 +311,7 @@ describe("site build manifest publication and artifact verification", () => {
     })).toThrow(/byte-identical/u);
 
     const legacy = temporaryRoot();
-    writeDist(legacy, `continuous-local-force vis-network-forceatlas2 forceAtlas2Based 委派与移交 网络访问控制 优化与学习 ${communityGraphFixture.sourceSha256} ${communityGraphFixture.projectionSha256}`);
+    writeDist(legacy, `continuous-local-force vis-network-forceatlas2 forceAtlas2Based 委派与移交 网络访问控制 学习数据、模型分数与变更提议 ${communityGraphFixture.sourceSha256} ${communityGraphFixture.projectionSha256}`);
     writeFileSync(resolve(legacy, "dist/build-manifest.json"), JSON.stringify(manifest));
     expect(() => verifySiteArtifact({ root: legacy, expectedManifest: manifest })).toThrow(/legacy marker/u);
 

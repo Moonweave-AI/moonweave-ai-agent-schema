@@ -336,7 +336,6 @@ function App({ ontologyRuntime, canonicalFingerprint }: AppProps) {
                 <p>{ontologyEntityDefinition(focusedEntity, language)}</p>
               </div>
               <dl className="summary-metrics">
-                <div><dt>{text.status}</dt><dd>{String((focusedEntity.data as { status?: unknown }).status ?? text.notApplicable)}</dd></div>
                 <div><dt>{text.iri}</dt><dd>{focusedIri}</dd></div>
                 <div><dt>{text.source}</dt><dd>{focusedSourceClaims?.length ?? 0}</dd></div>
               </dl>

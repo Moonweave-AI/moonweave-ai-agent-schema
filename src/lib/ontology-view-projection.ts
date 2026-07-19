@@ -231,12 +231,6 @@ export const entityDetails = (
       outgoingRelations: complete(
         conceptId ? (index.outgoingRelationsByConceptId.get(conceptId) ?? []) : [],
       ),
-      externalMappings: complete(asArray(data.external_mappings)),
-      deprecatedPredecessors: complete(
-        conceptId
-          ? (index.deprecatedPredecessorsByReplacementConceptId.get(conceptId) ?? [])
-          : [],
-      ),
     },
   };
 };

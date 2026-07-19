@@ -543,29 +543,6 @@ const hierarchyExpansionState = (
   };
 };
 
-const hierarchyExpansionWithinBudget = (
-  index: OntologyIndex,
-  state: OntologySceneState,
-  action: Extract<OntologySceneAction, { readonly type: "expand-hierarchy" }>,
-  budget: SceneBudget,
-): OntologySceneState => {
-  const currentProjection = projectOntologyScene(index, state);
-  const currentEdgeCount = currentProjection.relationIds.length +
-    currentProjection.derivedEdges.length;
-  const remainingNodes = Math.max(0, budget.maxNodes - currentProjection.nodeRefs.length);
-  const remainingEdges = Math.max(0, budget.maxEdges - currentEdgeCount);
-  const maximumNewChildren = Math.min(
-    normalizedExpansionLimit(action.limit, budget),
-    remainingNodes,
-    remainingEdges,
-  );
-  for (let childCount = maximumNewChildren; childCount > 0; childCount -= 1) {
-    const candidate = hierarchyExpansionState(index, state, action.ref, childCount);
-    if (!ontologySceneBudgetDiagnostic(index, candidate, budget)) return candidate;
-  }
-  return state;
-};
-
 const nextStateForAction = (
   index: OntologyIndex,
   state: OntologySceneState,
@@ -719,12 +696,6 @@ export const transitionOntologyScene = (
 ): OntologySceneTransition => {
   const candidate = nextStateForAction(index, state, action, budget);
   const diagnostic = ontologySceneBudgetDiagnostic(index, candidate, budget);
-  if (diagnostic && action.type === "expand-hierarchy") {
-    return {
-      state: hierarchyExpansionWithinBudget(index, state, action, budget),
-      diagnostic,
-    };
-  }
   if (diagnostic) return { state, diagnostic };
   return { state: candidate, diagnostic: null };
 };

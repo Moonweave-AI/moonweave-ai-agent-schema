@@ -1,6 +1,5 @@
 import {
   ontologyEntityRef,
-  type CanonicalConcept,
   type CanonicalField,
   type CanonicalRelation,
   type EffectiveOntologyField,
@@ -94,8 +93,6 @@ export interface EntityDetails {
     readonly sourceClaims: CompleteCollection<unknown>;
     readonly incomingRelations: CompleteCollection<CanonicalRelation>;
     readonly outgoingRelations: CompleteCollection<CanonicalRelation>;
-    readonly externalMappings: CompleteCollection<unknown>;
-    readonly deprecatedPredecessors: CompleteCollection<CanonicalConcept>;
   };
 }
 

@@ -24,7 +24,7 @@ const defaultRequiredMarkers = Object.freeze([
   "forceAtlas2Based",
   "委派与移交",
   "网络访问控制",
-  "优化与学习",
+  "学习数据、模型分数与变更提议",
 ]);
 
 const assetRelativePath = (assetUrl) => {
