@@ -9,7 +9,7 @@
   </p>
 
   <p>
-    <a href="https://moonweave-ai.github.io/agent-ontology/">Explorer</a>
+    <a href="https://moonweave-ai.github.io/moonweave-ai-agent-schema/">Explorer</a>
     | <a href="docs/README.zh.md">Chinese docs</a>
     | <a href="docs/README.ja.md">Japanese docs</a>
     | <a href="src/generated/agent-ontology.json">Generated ontology JSON</a>
@@ -138,6 +138,6 @@ Community assignment is released from the ontology’s module ownership, not fro
 
 GitHub Pages deploys the built explorer:
 
-[https://moonweave-ai.github.io/agent-ontology/](https://moonweave-ai.github.io/agent-ontology/)
+[https://moonweave-ai.github.io/moonweave-ai-agent-schema/](https://moonweave-ai.github.io/moonweave-ai-agent-schema/)
 
 Production artifacts must be generated from the same commit that is deployed. The site build manifest binds the deployed commit to the ontology source fingerprint, generated canonical artifact, and generated community graph.

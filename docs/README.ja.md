@@ -9,7 +9,7 @@
   </p>
 
   <p>
-    <a href="https://moonweave-ai.github.io/agent-ontology/">エクスプローラー</a>
+    <a href="https://moonweave-ai.github.io/moonweave-ai-agent-schema/">エクスプローラー</a>
     · <a href="../README.md">英語ドキュメント</a>
     · <a href="README.zh.md">中国語ドキュメント</a>
     · <a href="../src/generated/agent-ontology.json">生成オントロジー JSON</a>
@@ -139,6 +139,6 @@ npm run verify
 
 GitHub Pages:
 
-[https://moonweave-ai.github.io/agent-ontology/](https://moonweave-ai.github.io/agent-ontology/)
+[https://moonweave-ai.github.io/moonweave-ai-agent-schema/](https://moonweave-ai.github.io/moonweave-ai-agent-schema/)
 
 本番サイトは同一コミットから生成されます。ソース指紋、生成 canonical、本体コミュニティグラフ、デプロイ commit は build manifest で結びます。
