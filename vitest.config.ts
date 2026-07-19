@@ -37,6 +37,7 @@ export default defineConfig({
         "scripts/lib/dependency-security-gates.mjs",
         "scripts/lib/ontology-maintenance-commands.mjs",
         "scripts/lib/ontology-security-gates.mjs",
+        "scripts/lib/site-build-metadata.mjs",
         // Browser runtime, canvas rendering, and edge-case UI are covered by Playwright E2E tests.
         "src/lib/ontology-network-runtime.ts",
         "src/lib/ontology-graph-scenarios.ts",
