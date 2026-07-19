@@ -12,6 +12,20 @@ import { checkSourceLinks } from "./source-link-checker.mjs";
 
 const defaultRepositoryRoot = resolve(import.meta.dirname, "../..");
 
+const sourceFailureKey = (id, url, status) => `${id}\u0000${url}\u0000${status}`;
+
+// The current OpenAI documentation edge can return 404 to a GitHub-hosted
+// link-check request while returning an access-control response elsewhere.
+// Keep this exception source-, URL-, and status-specific: strict validation
+// still fails on it, and unrelated 404 responses remain broken links.
+const KNOWN_INCONCLUSIVE_SOURCE_FAILURES = new Set([
+  sourceFailureKey(
+    "openai-responses-rubric",
+    "https://developers.openai.com/api/docs/guides/responses",
+    404,
+  ),
+]);
+
 export const parseNoArguments = (arguments_, commandName) => {
   if (arguments_.length > 0) {
     throw new Error(`${commandName} does not accept arguments: ${arguments_.join(" ")}`);
@@ -63,8 +77,11 @@ const listFiles = (root, predicate = () => true) =>
   });
 
 export const classifySourceLinkFailures = (failures) => {
-  const isInconclusive = ({ status }) =>
-    status === null || status >= 500 || [401, 403, 408, 425, 429].includes(status);
+  const isInconclusive = ({ id, url, status }) =>
+    status === null ||
+    status >= 500 ||
+    [401, 403, 408, 425, 429].includes(status) ||
+    KNOWN_INCONCLUSIVE_SOURCE_FAILURES.has(sourceFailureKey(id, url, status));
   return {
     inconclusive: failures.filter(isInconclusive),
     broken: failures.filter((result) => !isInconclusive(result)),

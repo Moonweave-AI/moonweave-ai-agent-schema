@@ -62,6 +62,104 @@ describe("source link checker", () => {
     expect(checkLinks).not.toHaveBeenCalled();
   });
 
+  it("allows the known CI-only OpenAI documentation 404 only in inconclusive mode", async () => {
+    const checkLinks = vi.fn(async () => ({
+      checked: 1,
+      failures: [{
+        id: "openai-responses-rubric",
+        url: "https://developers.openai.com/api/docs/guides/responses",
+        ok: false,
+        method: "GET",
+        status: 404,
+        diagnostic: "GET returned HTTP 404",
+      }],
+    }));
+    const loadYamlInputs = async () => ({
+      sources: [{
+        id: "openai-responses-rubric",
+        url: "https://developers.openai.com/api/docs/guides/responses",
+      }],
+      referencedIds: new Set(["openai-responses-rubric"]),
+    });
+
+    await expect(runSourceLinkCheckCommand({
+      arguments_: ["--referenced-only", "--allow-inconclusive"],
+      loadYamlInputs,
+      checkLinks,
+      log: vi.fn(),
+      warn: vi.fn(),
+    })).resolves.toMatchObject({
+      broken: [],
+      inconclusive: [expect.objectContaining({ id: "openai-responses-rubric", status: 404 })],
+    });
+
+    await expect(runSourceLinkCheckCommand({
+      arguments_: ["--referenced-only"],
+      loadYamlInputs,
+      checkLinks,
+      log: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    })).rejects.toThrow(/Source link check failed with 0 broken and 1 inconclusive result/u);
+  });
+
+  it("keeps every other 404 broken in inconclusive mode", async () => {
+    const checkLinks = vi.fn(async () => ({
+      checked: 1,
+      failures: [{
+        id: "ordinary-source",
+        url: "https://source.example.test/missing",
+        ok: false,
+        method: "GET",
+        status: 404,
+        diagnostic: "GET returned HTTP 404",
+      }],
+    }));
+    const loadYamlInputs = async () => ({
+      sources: [{ id: "ordinary-source", url: "https://source.example.test/missing" }],
+      referencedIds: new Set(["ordinary-source"]),
+    });
+
+    await expect(runSourceLinkCheckCommand({
+      arguments_: ["--referenced-only", "--allow-inconclusive"],
+      loadYamlInputs,
+      checkLinks,
+      log: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    })).rejects.toThrow(/Source link check failed with 1 broken and 0 inconclusive result/u);
+  });
+
+  it("keeps the known source ID broken when its URL no longer matches the exception", async () => {
+    const checkLinks = vi.fn(async () => ({
+      checked: 1,
+      failures: [{
+        id: "openai-responses-rubric",
+        url: "https://developers.openai.com/api/docs/guides/responses-moved",
+        ok: false,
+        method: "GET",
+        status: 404,
+        diagnostic: "GET returned HTTP 404",
+      }],
+    }));
+    const loadYamlInputs = async () => ({
+      sources: [{
+        id: "openai-responses-rubric",
+        url: "https://developers.openai.com/api/docs/guides/responses-moved",
+      }],
+      referencedIds: new Set(["openai-responses-rubric"]),
+    });
+
+    await expect(runSourceLinkCheckCommand({
+      arguments_: ["--referenced-only", "--allow-inconclusive"],
+      loadYamlInputs,
+      checkLinks,
+      log: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    })).rejects.toThrow(/Source link check failed with 1 broken and 0 inconclusive result/u);
+  });
+
   it("manually validates every redirect hop and falls back to GET when HEAD is unsupported", async () => {
     const fetchImpl = vi.fn(async (input: string | URL, init?: RequestInit) => {
       const url = String(input);
