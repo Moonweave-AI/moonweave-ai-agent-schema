@@ -94,6 +94,11 @@ const normalizeEmbeddedClaims = (value, resolveClaims) => {
     ]));
 };
 
+const normalizeExamples = (examples, resolveClaims) => normalizeEmbeddedClaims(
+  examples,
+  resolveClaims,
+).map(({ kind: _kind, ...example }) => example);
+
 const commonInformation = (node) => {
   const semantics = node.semantics ?? {};
   const { claims, resolveClaims } = createClaimResolver(node);
@@ -113,7 +118,7 @@ const commonInformation = (node) => {
     why_needed: localizedFallback(semantics.why_needed ?? node.why_needed, node.id),
     includes: semantics.includes ?? node.includes ?? [],
     excludes: semantics.excludes ?? node.excludes ?? [],
-    examples: normalizeEmbeddedClaims(node.examples ?? [], resolveClaims),
+    examples: normalizeExamples(node.examples ?? [], resolveClaims),
     ...(engineering ? { engineering } : {}),
     ...(structure ? { structure } : {}),
     source_claims: claims.map(canonicalClaim),
@@ -225,7 +230,7 @@ const compileRelation = ({ relation, sourceNode, targetId, primary }) => {
     temporal_scope: normalized.temporal_scope ?? "timeless",
     boundary_context: normalized.boundary_context ?? null,
     constraints: normalized.constraints ?? [],
-    examples: normalized.examples ?? [],
+    examples: normalizeExamples(relation.examples ?? [], resolveClaims),
     source_claims: normalized.source_claims ?? [],
     distinct_fact_rationale: normalized.distinct_fact_rationale ?? null,
     layout_role: layoutRole,
@@ -299,14 +304,14 @@ const compileRelations = (tree) => {
   return relations.sort((left, right) => left.id.localeCompare(right.id));
 };
 
-const ontologyMetrics = ({ planes, modules, classes, relations }) => ({
+const ontologyMetrics = ({ planes, modules, classes, relations }, sourceExamples) => ({
   domains: planes.length,
   modules: modules.length,
   concepts: classes.length,
   taxonomy_roots: classes.filter(({ primary_parent_relation_id: id }) => !id).length,
   is_a_relations: relations.filter(({ predicate }) => predicate === "is_a").length,
   semantic_relations: relations.filter(({ predicate }) => predicate !== "is_a").length,
-  instance_examples: classes.flatMap(({ examples }) => examples)
+  instance_examples: sourceExamples
     .filter(({ kind }) => kind === "instance").length,
   controlled_values: classes.flatMap(({ structure }) => structure?.fields ?? [])
     .flatMap(({ allowed_values: values }) => values ?? []).length,
@@ -353,7 +358,10 @@ const compileCanonical = (tree) => {
   };
   return {
     ...partial,
-    ontology_metrics: ontologyMetrics(partial),
+    ontology_metrics: ontologyMetrics(
+      partial,
+      concepts.flatMap(({ examples }) => examples ?? []),
+    ),
     artifact_metadata: {
       artifact_kind: "canonical-agent-ontology",
       contract_version: "2.0.0",

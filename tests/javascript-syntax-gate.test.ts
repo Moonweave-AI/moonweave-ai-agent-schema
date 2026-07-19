@@ -35,6 +35,24 @@ describe("JavaScript syntax gate", () => {
     }
   });
 
+  it("uses the plural success message when more than one module is checked", () => {
+    const { directory, file } = createFixture("first.mjs", "export const first = 1;\n");
+    const secondFile = resolve(directory, "second.mjs");
+    const log = vi.fn();
+    writeFileSync(secondFile, "export const second = 2;\n", "utf8");
+
+    try {
+      expect(checkJavaScriptSyntax({
+        repositoryRoot: directory,
+        files: [file, secondFile],
+        log,
+      })).toEqual({ checkedFileCount: 2 });
+      expect(log).toHaveBeenCalledWith("JavaScript syntax check passed for 2 project modules.");
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it("rejects every malformed module and identifies each failed file", () => {
     const first = createFixture("literal-backslash-n.mjs", "export const ok = true;\n\\n\n");
     const secondFile = resolve(first.directory, "unfinished.mjs");
@@ -48,6 +66,21 @@ describe("JavaScript syntax gate", () => {
       })).toThrow(/JavaScript syntax check failed for 2 modules[\s\S]*literal-backslash-n\.mjs[\s\S]*unfinished\.mjs/iu);
     } finally {
       rmSync(first.directory, { recursive: true, force: true });
+    }
+  });
+
+  it("reports a failed module even when the syntax checker produces no output", () => {
+    const { directory, file } = createFixture("silent-failure.mjs", "export const value = 1;\n");
+
+    try {
+      expect(() => checkJavaScriptSyntax({
+        repositoryRoot: directory,
+        files: [file],
+        log: vi.fn(),
+        spawn: () => ({ status: 1, stdout: "", stderr: "" }) as never,
+      })).toThrow(/JavaScript syntax check failed for 1 module:\n- silent-failure\.mjs/u);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
     }
   });
 

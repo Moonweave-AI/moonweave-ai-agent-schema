@@ -18,8 +18,7 @@ describe("node-attached information projection", () => {
     agentRun.examples = [
       ...(agentRun.examples ?? []),
       {
-        id: "AgentRun-boundary-LeafRun",
-        kind: "boundary",
+        id: "AgentRun-related-LeafRun",
         related_node_ids: ["AgentRun", "RunResult", "LeafRun"],
         related_relation_ids: ["AgentRun-produces-RunResult"],
       },
@@ -29,7 +28,7 @@ describe("node-attached information projection", () => {
     );
   };
 
-  it("derives only confused-with nodes and never presents relation edges as engineering I/O", () => {
+  it("does not infer confused-with nodes from unclassified examples", () => {
     const index = buildIndex();
     const entity = index.entitiesByRef.get(ontologyEntityRef("concept", "AgentRun"));
     if (!entity) throw new Error("Missing indexed AgentRun");
@@ -38,7 +37,7 @@ describe("node-attached information projection", () => {
 
     expect(information).not.toHaveProperty("typicalInputRelations");
     expect(information).not.toHaveProperty("typicalOutputRelations");
-    expect(information.confusedWithEntities.map(({ id }) => id)).toEqual(["LeafRun"]);
+    expect(information.confusedWithEntities).toEqual([]);
   });
 
   it("does not infer module engineering I/O from competency questions", () => {

@@ -96,19 +96,19 @@ describe("canonical ontology visible-graph projection", () => {
     );
     expect(index.relationsById.has("AgentRun-points_to-MissingConcept")).toBe(false);
     expect(graph.nodes.some(({ ref }) => ref === fixtureRefs.root)).toBe(true);
-    expect(graph.nodes.filter(({ kind }) => kind === "plane")).toHaveLength(8);
+    expect(graph.nodes.filter(({ kind }) => kind === "plane")).toHaveLength(7);
   });
 
-  it("builds the only root graph as Agent Ontology plus exactly eight domains", () => {
+  it("builds the only root graph as Agent Ontology plus the current seven planes", () => {
     const index = buildFixtureIndex();
     const state = createOntologyViewState(index);
     const graph = buildVisibleConceptGraph(index, state);
 
     expect(state.graphRootRef).toBe(fixtureRefs.root);
-    expect(graph.nodes).toHaveLength(9);
-    expect(graph.nodes.filter(({ kind }) => kind === "plane")).toHaveLength(8);
+    expect(graph.nodes).toHaveLength(8);
+    expect(graph.nodes.filter(({ kind }) => kind === "plane")).toHaveLength(7);
     expect(graph.nodes.filter(({ kind }) => kind === "root")).toHaveLength(1);
-    expect(graph.counts).toEqual({ visibleNodes: 9, visibleEdges: 8 });
+    expect(graph.counts).toEqual({ visibleNodes: 8, visibleEdges: 7 });
   });
 
   it("builds a domain graph from its upper ontology root and all direct modules", () => {

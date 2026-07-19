@@ -76,6 +76,12 @@ const localized = (value: unknown, language: Language, fallback = ""): string =>
 const displayText = (value: unknown, language: Language, fallback = ""): string =>
   typeof value === "string" ? value : localized(value, language, fallback);
 
+const unclassifiedExamplesTitle: Readonly<Record<Language, string>> = {
+  zh: "示例",
+  en: "Examples",
+  ja: "例",
+};
+
 const localizedInformation = (value: unknown, language: Language): unknown => {
   if (Array.isArray(value)) return value.map((item) => localizedInformation(item, language));
   if (!value || typeof value !== "object") return value;
@@ -203,7 +209,7 @@ const ExampleList = ({
       emptyText={text.noInformation}
       className="detail-list example-list"
       renderItem={(example) => (
-        <article className={`example-${example.kind}`}>
+        <article>
           <strong>{localized(example.labels, language, example.id)}</strong>
           <p>{localized(example.descriptions, language)}</p>
           {example.why_valid_or_invalid ? <p><strong>{text.exampleRationale}: </strong>{localized(example.why_valid_or_invalid, language)}</p> : null}
@@ -439,6 +445,21 @@ const caseStepContext = (index: OntologyIndex, exampleId: string) => {
   return null;
 };
 
+const splitExamplesByCasePath = (
+  index: OntologyIndex,
+  examples: readonly CanonicalExample[],
+) => {
+  const caseFragmentExampleIds = new Set(
+    [...index.casePathsById.values()].flatMap(({ steps }) =>
+      steps.map(({ case_fragment_example_id: exampleId }) => exampleId),
+    ),
+  );
+  return {
+    unclassified: examples.filter(({ id }) => !caseFragmentExampleIds.has(id)),
+    caseFragments: examples.filter(({ id }) => caseFragmentExampleIds.has(id)),
+  };
+};
+
 const missingCasePathReferences = (
   index: OntologyIndex,
   path: CanonicalCasePath | undefined,
@@ -511,10 +532,7 @@ const EntityDetailsRows = ({
           return child?.data.status !== "deprecated" ? [child] : [];
         });
   const examples = arrayValue<CanonicalExample>(data.examples);
-  const positive = examples.filter(({ kind }) => kind === "positive");
-  const counter = examples.filter(({ kind }) => kind === "counterexample" || kind === "boundary");
-  const instances = examples.filter(({ kind }) => kind === "instance");
-  const caseFragments = examples.filter(({ kind }) => kind === "case-fragment");
+  const { unclassified: unclassifiedExamples, caseFragments } = splitExamplesByCasePath(index, examples);
   const rootCasePaths = entity.kind === "root" ? [...index.casePathsById.values()] : [];
   const localFields: readonly EffectiveOntologyField[] = (
     details?.collections.localFields.items ?? arrayValue<CanonicalField>(data.structure?.fields)
@@ -600,14 +618,10 @@ const EntityDetailsRows = ({
           <div><dt>{text.referenceImplementations}</dt><dd><ReferenceImplementationList id="reference-implementations" entries={referenceImplementations} language={language} /></dd></div>
         </dl>
       </DetailRow>
-      <DetailRow order={5} title={`${text.positiveExamples} / ${text.counterexamples}`}>
-        <h4>{text.positiveExamples}</h4><ExampleList id="positive-examples" examples={positive} index={index} language={language} />
-        <h4>{text.counterexamples}</h4><ExampleList id="counterexamples" examples={counter} index={index} language={language} />
+      <DetailRow order={5} title={unclassifiedExamplesTitle[language]}>
+        <ExampleList id="examples" examples={unclassifiedExamples} index={index} language={language} />
       </DetailRow>
-      <DetailRow order={6} title={text.instanceExamples}>
-        {entity.kind === "plane" || entity.kind === "module" ? <p>{text.organizationalNodeInstanceNote}</p> : <ExampleList id="instance-examples" examples={instances} index={index} language={language} />}
-      </DetailRow>
-      <DetailRow order={7} title={text.structureConstraints}>
+      <DetailRow order={6} title={text.structureConstraints}>
         <dl className="stacked-facts">
           <div><dt>{text.identityKeys}</dt><dd>{data.structure?.identity_keys?.join(", ") || text.notApplicable}</dd></div>
           <div><dt>{text.fields}</dt><dd>
@@ -622,7 +636,7 @@ const EntityDetailsRows = ({
           <div><dt>{text.taxonomyContract}</dt><dd>{Object.keys(taxonomyContract).length > 0 ? <pre><code>{JSON.stringify(localizedInformation(taxonomyContract, language), null, 2)}</code></pre> : text.notApplicable}</dd></div>
         </dl>
       </DetailRow>
-      <DetailRow order={8} title={text.caseFragments}>
+      <DetailRow order={7} title={text.caseFragments}>
         {entity.kind === "root" ? (
           <DisclosureList id="root-case-paths" items={rootCasePaths} language={language} emptyText={text.noInformation} renderItem={(path) => {
             const resolvedSteps = resolveCanonicalCasePath(index, path);
@@ -663,12 +677,13 @@ const EntityDetailsRows = ({
             const next = context?.nextOwner
               ? index.entitiesByRef.get(context.nextOwner)
               : undefined;
+            const scenarioId = context?.path.id ?? example.scenario_id;
             return (
-              <article className={example.scenario_id === highlightedScenarioId ? "case-path-highlight" : ""}>
+              <article className={scenarioId === highlightedScenarioId ? "case-path-highlight" : ""}>
                 <strong>{localized(example.labels, language, example.id)}</strong>
                 <p>{localized(example.descriptions, language)}</p>
                 <dl className="inline-facts">
-                  <div><dt>{text.scenario}</dt><dd>{example.scenario_id ?? context?.path.id ?? text.notApplicable}</dd></div>
+                  <div><dt>{text.scenario}</dt><dd>{scenarioId ?? text.notApplicable}</dd></div>
                   <div><dt>{text.currentStep}</dt><dd>{context?.step.order ?? text.notApplicable}</dd></div>
                   <div><dt>{text.previousStep}</dt><dd><EntityLink entity={previous} language={language} onFocus={onNavigateEntity} /></dd></div>
                   <div><dt>{text.nextStep}</dt><dd><EntityLink entity={next} language={language} onFocus={onNavigateEntity} /></dd></div>
@@ -676,13 +691,13 @@ const EntityDetailsRows = ({
                 </dl>
                 {missingReferenceIds.length > 0 ? <p role="alert">{text.caseReferenceError} <code>{missingReferenceIds.join(", ")}</code></p> : null}
                 <SourceClaimList id={`case-fragment-${example.id}-sources`} claims={example.source_claims ?? []} index={index} language={language} initialLimit={0} />
-                {example.scenario_id ? <button type="button" className="table-link" disabled={missingReferenceIds.length > 0} onClick={() => onHighlightScenario(example.scenario_id === highlightedScenarioId ? null : example.scenario_id ?? null)}>{example.scenario_id === highlightedScenarioId ? text.clearCaseHighlight : text.highlightCase}</button> : null}
+                {scenarioId ? <button type="button" className="table-link" disabled={missingReferenceIds.length > 0} onClick={() => onHighlightScenario(scenarioId === highlightedScenarioId ? null : scenarioId)}>{scenarioId === highlightedScenarioId ? text.clearCaseHighlight : text.highlightCase}</button> : null}
               </article>
             );
           }} />
         )}
       </DetailRow>
-      <DetailRow order={9} title={text.sourcesAndReferences}><SourceClaimList id="source-claims" claims={sourceClaims} index={index} language={language} /></DetailRow>
+      <DetailRow order={8} title={text.sourcesAndReferences}><SourceClaimList id="source-claims" claims={sourceClaims} index={index} language={language} /></DetailRow>
     </>
   );
 };
@@ -706,10 +721,7 @@ const RelationDetailsRows = ({
   const source = index.entitiesByRef.get(edge.source);
   const target = index.entitiesByRef.get(edge.target);
   const examples = relationExamples(details);
-  const positive = examples.filter(({ kind }) => kind === "positive");
-  const counter = examples.filter(({ kind }) => kind === "counterexample" || kind === "boundary");
-  const instances = examples.filter(({ kind }) => kind === "instance");
-  const cases = examples.filter(({ kind }) => kind === "case-fragment");
+  const { unclassified: unclassifiedExamples, caseFragments } = splitExamplesByCasePath(index, examples);
   const constraints = arrayValue<CanonicalConstraint>(relation?.constraints);
   const claims = arrayValue<CanonicalSourceClaim>(relation?.source_claims);
   const cardinality = relation?.cardinality
@@ -734,15 +746,15 @@ const RelationDetailsRows = ({
       <DetailRow order={2} title={text.definitionBoundary}><p>{relationDefinition}</p><dl className="stacked-facts"><div><dt>{text.distinctFactRationale}</dt><dd>{localized(relation?.distinct_fact_rationale, language, text.notApplicable)}</dd></div></dl></DetailRow>
       <DetailRow order={3} title={text.semanticRelations}><dl className="stacked-facts"><div><dt>{text.direction}</dt><dd>{relation?.direction ?? "source-to-target"}</dd></div><div><dt>{text.relationKind}</dt><dd>{relation?.relation_kind ?? text.derivedRelation}</dd></div><div><dt>{text.source}</dt><dd><EntityLink entity={source} language={language} onFocus={onFocusEntity} /></dd></div><div><dt>{text.targetConcept}</dt><dd><EntityLink entity={target} language={language} onFocus={onFocusEntity} /></dd></div></dl></DetailRow>
       <DetailRow order={4} title={text.engineeringExplanation}><dl className="stacked-facts"><div><dt>{text.endpointRestrictions}</dt><dd>{relation ? `${relation.source_id} → ${relation.target_id}` : statement}</dd></div><div><dt>{text.temporalScope}</dt><dd>{String(relation?.temporal_scope ?? text.notApplicable)}</dd></div><div><dt>{text.boundaryContext}</dt><dd>{Object.keys(boundaryContext).length > 0 ? <pre><code>{JSON.stringify(localizedInformation(boundaryContext, language), null, 2)}</code></pre> : text.notApplicable}</dd></div></dl></DetailRow>
-      <DetailRow order={5} title={`${text.positiveExamples} / ${text.counterexamples}`}><h4>{text.positiveExamples}</h4><ExampleList id="relation-positive" examples={positive} index={index} language={language} /><h4>{text.counterexamples}</h4><ExampleList id="relation-counter" examples={counter} index={index} language={language} /></DetailRow>
-      <DetailRow order={6} title={text.instanceExamples}><ExampleList id="relation-instances" examples={instances} index={index} language={language} /></DetailRow>
-      <DetailRow order={7} title={text.structureConstraints}><dl className="stacked-facts"><div><dt>{text.cardinality}</dt><dd><code>{cardinality}</code></dd></div><div><dt>{text.inverseReading}</dt><dd>{inverseText}</dd></div><div><dt>{text.constraints}</dt><dd><ConstraintList id="relation-structure-constraints" constraints={constraints} index={index} language={language} /></dd></div><div><dt>{text.conditions}</dt><dd><ConstraintList id="relation-conditions" constraints={arrayValue<CanonicalConstraint>(relation?.conditions)} index={index} language={language} /></dd></div></dl></DetailRow>
-      <DetailRow order={8} title={text.caseFragments}><DisclosureList id="relation-cases" items={cases} language={language} emptyText={text.noInformation} renderItem={(example) => {
+      <DetailRow order={5} title={unclassifiedExamplesTitle[language]}><ExampleList id="relation-examples" examples={unclassifiedExamples} index={index} language={language} /></DetailRow>
+      <DetailRow order={6} title={text.structureConstraints}><dl className="stacked-facts"><div><dt>{text.cardinality}</dt><dd><code>{cardinality}</code></dd></div><div><dt>{text.inverseReading}</dt><dd>{inverseText}</dd></div><div><dt>{text.constraints}</dt><dd><ConstraintList id="relation-structure-constraints" constraints={constraints} index={index} language={language} /></dd></div><div><dt>{text.conditions}</dt><dd><ConstraintList id="relation-conditions" constraints={arrayValue<CanonicalConstraint>(relation?.conditions)} index={index} language={language} /></dd></div></dl></DetailRow>
+      <DetailRow order={7} title={text.caseFragments}><DisclosureList id="relation-cases" items={caseFragments} language={language} emptyText={text.noInformation} renderItem={(example) => {
         const context = caseStepContext(index, example.id);
         const missingReferenceIds = missingCasePathReferences(index, context?.path);
-        return <article className={example.scenario_id === highlightedScenarioId ? "case-path-highlight" : ""}><strong>{localized(example.labels, language, example.id)}</strong><p>{localized(example.descriptions, language)}</p><dl className="inline-facts"><div><dt>{text.currentStep}</dt><dd>{context?.step.order ?? text.notApplicable}</dd></div><div><dt>{text.semanticRelations}</dt><dd>{context?.step.traversal_relation_id ?? text.notApplicable}</dd></div></dl>{missingReferenceIds.length > 0 ? <p role="alert">{text.caseReferenceError} <code>{missingReferenceIds.join(", ")}</code></p> : null}<SourceClaimList id={`relation-case-${example.id}-sources`} claims={example.source_claims ?? []} index={index} language={language} initialLimit={0} />{example.scenario_id ? <button type="button" className="table-link" disabled={missingReferenceIds.length > 0} onClick={() => onHighlightScenario(example.scenario_id === highlightedScenarioId ? null : example.scenario_id ?? null)}>{example.scenario_id === highlightedScenarioId ? text.clearCaseHighlight : text.highlightCase}</button> : null}</article>;
+        const scenarioId = context?.path.id ?? example.scenario_id;
+        return <article className={scenarioId === highlightedScenarioId ? "case-path-highlight" : ""}><strong>{localized(example.labels, language, example.id)}</strong><p>{localized(example.descriptions, language)}</p><dl className="inline-facts"><div><dt>{text.currentStep}</dt><dd>{context?.step.order ?? text.notApplicable}</dd></div><div><dt>{text.semanticRelations}</dt><dd>{context?.step.traversal_relation_id ?? text.notApplicable}</dd></div></dl>{missingReferenceIds.length > 0 ? <p role="alert">{text.caseReferenceError} <code>{missingReferenceIds.join(", ")}</code></p> : null}<SourceClaimList id={`relation-case-${example.id}-sources`} claims={example.source_claims ?? []} index={index} language={language} initialLimit={0} />{scenarioId ? <button type="button" className="table-link" disabled={missingReferenceIds.length > 0} onClick={() => onHighlightScenario(scenarioId === highlightedScenarioId ? null : scenarioId)}>{scenarioId === highlightedScenarioId ? text.clearCaseHighlight : text.highlightCase}</button> : null}</article>;
       }} /></DetailRow>
-      <DetailRow order={9} title={text.sourcesAndReferences}><SourceClaimList id="relation-sources" claims={claims} index={index} language={language} /></DetailRow>
+      <DetailRow order={8} title={text.sourcesAndReferences}><SourceClaimList id="relation-sources" claims={claims} index={index} language={language} /></DetailRow>
     </>
   );
 };

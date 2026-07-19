@@ -158,10 +158,10 @@ describe("ontology visible scene", () => {
     const state = createOntologySceneState(index);
     const projection = projectOntologyScene(index, state);
 
-    expect(projection.nodeRefs).toHaveLength(9);
+    expect(projection.nodeRefs).toHaveLength(8);
     expect(projection.nodeRefs).toContain(fixtureRefs.runtimePlane);
     expect(projection.relationIds).toEqual([]);
-    expect(projection.derivedEdges).toHaveLength(8);
+    expect(projection.derivedEdges).toHaveLength(7);
   });
 
   it("bounds the initial hierarchy scope and reports a rejected initial expansion", () => {
@@ -200,13 +200,14 @@ describe("ontology visible scene", () => {
     );
     const projection = projectOntologyScene(index, controller.sceneState);
 
-    expect(projection.nodeRefs).toHaveLength(9);
-    expect(projection.derivedEdges).toHaveLength(8);
+    expect(projection.nodeRefs).toHaveLength(8);
+    expect(projection.derivedEdges).toHaveLength(7);
     expect(controller.diagnostic).toMatchObject({
       code: "scene-budget-exceeded",
-      requestedNodes: 11,
+      requestedNodes: 10,
       maxNodes: 9,
     });
+    expect(controller.sceneState.revision).toBe(0);
   });
 
   it("expands semantic neighbors by direction, predicate, and deterministic limit", () => {
@@ -327,7 +328,7 @@ describe("ontology visible scene", () => {
     });
   });
 
-  it("loads only the hierarchy children that fit the remaining node budget", () => {
+  it("rejects a hierarchy expansion that would exceed the remaining node budget", () => {
     const index = buildHighDegreeHierarchyIndex(130);
     const initial = createOntologySceneState(index, { rootRef: fixtureRefs.agentRun });
     const first = transitionOntologyScene(index, initial, {
@@ -345,24 +346,17 @@ describe("ontology visible scene", () => {
     }, budget);
     const projection = projectOntologyScene(index, transition.state);
 
-    expect(transition.state).not.toBe(first);
+    expect(transition.state).toBe(first);
+    expect(transition.state.revision).toBe(first.revision);
     expect(transition.diagnostic).toMatchObject({
       code: "scene-budget-exceeded",
       requestedNodes: 130,
       maxNodes: 120,
     });
-    expect(projection.nodeRefs).toHaveLength(120);
-    expect(projection.nodeRefs).toContain("concept:HierarchyChild119");
-    expect(projection.nodeRefs).not.toContain("concept:HierarchyChild120");
-    expect(projection.hidden).toEqual({
-      hierarchyNodes: 12,
-      hierarchyEdges: 12,
-      semanticNodes: 0,
-      semanticEdges: 0,
-    });
+    expect(projection).toEqual(projectOntologyScene(index, first));
   });
 
-  it("loads only the hierarchy children that fit the remaining edge budget", () => {
+  it("rejects a hierarchy expansion that would exceed the remaining edge budget", () => {
     const index = buildHighDegreeHierarchyIndex();
     const budget = { maxNodes: 120, maxEdges: 13, semanticExpansionLimit: 12 };
     const initial = createOntologySceneState(index, { rootRef: fixtureRefs.agentRun });
@@ -378,16 +372,14 @@ describe("ontology visible scene", () => {
     }, budget);
     const projection = projectOntologyScene(index, transition.state);
 
-    expect(transition.state).not.toBe(first);
+    expect(transition.state).toBe(first);
+    expect(transition.state.revision).toBe(first.revision);
     expect(transition.diagnostic).toMatchObject({
       code: "scene-budget-exceeded",
       requestedEdges: 15,
       maxEdges: 13,
     });
-    expect(projection.nodeRefs).toHaveLength(14);
-    expect(projection.relationIds).toHaveLength(13);
-    expect(projection.hidden.hierarchyNodes).toBe(2);
-    expect(projection.hidden.hierarchyEdges).toBe(2);
+    expect(projection).toEqual(projectOntologyScene(index, first));
   });
 
   it("does not charge an already-visible semantic neighbor against the next-node quota", () => {
@@ -587,9 +579,10 @@ describe("ontology visible scene", () => {
     );
 
     expect(transition.state).toBe(initial);
+    expect(transition.state.revision).toBe(initial.revision);
     expect(transition.diagnostic).toMatchObject({
       code: "scene-budget-exceeded",
-      requestedNodes: 11,
+      requestedNodes: 10,
       maxNodes: 9,
     });
 

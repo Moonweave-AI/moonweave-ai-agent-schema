@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { runSourceLinkCheckCommand } from "../scripts/lib/ontology-maintenance-commands.mjs";
 import { checkSourceLinks } from "../scripts/lib/source-link-checker.mjs";
 
 const PUBLIC_IPV4 = "93.184.216.34";
@@ -12,7 +13,55 @@ const response = (status: number, location?: string) => ({
   headers: new Headers(location ? { location } : undefined),
 });
 
+const sourceLinkInputs = async () => ({
+  sources: [{ id: "registered-source", url: "https://source.example.test/spec" }],
+  referencedIds: new Set(["registered-source", "unregistered-source"]),
+});
+
 describe("source link checker", () => {
+  it("continues referenced-only validation when published claims have no registered link and inconclusive results are allowed", async () => {
+    const checkLinks = vi.fn(async (sources: readonly unknown[]) => ({
+      checked: sources.length,
+      failures: [],
+    }));
+    const log = vi.fn();
+    const warn = vi.fn();
+
+    await expect(runSourceLinkCheckCommand({
+      arguments_: ["--referenced-only", "--allow-inconclusive", "--json"],
+      loadYamlInputs: sourceLinkInputs,
+      checkLinks,
+      log,
+      warn,
+    })).resolves.toMatchObject({
+      broken: [],
+      inconclusive: [],
+      unregisteredReferencedIds: ["unregistered-source"],
+    });
+
+    expect(checkLinks).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(
+      /published source claims absent from the source registry/iu,
+    ));
+    expect(JSON.parse(log.mock.calls[0]?.[0] ?? "{}")).toMatchObject({
+      unregisteredReferencedIds: ["unregistered-source"],
+    });
+  });
+
+  it("keeps missing source registrations fatal when inconclusive results are not allowed", async () => {
+    const checkLinks = vi.fn();
+
+    await expect(runSourceLinkCheckCommand({
+      arguments_: ["--referenced-only"],
+      loadYamlInputs: sourceLinkInputs,
+      checkLinks,
+      log: vi.fn(),
+      warn: vi.fn(),
+    })).rejects.toThrow(/published source claims absent from the source registry/iu);
+
+    expect(checkLinks).not.toHaveBeenCalled();
+  });
+
   it("manually validates every redirect hop and falls back to GET when HEAD is unsupported", async () => {
     const fetchImpl = vi.fn(async (input: string | URL, init?: RequestInit) => {
       const url = String(input);

@@ -215,7 +215,7 @@ describe("unified graph UI contract", () => {
     expect(html).not.toMatch(/Logical hierarchy|Relation exploration|layout-direction/u);
   });
 
-  it("keeps a nine-row detail table without obsolete validation, mapping, or maturity sections", () => {
+  it("keeps an eight-row detail table without obsolete validation, mapping, or maturity sections", () => {
     const { index, state, view } = buildFixture();
     const html = renderToStaticMarkup(
       <OntologyCharacteristics
@@ -234,7 +234,7 @@ describe("unified graph UI contract", () => {
       />,
     );
 
-    expect((html.match(/data-detail-row=/g) ?? [])).toHaveLength(9);
+    expect((html.match(/data-detail-row=/g) ?? [])).toHaveLength(8);
     expect(html).toContain("已显示 5 / 共 7 项");
     expect(html).toContain("展开全部（共 7 项）");
     expect(html).toContain("已显示 5 / 共 9 项");
@@ -245,7 +245,7 @@ describe("unified graph UI contract", () => {
     expect(html).toContain("\u6765\u6e90\u4e0e\u5f15\u7528");
   });
 
-  it("uses the same nine rows for relation focus and distinguishes canonical relation data", () => {
+  it("uses the same eight rows for relation focus and distinguishes canonical relation data", () => {
     const { index, state } = buildFixture();
     const relationState = {
       ...state,
@@ -269,7 +269,7 @@ describe("unified graph UI contract", () => {
       />,
     );
 
-    expect((html.match(/data-detail-row=/g) ?? [])).toHaveLength(9);
+    expect((html.match(/data-detail-row=/g) ?? [])).toHaveLength(8);
     expect(html).toContain("AgentRun-produces-RunResult");
     expect(html).toContain("AgentRun — produces → RunResult");
     expect(html).toContain("Back to node details");
@@ -294,7 +294,7 @@ describe("unified graph UI contract", () => {
     expect(graphHtml).not.toContain('class="graph-edge-tooltip"');
   });
 
-  it("marks instance explanation as not applicable for a module organization node", () => {
+  it("presents module examples without assigning them an example kind", () => {
     const { index } = buildFixture();
     const state = createOntologyViewState(index, {
       graphRootRef: fixtureRefs.runLifecycleModule,
@@ -304,7 +304,7 @@ describe("unified graph UI contract", () => {
       <OntologyCharacteristics
         index={index}
         view={buildVisibleConceptGraph(index, state)}
-        language="zh"
+        language="en"
         focusedEntityRef={state.focusedEntityRef}
         focusedRelationId={null}
         highlightedScenarioId={null}
@@ -317,8 +317,10 @@ describe("unified graph UI contract", () => {
       />,
     );
 
-    expect((html.match(/data-detail-row=/g) ?? [])).toHaveLength(9);
-    expect(html).toContain("本节点为领域/模块组织节点，不适用实例说明");
+    expect((html.match(/data-detail-row=/g) ?? [])).toHaveLength(8);
+    expect(html).toContain("Examples");
+    expect(html).toContain("run-lifecycle example 1");
+    expect(html).not.toContain("Instance examples");
   });
 
   it("shows local and inherited fields in the same node details for AssistantMessage and AudioContent", () => {
@@ -460,13 +462,11 @@ describe("unified graph UI contract", () => {
     const agentCase = {
       ...ontologyViewModelFixture.classes[3].examples[0],
       id: "agent-run-case-fragment",
-      kind: "case-fragment",
       scenario_id: caseId,
     };
     const resultCase = {
       ...ontologyViewModelFixture.classes[2].examples[0],
       id: "run-result-case-fragment",
-      kind: "case-fragment",
       scenario_id: caseId,
     };
     const ontology = {

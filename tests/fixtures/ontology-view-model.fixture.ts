@@ -14,7 +14,6 @@ const sourceClaim = (ownerId: string, index: number) => ({
 
 const example = (ownerId: string, index: number) => ({
   id: `${ownerId}-example-${index}`,
-  kind: index === 1 ? "positive" : index === 2 ? "counterexample" : "instance",
   labels: localized(`${ownerId} example ${index}`),
   scenario_id: null,
   descriptions: localized(`Example ${index} for ${ownerId}`),
