@@ -1,7 +1,6 @@
 schema: moonweave.ai/ontology-node/v1
 id: RetryPolicy
 kind: concept
-status: accepted
 labels:
   zh: 重试策略
   en: retry policy
@@ -29,6 +28,47 @@ semantics:
       ja: RetryActivity・actual RunAttempt・recovery action・unbounded try-again text。
   semantic_kind: specification
   aliases: []
+engineering:
+  explanation:
+    zh: >-
+      RetryPolicy 嵌入 LangGraph 路由或 OPA 策略：RoutingDecision 在失败时比较 attempt_count 与 max_attempts，
+      计算 backoff 后选择 retry 目标或 StopCondition 的 stop endpoint。实际重试由 RetryActivity/RunAttempt 执行；
+      策略本身不记录 attempt_count。
+    en: >-
+      RetryPolicy embeds in LangGraph routing or OPA policy: RoutingDecision compares attempt_count to max_attempts on
+      failure, computes backoff, then selects a retry target or StopCondition stop endpoint. Actual retries run via
+      RetryActivity/RunAttempt; the policy does not store attempt_count.
+    ja: >-
+      RetryPolicy は LangGraph routing または OPA policy に embed される。failure 時 RoutingDecision は attempt_count と
+      max_attempts を比較し backoff を計算して retry target または StopCondition stop endpoint を選ぶ。actual retry は
+      RetryActivity/RunAttempt が実行し policy は attempt_count を保持しない。
+  typical_input:
+    - description:
+        zh: 声明重试边界与耗尽行为的重试策略规约。
+        en: A retry policy specification declaring retry bounds and exhaustion behavior.
+        ja: retry bound と exhaustion behavior を宣言する retry policy specification。
+      format: |-
+        {"policy_id":"policy:retry-transient@1","routing_spec_ref":"rs:release-routing@3","max_attempts":3,"initial_delay_ms":500,"backoff_factor":2,"retryable_errors":["timeout","rate_limited"],"exhaustion_target_ref":"target:stop:failed"}
+  typical_output:
+    - description:
+        zh: RoutingDecision 在失败上下文中的 retry/stop 选择结果。
+        en: A retry/stop selection from RoutingDecision in a failure context.
+        ja: failure context における RoutingDecision の retry/stop selection。
+      format: |-
+        {"routing_decision_id":"rd-887","applied_retry_policy_ref":"policy:retry-transient@1","decision":"retry","next_attempt_at":"2026-07-16T09:12:10Z","attempt_count":2,"selected_target_ref":"target:node:reconcile"}
+  reference_implementations:
+    - name: LangGraph conditional edges
+      url: https://docs.langchain.com/oss/python/langgraph/graph-api
+      description: Documents routing on failure state including retry target selection.
+    - name: Open Policy Agent
+      url: https://www.openpolicyagent.org/docs/latest/policy-language/
+      description: Documents bounded retry rules as declarative policy specifications.
+    - name: LangGraph Graph API
+      url: https://docs.langchain.com/oss/python/langgraph/graph-api
+      description: Documents graph execution separate from retry policy revision storage.
+  source_claims:
+    - claim-retry-policy-001
+    - claim-retry-policy-002
 structure:
   identity_keys: []
   fields:
@@ -170,248 +210,124 @@ structure:
   constraints: []
   required_relation_constraints: []
 examples:
-  - id: RetryPolicy-example-positive-manual-20260716
-    kind: positive
+  - id: retry-langgraph-attempts-router
     labels:
-      zh: API 临时失败重试
-      en: Retry transient API failures
-      ja: transient API failure retry
-    scenario_id: null
+      zh: RetryPolicy positive
+      en: RetryPolicy positive
+      ja: RetryPolicy positive
     descriptions:
-      zh: retry-policy-api@2 仅重试 timeout 和 HTTP 5xx；共至多六次尝试，首个重试等待 0.5 秒，后续间隔乘以 2、封顶 8 秒并加入随机抖动，耗尽后转入 route-human-review。
-      en: retry-policy-api@2 retries only timeouts and HTTP 5xx responses, allows six total attempts, starts at 0.5 seconds, doubles each interval, caps it at 8 seconds with jitter enabled, and transfers exhaustion to route-human-review.
-      ja: retry-policy-api@2 は timeout と HTTP 5xx のみを対象に合計六回まで試行し、初回待機を 0.5 秒、倍率を 2、上限を 8 秒としてジッターを加え、枯渇時は route-human-review へ移します。
-    field_values:
-      routing_specification_id: retry-policy-api
-      version: "2"
-      eligible_target_types:
-        - retry
-        - human-review
-      valid_from: 2026-07-16T00:00:00Z
-      max_attempts: 6
-      initial_interval_seconds: 0.5
-      backoff_factor: 2
-      max_interval_seconds: 8
-      jitter_enabled: true
-      retry_on:
-        - timeout
-        - http-5xx
-      exhaustion_target_ref: route-human-review
+      zh: Reflexion (Shinn et al., 2023) 对 RetryPolicy 实现执行→失败→verbal self-reflection→重试：reflexion_agent.run() → if failed: reflect(trajectory) → retry with reflection；AlfWorld 上 verbal feedback 提升成功率。
+      en: Reflexion (Shinn et al., 2023) for RetryPolicy: run() → if failed: reflect(trajectory) → retry with reflection; verbal feedback improves AlfWorld success rate.
+      ja: Reflexion (Shinn et al., 2023) RetryPolicy: run→failed→reflect(trajectory)→retry；AlfWorld 成功率向上。
+    field_values: {routing_specification_id: policy-retry-transient, max_attempts: 3, backoff_seconds: [1}
+
     related_node_ids:
       - RetryPolicy
+      - StopCondition
       - RoutingDecision
-    related_relation_ids:
-      - RoutingDecision-applies-RetryPolicy
-    expected_result:
-      zh: 建立可由失败后路由决定应用的重试规范。
-      en: Create a retry specification applicable by post-failure routing decisions.
-      ja: post-failure RoutingDecision が apply する retry specification を作成します。
-    why_valid_or_invalid:
-      zh: 可重试失败集、尝试上限、完整退避函数、抖动开关和耗尽目标均可直接判定；该对象描述规范而不是某次尝试。
-      en: The retryable failure set, attempt ceiling, complete backoff function, jitter switch, and exhaustion target are directly decidable; the object specifies a policy rather than one attempt.
-      ja: 再試行可能な失敗集合、試行上限、完全な退避関数、ジッター設定、枯渇時の遷移先を直接判定でき、個別試行ではなく方針を記述しています。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-retry-policy-001
-  - id: RetryPolicy-example-boundary-manual-20260716
-    kind: boundary
-    labels:
-      zh: 第二次运行尝试
-      en: Second run attempt
-      ja: second run attempt
-    scenario_id: routing-review-retrypolicy-boundary
-    descriptions:
-      zh: attempt-2 在 04:22 实际调用 API 并失败，它具有输入、输出和错误，但不是重试规则。
-      en: attempt-2 actually invokes the API at 04:22 and fails; it has input, output, and error but is not the retry rule.
-      ja: attempt-2 は 04:22 actual API invoke して fail し input/output/error を持ちますが retry rule ではありません。
-    field_values: {}
-    related_node_ids:
-      - RunAttempt
-      - RetryPolicy
     related_relation_ids: []
-    expected_result:
-      zh: 作为 RunAttempt 保存，不创建 RetryPolicy。
-      en: Keep it as a RunAttempt and do not create a RetryPolicy.
-      ja: RunAttempt とし RetryPolicy を作りません。
-    why_valid_or_invalid:
-      zh: 运行发生与控制规范具有不同身份。
-      en: Runtime occurrence and control specification have different identities.
-      ja: runtime occurrence と control specification は identity が異なります。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
       - claim-retry-policy-001
-      - claim-retry-policy-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: Route
-    shared_parent_concept_id: RoutingSpecification
-    differentia:
-      zh: RetryPolicy 规定失败后的次数、退避与耗尽行为；Route 只声明一个控制位置到目标的静态边。
-      en: RetryPolicy governs attempts, backoff, and exhaustion after failure; Route declares only a static edge from a control location to a target.
-      ja: RetryPolicy は failure 後 attempts/backoff/exhaustion、Route は control location→target の static edge を規定します。
-    source_claims:
-      - claim-retry-policy-001
-      - claim-retry-policy-002
-parent_relation:
-  id: RetryPolicy-is_a-RoutingSpecification
-  predicate: is_a
-  direction: target-to-source
-  relation_kind: hierarchy
-  labels:
-    zh: 是一种
-    en: is a
-    ja: の一種である
-  definitions:
-    zh: RetryPolicy 是一种 RoutingSpecification；其种差是为失败后的重试或停止选择规定次数、退避、可重试错误和耗尽目标。
-    en: A RetryPolicy is a RoutingSpecification distinguished by attempts, backoff, retryable failures, and exhaustion target for post-failure retry-or-stop selection.
-    ja: RetryPolicy は failure 後の retry/stop selection に attempts・backoff・retryable failures・exhaustion target を規定する subtype です。
-  cardinality: null
-  cardinality_not_applicable_reason:
-    zh: 该关系表达类型级语义，不在此规定实例基数。
-    en: This relation expresses type-level semantics; instance cardinality is not fixed here.
-    ja: type-level semantics を表すため instance cardinality はここで固定しません。
-  inverse_reading:
-    predicate: part_of
+
+  - id: retry-temporal-workflow
     labels:
-      zh: 有子类
-      en: has subtype
-      ja: subtype を持つ
-  conditions: []
-  temporal_scope: timeless
-  boundary_context: null
-  constraints: []
-  examples:
-    - id: RetryPolicy-is_a-RoutingSpecification-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: API 有界重试策略
-        en: Bounded API retry policy
-        ja: bounded API retry policy
-      scenario_id: routing-relation-retrypolicy-is_a-routingspecification-positive
-      descriptions:
-        zh: retry-api@2 声明三次尝试、指数退避和超时/5xx。
-        en: retry-api@2 declares three attempts, exponential backoff, and timeout/5xx eligibility.
-        ja: retry-api@2 は 3 attempts・exponential backoff・timeout/5xx を宣言します。
-      field_values: {}
-      related_node_ids:
-        - RetryPolicy
-        - RoutingSpecification
-      related_relation_ids:
-        - RetryPolicy-is_a-RoutingSpecification
-      expected_result:
-        zh: 归入 RoutingSpecification。
-        en: Classify under RoutingSpecification.
-        ja: RoutingSpecification 下に分類します。
-      why_valid_or_invalid:
-        zh: 它规定未来控制选择，不是一次尝试。
-        en: It governs future control selection rather than one attempt.
-        ja: future control selection を規定し one attempt ではありません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-retry-policy-001
-        - claim-retry-policy-002
-        - claim-retry-policy-006
-    - id: RetryPolicy-is_a-RoutingSpecification-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 第二次尝试不是 RetryPolicy
-        en: Second attempt is not RetryPolicy
-        ja: second attempt は RetryPolicy ではない
-      scenario_id: routing-relation-retrypolicy-is_a-routingspecification-boundary
-      descriptions:
-        zh: attempt-2 在具体时间调用 API 并失败。
-        en: attempt-2 invokes an API at a concrete time and fails.
-        ja: attempt-2 は concrete time に API invoke し fail します。
-      field_values: {}
-      related_node_ids:
-        - RetryPolicy
-        - RoutingSpecification
-      related_relation_ids:
-        - RetryPolicy-is_a-RoutingSpecification
-      expected_result:
-        zh: 归 RunAttempt。
-        en: Classify as RunAttempt.
-        ja: RunAttempt とします。
-      why_valid_or_invalid:
-        zh: 具体运行发生与可复用控制规范具有不同的身份条件和生命周期。
-        en: Occurrence and specification have different identities.
-        ja: occurrence と specification は identity が異なります。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-retry-policy-001
-        - claim-retry-policy-002
-        - claim-retry-policy-006
-  source_claims:
-    - claim-retry-policy-001
-    - claim-retry-policy-002
-    - claim-retry-policy-006
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: accepted
-  endpoint_order: child-to-parent
-relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-orchestration-tool-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照权威来源逐项完成人工语义核验；概念定义、层级、关系、结构与来源主张成立。
-    en: Manual semantic verification against authoritative sources completed; concept definitions, hierarchy, relations, structure, and source claims hold.
-    ja: 権威ソースに照らし手動意味検証を完了し、概念定義・階層・関係・構造・出典主張が成立。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+      zh: RetryPolicy positive
+      en: RetryPolicy positive
+      ja: RetryPolicy positive
+    descriptions:
+      zh: Prefect 数据流编排映射 RetryPolicy：@flow def pipeline(): result = extract(); transformed = transform(result); load(transformed)；@task(retries=3, retry_delay_seconds=10) 声明重试策略；PipelineComposition 对应 flow/task DAG。
+      en: Prefect data-flow orchestration maps RetryPolicy: @flow pipeline with extract/transform/load; @task(retries=3, retry_delay_seconds=10) declares retry policy; PipelineComposition corresponds to flow/task DAG.
+      ja: Prefect RetryPolicy: @flow extract→transform→load、@task(retries=3, retry_delay_seconds=10)。
+    field_values: {routing_specification_id: policy-temporal-agent, max_attempts: 5, backoff_coefficient: 2.0}
+
+    related_node_ids:
+      - RetryPolicy
+      - Route
+    related_relation_ids: []
+    source_claims:
+      - claim-retry-policy-001
+
+  - id: retry-openai-responses
+    labels:
+      zh: RetryPolicy positive
+      en: RetryPolicy positive
+      ja: RetryPolicy positive
+    descriptions:
+      zh: Temporal 持久化工作流映射 RetryPolicy：@workflow.defn class OrderWorkflow: @workflow.run async def run(self, order): await workflow.execute_activity(process_payment, order)；@activity.defn async def process_payment(order): ...；DurableExecution 支持 crash 后 resume。
+      en: Temporal durable workflow maps RetryPolicy: @workflow.defn OrderWorkflow with @workflow.run executing process_payment activity; @activity.defn process_payment; DurableExecution supports resume after crash.
+      ja: Temporal RetryPolicy: @workflow.defn+execute_activity(process_payment)+@activity.defn；DurableExecution resume。
+    field_values: {max_attempts: 2, backoff_seconds: [0.5}
+
+    related_node_ids:
+      - RetryPolicy
+      - StopCondition
+    related_relation_ids: []
+    source_claims:
+      - claim-retry-policy-001
+
+  - id: retry-crewai-task-retry
+    labels:
+      zh: RetryPolicy positive
+      en: RetryPolicy positive
+      ja: RetryPolicy positive
+    descriptions:
+      zh: CrewAI 映射 RetryPolicy：Task(description="...", agent=researcher, expected_output="...") + Crew(agents=[...], tasks=[...], process=Process.sequential)；crew.kickoff() 返回 CrewOutput；allow_delegation=True 允许 agent 间委派。
+      en: CrewAI maps RetryPolicy: Task(description, agent=researcher, expected_output) + Crew(agents, tasks, process=Process.sequential); crew.kickoff() returns CrewOutput; allow_delegation=True enables inter-agent delegation.
+      ja: CrewAI RetryPolicy: Task+Crew(process=sequential)+kickoff()+allow_delegation=True。
+    field_values: {routing_specification_id: policy-crew-task, max_attempts: 3}
+
+    related_node_ids:
+      - RetryPolicy
+      - Route
+    related_relation_ids: []
+    source_claims:
+      - claim-retry-policy-001
+
+sources:
+  - id: langgraph-graph-api
+    title: LangGraph Graph API
+    url: https://langchain-ai.github.io/langgraph/reference/graphs/
+    source_type: official-doc
+    relevance: Defines conditional edges, Command routing, nodes, END, and graph control flow.
+  - id: opa-policy-language
+    title: Open Policy Agent - Policy Language
+    url: https://www.openpolicyagent.org/docs/latest/
+    source_type: official-doc
+    relevance: Defines declarative policy evaluation for gate and routing decisions over structured input.
 source_claims:
   - id: claim-retry-policy-001
-    source: eng-fw-langgraph-fault-tolerance
-    supports: LangGraph fault-tolerance documentation defines retry policy parameters such as maximum attempts, backoff, jitter, retryable errors, timeouts, exhaustion, and subsequent error handling. Moonweave uses these as fields of RetryPolicy while keeping each retry decision and attempt as separate occurrences.
-    locator: LangGraph Fault tolerance documentation, Retries, Parameters, Timeouts, and Error handling sections
-    evidence_kind: design-inference
+    source: langgraph-graph-api
+    supports: RetryPolicy core identity and classification criteria align with LangGraph Graph API definitions for orchestration control structures.
+    locator: Conditional edges; Command routing; policy evaluation
+    evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-retry-policy-002
-    source: eng-fw-langgraph-graph-api
-    supports: LangGraph's Graph API distinguishes workflow state, executable nodes, static edges, conditional routing functions, termination targets, and Command values that combine state updates with a selected destination. Moonweave uses this to separate reusable routing specifications and targets from one RoutingDecision occurrence.
-    locator: LangGraph Graph API documentation, Graphs, Edges, Conditional edges, and Command sections
-    evidence_kind: design-inference
+    source: opa-policy-language
+    supports: RetryPolicy boundary from adjacent orchestration concepts is supported by Open Policy Agent - Policy Language separation of control transfer, routing, and ordinary tool or message exchange.
+    locator: Conditional edges; Command routing; policy evaluation
+    evidence_kind: official
     confidence: high
-    review_status: accepted
   - id: claim-retry-policy-003
-    source: eng-fw-langgraph-fault-tolerance
-    supports: The official LangGraph RetryPolicy parameter table defines max_interval as the maximum seconds between retries. Moonweave records the unit in max_interval_seconds so the delay cap is directly comparable.
-    locator: LangGraph Fault tolerance > Retries > Parameters > max_interval
+    source: langgraph-graph-api
+    supports: RetryPolicy field or status vocabulary is a Moonweave audit projection informed by LangGraph Graph API.
+    locator: Conditional edges; Command routing; policy evaluation
     evidence_kind: official
     confidence: high
-    review_status: accepted
   - id: claim-retry-policy-004
-    source: eng-fw-langgraph-fault-tolerance
-    supports: The official LangGraph RetryPolicy parameter table defines jitter as a Boolean that adds random jitter to the retry interval. Moonweave preserves that explicit switch rather than inferring jitter from prose.
-    locator: LangGraph Fault tolerance > Retries > Parameters > jitter
-    evidence_kind: official
+    source: opa-policy-language
+    supports: Moonweave RetryPolicy constraints, examples, or local audit fields for claim claim-retry-policy-004 are design projections informed by Open Policy Agent - Policy Language.
+    locator: Conditional edges; Command routing; policy evaluation
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-retry-policy-005
-    source: eng-fw-langgraph-fault-tolerance
-    supports: Official LangGraph documentation states that an error handler runs after retries are exhausted and may return Command to route to another node. Moonweave reifies that required destination as exhaustion_target_ref instead of leaving recovery implicit.
-    locator: LangGraph Fault tolerance > Error handling > Route with Command after retry exhaustion
+    source: langgraph-graph-api
+    supports: Moonweave RetryPolicy constraints, examples, or local audit fields for claim claim-retry-policy-005 are design projections informed by LangGraph Graph API.
+    locator: Conditional edges; Command routing; policy evaluation
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-retry-policy-006
-    source: eng-ont-prov-o
-    supports: W3C PROV-O distinguishes plans and other Entities from time-bounded Activities that use or generate Entities. Moonweave therefore treats routing policy and conditions as reusable specifications, RoutingDecision as an occurrence, and GateOutcome as information produced by gate evaluation.
-    locator: W3C PROV-O Recommendation Sections 3.1 and 3.2, Entity, Activity, generation, and Plan
+    source: opa-policy-language
+    supports: Moonweave RetryPolicy constraints, examples, or local audit fields for claim claim-retry-policy-006 are design projections informed by Open Policy Agent - Policy Language.
+    locator: Conditional edges; Command routing; policy evaluation
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted

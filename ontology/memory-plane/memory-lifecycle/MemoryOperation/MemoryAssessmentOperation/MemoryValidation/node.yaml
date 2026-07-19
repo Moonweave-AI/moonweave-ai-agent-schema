@@ -8,51 +8,349 @@ labels:
   ja: 記憶検証
 semantics:
   short_definition:
-    zh: 依据明确检查项评估一个记录并可检测冲突的评估操作。
-    en: An assessment operation evaluating a record against explicit checks and potentially detecting conflict.
-    ja: 明示checkによりrecordを評価しconflictを検出し得るassessment operationです。
+    zh: 按版本化明确检查项验证既有记忆记录并形成可审计判定的评估操作。
+    en: An assessment operation that validates existing memory records against versioned explicit checks and forms an auditable verdict.
+    ja: バージョン化された明示的検査に対して既存記憶レコードを検証し、監査可能な判定を形成する評価操作です。
   definition:
-    zh: MemoryValidation 是 MemoryAssessmentOperation：它对 MemoryRecord 执行来源、时效、信任边界、安全、同意或一致性检查，返回可审计判定；它不会自动合并冲突记录。
-    en: MemoryValidation is a MemoryAssessmentOperation that checks a MemoryRecord for provenance, freshness, trust boundary, safety, consent, or consistency and returns an auditable verdict. It does not automatically merge conflicting records.
-    ja: MemoryValidation はMemoryRecordのprovenance・freshness・trust boundary・safety・consent・consistencyをcheckしaudit可能verdictを返す MemoryAssessmentOperationです。conflicting recordを自動mergeしません。
+    zh: MemoryValidation 是 MemoryAssessmentOperation：它依据一个可重放的验证配置，对冻结的既有 MemoryRecord 执行来源、新鲜度、同意、信任边界、安全或一致性检查，并记录 valid、invalid、conflict_detected 或 inconclusive 判定。它不修改记录、不自动合并冲突、不选择赢家，也不执行处置。
+    en: MemoryValidation is a MemoryAssessmentOperation that uses a replayable validation profile to apply provenance, freshness, consent, trust-boundary, safety, or consistency checks to frozen existing MemoryRecord instances and records a valid, invalid, conflict_detected, or inconclusive verdict. It does not modify records, automatically merge conflict, select a winner, or perform disposition.
+    ja: MemoryValidation は、再実行可能な検証プロファイルを用いて、凍結された既存 MemoryRecord に provenance、freshness、consent、trust-boundary、安全性、一貫性の検査を適用し、valid、invalid、conflict_detected、inconclusive の判定を記録する MemoryAssessmentOperation です。レコードを変更せず、競合を自動統合せず、勝者を選ばず、処分も実行しません。
   why_needed:
-    zh: 让复用前验证成为独立活动，并把冲突作为输出状态。
-    en: Makes pre-reuse validation an independent activity and conflict an output state.
-    ja: reuse前validationを独立activityにしconflictをoutput stateにします。
+    zh: 将可重放的记录级检查与一般评估、冲突解决和内容变更分开，使复用前的证据与最终处置都可追溯。
+    en: Separates replayable record-level checks from general assessment, conflict resolution, and content change so both pre-reuse evidence and final disposition remain traceable.
+    ja: 再実行可能なレコード単位検査を一般評価、競合解決、内容変更から分離し、再利用前証跡と最終処分の両方を追跡可能にします。
   includes:
-    - zh: 纳入记录复用前的来源、新鲜度、授权、安全与冲突检查。
-      en: Includes provenance, freshness, authorization, safety, and conflict checks before record reuse.
-      ja: record reuse前のprovenance・freshness・authorization・safety・conflict checkを含みます。
+    - zh: 已执行的来源、新鲜度、同意、信任边界、安全和一致性检查，以及只检测并报告冲突的验证。
+      en: Executed provenance, freshness, consent, trust-boundary, safety, and consistency checks, including validations that only detect and report conflict.
+      ja: 実行済みの provenance、freshness、consent、trust-boundary、安全性、一貫性の検査、および競合を検出・報告するだけの検証を含みます。
   excludes:
-    - zh: 排除无证据的主观置信度、冲突解决决定和内容更新。
-      en: Excludes unsupported subjective confidence, conflict-resolution decisions, and content update.
-      ja: unsupported subjective confidence・conflict-resolution decision・content updateを除外します。
+    - zh: 无检查配置的主观置信度、仅展示的健康分数、冲突解决、记录更新、记录删除，以及用结果倒推检查已发生的假设。
+      en: Subjective confidence without a check profile, display-only health scores, conflict resolution, record update, record deletion, and assumptions that infer a check occurred from an outcome.
+      ja: 検査プロファイルのない主観的確信、表示専用の健全性スコア、競合解決、レコード更新、レコード削除、結果から検査発生を逆推論する仮定を除外します。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: 将验证实现为有目标记录、版本化检查配置、冻结证据和单一判定的只读工作单元；冲突只作为输出状态，后续处理另建活动。
+    en: Implement validation as a read-only work unit with target records, versioned check profile, frozen evidence, and one verdict; conflict is output state only and later handling is a separate activity.
+    ja: 検証を対象レコード、バージョン化された検査プロファイル、凍結証跡、一つの判定を持つ読み取り専用作業単位として実装します。競合は出力状態だけであり、後続処理は別活動です。
+  typical_input:
+    - description: Existing record references, versioned validation profile, explicit checks, and a frozen evidence manifest.
+      format: "{operation_id, target_record_refs, validation_profile_ref, validation_checks, validation_evidence_digest, actor_ref}"
+  typical_output:
+    - description: One reproducible validation verdict with result evidence and optional detected conflict reference.
+      format: "{operation_id, validation_verdict, validation_result_digest, validated_at, conflict_ref?}"
+  reference_implementations:
+    - name: Open Policy Agent policy language
+      url: https://www.openpolicyagent.org/docs/latest/policy-language/
+      description: Documents evaluating versioned structured rules against input without mutating that input.
+    - name: NIST AI Risk Management Framework
+      url: https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-1.pdf
+      description: Distinguishes measurement and evaluation from later management actions.
+  source_claims:
+    - claim-memory-validation-activity
+    - claim-memory-validation-profile
 structure:
   identity_keys:
-    - validation_operation_id
+    - operation_id
   fields:
-    - id: validation_operation_id
+    - id: operation_id
       labels:
-        zh: 验证操作标识
-        en: validation operation ID
-        ja: validation operation ID
+        zh: 操作标识
+        en: operation ID
+        ja: 操作 ID
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
       definitions:
-        zh: 标识一次具体记录验证。
-        en: Identifies one concrete record-validation activity.
-        ja: 一concrete record-validation activityを識別します。
+        zh: 复用 MemoryOperation 标识，以将验证目标、检查配置、判定、结果与审计事件关联为同一次执行。
+        en: Reuses the MemoryOperation identity to join validation target, check profile, verdict, result, and audit events as one execution.
+        ja: MemoryOperation 識別子を再利用し、検証対象、検査プロファイル、判定、結果、監査イベントを一つの実行として結びます。
+      allowed_values: []
+      pattern: "^mem-op-[a-z0-9][a-z0-9-]*$"
+      example_value: mem-op-validate-1708
+      source_claims:
+        - claim-memory-validation-identity
+    - id: operation_kind
+      labels:
+        zh: 操作类别
+        en: operation kind
+        ja: 操作種別
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 固定为 assessment，表明验证是对现有记录的只读检查活动而不是记录修订或处置。
+        en: Narrows the inherited operation kind to assessment and identifies validation as a read-only check of existing records rather than revision or disposition.
+        ja: 継承した操作種別を assessment に限定し、検証を修訂や処置ではなく既存レコードの読み取り専用検査として識別します。
+      allowed_values:
+        - assessment
+      pattern: null
+      example_value: assessment
+      source_claims:
+        - claim-memory-validation-activity
+    - id: status
+      labels:
+        zh: 运行状态
+        en: runtime status
+        ja: 実行状態
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 记录验证活动的执行状态，而不把 valid 或 invalid 的检查结论混作运行状态。
+        en: Records the state of the validation activity and does not conflate it with the valid or invalid check conclusion.
+        ja: 検証活動の実行状態を記録し、valid または invalid という検査結論と混同しません。
+      allowed_values:
+        - running
+        - succeeded
+        - failed
+        - partially_succeeded
+        - rejected
+        - cancelled
+      pattern: null
+      example_value: succeeded
+      source_claims:
+        - claim-memory-validation-activity
+    - id: started_at
+      labels:
+        zh: 开始时间
+        en: started at
+        ja: 開始時刻
+      datatype: date-time
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 记录实际开始读取验证目标和检查配置的时间，不以验证配置的发布时间替代。
+        en: Records when reading the validation targets and check profile actually began, not when the profile was published.
+        ja: 検証対象と検査プロファイルの読み取りを実際に始めた時刻を記録し、プロファイル公開時刻では代用しません。
       allowed_values: []
       pattern: null
-      example_value: validate-1708
+      example_value: "2026-07-18T21:00:00Z"
       source_claims:
-        - claim-memory-validation-002
-    - id: verdict
+        - claim-memory-validation-activity
+    - id: actor_ref
+      labels:
+        zh: 执行主体引用
+        en: executor reference
+        ja: 実行主体参照
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 引用实际运行验证检查的主体，而不是被验证记录的提供者。
+        en: References the actor that runs the validation checks, not a provider of the record being checked.
+        ja: 検証対象レコードの提供者ではなく、検査を実行する主体を参照します。
+      allowed_values: []
+      pattern: "^[A-Za-z0-9][A-Za-z0-9._:@/-]*$"
+      example_value: memory-validator-1
+      source_claims:
+        - claim-memory-validation-activity
+    - id: target_record_refs
+      labels:
+        zh: 被验证记录引用
+        en: validated record references
+        ja: 検証対象レコード参照
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: null
+      definitions:
+        zh: 列出验证实际读取的既有 MemoryRecord；每个目标必须在验证开始前存在并出现在冻结证据中。
+        en: Lists existing MemoryRecord instances actually read by validation; every target must exist before validation starts and appear in frozen evidence.
+        ja: 検証が実際に読み取る既存 MemoryRecord を列挙します。各対象は検証開始前に存在し、凍結証跡に現れなければなりません。
+      allowed_values: []
+      pattern: "^record-[A-Za-z0-9._-]+$"
+      example_value:
+        - record-1708-v1
+      source_claims:
+        - claim-memory-validation-target
+    - id: assessment_scope
+      labels:
+        zh: 评估范围
+        en: assessment scope
+        ja: 評価範囲
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: null
+      definitions:
+        zh: 用父类范围词汇说明本次验证评估哪些维度；它是对 validation_checks 所列具体检查的语义归类。
+        en: Records which parent assessment dimensions this validation covers and gives a semantic grouping for the concrete validation_checks.
+        ja: この検証が対象とする親評価の次元を記録し、具体的な validation_checks に意味上の分類を与えます。
+      allowed_values:
+        - provenance
+        - freshness
+        - consent
+        - safety
+        - consistency
+        - policy_compliance
+      pattern: null
+      example_value:
+        - provenance
+        - freshness
+      source_claims:
+        - claim-memory-validation-profile
+    - id: evidence_manifest_digest
+      labels:
+        zh: 评估证据清单摘要
+        en: assessment evidence manifest digest
+        ja: 評価証跡マニフェストダイジェスト
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 固定父类评估所依赖的目标版本、配置和检查证据快照；在此子类中它与 validation_evidence_digest 指向同一验证证据包。
+        en: Fixes the parent assessment snapshot of target versions, profile, and check evidence; in this subtype it names the same evidence package as validation_evidence_digest.
+        ja: 対象版、プロファイル、検査証跡から成る親評価のスナップショットを固定し、このサブタイプでは validation_evidence_digest と同じ証跡パッケージを指します。
+      allowed_values: []
+      pattern: "^sha256:[a-f0-9]{64}$"
+      example_value: sha256:4b5eb431aa76d8cb1ddad5d0e4af2c836fbe51d75109287b8961a5d8ec762e5f
+      source_claims:
+        - claim-memory-validation-digest
+    - id: assessment_verdict
+      labels:
+        zh: 评估结论
+        en: assessment verdict
+        ja: 評価結論
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 用父类结论词汇概括验证结果；valid 映射为 pass，invalid 映射为 fail，conflict_detected 和 inconclusive 保持同名结论。
+        en: Summarizes the validation outcome in the parent verdict vocabulary, mapping valid to pass and invalid to fail while retaining conflict_detected and inconclusive.
+        ja: 親の結論語彙で検証結果を要約し、valid を pass、invalid を fail に対応付け、conflict_detected と inconclusive はそのまま保持します。
+      allowed_values:
+        - pass
+        - warning
+        - fail
+        - conflict_detected
+        - inconclusive
+      pattern: null
+      example_value: pass
+      source_claims:
+        - claim-memory-validation-verdict
+    - id: assessment_result_digest
+      labels:
+        zh: 评估结果摘要
+        en: assessment result digest
+        ja: 評価結果ダイジェスト
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 固定父类评估结论和逐项结果；在此子类中它与 validation_result_digest 指向同一不可变结果包。
+        en: Fixes the parent assessment conclusion and per-check outcomes; in this subtype it names the same immutable result package as validation_result_digest.
+        ja: 親評価の結論と検査ごとの結果を固定し、このサブタイプでは validation_result_digest と同じ不変の結果パッケージを指します。
+      allowed_values: []
+      pattern: "^sha256:[a-f0-9]{64}$"
+      example_value: sha256:ca495cf1adc1ea166a4249243ca02ecc84f4df4b9a9cc2fa1536495d4b58f4e6
+      source_claims:
+        - claim-memory-validation-digest
+    - id: assessed_at
+      labels:
+        zh: 评估完成时间
+        en: assessed at
+        ja: 評価完了時刻
+      datatype: date-time
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 记录父类评估结论形成的时间；在验证子类中它与 validated_at 是同一个结论事件。
+        en: Records when the parent assessment conclusion was formed; in validation it is the same conclusion event as validated_at.
+        ja: 親評価の結論が形成された時刻を記録し、検証では validated_at と同じ結論イベントです。
+      allowed_values: []
+      pattern: null
+      example_value: "2026-07-18T21:00:00.104Z"
+      source_claims:
+        - claim-memory-validation-activity
+    - id: validation_profile_ref
+      labels:
+        zh: 验证配置引用
+        en: validation profile reference
+        ja: 検証プロファイル参照
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 标识本次验证使用的不可变检查配置版本，使同一记录可按相同规则重放。
+        en: Identifies the immutable version of check configuration used by this validation so the same record can be replayed under the same rules.
+        ja: この検証で使用する検査設定の不変バージョンを識別し、同じレコードを同じ規則で再実行できるようにします。
+      allowed_values: []
+      pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]*@v[0-9][A-Za-z0-9._-]*$"
+      example_value: memory-reuse-validation@v2
+      source_claims:
+        - claim-memory-validation-profile
+    - id: validation_checks
+      labels:
+        zh: 验证检查项
+        en: validation checks
+        ja: 検証チェック項目
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: null
+      definitions:
+        zh: 列出本次实际运行的明确检查，而不是以概括性“有效性”标签代替可审计程序。
+        en: Lists explicit checks actually run in this validation rather than substituting a general "validity" label for an auditable procedure.
+        ja: 監査可能な手順を一般的な「有効性」ラベルで置き換えず、この検証で実際に実行した明示的検査を列挙します。
+      allowed_values:
+        - provenance_required
+        - freshness_max_age
+        - consent_scope
+        - trust_boundary
+        - safety_policy
+        - consistency
+      pattern: null
+      example_value:
+        - provenance_required
+        - freshness_max_age
+        - consistency
+      source_claims:
+        - claim-memory-validation-profile
+    - id: validation_evidence_digest
+      labels:
+        zh: 验证证据摘要
+        en: validation evidence digest
+        ja: 検証証跡ダイジェスト
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 固定支撑逐项检查的记录版本、外部来源、策略版本和运行输出清单。
+        en: Fixes a manifest of record versions, external sources, policy versions, and run outputs supporting each check.
+        ja: 各検査を支えるレコードバージョン、外部出所、ポリシーバージョン、実行出力のマニフェストを固定します。
+      allowed_values: []
+      pattern: "^sha256:[a-f0-9]{64}$"
+      example_value: sha256:4b5eb431aa76d8cb1ddad5d0e4af2c836fbe51d75109287b8961a5d8ec762e5f
+      source_claims:
+        - claim-memory-validation-digest
+    - id: validation_verdict
       labels:
         zh: 验证判定
         en: validation verdict
@@ -63,366 +361,547 @@ structure:
         min: 1
         max: 1
       definitions:
-        zh: 记录通过、失败或冲突等可审计结论。
-        en: Records an auditable pass, fail, or conflict verdict.
-        ja: pass・fail・conflict等audit可能結論を記録します。
+        zh: 记录由明确检查产生的可重放结论；它不直接表达如何修改或处置记录。
+        en: Records the replayable conclusion produced by explicit checks; it does not directly state how to modify or dispose of records.
+        ja: 明示的検査が生成する再実行可能な結論を記録し、レコードをどう変更または処分するかを直接表しません。
+      allowed_values:
+        - valid
+        - invalid
+        - conflict_detected
+        - inconclusive
+      pattern: null
+      example_value: conflict_detected
+      source_claims:
+        - claim-memory-validation-verdict
+    - id: validation_result_digest
+      labels:
+        zh: 验证结果摘要
+        en: validation result digest
+        ja: 検証結果ダイジェスト
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 固定逐项结果与最终判定摘要，使后续解决或修订活动引用检查结果而不改写它。
+        en: Fixes a digest of per-check results and final verdict so later resolution or revision can reference the check without rewriting it.
+        ja: 各検査結果と最終判定のダイジェストを固定し、後続の解決または改訂が検査を改変せずに参照できるようにします。
+      allowed_values: []
+      pattern: "^sha256:[a-f0-9]{64}$"
+      example_value: sha256:ca495cf1adc1ea166a4249243ca02ecc84f4df4b9a9cc2fa1536495d4b58f4e6
+      source_claims:
+        - claim-memory-validation-digest
+    - id: validated_at
+      labels:
+        zh: 验证完成时间
+        en: validated at
+        ja: 検証完了時刻
+      datatype: date-time
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 记录验证判定形成的时间，必须位于父评估活动的执行区间内。
+        en: Records when the validation verdict is formed and must lie inside the parent assessment activity's execution interval.
+        ja: 検証判定が形成された時刻を記録し、親評価活動の実行区間内でなければなりません。
       allowed_values: []
       pattern: null
-      example_value: conflict
+      example_value: "2026-07-18T21:00:00.104Z"
       source_claims:
-        - claim-memory-validation-003
-  constraints: []
+        - claim-memory-validation-activity
+  constraints:
+    - id: MemoryValidation-inherited-assessment-envelope
+      expression: "operation_kind = assessment, evidence_manifest_digest = validation_evidence_digest, assessment_result_digest = validation_result_digest, assessed_at = validated_at, and assessment_verdict maps valid to pass, invalid to fail, or preserves conflict_detected and inconclusive."
+      explanation:
+        zh: 验证不能另起一套与父类评估相矛盾的证据、结果或时间线；专用字段细化检查细节，通用字段保持同一次评估的可互操作合同。
+        en: Validation cannot create a second contradictory evidence, result, or time line beside its parent assessment; specialized fields refine checks while generic fields preserve one interoperable assessment contract.
+        ja: 検証は親評価とは別の矛盾した証跡、結果、時系列を作れず、専用フィールドは検査を詳細化し、汎用フィールドは一つの相互運用可能な評価契約を保持します。
+      source_claims:
+        - claim-memory-validation-activity
+        - claim-memory-validation-digest
+        - claim-memory-validation-verdict
+    - id: MemoryValidation-parent-assessment-consistency
+      expression: "The instance satisfies MemoryAssessmentOperation with non-empty assessment_scope, frozen evidence, target_record_refs, and no record mutation; validation adds an explicit profile and check list."
+      explanation:
+        zh: 验证是具体化的评估，不是独立的处置捷径；父类的只读和可审计边界仍然适用。
+        en: Validation is a concrete assessment, not an independent disposition shortcut; the parent's read-only and auditable boundaries still apply.
+        ja: 検証は具体化された評価であり、独立した処分の近道ではありません。親の読み取り専用かつ監査可能な境界が引き続き適用されます。
+      source_claims:
+        - claim-memory-validation-activity
+    - id: MemoryValidation-profile-and-evidence-consistency
+      expression: "validation_profile_ref identifies one immutable version, validation_checks is non-empty, and validation_evidence_digest covers each target record and check outcome."
+      explanation:
+        zh: 没有版本化配置或冻结证据，后续无法判定同一结论是按什么规则和事实形成的。
+        en: Without a versioned profile or frozen evidence, later review cannot determine which rules and facts produced the same conclusion.
+        ja: バージョン化プロファイルまたは凍結証跡なしでは、後続レビューがどの規則と事実で同じ結論が形成されたかを判断できません。
+      source_claims:
+        - claim-memory-validation-profile
+        - claim-memory-validation-digest
+    - id: MemoryValidation-verdict-boundary
+      expression: "validation_verdict is valid, invalid, conflict_detected, or inconclusive and records assessment only; it must not choose a winner, generate a successor record, delete a record, or declare remediation complete."
+      explanation:
+        zh: 验证可给出问题结论，但选择解决方案或更改记录会越过检测与干预的边界。
+        en: Validation can conclude that a problem exists, but selecting a remedy or changing a record crosses the boundary from detection to intervention.
+        ja: 検証は問題の存在を結論できますが、救済策選択またはレコード変更は検出から介入への境界を越えます。
+      source_claims:
+        - claim-memory-validation-verdict
+    - id: MemoryValidation-conflict-evidence-consistency
+      expression: "When validation_verdict is conflict_detected, a linked MemoryConflict identifies at least two involved records, one comparison dimension, and incompatible values; a later resolution remains separate."
+      explanation:
+        zh: 冲突必须有相互不兼容的具体命题与参与记录；仅来源不同或信息不足不能创建冲突或触发解决。
+        en: Conflict requires concrete incompatible propositions and participating records; different provenance or missing information alone cannot create conflict or trigger resolution.
+        ja: 競合には具体的な両立しない命題と参加レコードが必要であり、出所の違いまたは情報不足だけでは競合を作成したり解決をトリガーしたりできません。
+      source_claims:
+        - claim-memory-validation-conflict
+    - id: MemoryValidation-time-consistency
+      expression: "validated_at is on or after started_at, and a terminal parent operation has ended_at on or after validated_at."
+      explanation:
+        zh: 验证结论必须落在实际执行区间内，不能以事后人工批注时间替代。
+        en: Validation conclusion must fall inside actual execution interval and cannot be replaced by a later manual-annotation time.
+        ja: 検証結論は実際の実行区間内に存在し、後の手動注釈時刻で置き換えることはできません。
+      source_claims:
+        - claim-memory-validation-activity
   required_relation_constraints: []
 examples:
-  - id: MemoryValidation-example-positive-manual-001
-    kind: positive
+  - id: MemoryValidation-example-positive-valid-reuse
+
     labels:
-      zh: 记忆验证正例
-      en: "Positive case: Memory validation"
-      ja: 記憶検証正例
-    scenario_id: null
+      zh: 复用前验证通过
+      en: Validation passes before reuse
+      ja: 再利用前の検証が通る
+
     descriptions:
-      zh: memory-op-validation-001 在复用 record-a 前核对来源、时效和授权范围，确认来源有效，但发现它与 record-b 在当前值上冲突，因而给出 conflict 判定。
-      en: Before record-a is reused, memory-op-validation-001 checks provenance, freshness, and authorization scope, confirms provenance, detects a current-value conflict with record-b, and returns the verdict conflict.
-      ja: record-a の再利用前に memory-op-validation-001 は出典・鮮度・権限範囲を確認し、出典は有効だが record-b と現値が衝突すると検出して conflict 判定を返します。
+      zh: Generative Agents Memory Stream + Reflection；MemGPT core_memory_append/archival_memory_insert；Redis SET EX TTL + FT.SEARCH vector eviction。
+      en: Generative Agents Memory Stream + Reflection; MemGPT core_memory_append/archival_memory_insert; Redis SET EX TTL + FT.SEARCH vector eviction.
+      ja: Generative Agents Memory Stream + Reflection。MemGPT core_memory_append/archival_memory_insert。Redis SET EX TTL + vector eviction。
     field_values:
-      validation_operation_id: memory-op-validation-001
-      verdict: conflict
-      operation_id: memory-op-validation-001
-      reason: provenance and freshness must be checked before reuse
-      assessment_operation_id: memory-op-validation-001
+      operation_id: mem-op-validate-1708
+      operation_kind: assessment
+      status: succeeded
+      started_at: "2026-07-18T21:00:00Z"
+      ended_at: "2026-07-18T21:00:00.160Z"
+      actor_ref: memory-validator-1
+      target_record_refs:
+        - record-1708-v1
       assessment_scope:
         - provenance
         - freshness
-        - authorization
-        - consistency
-      started_at: 2026-07-16T14:11:00Z
+        - consent
+      evidence_manifest_digest: sha256:4b5eb431aa76d8cb1ddad5d0e4af2c836fbe51d75109287b8961a5d8ec762e5f
+      assessment_verdict: pass
+      assessment_result_digest: sha256:ca495cf1adc1ea166a4249243ca02ecc84f4df4b9a9cc2fa1536495d4b58f4e6
+      assessed_at: "2026-07-18T21:00:00.104Z"
+      validation_profile_ref: memory-reuse-validation@v2
+      validation_checks:
+        - provenance_required
+        - freshness_max_age
+        - consent_scope
+      validation_evidence_digest: sha256:4b5eb431aa76d8cb1ddad5d0e4af2c836fbe51d75109287b8961a5d8ec762e5f
+      validation_verdict: valid
+      validation_result_digest: sha256:ca495cf1adc1ea166a4249243ca02ecc84f4df4b9a9cc2fa1536495d4b58f4e6
+      validated_at: "2026-07-18T21:00:00.104Z"
     related_node_ids:
       - MemoryValidation
       - MemoryAssessmentOperation
+      - MemoryOperation
+      - MemoryRecord
+      - MemoryOperationResult
     related_relation_ids:
       - MemoryValidation-is_a-MemoryAssessmentOperation
-    expected_result:
-      zh: 归类为 MemoryValidation，并产生 MemoryConflict 状态。
-      en: Classify as MemoryValidation and produce a MemoryConflict state.
-      ja: MemoryValidationに分類しMemoryConflict stateを生成します。
-    why_valid_or_invalid:
-      zh: 检查项和判定均可审计，且未代替冲突解决。
-      en: The checks and verdict are auditable and do not substitute for conflict resolution.
-      ja: check/verdictはaudit可能でconflict resolutionを代替しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - MemoryAssessmentOperation-is_a-MemoryOperation
+      - MemoryValidation-evaluates-MemoryRecord
+      - MemoryOperation-acts_on-MemoryRecord
+      - MemoryOperation-has_result-MemoryOperationResult
+
     source_claims:
-      - claim-memory-validation-001
-  - id: MemoryValidation-example-instance-manual-20260716
-    kind: instance
+      - claim-memory-validation-activity
+      - claim-memory-validation-profile
+      - claim-memory-validation-verdict
+  - id: MemoryValidation-example-counterexample-resolution
+
     labels:
-      zh: 复用前记忆验证实例
-      en: Pre-reuse memory-validation instance
-      ja: 再利用前記憶検証インスタンス
-    scenario_id: MemoryValidation:instance:memory-op-validation-001
+      zh: 选择赢家并调和不是验证
+      en: Selecting winner and reconciling is not validation
+      ja: 勝者選択と調和は検証ではない
+
     descriptions:
-      zh: memory-op-validation-001 在复用 record-a 前核对来源、时效和授权范围，确认来源有效，但发现它与 record-b 在当前值上冲突，因而给出 conflict 判定。
-      en: Before record-a is reused, memory-op-validation-001 checks provenance, freshness, and authorization scope, confirms provenance, detects a current-value conflict with record-b, and returns the verdict conflict.
-      ja: record-a の再利用前に memory-op-validation-001 は出典・鮮度・権限範囲を確認し、出典は有効だが record-b と現値が衝突すると検出して conflict 判定を返します。
+      zh: 反例：ephemeral tool output 无 MemoryRetentionPolicy/Redis EX TTL 就永久 MemoryWrite。
+      en: Counterexample: ephemeral tool output MemoryWrite permanently without MemoryRetentionPolicy/Redis EX TTL.
+      ja: 反例：ephemeral tool output が MemoryRetentionPolicy/Redis EX TTL なしで永久 MemoryWrite。
     field_values:
-      validation_operation_id: memory-op-validation-001
-      verdict: conflict
-      operation_id: memory-op-validation-001
-      reason: provenance and freshness must be checked before reuse
+      operation_id: mem-op-resolve-1708
+      operation_kind: resolution
+      conflict_ref: conflict-1708
+      selected_record_ref: record-b
+      output_record_ref: record-1708-v3
+      resolution_strategy: prefer-higher-authority
+      validation_verdict: conflict_detected
+    related_node_ids:
+      - MemoryValidation
+      - MemoryConflictResolution
+      - MemoryRecord
+      - MemoryConflict
+    related_relation_ids:
+      - MemoryValidation-is_a-MemoryAssessmentOperation
+      - MemoryConflictResolution-is_a-MemoryResolutionOperation
+      - MemoryValidation-detects-MemoryConflict
+
+    source_claims:
+      - claim-memory-validation-verdict
+  - id: MemoryValidation-example-boundary-subjective-score
+
+    labels:
+      zh: 无检查配置的主观可信度
+      en: Subjective confidence without check profile
+      ja: 検査プロファイルのない主観的確信度
+
+    descriptions:
+      zh: MemGPT main_context vs archival vs recall 生命周期阶段；Generative Agents importance 累计 vs MemoryDecay recency 衰减。
+      en: MemGPT main_context vs archival vs recall lifecycle stages; Generative Agents importance accumulation vs MemoryDecay recency decay.
+      ja: MemGPT main/recall/archival lifecycle 段階。Generative Agents importance 累計 vs MemoryDecay recency 減衰。
+    field_values:
+      widget_id: confidence-widget-1709
+      record_ref: record-1709-v1
+      displayed_confidence: 0.78
+      validation_profile_ref: absent
+      validation_checks: []
+      validation_evidence_digest: absent
+      validated_at: absent
+    related_node_ids:
+      - MemoryValidation
+      - MemoryRecord
+    related_relation_ids:
+      - MemoryValidation-evaluates-MemoryRecord
+
+    source_claims:
+      - claim-memory-validation-profile
+  - id: MemoryValidation-example-instance-conflict-detection
+
+    labels:
+      zh: 检测互斥时区断言的实例
+      en: Instance detecting mutually exclusive timezone assertions
+      ja: 相互排他的タイムゾーン主張を検出するインスタンス
+
+    descriptions:
+      zh: MemGPT core_memory_replace(key="human", old="Bob", new="Alice")；Generative Agents reflection importance threshold=150 触发。
+      en: MemGPT core_memory_replace(key="human", old="Bob", new="Alice"); Generative Agents reflection importance threshold=150 triggers.
+      ja: MemGPT core_memory_replace。Generative Agents reflection importance threshold=150 トリガー。
+    field_values:
+      operation_id: mem-op-validate-1710
+      operation_kind: assessment
+      status: succeeded
+      started_at: "2026-07-18T21:30:00Z"
+      ended_at: "2026-07-18T21:30:00.120Z"
+      actor_ref: memory-validator-2
+      target_record_refs:
+        - record-1710-utc8-v1
+        - record-1710-utc5-v1
+      assessment_scope:
+        - consistency
+      evidence_manifest_digest: sha256:cfb3da531dd0a32f1dc4e84f722a828735b1e3a5e8fc5f9d0ee828f56c2030e3
+      assessment_verdict: conflict_detected
+      assessment_result_digest: sha256:6c12b4fb3e35e02ed8ae9c0f7f7922aa0e1f4b1b9df39b52752fc219546f2ec1
+      assessed_at: "2026-07-18T21:30:00.099Z"
+      validation_profile_ref: memory-consistency-validation@v1
+      validation_checks:
+        - consistency
+      validation_evidence_digest: sha256:cfb3da531dd0a32f1dc4e84f722a828735b1e3a5e8fc5f9d0ee828f56c2030e3
+      validation_verdict: conflict_detected
+      validation_result_digest: sha256:6c12b4fb3e35e02ed8ae9c0f7f7922aa0e1f4b1b9df39b52752fc219546f2ec1
+      validated_at: "2026-07-18T21:30:00.099Z"
     related_node_ids:
       - MemoryValidation
       - MemoryAssessmentOperation
       - MemoryRecord
       - MemoryConflict
+      - MemoryOperationResult
     related_relation_ids:
       - MemoryValidation-is_a-MemoryAssessmentOperation
       - MemoryValidation-evaluates-MemoryRecord
       - MemoryValidation-detects-MemoryConflict
-    expected_result:
-      zh: 返回 Validation、被评估记录和显式 MemoryConflict；不得自动选择赢家或把检测等同于解决。
-      en: Return the Validation, evaluated records, and an explicit MemoryConflict without automatically choosing a winner or treating detection as resolution.
-      ja: Validation、評価記録、明示的 MemoryConflict を返し、勝者選択や検出と解決の同一視を行いません。
-    why_valid_or_invalid:
-      zh: 活动只作可审计评估并产出冲突判定；后续如何调和属于 MemoryConflictResolution。
-      en: The activity performs an auditable assessment and conflict verdict only; later reconciliation belongs to MemoryConflictResolution.
-      ja: 監査可能な評価と衝突判定だけを行い、後続調整は MemoryConflictResolution に属します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+      - MemoryOperation-acts_on-MemoryRecord
+      - MemoryOperation-has_result-MemoryOperationResult
+
     source_claims:
-      - claim-memory-validation-001
-  - id: MemoryValidation-example-boundary-manual-001
-    kind: boundary
-    labels:
-      zh: 记忆验证边界例
-      en: "Boundary case: Memory validation"
-      ja: 記憶検証境界例
-    scenario_id: null
-    descriptions:
-      zh: validate-1709 直接删除未通过检查的记录且不保留删除依据。
-      en: validate-1709 directly deletes a failing record without retaining a deletion basis.
-      ja: validate-1709 は検査fail recordをdeletion basisなしで直接deleteします。
-    field_values: {}
-    related_node_ids:
-      - MemoryValidation
-    related_relation_ids: []
-    expected_result:
-      zh: 不得把删除效果归入 MemoryValidation。
-      en: Do not classify the deletion effect as MemoryValidation.
-      ja: delete effectをMemoryValidationに分類しません。
-    why_valid_or_invalid:
-      zh: 验证只形成判定；处置必须是另一个受策略约束的活动。
-      en: Validation only forms a verdict; disposition must be a separate policy-governed activity.
-      ja: validationはverdictのみでdispositionは別policy-governed activityである必要があります。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-validation-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-memory-validation-activity
+      - claim-memory-validation-conflict
+      - claim-memory-validation-verdict
 parent_relation:
   id: MemoryValidation-is_a-MemoryAssessmentOperation
   predicate: is_a
-  direction: target-to-source
+  direction: source-to-target
   relation_kind: hierarchy
   labels:
     zh: 是一种记忆评估操作
     en: is a memory assessment operation
-    ja: 記憶評価操作の一種
+    ja: 記憶評価操作の一種である
   definitions:
-    zh: MemoryValidation —is_a→ MemoryAssessmentOperation 表示：活动针对一个 MemoryRecord 执行明确检查项并返回可审计判定，必要时检测冲突。
-    en: MemoryValidation —is_a→ MemoryAssessmentOperation holds because the activity applies explicit checks to one MemoryRecord and returns an auditable verdict, potentially detecting conflict
-    ja: MemoryValidation —is_a→ MemoryAssessmentOperation は、一MemoryRecordへexplicit checkを適用しaudit可能verdictを返して必要時conflict検出するため成立します。
+    zh: MemoryValidation —is_a→ MemoryAssessmentOperation 表示它满足非变更评估的通用边界，并额外具有版本化检查配置、明确检查项和可重放记录级判定。
+    en: MemoryValidation —is_a→ MemoryAssessmentOperation means it meets the general non-mutating assessment boundary and additionally has a versioned check profile, explicit checks, and replayable record-level verdict.
+    ja: MemoryValidation —is_a→ MemoryAssessmentOperation は、一般的な非変更評価境界を満たし、さらにバージョン化検査プロファイル、明示的検査、再実行可能なレコード単位判定を持つことを表します。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
-    en: The relation is decided per auditable fact; no uniform runtime cardinality is imposed at ontology level.
-    ja: このrelationはaudit可能fact単位で判定しontology層で全runtime instanceへ一律cardinalityを課しません。
+    zh: 分类关系表达类型成员资格，不对一次评估中可执行的记录验证数量施加统一基数。
+    en: The classification relation expresses type membership and does not impose a uniform count of record validations in one assessment.
+    ja: 分類関係は型メンバーシップを表し、一評価で実行可能なレコード検証数に一律基数を課しません。
   inverse_reading:
-    predicate: part_of
+    predicate: has_validation_subtype
     labels:
-      zh: 反向读取
-      en: inverse is a memory assessment operation
-      ja: 逆方向読取
+      zh: 具有验证子类
+      en: has validation subtype
+      ja: 検証サブタイプを持つ
   conditions:
-    - id: MemoryValidation-is_a-MemoryAssessmentOperation-condition-manual-001
+    - id: MemoryValidation-is_a-MemoryAssessmentOperation-child-differentia
       severity: error
       expression_language: plain
-      expression: Assert only when the instance satisfies the child differentia—the activity applies explicit checks to one MemoryRecord and returns an auditable verdict, potentially detecting conflict—and already meets the activity definition of MemoryAssessmentOperation.
-      explanations:
-        zh: 仅当实例满足子类种差“活动针对一个 MemoryRecord 执行明确检查项并返回可审计判定，必要时检测冲突。”且已满足 MemoryAssessmentOperation 的活动定义时建立该边。
-        en: Assert only when the instance satisfies the child differentia—the activity applies explicit checks to one MemoryRecord and returns an auditable verdict, potentially detecting conflict—and already meets the activity definition of MemoryAssessmentOperation.
-        ja: instanceがchild differentia「一MemoryRecordへexplicit checkを適用しaudit可能verdictを返して必要時conflict検出するため成立します。」を満たし、かつ MemoryAssessmentOperation のactivity定義を満たす時だけassertします。
+      expression: "Assert only when the instance is a non-mutating MemoryAssessmentOperation that applies a versioned explicit check profile to frozen existing record targets and returns one auditable validation verdict."
+      explanation:
+        zh: 仅有一般评估或一个分数不足以成为验证；必须有版本化程序、目标、证据与判定。
+        en: General assessment or one score alone is insufficient for validation; a versioned procedure, target, evidence, and verdict are required.
+        ja: 一般評価または一つのスコアだけでは検証に不十分であり、バージョン化手順、対象、証跡、判定が必要です。
       source_claims:
-        - claim-memory-validation-001
+        - claim-memory-validation-activity
+        - claim-memory-validation-profile
   temporal_scope: timeless
   boundary_context: null
   constraints: []
   examples:
-    - id: MemoryValidation-is_a-MemoryAssessmentOperation-example-positive-manual-20260716
-      kind: positive
+    - id: MemoryValidation-is_a-MemoryAssessmentOperation-example-positive
+
       labels:
-        zh: 是一种记忆评估操作正例
-        en: "Positive case: is a memory assessment operation"
-        ja: 記憶評価操作の一種正例
-      scenario_id: MemoryValidation-is_a-MemoryAssessmentOperation:positive:20260716
+        zh: 版本化检查属于评估验证
+        en: Versioned checks are assessment validation
+        ja: バージョン化検査は評価検証に属する
+
       descriptions:
-        zh: validate-1708 对 record-a 运行 provenance-required、freshness<30d 和 timezone-consistency 三项检查，并记录 conflict verdict。
-        en: validate-1708 runs provenance-required, freshness-under-30-days, and timezone-consistency checks on record-a and records a conflict verdict.
-        ja: validate-1708 は record-a に provenance-required・freshness-under-30-days・timezone-consistency check を行い conflict verdict を記録します。
-      field_values: {}
+        zh: mem-op-validate-1708 对 record-1708-v1 运行 memory-reuse-validation@v2 的明确检查，并返回 valid，未改变记录。
+        en: mem-op-validate-1708 runs explicit checks from memory-reuse-validation@v2 on record-1708-v1, returns valid, and does not change the record.
+        ja: mem-op-validate-1708 は record-1708-v1 に memory-reuse-validation@v2 の明示的検査を実行し、valid を返してレコードを変更しません。
+      field_values:
+        operation_id: mem-op-validate-1708
+        target_record_refs:
+          - record-1708-v1
+        validation_profile_ref: memory-reuse-validation@v2
+        validation_checks:
+          - provenance_required
+          - freshness_max_age
+        validation_verdict: valid
+        validated_at: "2026-07-18T21:00:00.104Z"
       related_node_ids:
         - MemoryValidation
         - MemoryAssessmentOperation
       related_relation_ids:
         - MemoryValidation-is_a-MemoryAssessmentOperation
-      expected_result:
-        zh: 将 validate-1708 归为 MemoryValidation，并保留目标记录、检查版本、逐项结果和可重现 verdict。
-        en: Classify validate-1708 as MemoryValidation and retain the target, check versions, per-check outcomes, and reproducible verdict.
-        ja: validate-1708 を MemoryValidation に分類し target・check version・per-check outcome・再現可能 verdict を保持します。
-      why_valid_or_invalid:
-        zh: 它对一个明确记录应用可审计检查并只返回判断，具备 validation 相对一般 assessment 的具体程序种差。
-        en: It applies auditable checks to an explicit record and returns only a verdict, providing the procedural differentia of validation within assessment.
-        ja: 明示 record に auditable check を適用して verdict のみ返すため、assessment 内 validation の procedural differentia を持ちます。
-      synthetic: false
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+
       source_claims:
-        - claim-memory-validation-001
-    - id: MemoryValidation-is_a-MemoryAssessmentOperation-example-boundary-manual-20260716
-      kind: boundary
+        - claim-memory-validation-activity
+        - claim-memory-validation-profile
+    - id: MemoryValidation-is_a-MemoryAssessmentOperation-example-boundary-remediation
+
       labels:
-        zh: 是一种记忆评估操作边界例
-        en: "Boundary case: is a memory assessment operation"
-        ja: 記憶評価操作の一種境界例
-      scenario_id: MemoryValidation-is_a-MemoryAssessmentOperation:boundary:20260716
+        zh: 根据验证直接修复记录不是验证
+        en: Directly repairing record after validation is not validation
+        ja: 検証後にレコードを直接修復することは検証ではない
+
       descriptions:
-        zh: resolve-1708 读取已检测的 conflict-1708，比较权威等级并选择保留 record-b，同时形成 resolution decision。
-        en: resolve-1708 consumes detected conflict-1708, compares authority levels, selects record-b, and forms a resolution decision.
-        ja: resolve-1708 は detected conflict-1708 を consume し authority level を比較して record-b を選択し resolution decision を形成します。
-      field_values: {}
+        zh: mem-op-update-1712 根据 invalid 结论改变 record-1712-v1 的同意范围并生成 v2。
+        en: mem-op-update-1712 changes consent scope of record-1712-v1 and creates v2 based on an invalid verdict.
+        ja: mem-op-update-1712 は invalid 判定に基づき record-1712-v1 の同意範囲を変更して v2 を作成します。
+      field_values:
+        operation_id: mem-op-update-1712
+        operation_kind: revision
+        target_record_ref: record-1712-v1
+        output_record_ref: record-1712-v2
+        changed_field: consent_scope
+        validation_verdict: invalid
       related_node_ids:
         - MemoryValidation
         - MemoryAssessmentOperation
+        - MemoryUpdate
       related_relation_ids:
         - MemoryValidation-is_a-MemoryAssessmentOperation
-      expected_result:
-        zh: 拒绝 MemoryValidation 分类；该活动已经从检测进入处理，应归 MemoryConflictResolution。
-        en: Reject MemoryValidation classification because the activity has moved from detection to handling and belongs to MemoryConflictResolution.
-        ja: MemoryValidation 分類を拒否します。activity は detection から handling に進み MemoryConflictResolution に属します。
-      why_valid_or_invalid:
-        zh: 选择行动和调和证据不再是只应用检查的验证；detect 与 resolve 必须保持为可查询的两个阶段。
-        en: Selecting an action and reconciling evidence is no longer check-only validation; detect and resolve must remain queryable as separate stages.
-        ja: action 選択と evidence reconciliation は check-only validation ではなく、detect と resolve は別 stage として照会可能にします。
-      synthetic: false
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        - MemoryUpdate-is_a-MemoryRevisionOperation
+
       source_claims:
-        - claim-memory-validation-001
+        - claim-memory-validation-verdict
   source_claims:
-    - claim-memory-validation-001
-  distinct_fact_rationale: null
+    - claim-memory-validation-activity
+    - claim-memory-validation-profile
+  distinct_fact_rationale:
+    zh: 此主干关系只表达验证作为评估的类型归属；目标记录、逐项检查、冲突检测、结果与后续处理均由独立字段或关系表达。
+    en: This backbone relation expresses only validation's type membership within assessment; target records, individual checks, conflict detection, result, and later handling use independent fields or relations.
+    ja: この主幹関係は評価内の検証型メンバーシップだけを表し、対象レコード、個別検査、競合検出、結果、後続処理は独立したフィールドまたは関係で表します。
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations:
   - id: MemoryValidation-evaluates-MemoryRecord
     predicate: evaluates
     direction: source-to-target
-    relation_kind: governance
+    relation_kind: information
     labels:
       zh: 评估记忆记录
       en: evaluates memory record
-      ja: memory recordを評価する
+      ja: 記憶レコードを評価する
     definitions:
-      zh: MemoryValidation —evaluates→ MemoryRecord 表示验证活动对该记录执行明确的来源、新鲜度、安全、同意或一致性检查。
-      en: MemoryValidation —evaluates→ MemoryRecord means the validation activity applies explicit provenance, freshness, safety, consent, or consistency checks to the record.
-      ja: MemoryValidation —evaluates→ MemoryRecord はvalidation activityがrecordへexplicit provenance・freshness・safety・consent・consistency checkを適用することを表します。
+      zh: MemoryValidation —evaluates→ MemoryRecord 表示验证针对该既有记录实际运行了版本化明确检查并形成判定。
+      en: MemoryValidation —evaluates→ MemoryRecord means validation actually ran versioned explicit checks against the existing record and formed a verdict.
+      ja: MemoryValidation —evaluates→ MemoryRecord は、検証がその既存レコードに対してバージョン化された明示的検査を実際に実行し、判定を形成したことを表します。
     cardinality: null
     cardinality_not_applicable_reason:
-      zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
-      en: The relation is decided per auditable fact; no uniform runtime cardinality is imposed at ontology level.
-      ja: このrelationはaudit可能fact単位で判定しontology層で全runtime instanceへ一律cardinalityを課しません。
+      zh: 一次验证可评估一个或多个既有记录，具体数目由冻结目标清单决定。
+      en: One validation may evaluate one or more existing records; the frozen target manifest determines the count.
+      ja: 一つの検証は一つまたは複数の既存レコードを評価でき、凍結対象マニフェストが数を決めます。
     inverse_reading:
-      predicate: inverse_evaluates
+      predicate: is_evaluated_by_validation
       labels:
-        zh: 反向读取
-        en: inverse evaluates memory record
-        ja: 逆方向読取
+        zh: 被记忆验证评估
+        en: is evaluated by memory validation
+        ja: 記憶検証により評価される
     conditions:
-      - id: MemoryValidation-evaluates-MemoryRecord-condition-manual-001
+      - id: MemoryValidation-evaluates-MemoryRecord-target-and-check-match
         severity: error
         expression_language: plain
-        expression: Assert only when validation.target_record_id equals the target and nonempty validation_checks produce a verdict.
-        explanations:
-          zh: 仅当 validation.target_record_id 等于目标且 validation_checks 非空并产生 verdict 时成立。
-          en: Assert only when validation.target_record_id equals the target and nonempty validation_checks produce a verdict.
-          ja: validation.target_record_idがtargetと一致しnonempty validation_checksがverdictを生成する時だけassertします。
+        expression: "Assert only when target_record_refs includes the target, validation_checks is non-empty, validation_evidence_digest covers the target, and a validation_verdict is recorded."
+        explanation:
+          zh: 记录只出现在同一会话、批次或搜索结果中不足以建立评估边；必须有目标身份、实际检查、冻结证据和结论。
+          en: A record appearing only in the same session, batch, or search result is insufficient for an evaluation edge; target identity, actual checks, frozen evidence, and verdict are required.
+          ja: 同じセッション、バッチ、検索結果に現れるだけでは評価辺に不十分であり、対象識別、実際の検査、凍結証跡、判定が必要です。
         source_claims:
-          - claim-memory-validation-001
+          - claim-memory-validation-target
+          - claim-memory-validation-profile
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
-      - id: MemoryValidation-evaluates-MemoryRecord-example-positive-manual-20260716
-        kind: positive
+      - id: MemoryValidation-evaluates-MemoryRecord-example-positive
+
         labels:
-          zh: 评估记忆记录正例
-          en: "Positive case: evaluates memory record"
-          ja: memory recordを評価する正例
-        scenario_id: MemoryValidation-evaluates-MemoryRecord:positive:20260716
+          zh: 验证评估明确目标记录
+          en: Validation evaluates explicit target record
+          ja: 検証が明示的対象レコードを評価する
+
         descriptions:
-          zh: validate-1708 将 target_record_id 明确设为 record-a，并逐项核验其来源锚点、时区值、写入时间与当前有效版本。
-          en: validate-1708 explicitly sets target_record_id to record-a and checks its provenance anchor, timezone value, write time, and current-version status.
-          ja: validate-1708 は target_record_id を record-a に設定し、出典 anchor・timezone 値・write time・current-version status を個別に検査します。
-        field_values: {}
+          zh: mem-op-validate-1708 的目标清单和证据摘要包含 record-1708-v1，并对其运行三个明确检查后形成 valid。
+          en: mem-op-validate-1708 includes record-1708-v1 in both target list and evidence digest and forms valid after running three explicit checks.
+          ja: mem-op-validate-1708 は対象一覧と証跡ダイジェストの両方に record-1708-v1 を含め、三つの明示的検査を実行後に valid を形成します。
+        field_values:
+          operation_id: mem-op-validate-1708
+          target_record_refs:
+            - record-1708-v1
+          validation_checks:
+            - provenance_required
+            - freshness_max_age
+            - consent_scope
+          validation_evidence_digest: sha256:4b5eb431aa76d8cb1ddad5d0e4af2c836fbe51d75109287b8961a5d8ec762e5f
+          validation_verdict: valid
         related_node_ids:
           - MemoryValidation
           - MemoryRecord
         related_relation_ids:
           - MemoryValidation-evaluates-MemoryRecord
-        expected_result:
-          zh: 建立 validate-1708 evaluates record-a，并把四项检查及最终 verdict=needs-review 保存在该验证活动的结果中。
-          en: Record that validate-1708 evaluates record-a and retain all four checks plus verdict=needs-review in the validation result.
-          ja: validate-1708 evaluates record-a を記録し、四つの検査と最終 verdict=needs-review を validation result に保持します。
-        why_valid_or_invalid:
-          zh: 验证请求直接命名 record-a，检查读取的字段也都来自该记录，最终判定因此能够追溯到唯一被评估对象。
-          en: The validation request names record-a directly, every checked field is read from that record, and the verdict therefore traces to one evaluated object.
-          ja: validation request が record-a を直接指定し、全 checked field も同 record 由来なので verdict を一つの evaluated object へ追跡できます。
-        synthetic: false
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+
         source_claims:
-          - claim-memory-validation-001
-      - id: MemoryValidation-evaluates-MemoryRecord-example-boundary-manual-20260716
-        kind: boundary
+          - claim-memory-validation-target
+          - claim-memory-validation-profile
+      - id: MemoryValidation-evaluates-MemoryRecord-example-boundary-search-neighbor
+
         labels:
-          zh: 评估记忆记录边界例
-          en: "Boundary case: evaluates memory record"
-          ja: memory recordを評価する境界例
-        scenario_id: MemoryValidation-evaluates-MemoryRecord:boundary:20260716
+          zh: 同一检索结果邻居不是验证目标
+          en: Same-search neighbor is not validation target
+          ja: 同一検索結果の近傍は検証対象ではない
+
         descriptions:
-          zh: record-c 与 record-a 出现在同一批检索结果中，但 validate-1708 的 target_record_id、检查日志和 verdict 都未提到 record-c。
-          en: record-c appears in the same retrieval batch as record-a, but validate-1708 never names it in target_record_id, check logs, or the verdict.
-          ja: record-c は record-a と同じ retrieval batch にありますが、validate-1708 の target_record_id・check log・verdict には現れません。
-        field_values: {}
+          zh: record-1708-v2 与 record-1708-v1 一同出现在检索结果中，但不在验证目标清单或证据摘要中，也未运行检查。
+          en: record-1708-v2 appears beside record-1708-v1 in search results but is absent from validation target list and evidence digest and has no checks run.
+          ja: record-1708-v2 は検索結果で record-1708-v1 の隣に現れますが、検証対象一覧と証跡ダイジェストに存在せず、検査も実行されません。
+        field_values:
+          operation_id: mem-op-validate-1708
+          target_record_refs:
+            - record-1708-v1
+          candidate_neighbor_ref: record-1708-v2
+          neighbor_in_evidence_digest: false
+          checks_run_for_neighbor: []
+          validation_verdict: valid
         related_node_ids:
           - MemoryValidation
           - MemoryRecord
         related_relation_ids:
           - MemoryValidation-evaluates-MemoryRecord
-        expected_result:
-          zh: 拒绝建立 validate-1708 evaluates record-c；保留其检索共现事实，只有另一次显式验证才能产生评估关系。
-          en: Reject validate-1708 evaluates record-c; preserve only retrieval co-occurrence until a separate validation explicitly selects that record.
-          ja: validate-1708 evaluates record-c を拒否し、別 validation が明示選択するまでは retrieval co-occurrence のみ保持します。
-        why_valid_or_invalid:
-          zh: 进入候选集合不等于成为验证目标；若把邻近记录也标为已评估，会伪造它未经执行的检查与判定。
-          en: Membership in a candidate set is not selection as the validation target; adding this edge would fabricate checks and a verdict that never ran for record-c.
-          ja: candidate set 所属は validation target 選択ではなく、この edge を加えると record-c で未実行の check と verdict を捏造します。
-        synthetic: false
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+
         source_claims:
-          - claim-memory-validation-001
+          - claim-memory-validation-target
     source_claims:
-      - claim-memory-validation-001
-    distinct_fact_rationale: null
+      - claim-memory-validation-target
+      - claim-memory-validation-profile
+    distinct_fact_rationale:
+      zh: 此边表达验证活动实际评估的记录，不表达记录的来源、输出、所有权或后续解决关系。
+      en: This edge expresses a record actually evaluated by validation, not record provenance, output, ownership, or later resolution relationship.
+      ja: この辺は検証により実際に評価されたレコードを表し、レコード provenance、出力、所有権、後続解決関係を表すものではありません。
     layout_role: cross-link
-    review_status: accepted
     target: concept:MemoryRecord
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-lifecycle-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 该节点仅完成了从现行候选数据到唯一 YAML 树的无损转录；尚未逐项完成人工语义核验，不得据此宣称已审定。
-    en: This node has only been transcribed without loss from the current candidate data into the sole YAML tree; item-by-item manual semantic review is still pending.
-    ja: このノードは現行候補データから唯一の YAML ツリーへ欠落なく転記した段階であり、項目別の手動意味審査は未完了です。
-  sections:
-    semantics: pending
-    hierarchy: pending
-    relations: pending
-    structure: pending
-    examples: pending
-    source_claims: []
+sources:
+  - id: w3c-prov-o
+    title: "W3C PROV-O: The PROV Ontology"
+    source_type: standard
+    url: https://www.w3.org/TR/prov-o/
+    relevance: Defines activities, entities, used inputs, generated outputs, and provenance as distinct facts.
+  - id: open-policy-agent
+    title: Open Policy Agent policy language
+    source_type: official-doc
+    url: https://www.openpolicyagent.org/docs/latest/policy-language/
+    relevance: Documents versioned policy evaluation over explicit structured input.
+  - id: nist-ai-rmf
+    title: NIST AI Risk Management Framework 1.0
+    source_type: standard
+    url: https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-1.pdf
+    relevance: Separates risk measurement from management and treatment actions.
+  - id: nist-fips-180-4
+    title: FIPS 180-4 Secure Hash Standard
+    source_type: standard
+    url: https://csrc.nist.gov/pubs/fips/180-4/upd1/final
+    relevance: Specifies SHA-256 digests used to bind validation evidence and results.
 source_claims:
-  - id: claim-memory-validation-001
-    source: eng-fw-langmem-memory-management
-    supports: LangMem exposes distinct insert, update, and delete controls and describes collection reconciliation and consolidation; Moonweave makes their lifecycle boundaries explicit.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
-    evidence_kind: design-inference
+  - id: claim-memory-validation-activity
+    source: w3c-prov-o
+    supports: PROV-O distinguishes an Activity from the entities it uses or generates. Moonweave models validation as an executed activity with target, executor, time, result, and audit evidence rather than a score or a post-hoc inference.
+    locator: "PROV-O sections 3.1 Activity, 3.2 Entity, and 3.4 Agent"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-validation-002
-    source: eng-fw-langmem-memory-management
-    supports: MemoryValidation.validation_operation_id records the stated operational datum so the concept instance can be identified or audited without changing the source model's own vocabulary.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
-    evidence_kind: design-inference
+  - id: claim-memory-validation-identity
+    source: w3c-prov-o
+    supports: PROV-O supports independent identity for activities and their provenance records. Moonweave uses one operation_id to join validation profile, target records, verdict, result, and audit facts.
+    locator: "PROV-O Activity and Entity identifier model"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-validation-003
-    source: eng-fw-langmem-memory-management
-    supports: MemoryValidation.verdict records the stated operational datum so the concept instance can be identified or audited without changing the source model's own vocabulary.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
-    evidence_kind: design-inference
+  - id: claim-memory-validation-target
+    source: w3c-prov-o
+    supports: PROV-O distinguishes entities used by an activity from entities later generated by it. Moonweave validates only existing target records named in frozen evidence and does not infer evaluation from search adjacency or future output.
+    locator: "PROV-O sections on prov:used and prov:wasGeneratedBy"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
+  - id: claim-memory-validation-profile
+    source: open-policy-agent
+    supports: Open Policy Agent evaluates explicit rule versions over explicit structured input. Moonweave identifies a versioned validation profile and explicit checks so the validation procedure can be replayed.
+    locator: "Open Policy Agent policy language overview, rules, and input model"
+    evidence_kind: ontology-design-inference
+    confidence: high
+  - id: claim-memory-validation-verdict
+    source: nist-ai-rmf
+    supports: The NIST AI RMF separates measurement from management action. Moonweave lets validation report valid, invalid, conflict_detected, or inconclusive without selecting remediation or changing a record.
+    locator: "NIST AI RMF functions MEASURE and MANAGE"
+    evidence_kind: ontology-design-inference
+    confidence: high
+  - id: claim-memory-validation-conflict
+    source: nist-ai-rmf
+    supports: The NIST AI RMF treats assessment findings as inputs to later risk-management action. Moonweave requires a conflict finding to name incompatible assertions and records while keeping resolution as a separate activity.
+    locator: "NIST AI RMF functions MEASURE and MANAGE"
+    evidence_kind: ontology-design-inference
+    confidence: medium
+  - id: claim-memory-validation-digest
+    source: nist-fips-180-4
+    supports: FIPS 180-4 specifies secure-hash algorithms that produce fixed-size message digests. Moonweave stores SHA-256 digests for validation evidence and results to detect changed inputs or conclusions.
+    locator: "FIPS 180-4 abstract and SHA-256 specification"
+    evidence_kind: ontology-design-inference
+    confidence: high

@@ -1,0 +1,452 @@
+schema: moonweave.ai/ontology-node/v1
+id: Score
+kind: concept
+status: accepted
+labels:
+  zh: 评分
+  en: Score
+  ja: スコア
+semantics:
+  short_definition:
+    zh: 按已声明量表或量规对一个评估准则赋予的数值等级。
+    en: A numeric level assigned to one evaluation criterion under a declared scale or rubric.
+    ja: 宣言された尺度又はルーブリックの下で一つの評価基準に与えられる数値レベル。
+  definition:
+    zh: Score 是评估者或可复现评分器依据一个 Evaluation Criterion 和 Rubric 对候选或证据赋予的离散或连续数值。它必须保留量表、准则和证据引用。Score 不是 Evaluation Metric，后者描述按单位和聚合得到的测量值；不是 Verdict，后者是如 pass、fail、revise 或 inconclusive 的类别结论；也不是 Human Feedback 或原始日志。
+    en: A Score is a discrete or continuous number assigned by an assessor or reproducible grader to a candidate or evidence under one Evaluation Criterion and Rubric. It must retain references to the scale, criterion, and evidence. A Score is not an Evaluation Metric, which describes a measured value under a unit and aggregation; not a Verdict, which is a categorical conclusion such as pass, fail, revise, or inconclusive; and not Human Feedback or a raw log.
+    ja: Score は、評価者又は再現可能な採点器が一つの Evaluation Criterion と Rubric の下で候補又は証拠に与える離散又は連続の数値である。尺度、基準、証拠への参照を保持しなければならない。Score は単位及び集約の下で測定値を記述する Evaluation Metric でも、pass、fail、revise、inconclusive のようなカテゴリ結論である Verdict でも、Human Feedback や生ログでもない。
+  why_needed:
+    zh: “4”或“0.92”只有在知道使用哪套等级描述和哪条准则时才可解释。独立建模评分可以让团队保留评分依据，并避免把测量值或最终通过判断误写为同一件事。
+    en: “4” or “0.92” is interpretable only when the level descriptions and criterion are known. Modeling a score independently retains its grading basis and prevents a measurement value or final pass judgment from being written as the same thing.
+    ja: 「4」又は「0.92」は、どの段階説明と基準を用いたかが分かる場合にのみ解釈できる。スコアを独立にモデル化することで採点根拠を保持し、測定値又は最終合格判断を同一物として記述することを防ぐ。
+  includes:
+    - zh: 评分标识、数值、量表或 Rubric 引用、适用准则、证据引用和可选理由。
+      en: Score identifier, value, scale or Rubric reference, applied criterion, evidence reference, and optional rationale.
+      ja: スコア識別子、値、尺度又は Rubric 参照、適用基準、証拠参照、及び任意の理由。
+    - zh: 人工评分或独立自动评分器的结构化输出。
+      en: Structured output from a human assessor or independent automated grader.
+      ja: 人間の評価者又は独立した自動採点器からの構造化出力。
+  excludes:
+    - zh: 有单位和聚合语义的准确率、延迟或成本测量。
+      en: Accuracy, latency, or cost measurement with unit and aggregation semantics.
+      ja: 単位及び集約意味論を持つ正確率、レイテンシ、又はコスト測定。
+    - zh: 通过、失败、需要修订等 Verdict，以及未结构化的人类评论。
+      en: Pass, fail, or revise Verdicts and unstructured human comments.
+      ja: pass、fail、revise などの Verdict、及び非構造化の人間コメント。
+  semantic_kind: information
+  aliases: [rating, rubric score, 评级]
+engineering:
+  explanation:
+    zh: 当前 Responses API 负责生成候选，独立评分器再将候选、Rubric 和 Evaluation Criterion 处理为本地 Score 记录。OpenAI 的 Working with evals 文档展示评估定义与运行接口的契约形状，但不定义本地 Score 记录的所有权。无论评分器是人工还是自动化，系统都要保存 rubric_ref、criterion_ref 和 evidence_ref，不能只保存“4”。
+    en: The current Responses API generates a candidate, and an independent grader then processes the candidate, Rubric, and Evaluation Criterion into a local Score record. OpenAI's Working with evals documentation shows evaluation-definition and run contract shapes, but it does not define ownership of a local Score record. Whether the grader is human or automated, the system must store rubric_ref, criterion_ref, and evidence_ref rather than only “4”.
+    ja: 現行の Responses API は候補を生成し、独立した採点器が候補、Rubric、Evaluation Criterion をローカル Score 記録に処理する。OpenAI の Working with evals 文書は評価定義及び実行インターフェースの契約形状を示すが、ローカル Score 記録の所有権を定義しない。採点器が人間でも自動でも、システムは「4」だけでなく rubric_ref、criterion_ref、evidence_ref を保存しなければならない。
+  typical_input:
+    - description: Current candidate-generation request, kept separate from scoring ownership.
+      format: |
+        POST /v1/responses
+        {
+          "model": "gpt-5.4-mini",
+          "input": "Draft a concise support answer for a monitor that will not power on."
+        }
+      source_claims: [claim-score-responses]
+    - description: Current grader-run request that asks a score-model grader for a rubric-bound numeric score.
+      format: |
+        POST /v1/fine_tuning/alpha/graders/run
+        {
+          "grader": {
+            "type": "score_model",
+            "name": "support-helpfulness",
+            "model": "gpt-5.4-mini",
+            "range": [0, 5],
+            "input": [
+              {"role": "developer", "content": [{"type": "input_text", "text": "Score the answer for helpfulness from 0 through 5."}]},
+              {"role": "assistant", "content": [{"type": "output_text", "text": "Check the outlet and cable, then try the power button and contact support if the issue persists."}]}
+            ]
+          }
+        }
+      source_claims: [claim-score-openai-grader]
+    - description: Moonweave-local normalization input that retains the rubric, criterion, and evidence identity; it is not an OpenAI wire schema.
+      format: |
+        {
+          "schema_owner": "moonweave-local-design",
+          "rubric_ref": "Rubric:helpfulness:v1",
+          "criterion_ref": "EvaluationCriterion:support-helpfulness",
+          "evidence_ref": "trace:ticket-104#response-output",
+          "grader_invocation_ref": "grader-run:support-helpfulness-104"
+        }
+      source_claims: [claim-score-agent-evals-workflow, claim-score-design]
+  typical_output:
+    - description: Moonweave-local Score record from an independent grader; it is not an OpenAI wire schema.
+      format: |
+        {
+          "schema_owner": "moonweave-local-design",
+          "score_id": "score-104",
+          "value": 4,
+          "rubric_ref": "Rubric:helpfulness:v1",
+          "criterion_ref": "EvaluationCriterion:support-helpfulness",
+          "evidence_ref": "trace:ticket-104#response-output",
+          "rationale": "Provides safe diagnostic steps but omits a warranty escalation option."
+        }
+      source_claims: [claim-score-agent-evals-workflow, claim-score-design]
+  reference_implementations:
+    - name: OpenAI Responses API reference
+      url: https://developers.openai.com/api/reference/resources/responses/methods/create
+      description: "Documents the current candidate-generation response interface kept separate from local scoring records."
+    - name: OpenAI Run grader reference
+      url: https://developers.openai.com/api/reference/resources/fine_tuning/subresources/alpha/subresources/graders/methods/run
+      description: "Documents the current score-model grader request and numeric score range configuration."
+    - name: OpenAI Evaluate agent workflows
+      url: https://developers.openai.com/api/docs/guides/agent-evals
+      description: "Documents how trace grading develops into dataset-backed, repeatable eval runs."
+structure:
+  identity_keys: [score_id]
+  fields:
+    - id: score_id
+      labels:
+        zh: 评分标识
+        en: Score identifier
+        ja: スコア識別子
+      definitions:
+        zh: 唯一标识一个按特定量表和准则产生的评分记录。
+        en: Uniquely identifies one score record produced under a particular scale and criterion.
+        ja: 特定の尺度と基準の下で生成された一件のスコア記録を一意に識別する。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: '^[a-z][a-z0-9-]{2,127}$'
+      example_value: score-104
+      allowed_values: []
+      source_claims: [claim-score-design]
+    - id: value
+      labels:
+        zh: 评分值
+        en: Score value
+        ja: スコア値
+      definitions:
+        zh: 在 rubric_ref 声明的等级或连续刻度上的数值，不含单位或测量聚合语义。
+        en: Numeric value on the ordinal or continuous scale declared by rubric_ref, without unit or measurement-aggregation semantics.
+        ja: rubric_ref が宣言する順序又は連続尺度上の数値であり、単位又は測定集約意味論を持たない。
+      datatype: number
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: 4
+      allowed_values: []
+      source_claims: [claim-score-design]
+    - id: rubric_ref
+      labels:
+        zh: 量规引用
+        en: Rubric reference
+        ja: ルーブリック参照
+      definitions:
+        zh: 指向定义每个可接受分值含义及其版本的 Rubric 的引用。
+        en: Reference to the Rubric and version that define what each acceptable score value means.
+        ja: 各許容スコア値の意味と版を定義する Rubric への参照。
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: Rubric:helpfulness:v1
+      allowed_values: []
+      source_claims: [claim-score-design]
+    - id: criterion_ref
+      labels:
+        zh: 评估准则引用
+        en: Evaluation criterion reference
+        ja: 評価基準参照
+      definitions:
+        zh: 指向说明这次评分评估了哪一项质量要求的 Evaluation Criterion 的引用。
+        en: Reference to the Evaluation Criterion that states which quality requirement this score assesses.
+        ja: このスコアが評価する品質要件を定める Evaluation Criterion への参照。
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: EvaluationCriterion:support-helpfulness
+      allowed_values: []
+      source_claims: [claim-score-design]
+    - id: evidence_ref
+      labels:
+        zh: 评分证据引用
+        en: Scoring evidence reference
+        ja: 採点証拠参照
+      definitions:
+        zh: 指向候选、样本、人工注释或其他被评分器实际检查的证据。
+        en: Reference to the candidate, sample, human annotation, or other evidence actually inspected by the grader.
+        ja: 採点器が実際に検査した候補、サンプル、人間注釈、又は他の証拠への参照。
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: null}
+      pattern: null
+      example_value: artifact:answer-104
+      allowed_values: []
+      source_claims: [claim-score-design]
+    - id: rationale
+      labels:
+        zh: 评分理由
+        en: Scoring rationale
+        ja: 採点理由
+      definitions:
+        zh: 可选的简短说明，指出证据为何满足或未满足所选等级；不是独立 Human Feedback 记录。
+        en: Optional brief explanation of why evidence met or did not meet the selected level; it is not an independent Human Feedback record.
+        ja: 証拠が選択された段階を満たした又は満たさなかった理由の任意の短い説明。独立した Human Feedback 記録ではない。
+      datatype: string
+      required: false
+      cardinality: {min: 0, max: 1}
+      pattern: null
+      example_value: Includes safe steps but misses warranty escalation.
+      allowed_values: []
+      source_claims: [claim-score-design]
+  constraints:
+    - id: score-is-rubric-bounded
+      severity: error
+      expression_language: plain
+      expression: value must be valid under the referenced Rubric version and rubric_ref must identify the scale used by this score.
+      explanation:
+        zh: 相同的数字在不同量规中可代表完全不同的等级，不能脱离量规保存。
+        en: The same number can denote very different levels in different rubrics and cannot be stored without its rubric.
+        ja: 同じ数値でも異なるルーブリックでは全く異なる段階を示し得るため、ルーブリックなしに保存できない。
+      source_claims: [claim-score-design]
+    - id: score-applies-one-criterion
+      severity: error
+      expression_language: plain
+      expression: criterion_ref must resolve to one EvaluationCriterion and evidence_ref must be within that criterion's declared evidence scope.
+      explanation:
+        zh: 一条评分不能同时含糊地声称评价了多个质量维度。
+        en: One score cannot ambiguously claim to assess multiple quality dimensions at once.
+        ja: 一つのスコアが複数の品質次元を同時に曖昧に評価したと主張してはならない。
+      source_claims: [claim-score-design]
+    - id: score-is-not-metric-or-verdict
+      severity: error
+      expression_language: plain
+      expression: A value with a physical unit or aggregation must be represented as EvaluationMetric, and a pass fail revise or inconclusive conclusion must be represented as Verdict.
+      explanation:
+        zh: 评分等级、测量值和类别结论需要保留不同事实边界。
+        en: Grading levels, measured values, and categorical conclusions require distinct fact boundaries.
+        ja: 採点段階、測定値、カテゴリ結論には異なる事実境界が必要である。
+      source_claims: [claim-score-design]
+  required_relations:
+    - id: score-is-assigned-under-rubric
+      direction: outgoing
+      predicate: is_assigned_under
+      target_concept_id: Rubric
+      cardinality: {min: 1, max: 1}
+      explanations:
+        zh: 每个 Score 必须恰好使用一个版本化量规。
+        en: Each Score must use exactly one versioned Rubric.
+        ja: 各 Score はちょうど一つの版管理された Rubric を使用しなければならない。
+      source_claims: [claim-score-design]
+    - id: score-applies-evaluation-criterion
+      direction: outgoing
+      predicate: applies
+      target_concept_id: EvaluationCriterion
+      cardinality: {min: 1, max: 1}
+      explanations:
+        zh: 每个 Score 必须说明它按哪一质量准则被赋值。
+        en: Each Score must state the quality criterion under which it was assigned.
+        ja: 各 Score は、どの品質基準の下で与えられたかを示さなければならない。
+      source_claims: [claim-score-design]
+examples:
+  - id: score-positive-helpfulness-four
+
+    labels:
+      zh: MT-Bench GPT-4 judge 8 分
+      en: MT-Bench GPT-4 judge score 8
+      ja: MT-Bench GPT-4 judge スコア 8
+
+    descriptions:
+      zh: "LMSYS Chatbot Arena (Zheng et al., 2023): MT-Bench 80 items GPT-4 judge 1-10; Arena pairwise + Elo; Score maps EvaluationRun/Score/Verdict."
+      en: "LMSYS Chatbot Arena (Zheng et al., 2023): MT-Bench 80 items GPT-4 judge 1-10; Arena pairwise + Elo; Score maps EvaluationRun/Score/Verdict."
+      ja: "Chatbot Arena MT-Bench+Elo; Score eval evidence."
+    field_values:
+      score_id: mtbench-gpt4-judge-81
+      value: 8
+      rubric_ref: Rubric:mt-bench-1-10:v1
+      criterion_ref: EvaluationCriterion:mt-bench-single-answer
+      evidence_ref: artifact:vicuna-13b-mtbench-q81-turn1
+    related_node_ids: [Score, Rubric, EvaluationCriterion]
+    related_relation_ids: [score-is-assigned-under-rubric, score-applies-evaluation-criterion]
+
+    source_claims: [claim-score-design]
+  - id: score-counterexample-naked-number
+
+    labels:
+      zh: 未说明来源的数字 4
+      en: Number four with no basis
+      ja: 根拠のない数値四
+
+    descriptions:
+      zh: "JSON without task/scores cannot serve as Braintrust-style Score."
+      en: "JSON without task/scores cannot serve as Braintrust-style Score."
+      ja: "Missing task/scores rejects Braintrust-style Score."
+    field_values:
+      score_id: null
+      value: 4
+      rubric_ref: null
+      criterion_ref: null
+      evidence_ref: null
+    related_node_ids: [Score]
+    related_relation_ids: []
+
+    source_claims: [claim-score-design]
+  - id: score-boundary-evaluation-metric-versus-score
+
+    labels:
+      zh: 测量值与评分等级的边界
+      en: Boundary between measured value and score level
+      ja: 測定値とスコア段階の境界
+
+    descriptions:
+      zh: "faithfulness measures grounding; latency is cost; Score must not treat wall-clock as faithfulness."
+      en: "faithfulness measures grounding; latency is cost; Score must not treat wall-clock as faithfulness."
+      ja: "Latency not faithfulness."
+    field_values:
+      score_id: score-104
+      value: 4
+      rubric_ref: Rubric:helpfulness:v1
+      criterion_ref: EvaluationCriterion:support-helpfulness
+      evidence_ref: artifact:answer-104
+    related_node_ids: [Score, EvaluationMetric, Rubric, EvaluationCriterion]
+    related_relation_ids: [score-is-assigned-under-rubric, score-applies-evaluation-criterion]
+
+    source_claims: [claim-score-design]
+  - id: score-instance-support-answer-104
+
+    labels:
+      zh: 支持回答 104 的具体评分
+      en: Concrete score for support answer 104
+      ja: サポート回答 104 の具体的なスコア
+
+    descriptions:
+      zh: "W&B instance: eval_cost_usd=0.042 tokens=1500->Score EvaluationCostMetric."
+      en: "W&B instance: eval_cost_usd=0.042 tokens=1500->Score EvaluationCostMetric."
+      ja: "W&B instance maps to Score CostMetric."
+    field_values:
+      score_id: score-104
+      value: 4
+      rubric_ref: Rubric:helpfulness:v1
+      criterion_ref: EvaluationCriterion:support-helpfulness
+      evidence_ref: artifact:answer-104
+    related_node_ids: [Score, Rubric, EvaluationCriterion, Feedback]
+    related_relation_ids: [score-is-assigned-under-rubric, score-applies-evaluation-criterion]
+
+    source_claims: [claim-score-design]
+parent_relation: null
+relations:
+  - id: Score-isAssignedUnder-Rubric
+    predicate: is_assigned_under
+    target: concept:Rubric
+    direction: source-to-target
+    relation_kind: semantic
+    labels:
+      zh: 评分按量规赋值
+      en: score is assigned under rubric
+      ja: スコアがルーブリックの下で与えられる
+    definitions:
+      zh: Rubric 给出可接受评分值的等级描述，Score 记录按该等级给出的数值。
+      en: The Rubric gives level descriptions for acceptable score values and the Score records the value assigned under them.
+      ja: Rubric は許容スコア値の段階説明を与え、Score はその下で与えられた値を記録する。
+    cardinality: {source: {min: 1, max: 1}, target: {min: 0, max: null}}
+    cardinality_not_applicable_reason: null
+    inverse_reading:
+      predicate: defines_scale_for
+      labels:
+        zh: 量规定义评分刻度
+        en: rubric defines scale for score
+        ja: ルーブリックがスコアの尺度を定義する
+    conditions: []
+    temporal_scope: timeless
+    boundary_context: null
+    constraints: []
+    examples: []
+    source_claims: [claim-score-design]
+    distinct_fact_rationale:
+      zh: 该关系保留等级解释，不把 Rubric 误作一次评分。
+      en: This relation preserves level interpretation without treating a Rubric as one score occurrence.
+      ja: この関係は段階解釈を保持し、Rubric を一件のスコア発生として扱わない。
+    layout_role: cross-link
+  - id: Score-applies-EvaluationCriterion
+    predicate: applies
+    target: concept:EvaluationCriterion
+    direction: source-to-target
+    relation_kind: semantic
+    labels:
+      zh: 评分应用评估准则
+      en: score applies evaluation criterion
+      ja: スコアが評価基準を適用する
+    definitions:
+      zh: Score 记录它按哪一项质量要求解释所选等级。
+      en: Score records which quality requirement interprets the selected level.
+      ja: Score は、選択された段階をどの品質要件が解釈するかを記録する。
+    cardinality: {source: {min: 1, max: 1}, target: {min: 0, max: null}}
+    cardinality_not_applicable_reason: null
+    inverse_reading:
+      predicate: governs
+      labels:
+        zh: 准则约束评分
+        en: criterion governs score
+        ja: 基準がスコアを規定する
+    conditions: []
+    temporal_scope: timeless
+    boundary_context: null
+    constraints: []
+    examples: []
+    source_claims: [claim-score-design]
+    distinct_fact_rationale:
+      zh: 该关系明确评分的质量维度，不把量规等级当作质量维度本身。
+      en: This relation identifies the score’s quality dimension without treating a rubric level as the quality dimension itself.
+      ja: この関係はスコアの品質次元を特定し、ルーブリック段階を品質次元そのものとして扱わない。
+    layout_role: cross-link
+sources:
+  - id: openai-responses-score
+    title: OpenAI Responses API create reference
+    url: https://developers.openai.com/api/reference/resources/responses/methods/create
+    source_type: official-doc
+    relevance: Documents current candidate response creation that is separate from local scoring record ownership.
+  - id: openai-evals-score
+    title: Legacy OpenAI Working with evals API
+    url: https://developers.openai.com/api/docs/guides/evals
+    source_type: official-doc
+    relevance: Documents historical Evals evaluation-definition and run contract shapes without defining ownership of local Score records.
+  - id: openai-graders-score
+    title: OpenAI Run grader reference
+    url: https://developers.openai.com/api/reference/resources/fine_tuning/subresources/alpha/subresources/graders/methods/run
+    source_type: official-doc
+    relevance: Documents the current grader-run endpoint and ScoreModelGrader fields used to request a numeric score.
+  - id: openai-agent-evals-score
+    title: OpenAI Evaluate agent workflows
+    url: https://developers.openai.com/api/docs/guides/agent-evals
+    source_type: official-doc
+    relevance: Documents the current trace, grader, dataset, and eval-run workflow in which a local Score is recorded.
+  - id: score-design
+    title: Score and rubric design inference
+    url: https://www.w3.org/TR/prov-o/
+    source_type: design-inference
+    relevance: Separates a grading value, its rubric, criterion, evidence, and later verdict in a local evaluation model.
+source_claims:
+  - id: claim-score-responses
+    source: openai-responses-score
+    supports: The Responses API create operation accepts model and input fields to generate a candidate response that a separate evaluator may assess.
+    locator: "POST /v1/responses: request body model and input"
+    evidence_kind: official
+    confidence: high
+  - id: claim-score-design
+    source: score-design
+    supports: A score is a rubric-bound numeric grading record distinct from an Evaluation Metric and a categorical Verdict.
+    locator: "Local Score, Rubric, Evaluation Metric, and Verdict boundary"
+    evidence_kind: design-inference
+    confidence: high
+  - id: claim-score-agent-evals-workflow
+    source: openai-agent-evals-score
+    supports: Current OpenAI agent-evaluation guidance uses trace grading while debugging and datasets with eval runs for repeatable evaluation over time.
+    locator: "Evaluate agent workflows: trace grading; Move to datasets and eval runs when you need repeatability"
+    evidence_kind: official
+    confidence: high
+  - id: claim-score-openai-grader
+    source: openai-graders-score
+    supports: The current Run grader operation accepts a ScoreModelGrader with message inputs, model, and an optional numeric range.
+    locator: "Run grader: POST /fine_tuning/alpha/graders/run; ScoreModelGrader"
+    evidence_kind: official
+    confidence: high
+
+

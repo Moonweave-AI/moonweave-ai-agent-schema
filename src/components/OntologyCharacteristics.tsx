@@ -26,7 +26,6 @@ import type {
   VisibleOntologyGraph,
 } from "../lib/ontology-view-model";
 import { DisclosureList } from "./DisclosureList";
-import { OntologyDeprecationLineageFact } from "./OntologyDeprecationLineage";
 
 export interface OntologyCharacteristicsProps {
   readonly index: OntologyIndex;
@@ -58,18 +57,12 @@ interface OntologyInformationView {
   readonly semantic_kind?: string | null;
   readonly applicability?: readonly string[];
   readonly structure?: CanonicalConcept["structure"];
-  readonly external_mappings?: readonly unknown[];
-  readonly competency_questions?: readonly unknown[];
+  readonly engineering?: unknown;
   readonly hygiene_gates?: readonly unknown[];
   readonly interaction_contract?: unknown;
   readonly taxonomy_contract?: unknown;
   readonly status?: string;
   readonly review?: unknown;
-  readonly introduced_in?: string;
-  readonly deprecated_in?: string | null;
-  readonly replaced_by_ids?: readonly string[];
-  readonly deprecation_reason?: LocalizedText | null;
-  readonly change_note?: LocalizedText;
 }
 
 const asRecord = (value: unknown): Readonly<Record<string, unknown>> =>
@@ -79,6 +72,9 @@ const arrayValue = <T,>(value: unknown): readonly T[] => (Array.isArray(value) ?
 
 const localized = (value: unknown, language: Language, fallback = ""): string =>
   localizedOntologyText(value as LocalizedText | undefined, language, fallback);
+
+const displayText = (value: unknown, language: Language, fallback = ""): string =>
+  typeof value === "string" ? value : localized(value, language, fallback);
 
 const localizedInformation = (value: unknown, language: Language): unknown => {
   if (Array.isArray(value)) return value.map((item) => localizedInformation(item, language));
@@ -207,19 +203,88 @@ const ExampleList = ({
       emptyText={text.noInformation}
       className="detail-list example-list"
       renderItem={(example) => (
-        <article className={`example-${example.kind === "positive" ? "positive" : "counterexample"}`}>
+        <article className={`example-${example.kind}`}>
           <strong>{localized(example.labels, language, example.id)}</strong>
           <p>{localized(example.descriptions, language)}</p>
-          <small>{example.synthetic ? text.syntheticExample : text.realExample} · {text.verifiedVersion}: {String(example.verified_version ?? text.notApplicable)}</small>
-          {example.why_valid_or_invalid ? <p>{localized(example.why_valid_or_invalid, language)}</p> : null}
-          <dl className="inline-facts">
-            <div><dt>{text.scenario}</dt><dd>{example.scenario_id ?? text.notApplicable}</dd></div>
-            <div><dt>{text.expectedResult}</dt><dd>{localized(example.expected_result, language, text.notApplicable)}</dd></div>
-            <div><dt>{text.fieldValues}</dt><dd><code>{JSON.stringify(example.field_values ?? {})}</code></dd></div>
-          </dl>
+          {example.why_valid_or_invalid ? <p><strong>{text.exampleRationale}: </strong>{localized(example.why_valid_or_invalid, language)}</p> : null}
+          <small>{example.synthetic ? text.syntheticExample : text.realExample}</small>
           <SourceClaimList id={`${id}-${example.id}-sources`} claims={example.source_claims ?? []} index={index} language={language} initialLimit={0} />
         </article>
       )}
+    />
+  );
+};
+
+const engineeringFormat = (value: unknown): string | null => {
+  if (typeof value === "string") return value;
+  if (value === undefined || value === null) return null;
+  return JSON.stringify(value, null, 2);
+};
+
+const EngineeringPayloadList = ({
+  id,
+  entries,
+  language,
+}: {
+  readonly id: string;
+  readonly entries: readonly unknown[];
+  readonly language: Language;
+}) => {
+  const text = uiText[language];
+  return (
+    <DisclosureList
+      id={id}
+      items={entries}
+      language={language}
+      emptyText={text.noInformation}
+      renderItem={(entry) => {
+        const payload = asRecord(entry);
+        const description = displayText(
+          payload.description ?? payload.label ?? payload.name,
+          language,
+          text.noInformation,
+        );
+        const format = engineeringFormat(payload.format ?? payload.example ?? payload.schema);
+        return (
+          <article className="engineering-payload">
+            <strong>{description}</strong>
+            {format ? <pre><code>{format}</code></pre> : null}
+          </article>
+        );
+      }}
+    />
+  );
+};
+
+const ReferenceImplementationList = ({
+  id,
+  entries,
+  language,
+}: {
+  readonly id: string;
+  readonly entries: readonly unknown[];
+  readonly language: Language;
+}) => {
+  const text = uiText[language];
+  return (
+    <DisclosureList
+      id={id}
+      items={entries}
+      language={language}
+      emptyText={text.noInformation}
+      renderItem={(entry) => {
+        const reference = asRecord(entry);
+        const name = displayText(reference.name, language, text.noInformation);
+        const description = displayText(reference.description, language);
+        const url = typeof reference.url === "string" ? safeExternalUrl(reference.url) : null;
+        return (
+          <article className="reference-implementation">
+            {url ? <a href={url} target="_blank" rel="noreferrer noopener">{name}</a> : <strong>{name}</strong>}
+            {description ? <p>{description}</p> : null}
+            {url ? <a href={url} target="_blank" rel="noreferrer noopener">{url}</a> : null}
+          </article>
+        );
+      }}
     />
   );
 };
@@ -272,35 +337,6 @@ const SourceClaimList = ({
   );
 };
 
-const ReviewSummary = ({
-  id,
-  value,
-  language,
-}: {
-  readonly id: string;
-  readonly value: unknown;
-  readonly language: Language;
-}) => {
-  const text = uiText[language];
-  const review = asRecord(value);
-  const reviewers = arrayValue<Readonly<Record<string, unknown>>>(review.reviewers);
-  return (
-    <dl className="stacked-facts review-summary">
-      <div><dt>{text.status}</dt><dd>{String(review.review_status ?? text.notApplicable)}</dd></div>
-      <div><dt>{text.reviewers}</dt><dd>
-        <DisclosureList id={`${id}-reviewers`} items={reviewers} language={language} renderItem={(reviewer) => (
-          <dl className="inline-facts">
-            <div><dt>ID</dt><dd>{String(reviewer.reviewer_id ?? text.notApplicable)}</dd></div>
-            <div><dt>{text.relationKind}</dt><dd>{String(reviewer.reviewer_role ?? reviewer.reviewer_kind ?? text.notApplicable)}</dd></div>
-            <div><dt>{text.year}</dt><dd>{String(reviewer.reviewed_on ?? text.notApplicable)}</dd></div>
-            <div><dt>{text.changeNote}</dt><dd>{localized(reviewer.decision_note, language, text.notApplicable)}</dd></div>
-          </dl>
-        )} />
-      </dd></div>
-    </dl>
-  );
-};
-
 const FieldList = ({
   id,
   fields,
@@ -338,7 +374,7 @@ const FieldList = ({
                 return <article><strong>{localized(value.labels, language, String(value.id ?? value.value ?? text.notApplicable))}</strong><p>{localized(value.definitions, language)}</p><code>{JSON.stringify(value.value ?? null)}</code><SourceClaimList id={`field-${field.id}-value-${String(value.id ?? "value")}-sources`} claims={arrayValue<CanonicalSourceClaim>(value.source_claims)} index={index} language={language} initialLimit={0} /></article>;
               }} />
             </td></tr>
-            <tr><th>{text.sourceClaims}</th><td><SourceClaimList id={`field-${field.id}-sources`} claims={field.source_claims ?? []} index={index} language={language} initialLimit={0} /></td></tr>
+            <tr><th>{text.sourcesAndReferences}</th><td><SourceClaimList id={`field-${field.id}-sources`} claims={field.source_claims ?? []} index={index} language={language} initialLimit={0} /></td></tr>
           </tbody>
         </table>
       )}
@@ -474,7 +510,6 @@ const EntityDetailsRows = ({
           const child = index.entitiesByRef.get(ref);
           return child?.data.status !== "deprecated" ? [child] : [];
         });
-  const deprecatedPredecessors = details?.collections.deprecatedPredecessors.items ?? [];
   const examples = arrayValue<CanonicalExample>(data.examples);
   const positive = examples.filter(({ kind }) => kind === "positive");
   const counter = examples.filter(({ kind }) => kind === "counterexample" || kind === "boundary");
@@ -496,10 +531,10 @@ const EntityDetailsRows = ({
     details?.collections.constraints.items ?? data.structure?.constraints,
   );
   const requiredRelationConstraints = arrayValue<unknown>(data.structure?.required_relation_constraints);
-  const mappings = arrayValue<unknown>(data.external_mappings);
-  const competencyQuestions = arrayValue<unknown>(data.competency_questions);
-  const hygieneGates = entity.kind === "root" ? arrayValue<unknown>(data.hygiene_gates) : [];
-  const interactionContract = asRecord(data.interaction_contract);
+  const engineering = asRecord(data.engineering);
+  const typicalInputs = arrayValue<unknown>(engineering.typical_input);
+  const typicalOutputs = arrayValue<unknown>(engineering.typical_output);
+  const referenceImplementations = arrayValue<unknown>(engineering.reference_implementations);
   const taxonomyContract = asRecord(data.taxonomy_contract);
   const sourceClaims = arrayValue<CanonicalSourceClaim>(data.source_claims);
   const incoming = details?.collections.incomingRelations.items ?? [];
@@ -507,10 +542,6 @@ const EntityDetailsRows = ({
   const visibleRelationIds = new Set(view.edges.map(({ id }) => id));
   const derivedInformation = deriveOntologyInformation(index, entity);
   const rootMetadata = asRecord(index.ontology.artifact_metadata);
-  const rootGeneratedFrom = arrayValue<string>(rootMetadata.generated_from);
-  const rootMetadataFacts = Object.entries(rootMetadata).filter(
-    ([key]) => key !== "generated_from",
-  );
   const baseIri = String(
     rootMetadata.canonical_version ??
     "",
@@ -562,12 +593,11 @@ const EntityDetailsRows = ({
         <RelationList id="outgoing-relations" relations={outgoing} index={index} language={language} onFocusRelation={onFocusRelation} focusableRelationIds={visibleRelationIds} />
       </DetailRow>
       <DetailRow order={4} title={text.engineeringExplanation}>
+        <p>{displayText(engineering.explanation, language, text.noInformation)}</p>
         <dl className="stacked-facts">
-          <div><dt>{text.lifecyclePosition}</dt><dd>{localized(data.why_needed ?? data.purpose, language, text.notApplicable)}</dd></div>
-          <div><dt>{text.solvesProblem}</dt><dd>{localized(data.definitions, language, text.notApplicable)}</dd></div>
-          <div><dt>{text.typicalInput}</dt><dd><RelationList id="typical-input-relations" relations={derivedInformation.typicalInputRelations} index={index} language={language} onFocusRelation={onFocusRelation} focusableRelationIds={visibleRelationIds} emptyText={text.notApplicable} /></dd></div>
-          <div><dt>{text.typicalOutput}</dt><dd><RelationList id="typical-output-relations" relations={derivedInformation.typicalOutputRelations} index={index} language={language} onFocusRelation={onFocusRelation} focusableRelationIds={visibleRelationIds} emptyText={text.notApplicable} /></dd></div>
-          <div><dt>{text.interactionContract}</dt><dd>{Object.keys(interactionContract).length > 0 ? <pre><code>{JSON.stringify(localizedInformation(interactionContract, language), null, 2)}</code></pre> : text.notApplicable}</dd></div>
+          <div><dt>{text.typicalInput}</dt><dd><EngineeringPayloadList id="typical-input" entries={typicalInputs} language={language} /></dd></div>
+          <div><dt>{text.typicalOutput}</dt><dd><EngineeringPayloadList id="typical-output" entries={typicalOutputs} language={language} /></dd></div>
+          <div><dt>{text.referenceImplementations}</dt><dd><ReferenceImplementationList id="reference-implementations" entries={referenceImplementations} language={language} /></dd></div>
         </dl>
       </DetailRow>
       <DetailRow order={5} title={`${text.positiveExamples} / ${text.counterexamples}`}>
@@ -588,18 +618,11 @@ const EntityDetailsRows = ({
           </dd></div>
           <div><dt>{text.minimumJson}</dt><dd><pre><code>{Object.keys(minimalJson).length > 0 ? JSON.stringify(minimalJson, null, 2) : text.notApplicable}</code></pre></dd></div>
           <div><dt>{text.requiredRelationConstraints}</dt><dd><DisclosureList id="required-relation-constraints" items={requiredRelationConstraints} language={language} emptyText={text.noInformation} renderItem={(item) => <code>{JSON.stringify(localizedInformation(item, language))}</code>} /></dd></div>
+          <div><dt>{text.constraints}</dt><dd><ConstraintList id="entity-structure-constraints" constraints={constraints} index={index} language={language} /></dd></div>
           <div><dt>{text.taxonomyContract}</dt><dd>{Object.keys(taxonomyContract).length > 0 ? <pre><code>{JSON.stringify(localizedInformation(taxonomyContract, language), null, 2)}</code></pre> : text.notApplicable}</dd></div>
         </dl>
       </DetailRow>
-      <DetailRow order={8} title={text.validationRules}>
-        <ConstraintList id="entity-validation-constraints" constraints={constraints} index={index} language={language} />
-        <h4>{text.competencyQuestions}</h4>
-        <DisclosureList id="competency-questions" items={competencyQuestions} language={language} emptyText={text.noInformation} renderItem={(item) => {
-          const value = asRecord(item);
-          return <article><strong>{localized(value.questions, language, String(value.id ?? text.notApplicable))}</strong><p><code>{String(value.query ?? text.notApplicable)}</code></p><p>{String(value.expected_assertion ?? text.notApplicable)}</p><SourceClaimList id={`competency-${String(value.id ?? "question")}-sources`} claims={arrayValue<CanonicalSourceClaim>(value.source_claims)} index={index} language={language} initialLimit={0} /></article>;
-        }} />
-      </DetailRow>
-      <DetailRow order={9} title={text.caseFragments}>
+      <DetailRow order={8} title={text.caseFragments}>
         {entity.kind === "root" ? (
           <DisclosureList id="root-case-paths" items={rootCasePaths} language={language} emptyText={text.noInformation} renderItem={(path) => {
             const resolvedSteps = resolveCanonicalCasePath(index, path);
@@ -626,7 +649,6 @@ const EntityDetailsRows = ({
                  }} />
                 {missingReferenceIds.length > 0 ? <p role="alert">{text.caseReferenceError} <code>{missingReferenceIds.join(", ")}</code></p> : null}
                 <SourceClaimList id={`case-path-${path.id}-sources`} claims={arrayValue<CanonicalSourceClaim>(path.source_claims)} index={index} language={language} initialLimit={0} />
-                <ReviewSummary id={`case-path-${path.id}`} value={path.review} language={language} />
                 <button type="button" className="table-link" disabled={missingReferenceIds.length > 0} onClick={() => onHighlightScenario(path.id === highlightedScenarioId ? null : path.id)}>{path.id === highlightedScenarioId ? text.clearCaseHighlight : text.highlightCase}</button>
               </article>
             );
@@ -660,56 +682,7 @@ const EntityDetailsRows = ({
           }} />
         )}
       </DetailRow>
-      <DetailRow order={10} title={text.externalMappings}>
-        <DisclosureList id="external-mappings" items={mappings} language={language} emptyText={text.noInformation} renderItem={(mapping) => {
-          const value = asRecord(mapping);
-          const mappingId = String(value.id ?? "mapping");
-          const targetIds = arrayValue<string>(value.canonical_target_ids);
-          const conformance = asRecord(value.conformance);
-          return (
-            <article>
-              <dl className="inline-facts">
-                <div><dt>{text.source}</dt><dd>{String(value.system ?? text.notApplicable)}: {String(value.external_identifier ?? text.notApplicable)}</dd></div>
-                <div><dt>{text.mappingVersion}</dt><dd>{String(value.external_version ?? text.notApplicable)}</dd></div>
-                <div><dt>{text.mappingScope}</dt><dd>{localized(value.scope, language, text.notApplicable)}</dd></div>
-                <div><dt>{text.mappingDirection}</dt><dd>{String(value.direction ?? text.notApplicable)}</dd></div>
-                <div><dt>{text.mappingKind}</dt><dd>{String(value.mapping_kind ?? text.notApplicable)}</dd></div>
-                <div><dt>{text.mappingLoss}</dt><dd>{localized(value.loss_notes, language, text.notApplicable)}</dd></div>
-                <div><dt>{text.conversionNote}</dt><dd>{localized(value.conversion_note, language, text.notApplicable)}</dd></div>
-                <div><dt>{text.targetConcept}</dt><dd><DisclosureList id={`${mappingId}-targets`} items={targetIds} language={language} emptyText={text.noInformation} renderItem={(targetId) => { const target = entityForConcept(index, targetId); return target ? <EntityLink entity={target} language={language} onFocus={onNavigateEntity} /> : <code>{targetId}</code>; }} /></dd></div>
-                <div><dt>{text.status}</dt><dd>{String(value.status ?? text.notApplicable)}</dd></div>
-              </dl>
-              <h4>{text.mappingConformance}</h4>
-              <dl className="inline-facts">
-                <div><dt>{text.conformanceStatus}</dt><dd>{String(conformance.status ?? text.notApplicable)}</dd></div>
-                <div><dt>{text.conformanceTestId}</dt><dd><code>{String(conformance.test_id ?? text.notApplicable)}</code></dd></div>
-                <div><dt>{text.conformanceMethod}</dt><dd>{localized(conformance.method, language, text.notApplicable)}</dd></div>
-              </dl>
-              <SourceClaimList id={`${mappingId}-sources`} claims={arrayValue<CanonicalSourceClaim>(value.source_claims)} index={index} language={language} initialLimit={0} />
-            </article>
-          );
-        }} />
-      </DetailRow>
-      <DetailRow order={11} title={text.sourceClaims}><SourceClaimList id="source-claims" claims={sourceClaims} index={index} language={language} /></DetailRow>
-      <DetailRow order={12} title={text.maturityChanges}>
-        <dl className="stacked-facts">
-          <div><dt>{text.status}</dt><dd>{data.status ?? text.notApplicable}</dd></div>
-          <div><dt>{text.versionIri}</dt><dd><code>{baseIri || text.notApplicable}</code></dd></div>
-          <div><dt>{text.introduced}</dt><dd>{data.introduced_in ?? text.notApplicable}</dd></div>
-          <div><dt>{text.deprecated}</dt><dd>{data.deprecated_in ?? text.notApplicable}</dd></div>
-          <div><dt>{text.replacements}</dt><dd>{data.replaced_by_ids?.join(", ") || text.notApplicable}</dd></div>
-          <OntologyDeprecationLineageFact
-            index={index}
-            predecessors={deprecatedPredecessors}
-            language={language}
-            onNavigate={onNavigateEntity}
-          />
-          <div><dt>{text.deprecationReason}</dt><dd>{localized(data.deprecation_reason, language, text.notApplicable)}</dd></div>
-          <div><dt>{text.changeNote}</dt><dd>{localized(data.change_note, language, text.notApplicable)}</dd></div>
-        </dl>
-        <h4>{text.review}</h4><ReviewSummary id="entity-review" value={data.review} language={language} />
-        {entity.kind === "root" ? <><h4>{text.sourcesGovernance}</h4><dl className="inline-facts">{rootMetadataFacts.map(([key, value]) => <div key={key}><dt>{key}</dt><dd><code>{String(value)}</code></dd></div>)}</dl><DisclosureList id="generated-from" items={rootGeneratedFrom} language={language} emptyText={text.noInformation} renderItem={(value) => <code>{value}</code>} /><h4>{text.hygieneGates}</h4><DisclosureList id="hygiene-gates" items={hygieneGates} language={language} emptyText={text.noInformation} renderItem={(item) => { const value = asRecord(item); return <article><strong>{localized(value.labels, language, String(value.id ?? text.notApplicable))}</strong><p>{localized(value.descriptions, language)}</p><code>{String(value.expression ?? text.notApplicable)}</code><SourceClaimList id={`hygiene-${String(value.id ?? "gate")}-sources`} claims={arrayValue<CanonicalSourceClaim>(value.source_claims)} index={index} language={language} initialLimit={0} /></article>; }} /></> : null}
-      </DetailRow>
+      <DetailRow order={9} title={text.sourcesAndReferences}><SourceClaimList id="source-claims" claims={sourceClaims} index={index} language={language} /></DetailRow>
     </>
   );
 };
@@ -747,11 +720,6 @@ const RelationDetailsRows = ({
     ? `${String(inverseReading.predicate ?? "")} — ${localized(inverseReading.labels, language, text.notApplicable)}`
     : text.notApplicable;
   const boundaryContext = asRecord(relation?.boundary_context);
-  const artifactMetadata = asRecord(index.ontology.artifact_metadata);
-  const versionIri = String(
-    artifactMetadata.canonical_version ??
-    text.notApplicable,
-  );
   const relationName = relation
     ? localized(relation.labels, language, edge.predicate)
     : text.derivedRelationLabels[edge.predicate] ?? edge.predicate;
@@ -762,22 +730,19 @@ const RelationDetailsRows = ({
 
   return (
     <>
-      <DetailRow order={1} title={text.logicalPosition}><button type="button" className="table-link back-to-node" onClick={onBackToNode}>{text.backToNode}</button><dl className="stacked-facts"><div><dt>{text.relationId}</dt><dd><code>{edge.id}</code></dd></div><div><dt>{text.relationKindLabel}</dt><dd>{edge.derived ? text.derivedRelation : text.canonicalRelation}</dd></div><div><dt>{text.status}</dt><dd>{relation?.status ?? text.derivedRelation}</dd></div><div><dt>{text.relationStatement}</dt><dd>{statement}</dd></div></dl></DetailRow>
+      <DetailRow order={1} title={text.logicalPosition}><button type="button" className="table-link back-to-node" onClick={onBackToNode}>{text.backToNode}</button><dl className="stacked-facts"><div><dt>{text.relationId}</dt><dd><code>{edge.id}</code></dd></div><div><dt>{text.relationKindLabel}</dt><dd>{edge.derived ? text.derivedRelation : text.canonicalRelation}</dd></div><div><dt>{text.relationStatement}</dt><dd>{statement}</dd></div></dl></DetailRow>
       <DetailRow order={2} title={text.definitionBoundary}><p>{relationDefinition}</p><dl className="stacked-facts"><div><dt>{text.distinctFactRationale}</dt><dd>{localized(relation?.distinct_fact_rationale, language, text.notApplicable)}</dd></div></dl></DetailRow>
       <DetailRow order={3} title={text.semanticRelations}><dl className="stacked-facts"><div><dt>{text.direction}</dt><dd>{relation?.direction ?? "source-to-target"}</dd></div><div><dt>{text.relationKind}</dt><dd>{relation?.relation_kind ?? text.derivedRelation}</dd></div><div><dt>{text.source}</dt><dd><EntityLink entity={source} language={language} onFocus={onFocusEntity} /></dd></div><div><dt>{text.targetConcept}</dt><dd><EntityLink entity={target} language={language} onFocus={onFocusEntity} /></dd></div></dl></DetailRow>
       <DetailRow order={4} title={text.engineeringExplanation}><dl className="stacked-facts"><div><dt>{text.endpointRestrictions}</dt><dd>{relation ? `${relation.source_id} → ${relation.target_id}` : statement}</dd></div><div><dt>{text.temporalScope}</dt><dd>{String(relation?.temporal_scope ?? text.notApplicable)}</dd></div><div><dt>{text.boundaryContext}</dt><dd>{Object.keys(boundaryContext).length > 0 ? <pre><code>{JSON.stringify(localizedInformation(boundaryContext, language), null, 2)}</code></pre> : text.notApplicable}</dd></div></dl></DetailRow>
       <DetailRow order={5} title={`${text.positiveExamples} / ${text.counterexamples}`}><h4>{text.positiveExamples}</h4><ExampleList id="relation-positive" examples={positive} index={index} language={language} /><h4>{text.counterexamples}</h4><ExampleList id="relation-counter" examples={counter} index={index} language={language} /></DetailRow>
       <DetailRow order={6} title={text.instanceExamples}><ExampleList id="relation-instances" examples={instances} index={index} language={language} /></DetailRow>
-      <DetailRow order={7} title={text.structureConstraints}><dl className="stacked-facts"><div><dt>{text.cardinality}</dt><dd><code>{cardinality}</code></dd></div><div><dt>{text.inverseReading}</dt><dd>{inverseText}</dd></div></dl></DetailRow>
-      <DetailRow order={8} title={text.validationRules}><ConstraintList id="relation-validation-constraints" constraints={constraints} index={index} language={language} /><h4>{text.conditions}</h4><ConstraintList id="relation-conditions" constraints={arrayValue<CanonicalConstraint>(relation?.conditions)} index={index} language={language} /></DetailRow>
-      <DetailRow order={9} title={text.caseFragments}><DisclosureList id="relation-cases" items={cases} language={language} emptyText={text.noInformation} renderItem={(example) => {
+      <DetailRow order={7} title={text.structureConstraints}><dl className="stacked-facts"><div><dt>{text.cardinality}</dt><dd><code>{cardinality}</code></dd></div><div><dt>{text.inverseReading}</dt><dd>{inverseText}</dd></div><div><dt>{text.constraints}</dt><dd><ConstraintList id="relation-structure-constraints" constraints={constraints} index={index} language={language} /></dd></div><div><dt>{text.conditions}</dt><dd><ConstraintList id="relation-conditions" constraints={arrayValue<CanonicalConstraint>(relation?.conditions)} index={index} language={language} /></dd></div></dl></DetailRow>
+      <DetailRow order={8} title={text.caseFragments}><DisclosureList id="relation-cases" items={cases} language={language} emptyText={text.noInformation} renderItem={(example) => {
         const context = caseStepContext(index, example.id);
         const missingReferenceIds = missingCasePathReferences(index, context?.path);
         return <article className={example.scenario_id === highlightedScenarioId ? "case-path-highlight" : ""}><strong>{localized(example.labels, language, example.id)}</strong><p>{localized(example.descriptions, language)}</p><dl className="inline-facts"><div><dt>{text.currentStep}</dt><dd>{context?.step.order ?? text.notApplicable}</dd></div><div><dt>{text.semanticRelations}</dt><dd>{context?.step.traversal_relation_id ?? text.notApplicable}</dd></div></dl>{missingReferenceIds.length > 0 ? <p role="alert">{text.caseReferenceError} <code>{missingReferenceIds.join(", ")}</code></p> : null}<SourceClaimList id={`relation-case-${example.id}-sources`} claims={example.source_claims ?? []} index={index} language={language} initialLimit={0} />{example.scenario_id ? <button type="button" className="table-link" disabled={missingReferenceIds.length > 0} onClick={() => onHighlightScenario(example.scenario_id === highlightedScenarioId ? null : example.scenario_id ?? null)}>{example.scenario_id === highlightedScenarioId ? text.clearCaseHighlight : text.highlightCase}</button> : null}</article>;
       }} /></DetailRow>
-      <DetailRow order={10} title={text.externalMappings}><p>{text.notApplicable}</p></DetailRow>
-      <DetailRow order={11} title={text.sourceClaims}><SourceClaimList id="relation-sources" claims={claims} index={index} language={language} /></DetailRow>
-      <DetailRow order={12} title={text.maturityChanges}><dl className="stacked-facts"><div><dt>{text.status}</dt><dd>{relation?.status ?? text.derivedRelation}</dd></div><div><dt>{text.versionIri}</dt><dd><code>{versionIri}</code></dd></div><div><dt>{text.introduced}</dt><dd>{relation?.introduced_in ?? text.notApplicable}</dd></div><div><dt>{text.deprecated}</dt><dd>{relation?.deprecated_in ?? text.notApplicable}</dd></div><div><dt>{text.replacements}</dt><dd>{relation?.replaced_by_ids?.join(", ") || text.notApplicable}</dd></div><div><dt>{text.deprecationReason}</dt><dd>{localized(relation?.deprecation_reason, language, text.notApplicable)}</dd></div><div><dt>{text.changeNote}</dt><dd>{localized(relation?.change_note, language, text.notApplicable)}</dd></div></dl><h4>{text.review}</h4><ReviewSummary id="relation-review" value={relation?.review} language={language} /></DetailRow>
+      <DetailRow order={9} title={text.sourcesAndReferences}><SourceClaimList id="relation-sources" claims={claims} index={index} language={language} /></DetailRow>
     </>
   );
 };

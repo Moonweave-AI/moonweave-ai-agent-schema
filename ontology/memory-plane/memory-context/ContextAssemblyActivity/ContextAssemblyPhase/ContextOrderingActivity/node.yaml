@@ -8,388 +8,500 @@ labels:
   ja: コンテキスト順序付け活動
 semantics:
   short_definition:
-    zh: 为已选上下文项确定稳定序列位置和邻接关系的组装阶段。
-    en: An assembly phase that assigns stable sequence positions and adjacency to selected context items.
-    ja: 選択済みコンテキスト項目へ安定した列位置と隣接関係を割り当てる組立段階です。
+    zh: 在不改变已选工件成员的前提下，为一次装配确定其渲染顺序的完成阶段活动。
+    en: A completed phase activity that determines rendering order for selected artifacts without changing their membership.
+    ja: 選択済み工件の所属を変えずに、一回の組立の描画順を決める完了段階活動です。
   definition:
-    zh: 上下文排序活动是一种 ContextAssembly 组成阶段；其种差是：它接收已经完成纳入判定的项目，依据 ContextOrderingRule 生成确定性序列位置与邻接关系，但不新增候选，也不因容量删除项目。
-    en: A context ordering activity is a component phase of ContextAssembly. It receives items whose inclusion has already been decided and applies ContextOrderingRules to produce deterministic positions and adjacency, without adding candidates or deleting items for capacity.
-    ja: コンテキスト順序付け活動は ContextAssembly の構成段階です。採用判定済み項目を受け、ContextOrderingRule により決定的な位置と隣接を生成しますが、候補追加や容量理由の削除は行いません。
+    zh: >
+      ContextOrderingActivity 是 ContextAssemblyPhase 的完成子类型，接收已选 ContextArtifact 的同一成员集合与一个 ContextOrderingRule，产出该集合的确定顺序。它处理位置和相对顺序，不负责是否选择候选、是否裁剪、是否摘要或是否授权。其 ordered_artifact_refs 必须是 input_artifact_refs 的排列，不能添加、删除、压缩或替换项。排序可把治理指令、当前请求、证据和历史放在不同位置，但不能从“位置影响模型表现”的研究结果推断存在对所有模型、任务都最优的普遍顺序。
+    en: >
+      ContextOrderingActivity is a completed ContextAssemblyPhase subtype that receives the same membership set of selected ContextArtifacts and a ContextOrderingRule, then produces a deterministic order for that set. It handles position and relative order, not whether to select candidates, trim, summarize, or authorize them. ordered_artifact_refs must be a permutation of input_artifact_refs and cannot add, delete, compress, or substitute items. Ordering can place governing instructions, the current request, evidence, and history differently, but research that position affects model performance does not establish one universally optimal order for all models and tasks.
+    ja: >
+      ContextOrderingActivity は完了 ContextAssemblyPhase 下位型であり、選択済み ContextArtifact の同一所属集合と ContextOrderingRule を受け取り、その集合の決定的順序を生成します。位置と相対順を扱い、候補選択、裁断、要約、認可は扱いません。ordered_artifact_refs は input_artifact_refs の順列でなければならず、項目の追加、削除、圧縮、置換はできません。順序付けは統治指示、現在要求、根拠、履歴を異なる位置に置けますが、位置がモデル性能に影響する研究は、全モデル・全タスクに普遍的に最適な順序を確立しません。
   why_needed:
-    zh: 单独记录排序阶段可解释系统指令、最近消息和检索证据为何处于特定位置，并复核裁剪后相对顺序是否保持。
-    en: Recording this phase explains why system instructions, recent messages, and retrieved evidence occupy particular positions and verifies that trimming preserved relative order.
-    ja: この段階を記録すると、システム指示・最近メッセージ・検索証拠が特定位置にある理由と、裁剪後に相対順序が保たれたかを検証できます。
+    zh: 长上下文中信息位置会影响可用性；独立排序活动让位置规则可审计，同时防止选择、裁剪或政策判断被隐藏在“排序”名义下。
+    en: Information position affects long-context usability. An independent ordering activity makes placement rules auditable while preventing selection, trimming, or policy judgment from being hidden under “ordering.”
+    ja: 情報位置は長いコンテキストの利用可能性に影響します。独立した順序付け活動により配置規則を監査可能にし、選択、裁断、方針判断を「順序付け」の下に隠しません。
   includes:
-    - zh: 纳入记录输入集合、所用排序规则版本、每项序位和平局处理结果的排序阶段。
-      en: Includes ordering phases that record the input set, ordering-rule version, position of every item, and tie-breaking outcome.
-      ja: 入力集合、順序規則版、各項目の順位、同順位処理結果を記録する順序付け段階を含みます。
+    - zh: 已选项的输入集合、应用排序规则、排列输出和完成时间。
+      en: Selected-item input set, applied ordering rule, permutation output, and completion time.
+      ja: 選択項目入力集合、適用順序規則、順列出力、完了時刻。
   excludes:
-    - zh: 排除决定是否纳入候选的 ContextSelectionActivity，以及为满足容量而删除或缩短内容的 ContextTrimmingActivity。
-      en: Excludes ContextSelectionActivity, which decides inclusion, and ContextTrimmingActivity, which removes or shortens content to meet capacity.
-      ja: 採用を決める ContextSelectionActivity と、容量を満たすため内容を削除・短縮する ContextTrimmingActivity を除外します。
+    - zh: 候选纳入、内容裁剪、摘要生成、来源授权或模型调用。
+      en: Candidate admission, content trimming, summary generation, source authorization, or model invocation.
+      ja: 候補受け入れ、内容裁断、要約生成、情報源認可、モデル呼び出し。
   semantic_kind: activity
-  aliases: []
+  aliases:
+    - context placement activity
+engineering:
+  explanation:
+    zh: >
+      实现以有序消息或会话项列表为真实 I/O 表面。LangGraph 最终将消息列表传给模型；OpenAI Realtime 的 conversation.item.create 允许通过 previous_item_id 在会话中插入项目。Moonweave 在这些 API 之上记录排序规则和输入排列，但不假装排序活动是提供方原生 API。
+    en: >
+      Use ordered message or conversation-item lists as the real I/O surface. LangGraph ultimately passes a message list to a model, and OpenAI Realtime conversation.item.create can insert an item through previous_item_id. Moonweave records ordering rule and input permutation above those APIs without pretending ordering activity is provider-native.
+    ja: >
+      順序付きメッセージまたは会話項目リストを実 I/O 表面として使います。LangGraph は最終的にメッセージリストをモデルへ渡し、OpenAI Realtime の conversation.item.create は previous_item_id で項目を会話内に挿入できます。Moonweave はこれら API の上に順序規則と入力順列を記録し、順序付け活動がプロバイダー固有 API であるとは見せかけません。
+  typical_input:
+    - description: Ordered message sequence passed after assembly.
+      format: |
+        visible_messages = [system_instruction, developer_instruction, history_summary, user_request]
+        response = model.invoke(visible_messages)
+    - description: OpenAI Realtime item insertion order control.
+      format: |
+        {
+          "type": "conversation.item.create",
+          "previous_item_id": "item_123",
+          "item": {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "Additional evidence"}]}
+        }
+  typical_output:
+    - description: Deterministic permutation of the same selected artifacts.
+      format: |
+        {
+          "ordering_activity_id": "ctx-order-01",
+          "input_artifact_refs": ["ctx-art-user-22", "ctx-art-system-1", "ctx-art-summary-9"],
+          "ordered_artifact_refs": ["ctx-art-system-1", "ctx-art-summary-9", "ctx-art-user-22"],
+          "ordering_rule_ref": "ctx-rule-support-order-v1"
+        }
+  reference_implementations:
+    - name: LangGraph message invocation pattern
+      url: https://docs.langchain.com/oss/python/langgraph/add-memory
+      description: Documents preparing and invoking models with an ordered messages sequence.
+    - name: OpenAI Realtime API conversation item creation
+      url: https://developers.openai.com/api/reference/resources/realtime
+      description: Documents previous_item_id for appending or inserting conversation items in order.
+    - name: Lost in the Middle
+      url: https://arxiv.org/abs/2307.03172
+      description: Reports position-dependent long-context performance.
+  source_claims:
+    - claim-context-ordering-message-order
+    - claim-context-ordering-realtime-position
+    - claim-context-ordering-position-effect
 structure:
-  identity_keys: []
-  fields: []
-  constraints: []
-  required_relation_constraints: []
+  identity_keys:
+    - assembly_activity_id
+    - phase_activity_id
+    - ordering_activity_id
+  fields:
+    - id: ordering_activity_id
+      labels:
+        zh: 排序活动标识
+        en: ordering activity ID
+        ja: 順序付け活動 ID
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 标识一次完成的排序阶段，而非排序规则、包或消息序列标识。
+        en: Identifies one completed ordering phase, not an ordering rule, package, or message-sequence ID.
+        ja: 一つの完了順序付け段階を識別し、順序規則、パッケージ、メッセージ列 ID ではありません。
+      allowed_values: []
+      pattern: '^ctx-order-[A-Za-z0-9._-]+$'
+      example_value: ctx-order-01
+      source_claims: [claim-context-ordering-message-order]
+    - id: assembly_ref
+      labels:
+        zh: 父装配引用
+        en: parent assembly reference
+        ja: 親組立参照
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 指向该排序阶段所属的具体 ContextAssembly。
+        en: Points to the concrete ContextAssembly containing this ordering phase.
+        ja: この順序付け段階を含む具体的 ContextAssembly を指します。
+      allowed_values: []
+      pattern: '^ctx-assembly-[A-Za-z0-9._-]+$'
+      example_value: ctx-assembly-support-01
+      source_claims: [claim-context-ordering-message-order]
+    - id: call_scope_id
+      labels:
+        zh: 调用范围标识
+        en: call scope ID
+        ja: 呼び出し範囲 ID
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 必须与父装配和相关包的调用范围一致。
+        en: Must match the call scope of parent assembly and related package.
+        ja: 親組立と関連パッケージの呼び出し範囲に一致しなければなりません。
+      allowed_values: []
+      pattern: '^call-[A-Za-z0-9._-]+$'
+      example_value: call-support-20260719-01
+      source_claims: [claim-context-ordering-message-order]
+    - id: input_artifact_refs
+      labels:
+        zh: 输入工件引用
+        en: input artifact references
+        ja: 入力工件参照
+      datatype: array[string]
+      required: true
+      cardinality: {min: 1, max: null}
+      definitions:
+        zh: 排序前已选工件的无重复成员集合；它不是所有候选或完整历史。
+        en: The duplicate-free membership set of artifacts already selected before ordering, not all candidates or complete history.
+        ja: 順序付け前に既に選択された工件の重複なし所属集合であり、全候補や完全履歴ではありません。
+      allowed_values: []
+      pattern: '^ctx-art-[A-Za-z0-9._-]+$'
+      example_value: [ctx-art-system-1, ctx-art-summary-9, ctx-art-user-22]
+      source_claims: [claim-context-ordering-message-order]
+    - id: ordering_rule_ref
+      labels:
+        zh: 排序规则引用
+        en: ordering rule reference
+        ja: 順序規則参照
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 指向此次实际使用的 ContextOrderingRule 版本，而不是一个未应用的建议。
+        en: Points to the version of ContextOrderingRule actually used this time, not an unapplied recommendation.
+        ja: 今回実際に使用した ContextOrderingRule 版を指し、未適用の推奨を指しません。
+      allowed_values: []
+      pattern: '^ctx-rule-[A-Za-z0-9._-]+$'
+      example_value: ctx-rule-support-order-v1
+      source_claims: [claim-context-ordering-position-effect]
+    - id: ordered_artifact_refs
+      labels:
+        zh: 有序工件引用
+        en: ordered artifact references
+        ja: 順序付き工件参照
+      datatype: array[string]
+      required: true
+      cardinality: {min: 1, max: null}
+      definitions:
+        zh: 与输入成员完全相同但按本次渲染顺序排列的列表；它不能承担删除、摘要或选择职责。
+        en: A list with exactly the input membership but in this rendering order. It cannot perform deletion, summarization, or selection.
+        ja: 入力と完全に同じ所属を今回の描画順で並べたリストです。削除、要約、選択を行えません。
+      allowed_values: []
+      pattern: '^ctx-art-[A-Za-z0-9._-]+$'
+      example_value: [ctx-art-system-1, ctx-art-summary-9, ctx-art-user-22]
+      source_claims: [claim-context-ordering-message-order]
+    - id: completed_at
+      labels:
+        zh: 完成时间
+        en: completed at
+        ja: 完了時刻
+      datatype: datetime
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 记录排序完成时间，不是最终模型响应的生成时间。
+        en: Records completion of ordering, not generation time of a final model response.
+        ja: 順序付けの完了を記録し、最終モデル応答の生成時刻ではありません。
+      allowed_values: []
+      pattern: null
+      example_value: "2026-07-19T09:20:01Z"
+      source_claims: [claim-context-ordering-message-order]
+    - id: assembly_activity_id
+      labels: {zh: 父装配活动标识, en: parent assembly activity ID, ja: 親組み立て活動 ID}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 标识包含本次排序的已执行装配活动，不把排序活动本身提升为完整装配。
+        en: Identifies the executed assembly activity containing this ordering step without elevating the ordering activity to the complete assembly.
+        ja: この順序付けを含む実行済み組み立て活動を識別し、順序付け活動自体を完全な組み立てへ昇格させません。
+      allowed_values: []
+      pattern: '^ctx-assembly-[A-Za-z0-9._-]+$'
+      example_value: ctx-assembly-activity-support-01
+      source_claims: [claim-context-ordering-message-order]
+    - id: phase_activity_id
+      labels: {zh: 排序阶段活动标识, en: ordering phase activity ID, ja: 順序付けフェーズ活動 ID}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 保留父 ContextAssemblyPhase 的身份，使这次排列成为装配阶段而不是提供方插入事件。
+        en: Retains the parent ContextAssemblyPhase identity so this permutation remains an assembly phase rather than a provider insertion event.
+        ja: 親 ContextAssemblyPhase の ID を保持し、この並べ替えを提供者の挿入イベントではなく組み立てフェーズに保ちます。
+      allowed_values: []
+      pattern: '^ctx-phase-[A-Za-z0-9._-]+$'
+      example_value: ctx-phase-ordering-01
+      source_claims: [claim-context-ordering-message-order]
+    - id: consumed_artifact_refs
+      labels: {zh: 父活动已消费工件引用, en: parent activity consumed artifact references, ja: 親活動で消費したアーティファクト参照}
+      datatype: array[string]
+      required: true
+      cardinality: {min: 1, max: null}
+      definitions:
+        zh: 列出父装配实际消费的工件；对排序阶段而言，该集合保留成员事实，input_artifact_refs 仍表达排列输入。
+        en: Lists artifacts actually consumed by the parent assembly; for ordering it preserves membership facts while input_artifact_refs expresses permutation input.
+        ja: 親組み立てが実際に消費したアーティファクトを列挙します。順序付けでは所属の事実を保ち、input_artifact_refs が並べ替え入力を表します。
+      allowed_values: []
+      pattern: '^ctx-art-[A-Za-z0-9._-]+$'
+      example_value: [ctx-art-system-1]
+      source_claims: [claim-context-ordering-message-order]
+    - id: window_ref
+      labels: {zh: 父活动窗口引用, en: parent activity window reference, ja: 親活動のウィンドウ参照}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 关联排序服务的容量窗口，使位置选择仍受同一次调用的输入预算约束。
+        en: Links ordering to the capacity window it serves so position choices remain constrained by the same call's input budget.
+        ja: 順序付けをそれが利用する容量ウィンドウに結び付け、位置の選択が同じ呼び出しの入力予算に制約されるようにします。
+      allowed_values: []
+      pattern: '^ctx-window-[A-Za-z0-9._-]+$'
+      example_value: ctx-window-support-01
+      source_claims: [claim-context-ordering-message-order]
+    - id: applied_policy_ref
+      labels: {zh: 父活动已应用策略引用, en: parent activity applied policy reference, ja: 親活動の適用済み方針参照}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 记录装配实际采用的整体上下文策略，区别于 ordering_rule_ref 的具体排列规则。
+        en: Records the overall context policy actually applied by the assembly, distinct from ordering_rule_ref's specific permutation rule.
+        ja: 組み立てで実際に適用された全体コンテキスト方針を記録し、ordering_rule_ref の具体的な並べ替え規則と区別します。
+      allowed_values: []
+      pattern: '^ctx-spec-[A-Za-z0-9._@-]+$'
+      example_value: ctx-spec-support-v1
+      source_claims: [claim-context-ordering-message-order]
+    - id: activity_status
+      labels: {zh: 父活动状态, en: parent activity status, ja: 親活動状態}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 记录父装配执行的状态，避免将一份已计算的顺序误作成功交付的上下文包。
+        en: Records the parent assembly execution status so a computed order is not mistaken for a successfully delivered context package.
+        ja: 親組み立ての実行状態を記録し、計算済みの順序を正常に配信されたコンテキストパッケージと取り違えません。
+      allowed_values: [completed, failed, cancelled]
+      pattern: null
+      example_value: completed
+      source_claims: [claim-context-ordering-message-order]
+    - id: phase_kind
+      labels: {zh: 阶段类别, en: phase kind, ja: フェーズ種別}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 声明该子活动为 ordering 阶段，只变换成员的相对位置而不改变成员资格。
+        en: Declares this subactivity as the ordering phase, changing only relative member positions rather than membership.
+        ja: この部分活動を ordering フェーズとして宣言し、所属を変えずにメンバーの相対位置だけを変更します。
+      allowed_values: [ordering]
+      pattern: null
+      example_value: ordering
+      source_claims: [claim-context-ordering-message-order]
+    - id: phase_index
+      labels: {zh: 阶段序号, en: phase index, ja: フェーズ順序番号}
+      datatype: integer
+      required: true
+      cardinality: {min: 0, max: 1}
+      definitions:
+        zh: 记录排序在一次装配活动内的执行次序，而不表示最终消息的槽位位置。
+        en: Records ordering's execution sequence within one assembly activity, not the slot position of a final message.
+        ja: 一つの組み立て活動内での順序付けの実行順を記録し、最終メッセージのスロット位置を表しません。
+      allowed_values: []
+      pattern: null
+      example_value: 1
+      source_claims: [claim-context-ordering-message-order]
+    - id: phase_status
+      labels: {zh: 阶段状态, en: phase status, ja: フェーズ状態}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 记录排序阶段本身的完成、失败或取消状态，独立于父装配和包最终化状态。
+        en: Records whether ordering itself completed, failed, or was cancelled, independently of parent assembly and package finalization state.
+        ja: 順序付け自体が完了、失敗、取消のいずれかを記録し、親組み立てとパッケージ最終化の状態から独立させます。
+      allowed_values: [completed, failed, cancelled]
+      pattern: null
+      example_value: completed
+      source_claims: [claim-context-ordering-message-order]
+  constraints:
+    - id: context-ordering-preserves-selected-membership
+      severity: error
+      expression_language: plain
+      expression: ordered_artifact_refs must be a duplicate-free permutation of input_artifact_refs. An ordering activity may not add, remove, summarize, or replace artifacts.
+      explanation:
+        zh: 成员改变属于选择、裁剪或摘要阶段；排序只改变位置。
+        en: Membership change belongs to selection, trimming, or summarization phases; ordering changes only position.
+        ja: 所属変更は selection、trimming、summarization 段階に属します。ordering は位置だけを変えます。
+      source_claims: [claim-context-ordering-message-order]
+    - id: context-ordering-uses-applied-rule-not-universal-claim
+      severity: warning
+      expression_language: plain
+      expression: Ordering must cite an applied ordering_rule_ref. No ordering activity may claim its placement is universally optimal across all models, contexts, or tasks.
+      explanation:
+        zh: 排序需要可审计的局部规则；研究支持位置敏感性，不支持普遍最优模板。
+        en: Ordering needs an auditable local rule. Research supports position sensitivity, not a universally optimal template.
+        ja: 順序付けには監査可能な局所規則が必要です。研究は位置感度を支持しますが、普遍的最適テンプレートを支持しません。
+      source_claims: [claim-context-ordering-position-effect]
 examples:
-  - id: ContextOrderingActivity-example-positive-001
-    kind: positive
-    labels:
-      zh: 上下文排序活动正例
-      en: Positive example of Context ordering activity
-      ja: コンテキスト順序付け活動の正例
-    scenario_id: null
+  - id: context-ordering-example-positive-support-order
+
+    labels: {zh: 支持调用的确定排序, en: Deterministic support-call ordering, ja: 決定的なサポート呼び出し順序付け}
+
     descriptions:
-      zh: 排序阶段 order-17 接收六个已选项目，依据角色优先、因果依赖和同组内新鲜度，产出固定序列 instruction→task-state→tool-result→evidence-1→evidence-2→summary。
-      en: Ordering phase order-17 receives six selected items and, using role precedence, causal dependencies, and freshness within peer groups, emits the stable sequence instruction→task-state→tool-result→evidence-1→evidence-2→summary.
-      ja: 順序付け段階 order-17 は選択済み六項目を受け取り、役割優先、因果依存、同群内新鮮度により instruction→task-state→tool-result→evidence-1→evidence-2→summary の安定列を出力します。
+      zh: Lost in the Middle：高 relevance 检索文档放 prompt 首尾；RAG p(y|x,z) 将检索 z 插入 system/user 边界；Cursor @ 引用按相关性排序。
+      en: Lost in the Middle: high-relevance retrieved docs at prompt head/tail; RAG p(y|x,z) inserts retrieved z at system/user boundary; Cursor @ citations sorted by relevance.
+      ja: Lost in the Middle 高 relevance doc を prompt 首尾へ。RAG p(y|x,z) system/user 境界 insert。
     field_values:
-      assembly_id: order-17
-      target_call_ref: call-88
-      candidate_set_ref: selected-context-candidates-88@1
-      context_specification_ref: context-policy-production@12
-      started_at: 2026-07-16T04:00:00.070Z
-      ended_at: 2026-07-16T04:00:00.110Z
-      outcome: success
-    related_node_ids:
-      - ContextOrderingActivity
-      - ContextTrimmingActivity
-    related_relation_ids:
-      - ContextOrderingActivity-precedes-ContextTrimmingActivity
-    expected_result:
-      zh: 该运行可查询 ContextOrderingActivity 以及方向保持不变的事实 ContextOrderingActivity-precedes-ContextTrimmingActivity。
-      en: The run can query ContextOrderingActivity together with direction-preserving fact ContextOrderingActivity-precedes-ContextTrimmingActivity.
-      ja: この実行では ContextOrderingActivity と方向を保持した事実 ContextOrderingActivity-precedes-ContextTrimmingActivity を共に照会できます。
-    why_valid_or_invalid:
-      zh: 该场景同时给出真实运行语境、ContextOrderingActivity-precedes-ContextTrimmingActivity 的 canonical 方向、概念定义和可用字段值。
-      en: This is an executed phase that changes order and adjacency without adding or removing members; capacity trimming occurs only after this ordered result exists.
-      ja: このシナリオは実際の運用文脈、ContextOrderingActivity-precedes-ContextTrimmingActivity の canonical 方向、概念定義、利用可能な項目値を組み合わせます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-context-ordering-activity-003
-      - claim-context-ordering-activity-004
-  - id: ContextOrderingActivity-example-boundary-001
-    kind: boundary
-    labels:
-      zh: 上下文排序活动边界例
-      en: Boundary case for Context ordering activity
-      ja: コンテキスト順序付け活動の境界例
-    scenario_id: null
+      assembly_activity_id: ctx-assembly-activity-support-01
+      phase_activity_id: ctx-phase-ordering-01
+      ordering_activity_id: ctx-order-01
+      assembly_ref: ctx-assembly-support-01
+      call_scope_id: call-support-20260719-01
+      consumed_artifact_refs: [ctx-art-system-1, ctx-art-summary-9, ctx-art-user-22]
+      window_ref: ctx-window-support-01
+      applied_policy_ref: ctx-spec-support-v1
+      activity_status: completed
+      phase_kind: ordering
+      phase_index: 1
+      phase_status: completed
+      input_artifact_refs: [ctx-art-user-22, ctx-art-system-1, ctx-art-summary-9]
+      ordering_rule_ref: ctx-rule-support-order-v1
+      ordered_artifact_refs: [ctx-art-system-1, ctx-art-summary-9, ctx-art-user-22]
+      completed_at: "2026-07-19T09:20:01Z"
+    related_node_ids: [ContextOrderingActivity, ContextAssembly, ContextOrderingRule]
+    related_relation_ids: [ContextAssemblyPhase-part-of-ContextAssembly]
+
+    source_claims: [claim-context-ordering-message-order, claim-context-ordering-position-effect]
+  - id: context-ordering-example-counterexample-drop-candidate
+
+    labels: {zh: 用排序名义丢弃候选, en: Drop a candidate under the name of ordering, ja: 順序付けの名目で候補を落とす}
+
     descriptions:
-      zh: 随后执行的 trim-17 删除 evidence-2 并把 summary 缩短到 300 tokens；它改变成员或范围而不重新计算剩余项顺序，因此属于 ContextTrimmingActivity 而非 ContextOrderingActivity。
-      en: The following trim-17 removes evidence-2 and shortens summary to 300 tokens. It changes membership or extent without recomputing the remaining order, so it is ContextTrimmingActivity rather than ContextOrderingActivity.
-      ja: 後続 trim-17 は evidence-2 を除き summary を300 tokensへ短縮します。残存順序を再計算せず構成員または範囲を変えるため、ContextOrderingActivity ではなく ContextTrimmingActivity です。
-    field_values: {}
-    related_node_ids:
-      - ContextOrderingActivity
-      - ContextTrimmingActivity
-    related_relation_ids:
-      - ContextOrderingActivity-precedes-ContextTrimmingActivity
-    expected_result:
-      zh: ContextTrimmingActivity 保持其原有类型，验证器不得凭关系共现把它提升为 ContextOrderingActivity。
-      en: ContextTrimmingActivity retains its own type; validation must not promote it to ContextOrderingActivity from relation co-occurrence.
-      ja: ContextTrimmingActivity は元の型を維持し、関係の共起だけで ContextOrderingActivity へ昇格してはなりません。
-    why_valid_or_invalid:
-      zh: 边界例点名实际对照节点，并保留 ContextOrderingActivity-precedes-ContextTrimmingActivity 的方向；只有显式 is_a 或完整种差才支持成员资格。
-      en: Ordering determines relative position over a fixed selected set; trimming changes membership or extent to satisfy capacity. Temporal adjacency does not collapse those different effects.
-      ja: 境界例は実在する対照ノードを示し、ContextOrderingActivity-precedes-ContextTrimmingActivity の方向を保持します。明示的 is_a または完全な種差だけが所属を支持します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-context-ordering-activity-005
-      - claim-context-ordering-activity-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      zh: 反例：RetrievalResult 候选按 raw similarity 降序全部置于 context 中间段。
+      en: Counterexample: RetrievalResult candidates by raw similarity descending all placed in context middle section.
+      ja: 反例：RetrievalResult candidate を context 中間段に全配置。
+    field_values:
+      ordering_activity_id: ctx-order-invalid-drop
+      assembly_ref: ctx-assembly-support-02
+      call_scope_id: call-support-20260719-02
+      input_artifact_refs: [ctx-art-system-1, ctx-art-evidence-1, ctx-art-user-23]
+      ordering_rule_ref: ctx-rule-support-order-v1
+      ordered_artifact_refs: [ctx-art-system-1, ctx-art-user-23]
+      completed_at: "2026-07-19T09:21:01Z"
+    related_node_ids: [ContextOrderingActivity, ContextSelectionActivity, ContextTrimmingActivity]
+    related_relation_ids: [ContextAssemblyPhase-part-of-ContextAssembly]
+
+    source_claims: [claim-context-ordering-message-order]
+  - id: context-ordering-example-boundary-conditional-evidence-placement
+
+    labels: {zh: 依据局部规则放置工具证据, en: Place tool evidence by local rule, ja: 局所規則でツール根拠を配置する}
+
+    descriptions:
+      zh: ContextOrderingRule 策略 vs ContextOrderingActivity 执行；Generative Agents 按 score 排序不等于 Lost in the Middle 位置优化。
+      en: ContextOrderingRule policy vs ContextOrderingActivity execution; Generative Agents score ordering is not Lost in the Middle position optimization.
+      ja: ContextOrderingRule 方針 vs ContextOrderingActivity 実行。
+    field_values:
+      ordering_activity_id: ctx-order-evidence-01
+      assembly_ref: ctx-assembly-support-03
+      call_scope_id: call-support-20260719-03
+      input_artifact_refs: [ctx-art-system-2, ctx-art-tool-8, ctx-art-user-25]
+      ordering_rule_ref: ctx-rule-evidence-freshness-v1
+      ordered_artifact_refs: [ctx-art-system-2, ctx-art-tool-8, ctx-art-user-25]
+      completed_at: "2026-07-19T09:22:01Z"
+    related_node_ids: [ContextOrderingActivity, ContextOrderingRule, ContextArtifact]
+    related_relation_ids: [ContextAssemblyPhase-part-of-ContextAssembly]
+
+    source_claims: [claim-context-ordering-position-effect]
+  - id: context-ordering-example-instance-realtime-previous-item
+
+    labels: {zh: 实例：Realtime previous_item_id 插入顺序, en: "Instance: Realtime previous_item_id insertion order", ja: 実例：Realtime previous_item_id の挿入順序}
+
+    descriptions:
+      zh: RAG assembly：system prompt → top-3 retrieved docs (head) → user query → recent 4 messages (tail)。
+      en: RAG assembly: system prompt → top-3 retrieved docs (head) → user query → recent 4 messages (tail).
+      ja: RAG assembly：system→top-3 docs(head)→user query→recent 4 messages(tail)。
+    field_values:
+      assembly_activity_id: ctx-assembly-activity-realtime-01
+      phase_activity_id: ctx-phase-ordering-realtime-01
+      ordering_activity_id: ctx-order-realtime-01
+      assembly_ref: ctx-assembly-realtime-01
+      call_scope_id: call-realtime-20260719-01
+      consumed_artifact_refs: [ctx-art-system-4, ctx-art-user-40]
+      window_ref: ctx-window-realtime-01
+      applied_policy_ref: ctx-spec-realtime-v1
+      activity_status: completed
+      phase_kind: ordering
+      phase_index: 1
+      phase_status: completed
+      input_artifact_refs: [ctx-art-system-4, ctx-art-user-40]
+      ordering_rule_ref: ctx-rule-realtime-order-v1
+      ordered_artifact_refs: [ctx-art-system-4, ctx-art-user-40]
+      completed_at: "2026-07-19T09:23:01Z"
+    related_node_ids: [ContextOrderingActivity, ContextAssembly, ContextPackage]
+    related_relation_ids: [ContextAssemblyPhase-part-of-ContextAssembly]
+    source_claims: [claim-context-ordering-realtime-position]
 parent_relation:
-  id: ContextOrderingActivity-is_a-ContextAssemblyPhase
+  id: ContextOrderingActivity-specializes-ContextAssemblyPhase
   predicate: is_a
-  direction: target-to-source
+  target: concept:ContextAssemblyPhase
+  endpoint_order: child-to-parent
+  direction: source-to-target
   relation_kind: hierarchy
-  labels:
-    zh: 排序活动是一种组装阶段
-    en: ordering activity is an assembly phase
-    ja: 整列活動は組立段階の一種
+  labels: {zh: 是装配排序阶段活动, en: is an assembly ordering phase activity, ja: 組立順序付け段階活動である}
   definitions:
-    zh: 每个 ContextOrderingActivity 都是 ContextAssemblyPhase；其种差是依据版本化比较规则为已选项分配稳定序位，且不改变纳入集合。
-    en: Every ContextOrderingActivity is a ContextAssemblyPhase distinguished by assigning stable positions to already selected items under versioned comparison rules without changing membership.
-    ja: すべての ContextOrderingActivity は ContextAssemblyPhase で、版管理比較規則により選択済み項目へ安定位置を割当て包含集合を変えない種差を持ちます。
+    zh: ContextOrderingActivity 是仅改变已选成员位置的完成 ContextAssemblyPhase 子类型。
+    en: ContextOrderingActivity is the completed ContextAssemblyPhase subtype that changes only positions of selected membership.
+    ja: ContextOrderingActivity は選択済み所属の位置だけを変える完了 ContextAssemblyPhase 下位型です。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 该关系的实例基数由调用、版本或部署约束决定，不在类级关系上统一封闭。
-    en: Instance cardinality depends on the call, version, or deployment and is not globally closed on the class-level relation.
-    ja: インスタンス基数は呼出し・版・配置制約に依存し、クラス関係上で一律に閉じません。
+    zh: 分类关系不决定一次装配中排序阶段的数量；重排需要新的具体活动记录。
+    en: Classification does not determine the number of ordering phases in one assembly; reordering needs a new concrete activity record.
+    ja: 分類関係は一つの組立内の順序付け段階数を決めません。再順序付けには新しい具体的活動記録が必要です。
   inverse_reading:
-    predicate: part_of
-    labels:
-      zh: 以上下文排序活动为下位类型
-      en: has ContextOrderingActivity subtype
-      ja: ContextOrderingActivity を下位型に持つ
+    predicate: has_ordering_phase_subtype
+    labels: {zh: 具有排序阶段子类型, en: has ordering-phase subtype, ja: 順序付け段階下位型を持つ}
   conditions: []
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: ContextOrderingActivity-is_a-ContextAssemblyPhase-example-positive-001
-      kind: positive
-      labels:
-        zh: 排序活动是一种组装阶段正例
-        en: "Positive case: ordering activity is an assembly phase"
-        ja: 整列活動は組立段階の一種の正例
-      scenario_id: null
-      descriptions:
-        zh: order-88 按 system→user→tool、时间与稳定 ID 排出 7 项。
-        en: order-88 positions seven items by system→user→tool, timestamp, and stable ID.
-        ja: order-88 は system→user→tool、時刻、安定IDで7項目を整列します。
-      field_values: {}
-      related_node_ids:
-        - ContextOrderingActivity
-        - ContextAssemblyPhase
-      related_relation_ids:
-        - ContextOrderingActivity-is_a-ContextAssemblyPhase
-      expected_result:
-        zh: 输出中的每个位置都唯一确定，并能够按规则版本重放。
-        en: Output positions are unique and replayable.
-        ja: 出力位置は一意で再現可能です。
-      why_valid_or_invalid:
-        zh: 输入候选集合保持不变，只有相对顺序由已绑定规则版本决定。
-        en: Membership is unchanged and order follows the rule.
-        ja: 包含集合は不変で順序は規則に従います。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-context-ordering-activity-007
-    - id: ContextOrderingActivity-is_a-ContextAssemblyPhase-example-boundary-001
-      kind: boundary
-      labels:
-        zh: 排序活动是一种组装阶段边界例
-        en: "Boundary case: ordering activity is an assembly phase"
-        ja: 整列活動は組立段階の一種の境界例
-      scenario_id: null
-      descriptions:
-        zh: trim-88 删除低优先级项以满足 32k 上限。
-        en: trim-88 removes low-priority items to satisfy a 32k ceiling.
-        ja: trim-88 は32k上限のため低優先項目を削除します。
-      field_values: {}
-      related_node_ids:
-        - ContextOrderingActivity
-        - ContextAssemblyPhase
-      related_relation_ids:
-        - ContextOrderingActivity-is_a-ContextAssemblyPhase
-      expected_result:
-        zh: 裁剪活动不归入排序活动。
-        en: The trimming activity is not classified as ordering.
-        ja: 裁断活動を整列活動に分類しません。
-      why_valid_or_invalid:
-        zh: 删除候选会改变集合成员，而排序阶段只能为既有成员分配序位。
-        en: Removing items changes membership rather than only assigning positions.
-        ja: 項目削除は順序割当てだけでなく集合を変えます。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-context-ordering-activity-008
-  source_claims:
-    - claim-context-ordering-activity-009
-  distinct_fact_rationale: null
+  examples: []
+  source_claims: [claim-context-ordering-message-order]
+  distinct_fact_rationale:
+    zh: 此关系表达排序活动的类型归属，不表达规则应用、具体排列、选择、裁剪或模型可见性。
+    en: This relation expresses ordering-activity type membership, not rule application, concrete permutation, selection, trimming, or model visibility.
+    ja: この関係は順序付け活動の型所属を表し、規則適用、具体的順列、選択、裁断、モデル可視性を表しません。
   layout_role: primary-backbone
-  review_status: accepted
-  endpoint_order: child-to-parent
-relations:
-  - id: ContextOrderingActivity-precedes-ContextTrimmingActivity
-    predicate: precedes
-    direction: source-to-target
-    relation_kind: temporal
-    labels:
-      zh: precedes
-      en: precedes
-      ja: precedes
-    definitions:
-      zh: ContextOrderingActivity-precedes-ContextTrimmingActivity 表示同一组装中排序输出成为裁剪输入，排序阶段完成时间不晚于裁剪开始；它不是跨运行的类型级固定时序。
-      en: ContextOrderingActivity-precedes-ContextTrimmingActivity states that, within one assembly, ordering output becomes trimming input and ordering completes no later than trimming starts. It is not a global type-level order across runs.
-      ja: ContextOrderingActivity-precedes-ContextTrimmingActivity は同一組立で整列出力が裁断入力となり整列完了が裁断開始以前であることを表し、実行横断の型級固定順序ではありません。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该语义事实不对所有运行实例施加统一基数。
-      en: This semantic fact does not impose one universal cardinality on every runtime instance.
-      ja: この意味事実はすべての実行インスタンスに一律の基数を課しません。
-    inverse_reading:
-      predicate: inverse_of_precedes
-      labels:
-        zh: 反向 precedes
-        en: inverse precedes
-        ja: 逆 precedes
-    conditions: []
-    temporal_scope: timeless
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: ContextOrderingActivity-precedes-ContextTrimmingActivity-example-positive-001
-        kind: positive
-        labels:
-          zh: precedes正例
-          en: "Positive case: precedes"
-          ja: precedesの正例
-        scenario_id: null
-        descriptions:
-          zh: order-2 在 10:00:03 输出序列，trim-3 于 10:00:04 读取该序列。
-          en: order-2 emits the sequence at 10:00:03 and trim-3 reads it at 10:00:04.
-          ja: order-2 は10:00:03に列を出力し trim-3 は10:00:04に読みます。
-        field_values: {}
-        related_node_ids:
-          - ContextOrderingActivity
-          - ContextTrimmingActivity
-        related_relation_ids:
-          - ContextOrderingActivity-precedes-ContextTrimmingActivity
-        expected_result:
-          zh: 时序查询返回相邻阶段和传递产物。
-          en: The temporal query returns adjacent phases and the transferred artifact.
-          ja: 時系列照会は隣接段階と受渡成果物を返します。
-        why_valid_or_invalid:
-          zh: 同一 assembly_id、时间和输入输出均吻合。
-          en: Assembly ID, times, and input/output all agree.
-          ja: assembly_id・時刻・入出力が一致します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-context-ordering-activity-010
-      - id: ContextOrderingActivity-precedes-ContextTrimmingActivity-example-boundary-001
-        kind: boundary
-        labels:
-          zh: precedes边界例
-          en: "Boundary case: precedes"
-          ja: precedesの境界例
-        scenario_id: null
-        descriptions:
-          zh: order-9 属于另一组装，虽时间更早也不 precede trim-3。
-          en: order-9 belongs to another assembly and does not precede trim-3 merely because its timestamp is earlier.
-          ja: order-9 は別組立で時刻が早くても trim-3 に precede しません。
-        field_values: {}
-        related_node_ids:
-          - ContextOrderingActivity
-          - ContextTrimmingActivity
-        related_relation_ids:
-          - ContextOrderingActivity-precedes-ContextTrimmingActivity
-        expected_result:
-          zh: 跨运行时间比较不形成该边。
-          en: Cross-run timestamp comparison does not create this edge.
-          ja: 実行横断時刻比較でこの辺を作りません。
-        why_valid_or_invalid:
-          zh: 该时序要求同一工作流和产物传递。
-          en: The ordering requires one workflow and artifact handoff.
-          ja: 同一workflowと成果物受渡しが必要です。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-context-ordering-activity-011
-    source_claims:
-      - claim-context-ordering-activity-012
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:ContextTrimmingActivity
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-lifecycle-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 该节点仅完成了从现行候选数据到唯一 YAML 树的无损转录；尚未逐项完成人工语义核验，不得据此宣称已审定。
-    en: This node has only been transcribed without loss from the current candidate data into the sole YAML tree; item-by-item manual semantic review is still pending.
-    ja: このノードは現行候補データから唯一の YAML ツリーへ欠落なく転記した段階であり、項目別の手動意味審査は未完了です。
-  sections:
-    semantics: pending
-    hierarchy: pending
-    relations: pending
-    structure: pending
-    examples: pending
-    source_claims: []
+relations: []
+sources:
+  - id: langgraph-memory
+    title: LangGraph memory and conversation-history management
+    source_type: official-documentation
+    url: https://docs.langchain.com/oss/python/langgraph/add-memory
+    relevance: Documents ordered message sequences transformed before invocation.
+  - id: openai-realtime-api
+    title: OpenAI Realtime API reference
+    source_type: official-documentation
+    url: https://developers.openai.com/api/reference/resources/realtime
+    relevance: Documents previous_item_id placement for conversation.item.create.
+  - id: lost-in-middle
+    title: "Lost in the Middle: How Language Models Use Long Contexts"
+    source_type: paper
+    url: https://arxiv.org/abs/2307.03172
+    relevance: Reports position-dependent performance in long-context settings.
+  - id: semantic-kernel-chat-history
+    title: Semantic Kernel chat-history reducers
+    source_type: official-documentation
+    url: https://learn.microsoft.com/en-in/semantic-kernel/concepts/ai-services/chat-completion/chat-history
+    relevance: Documents reducer calls that transform history before ordered input reaches a completion service.
+  - id: w3c-prov-o
+    title: W3C PROV-O
+    source_type: standard
+    url: https://www.w3.org/TR/prov-o/
+    relevance: Defines activities, used entities, generated entities, and temporal provenance as distinct facts.
 source_claims:
-  - id: claim-context-ordering-activity-001
-    source: eng-fw-deepagents-js-docs
-    supports: Deep Agents documents structured model context containing instructions, messages, memory, and compressed material, all of which must be presented to a model call in a concrete sequence. Moonweave reifies the run-specific determination of that sequence as ContextOrderingActivity; the class and its phase placement are design inferences.
-    locator: Context engineering in Deep Agents > Summarization > recent messages retained beside compressed history
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-ordering-activity-002
-    source: lit-agent-memory-as-action
-    supports: Memory as Action frames memory management as explicit operations chosen during agent execution. ContextOrderingActivity is Moonweave's run-level operation for fixing relative position and adjacency among already selected items, kept separate from selection and trimming.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-ordering-activity-003
-    source: eng-fw-deepagents-js-docs
-    supports: Deep Agents documents a deterministic context-preparation lifecycle before model calls, including keeping recent messages while compressing older content. Moonweave makes the ordering step observable so the final sequence can be audited independently of trimming.
-    locator: Context engineering in Deep Agents > Summarization > recent messages retained beside compressed history
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-ordering-activity-004
-    source: lit-agent-memory-as-action
-    supports: Memory as Action motivates agent-controlled memory operations under limited context. The concrete role/dependency/freshness ordering phase is Moonweave's auditable preparation activity, not an operation name asserted by the paper.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-ordering-activity-005
-    source: eng-fw-deepagents-js-docs
-    supports: Deep Agents distinguishes summarization and offloading, which change active content, from the resulting prompt order. Moonweave uses effect on membership/extent versus effect on order as the boundary test here.
-    locator: Context engineering in Deep Agents > Summarization > recent messages retained beside compressed history
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-ordering-activity-006
-    source: lit-agent-memory-as-action
-    supports: Memory as Action distinguishes operations by the memory transformation they perform. Moonweave accordingly separates a permutation of selected items from deletion, shortening, or summary replacement.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-ordering-activity-007
-    source: eng-fw-langchain-context-engineering
-    supports: Role, timestamp, and stable-ID comparison keys make the selected model-context order replayable.
-    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
-    evidence_kind: design-inference
+  - id: claim-context-ordering-message-order
+    source: langgraph-memory
+    supports: LangGraph documents transforming and invoking a model with an ordered messages sequence. Moonweave represents an ordering activity as a membership-preserving permutation of selected artifacts before rendering that sequence.
+    locator: "LangGraph memory guide: ordered messages passed to model invocation"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-context-ordering-activity-008
-    source: eng-fw-langchain-context-engineering
-    supports: Capacity-driven removal changes which context is present and therefore belongs to trimming rather than ordering.
-    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
-    evidence_kind: design-inference
+  - id: claim-context-ordering-realtime-position
+    source: openai-realtime-api
+    supports: The OpenAI Realtime API reference documents previous_item_id for conversation.item.create, allowing a new item to be appended, placed at the beginning, or inserted after an existing item. Moonweave records the local rule and activity that choose placement separately from the provider event.
+    locator: "Realtime conversation.item.create previous_item_id semantics"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-context-ordering-activity-009
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain describes controlling the messages and tools supplied to a model call; Moonweave separates deterministic ordering of the selected components into its own traceable phase.
-    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
-    evidence_kind: design-inference
+  - id: claim-context-ordering-position-effect
+    source: lost-in-middle
+    supports: Liu et al. report that long-context performance depends on relevant-information position, including weaker use for middle positions in tested settings. Moonweave requires explicit local ordering rules but does not assert a universal order.
+    locator: "Abstract and long-context retrieval experiments"
+    evidence_kind: academic-result
     confidence: high
-    review_status: accepted
-  - id: claim-context-ordering-activity-010
-    source: eng-fw-langchain-context-engineering
-    supports: Matching assembly identity, non-overlapping intervals, and explicit handoff establish execution-level precedence.
-    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-context-ordering-activity-011
-    source: eng-fw-langchain-context-engineering
-    supports: An earlier timestamp in an unrelated run has no workflow or data dependency with trim-3.
-    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-context-ordering-activity-012
-    source: eng-fw-langchain-context-engineering
-    supports: Context construction controls both which components enter a call and their final form; Moonweave orders the concrete ordering and capacity phases when one phase's output feeds the next.
-    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

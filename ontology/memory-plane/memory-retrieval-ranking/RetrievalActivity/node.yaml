@@ -4,187 +4,278 @@ kind: concept
 status: accepted
 labels:
   zh: 检索活动
-  en: Retrieval activity
+  en: Retrieval Activity
   ja: 検索活動
 semantics:
   short_definition:
-    zh: 在一个已声明索引版本上生成、评分或排序候选的可审计活动。
-    en: An auditable activity that generates, scores, or orders candidates against a declared index version.
-    ja: 指定index version上でcandidateを生成・採点・順位付けする監査可能activityです。
+    zh: 为一个已标识请求实际执行候选查找、评分、排序或结果生成的有时间范围活动。
+    en: A time-bounded activity that actually performs candidate lookup, scoring, ranking, or result production for an identified request.
+    ja: 識別済み request に対して candidate lookup、scoring、ranking、result production を実際に行う時間境界付き活動。
   definition:
-    zh: RetrievalActivity 是具有独立活动标识、开始时间和可追踪输入输出的执行；它统摄完整检索运行、候选生成和排序活动，但不是请求、结果、候选或分数记录。
-    en: RetrievalActivity is an execution with its own activity identity, start time, and traceable inputs and outputs. It subsumes retrieval runs, candidate generation, and ranking activities, but is not a request, result, candidate, or score record.
-    ja: RetrievalActivity は固有activity identity・開始時刻・追跡可能input/outputを持つ実行で、run・candidate generation・rankingを包括しますがrequest・result・candidate・score recordではありません。
+    zh: RetrievalActivity 是在开始和结束时间之间消费 RetrievalRequest 或其已解析查询、调用一个或多个检索或排序实现并产生 RetrievalResult、CandidateSet 或失败事实的执行活动。它不是 RetrievalRequest、RetrievalQuery、RetrievedCandidate、RetrievalScore、索引、embedding、静态排序政策或模型生成。CandidateGenerationActivity、RankingOperation 和 RetrievalRun 是其具体活动类型；活动自身不证明结果已进入 ContextPackage 或被模型使用。
+    en: RetrievalActivity is an execution activity that, between start and end time, consumes a RetrievalRequest or resolved query, invokes one or more retrieval or ranking implementations, and produces a RetrievalResult, CandidateSet, or failure fact. It is not a RetrievalRequest, RetrievalQuery, RetrievedCandidate, RetrievalScore, index, embedding, static ranking policy, or model generation. CandidateGenerationActivity, RankingOperation, and RetrievalRun are concrete activity types. The activity does not prove a result entered ContextPackage or was used by a model.
+    ja: RetrievalActivity は開始・終了時刻の間に RetrievalRequest または解決済み query を消費し、一つ以上の retrieval または ranking implementation を呼び、RetrievalResult、CandidateSet、または failure fact を生む実行活動です。RetrievalRequest、RetrievalQuery、RetrievedCandidate、RetrievalScore、index、embedding、静的 ranking policy、model generation ではありません。CandidateGenerationActivity、RankingOperation、RetrievalRun は具体的活動型です。この活動は result が ContextPackage に入ったことや model が使用したことを証明しません。
   why_needed:
-    zh: 为检索执行提供一棵活动树，避免把运行、阶段和信息产物压成同级节点。
-    en: Provides one activity tree for retrieval execution so runs, stages, and information artifacts are not flattened as peers.
-    ja: run・stage・information artifactを同列化しないため検索実行のactivity treeを提供します。
+    zh: 同一个请求可被不同索引、模型、过滤条件或时间重复执行并产生不同结果。活动记录将请求与具体运行、实现版本、时间、输入输出和失败边界相连，避免把可重用请求或候选数据误称为已经执行的操作。
+    en: The same request can be executed repeatedly with different indexes, models, filters, or times and yield different results. An activity record links request to concrete run, implementation version, time, I/O, and failure boundary without calling reusable request or candidate data an operation that already happened.
+    ja: 同じ request は異なる index、model、filter、time で繰り返し実行され異なる result を返し得ます。activity record は request を具体 run、implementation version、time、I/O、failure boundary へ結び、再利用可能 request や candidate data を既に起きた操作と呼びません。
   includes:
-    - zh: 纳入具有自身执行身份和阶段边界的检索、候选生成、评分、融合、重排与截断活动。
-      en: Includes retrieval, candidate-generation, scoring, fusion, reranking, and truncation activities with their own execution identity and stage boundary.
-      ja: 固有execution identityとstage boundaryを持つ検索・候補生成・採点・融合・再順位付け・切詰めactivityを含みます。
+    - zh: 已解析请求引用、开始结束时间、实现或索引引用、状态、输出结果引用及可选失败信息。
+      en: Resolved request reference, start and end time, implementation or index reference, status, output-result reference, and optional failure information.
+      ja: 解決済み request 参照、開始終了時刻、implementation または index 参照、status、output-result 参照、任意 failure information。
   excludes:
-    - zh: 排除 RetrievalRequest、CandidateSet、RetrievalScore、RetrievalResult 和 RetrievalTrace 等信息产物。
-      en: Excludes information artifacts such as RetrievalRequest, CandidateSet, RetrievalScore, RetrievalResult, and RetrievalTrace.
-      ja: RetrievalRequest・CandidateSet・RetrievalScore・RetrievalResult・RetrievalTraceなどinformation artifactを除外します。
+    - zh: 请求定义、静态过滤条件、单个分数、持久索引构建、上下文装配和模型回答。
+      en: Request definition, static filter condition, one score, persistent index construction, context assembly, and model answer.
+      ja: request definition、静的 filter condition、一つの score、永続 index construction、context assembly、model answer。
   semantic_kind: activity
-  aliases: []
+  aliases: [search execution, retrieval run step, 检索执行]
+engineering:
+  explanation:
+    zh: 真实实现会从请求派生查询向量或词法查询，调用索引并接收临时命中。pgvector 的 `SELECT ... ORDER BY embedding <-> query LIMIT k` 是一次候选查找；LangChain 将 retrieval 用于在查询时获取外部知识。Moonweave 将这次调用及其时间、输入和输出建为活动，而不是把 SQL、向量或返回行本身当成活动。
+    en: A real implementation derives a query vector or lexical query from a request, calls an index, and receives transient hits. pgvector `SELECT ... ORDER BY embedding <-> query LIMIT k` is one candidate lookup, and LangChain uses retrieval to fetch external knowledge at query time. Moonweave models that call with its time, input, and output as activity rather than treating SQL, vector, or returned rows as the activity.
+    ja: 実 implementation は request から query vector または lexical query を導き、index を呼び一時 hit を受け取ります。pgvector の `SELECT ... ORDER BY embedding <-> query LIMIT k` は一回の candidate lookup であり、LangChain は query time に external knowledge を得るため retrieval を使います。Moonweave はこの call と time、input、output を activity として model 化し、SQL、vector、返却 row 自体を activity と扱いません。
+  typical_input:
+    - description: pgvector candidate lookup
+      format: |
+        SELECT id, content
+        FROM memory_chunks
+        ORDER BY embedding <-> '[0.1,0.2,0.3]'
+        LIMIT 20;
+  typical_output:
+    - description: Completed retrieval-activity record
+      format: |
+        {
+          "retrieval_activity_id": "retrieval-activity-18",
+          "request_ref": "retrieval-request-support-18",
+          "execution_status": "completed",
+          "result_ref": "retrieval-result-support-18",
+          "candidate_count": 20
+        }
+  reference_implementations:
+    - name: pgvector
+      url: https://github.com/pgvector/pgvector
+      description: Documents nearest-neighbor vector retrieval using distance order and LIMIT.
+    - name: LangChain retrieval
+      url: https://docs.langchain.com/oss/python/langchain/retrieval
+      description: Describes query-time retrieval of external knowledge.
 structure:
-  identity_keys:
-    - activity_id
+  identity_keys: [retrieval_activity_id]
   fields:
-    - id: activity_id
-      labels:
-        zh: 活动标识
-        en: activity ID
-        ja: activity ID
+    - id: retrieval_activity_id
+      labels: {zh: 检索活动标识, en: retrieval activity ID, ja: retrieval activity ID}
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
+      cardinality: {min: 1, max: 1}
       definitions:
-        zh: 稳定标识一次检索域活动。
-        en: Stable identifier for one retrieval-domain activity.
-        ja: 一つのretrieval-domain activityを安定識別します。
+        zh: 标识一次具体执行，不复用为请求、候选、分数或结果标识。
+        en: Identifies one concrete execution and is not reused as request, candidate, score, or result ID.
+        ja: 一つの具体的 execution を識別し、request、candidate、score、result ID として再利用しません。
       allowed_values: []
-      pattern: null
-      example_value: retrieval-activity-410
-      source_claims:
-        - claim-retrieval-activity-002
-    - id: started_at
-      labels:
-        zh: 开始时间
-        en: started at
-        ja: 開始時刻
-      datatype: date-time
+      pattern: "^retrieval-activity-[A-Za-z0-9._-]+$"
+      example_value: retrieval-activity-18
+      source_claims: [claim-retrieval-activity-execution]
+    - id: request_ref
+      labels: {zh: 请求引用, en: request reference, ja: request 参照}
+      datatype: reference
       required: true
-      cardinality:
-        min: 1
-        max: 1
+      cardinality: {min: 1, max: 1}
       definitions:
-        zh: 记录活动开始的事件时间。
-        en: Event time at which the activity started.
-        ja: activity開始のevent timeです。
+        zh: 指向本次执行实际消费的 RetrievalRequest，而非将请求文本复制为活动身份。
+        en: Points to the RetrievalRequest actually consumed by this execution rather than copying request text as activity identity.
+        ja: この execution が実際に消費した RetrievalRequest を指し、request text を activity identity として複製しません。
+      allowed_values: []
+      pattern: "^retrieval-request-[A-Za-z0-9._-]+$"
+      example_value: retrieval-request-support-18
+      source_claims: [claim-retrieval-activity-execution]
+    - id: implementation_ref
+      labels: {zh: 实现引用, en: implementation reference, ja: implementation 参照}
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 指向本次执行所用检索器、索引或排序实现版本，不等同于结果分数。
+        en: Points to the retriever, index, or ranking implementation version used by this execution and is not a result score.
+        ja: この execution が使う retriever、index、ranking implementation version を指し、result score ではありません。
+      allowed_values: []
+      pattern: "^retrieval-impl-[A-Za-z0-9._-]+$"
+      example_value: retrieval-impl-pgvector-l2-v1
+      source_claims: [claim-retrieval-activity-pgvector]
+    - id: started_at
+      labels: {zh: 开始时间, en: started at, ja: 開始時刻}
+      datatype: datetime
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 记录本次检索执行开始的时间，不可由请求创建时间替代。
+        en: Records when this retrieval execution began and cannot be substituted by request creation time.
+        ja: この retrieval execution が開始した時刻を記録し、request creation time では代替できません。
       allowed_values: []
       pattern: null
-      example_value: 2026-07-16T02:10:00Z
-      source_claims:
-        - claim-retrieval-activity-003
-  constraints: []
-  required_relation_constraints: []
+      example_value: "2026-07-19T03:20:00Z"
+      source_claims: [claim-retrieval-activity-prov]
+    - id: execution_status
+      labels: {zh: 执行状态, en: execution status, ja: execution status}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 指明活动是运行中、已完成或失败；状态不代替结果来源或错误细节。
+        en: States whether activity is running, completed, or failed and does not replace result provenance or error detail.
+        ja: activity が running、completed、failed のいずれかを示し、result provenance や error detail を置き換えません。
+      allowed_values: [running, completed, failed]
+      pattern: null
+      example_value: completed
+      source_claims: [claim-retrieval-activity-prov]
+    - id: result_ref
+      labels: {zh: 结果引用, en: result reference, ja: result 参照}
+      datatype: reference
+      required: false
+      cardinality: {min: 0, max: 1}
+      definitions:
+        zh: 在成功完成时指向本次活动产生的 RetrievalResult；失败或运行中时不得伪造结果引用。
+        en: Points to RetrievalResult produced by this activity on successful completion; failed or running activity must not fabricate a result reference.
+        ja: 成功完了時にこの活動が生成した RetrievalResult を指し、failed または running の活動は result 参照を捏造してはなりません。
+      allowed_values: []
+      pattern: "^retrieval-result-[A-Za-z0-9._-]+$"
+      example_value: retrieval-result-support-18
+      source_claims: [claim-retrieval-activity-prov]
+  constraints:
+    - id: retrieval-activity-lifecycle-consistency
+      severity: error
+      expression_language: plain
+      expression: A completed RetrievalActivity requires result_ref and ended_at evidence in its audit record. A failed activity must not claim result_ref. Every request_ref and implementation_ref must be resolved before execution starts.
+      explanation:
+        zh: 活动状态、输入和输出必须可审计；运行失败不能产生假结果事实。
+        en: Activity state, input, and output must be auditable; failure cannot produce a fabricated result fact.
+        ja: activity state、input、output は監査可能でなければならず、failure は捏造された result fact を生めません。
+      source_claims: [claim-retrieval-activity-prov]
+    - id: retrieval-activity-context-boundary
+      severity: error
+      expression_language: plain
+      expression: RetrievalActivity may produce candidates or results but must not assert ContextPackage inclusion, model attention, answer correctness, or MemoryRecord persistence without separate downstream activity and artifact facts.
+      explanation:
+        zh: 检索运行的输出是候选证据，不能跨越到上下文装配、推理或记忆写入。
+        en: Retrieval-run output is candidate evidence and cannot cross into context assembly, inference, or memory write.
+        ja: retrieval-run output は candidate evidence であり、context assembly、inference、memory write へ越境できません。
+      source_claims: [claim-retrieval-activity-rag-boundary]
+  required_relations: []
 examples:
-  - id: RetrievalActivity-example-positive-manual-001
-    kind: positive
-    labels:
-      zh: 检索活动正例
-      en: "Positive case: Retrieval activity"
-      ja: 検索活動正例
-    scenario_id: null
+  - id: retrieval-activity-example-positive-completed
+
+    labels: {zh: 已完成的向量检索, en: Completed vector retrieval, ja: 完了した vector retrieval}
+
     descriptions:
-      zh: activity-410 读取已声明索引版本并开始候选生成。
-      en: activity-410 starts candidate generation against a declared index version.
-      ja: activity-410 は指定index versionに対するcandidate generationを開始します。
+      zh: Lewis RAG p(y|x)=Σ_z p(z|x)·p(y|x,z)；HyDE 假设文档 embedding；RAPTOR 树检索；Self-RAG [Retrieve] adaptive；Generative Agents score=α·recency+β·importance+γ·relevance。
+      en: Lewis RAG p(y|x)=Σ_z p(z|x)·p(y|x,z); HyDE hypothetical doc embedding; RAPTOR tree retrieval; Self-RAG [Retrieve] adaptive; Generative Agents score=α·recency+β·importance+γ·relevance.
+      ja: Lewis RAG p(y|x,z)。HyDE 仮説 doc embedding。RAPTOR tree retrieval。Self-RAG [Retrieve]。Generative Agents score 公式。
     field_values:
-      activity_id: activity-410
-      started_at: 2026-07-16T02:10:00Z
-    related_node_ids:
-      - RetrievalActivity
+      retrieval_activity_id: retrieval-activity-18
+      request_ref: retrieval-request-support-18
+      implementation_ref: retrieval-impl-pgvector-l2-v1
+      started_at: "2026-07-19T03:20:00Z"
+      execution_status: completed
+      result_ref: retrieval-result-support-18
+    related_node_ids: [RetrievalActivity, RetrievalRequest, RetrievalResult]
     related_relation_ids: []
-    expected_result:
-      zh: 归类为 RetrievalActivity。
-      en: Classify the object as RetrievalActivity.
-      ja: RetrievalActivity として分類します。
-    why_valid_or_invalid:
-      zh: 它具有独立活动身份、时间边界和可追踪输入输出。
-      en: It has an independent activity identity, temporal boundary, and traceable inputs and outputs.
-      ja: 独立activity identity・時間境界・追跡可能input/outputがあります。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-retrieval-activity-004
-  - id: RetrievalActivity-example-boundary-manual-001
-    kind: boundary
-    labels:
-      zh: 检索活动边界例
-      en: "Boundary case: Retrieval activity"
-      ja: 検索活動境界例
-    scenario_id: null
+
+    source_claims: [claim-retrieval-activity-pgvector, claim-retrieval-activity-prov]
+  - id: retrieval-activity-example-counterexample-request-only
+
+    labels: {zh: 仅有请求不是活动, en: Request alone is not activity, ja: request 単独は activity ではない}
+
     descriptions:
-      zh: request-410 仅声明查询与过滤条件，尚未开始执行。
-      en: request-410 only declares a query and filter; no execution has started.
-      ja: request-410 はqueryとfilterを宣言するだけで実行は開始していません。
-    field_values: {}
-    related_node_ids:
-      - RetrievalActivity
+      zh: 反例：RetrievalResult 候选无 TopKSelection/token budget 直接全量进 ContextPackage。
+      en: Counterexample: RetrievalResult candidates enter ContextPackage without TopKSelection/token budget.
+      ja: 反例：RetrievalResult candidate が TopKSelection/token budget なしで ContextPackage 全量進入。
+    field_values:
+      request_ref: retrieval-request-support-18
+      retrieval_activity_id: null
+      execution_status: null
+      result_ref: null
+    related_node_ids: [RetrievalActivity, RetrievalRequest]
     related_relation_ids: []
-    expected_result:
-      zh: 不得归类为 RetrievalActivity。
-      en: Do not classify the object as RetrievalActivity.
-      ja: RetrievalActivity として分類しません。
-    why_valid_or_invalid:
-      zh: 它是信息产物，没有活动开始时间和执行身份。
-      en: It is an information artifact without an execution identity or activity start.
-      ja: information artifactでexecution identityやactivity startを持ちません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-retrieval-activity-005
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+
+    source_claims: [claim-retrieval-activity-execution]
+  - id: retrieval-activity-example-boundary-index-build
+
+    labels: {zh: 预建索引作业, en: Prebuilding index job, ja: index を事前構築する job}
+
+    descriptions:
+      zh: IndexBuildRun 离线索引 vs RetrievalRun 在线查询；RAG-Sequence vs RAG-Token 变体边界。
+      en: IndexBuildRun offline index vs RetrievalRun online query; RAG-Sequence vs RAG-Token variant boundary.
+      ja: IndexBuildRun offline vs RetrievalRun online。RAG-Sequence vs RAG-Token 境界。
+    field_values:
+      operation_kind: index_build
+      request_ref: null
+      execution_status: completed
+      result_ref: null
+    related_node_ids: [RetrievalActivity]
+    related_relation_ids: []
+
+    source_claims: [claim-retrieval-activity-pgvector]
+  - id: retrieval-activity-example-instance-pgvector
+
+    labels: {zh: "实例：pgvector LIMIT 查询活动", en: "Instance: pgvector LIMIT query activity", ja: "インスタンス：pgvector LIMIT query activity"}
+
+    descriptions:
+      zh: pgvector ORDER BY embedding <=> query LIMIT 20；Anthropic Contextual Retrieval top-20 + rerank → top-5 context。
+      en: pgvector ORDER BY embedding <=> query LIMIT 20; Anthropic Contextual Retrieval top-20 + rerank → top-5 context.
+      ja: pgvector <=> LIMIT 20。Anthropic Contextual Retrieval top-20+rerank→top-5 context。
+    field_values:
+      retrieval_activity_id: retrieval-activity-18
+      request_ref: retrieval-request-support-18
+      implementation_ref: retrieval-impl-pgvector-l2-v1
+      started_at: "2026-07-19T03:20:00Z"
+      execution_status: completed
+      result_ref: retrieval-result-support-18
+    related_node_ids: [RetrievalActivity, RetrievedCandidate, ContextAssembly]
+    related_relation_ids: []
+    source_claims: [claim-retrieval-activity-pgvector]
 parent_relation: null
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: langchain-retrieval
+    title: LangChain retrieval
+    source_type: official-documentation
+    url: https://docs.langchain.com/oss/python/langchain/retrieval
+    relevance: Describes retrieval of external knowledge at query time.
+  - id: pgvector-readme
+    title: pgvector project documentation
+    source_type: official-project-documentation
+    url: https://github.com/pgvector/pgvector
+    relevance: Documents distance ordering and LIMIT nearest-neighbor queries.
+  - id: rag-paper
+    title: Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks
+    source_type: academic-paper
+    url: https://arxiv.org/abs/2005.11401
+    relevance: Describes retrieved non-parametric memory used as input to downstream generation.
+  - id: w3c-prov-o
+    title: W3C PROV-O
+    source_type: standard
+    url: https://www.w3.org/TR/prov-o/
+    relevance: Defines activity, entity, usage, and generation distinctions.
 source_claims:
-  - id: claim-retrieval-activity-001
-    source: eng-fw-langchain-retrieval
-    supports: LangChain documents retrieval as an operation that accepts a query and returns relevant documents; Moonweave separates the operation from its information artifacts.
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
-    evidence_kind: design-inference
+  - id: claim-retrieval-activity-execution
+    source: langchain-retrieval
+    supports: LangChain describes retrieval at query time and a retriever returning documents for a query. Moonweave models one invocation of such capability as a time-bounded RetrievalActivity rather than as the request or returned document itself.
+    locator: "Retrieval overview and retriever building block"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieval-activity-002
-    source: eng-fw-langchain-retrieval
-    supports: "LangChain documents retrieval as an operation that accepts a query and returns relevant documents; Moonweave separates the operation from its information artifacts. Moonweave records RetrievalActivity.activity_id as the stated auditable datum: Stable identifier for one retrieval-domain activity."
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
-    evidence_kind: design-inference
+  - id: claim-retrieval-activity-pgvector
+    source: pgvector-readme
+    supports: pgvector documents nearest-neighbor retrieval using a distance operator in ORDER BY and LIMIT. Moonweave records one such invocation as an activity and the returned rows as separate candidate or result artifacts.
+    locator: "Querying nearest neighbors"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieval-activity-003
-    source: eng-fw-langchain-retrieval
-    supports: "LangChain documents retrieval as an operation that accepts a query and returns relevant documents; Moonweave separates the operation from its information artifacts. Moonweave records RetrievalActivity.started_at as the stated auditable datum: Event time at which the activity started."
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
-    evidence_kind: design-inference
+  - id: claim-retrieval-activity-rag-boundary
+    source: rag-paper
+    supports: Lewis et al. describe a system that retrieves non-parametric memory for downstream generation. The paper supports distinguishing retrieval from generation; Moonweave's boundary to ContextPackage and model use is a local design inference.
+    locator: "Abstract and model overview"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieval-activity-004
-    source: eng-fw-langchain-retrieval
-    supports: LangChain documents retrieval as an operation that accepts a query and returns relevant documents; Moonweave separates the operation from its information artifacts. The case applies the documented retrieval-stage separation without treating a vendor query object as the ontology activity.
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
-    evidence_kind: design-inference
+  - id: claim-retrieval-activity-prov
+    source: w3c-prov-o
+    supports: PROV-O distinguishes an Activity from input and output Entities. Moonweave applies this distinction to retrieval execution, its request input, and its result output.
+    locator: "PROV-O Activity, used, and wasGeneratedBy"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieval-activity-005
-    source: eng-fw-langchain-retrieval
-    supports: LangChain documents retrieval as an operation that accepts a query and returns relevant documents; Moonweave separates the operation from its information artifacts. The documentation distinguishes retrieval inputs from the retriever operation that consumes them.
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

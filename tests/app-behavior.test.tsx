@@ -382,7 +382,7 @@ describe("App state and URL recovery behavior", () => {
     );
   });
 
-  it("uses explicit display fallbacks when optional runtime annotations are absent", async () => {
+  it("keeps the source count stable when optional runtime annotations are absent", async () => {
     const rootRef = baseOntologyRuntime.index.rootRef;
     const rootEntity = baseOntologyRuntime.index.entitiesByRef.get(rootRef);
     if (!rootEntity) throw new Error("Missing ontology root fixture");
@@ -391,7 +391,6 @@ describe("App state and URL recovery behavior", () => {
       ...rootEntity,
       data: {
         ...rootEntity.data,
-        status: undefined,
         source_claims: undefined,
       } as unknown as typeof rootEntity.data,
     });
@@ -415,7 +414,7 @@ describe("App state and URL recovery behavior", () => {
     const definitionValues = elements
       .filter(({ type }) => type === "dd")
       .map(({ props }) => props.children);
-    expect(definitionValues).toContain("Not applicable");
+    expect(definitionValues).toContain("agent-system-ontology");
     expect(definitionValues).toContain(0);
     expect(byTestId(elements, "left-statistics")).toBeDefined();
   });

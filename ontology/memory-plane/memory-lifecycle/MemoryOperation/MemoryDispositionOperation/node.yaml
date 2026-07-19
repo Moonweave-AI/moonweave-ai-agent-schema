@@ -8,305 +8,652 @@ labels:
   ja: 記憶処分操作
 semantics:
   short_definition:
-    zh: 改变既有记录的可用性、强度或保留状态的操作。
-    en: An operation changing an existing record's availability, strength, or retention state.
-    ja: 既存recordのavailability・strength・retention stateを変えるoperationです。
+    zh: 对既有记忆记录执行可审计状态处置，以改变其强度、活动层驻留、有效性或保留资格的操作。
+    en: An auditable operation that disposes of existing memory records by changing their strength, active-tier residency, validity, or retention eligibility.
+    ja: 既存の記憶レコードに対し、強度、アクティブ層への常駐、有効性、または保持適格性を変更する監査可能な処分操作です。
   definition:
-    zh: MemoryDispositionOperation 以既有 MemoryRecord 为对象，因时间、容量、显式删除依据或重要性变化而改变其生命周期状态；Decay、Delete、Eviction 与 Expiration 按触发原因和效果分开。
-    en: MemoryDispositionOperation acts on an existing MemoryRecord and changes its lifecycle state because of time, capacity, an explicit deletion basis, or changing importance. Decay, Delete, Eviction, and Expiration remain distinct by trigger and effect.
-    ja: MemoryDispositionOperation は既存 MemoryRecordを対象にtime・capacity・explicit deletion basis・importance変化でlifecycle stateを変えます。Decay・Delete・Eviction・Expirationはtrigger/effectで区別します。
+    zh: MemoryDispositionOperation 是一种针对已存在 MemoryRecord 的已执行 MemoryOperation。它依据明确的衰减规则、容量压力、保留期限或删除依据，记录一次已发生的状态转变及其证据。它包括降低检索强度、移出活动层、使记录失效和标记为到期不合格；它不创建新内容版本，不仅仅评估风险或冲突，也不把尚未执行的未来清理计划当作处置。
+    en: MemoryDispositionOperation is an executed MemoryOperation over an already existing MemoryRecord. It records one completed state transition and its evidence under an explicit decay rule, capacity pressure, retention deadline, or deletion basis. It includes reducing retrieval strength, removing active-tier residency, invalidating a record, and marking it retention-ineligible; it neither creates a new content version nor merely assesses a risk or conflict, and it does not treat an unexecuted future cleanup plan as disposition.
+    ja: MemoryDispositionOperation は、すでに存在する MemoryRecord に対する実行済みの MemoryOperation です。明示的な減衰規則、容量圧力、保持期限、または削除根拠に従って、一つの完了した状態遷移とその証跡を記録します。検索強度の低下、アクティブ層常駐の除去、レコードの無効化、保持不適格への印付けを含みますが、新しい内容バージョンを作らず、リスクや競合を評価するだけでもなく、未実行の将来清掃計画を処分として扱いません。
   why_needed:
-    zh: 防止把所有“不可用”都误写成删除。
-    en: Prevents every form of unavailability from being mislabeled as deletion.
-    ja: あらゆるunavailabilityをdeleteと誤記することを防ぎます。
+    zh: “不再可用”可能是强度降低、缓存驱逐、保留到期或删除，各自的触发器、可恢复性和责任后果不同；统一归为删除会破坏审计与合规判断。
+    en: A record becoming unavailable can mean strength reduction, cache eviction, retention expiry, or deletion, each with different triggers, recoverability, and accountability consequences; calling all of them deletion corrupts audit and compliance reasoning.
+    ja: レコードが利用不可になることは、強度低下、キャッシュ追い出し、保持期限切れ、削除のいずれかであり、トリガー、回復可能性、説明責任が異なります。すべてを削除と呼ぶと、監査とコンプライアンスの判断を壊します。
   includes:
-    - zh: 纳入衰减、删除、活动层驱逐和到期资格变化。
-      en: Includes decay, deletion, active-tier eviction, and expiration eligibility change.
-      ja: decay・delete・active-tier eviction・expiration eligibility changeを含みます。
+    - zh: 已执行的记忆强度衰减、容量或性能导致的活动层驱逐、基于保留规则的到期不合格，以及由明确依据触发的记录无效化或删除。
+      en: Executed memory-strength decay, capacity- or performance-driven active-tier eviction, retention-rule expiry ineligibility, and record invalidation or deletion under an explicit basis.
+      ja: 実行済みの記憶強度減衰、容量または性能によるアクティブ層追い出し、保持規則に基づく期限切れ不適格化、明示的根拠によるレコード無効化または削除を含みます。
   excludes:
-    - zh: 排除候选丢弃、内容更新和仅检查状态的验证。
-      en: Excludes candidate discard, content revision, and validation that only checks state.
-      ja: candidate discard・content revision・state checkのみのvalidationを除外します。
+    - zh: 首次写入候选项、仅形成检查结论、创建后继内容版本、选择冲突赢家、策略或保留计划定义，以及尚未发生的定时清理任务。
+      en: First admission of a candidate, an operation that only forms a check conclusion, creation of a successor content version, selection of a conflict winner, policy or retention-plan definition, and a scheduled cleanup task that has not occurred.
+      ja: 候補の初回受入、検査結論だけを形成する操作、後継内容バージョンの作成、競合勝者の選択、ポリシーまたは保持計画の定義、まだ発生していないスケジュール済み清掃タスクを除外します。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: 将处置实现为对已存在记录的不可缺省状态转换工作单元：保存触发依据、前后效果、证据摘要与发生时间。按效果分别建模衰减、驱逐、到期和删除，不能仅以“记录不可见”推断某一种处置。
+    en: "Implement disposition as a non-optional state-transition work unit over an existing record: retain its trigger basis, before-and-after effect, evidence digest, and occurrence time. Model decay, eviction, expiration, and deletion separately by effect; do not infer one kind merely because a record is no longer visible."
+    ja: 処分は既存レコードに対する省略不可の状態遷移作業単位として実装し、トリガー根拠、前後の効果、証跡ダイジェスト、発生時刻を保持します。減衰、追い出し、期限切れ、削除は効果ごとに別々にモデル化し、レコードが見えなくなっただけで一種類の処分を推測してはいけません。
+  typical_input:
+    - description: An existing record reference, explicit disposition kind and basis, prior state evidence, executor identity, and operation start time.
+      format: "{operation_id, target_record_refs, disposition_kind, disposition_basis, prior_state_digest, actor_ref, started_at}"
+  typical_output:
+    - description: A completed state-transition fact with effect, evidence digest, disposal time, result, and audit event.
+      format: "{operation_id, disposition_effect, disposition_evidence_digest, disposed_at, result_ref?, audit_event_ref?}"
+  reference_implementations:
+    - name: Redis EXPIRE command
+      url: https://redis.io/docs/latest/commands/expire/
+      description: Documents time-based key expiry as a distinct lifecycle action.
+    - name: NIST SP 800-88 Rev. 1
+      url: https://csrc.nist.gov/pubs/sp/800/88/r1/final
+      description: Describes media sanitization decisions and evidence as distinct from ordinary availability changes.
+    - name: W3C PROV-O
+      url: https://www.w3.org/TR/prov-o/
+      description: Distinguishes executed activities, entities, agents, and provenance facts.
+  source_claims:
+    - claim-memory-disposition-operation-activity
+    - claim-memory-disposition-operation-boundary
 structure:
   identity_keys:
-    - disposition_operation_id
+    - operation_id
   fields:
-    - id: disposition_operation_id
+    - id: operation_id
       labels:
-        zh: 处置操作标识
-        en: disposition operation ID
-        ja: disposition operation ID
+        zh: 操作标识
+        en: operation ID
+        ja: 操作 ID
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
       definitions:
-        zh: 标识一次记录生命周期处置活动。
-        en: Identifies one record-lifecycle disposition activity.
-        ja: 一record-lifecycle disposition activityを識別します。
+        zh: 复用父类 MemoryOperation 的稳定标识，以关联一次处置的目标、依据、效果、结果和审计证据。
+        en: Reuses the stable MemoryOperation identity to join one disposition's targets, basis, effect, result, and audit evidence.
+        ja: 親 MemoryOperation の安定識別子を再利用し、一つの処分の対象、根拠、効果、結果、監査証跡を結びます。
       allowed_values: []
-      pattern: null
-      example_value: dispose-1101
+      pattern: '^mem-op-[a-z0-9][a-z0-9-]*$'
+      example_value: mem-op-expire-2401
       source_claims:
-        - claim-memory-disposition-operation-002
-    - id: target_record_id
+        - claim-memory-disposition-operation-identity
+    - id: operation_kind
       labels:
-        zh: 目标记录标识
-        en: target record ID
-        ja: target record ID
+        zh: 操作类别
+        en: operation kind
+        ja: 操作種別
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
       definitions:
-        zh: 标识被改变可用性或保留状态的记录。
-        en: Identifies the record whose availability or retention state changes.
-        ja: availability/retention stateが変わるrecordを識別します。
+        zh: 固定为 disposition，表明该活动改变既有记忆的可用性、驻留状态或有效性，而不是生成修订记录。
+        en: Narrows the parent operation kind to disposition and records an executed change to an existing record's eligibility, residency, or validity.
+        ja: 親の操作種別を disposition に限定し、既存レコードの利用可否、常駐状態、または有効性を実行済みで変更する活動であることを記録します。
+      allowed_values:
+        - disposition
+      pattern: null
+      example_value: disposition
+      source_claims:
+        - claim-memory-disposition-operation-activity
+    - id: status
+      labels:
+        zh: 运行状态
+        en: runtime status
+        ja: 実行状態
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 记录处置活动的执行状态；它不同于被处置记录后续是否可检索。
+        en: Records the execution state of the disposition activity, which is distinct from whether the target remains retrievable afterward.
+        ja: 処置活動の実行状態を記録し、対象が後で検索可能かどうかとは区別します。
+      allowed_values:
+        - running
+        - succeeded
+        - failed
+        - partially_succeeded
+        - rejected
+        - cancelled
+      pattern: null
+      example_value: succeeded
+      source_claims:
+        - claim-memory-disposition-operation-activity
+    - id: started_at
+      labels:
+        zh: 开始时间
+        en: started at
+        ja: 開始時刻
+      datatype: date-time
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 记录执行者实际开始应用处置规则或请求的时间，不以策略发布时间或截止时间替代。
+        en: Records when the executor actually began applying the disposition rule or request, not policy publication or a deadline.
+        ja: 実行者が処置規則または要求を実際に適用し始めた時刻を記録し、ポリシー公開時刻や期限で代用しません。
       allowed_values: []
       pattern: null
-      example_value: record-1101
+      example_value: "2026-07-18T21:00:00Z"
       source_claims:
-        - claim-memory-disposition-operation-003
-  constraints: []
+        - claim-memory-disposition-operation-activity
+    - id: actor_ref
+      labels:
+        zh: 执行主体引用
+        en: executor reference
+        ja: 実行主体参照
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 引用实际执行此次处置的主体，不将策略作者或记录所有者误记为执行者。
+        en: References the actor that executes this disposition and does not confuse it with a policy author or record owner.
+        ja: この処置を実行する主体を参照し、ポリシー作成者やレコード所有者と取り違えません。
+      allowed_values: []
+      pattern: "^[A-Za-z0-9][A-Za-z0-9._:@/-]*$"
+      example_value: retention-enforcer-2
+      source_claims:
+        - claim-memory-disposition-operation-activity
+    - id: target_record_refs
+      labels:
+        zh: 目标记录引用
+        en: target record references
+        ja: 対象レコード参照
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: null
+      definitions:
+        zh: 列出本次处置实际改变的既有 MemoryRecord；候选输入、规划中的输出或仅共享追踪上下文的记录不能替代。
+        en: Lists existing MemoryRecord instances actually changed by this disposition; candidate input, planned output, or a record merely sharing trace context cannot substitute.
+        ja: この処分が実際に変更する既存 MemoryRecord を列挙します。候補入力、計画中の出力、追跡文脈を共有するだけのレコードでは代替できません。
+      allowed_values: []
+      pattern: '^record-[A-Za-z0-9._-]+$'
+      example_value:
+        - record-2401-v1
+      source_claims:
+        - claim-memory-disposition-operation-target
+    - id: disposition_kind
+      labels:
+        zh: 处置种类
+        en: disposition kind
+        ja: 処分種別
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 声明本次活动的不同处置机制，以避免将驱逐、到期、衰减或删除仅因表面不可用而混为一谈。
+        en: States the distinct disposition mechanism so eviction, expiration, decay, and deletion are not conflated merely because of apparent unavailability.
+        ja: 見かけの利用不可だけを理由に追い出し、期限切れ、減衰、削除を混同しないよう、この活動の異なる処分機構を示します。
+      allowed_values:
+        - decay
+        - eviction
+        - expiration
+        - delete
+      pattern: null
+      example_value: expiration
+      source_claims:
+        - claim-memory-disposition-operation-kind
+    - id: disposition_basis
+      labels:
+        zh: 处置依据
+        en: disposition basis
+        ja: 処分根拠
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 记录触发本次已执行处置的明确原因或受控规则，而不是只写“系统清理”之类无法审计的概述。
+        en: Records the explicit reason or controlled rule that triggered this completed disposition rather than an unauditable summary such as "system cleanup".
+        ja: 「システム清掃」のような監査不能な要約ではなく、この完了済み処分を起動した明示的理由または管理された規則を記録します。
+      allowed_values:
+        - decay_policy
+        - capacity_pressure
+        - retention_policy
+        - explicit_deletion_request
+        - legal_or_security_requirement
+      pattern: null
+      example_value: retention_policy
+      source_claims:
+        - claim-memory-disposition-operation-basis
+    - id: disposition_effect
+      labels:
+        zh: 处置效果
+        en: disposition effect
+        ja: 処分効果
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 记录落在目标记录上的具体状态变化；它描述发生的效果，而不是拟议动作、策略名称或泛化的成功状态。
+        en: Records the concrete state change applied to the target record; it describes the effect that occurred, not a proposed action, policy name, or generic success status.
+        ja: 対象レコードに適用された具体的状態変更を記録します。提案された行為、ポリシー名、一般的な成功状態ではなく、実際に起きた効果を表します。
+      allowed_values:
+        - strength_reduced
+        - active_tier_removed
+        - retention_ineligible
+        - invalidated
+      pattern: null
+      example_value: retention_ineligible
+      source_claims:
+        - claim-memory-disposition-operation-effect
+    - id: disposition_evidence_digest
+      labels:
+        zh: 处置证据摘要
+        en: disposition evidence digest
+        ja: 処分証跡ダイジェスト
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 固定处置时使用的目标版本、触发依据、前后状态和执行输出摘要，使以后能够验证该状态变化而不重写历史事实。
+        en: Fixes a digest of the target version, trigger basis, before-and-after state, and execution output used for disposition so the transition can later be verified without rewriting historical fact.
+        ja: 処分で用いた対象バージョン、トリガー根拠、前後状態、実行出力のダイジェストを固定し、履歴事実を書き換えずに遷移を後から検証できるようにします。
+      allowed_values: []
+      pattern: '^sha256:[a-f0-9]{64}$'
+      example_value: sha256:ba0d7be3e62274472d62f8af287a0444c968a3c2fd1c64c433a0bb7ddae09b44
+      source_claims:
+        - claim-memory-disposition-operation-evidence
+    - id: disposed_at
+      labels:
+        zh: 处置发生时间
+        en: disposed at
+        ja: 処分発生時刻
+      datatype: date-time
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 记录状态转变实际生效的事件时间，不能以策略创建时间、计划时间或日志摄取时间替代。
+        en: Records the event time at which the state transition actually took effect; policy creation, scheduled, or log-ingestion time cannot substitute.
+        ja: 状態遷移が実際に有効になったイベント時刻を記録します。ポリシー作成時刻、予定時刻、ログ取込時刻では代替できません。
+      allowed_values: []
+      pattern: null
+      example_value: "2026-07-18T21:00:00.144Z"
+      source_claims:
+        - claim-memory-disposition-operation-activity
+  constraints:
+    - id: MemoryDispositionOperation-parent-operation-envelope
+      expression: "operation_kind = disposition and status, started_at, and actor_ref identify one executed disposition activity."
+      explanation:
+        zh: 策略、截止时间或缓存压力本身不是处置；必须保留执行活动的类别、状态、开始时间和责任主体。
+        en: A policy, deadline, or cache-pressure reading is not itself a disposition; the executed activity must retain its kind, status, time, and responsible actor.
+        ja: ポリシー、期限、キャッシュ圧力の値そのものは処置ではなく、実行済み活動の種別、状態、開始時刻、責任主体を保持する必要があります。
+      source_claims:
+        - claim-memory-disposition-operation-activity
+    - id: MemoryDispositionOperation-existing-target-boundary
+      expression: "Every target_record_refs value identifies a MemoryRecord that existed before disposed_at and whose relevant prior state is covered by disposition_evidence_digest; a candidate item or future successor record cannot be disposed."
+      explanation:
+        zh: 处置作用于既有事实；若目标尚未写入或只是将来输出，就没有可被衰减、驱逐、到期或无效化的记录状态。
+        en: Disposition acts on an existing fact; if the target has not been written or is only a future output, there is no record state to decay, evict, expire, or invalidate.
+        ja: 処分は既存の事実に作用します。対象がまだ書き込まれていない、または将来出力にすぎない場合、減衰、追い出し、期限切れ、無効化できるレコード状態はありません。
+      source_claims:
+        - claim-memory-disposition-operation-target
+        - claim-memory-disposition-operation-evidence
+    - id: MemoryDispositionOperation-kind-basis-effect-consistency
+      expression: "decay requires disposition_basis=decay_policy and disposition_effect=strength_reduced; eviction requires capacity_pressure and active_tier_removed; expiration requires retention_policy and retention_ineligible; delete requires explicit_deletion_request or legal_or_security_requirement and invalidated."
+      explanation:
+        zh: 处置的名称、触发依据和实际效果必须相互支持；例如缓存驱逐不应伪装为删除，到期标记也不应被记录为物理清除。
+        en: Disposition name, triggering basis, and actual effect must support one another; for example, cache eviction must not masquerade as deletion, and an expiry mark must not be recorded as physical clearing.
+        ja: 処分名、起動根拠、実際の効果は互いに裏付けなければなりません。たとえばキャッシュ追い出しを削除と偽装してはならず、期限切れ印付けを物理消去として記録してもなりません。
+      source_claims:
+        - claim-memory-disposition-operation-kind
+        - claim-memory-disposition-operation-basis
+        - claim-memory-disposition-operation-effect
+    - id: MemoryDispositionOperation-executed-not-planned
+      expression: "disposed_at is on or after started_at and a terminal parent operation has ended_at on or after disposed_at; a future schedule or policy definition without an applied effect does not satisfy this concept."
+      explanation:
+        zh: 处置描述已经发生的活动，不是未来可能发生的生命周期意图；时间和效果证据共同区分执行事实与计划。
+        en: Disposition describes an activity that has happened, not a lifecycle intention that might happen later; time and effect evidence together distinguish execution fact from plan.
+        ja: 処分はすでに起きた活動を表し、将来起きるかもしれないライフサイクル意図ではありません。時刻と効果の証拠が、実行事実と計画を区別します。
+      source_claims:
+        - claim-memory-disposition-operation-activity
+    - id: MemoryDispositionOperation-nonrevision-nonassessment-boundary
+      expression: "The operation changes availability, strength, validity, or retention eligibility without creating a successor content version or merely reporting a conclusion; revision and assessment must remain separate operations even when they supply evidence for disposition."
+      explanation:
+        zh: 修订改变内容版本，评估形成结论；二者都可能成为处置依据，但不应吞并已经实际改变记录状态的处置活动。
+        en: Revision changes a content version and assessment forms a conclusion; either can supply disposition evidence, but neither should absorb the activity that actually changes record state.
+        ja: 改訂は内容バージョンを変更し、評価は結論を形成します。どちらも処分証跡を提供し得ますが、実際にレコード状態を変更する活動を吸収してはいけません。
+      source_claims:
+        - claim-memory-disposition-operation-boundary
   required_relation_constraints: []
 examples:
-  - id: MemoryDispositionOperation-example-positive-manual-001
-    kind: positive
+  - id: MemoryDispositionOperation-example-positive-expiration
+
     labels:
-      zh: 记忆处置操作正例
-      en: "Positive case: Memory disposition operation"
-      ja: 記憶処分操作正例
-    scenario_id: null
+      zh: 保留到期处置
+      en: Retention-expiry disposition
+      ja: 保持期限切れ処分
+
     descriptions:
-      zh: dispose-1101 因 TTL 到点把 record-1101 标为待过期清理。
-      en: dispose-1101 marks record-1101 pending expiry cleanup when its TTL is reached.
-      ja: dispose-1101 はTTL到達時record-1101をexpiry cleanup待ちにします。
+      zh: Generative Agents Memory Stream + Reflection；MemGPT core_memory_append/archival_memory_insert；Redis SET EX TTL + FT.SEARCH vector eviction。
+      en: Generative Agents Memory Stream + Reflection; MemGPT core_memory_append/archival_memory_insert; Redis SET EX TTL + FT.SEARCH vector eviction.
+      ja: Generative Agents Memory Stream + Reflection。MemGPT core_memory_append/archival_memory_insert。Redis SET EX TTL + vector eviction。
     field_values:
-      disposition_operation_id: dispose-1101
-      target_record_id: record-1101
-      operation_id: dispose-1101
-      started_at: 2026-07-16T14:00:00Z
+      operation_id: mem-op-expire-2401
+      operation_kind: disposition
+      status: succeeded
+      started_at: "2026-07-18T21:00:00Z"
+      ended_at: "2026-07-18T21:00:00.180Z"
+      actor_ref: retention-worker-1
+      target_record_refs:
+        - record-2401-v1
+      disposition_kind: expiration
+      disposition_basis: retention_policy
+      disposition_effect: retention_ineligible
+      disposition_evidence_digest: sha256:ba0d7be3e62274472d62f8af287a0444c968a3c2fd1c64c433a0bb7ddae09b44
+      disposed_at: "2026-07-18T21:00:00.144Z"
     related_node_ids:
       - MemoryDispositionOperation
       - MemoryOperation
+      - MemoryExpiration
+      - MemoryRecord
+      - MemoryRetentionPolicy
+      - MemoryOperationResult
+      - MemoryAuditEvent
     related_relation_ids:
       - MemoryDispositionOperation-is_a-MemoryOperation
-    expected_result:
-      zh: 归类为 MemoryDispositionOperation，并进一步归 MemoryExpiration。
-      en: Classify as MemoryDispositionOperation and further as MemoryExpiration.
-      ja: MemoryDispositionOperation、さらにMemoryExpirationへ分類します。
-    why_valid_or_invalid:
-      zh: 活动针对既有记录改变保留资格，触发依据明确。
-      en: The activity changes retention eligibility of an existing record with an explicit trigger.
-      ja: 既存recordのretention eligibilityを明示triggerで変えます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - MemoryExpiration-is_a-MemoryDispositionOperation
+      - MemoryOperation-acts_on-MemoryRecord
+      - MemoryExpiration-governed_by-MemoryRetentionPolicy
+      - MemoryOperation-has_result-MemoryOperationResult
+      - MemoryOperation-has_audit_event-MemoryAuditEvent
+
     source_claims:
-      - claim-memory-disposition-operation-001
-  - id: MemoryDispositionOperation-example-boundary-manual-001
-    kind: boundary
+      - claim-memory-disposition-operation-activity
+      - claim-memory-disposition-operation-kind
+      - claim-memory-disposition-operation-evidence
+  - id: MemoryDispositionOperation-example-counterexample-revision
+
     labels:
-      zh: 记忆处置操作边界例
-      en: "Boundary case: Memory disposition operation"
-      ja: 記憶処分操作境界例
-    scenario_id: null
+      zh: 修订内容不是处置
+      en: Revising content is not disposition
+      ja: 内容改訂は処分ではない
+
     descriptions:
-      zh: write-1101 把新候选项首次持久化。
-      en: write-1101 persists a new candidate for the first time.
-      ja: write-1101 はnew candidateを初めてpersistします。
-    field_values: {}
+      zh: 反例：ephemeral tool output 无 MemoryRetentionPolicy/Redis EX TTL 就永久 MemoryWrite。
+      en: Counterexample: ephemeral tool output MemoryWrite permanently without MemoryRetentionPolicy/Redis EX TTL.
+      ja: 反例：ephemeral tool output が MemoryRetentionPolicy/Redis EX TTL なしで永久 MemoryWrite。
+    field_values:
+      operation_id: mem-op-revise-2401
+      operation_kind: revision
+      status: succeeded
+      started_at: "2026-07-18T21:10:00Z"
+      target_record_refs:
+        - record-2401-v1
+      output_record_ref: record-2401-v2
+      changed_field: consent_scope
+      disposition_effect: absent
+      disposed_at: absent
     related_node_ids:
       - MemoryDispositionOperation
-    related_relation_ids: []
-    expected_result:
-      zh: 不得归类为 MemoryDispositionOperation。
-      en: Do not classify as MemoryDispositionOperation.
-      ja: MemoryDispositionOperationに分類しません。
-    why_valid_or_invalid:
-      zh: 这是准入，不是对既有记录的处置。
-      en: This is admission, not disposition of an existing record.
-      ja: これはadmissionで既存recordのdispositionではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - MemoryRevisionOperation
+      - MemoryRecord
+    related_relation_ids:
+      - MemoryDispositionOperation-is_a-MemoryOperation
+      - MemoryRevisionOperation-is_a-MemoryOperation
+      - MemoryOperation-acts_on-MemoryRecord
+
     source_claims:
-      - claim-memory-disposition-operation-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: MemoryResolutionOperation
-    shared_parent_concept_id: MemoryOperation
-    differentia:
-      zh: 正向身份比较：父节点 MemoryOperation：MemoryDispositionOperation（semantic kind=activity，骨架 MemoryDispositionOperation-is_a-MemoryOperation）；MemoryResolutionOperation（semantic kind=activity，骨架 MemoryResolutionOperation-is_a-MemoryOperation）。双端条件：MemoryDispositionOperation 条件：“改变既有记录的可用性、强度或保留状态的操作”；MemoryResolutionOperation 条件：“消费已识别问题状态并作出可审计解决决定的操作”。仅依据各自定义与骨架逐端验证。
-      en: "Positive identity comparison: parent MemoryOperation: MemoryDispositionOperation (semantic kind=activity, backbone MemoryDispositionOperation-is_a-MemoryOperation); MemoryResolutionOperation (semantic kind=activity, backbone MemoryResolutionOperation-is_a-MemoryOperation). Endpoint conditions: MemoryDispositionOperation condition: “An operation changing an existing record's availability, strength, or retention state”; MemoryResolutionOperation condition: “An operation consuming an identified problem state and making an auditable resolution decision”. Verify each endpoint from its own definition and backbone."
-      ja: 正の同一性比較：親 MemoryOperation：MemoryDispositionOperation（semantic kind=activity、バックボーン MemoryDispositionOperation-is_a-MemoryOperation）；MemoryResolutionOperation（semantic kind=activity、バックボーン MemoryResolutionOperation-is_a-MemoryOperation）。両端条件：MemoryDispositionOperation の条件：「既存recordのavailability・strength・retention stateを変えるoperationです」；MemoryResolutionOperation の条件：「識別済problem stateを消費しaudit可能resolution decisionを行うoperationです」。各端を固有の定義とバックボーンで検証します。
+      - claim-memory-disposition-operation-boundary
+  - id: MemoryDispositionOperation-example-boundary-scheduled-cleanup
+
+    labels:
+      zh: 未执行的清理计划
+      en: Unexecuted cleanup schedule
+      ja: 未実行の清掃予定
+
+    descriptions:
+      zh: MemGPT main_context vs archival vs recall 生命周期阶段；Generative Agents importance 累计 vs MemoryDecay recency 衰减。
+      en: MemGPT main_context vs archival vs recall lifecycle stages; Generative Agents importance accumulation vs MemoryDecay recency decay.
+      ja: MemGPT main/recall/archival lifecycle 段階。Generative Agents importance 累計 vs MemoryDecay recency 減衰。
+    field_values:
+      schedule_id: retention-job-2402
+      target_record_ref: record-2402-v1
+      planned_check_at: "2026-07-25T21:00:00Z"
+      operation_id: absent
+      disposition_effect: absent
+      disposition_evidence_digest: absent
+      disposed_at: absent
+    related_node_ids:
+      - MemoryDispositionOperation
+      - MemoryRetentionPolicy
+      - MemoryRecord
+    related_relation_ids:
+      - MemoryDispositionOperation-is_a-MemoryOperation
+
     source_claims:
-      - claim-memory-disposition-operation-004
-  - sibling_concept_id: MemoryRevisionOperation
-    shared_parent_concept_id: MemoryOperation
-    differentia:
-      zh: 已审查兄弟区分：父节点 MemoryOperation：MemoryDispositionOperation（semantic kind=activity，骨架 MemoryDispositionOperation-is_a-MemoryOperation）；MemoryRevisionOperation（semantic kind=activity，骨架 MemoryRevisionOperation-is_a-MemoryOperation）。双端条件：MemoryDispositionOperation 条件：“改变既有记录的可用性、强度或保留状态的操作”；MemoryRevisionOperation 条件：“以一个或多个既有记录为输入并产生新记录版本的操作”。任一条件成立不推出另一端。
-      en: "Reviewed sibling distinction: parent MemoryOperation: MemoryDispositionOperation (semantic kind=activity, backbone MemoryDispositionOperation-is_a-MemoryOperation); MemoryRevisionOperation (semantic kind=activity, backbone MemoryRevisionOperation-is_a-MemoryOperation). Endpoint conditions: MemoryDispositionOperation condition: “An operation changing an existing record's availability, strength, or retention state”; MemoryRevisionOperation condition: “An operation taking one or more existing records as input and producing a new record version”. Either condition leaves the other unproven."
-      ja: 審査済み兄弟区別：親 MemoryOperation：MemoryDispositionOperation（semantic kind=activity、バックボーン MemoryDispositionOperation-is_a-MemoryOperation）；MemoryRevisionOperation（semantic kind=activity、バックボーン MemoryRevisionOperation-is_a-MemoryOperation）。両端条件：MemoryDispositionOperation の条件：「既存recordのavailability・strength・retention stateを変えるoperationです」；MemoryRevisionOperation の条件：「一つ以上の既存recordをinputに新版recordを生成するoperationです」。一方の成立は他方を証明しません。
+      - claim-memory-disposition-operation-activity
+  - id: MemoryDispositionOperation-example-instance-capacity-eviction
+
+    labels:
+      zh: 容量驱逐实例
+      en: Capacity-eviction instance
+      ja: 容量追い出しインスタンス
+
+    descriptions:
+      zh: MemGPT core_memory_replace(key="human", old="Bob", new="Alice")；Generative Agents reflection importance threshold=150 触发。
+      en: MemGPT core_memory_replace(key="human", old="Bob", new="Alice"); Generative Agents reflection importance threshold=150 triggers.
+      ja: MemGPT core_memory_replace。Generative Agents reflection importance threshold=150 トリガー。
+    field_values:
+      operation_id: mem-op-evict-2403
+      operation_kind: disposition
+      status: succeeded
+      started_at: "2026-07-18T21:20:00Z"
+      ended_at: "2026-07-18T21:20:00.088Z"
+      actor_ref: retrieval-tier-manager-1
+      target_record_refs:
+        - record-2403-v4
+      disposition_kind: eviction
+      disposition_basis: capacity_pressure
+      disposition_effect: active_tier_removed
+      disposition_evidence_digest: sha256:36939f4db6204e4a98849b78d777418c38c1f6c5aeb0a87a51e20917e29aee3c
+      disposed_at: "2026-07-18T21:20:00.061Z"
+      durable_record_state: retained
+      tombstone_ref: absent
+    related_node_ids:
+      - MemoryDispositionOperation
+      - MemoryEviction
+      - MemoryRecord
+      - MemoryOperationResult
+      - MemoryAuditEvent
+    related_relation_ids:
+      - MemoryDispositionOperation-is_a-MemoryOperation
+      - MemoryEviction-is_a-MemoryDispositionOperation
+      - MemoryEviction-evicts-MemoryRecord
+      - MemoryOperation-has_result-MemoryOperationResult
+      - MemoryOperation-has_audit_event-MemoryAuditEvent
+
     source_claims:
-      - claim-memory-disposition-operation-005
+      - claim-memory-disposition-operation-kind
+      - claim-memory-disposition-operation-basis
+      - claim-memory-disposition-operation-effect
 parent_relation:
   id: MemoryDispositionOperation-is_a-MemoryOperation
   predicate: is_a
-  direction: target-to-source
+  direction: source-to-target
   relation_kind: hierarchy
   labels:
     zh: 是一种记忆操作
     en: is a memory operation
-    ja: 記憶操作の一種
+    ja: 記憶操作の一種である
   definitions:
-    zh: MemoryDispositionOperation —is_a→ MemoryOperation 表示：对象是既有 MemoryRecord，活动改变其强度、活动层驻留、到期资格或有效性。
-    en: MemoryDispositionOperation —is_a→ MemoryOperation holds because the object is an existing MemoryRecord whose strength, active-tier residency, expiry eligibility, or validity changes
-    ja: MemoryDispositionOperation —is_a→ MemoryOperation は、対象が既存MemoryRecordでstrength・active-tier residency・expiry eligibility・validityを変えるため成立します。
+    zh: MemoryDispositionOperation —is_a→ MemoryOperation 表示一个已执行的记忆活动对既有记录施加了有依据、可证实的生命周期状态效果。
+    en: MemoryDispositionOperation —is_a→ MemoryOperation means an executed memory activity applies a grounded and evidential lifecycle-state effect to an existing record.
+    ja: MemoryDispositionOperation —is_a→ MemoryOperation は、実行済みの記憶活動が既存レコードに根拠と証跡を伴うライフサイクル状態効果を適用することを表します。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
-    en: The relation is decided per auditable fact; no uniform runtime cardinality is imposed at ontology level.
-    ja: このrelationはaudit可能fact単位で判定しontology層で全runtime instanceへ一律cardinalityを課しません。
+    zh: 分类关系表达类型成员资格，不限制一次处置操作可处理的目标记录数。
+    en: The classification relation expresses type membership and does not limit the number of target records one disposition operation can handle.
+    ja: 分類関係は型メンバーシップを表し、一つの処分操作が扱える対象レコード数を制限しません。
   inverse_reading:
-    predicate: part_of
+    predicate: has_disposition_subtype
     labels:
-      zh: 反向读取
-      en: inverse is a memory operation
-      ja: 逆方向読取
+      zh: 具有处置操作子类
+      en: has disposition-operation subtype
+      ja: 処分操作サブタイプを持つ
   conditions:
-    - id: MemoryDispositionOperation-is_a-MemoryOperation-condition-manual-001
+    - id: MemoryDispositionOperation-is_a-MemoryOperation-child-differentia
       severity: error
       expression_language: plain
-      expression: Assert only when the instance satisfies the child differentia—the object is an existing MemoryRecord whose strength, active-tier residency, expiry eligibility, or validity changes—and already meets the activity definition of MemoryOperation.
-      explanations:
-        zh: 仅当实例满足子类种差“对象是既有 MemoryRecord，活动改变其强度、活动层驻留、到期资格或有效性。”且已满足 MemoryOperation 的活动定义时建立该边。
-        en: Assert only when the instance satisfies the child differentia—the object is an existing MemoryRecord whose strength, active-tier residency, expiry eligibility, or validity changes—and already meets the activity definition of MemoryOperation.
-        ja: instanceがchild differentia「対象が既存MemoryRecordでstrength・active-tier residency・expiry eligibility・validityを変えるため成立します。」を満たし、かつ MemoryOperation のactivity定義を満たす時だけassertします。
+      expression: "Assert only when the instance is an executed MemoryOperation over existing MemoryRecord targets that applies a documented disposition basis and one concrete lifecycle-state effect, rather than merely planning, assessing, or revising."
+      explanation:
+        zh: 父类活动身份不足以证明处置子类；必须同时有既有目标、已执行的状态效果和可追溯依据。
+        en: Parent activity identity alone does not prove the disposition subtype; an existing target, an applied state effect, and a traceable basis are all required.
+        ja: 親活動の識別だけでは処分サブタイプを証明できません。既存対象、適用済み状態効果、追跡可能な根拠のすべてが必要です。
       source_claims:
-        - claim-memory-disposition-operation-001
+        - claim-memory-disposition-operation-activity
+        - claim-memory-disposition-operation-boundary
   temporal_scope: timeless
   boundary_context: null
   constraints: []
   examples:
-    - id: MemoryDispositionOperation-is_a-MemoryOperation-example-positive-manual-20260716
-      kind: positive
+    - id: MemoryDispositionOperation-is_a-MemoryOperation-example-positive
+
       labels:
-        zh: 是一种记忆操作正例
-        en: "Positive case: is a memory operation"
-        ja: 記憶操作の一種正例
-      scenario_id: MemoryDispositionOperation-is_a-MemoryOperation:positive:20260716
+        zh: 已执行的到期处置属于记忆操作
+        en: Executed expiry disposition is a memory operation
+        ja: 実行済み期限切れ処分は記憶操作に属する
+
       descriptions:
-        zh: dispose-1101 对已存在的 record-1101 应用保留策略，把它从 active 状态改为 expired-pending-delete 并记录生效时间。
-        en: dispose-1101 applies a retention policy to existing record-1101, changing it from active to expired-pending-delete and recording the effective time.
-        ja: dispose-1101 は既存 record-1101 に retention policy を適用し active から expired-pending-delete へ変え effective time を記録します。
-      field_values: {}
+        zh: mem-op-expire-2401 有稳定活动身份、既有记录目标、保留依据、已应用的不合格效果和发生时间。
+        en: mem-op-expire-2401 has stable activity identity, an existing record target, retention basis, an applied ineligibility effect, and occurrence time.
+        ja: mem-op-expire-2401 は安定した活動識別、既存レコード対象、保持根拠、適用済み不適格効果、発生時刻を持ちます。
+      field_values:
+        operation_id: mem-op-expire-2401
+        operation_kind: disposition
+        target_record_refs:
+          - record-2401-v1
+        disposition_kind: expiration
+        disposition_basis: retention_policy
+        disposition_effect: retention_ineligible
+        disposed_at: "2026-07-18T21:00:00.144Z"
       related_node_ids:
         - MemoryDispositionOperation
         - MemoryOperation
       related_relation_ids:
         - MemoryDispositionOperation-is_a-MemoryOperation
-      expected_result:
-        zh: 将 dispose-1101 归入 MemoryDispositionOperation，因为它改变现有记录的可用性状态而非内容版本。
-        en: Classify dispose-1101 as MemoryDispositionOperation because it changes an existing record's usability state rather than its content version.
-        ja: dispose-1101 を MemoryDispositionOperation に分類します。既存 record の content version ではなく usability state を変えるためです。
-      why_valid_or_invalid:
-        zh: 活动对象是持久化记录，效果落在强度、驻留、资格或有效性之一，符合处置操作相对准入和修订的边界。
-        en: The object is persisted and the effect concerns strength, residency, eligibility, or validity, which defines disposition against admission and revision.
-        ja: object は永続済みで effect は strength・residency・eligibility・validity に関わり、admission/revision と区別されます。
-      synthetic: false
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+
       source_claims:
-        - claim-memory-disposition-operation-001
-    - id: MemoryDispositionOperation-is_a-MemoryOperation-example-boundary-manual-20260716
-      kind: boundary
+        - claim-memory-disposition-operation-activity
+        - claim-memory-disposition-operation-boundary
+    - id: MemoryDispositionOperation-is_a-MemoryOperation-example-boundary-plan
+
       labels:
-        zh: 是一种记忆操作边界例
-        en: "Boundary case: is a memory operation"
-        ja: 記憶操作の一種境界例
-      scenario_id: MemoryDispositionOperation-is_a-MemoryOperation:boundary:20260716
+        zh: 未来清理计划不是已执行操作
+        en: Future cleanup plan is not an executed operation
+        ja: 将来清掃計画は実行済み操作ではない
+
       descriptions:
-        zh: discard-1101 在任何记录创建前拒绝候选 item-1101，既没有现有 record_id，也没有改变记录状态。
-        en: discard-1101 rejects candidate item-1101 before any record is created; it has no existing record_id and changes no record state.
-        ja: discard-1101 は record 作成前に候補 item-1101 を拒否し、existing record_id も record state change もありません。
-      field_values: {}
+        zh: retention-job-2402 只计划在未来检查 record-2402-v1，没有处置活动身份或实际状态变化。
+        en: retention-job-2402 only plans a future check of record-2402-v1 and has neither disposition activity identity nor an actual state change.
+        ja: retention-job-2402 は record-2402-v1 の将来確認を計画するだけで、処分活動識別も実際の状態変更もありません。
+      field_values:
+        schedule_id: retention-job-2402
+        target_record_ref: record-2402-v1
+        planned_check_at: "2026-07-25T21:00:00Z"
+        operation_id: absent
+        disposition_effect: absent
       related_node_ids:
         - MemoryDispositionOperation
         - MemoryOperation
       related_relation_ids:
         - MemoryDispositionOperation-is_a-MemoryOperation
-      expected_result:
-        zh: 拒绝将 discard-1101 归为 MemoryDispositionOperation；它属于 MemoryAdmissionOperation 下的 MemoryDiscard。
-        en: Reject MemoryDispositionOperation membership for discard-1101; it belongs to MemoryDiscard under admission.
-        ja: discard-1101 の MemoryDispositionOperation 所属を拒否し、admission 配下の MemoryDiscard とします。
-      why_valid_or_invalid:
-        zh: 没有已存在记录就不存在可处置的强度、驻留、资格或有效性，候选拒绝必须留在准入阶段。
-        en: Without an existing record there is no strength, residency, eligibility, or validity to dispose; candidate rejection stays in admission.
-        ja: existing record がなければ disposition 対象の strength・residency・eligibility・validity はなく、candidate rejection は admission に残ります。
-      synthetic: false
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+
       source_claims:
-        - claim-memory-disposition-operation-001
+        - claim-memory-disposition-operation-activity
   source_claims:
-    - claim-memory-disposition-operation-001
-  distinct_fact_rationale: null
+    - claim-memory-disposition-operation-activity
+    - claim-memory-disposition-operation-boundary
+  distinct_fact_rationale:
+    zh: 此主干关系仅表达具有既有目标和实际生命周期效果的活动属于记忆操作；目标、具体种类、触发依据、效果、结果和审计证据分别由字段或独立关系表达。
+    en: This backbone relation only expresses that an activity with an existing target and actual lifecycle effect is a memory operation; target, concrete kind, triggering basis, effect, result, and audit evidence are expressed by fields or separate relations.
+    ja: この主幹関係は、既存対象と実際のライフサイクル効果を持つ活動が記憶操作であることだけを表します。対象、具体種別、起動根拠、効果、結果、監査証跡はフィールドまたは別関係で表します。
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-lifecycle-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 该节点仅完成了从现行候选数据到唯一 YAML 树的无损转录；尚未逐项完成人工语义核验，不得据此宣称已审定。
-    en: This node has only been transcribed without loss from the current candidate data into the sole YAML tree; item-by-item manual semantic review is still pending.
-    ja: このノードは現行候補データから唯一の YAML ツリーへ欠落なく転記した段階であり、項目別の手動意味審査は未完了です。
-  sections:
-    semantics: pending
-    hierarchy: pending
-    relations: pending
-    structure: pending
-    examples: pending
-    source_claims: []
+sources:
+  - id: w3c-prov-o
+    title: "W3C PROV-O: The PROV Ontology"
+    source_type: standard
+    url: https://www.w3.org/TR/prov-o/
+    relevance: Defines executed activities, entities, agents, time, and provenance associations as distinct facts.
+  - id: redis-expire
+    title: Redis EXPIRE command
+    source_type: official-doc
+    url: https://redis.io/docs/latest/commands/expire/
+    relevance: Documents time-based expiry as an explicit lifecycle action with observable effects.
+  - id: nist-sp-800-88r1
+    title: NIST SP 800-88 Rev. 1 Guidelines for Media Sanitization
+    source_type: standard
+    url: https://csrc.nist.gov/pubs/sp/800/88/r1/final
+    relevance: Separates controlled sanitization decisions and evidence from ordinary data availability changes.
+  - id: nist-fips-180-4
+    title: FIPS 180-4 Secure Hash Standard
+    source_type: standard
+    url: https://csrc.nist.gov/pubs/fips/180/4/final
+    relevance: Specifies SHA-256 message digests used to bind disposition evidence snapshots.
 source_claims:
-  - id: claim-memory-disposition-operation-001
-    source: eng-ont-prov-o
-    supports: PROV-O distinguishes an Activity from the Entity it uses or generates and the Agent associated with it; Moonweave applies that separation to memory operations.
-    locator: PROV-O Recommendation > Starting Point Terms > Entity, Activity, Agent, used, wasGeneratedBy, and wasInvalidatedBy
-    evidence_kind: design-inference
+  - id: claim-memory-disposition-operation-activity
+    source: w3c-prov-o
+    supports: PROV-O distinguishes an executed Activity from the entities it uses or changes in provenance records. Moonweave records disposition as an executed operation with target, actor, time, result, and audit evidence rather than a policy or future schedule.
+    locator: "PROV-O sections 3.1 Activity, 3.2 Entity, and 3.4 Agent"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-disposition-operation-002
-    source: eng-ont-prov-o
-    supports: MemoryDispositionOperation.disposition_operation_id records the stated operational datum so the concept instance can be identified or audited without changing the source model's own vocabulary.
-    locator: PROV-O Recommendation > Starting Point Terms > Entity, Activity, Agent, used, wasGeneratedBy, and wasInvalidatedBy
-    evidence_kind: design-inference
+  - id: claim-memory-disposition-operation-identity
+    source: w3c-prov-o
+    supports: PROV-O permits activities and provenance facts to have stable independent identities. Moonweave reuses one operation ID to join one disposition's targets, state effect, result, and audit evidence.
+    locator: "PROV-O Activity and Entity identifier model"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-disposition-operation-003
-    source: eng-ont-prov-o
-    supports: MemoryDispositionOperation.target_record_id records the stated operational datum so the concept instance can be identified or audited without changing the source model's own vocabulary.
-    locator: PROV-O Recommendation > Starting Point Terms > Entity, Activity, Agent, used, wasGeneratedBy, and wasInvalidatedBy
-    evidence_kind: design-inference
+  - id: claim-memory-disposition-operation-target
+    source: w3c-prov-o
+    supports: PROV-O distinguishes existing entities used by an activity from entities that are generated later. Moonweave disposes existing memory records and does not treat a candidate or future output as a disposed record.
+    locator: "PROV-O sections on prov:used and prov:wasGeneratedBy"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-disposition-operation-004
-    source: eng-ont-prov-o
-    supports: PROV-O can record both an Activity that invalidates an existing Entity and an Activity that uses one Entity to generate another. Moonweave maps these trace shapes to disposition and resolution respectively, while the memory-specific purposes and their sibling placement remain Moonweave design decisions.
-    locator: PROV-O Recommendation > Starting Point Terms > Entity, Activity, Agent, used, wasGeneratedBy, and wasInvalidatedBy
-    evidence_kind: design-inference
+  - id: claim-memory-disposition-operation-kind
+    source: redis-expire
+    supports: Redis documents expiry as an explicit time-based lifecycle action. Moonweave uses separate explicit kinds for expiration, decay, eviction, and deletion so different state effects are not silently merged.
+    locator: "Redis EXPIRE command behavior and key expiry semantics"
+    evidence_kind: ontology-design-inference
+    confidence: medium
+  - id: claim-memory-disposition-operation-basis
+    source: nist-sp-800-88r1
+    supports: NIST SP 800-88 describes sanitization as a controlled decision with defined methods and verification. Moonweave records the concrete controlled basis for a completed disposition instead of an unauditable cleanup label.
+    locator: "NIST SP 800-88 Rev. 1 media sanitization decision and verification guidance"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-disposition-operation-005
-    source: eng-ont-prov-o
-    supports: PROV-O distinguishes invalidation of an existing Entity from generation of a new Entity by an Activity. Moonweave uses that distinction to separate MemoryDispositionOperation from successor-producing MemoryRevisionOperation; PROV-O supplies provenance relations, not the memory lifecycle taxonomy.
-    locator: PROV-O Recommendation > Starting Point Terms > Entity, Activity, Agent, used, wasGeneratedBy, and wasInvalidatedBy
-    evidence_kind: design-inference
+  - id: claim-memory-disposition-operation-effect
+    source: nist-sp-800-88r1
+    supports: NIST SP 800-88 separates sanitization outcomes from merely changing access or storage conditions. Moonweave records an explicit applied effect and does not equate active-tier eviction or expiry marking with deletion.
+    locator: "NIST SP 800-88 Rev. 1 sanitization outcome and verification guidance"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
+  - id: claim-memory-disposition-operation-evidence
+    source: nist-fips-180-4
+    supports: FIPS 180-4 specifies fixed-size secure message digests. Moonweave stores a SHA-256 digest over target version, basis, state transition, and execution output to preserve disposition evidence.
+    locator: "FIPS 180-4 abstract and SHA-256 specification"
+    evidence_kind: ontology-design-inference
+    confidence: high
+  - id: claim-memory-disposition-operation-boundary
+    source: w3c-prov-o
+    supports: PROV-O distinguishes activities from the entities and descriptions surrounding them. Moonweave keeps disposition separate from policy definition, assessment conclusion, and content revision even when those facts are causally related.
+    locator: "PROV-O Activity, Entity, and provenance association model"
+    evidence_kind: ontology-design-inference
+    confidence: high

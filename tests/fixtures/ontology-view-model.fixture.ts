@@ -10,7 +10,6 @@ const sourceClaim = (ownerId: string, index: number) => ({
   locator: `section-${index}`,
   evidence_kind: "official",
   confidence: "high",
-  review_status: "accepted",
 });
 
 const example = (ownerId: string, index: number) => ({
@@ -63,8 +62,6 @@ const plane = (id: string) => ({
   examples: [example(id, 1)],
   source_claims: [sourceClaim(id, 1)],
   status: "accepted",
-  introduced_in: "https://moonweave.ai/ontology/agent-system/2.0.0/",
-  change_note: localized(`Introduced ${id}`),
 });
 
 const module = (id: string, planeId: string) => ({
@@ -82,15 +79,10 @@ const module = (id: string, planeId: string) => ({
   taxonomy_contract: {
     applicability: "specialization",
     not_applicable_reason: null,
-    reviewer: "ontology-reviewer",
-    review_status: "accepted",
   },
   examples: [example(id, 1)],
-  competency_questions: [],
   source_claims: [sourceClaim(id, 1)],
   status: "accepted",
-  introduced_in: "https://moonweave.ai/ontology/agent-system/2.0.0/",
-  change_note: localized(`Introduced ${id}`),
 });
 
 type ConceptOptions = {
@@ -125,13 +117,8 @@ const concept = (id: string, moduleId: string, options: ConceptOptions = {}) => 
   source_claims: options.richAnnotations
     ? Array.from({ length: 9 }, (_, index) => sourceClaim(id, index + 1))
     : [sourceClaim(id, 1)],
-  external_mappings: [],
   applicability: ["core"],
   status: "accepted",
-  introduced_in: "https://moonweave.ai/ontology/agent-system/2.0.0/",
-  deprecated_in: null,
-  replaced_by_ids: [],
-  change_note: localized(`Introduced ${id}`),
 });
 
 type RelationOptions = {
@@ -173,8 +160,6 @@ const relation = (
     examples: [example(id, 1), example(id, 2)],
     source_claims: [sourceClaim(id, 1)],
     status: "accepted",
-    introduced_in: "https://moonweave.ai/ontology/agent-system/2.0.0/",
-    change_note: localized(`Introduced ${id}`),
   };
 };
 
@@ -207,7 +192,6 @@ export const ontologyViewModelFixture = {
     plane("feedback-plane"),
     plane("memory-plane"),
     plane("info-plane"),
-    plane("adapter-plane"),
   ],
   modules: [
     module("run-lifecycle", "runtime-plane"),
@@ -218,7 +202,6 @@ export const ontologyViewModelFixture = {
     module("feedback-evaluation", "feedback-plane"),
     module("memory-context", "memory-plane"),
     module("info-evidence", "info-plane"),
-    module("adapter-interoperability", "adapter-plane"),
   ],
   classes: [
     concept("RuntimeEntity", "run-lifecycle"),
@@ -329,8 +312,8 @@ export const inheritanceProjectionFixture = {
     ...ontologyViewModelFixture.classes,
     inheritedFieldConcept("Message", null, "message_id", true),
     inheritedFieldConcept("AssistantMessage", "Message", "assistant_role", true),
-    inheritedFieldConcept("MediaBlock", null, "media_type", true),
-    inheritedFieldConcept("AudioBlock", "MediaBlock", "sample_rate_hz", false),
+    inheritedFieldConcept("MediaContent", null, "media_type", true),
+    inheritedFieldConcept("AudioContent", "MediaContent", "sample_rate_hz", false),
   ],
   relations: [
     ...ontologyViewModelFixture.relations,
@@ -338,7 +321,7 @@ export const inheritanceProjectionFixture = {
       kind: "hierarchy",
       predicate: "is_a",
     }),
-    relation("AudioBlock-is_a-MediaBlock", "AudioBlock", "MediaBlock", {
+    relation("AudioContent-is_a-MediaContent", "AudioContent", "MediaContent", {
       kind: "hierarchy",
       predicate: "is_a",
     }),

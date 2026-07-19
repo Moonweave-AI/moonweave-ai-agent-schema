@@ -3,539 +3,510 @@ id: RerankActivity
 kind: concept
 status: accepted
 labels:
-  zh: 候选重排
-  en: Candidate reranking
-  ja: 候補再順位付け
+  zh: 重排活动
+  en: Rerank Activity
+  ja: 再ランキング活動
 semantics:
   short_definition:
-    zh: 用声明的重排模型重新评估初始候选并形成新顺序的第二阶段活动。
-    en: A second-stage activity that reassesses initial candidates with a declared reranker model and forms a new order.
-    ja: 指定reranker modelでinitial candidateを再評価しnew orderを作るsecond-stage activityです。
+    zh: 使用已声明的重排模型对一个请求与已有候选集进行第二阶段重新排序的 RankingOperation 子类。
+    en: A RankingOperation subtype that uses a declared reranker model to perform second-stage reordering of one request and existing candidate set.
+    ja: 宣言済み reranker model を使い、一つの request と既存 candidate set の二段階 reordering を行う RankingOperation の下位型。
   definition:
-    zh: RerankActivity 消费一个已有 CandidateSet，把查询与候选字段交给声明版本的重排模型，产生 RerankScore 并据此重排或截断候选；它不从索引生成初始候选，也不把多个独立排名仅按位置融合。
-    en: RerankActivity consumes an existing CandidateSet, sends the query and declared candidate fields to a versioned reranker model, and produces RerankScore values that reorder or truncate candidates. It neither retrieves initial candidates from an index nor fuses independent rankings only by position.
-    ja: RerankActivity は既存CandidateSetをconsumeしqueryと指定candidate fieldをversioned reranker modelへ渡しRerankScoreで再順序/切詰めします。initial recallやrank-positionだけのfusionではありません。
+    zh: >
+      RerankActivity 是在初始候选召回之后以更精细模型重新估计候选顺序的活动。它读取一个请求、候选集和可版本化的
+      reranker，产生新的排序结果和可选重排分数。交叉编码器可对 query—document 对进行评分，但该活动不生成初始
+      候选、不融合多路排名、不只是取前 k 项、也不证明结果被授权、进入模型上下文或回答正确。
+    en: >
+      RerankActivity is activity that re-estimates candidate order with a more precise model after initial candidate
+      recall. It reads one request, candidate set, and versionable reranker and produces new ranked result and
+      optional rerank scores. A cross-encoder may score query–document pairs, but this activity does not generate
+      initial candidates, fuse multiple rankings, merely take first k items, or prove a result is authorized, in
+      model context, or answer-correct.
+    ja: >
+      RerankActivity は初期 candidate recall の後に、より精密な model で candidate order を再推定する activity です。
+      一つの request、candidate set、版管理可能な reranker を読み取り、新しい ranked result と任意の rerank score
+      を生成します。cross-encoder は query–document pair を score できますが、この activity は初期 candidate を
+      生成せず、複数 ranking を fusion せず、単に最初の k item を取らず、result が authorized、model context 内、
+      answer-correct であることも証明しません。
   why_needed:
-    zh: 保留二阶段检索中重排模型、输入字段、top_n 与输出分数的独立可追溯性。
-    en: Preserves independent traceability for the second-stage reranker model, input fields, top_n, and output scores.
-    ja: second-stage reranker model・input field・top_n・output scoreの独立追跡性を保持します。
+    zh: 高召回初筛与高精度比较通常使用不同模型和成本。显式记录重排能解释第二阶段模型、输入范围和排序变化。
+    en: High-recall first stage and high-precision comparison often use different models and costs. Explicit reranking explains second-stage model, input scope, and order change.
+    ja: high-recall first stage と high-precision comparison は異なる model と cost を使うことが多く、明示的 reranking は二段階 model、input scope、order change を説明します。
   includes:
-    - zh: 纳入交叉编码器或其他根据查询-候选联合内容重新评分的活动。
-      en: Includes cross-encoder and other activities that rescore joint query-candidate content.
-      ja: query-candidate joint contentを再採点するcross-encoder等activityを含みます。
+    - zh: 已执行的 query—candidate 对模型比较、输入候选集、reranker 版本和新的排序结果。
+      en: Executed model comparison of query–candidate pairs, input candidate set, reranker revision, and newly ranked result.
+      ja: 実行済み query–candidate pair の model comparison、input candidate set、reranker revision、新しい ranked result。
   excludes:
-    - zh: 排除初始候选召回、RRF/DBSF 融合、仅按既有顺序截取 TopK 和上下文采用。
-      en: Excludes initial recall, RRF or DBSF fusion, truncation of an existing order alone, and context admission.
-      ja: initial recall・RRF/DBSF fusion・既存順序だけのTopK truncation・context admissionを除外します。
+    - zh: 初始向量或词法召回、RRF 融合、一般单项评分、top-k 截断、离线嵌入、索引构建和答案评估。
+      en: Initial vector or lexical recall, RRF fusion, generic one-off scoring, top-k truncation, offline embedding, index construction, or answer evaluation.
+      ja: 初期 vector または lexical recall、RRF fusion、一般的な one-off scoring、top-k truncation、offline embedding、index construction、answer evaluation。
   semantic_kind: activity
-  aliases: []
+  aliases: [cross-encoder rerank, second-stage ranking, 二阶段精排]
+engineering:
+  explanation:
+    zh: Sentence Transformers CrossEncoder 对一组 query—document 对调用 predict，并可用分数排序文档。Moonweave 将该模型调用记录为 RerankActivity，而不是分数或候选本身。
+    en: Sentence Transformers CrossEncoder calls predict over query–document pairs and can order documents by scores. Moonweave records that model call as RerankActivity rather than score or candidate itself.
+    ja: Sentence Transformers CrossEncoder は query–document pair に predict を呼び出し、score で document を order できます。Moonweave はその model call を score や candidate 自体ではなく RerankActivity として記録します。
+  typical_input:
+    - description: Query and recalled candidates
+      format: |
+        {
+          "request_ref": "retrieval-request-support-18",
+          "input_candidate_set_ref": "candidate-set-support-18",
+          "reranker_model_ref": "cross-encoder-ms-marco-v1"
+        }
+  typical_output:
+    - description: Reranked result
+      format: |
+        {
+          "rerank_activity_id": "rerank-18",
+          "ranking_operation_id": "ranking-rerank-18",
+          "retrieval_activity_id": "retrieval-activity-support-18",
+          "request_ref": "retrieval-request-support-18",
+          "input_candidate_set_ref": "candidate-set-support-18",
+          "ranking_method_ref": "cross-encoder-ms-marco-v1",
+          "implementation_ref": "sentence-transformers-crossencoder-v1",
+          "reranker_model_ref": "cross-encoder-ms-marco-v1",
+          "output_result_ref": "retrieval-result-reranked-18",
+          "started_at": "2026-07-19T01:00:03Z",
+          "rerank_status": "completed",
+          "ranking_status": "completed",
+          "execution_status": "completed"
+        }
+  reference_implementations:
+    - name: Sentence Transformers CrossEncoder
+      url: https://www.sbert.net/docs/cross_encoder/usage/usage.html
+      description: Documents scoring query–document pairs with CrossEncoder.predict and sorting documents by score.
 structure:
-  identity_keys:
-    - rerank_activity_id
+  identity_keys: [rerank_activity_id]
   fields:
     - id: rerank_activity_id
-      labels:
-        zh: 重排活动标识
-        en: rerank activity ID
-        ja: rerank activity ID
+      labels: {zh: 重排活动标识, en: rerank activity ID, ja: 再ランキング活動 ID}
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
+      cardinality: {min: 1, max: 1}
       definitions:
-        zh: 稳定标识一次重排执行。
-        en: Stable identifier for one reranking execution.
-        ja: 一つのreranking executionを安定識別します。
+        zh: 标识一次实际重排执行，不能复用为 reranker 模型、候选集或结果标识。
+        en: Identifies one actual rerank execution and is not reused as reranker model, candidate set, or result ID.
+        ja: 一回の実際の rerank execution を識別し、reranker model、candidate set、result ID として再利用しません。
       allowed_values: []
-      pattern: null
-      example_value: rerank-416
-      source_claims:
-        - claim-rerank-activity-002
-    - id: model_version
-      labels:
-        zh: 重排模型版本
-        en: reranker model version
-        ja: reranker model version
+      pattern: "^rerank-[A-Za-z0-9._-]+$"
+      example_value: rerank-18
+      source_claims: [claim-rerank-cross-encoder]
+    - id: request_ref
+      labels: {zh: 请求引用, en: request reference, ja: request 参照}
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 指向与候选成对比较的确定 RetrievalRequest。
+        en: Points to determinate RetrievalRequest paired with candidates for comparison.
+        ja: comparison のため candidate と pair にする確定済み RetrievalRequest を指します。
+      allowed_values: []
+      pattern: "^retrieval-request-[A-Za-z0-9._-]+$"
+      example_value: retrieval-request-support-18
+      source_claims: [claim-rerank-provenance]
+    - id: input_candidate_set_ref
+      labels: {zh: 输入候选集引用, en: input candidate set reference, ja: input candidate set 参照}
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 指向实际交给 reranker 的候选集，而不是重排后从输出推断的集合。
+        en: Points to CandidateSet actually given to reranker rather than a set inferred from reranked output.
+        ja: reranker に実際に渡した CandidateSet を指し、reranked output から推論した set ではありません。
+      allowed_values: []
+      pattern: "^candidate-set-[A-Za-z0-9._-]+$"
+      example_value: candidate-set-support-18
+      source_claims: [claim-rerank-provenance]
+    - id: reranker_model_ref
+      labels: {zh: 重排模型引用, en: reranker model reference, ja: reranker model 参照}
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 指向执行 query—candidate 评估的模型或部署版本，不能仅以“rerank”描述。
+        en: Points to model or deployment revision executing query–candidate evaluation and cannot be described only as “rerank.”
+        ja: query–candidate evaluation を実行する model または deployment revision を指し、単に「rerank」とだけ記述できません。
+      allowed_values: []
+      pattern: "^[A-Za-z][A-Za-z0-9._-]+$"
+      example_value: cross-encoder-ms-marco-v1
+      source_claims: [claim-rerank-cross-encoder]
+    - id: output_result_ref
+      labels: {zh: 重排结果引用, en: reranked result reference, ja: reranked result 参照}
+      datatype: reference
+      required: false
+      cardinality: {min: 0, max: 1}
+      definitions:
+        zh: 成功时指向由此运行产生的新的 RetrievalResult；失败或运行中不得伪造。
+        en: On success points to new RetrievalResult produced by this run; it cannot be fabricated on failure or while running.
+        ja: 成功時にこの run が生成した新しい RetrievalResult を指し、failure または running 中に捏造できません。
+      allowed_values: []
+      pattern: "^retrieval-result-[A-Za-z0-9._-]+$"
+      example_value: retrieval-result-reranked-18
+      source_claims: [claim-rerank-provenance]
+    - id: rerank_status
+      labels: {zh: 重排状态, en: rerank status, ja: rerank status}
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
+      cardinality: {min: 1, max: 1}
       definitions:
-        zh: 记录实际执行重排的模型及不可替代版本。
-        en: Records the actual reranker model and non-substitutable version.
-        ja: 実際にrerankしたmodelと置換不能versionを記録します。
-      allowed_values: []
+        zh: 指示重排完成、失败、取消或部分完成，不代表模型对答案真实性的结论。
+        en: Indicates rerank completed, failed, was cancelled, or partial and is not model conclusion about answer truth.
+        ja: rerank が completed、failed、cancelled、partial のどれかを示し、answer truth に関する model conclusion ではありません。
+      allowed_values: [completed, failed, cancelled, partial]
       pattern: null
-      example_value: bge-reranker-v3
-      source_claims:
-        - claim-rerank-activity-003
-    - id: top_n
+      example_value: completed
+      source_claims: [claim-rerank-provenance]
+    - id: ranking_operation_id
       labels:
-        zh: 返回数量
-        en: top N
-        ja: top N
-      datatype: integer
-      required: true
-      cardinality:
-        min: 1
-        max: 1
+        zh: 排序操作标识
+        en: ranking operation ID
+        ja: ランキング操作 ID
       definitions:
-        zh: 记录重排调用请求返回的候选数量。
-        en: Number of reranked candidates requested from the operation.
-        ja: rerank operationに要求する返却candidate数です。
+        zh: 标识同一二阶段重排执行的通用排序操作身份，不复用为候选集、结果或分数标识。
+        en: Identifies the same second-stage rerank execution as a general ranking operation and is not reused as a candidate-set, result, or score ID.
+        ja: 同じ second-stage rerank execution を一般の ranking operation として識別し、candidate-set、result、score ID として再利用しない。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: '^ranking-[A-Za-z0-9._-]+$'
+      example_value: ranking-rerank-18
+      source_claims: [claim-rerank-subtype]
+    - id: ranking_method_ref
+      labels:
+        zh: 排序方法引用
+        en: ranking method reference
+        ja: ranking method 参照
+      definitions:
+        zh: 指向本次二阶段重排采用的方法或配置版本，不等同于单个候选的重排值。
+        en: Points to the reranking-method or configuration revision used by this second-stage execution and is not one candidate's rerank value.
+        ja: この second-stage execution が使う reranking-method または configuration revision を指し、一つの candidate の rerank value ではない。
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: '^[A-Za-z][A-Za-z0-9._-]+$'
+      example_value: cross-encoder-rerank-v1
+      source_claims: [claim-rerank-cross-encoder]
+    - id: ranking_status
+      labels:
+        zh: 排序状态
+        en: ranking status
+        ja: ranking status
+      definitions:
+        zh: 指示重排排序是否完成、失败、取消或部分完成，不等同于候选的重排相关性。
+        en: Indicates whether reranking completed, failed, was cancelled, or partially completed and is not a candidate's rerank relevance.
+        ja: reranking が completed、failed、cancelled、partial のどれかを示し、candidate の rerank relevance ではない。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: [completed, failed, cancelled, partial]
+      pattern: null
+      example_value: completed
+      source_claims: [claim-rerank-provenance]
+    - id: retrieval_activity_id
+      labels:
+        zh: 检索活动标识
+        en: retrieval activity ID
+        ja: retrieval activity ID
+      definitions:
+        zh: 标识同一二阶段重排执行的通用检索活动身份，不复用为请求、候选、分数或结果标识。
+        en: Identifies the same second-stage rerank execution as a general retrieval activity and is not reused as a request, candidate, score, or result ID.
+        ja: 同じ second-stage rerank execution を一般の retrieval activity として識別し、request、candidate、score、result ID として再利用しない。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: '^retrieval-activity-[A-Za-z0-9._-]+$'
+      example_value: retrieval-activity-rerank-18
+      source_claims: [claim-rerank-subtype]
+    - id: implementation_ref
+      labels:
+        zh: 实现引用
+        en: implementation reference
+        ja: implementation 参照
+      definitions:
+        zh: 指向执行该重排模型和方法的检索或排序实现版本，不等同于模型名称或输出分数。
+        en: Points to the retrieval or ranking implementation revision executing the reranker model and method, not the model name or an output score.
+        ja: reranker model と method を実行する retrieval または ranking implementation revision を指し、model 名や output score ではない。
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: '^retrieval-impl-[A-Za-z0-9._-]+$'
+      example_value: retrieval-impl-cross-encoder-v1
+      source_claims: [claim-rerank-cross-encoder]
+    - id: started_at
+      labels:
+        zh: 开始时间
+        en: started at
+        ja: 開始時刻
+      definitions:
+        zh: 记录二阶段重排检索活动开始的时间，不能由请求创建或输出结果发布时间替代。
+        en: Records when this second-stage rerank retrieval activity began and cannot be substituted by request creation or output-result publication time.
+        ja: この second-stage rerank retrieval activity の開始時刻を記録し、request 作成時刻や output-result 公開時刻では代替できない。
+      datatype: datetime
+      required: true
+      cardinality: {min: 1, max: 1}
       allowed_values: []
       pattern: null
-      example_value: 12
-      source_claims:
-        - claim-rerank-activity-004
-  constraints: []
-  required_relation_constraints: []
+      example_value: '2026-07-19T03:20:00Z'
+      source_claims: [claim-rerank-provenance]
+    - id: execution_status
+      labels:
+        zh: 执行状态
+        en: execution status
+        ja: execution status
+      definitions:
+        zh: 提供重排活动的粗粒度运行、完成或失败状态；详细取消和部分完成由 ranking_status 与 rerank_status 保留。
+        en: Provides coarse running, completed, or failed status for reranking while ranking_status and rerank_status retain cancellation and partial-completion detail.
+        ja: reranking の coarse な running、completed、failed 状態を示し、cancelled と partial の詳細は ranking_status と rerank_status に保持する。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: [running, completed, failed]
+      pattern: null
+      example_value: completed
+      source_claims: [claim-rerank-provenance]
+  constraints:
+    - id: rerank-inherits-ranking-and-retrieval-fields
+      severity: error
+      expression_language: plain
+      expression: RerankActivity is one RankingOperation and RetrievalActivity record. rerank_activity_id, ranking_operation_id, and retrieval_activity_id must resolve to the same execution; ranking_method_ref is the method configuration used with reranker_model_ref; implementation_ref executes that method; input_candidate_set_ref, request_ref, and output_result_ref remain the same execution facts; and ranking_status plus execution_status are the generic lifecycle projections of rerank_status.
+      explanation:
+        zh: 重排是排序和检索活动的真实特化；模型、方法与专用状态细化同一记录，而不另建父活动或吞并输入输出来源。
+        en: Reranking is a real ranking and retrieval specialization; its model, method, and detailed status refine one record without creating another parent activity or absorbing input-output provenance.
+        ja: reranking は真の ranking および retrieval 特殊化であり、model、method、詳細 status は一つの record を細化する。別の親 activity を作らず、input-output provenance を吸収しない。
+      source_claims: [claim-rerank-subtype, claim-rerank-provenance]
+    - id: rerank-input-output-provenance
+      severity: error
+      expression_language: plain
+      expression: request_ref, input_candidate_set_ref, reranker_model_ref, and rerank_status are required. A completed rerank requires output_result_ref whose members originate from the input candidate set; failure must not claim completed output.
+      explanation:
+        zh: 重排输出必须能回查实际请求、候选和模型；不能因相似主题或模型名称推断。
+        en: Rerank output must trace to actual request, candidates, and model and cannot be inferred from similar topic or model name.
+        ja: rerank output は実際の request、candidate、model まで追跡でき、似た topic や model name から推論できません。
+      source_claims: [claim-rerank-provenance]
+    - id: rerank-not-fusion-or-topk
+      severity: error
+      expression_language: plain
+      expression: RerankActivity must not assert independent-retriever fusion, initial recall, simple prefix selection, source authorization, ContextPackage inclusion, or answer correctness.
+      explanation:
+        zh: 重排以模型比较同一候选集；融合、召回、截断、治理和回答判断各有独立事实。
+        en: Rerank compares one candidate set with a model; fusion, recall, truncation, governance, and answer judgment are separate facts.
+        ja: rerank は model で一つの candidate set を比較し、fusion、recall、truncation、governance、answer judgment は別の事実です。
+      source_claims: [claim-rerank-boundary]
+  required_relations: []
 examples:
-  - id: RerankActivity-example-positive-manual-001
-    kind: positive
-    labels:
-      zh: 候选重排正例
-      en: "Positive case: Candidate reranking"
-      ja: 候補再順位付け正例
-    scenario_id: null
+  - id: rerank-example-positive
+
+    labels: {zh: CrossEncoder 重排候选, en: CrossEncoder reranks candidates, ja: CrossEncoder が candidate を rerank する}
+
     descriptions:
-      zh: rerank-416 用 bge-reranker-v3 对 80 个初始候选重评分并返回前 12 个。
-      en: rerank-416 uses bge-reranker-v3 to rescore 80 initial candidates and return 12.
-      ja: rerank-416 はbge-reranker-v3で80 initial candidateを再採点し12件を返します。
+      zh: Anthropic Contextual Retrieval：top-20 候选 + rerank 降检索失败率 67%；ColBERT rerank 用 MaxSim 重排；Self-RAG [IsRel] token 过滤不相关文档。
+      en: Anthropic Contextual Retrieval: top-20 candidates + rerank reduces failure 67%; ColBERT rerank via MaxSim; Self-RAG [IsRel] token filters irrelevant docs.
+      ja: Anthropic Contextual Retrieval top-20+rerank 失敗率 67% 低下。ColBERT MaxSim rerank。Self-RAG [IsRel] filter。
     field_values:
-      rerank_activity_id: rerank-416
-      model_version: bge-reranker-v3
-      top_n: 12
-      ranking_operation_id: rerank-416
-      input_candidate_set_id: candidate-set-fused-415
-      activity_id: rerank-416
-      started_at: 2026-07-16T12:04:00Z
-    related_node_ids:
-      - RerankActivity
-    related_relation_ids: []
-    expected_result:
-      zh: 归类为 RerankActivity。
-      en: Classify the object as RerankActivity.
-      ja: RerankActivity として分類します。
-    why_valid_or_invalid:
-      zh: 已有候选被声明模型重新评分，且产生可区分的 RerankScore。
-      en: Existing candidates are rescored by a declared model and produce distinguishable RerankScore values.
-      ja: 既存candidateを指定modelが再採点し区別可能RerankScoreを生成します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-rerank-activity-005
-  - id: RerankActivity-example-boundary-manual-001
-    kind: boundary
-    labels:
-      zh: 候选重排边界例
-      en: "Boundary case: Candidate reranking"
-      ja: 候補再順位付け境界例
-    scenario_id: null
+      rerank_activity_id: rerank-18
+      ranking_operation_id: ranking-rerank-18
+      retrieval_activity_id: retrieval-activity-support-18
+      request_ref: retrieval-request-support-18
+      input_candidate_set_ref: candidate-set-support-18
+      ranking_method_ref: cross-encoder-ms-marco-v1
+      implementation_ref: sentence-transformers-crossencoder-v1
+      reranker_model_ref: cross-encoder-ms-marco-v1
+      output_result_ref: retrieval-result-reranked-18
+      started_at: "2026-07-19T01:00:03Z"
+      rerank_status: completed
+      ranking_status: completed
+      execution_status: completed
+    related_node_ids: [RerankActivity, RankingOperation, CandidateSet, RetrievalResult]
+    related_relation_ids: [RerankActivity-is_a-RankingOperation, RerankActivity-uses-CandidateSet, RerankActivity-generates-RetrievalResult]
+
+    source_claims: [claim-rerank-cross-encoder, claim-rerank-provenance]
+  - id: rerank-example-counterexample-rrf
+
+    labels: {zh: RRF 多列表融合, en: RRF multi-list fusion, ja: RRF multi-list fusion}
+
     descriptions:
-      zh: fusion-416 按 RRF 只组合两个列表的排名位置，没有读取候选文本。
-      en: fusion-416 combines only rank positions from two lists using RRF and does not read candidate text.
-      ja: fusion-416 はRRFで二listのrank positionだけを結合しcandidate textを読みません。
-    field_values: {}
-    related_node_ids:
-      - RerankActivity
+      zh: 反例：rerank 输入超过 100 文档且无 TopKSelection 预过滤。
+      en: Counterexample: rerank input exceeds 100 documents without TopKSelection pre-filter.
+      ja: 反例：rerank 入力 100 doc 超 TopKSelection 事前 filter なし。
+    field_values:
+      fusion_method_ref: rrf-v1
+      input_ranked_list_refs: [candidate-set-lexical-18, candidate-set-vector-18]
+      reranker_model_ref: null
+      output_result_ref: retrieval-result-hybrid-18
+    related_node_ids: [RerankActivity, RankFusion]
     related_relation_ids: []
-    expected_result:
-      zh: 不得归类为 RerankActivity。
-      en: Do not classify the object as RerankActivity.
-      ja: RerankActivity として分類しません。
-    why_valid_or_invalid:
-      zh: 它是 RankFusion，不是模型重排。
-      en: It is RankFusion, not model reranking.
-      ja: RankFusionでmodel rerankingではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-rerank-activity-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+
+    source_claims: [claim-rerank-boundary]
+  - id: rerank-example-boundary-topk
+
+    labels: {zh: 仅取排序前五项, en: Only take first five ranked items, ja: rank 済み最初の五 item だけを取る}
+
+    descriptions:
+      zh: RerankActivity 重排 vs CandidateScoringActivity 初评；RerankScore 与 SimilarityScore 不同分数类型。
+      en: RerankActivity reranking vs CandidateScoringActivity initial scoring; RerankScore differs from SimilarityScore.
+      ja: RerankActivity rerank vs CandidateScoringActivity 初評。
+    field_values:
+      input_result_ref: retrieval-result-support-18
+      k: 5
+      reranker_model_ref: null
+      output_result_ref: retrieval-result-top5-18
+    related_node_ids: [RerankActivity, TopKSelection]
+    related_relation_ids: []
+
+    source_claims: [claim-rerank-boundary]
+  - id: rerank-example-instance-sentence-transformers
+
+    labels: {zh: 实例：Sentence Transformers CrossEncoder, en: "Instance: Sentence Transformers CrossEncoder", ja: "事例：Sentence Transformers CrossEncoder"}
+
+    descriptions:
+      zh: Anthropic pipeline：BM25 top-150 ∩ embedding top-150 → union top-20 → rerank → top-5 for context assembly。
+      en: Anthropic pipeline: BM25 top-150 ∩ embedding top-150 → union top-20 → rerank → top-5 for context assembly.
+      ja: Anthropic pipeline BM25∩embedding top-150→union top-20→rerank→top-5。
+    field_values:
+      rerank_activity_id: rerank-crossencoder-21
+      ranking_operation_id: ranking-rerank-21
+      retrieval_activity_id: retrieval-activity-support-21
+      request_ref: retrieval-request-support-21
+      input_candidate_set_ref: candidate-set-support-21
+      ranking_method_ref: sentence-transformers-crossencoder-v1
+      implementation_ref: sentence-transformers-crossencoder-v1
+      reranker_model_ref: sentence-transformers-crossencoder-v1
+      output_result_ref: retrieval-result-reranked-21
+      started_at: "2026-07-19T02:00:03Z"
+      rerank_status: completed
+      ranking_status: completed
+      execution_status: completed
+    related_node_ids: [RerankActivity, CandidateSet, RerankScore]
+    related_relation_ids: [RerankActivity-is_a-RankingOperation]
+    source_claims: [claim-rerank-cross-encoder]
 parent_relation:
   id: RerankActivity-is_a-RankingOperation
   predicate: is_a
-  direction: target-to-source
+  target: concept:RankingOperation
+  endpoint_order: child-to-parent
+  direction: source-to-target
   relation_kind: hierarchy
   labels:
-    zh: 是一种RankingOperation
-    en: is a RankingOperation
-    ja: RankingOperationの一種
+    zh: 是排序操作的重排子类
+    en: is a rerank subtype of ranking operation
+    ja: RankingOperation の再ランキング下位型である
   definitions:
-    zh: RerankActivity —is_a→ RankingOperation 成立，因为它用声明版本的模型重新评估已有候选并产生 RerankScore。
-    en: RerankActivity —is_a→ RankingOperation holds because it uses a declared model version to reassess existing candidates and produce RerankScore values.
-    ja: RerankActivity —is_a→ RankingOperation は指定model versionで既存candidateを再評価しRerankScoreを生成するため成立します。
+    zh: RerankActivity is_a RankingOperation，表示每次模型驱动候选顺序重估都是对已有候选的排序活动。
+    en: RerankActivity is_a RankingOperation means every model-driven candidate-order re-estimation is ranking activity over existing candidates.
+    ja: RerankActivity is_a RankingOperation は、すべての model-driven candidate-order re-estimation が既存 candidate に対する ranking activity であることを表します。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
-    en: The relation is decided per auditable fact; no universal runtime cardinality is imposed at ontology level.
-    ja: このrelationはaudit可能fact単位で判定しontology層で一律runtime cardinalityを課しません。
+    zh: 分类关系不规定 reranker 一次可处理多少候选。
+    en: Classification does not prescribe how many candidates reranker may process in one run.
+    ja: 分類関係は reranker が一回の run で処理できる candidate 数を規定しません。
   inverse_reading:
-    predicate: part_of
-    labels:
-      zh: 反向读取
-      en: inverse is_a
-      ja: 逆方向読取
-  conditions:
-    - id: RerankActivity-is_a-RankingOperation-condition-manual-001
-      severity: error
-      expression_language: plain
-      expression: "Assert only when the instance satisfies the complete RankingOperation definition and the child differentia: it uses a declared model version to reassess existing candidates and produce RerankScore values."
-      explanations:
-        zh: 仅当实例既满足 RankingOperation 的完整定义，又满足子类种差“它用声明版本的模型重新评估已有候选并产生 RerankScore。”时建立该边。
-        en: "Assert only when the instance satisfies the complete RankingOperation definition and the child differentia: it uses a declared model version to reassess existing candidates and produce RerankScore values."
-        ja: instanceがRankingOperation完全定義とchild differentia「指定model versionで既存candidateを再評価しRerankScoreを生成する」を共に満たす時だけassertします。
-      source_claims:
-        - claim-rerank-activity-007
+    predicate: has_rerank_activity_subtype
+    labels: {zh: 具有重排活动子类, en: has rerank-activity subtype, ja: 再ランキング活動下位型を持つ}
+  conditions: []
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: RerankActivity-is_a-RankingOperation-example-positive-manual-001
-      kind: positive
-      labels:
-        zh: 是一种RankingOperation正例
-        en: "Positive case: is a RankingOperation"
-        ja: RankingOperationの一種正例
-      scenario_id: null
-      descriptions:
-        zh: rerank-416 用 bge-reranker-v3 重排 80 个候选。
-        en: rerank-416 reranks 80 candidates with bge-reranker-v3.
-        ja: rerank-416がbge-reranker-v3で80候補をrerankします。
-      field_values: {}
-      related_node_ids:
-        - RerankActivity
-        - RankingOperation
-      related_relation_ids:
-        - RerankActivity-is_a-RankingOperation
-      expected_result:
-        zh: 建立该有向事实，并保留条件与证据。
-        en: Assert the directed fact with its condition and evidence retained.
-        ja: condition/evidenceを保持してdirected factをassertします。
-      why_valid_or_invalid:
-        zh: 实例满足端点定义、方向和该关系的显式成立条件。
-        en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-        ja: endpoint定義・direction・明示assertion conditionを満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-rerank-activity-007
-    - id: RerankActivity-is_a-RankingOperation-example-boundary-manual-001
-      kind: boundary
-      labels:
-        zh: 是一种RankingOperation边界例
-        en: "Boundary case: is a RankingOperation"
-        ja: RankingOperationの一種境界例
-      scenario_id: null
-      descriptions:
-        zh: fusion-415 只按排名位置组合列表。
-        en: fusion-415 only combines lists by rank position.
-        ja: fusion-415はrank positionだけでlistを結合します。
-      field_values: {}
-      related_node_ids:
-        - RerankActivity
-        - RankingOperation
-      related_relation_ids:
-        - RerankActivity-is_a-RankingOperation
-      expected_result:
-        zh: 验证器不得建立该有向关系事实。
-        en: Do not assert the directed fact.
-        ja: directed factをassertしません。
-      why_valid_or_invalid:
-        zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-        en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-        ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-rerank-activity-007
-  source_claims:
-    - claim-rerank-activity-007
-  distinct_fact_rationale: null
+  examples: []
+  source_claims: [claim-rerank-subtype]
+  distinct_fact_rationale:
+    zh: 此关系表达活动类型归属，不表达单个 rerank 分数、输入候选成员、RRF 融合或 top-k 选择。
+    en: This relation expresses activity type membership, not one rerank score, input candidate membership, RRF fusion, or top-k selection.
+    ja: この関係は activity type membership を表し、一つの rerank score、input candidate membership、RRF fusion、top-k selection は表しません。
   layout_role: primary-backbone
-  review_status: pending
-  endpoint_order: child-to-parent
 relations:
-  - id: RerankActivity-consumes-CandidateSet
-    predicate: consumes
-    direction: source-to-target
-    relation_kind: information
-    labels:
-      zh: consumes CandidateSet
-      en: consumes CandidateSet
-      ja: CandidateSetをconsumes
-    definitions:
-      zh: RerankActivity —consumes→ CandidateSet 表示重排活动把已有候选集合而非索引本身作为二阶段模型输入。
-      en: RerankActivity —consumes→ CandidateSet states that the reranking activity takes an existing candidate set, not the index itself, as second-stage model input.
-      ja: RerankActivity —consumes→ CandidateSet はreranking activityがindex自体でなく既存candidate setをsecond-stage model inputにします。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
-      en: The relation is decided per auditable fact; no universal runtime cardinality is imposed at ontology level.
-      ja: このrelationはaudit可能fact単位で判定しontology層で一律runtime cardinalityを課しません。
-    inverse_reading:
-      predicate: inverse_consumes
-      labels:
-        zh: 反向读取
-        en: inverse consumes
-        ja: 逆方向読取
-    conditions:
-      - id: RerankActivity-consumes-CandidateSet-condition-manual-001
-        severity: error
-        expression_language: plain
-        expression: Assert only when the documents in the rerank request correspond to this set's candidate members.
-        explanations:
-          zh: 仅当 rerank 请求中的 documents 与该集合候选成员一致时建立。
-          en: Assert only when the documents in the rerank request correspond to this set's candidate members.
-          ja: rerank request内documentsがこのsetのcandidate memberと対応する時だけassertします。
-        source_claims:
-          - claim-rerank-activity-008
-    temporal_scope: valid-time
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: RerankActivity-consumes-CandidateSet-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: consumes CandidateSet正例
-          en: "Positive case: consumes CandidateSet"
-          ja: CandidateSetをconsumes正例
-        scenario_id: null
-        descriptions:
-          zh: rerank-416 consumes candidate-set-fused-415。
-          en: rerank-416 consumes candidate-set-fused-415.
-          ja: rerank-416がcandidate-set-fused-415をconsumeします。
-        field_values: {}
-        related_node_ids:
-          - RerankActivity
-          - CandidateSet
-        related_relation_ids:
-          - RerankActivity-consumes-CandidateSet
-        expected_result:
-          zh: 建立该有向事实，并保留条件与证据。
-          en: Assert the directed fact with its condition and evidence retained.
-          ja: condition/evidenceを保持してdirected factをassertします。
-        why_valid_or_invalid:
-          zh: 实例满足端点定义、方向和该关系的显式成立条件。
-          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-          ja: endpoint定義・direction・明示assertion conditionを満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-rerank-activity-008
-      - id: RerankActivity-consumes-CandidateSet-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: consumes CandidateSet边界例
-          en: "Boundary case: consumes CandidateSet"
-          ja: CandidateSetをconsumes境界例
-        scenario_id: null
-        descriptions:
-          zh: 直接在索引上首次检索属于候选生成而非此关系。
-          en: First-stage index retrieval belongs to candidate generation, not this relation.
-          ja: index上first-stage retrievalはcandidate generationでこのrelationではありません。
-        field_values: {}
-        related_node_ids:
-          - RerankActivity
-          - CandidateSet
-        related_relation_ids:
-          - RerankActivity-consumes-CandidateSet
-        expected_result:
-          zh: 验证器不得建立该有向关系事实。
-          en: Do not assert the directed fact.
-          ja: directed factをassertしません。
-        why_valid_or_invalid:
-          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-rerank-activity-008
-    source_claims:
-      - claim-rerank-activity-008
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
+  - id: RerankActivity-uses-CandidateSet
+    predicate: uses
     target: concept:CandidateSet
-  - id: RerankActivity-produces-RerankScore
-    predicate: produces
+    endpoint_order: source-to-target
     direction: source-to-target
     relation_kind: causal
-    labels:
-      zh: produces RerankScore
-      en: produces RerankScore
-      ja: RerankScoreをproduces
+    labels: {zh: 使用候选集, en: uses candidate set, ja: candidate set を使用する}
     definitions:
-      zh: RerankActivity —produces→ RerankScore 表示该重排分数是声明模型联合评估查询与候选字段后的直接输出。
-      en: RerankActivity —produces→ RerankScore states that the rerank score is the direct output of the declared model jointly evaluating query and candidate fields.
-      ja: RerankActivity —produces→ RerankScore はrerank scoreが指定modelによるquery/candidate field joint evaluationのdirect outputです。
+      zh: 仅当 input_candidate_set_ref 指向目标且候选被实际提供给 reranker 时，重排活动使用该候选集。
+      en: RerankActivity uses CandidateSet only when input_candidate_set_ref identifies it and candidates were actually supplied to reranker.
+      ja: input_candidate_set_ref が対象を識別し、candidate が実際に reranker に与えられた場合にだけ、RerankActivity は CandidateSet を使用します。
     cardinality: null
     cardinality_not_applicable_reason:
-      zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
-      en: The relation is decided per auditable fact; no universal runtime cardinality is imposed at ontology level.
-      ja: このrelationはaudit可能fact単位で判定しontology層で一律runtime cardinalityを課しません。
+      zh: 批处理重排可使用多个明确输入集。
+      en: Batch rerank may use multiple explicitly recorded input sets.
+      ja: batch rerank は複数の明示的 input set を使用できます。
     inverse_reading:
-      predicate: inverse_produces
-      labels:
-        zh: 反向读取
-        en: inverse produces
-        ja: 逆方向読取
-    conditions:
-      - id: RerankActivity-produces-RerankScore-condition-manual-001
-        severity: error
-        expression_language: plain
-        expression: Assert only when score.model_version equals RerankActivity.model_version and candidate lineage is explicit.
-        explanations:
-          zh: 仅当 score.model_version 与 RerankActivity.model_version 一致且候选血缘明确时建立。
-          en: Assert only when score.model_version equals RerankActivity.model_version and candidate lineage is explicit.
-          ja: score.model_versionがactivity.model_versionと一致しcandidate lineageが明示される時だけassertします。
-        source_claims:
-          - claim-rerank-activity-008
+      predicate: is_used_by_rerank_activity
+      labels: {zh: 被重排活动使用, en: is used by rerank activity, ja: 再ランキング活動に使用される}
+    conditions: []
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
-    examples:
-      - id: RerankActivity-produces-RerankScore-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: produces RerankScore正例
-          en: "Positive case: produces RerankScore"
-          ja: RerankScoreをproduces正例
-        scenario_id: null
-        descriptions:
-          zh: rerank-416 produces rerank-score-430。
-          en: rerank-416 produces rerank-score-430.
-          ja: rerank-416がrerank-score-430を生成します。
-        field_values: {}
-        related_node_ids:
-          - RerankActivity
-          - RerankScore
-        related_relation_ids:
-          - RerankActivity-produces-RerankScore
-        expected_result:
-          zh: 建立该有向事实，并保留条件与证据。
-          en: Assert the directed fact with its condition and evidence retained.
-          ja: condition/evidenceを保持してdirected factをassertします。
-        why_valid_or_invalid:
-          zh: 实例满足端点定义、方向和该关系的显式成立条件。
-          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-          ja: endpoint定義・direction・明示assertion conditionを満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-rerank-activity-008
-      - id: RerankActivity-produces-RerankScore-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: produces RerankScore边界例
-          en: "Boundary case: produces RerankScore"
-          ja: RerankScoreをproduces境界例
-        scenario_id: null
-        descriptions:
-          zh: 模型版本不同或仅复制旧分数时不得建立。
-          en: Do not assert when model versions differ or the value merely copies an old score.
-          ja: model version不一致またはold scoreコピーだけならassertしません。
-        field_values: {}
-        related_node_ids:
-          - RerankActivity
-          - RerankScore
-        related_relation_ids:
-          - RerankActivity-produces-RerankScore
-        expected_result:
-          zh: 验证器不得建立该有向关系事实。
-          en: Do not assert the directed fact.
-          ja: directed factをassertしません。
-        why_valid_or_invalid:
-          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-rerank-activity-008
-    source_claims:
-      - claim-rerank-activity-008
-    distinct_fact_rationale: null
+    examples: []
+    source_claims: [claim-rerank-provenance]
+    distinct_fact_rationale: "This records candidate input use rather than candidate containment in the activity."
     layout_role: cross-link
-    review_status: accepted
-    target: concept:RerankScore
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+  - id: RerankActivity-generates-RetrievalResult
+    predicate: generates
+    target: concept:RetrievalResult
+    endpoint_order: source-to-target
+    direction: source-to-target
+    relation_kind: causal
+    labels: {zh: 生成重排结果, en: generates reranked result, ja: reranked result を生成する}
+    definitions:
+      zh: 仅当 output_result_ref 指向目标且运行完成时，RerankActivity 生成该重排结果。
+      en: RerankActivity generates RetrievalResult only when output_result_ref identifies it and the run completed.
+      ja: output_result_ref が対象を識別し run が完了した場合にだけ、RerankActivity は RetrievalResult を生成します。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 一个执行通常生成一个重排结果；批处理可记录多个明确输出。
+      en: One execution normally generates one reranked result; batch may record multiple explicit outputs.
+      ja: 一つの execution は通常一つの reranked result を生成し、batch では複数の明示的 output を記録できます。
+    inverse_reading:
+      predicate: is_generated_by_rerank_activity
+      labels: {zh: 由重排活动生成, en: is generated by rerank activity, ja: 再ランキング活動により生成される}
+    conditions: []
+    temporal_scope: valid-time
+    boundary_context: null
+    constraints: []
+    examples: []
+    source_claims: [claim-rerank-provenance]
+    distinct_fact_rationale: "This is causal result generation and does not make the result an activity subtype or component."
+    layout_role: cross-link
+sources:
+  - id: sentence-transformers-cross-encoder
+    title: Sentence Transformers CrossEncoder usage
+    source_type: official-project-documentation
+    url: https://www.sbert.net/docs/cross_encoder/usage/usage.html
+    relevance: Documents CrossEncoder.predict over query–document pairs and sorting documents by score.
+  - id: w3c-prov-o
+    title: "W3C PROV-O: The PROV Ontology"
+    source_type: standard
+    url: https://www.w3.org/TR/prov-o/
+    relevance: Distinguishes activities from entities they use and generate.
 source_claims:
-  - id: claim-rerank-activity-001
-    source: eng-vector-pinecone-reranking
-    supports: Pinecone documents a two-stage workflow in which initial search results are rescored by a selected reranker model using query, documents, rank_fields, top_n, and truncation settings.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
+  - id: claim-rerank-cross-encoder
+    source: sentence-transformers-cross-encoder
+    supports: Sentence Transformers documents CrossEncoder.predict for query–document pairs and ranking documents by resulting scores. Moonweave records one such execution as RerankActivity.
+    locator: "CrossEncoder usage: reranking search results"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-rerank-activity-002
-    source: eng-vector-pinecone-reranking
-    supports: "Pinecone documents a two-stage workflow in which initial search results are rescored by a selected reranker model using query, documents, rank_fields, top_n, and truncation settings. Moonweave records RerankActivity.rerank_activity_id as the stated auditable datum: Stable identifier for one reranking execution."
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
+  - id: claim-rerank-boundary
+    source: sentence-transformers-cross-encoder
+    supports: CrossEncoder documents query–document scoring for reranking. Moonweave distinguishes that model-based second stage from RRF fusion, initial recall, top-k selection, authorization, and answer quality.
+    locator: "CrossEncoder usage: reranking search results"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-rerank-activity-003
-    source: eng-vector-pinecone-reranking
-    supports: "Pinecone documents a two-stage workflow in which initial search results are rescored by a selected reranker model using query, documents, rank_fields, top_n, and truncation settings. Moonweave records RerankActivity.model_version as the stated auditable datum: Records the actual reranker model and non-substitutable version."
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
+  - id: claim-rerank-provenance
+    source: w3c-prov-o
+    supports: PROV-O distinguishes activities from entities they use and generate. Moonweave applies this to RerankActivity, CandidateSet, and newly ranked RetrievalResult.
+    locator: "PROV-O: Activity, Entity, prov:used, and prov:wasGeneratedBy"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-rerank-activity-004
-    source: eng-vector-pinecone-reranking
-    supports: "Pinecone documents a two-stage workflow in which initial search results are rescored by a selected reranker model using query, documents, rank_fields, top_n, and truncation settings. Moonweave records RerankActivity.top_n as the stated auditable datum: Number of reranked candidates requested from the operation."
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-rerank-activity-005
-    source: eng-vector-pinecone-reranking
-    supports: Pinecone documents a two-stage workflow in which initial search results are rescored by a selected reranker model using query, documents, rank_fields, top_n, and truncation settings. Pinecone documents reranking as a second-stage rescore of initial search results with model and top_n parameters.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-rerank-activity-006
-    source: eng-vector-pinecone-reranking
-    supports: Pinecone documents a two-stage workflow in which initial search results are rescored by a selected reranker model using query, documents, rank_fields, top_n, and truncation settings. RRF and reranking are documented as different ordering mechanisms.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-rerank-activity-007
-    source: eng-vector-pinecone-reranking
-    supports: The official documentation supports the operational distinction used in this child differentia; Moonweave's RerankActivity-to-RankingOperation subclass placement is an explicit ontology design decision.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-rerank-activity-008
-    source: eng-vector-pinecone-reranking
-    supports: The cited official documentation supports the endpoint roles and direction of this retrieval fact; the exact relation identifier and ownership boundary are Moonweave design decisions.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
+  - id: claim-rerank-subtype
+    source: sentence-transformers-cross-encoder
+    supports: Modeling a query–candidate model reordering execution as RerankActivity subtype of RankingOperation is a Moonweave taxonomy inference based on CrossEncoder reranking behavior.
+    locator: "CrossEncoder usage: reranking search results"
+    evidence_kind: ontology-design-inference
+    confidence: medium

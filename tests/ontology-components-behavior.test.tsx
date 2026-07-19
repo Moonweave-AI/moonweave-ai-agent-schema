@@ -383,7 +383,7 @@ describe("recursive directory and attached node information", () => {
     expect(onFocusRelation).toHaveBeenCalled();
   });
 
-  it("renders root case paths and canonical relation details in the same twelve-row table", () => {
+  it("renders root case paths and canonical relation details in the same nine-row table", () => {
     reactHarness.forceExpanded = true;
     const rootState = createOntologyViewState(index);
     const rootView = buildVisibleConceptGraph(index, rootState);
@@ -391,7 +391,7 @@ describe("recursive directory and attached node information", () => {
       focusedEntityRef: index.rootRef,
       highlightedScenarioId: "attached-case",
     })));
-    expect(rootHosts.filter(({ props }) => props["data-detail-row"] !== undefined)).toHaveLength(12);
+    expect(rootHosts.filter(({ props }) => props["data-detail-row"] !== undefined)).toHaveLength(9);
     invokeHostControls(rootHosts);
 
     const relationId = "AgentRun-produces-RunResult";
@@ -405,7 +405,7 @@ describe("recursive directory and attached node information", () => {
     const relationHosts = evaluate(OntologyCharacteristics(characteristicsProps(relationView, {
       focusedRelationId: relationId,
     })));
-    expect(relationHosts.filter(({ props }) => props["data-detail-row"] !== undefined)).toHaveLength(12);
+    expect(relationHosts.filter(({ props }) => props["data-detail-row"] !== undefined)).toHaveLength(9);
     invokeHostControls(relationHosts);
     expect(onBackToNode).toHaveBeenCalled();
     expect(onFocusEntity).toHaveBeenCalled();

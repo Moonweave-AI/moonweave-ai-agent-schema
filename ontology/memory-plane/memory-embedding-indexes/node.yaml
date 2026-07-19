@@ -3,1258 +3,217 @@ id: memory-embedding-indexes
 kind: module
 status: accepted
 labels:
-  zh: 检索表示与索引
-  en: Retrieval representations and indexes
-  ja: 検索表現と索引
+  zh: 嵌入与索引
+  en: Embeddings and Indexes
+  ja: 埋め込みとインデックス
 semantics:
   short_definition:
-    zh: 检索表示与索引区分三种身份：Representation 是从内容派生的可比较表示；Index 及其版本、分片和条目是可持续查询的结构；IndexActivity 是生成表示、构建或刷新索引的活动。VectorDatabase 只是托管这些索引的存储后端，不是 Index 子类。
-    en: "Representations and indexes describes three connected but distinct lines: how source content becomes an indexable Representation, how a logical Index unfolds into immutable IndexVersion, IndexShard, and IndexEntry records, and how IndexActivity generates representations or builds versions. The stores domain owns VectorDatabase; this module references it only through the hosts fact that identifies its VectorIndex."
-    ja: 表現と索引は、出典内容から Representation、論理 Index から不変 IndexVersion・IndexShard・IndexEntry、IndexActivity から表現・版生成という三系統を分離します。VectorDatabase は store domain が所有し、本 module はどの VectorIndex を hosts するかという fact だけで参照します。
+    zh: 规定内容表示、嵌入生成、索引构建和索引条目之间边界的记忆平面模块。
+    en: The memory-plane module that separates content representations, embedding generation, index construction, and index entries.
+    ja: content representation、embedding generation、index construction、index entry の境界を定める memory-plane module。
   definition:
-    zh: 表示与索引描述三条相互衔接但不混同的主线：源内容如何形成可索引的 Representation，逻辑 Index 如何展开为不可变 IndexVersion、IndexShard 与 IndexEntry，以及 IndexActivity 如何生成表示或构建版本。存储域拥有 VectorDatabase，本模块只通过 hosts 事实说明某个数据库托管哪个 VectorIndex。
-    en: "Representations and indexes describes three connected but distinct lines: how source content becomes an indexable Representation, how a logical Index unfolds into immutable IndexVersion, IndexShard, and IndexEntry records, and how IndexActivity generates representations or builds versions. The stores domain owns VectorDatabase; this module references it only through the hosts fact that identifies its VectorIndex."
-    ja: 表現と索引は、出典内容から Representation、論理 Index から不変 IndexVersion・IndexShard・IndexEntry、IndexActivity から表現・版生成という三系統を分離します。VectorDatabase は store domain が所有し、本 module はどの VectorIndex を hosts するかという fact だけで参照します。
+    zh: >-
+      memory-embedding-indexes 模块描述如何把已有内容工件转换为可检索的数值或词项表示，并如何将这些表示写入、版本化和维护在
+      Index 中。EmbeddingRun 生成 EmbeddingVector；IndexBuildRun 以明确输入建立或更新 Index、IndexVersion、IndexShard 和
+      IndexEntry；VectorIndex、TfIdfIndex 和 HybridIndex 是不同的索引结构。它不把 Chunk 当作向量，不把 VectorDatabase
+      设施当作 VectorIndex，也不把候选、重排结果或最终 Context Assembly 视为索引写入结果。查询和排序属于 retrieval 平面，
+      且不能因为命中索引而隐式写入任何持久工件。
+    en: >-
+      The memory-embedding-indexes module describes how an existing content artifact becomes a retrievable numeric or
+      term representation and how that representation is written, versioned, and maintained in an Index. EmbeddingRun
+      produces an EmbeddingVector; IndexBuildRun creates or updates an Index, IndexVersion, IndexShard, and IndexEntry
+      from explicit inputs; VectorIndex, TfIdfIndex, and HybridIndex are different index structures. It does not treat a
+      Chunk as a vector, a VectorDatabase facility as a VectorIndex, or a candidate, reranking result, or final Context
+      Assembly as an index-write result. Querying and ranking belong to the retrieval plane and cannot implicitly write a
+      persistent artifact merely because an index hit occurred.
+    ja: >-
+      memory-embedding-indexes module は、既存 content artifact が retrievable な numeric 又は term representation になる方法と、
+      その representation を Index に write、version、maintain する方法を表します。EmbeddingRun は EmbeddingVector を生成し、
+      IndexBuildRun は明示 input から Index、IndexVersion、IndexShard、IndexEntry を作成又は更新します。VectorIndex、
+      TfIdfIndex、HybridIndex は異なる index structure です。Chunk を vector、VectorDatabase facility を VectorIndex、
+      candidate、reranking result、最終 Context Assembly を index-write result として扱いません。query と ranking は retrieval
+      plane の関心であり、index hit があっても persistent artifact を暗黙に write できません。
   why_needed:
-    zh: 把记忆内容转换为可版本化表示，并组织为可构建、刷新和定位条目的持久索引。
-    en: Convert memory content into versioned representations and organize it in persistent indexes whose entries can be built, refreshed, and located.
-    ja: 記憶内容を版管理可能な表現へ変換し、構築、更新、条目位置付けが可能な永続索引として組織します。
+    zh: 只有把表示生成、索引写入和检索读取分开，系统才能追溯向量来自何种内容和模型，并防止查询路径篡改记忆。
+    en: Separating representation generation, index writes, and retrieval reads makes vector provenance traceable and prevents a query path from mutating memory.
+    ja: representation generation、index write、retrieval read を分けることで vector provenance を追跡でき、query path による memory mutation を防ぐ。
   includes:
-    - zh: Representation → VectorRepresentation；其下区分 DenseVector、SparseVector 与由模型生成的 EmbeddingVector，后者再细分为 TextEmbedding 和 GraphEmbedding。
-      en: Representation to VectorRepresentation, then DenseVector, SparseVector, and model-generated EmbeddingVector, with TextEmbedding and GraphEmbedding below the latter.
-      ja: Representation から VectorRepresentation へ進み、その下で DenseVector、SparseVector、モデル生成の EmbeddingVector を区別し、さらに後者を TextEmbedding と GraphEmbedding に分けます。
-    - zh: Index 的向量、混合与 TF-IDF 专化，IndexVersion → IndexShard → IndexEntry 的组成链，以及 EmbeddingRun、IndexBuildRun 与 IndexRefreshRun 的活动链。
-      en: Vector, hybrid, and TF-IDF specializations of Index; the IndexVersion to IndexShard to IndexEntry composition chain; and the EmbeddingRun, IndexBuildRun, and IndexRefreshRun activity chain.
-      ja: Index のベクトル、ハイブリッド、TF-IDF 特殊化、IndexVersion から IndexShard、IndexEntry へ続く構成連鎖、および EmbeddingRun、IndexBuildRun、IndexRefreshRun の活動連鎖。
+    - zh: 内容到 EmbeddingVector 的明确生成、索引版本和分片的构建、以及包含标识、表示引用和受控元数据的索引条目。
+      en: Explicit content-to-EmbeddingVector generation, construction of index versions and shards, and index entries with an ID, representation reference, and controlled metadata.
+      ja: 明示的な content-to-EmbeddingVector generation、index version と shard の construction、ID、representation reference、controlled metadata を持つ index entry。
   excludes:
-    - zh: EmbeddingModel 的模型身份与版本由运行时本体拥有，本模块只通过 EmbeddingRun 引用；VectorDatabase 虽可托管 VectorIndex，但不进入 Index 分类主链。
-      en: Runtime ontology owns EmbeddingModel identity and version, which this module only references through EmbeddingRun; VectorDatabase may host a VectorIndex but does not enter the Index taxonomy.
-      ja: EmbeddingModel の同一性と版は実行時オントロジーが所有し、本モジュールは EmbeddingRun を通じて参照するだけです。VectorDatabase は VectorIndex をホストできますが、Index の分類主系統には入りません。
-    - zh: Query、候选、评分、融合和重排活动归检索与排序；索引不拥有一次检索结果。
-      en: Query, candidates, scores, fusion, and reranking activities belong to retrieval and ranking; an index does not own a retrieval result.
-      ja: Query、候補、得点、融合、再順位付け活動は検索と順位付けに属し、索引は検索結果を所有しません。
-  semantic_kind: null
-  aliases: []
-purpose:
-  zh: 把记忆内容转换为可版本化表示，并组织为可构建、刷新和定位条目的持久索引。
-  en: Convert memory content into versioned representations and organize it in persistent indexes whose entries can be built, refreshed, and located.
-  ja: 記憶内容を版管理可能な表現へ変換し、構築、更新、条目位置付けが可能な永続索引として組織します。
-structure: null
+    - zh: Chunk 切分、向量数据库部署、检索请求、候选排序、重排决策和已经传给模型的上下文。
+      en: Chunk splitting, vector-database deployment, retrieval requests, candidate ranking, reranking decisions, and context already sent to a model.
+      ja: Chunk splitting、vector-database deployment、retrieval request、candidate ranking、reranking decision、既に model に送られた context。
+  semantic_kind: module
+  aliases: [embedding pipeline model, index construction model]
+engineering:
+  explanation:
+    zh: >-
+      摄取或分块活动提供带来源的内容引用；EmbeddingRun 调用模型并记录模型、输入摘要、维度与输出向量引用；随后
+      IndexBuildRun 将兼容表示通过显式 upsert 写入目标 IndexVersion。Pinecone 文档中的索引记录由 ID、dense 或 sparse
+      向量及元数据组成；其搜索 API 读取既有记录并返回匹配结果。Moonweave 因此把搜索候选保留在检索平面，而不把它们写回索引。
+    en: >-
+      Ingestion or chunking provides content references with provenance. An EmbeddingRun calls a model and records the
+      model, input digest, dimension, and output-vector reference; an IndexBuildRun then writes compatible representations
+      to a target IndexVersion through an explicit upsert. Pinecone documents index records with an ID, dense or sparse
+      vector, and metadata, and its search API reads existing records and returns matches. Moonweave therefore retains
+      search candidates in the retrieval plane rather than writing them back into an index.
+    ja: >-
+      ingestion 又は chunking は provenance 付き content reference を提供します。EmbeddingRun は model を呼び、model、input
+      digest、dimension、output-vector reference を記録します。IndexBuildRun はその後 compatible representation を明示 upsert
+      で target IndexVersion に write します。Pinecone は ID、dense 又は sparse vector、metadata を持つ index record を文書化し、
+      search API は既存 record を read して match を返します。したがって Moonweave は search candidate を index に write back
+      せず retrieval plane に保持します。
+  typical_input:
+    - description: Explicit embedding and index-build inputs
+      format: |
+        embedding_run = {"content_ref":"chunk-42","model":"text-embedding-3-small","input_digest":"sha256:aa21"}
+        build = {"index_ref":"project-index-p-88","index_version":"v4","vector_ref":"embedding-chunk-42-v1","mode":"upsert"}
+  typical_output:
+    - description: Persisted index entry, distinct from a query result
+      format: |
+        {"index_entry_id":"entry-p-88-42","index_version_ref":"project-index-p-88-v4","representation_ref":"embedding-chunk-42-v1","write_performed":true}
+  reference_implementations:
+    - name: OpenAI embeddings guide
+      url: https://developers.openai.com/api/docs/guides/embeddings
+      description: Documents creating numerical vector representations from supplied input content.
+    - name: Pinecone indexing overview
+      url: https://docs.pinecone.io/guides/index-data/indexing-overview
+      description: Documents indexes with dense, sparse, text, and metadata fields and explicit data indexing.
+structure:
+  identity_keys: [module_id]
+  fields:
+    - id: module_id
+      labels: {zh: 模块标识, en: module ID, ja: モジュール ID}
+      definitions:
+        zh: 稳定标识这组嵌入和索引边界，而不是其中的一个模型、向量、索引或查询。
+        en: Stably identifies this set of embedding and indexing boundaries, not one model, vector, index, or query inside it.
+        ja: この embedding と indexing boundary 群を安定して識別し、内部の一つの model、vector、index、query ではない。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: [memory-embedding-indexes]
+      pattern: null
+      example_value: memory-embedding-indexes
+      source_claims: [claim-module-indexed-representations]
+    - id: write_read_boundary
+      labels: {zh: 写读边界, en: write/read boundary, ja: write/read 境界}
+      definitions:
+        zh: 声明嵌入和索引构建是显式写路径，检索候选和重排是不会写回持久工件的读路径。
+        en: Declares that embedding and index construction are explicit write paths while retrieval candidates and reranking are read paths that do not write persistent artifacts.
+        ja: embedding と index construction は明示 write path、retrieval candidate と reranking は persistent artifact を write しない read path であることを宣言する。
+      datatype: json
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: null
+      example_value: '{"writes":["EmbeddingRun","IndexBuildRun"],"reads":["RetrievalRequest","Reranking"]}'
+      source_claims: [claim-module-embedding-generation, claim-module-indexed-representations, claim-module-query-read-only]
+  constraints:
+    - id: embedding-index-module-boundary
+      severity: error
+      expression_language: plain
+      expression: Content representation, embedding generation, index construction, vector-database facility, index entry, retrieval candidate, reranking output, checkpoint history, and final Context Assembly must remain separately asserted. A retrieval query must not create or update an embedding, IndexVersion, IndexEntry, or MemoryRecord without a distinct write activity.
+      explanation:
+        zh: 这些对象由不同输入、不同活动和不同时间边界产生；分离它们可让索引可重建、检索可审计且模型可见性不会被索引命中暗示。
+        en: These objects arise from different inputs, activities, and time boundaries. Keeping them separate makes indexes rebuildable, retrieval auditable, and model visibility independent of an index hit.
+        ja: これらの object は異なる input、activity、time boundary から生じる。分離により index は rebuild 可能になり、retrieval は audit 可能になり、model visibility は index hit から独立する。
+      source_claims: [claim-module-indexed-representations, claim-module-query-read-only, claim-module-design]
+  required_relations: []
 examples:
-  - id: memory-embedding-indexes-cq-representation-lineage-v3-example-positive
-    kind: positive
-    labels:
-      zh: 嵌入来源链正例
-      en: Positive embedding-lineage case
-      ja: embedding来歴chain正例
-    scenario_id: embedding-lineage-17
+  - id: embedding-index-module-positive
+
+    labels: {zh: 显式向量索引写入, en: Explicit vector-index write, ja: 明示 vector-index write}
+
     descriptions:
-      zh: embedding-run-17 明确消费 chunk-17@3、调用 text-embedding-3-small@2026-07 并产生 emb-17；emb-17 的 input_digest 又与 chunk-17@3 完全一致。
-      en: embedding-run-17 explicitly consumes chunk-17@3, invokes text-embedding-3-small@2026-07, and produces emb-17; emb-17's input_digest exactly matches chunk-17@3.
-      ja: embedding-run-17 は chunk-17@3 を明示消費し text-embedding-3-small@2026-07 を呼び emb-17 を生成し、emb-17 の input_digest も chunk-17@3 と完全一致します。
-    field_values:
-      run_id: embedding-run-17
-      chunk_version: chunk-17@3
-      model_snapshot: text-embedding-3-small@2026-07
-      embedding_id: emb-17
-    related_node_ids:
-      - EmbeddingRun
-      - Chunk
-      - EmbeddingModel
-      - EmbeddingVector
-    related_relation_ids:
-      - EmbeddingRun-consumes-Chunk
-      - EmbeddingRun-uses-EmbeddingModel
-      - EmbeddingRun-produces-EmbeddingVector
-      - EmbeddingVector-represents-Chunk
-    expected_result:
-      zh: 返回唯一且方向一致的 Chunk → 运行输入、模型使用、向量生成与表示对象链。
-      en: Return one directionally consistent chain covering the Chunk input, model use, vector generation, and represented object.
-      ja: Chunk入力、model使用、vector生成、表現対象を結ぶ方向整合した一意chainを返します。
-    why_valid_or_invalid:
-      zh: 运行清单、模型快照、生成 ID 与输入摘要四项能够相互核对，没有借助已退役的泛化 Embedding 节点。
-      en: Run manifest, model snapshot, generating ID, and input digest cross-check without relying on the retired generic Embedding node.
-      ja: run manifest、model snapshot、generating ID、input digestを相互照合でき、廃止済みgeneric Embedding nodeに依存しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-embedding-indexes-005
-  - id: memory-embedding-indexes-cq-representation-lineage-v3-example-counter
-    kind: counterexample
-    labels:
-      zh: 嵌入来源链反例
-      en: "Counterexample: missing embedding lineage"
-      ja: embedding来歴chain反例
-    scenario_id: embedding-lineage-missing-run-18
+      zh: Generative Agents Memory Stream + Reflection；MemGPT core_memory_append/archival_memory_insert；Redis SET EX TTL + FT.SEARCH vector eviction。
+      en: Generative Agents Memory Stream + Reflection; MemGPT core_memory_append/archival_memory_insert; Redis SET EX TTL + FT.SEARCH vector eviction.
+      ja: Generative Agents Memory Stream + Reflection。MemGPT core_memory_append/archival_memory_insert。Redis SET EX TTL + vector eviction。
+    field_values: {module_id: memory-embedding-indexes, write_read_boundary: '{"activity":"IndexBuildRun","write":"entry-p-88-42"}'}
+    related_node_ids: [EmbeddingRun, EmbeddingVector, IndexBuildRun, IndexEntry]
+    related_relation_ids: [EmbeddingRun-generates-EmbeddingVector, IndexEntry-part_of-IndexShard]
+
+    source_claims: [claim-module-embedding-generation, claim-module-indexed-representations]
+  - id: embedding-index-module-boundary
+
+    labels: {zh: 查询嵌入与候选读取, en: Query embedding and candidate read, ja: query embedding と candidate read}
+
     descriptions:
-      zh: emb-18 与 chunk-18 同在一个索引条目中且维数相同，但没有 generating_run_id、模型快照或匹配的 input_digest；共同存储不能补出生成链。
-      en: emb-18 and chunk-18 appear in the same index entry and share dimensionality, but no generating_run_id, model snapshot, or matching input_digest exists; co-storage cannot reconstruct generation lineage.
-      ja: emb-18 と chunk-18 は同じindex entryにあり次元も同じですが、generating_run_id、model snapshot、一致input_digestがなく、共通保存から生成来歴を補えません。
-    field_values:
-      embedding_id: emb-18
-      missing:
-        - generating_run_id
-        - model_snapshot
-        - input_digest
-    related_node_ids:
-      - EmbeddingVector
-      - Chunk
-      - EmbeddingRun
-      - EmbeddingModel
-    related_relation_ids:
-      - EmbeddingRun-consumes-Chunk
-      - EmbeddingRun-uses-EmbeddingModel
-      - EmbeddingRun-produces-EmbeddingVector
-      - EmbeddingVector-represents-Chunk
-    expected_result:
-      zh: 查询必须报告来源链不完整，不得依据同条目或同维数推断四条关系。
-      en: The query must report incomplete lineage and must not infer the four relations from shared entry or dimensionality.
-      ja: queryは来歴不完全を報告し、同entry・同次元だけで四relationを推論してはいけません。
-    why_valid_or_invalid:
-      zh: 索引邻接是存储事实，不是活动消费、模型使用、生成和表示事实。
-      en: Index adjacency is a storage fact, not activity consumption, model use, generation, or representation.
-      ja: index隣接は保存factであり、activity consumption・model use・generation・representationではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-embedding-indexes-006
-  - id: memory-embedding-indexes-cq-entry-version-membership-v3-example-positive
-    kind: positive
-    labels:
-      zh: 索引成员链正例
-      en: Positive index-membership chain
-      ja: index membership chain正例
-    scenario_id: index-membership-17-42-03
+      zh: MemGPT main_context vs archival vs recall 生命周期阶段；Generative Agents importance 累计 vs MemoryDecay recency 衰减。
+      en: MemGPT main_context vs archival vs recall lifecycle stages; Generative Agents importance accumulation vs MemoryDecay recency decay.
+      ja: MemGPT main/recall/archival lifecycle 段階。Generative Agents importance 累計 vs MemoryDecay recency 減衰。
+    field_values: {module_id: memory-embedding-indexes, write_read_boundary: '{"activity":"RetrievalRequest","write_performed":false,"candidate":"entry-p-88-42"}'}
+    related_node_ids: [EmbeddingVector, VectorIndex, RetrievalRequest, RetrievedCandidate]
+    related_relation_ids: []
+
+    source_claims: [claim-module-query-read-only]
+  - id: embedding-index-module-counterexample
+
+    labels: {zh: Chunk 不是嵌入向量, en: Chunk is not an embedding vector, ja: Chunk は embedding vector ではない}
+
     descriptions:
-      zh: index-17@42 是 index-17 的版本，包含 shard-03；shard-03 的分区边界包含 entry-17 的键，而 entry-17 明确保存 rep-17 的 ID 与摘要。
-      en: index-17@42 is a version of index-17 and contains shard-03; shard-03's partition boundary contains entry-17's key, and entry-17 explicitly stores rep-17's ID and digest.
-      ja: index-17@42 は index-17 の版で shard-03 を含み、shard-03 のpartition境界は entry-17 のkeyを含み、entry-17 は rep-17 のIDとdigestを明示保存します。
-    field_values:
-      index_id: index-17
-      version: 42
-      shard_id: shard-03
-      entry_id: entry-17
-      representation_id: rep-17
-    related_node_ids:
-      - Index
-      - IndexVersion
-      - IndexShard
-      - IndexEntry
-      - Representation
-    related_relation_ids:
-      - IndexVersion-version_of-Index
-      - IndexVersion-contains-IndexShard
-      - IndexShard-contains-IndexEntry
-      - IndexEntry-stores-Representation
-    expected_result:
-      zh: 沿四条已接受关系返回唯一的 IndexVersion → IndexShard → IndexEntry 成员路径及其 Representation。
-      en: Return the unique IndexVersion-to-IndexShard-to-IndexEntry membership path and its Representation through the four accepted relations.
-      ja: 四つの承認済みrelationを通じ、一意の IndexVersion→IndexShard→IndexEntry membership pathとその Representation を返します。
-    why_valid_or_invalid:
-      zh: 版本复合身份、分区边界、条目键及表示摘要全部一致，未跳过版本或分片层。
-      en: Composite version identity, partition boundary, entry key, and representation digest all agree, with no skipped version or shard level.
-      ja: 複合version同一性、partition境界、entry key、representation digestがすべて一致し、版・shard階層を飛ばしません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-embedding-indexes-007
-  - id: memory-embedding-indexes-cq-entry-version-membership-v3-example-counter
-    kind: counterexample
-    labels:
-      zh: 索引成员链反例
-      en: "Counterexample: mismatched index membership"
-      ja: index membership chain反例
-    scenario_id: index-membership-version-mismatch
+      zh: 反例：ephemeral tool output 无 MemoryRetentionPolicy/Redis EX TTL 就永久 MemoryWrite。
+      en: Counterexample: ephemeral tool output MemoryWrite permanently without MemoryRetentionPolicy/Redis EX TTL.
+      ja: 反例：ephemeral tool output が MemoryRetentionPolicy/Redis EX TTL なしで永久 MemoryWrite。
+    field_values: {module_id: memory-embedding-indexes, write_read_boundary: '{"artifact":"chunk-43","embedding_state":"not-generated"}'}
+    related_node_ids: [Chunk, EmbeddingVector, EmbeddingRun]
+    related_relation_ids: []
+
+    source_claims: [claim-module-indexed-representations]
+  - id: embedding-index-module-instance
+
+    labels: {zh: 实例：项目混合索引版本, en: "Instance: project hybrid-index version", ja: "事例: project hybrid-index version"}
+
     descriptions:
-      zh: entry-17-copy 的键属于 index-17@43 的 shard-04；即使 entry_id 与 rep-17 相同，也不能挂到 index-17@42 的 shard-03。
-      en: entry-17-copy's key belongs to shard-04 of index-17@43; even with the same entry_id and rep-17, it cannot be attached to shard-03 of index-17@42.
-      ja: entry-17-copy のkeyは index-17@43 の shard-04 に属し、同じ entry_id と rep-17 を持っても index-17@42 の shard-03 へ付けられません。
-    field_values:
-      entry_id: entry-17
-      actual_version: 43
-      actual_shard: shard-04
-      proposed_version: 42
-      proposed_shard: shard-03
-    related_node_ids:
-      - IndexVersion
-      - IndexShard
-      - IndexEntry
-      - Representation
-    related_relation_ids:
-      - IndexVersion-contains-IndexShard
-      - IndexShard-contains-IndexEntry
-      - IndexEntry-stores-Representation
-    expected_result:
-      zh: 拒绝跨版本、跨分区拼接路径，并指出 version 与 partition boundary 不匹配。
-      en: Reject the cross-version, cross-partition path and report the version and partition-boundary mismatch.
-      ja: cross-version・cross-partition pathを拒否し、versionとpartition boundaryの不一致を報告します。
-    why_valid_or_invalid:
-      zh: 条目 ID 或表示相同不能覆盖不可变版本和分片成员约束。
-      en: Equal entry ID or representation cannot override immutable-version and shard-membership constraints.
-      ja: 同entry ID・representationでもimmutable versionとshard membership制約を上書きできません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-embedding-indexes-008
-  - id: memory-embedding-indexes-cq-refresh-visibility-v3-example-positive
-    kind: positive
-    labels:
-      zh: 索引刷新链正例
-      en: Positive index-refresh chain
-      ja: index refresh chain正例
-    scenario_id: index-refresh-43
-    descriptions:
-      zh: refresh-event-43 记录 source-change 并触发 refresh-run-43；该运行以 index-17@42 为 predecessor，应用 delta43 后成功发布同一 index-17 的 @43。
-      en: refresh-event-43 records a source change and triggers refresh-run-43; the run uses index-17@42 as predecessor, applies delta43, and successfully publishes @43 for the same index-17.
-      ja: refresh-event-43 は source-change を記録して refresh-run-43 をtriggerし、runは index-17@42 をpredecessorとして delta43 を適用し、同じ index-17 の @43 を公開します。
-    field_values:
-      event_id: refresh-event-43
-      run_id: refresh-run-43
-      predecessor: index-17@42
-      successor: index-17@43
-    related_node_ids:
-      - IndexRefreshEvent
-      - IndexRefreshRun
-      - IndexVersion
-      - Index
-    related_relation_ids:
-      - IndexRefreshEvent-triggers-IndexRefreshRun
-      - IndexRefreshRun-consumes-IndexVersion
-      - IndexRefreshRun-produces-IndexVersion
-    expected_result:
-      zh: 返回一个触发事件、一个前序版本和一个已发布后继版本，并确认前后属于同一逻辑 Index。
-      en: Return one trigger event, one predecessor, and one published successor and confirm that both versions belong to the same logical Index.
-      ja: 一trigger event、一predecessor版、一published successor版を返し、前後が同じ論理 Index に属すると確認します。
-    why_valid_or_invalid:
-      zh: 事件绑定、运行输入与成功输出均有独立事实，运行本身不被误写为 supersedes 版本。
-      en: Event binding, run input, and successful output are independent facts; the run itself is not mislabeled as superseding a version.
-      ja: event binding、run input、成功outputが独立factで、run自体をversion supersedeと誤記しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-embedding-indexes-009
-  - id: memory-embedding-indexes-cq-refresh-visibility-v3-example-counter
-    kind: counterexample
-    labels:
-      zh: 索引刷新链反例
-      en: "Counterexample: failed refresh"
-      ja: index refresh chain反例
-    scenario_id: index-refresh-failed-44
-    descriptions:
-      zh: refresh-event-44 启动 refresh-run-44，运行读取 index-17@43 后失败且没有发布 @44；不能把计划版本号或原版本重新使用解释为新后继版本。
-      en: refresh-event-44 starts refresh-run-44, which reads index-17@43 but fails without publishing @44; a planned version number or reuse of the old version is not a new successor.
-      ja: refresh-event-44 は refresh-run-44 を開始しますが、runは index-17@43 を読んだ後失敗し @44 を公開しません。計画版番号や旧版再利用を新successorとはみなしません。
-    field_values:
-      event_id: refresh-event-44
-      run_id: refresh-run-44
-      predecessor: index-17@43
-      status: failed
-      successor: null
-    related_node_ids:
-      - IndexRefreshEvent
-      - IndexRefreshRun
-      - IndexVersion
-    related_relation_ids:
-      - IndexRefreshEvent-triggers-IndexRefreshRun
-      - IndexRefreshRun-consumes-IndexVersion
-      - IndexRefreshRun-produces-IndexVersion
-    expected_result:
-      zh: 保留触发与消费事实，但不得返回 produces 后继版本。
-      en: Retain the trigger and consumption facts but do not return a produced successor version.
-      ja: triggerとconsumption factは保持しますが、produced successor版を返してはいけません。
-    why_valid_or_invalid:
-      zh: 构建尝试不等于成功发布；只有完成并登记的不可变快照才是输出版本。
-      en: A build attempt is not a successful publication; only a completed and registered immutable snapshot is an output version.
-      ja: build attemptは成功publicationではなく、完了・登録済みimmutable snapshotだけがoutput版です。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-embedding-indexes-010
+      zh: MemGPT core_memory_replace(key="human", old="Bob", new="Alice")；Generative Agents reflection importance threshold=150 触发。
+      en: MemGPT core_memory_replace(key="human", old="Bob", new="Alice"); Generative Agents reflection importance threshold=150 triggers.
+      ja: MemGPT core_memory_replace。Generative Agents reflection importance threshold=150 トリガー。
+    field_values: {module_id: memory-embedding-indexes, write_read_boundary: '{"index_version":"project-index-p-88-v4","modes":["dense","sparse"],"write_performed":true}'}
+    related_node_ids: [HybridIndex, IndexVersion, DenseVector, SparseVector]
+    related_relation_ids: [IndexVersion-part-of-Index]
+
+    source_claims: [claim-module-indexed-representations, claim-module-query-read-only]
 parent_relation: null
 relations: []
-module_contract:
-  interaction_contract:
-    applicability: operational
-    facets:
-      input:
-        applicable: true
-        description:
-          zh: 嵌入/索引输入由 Chunk、EmbeddingModel 与 Representation 三类精确事实组成；消费、使用和构建关系分别表达，不再用 embeds 混合。
-          en: Embedding/index input is expressed by precise Chunk, EmbeddingModel, and Representation facts; consumption, model use, and index construction remain separate rather than being conflated by embeds.
-          ja: embedding/index入力は Chunk・EmbeddingModel・Representation のexact factで表しconsumption・model use・index buildをembedsで混同しません。
-        family_concept_ids:
-          - Chunk
-          - EmbeddingModel
-          - Representation
-        relation_ids:
-          - EmbeddingRun-consumes-Chunk
-          - EmbeddingRun-uses-EmbeddingModel
-          - IndexBuildRun-consumes-Representation
-        not_applicable_reason: null
-      output:
-        applicable: true
-        description:
-          zh: 输出只保留生成的 EmbeddingVector 与不可变 IndexVersion，两者均由具体活动产生。
-          en: Outputs are limited to generated EmbeddingVector and immutable IndexVersion, each produced by a concrete activity.
-          ja: outputは生成 EmbeddingVector とimmutable IndexVersionに限定し各々を具体activityが生成します。
-        family_concept_ids:
-          - EmbeddingVector
-          - IndexVersion
-        relation_ids:
-          - EmbeddingRun-produces-EmbeddingVector
-          - IndexBuildRun-produces-IndexVersion
-        not_applicable_reason: null
-      failure:
-        applicable: false
-        description: null
-        family_concept_ids: []
-        relation_ids: []
-        not_applicable_reason:
-          zh: 本模块记录 EmbeddingRun、IndexBuildRun 与 IndexRefreshRun 的状态和产物，但不定义错误分类或失败裁决；运行时或反馈模块可引用 activity_id 与 status 关联 ErrorEvent。
-          en: This module records EmbeddingRun, IndexBuildRun, and IndexRefreshRun status and outputs but does not define error classification or failure adjudication; runtime or feedback modules may link an ErrorEvent by activity_id and status.
-          ja: 本moduleは EmbeddingRun・IndexBuildRun・IndexRefreshRun のstatusとoutputを記録しますが、error分類やfailure裁定は定義しません。runtime／feedback moduleが activity_id とstatusで ErrorEvent を関連付けます。
-      recovery:
-        applicable: false
-        description: null
-        family_concept_ids: []
-        relation_ids: []
-        not_applicable_reason:
-          zh: IndexRefreshRun 是正常版本维护而非故障恢复；重试、回滚或会话恢复由运行时控制，本模块只提供前序/后继 IndexVersion 与构建来源供其引用。
-          en: IndexRefreshRun is normal version maintenance, not failure recovery; retry, rollback, or session recovery belongs to runtime control, which may reference predecessor/successor IndexVersion and build provenance here.
-          ja: IndexRefreshRun は通常の版保守でfailure recoveryではありません。retry・rollback・session recoveryはruntime controlが所有し、本moduleのpredecessor／successor IndexVersionとbuild来歴を参照します。
-    review:
-      review_status: accepted
-      reviewers:
-        - reviewer_id: moonweave-memory-domain-reviewer
-          reviewer_role: domain
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 输入由 Chunk、EmbeddingModel、Representation 的 consumes/uses/consumes 事实组成；输出仅由具体活动产生 EmbeddingVector 与 IndexVersion，失败/恢复不在本模块裁决。
-            en: Inputs are consumes or uses facts over Chunk, EmbeddingModel, and Representation; outputs are only EmbeddingVector and IndexVersion produced by concrete activities, while failure and recovery adjudication are out of scope.
-            ja: inputは Chunk・EmbeddingModel・Representationのconsumes／uses fact、outputは具体activity生成 EmbeddingVector／IndexVersionだけで、failure／recovery裁定はscope外です。
-        - reviewer_id: moonweave-ontology-structure-reviewer
-          reviewer_role: ontology
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 输入由 Chunk、EmbeddingModel、Representation 的 consumes/uses/consumes 事实组成；输出仅由具体活动产生 EmbeddingVector 与 IndexVersion，失败/恢复不在本模块裁决。
-            en: Inputs are consumes or uses facts over Chunk, EmbeddingModel, and Representation; outputs are only EmbeddingVector and IndexVersion produced by concrete activities, while failure and recovery adjudication are out of scope.
-            ja: inputは Chunk・EmbeddingModel・Representationのconsumes／uses fact、outputは具体activity生成 EmbeddingVector／IndexVersionだけで、failure／recovery裁定はscope外です。
-  taxonomy_contract:
-    applicability: mixed-backbone
-    not_applicable_reason: null
-    hierarchy_policy: arbitrary-depth-reviewed-backbone
-    key_root_concept_ids:
-      - IndexActivity
-    allowed_backbone_predicates:
-      - builds
-      - contains
-      - consumes
-      - is_a
-      - triggers
-      - version_of
-    flat_root_exception_concept_ids: []
-    review:
-      review_status: accepted
-      reviewers:
-        - reviewer_id: moonweave-memory-domain-reviewer
-          reviewer_role: domain
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 逐项核验后保留 Representation、Index、IndexActivity 三条主根与 IndexRefreshEvent 一个事件根。VectorDatabase 的服务、端点与持久化身份归 memory-stores-scopes；本模块只保留 VectorDatabase-hosts-VectorIndex 作为跨域引用，不把存储服务加入索引分类。
-            en: Point-by-point review retains Representation, Index, and IndexActivity as key roots and IndexRefreshEvent as one event root. VectorDatabase service, endpoint, and persistence identity belong to memory-stores-scopes; this module retains only VectorDatabase-hosts-VectorIndex as a cross-domain reference and does not classify the storage service as an index.
-            ja: 個別審査後、Representation・Index・IndexActivity の key root と IndexRefreshEvent の event root を維持します。VectorDatabase の service・endpoint・persistence identity は memory-stores-scopes に属し、本 module は VectorDatabase-hosts-VectorIndex だけを cross-domain reference として保持します。
-        - reviewer_id: moonweave-ontology-structure-reviewer
-          reviewer_role: ontology
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: IndexActivity 是唯一域内根。IndexBuildRun 通过 consumes 接到输入 Representation，并通过 builds 接到具有独立身份与版本序列的 Index；IndexVersion 再由 version_of 展开。IndexRefreshRun 的 triggers 关系以运行→事件展示，consumes baseline version 保持跨链。严格限定具体 IndexBuildRun，避免把只计算 Embedding 的 IndexActivity 错说成构建索引。
-            en: IndexActivity is the sole intra-domain root. IndexBuildRun reaches input Representation through consumes and an independently identified, versioned Index through builds; IndexVersion then unfolds through version_of. IndexRefreshRun displays its triggers relation as run→event, while consuming a baseline version remains cross-link. The build branch deliberately uses concrete IndexBuildRun so an embedding-only IndexActivity is not falsely said to construct an index.
-            ja: IndexActivity を唯一 domain root とします。IndexBuildRun は consumes で input Representation、builds で独立 identity/version sequence を持つ Index に接続し、IndexVersion は version_of で展開します。IndexRefreshRun の triggers は run→event 表示、baseline version consumes は cross-link です。具体的 IndexBuildRun に限定し embedding-only IndexActivity を index build と誤記しません。
-  competency_questions:
-    - id: memory-embedding-indexes-cq-representation-lineage-v3
-      semantic_key: memory-embedding-indexes.representation-lineage
-      primary_owner_module_id: memory-embedding-indexes
-      related_module_ids:
-        - memory-chunking-situating
-        - runtime-actors
-      questions:
-        zh: 一个嵌入向量由哪个分块版本、模型快照和运行生成？
-        en: Which chunk version, model snapshot, and run generated an embedding vector?
-        ja: embedding vectorはどのchunk版・model snapshot・runから生成されましたか。
-      query: Trace EmbeddingVector through its generating EmbeddingRun to the exact Chunk digest and EmbeddingModel snapshot.
-      expected_assertion: One accepted chain binds input chunk, model snapshot, generating run, and output vector without using the retired generic Embedding node.
-      evidence_binding:
-        applicability: relation-backed
-        owner_concept_ids:
-          - EmbeddingRun
-          - EmbeddingVector
-        related_concept_ids:
-          - Chunk
-          - EmbeddingModel
-        relation_ids:
-          - EmbeddingRun-consumes-Chunk
-          - EmbeddingRun-uses-EmbeddingModel
-          - EmbeddingRun-produces-EmbeddingVector
-          - EmbeddingVector-represents-Chunk
-        not_applicable_reason: null
-      positive_example_ids:
-        - memory-embedding-indexes-cq-representation-lineage-v3-example-positive
-      counterexample_ids:
-        - memory-embedding-indexes-cq-representation-lineage-v3-example-counter
-      source_claims:
-        - claim-memory-embedding-indexes-011
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 该 CQ 已按可执行关系链重新绑定，不再依靠概念并列或边界对照。
-              en: This CQ was rebound to an executable relation chain rather than concept juxtaposition or boundary comparison.
-              ja: このCQは概念並置や境界比較でなく実行可能relation chainへ再bindingしました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 证据链由已接受关系 EmbeddingRun-consumes-Chunk、EmbeddingRun-uses-EmbeddingModel、EmbeddingRun-produces-EmbeddingVector、EmbeddingVector-represents-Chunk 构成。
-              en: The evidence chain consists of accepted relations EmbeddingRun-consumes-Chunk, EmbeddingRun-uses-EmbeddingModel, EmbeddingRun-produces-EmbeddingVector, EmbeddingVector-represents-Chunk.
-              ja: evidence chainは承認済みrelation EmbeddingRun-consumes-Chunk、EmbeddingRun-uses-EmbeddingModel、EmbeddingRun-produces-EmbeddingVector、EmbeddingVector-represents-Chunk で構成されます。
-    - id: memory-embedding-indexes-cq-entry-version-membership-v3
-      semantic_key: memory-embedding-indexes.entry-version-membership
-      primary_owner_module_id: memory-embedding-indexes
-      related_module_ids: []
-      questions:
-        zh: 一个索引条目属于哪个分片、哪个不可变版本并存储哪份表示？
-        en: Which shard and immutable version contain an index entry, and which representation does it store?
-        ja: index entryはどのshard・immutable版に属しどのrepresentationを保存しますか。
-      query: Walk from Index through IndexVersion and IndexShard to IndexEntry, then resolve the stored Representation identity.
-      expected_assertion: Exactly one version-shard-entry path exists and the entry's representation ID and digest match the stored representation.
-      evidence_binding:
-        applicability: owner-only
-        owner_concept_ids:
-          - Index
-          - IndexVersion
-          - IndexShard
-          - IndexEntry
-          - Representation
-        related_concept_ids: []
-        relation_ids: []
-        not_applicable_reason:
-          zh: 索引、版本、分片、条目与表示均由本模块拥有；CQ 查询其模块内成员链，不需要虚构跨模块证据绑定。
-          en: Index, version, shard, entry, and representation are all owned by this module; the CQ queries their intra-module membership chain and needs no invented cross-module evidence binding.
-          ja: index・version・shard・entry・representation はすべて本module所有で、このCQはmodule内membership chainを問うため架空のcross-module evidence bindingは不要です。
-      positive_example_ids:
-        - memory-embedding-indexes-cq-entry-version-membership-v3-example-positive
-      counterexample_ids:
-        - memory-embedding-indexes-cq-entry-version-membership-v3-example-counter
-      source_claims:
-        - claim-memory-embedding-indexes-012
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 该 CQ 的五个概念均由本模块拥有；问题仍沿索引—版本—分片—条目—表示链执行，但不把模块内节点伪装成跨模块证据。
-              en: All five concepts in this CQ are owned by this module; the question still executes along the index-version-shard-entry-representation chain without disguising intra-module nodes as cross-module evidence.
-              ja: このCQの五概念はすべて本module所有です。index—version—shard—entry—representation chainで問合せますが、module内nodeをcross-module evidenceに見せません。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 四条已接受关系继续定义模块内可执行路径；evidence_binding 的 owner-only 仅表示没有跨模块证据，并不取消这些本体关系。
-              en: The four accepted relations continue to define the executable path inside the module; owner-only in evidence_binding means only that no cross-module evidence is needed and does not remove those ontology relations.
-              ja: 四つの承認済みrelationはmodule内実行pathを引き続き定義します。evidence_bindingのowner-onlyはcross-module evidence不要を示すだけで、ontology relationを削除しません。
-    - id: memory-embedding-indexes-cq-refresh-visibility-v3
-      semantic_key: memory-embedding-indexes.refresh-visibility
-      primary_owner_module_id: memory-embedding-indexes
-      related_module_ids: []
-      questions:
-        zh: 一次刷新由什么触发、消费哪个前序版本并产生哪个后继版本？
-        en: What triggered a refresh, which predecessor version did it consume, and which successor version did it produce?
-        ja: refreshは何にtriggerされどのpredecessor版を消費しどのsuccessor版を生成しましたか。
-      query: Follow the trigger event to IndexRefreshRun, then compare its consumed predecessor and generated successor IndexVersion identities.
-      expected_assertion: The refresh chain has one trigger, one predecessor, and one successfully published successor of the same logical Index.
-      evidence_binding:
-        applicability: owner-only
-        owner_concept_ids:
-          - IndexRefreshEvent
-          - IndexRefreshRun
-          - IndexVersion
-        related_concept_ids: []
-        relation_ids: []
-        not_applicable_reason:
-          zh: 触发事件、刷新运行和前后版本均由本模块拥有；该问题不涉及 IndexBuildRun，也不需要跨模块证据绑定。
-          en: The trigger event, refresh run, and predecessor and successor versions are all owned by this module; this question does not involve IndexBuildRun and needs no cross-module evidence binding.
-          ja: trigger event・refresh run・前後versionはすべて本module所有で、この問合せはIndexBuildRunを含まずcross-module evidence bindingを必要としません。
-      positive_example_ids:
-        - memory-embedding-indexes-cq-refresh-visibility-v3-example-positive
-      counterexample_ids:
-        - memory-embedding-indexes-cq-refresh-visibility-v3-example-counter
-      source_claims:
-        - claim-memory-embedding-indexes-013
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 该 CQ 只查询本模块拥有的触发事件、刷新运行和索引版本；已移除未参与问题或关系链的 IndexBuildRun。
-              en: This CQ queries only the trigger event, refresh run, and index versions owned by this module; IndexBuildRun was removed because it participates in neither the question nor its relation chain.
-              ja: このCQは本module所有のtrigger event・refresh run・index versionだけを問い、問合せにもrelation chainにも参加しないIndexBuildRunを除外しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 三条已接受关系继续定义模块内刷新路径；owner-only 仅声明不存在跨模块证据，不改变触发、消费和产出关系。
-              en: The three accepted relations continue to define the intra-module refresh path; owner-only declares only that there is no cross-module evidence and does not alter the trigger, consume, or produce relations.
-              ja: 三つの承認済みrelationはmodule内refresh pathを定義し続けます。owner-onlyはcross-module evidenceがないことだけを示し、trigger・consume・produce relationを変更しません。
-  key_notion:
-    zh: 检索表示
-    en: Representation
-    ja: 検索表現
-  owns_when:
-    zh: 当对象的身份取决于输入内容摘要与表示方法，或取决于逻辑索引、不可变版本、分片、条目以及生成/构建/刷新活动时，由本模块拥有。
-    en: Own an object here when its composite identity is determined by source digest and representation method, logical index and immutable version, shard, or entry, or by generation and build activity.
-    ja: source digestとrepresentation method、論理indexとimmutable version／shard／entry、またはgeneration／build activityで複合同一性が決まる対象を本moduleが所有します。
-  references_when:
-    zh: EmbeddingRun 引用运行时拥有的 EmbeddingModel，Index 通过 hosts 关系引用存储模块的 VectorDatabase，检索运行则引用本模块拥有的 IndexVersion；三方不互相复制节点。
-    en: Runtime owns EmbeddingModel; retrieval owns requests and runs that read IndexVersion; storage ontology owns generic MemoryStore; this module references them only through explicit cross-domain relations.
-    ja: runtimeは EmbeddingModel、retrievalは IndexVersion を読むrequest／run、storage ontologyはgeneric MemoryStoreを所有し、本moduleは明示cross-domain relationでのみ参照します。
-  boundary_decisions:
-    - other_module_id: memory-chunking-situating
-      subject_concept_ids:
-        - EmbeddingRun
-        - EmbeddingVector
-      decision: owns
-      owner_module_id: memory-embedding-indexes
-      rationale:
-        zh: EmbeddingRun 由输入、模型快照与一次生成过程确定，EmbeddingVector 由该运行及其数值表示确定。
-        en: EmbeddingRun is identified by its input, model snapshot, and one generation occurrence; EmbeddingVector is identified by that run and its numeric representation.
-        ja: EmbeddingRun は入力・モデル snapshot・一回の生成で、EmbeddingVector はその実行と数値表現で識別されます。
-      relation_ids:
-        - EmbeddingRun-consumes-Chunk
-        - EmbeddingVector-represents-Chunk
-      relation_not_applicable_reason: null
-      overlap_not_applicable_reason:
-        zh: EmbeddingRun consumes Chunk 且 EmbeddingVector represents Chunk 是生成与表示关系；向量、运行和分块具有不同身份，不需要概念重叠裁决。
-        en: EmbeddingRun consumes Chunk and EmbeddingVector represents Chunk are generation and representation relations; vectors, runs, and chunks have different identities and need no concept-overlap adjudication.
-        ja: EmbeddingRun consumes Chunk と EmbeddingVector represents Chunk は generation/representation relation です。vector・run・chunk は identity が異なり overlap adjudication は不要です。
-      source_claims:
-        - claim-memory-embedding-indexes-014
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已核实 EmbeddingRun 与 EmbeddingVector 的身份来自表示生成过程，Chunk 的文本与来源身份留在分块域；consumes 与 represents 均不是 is_a。
-              en: Verified that EmbeddingRun and EmbeddingVector derive identity from representation production, while Chunk text and provenance remain in the chunking domain; neither consumes nor represents is an is_a relation.
-              ja: EmbeddingRun と EmbeddingVector は表現生成で識別され、Chunk のテキストと出典同一性は chunking に残り、consumes/represents は is_a ではありません。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已核实 EmbeddingRun 与 EmbeddingVector 的身份来自表示生成过程，Chunk 的文本与来源身份留在分块域；consumes 与 represents 均不是 is_a。
-              en: Verified that EmbeddingRun and EmbeddingVector derive identity from representation production, while Chunk text and provenance remain in the chunking domain; neither consumes nor represents is an is_a relation.
-              ja: EmbeddingRun と EmbeddingVector は表現生成で識別され、Chunk のテキストと出典同一性は chunking に残り、consumes/represents は is_a ではありません。
-    - other_module_id: memory-chunking-situating
-      subject_concept_ids:
-        - Chunk
-      decision: references
-      owner_module_id: memory-chunking-situating
-      rationale:
-        zh: Chunk 是被表示的版本化文本对象；生成新向量或重建索引不会转移其文本范围和来源谱系。
-        en: Chunk is the versioned textual object being represented; producing a new vector or rebuilding an index does not transfer its text extent or provenance lineage.
-        ja: Chunk は表現対象の版管理テキストで、新しい vector の生成や index 再構築でもテキスト範囲と出典系譜は移転しません。
-      relation_ids:
-        - EmbeddingRun-consumes-Chunk
-        - EmbeddingVector-represents-Chunk
-      relation_not_applicable_reason: null
-      overlap_not_applicable_reason:
-        zh: EmbeddingRun consumes Chunk 且 EmbeddingVector represents Chunk 是生成与表示关系；向量、运行和分块具有不同身份，不需要概念重叠裁决。
-        en: EmbeddingRun consumes Chunk and EmbeddingVector represents Chunk are generation and representation relations; vectors, runs, and chunks have different identities and need no concept-overlap adjudication.
-        ja: EmbeddingRun consumes Chunk と EmbeddingVector represents Chunk は generation/representation relation です。vector・run・chunk は identity が異なり overlap adjudication は不要です。
-      source_claims:
-        - claim-memory-embedding-indexes-014
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已核实 EmbeddingRun 与 EmbeddingVector 的身份来自表示生成过程，Chunk 的文本与来源身份留在分块域；consumes 与 represents 均不是 is_a。
-              en: Verified that EmbeddingRun and EmbeddingVector derive identity from representation production, while Chunk text and provenance remain in the chunking domain; neither consumes nor represents is an is_a relation.
-              ja: EmbeddingRun と EmbeddingVector は表現生成で識別され、Chunk のテキストと出典同一性は chunking に残り、consumes/represents は is_a ではありません。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已核实 EmbeddingRun 与 EmbeddingVector 的身份来自表示生成过程，Chunk 的文本与来源身份留在分块域；consumes 与 represents 均不是 is_a。
-              en: Verified that EmbeddingRun and EmbeddingVector derive identity from representation production, while Chunk text and provenance remain in the chunking domain; neither consumes nor represents is an is_a relation.
-              ja: EmbeddingRun と EmbeddingVector は表現生成で識別され、Chunk のテキストと出典同一性は chunking に残り、consumes/represents は is_a ではありません。
-    - other_module_id: memory-retrieval-ranking
-      subject_concept_ids:
-        - IndexVersion
-      decision: owns
-      owner_module_id: memory-embedding-indexes
-      rationale:
-        zh: 表示与索引拥有逻辑 Index 的不可变 IndexVersion 及其分片/条目成员；检索请求指向、检索运行读取、检索追踪记录该版本，但三者都不拥有版本身份。
-        en: Representations and indexes own immutable IndexVersion identity and its shard or entry members; retrieval requests target, retrieval runs read, and retrieval traces record that version, but none owns its identity.
-        ja: 表現と索引は immutable IndexVersion 同一性と shard／entry member を所有します。retrieval request は target、run は read、trace はその版を record しますが、版同一性は所有しません。
-      relation_ids:
-        - RetrievalRequest-targets-IndexVersion
-        - RetrievalRun-reads-IndexVersion
-        - RetrievalTrace-records-IndexVersion
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-embedding-indexes-015
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 表示与索引拥有逻辑 Index 的不可变 IndexVersion 及其分片/条目成员；检索请求指向、检索运行读取、检索追踪记录该版本，但三者都不拥有版本身份。
-              en: Representations and indexes own immutable IndexVersion identity and its shard or entry members; retrieval requests target, retrieval runs read, and retrieval traces record that version, but none owns its identity.
-              ja: 表現と索引は immutable IndexVersion 同一性と shard／entry member を所有します。retrieval request は target、run は read、trace はその版を record しますが、版同一性は所有しません。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 表示与索引拥有逻辑 Index 的不可变 IndexVersion 及其分片/条目成员；检索请求指向、检索运行读取、检索追踪记录该版本，但三者都不拥有版本身份。
-              en: Representations and indexes own immutable IndexVersion identity and its shard or entry members; retrieval requests target, retrieval runs read, and retrieval traces record that version, but none owns its identity.
-              ja: 表現と索引は immutable IndexVersion 同一性と shard／entry member を所有します。retrieval request は target、run は read、trace はその版を record しますが、版同一性は所有しません。
-    - other_module_id: memory-retrieval-ranking
-      subject_concept_ids:
-        - RetrievalRequest
-        - RetrievalRun
-        - RetrievalTrace
-      decision: references
-      owner_module_id: memory-retrieval-ranking
-      rationale:
-        zh: RetrievalRequest 以目标版本发起查询，RetrievalRun 实际读取该版本，RetrievalTrace 留存所用版本；三者都由一次检索发生识别并归检索与排序，本模块只因拥有 IndexVersion 而引用它们。
-        en: RetrievalRequest targets an index version, RetrievalRun reads it, and RetrievalTrace records the version actually used. All three are identified by a retrieval occurrence and owned by retrieval-ranking; this module references them only because it owns IndexVersion.
-        ja: RetrievalRequest は index version を target し、RetrievalRun はそれを read し、RetrievalTrace は実際に使用した版を記録します。三者は retrieval occurrence で識別され retrieval-ranking が所有し、本 module は IndexVersion owner としてのみ参照します。
-      relation_ids:
-        - RetrievalRequest-targets-IndexVersion
-        - RetrievalRun-reads-IndexVersion
-        - RetrievalTrace-records-IndexVersion
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-embedding-indexes-016
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 领域复核确认 Request、Run 与 Trace 分别表达目标、读取和已用版本证据，三者均为检索侧端点，不能遗漏 Trace。
-              en: Domain review confirms that Request, Run, and Trace respectively express the target, read, and recorded-version evidence; all three are retrieval-side endpoints, so Trace cannot be omitted.
-              ja: ドメイン審査により Request・Run・Trace は target・read・使用版証拠をそれぞれ表し、三者すべて retrieval 側 endpoint のため Trace を省けないと確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 结构复核确认三条 accepted 跨界关系共享 IndexVersion，并在检索侧分别以 RetrievalRequest、RetrievalRun 与 RetrievalTrace 为端点。
-              en: Structural review confirms that the three accepted boundary relations share IndexVersion and use RetrievalRequest, RetrievalRun, and RetrievalTrace as their respective retrieval-side endpoints.
-              ja: 構造審査により三つの accepted boundary relation は IndexVersion を共有し、retrieval 側 endpoint は RetrievalRequest・RetrievalRun・RetrievalTrace と確認しました。
-    - other_module_id: runtime-actors
-      subject_concept_ids:
-        - EmbeddingRun
-      decision: owns
-      owner_module_id: memory-embedding-indexes
-      rationale:
-        zh: EmbeddingRun 是本模块拥有的一次表示生成活动；它通过 uses 指向 runtime-actors 拥有的可复用 EmbeddingModel。EmbeddingVector 是本模块内部 produces 边的结果，不是这条模型边界的端点。
-        en: EmbeddingRun is one representation-production activity owned by this module and points through uses to the reusable EmbeddingModel owned by runtime-actors. EmbeddingVector is the result of an internal produces edge, not an endpoint of this model boundary.
-        ja: EmbeddingRun は本 module が所有する一 representation-production activity で、uses により runtime-actors 所有の再利用可能な EmbeddingModel を指します。EmbeddingVector は module 内 produces edge の結果で、この model 境界の endpoint ではありません。
-      relation_ids:
-        - EmbeddingRun-uses-EmbeddingModel
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-embedding-indexes-017
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 领域复核确认本边界只回答哪次 EmbeddingRun 使用哪个 EmbeddingModel；EmbeddingVector 的生成属于表示模块内部。
-              en: Domain review confirms that this boundary answers only which EmbeddingModel a given EmbeddingRun used; production of EmbeddingVector remains internal to the representation module.
-              ja: ドメイン審査により、この境界は一 EmbeddingRun がどの EmbeddingModel を使用したかだけを回答し、EmbeddingVector 生成は representation module 内部に残ると確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 结构复核确认 accepted 跨界关系只有 EmbeddingRun-uses-EmbeddingModel，故本模块侧端点严格为 EmbeddingRun。
-              en: Structural review confirms that EmbeddingRun-uses-EmbeddingModel is the sole accepted cross-boundary relation, so this module's endpoint set is exactly EmbeddingRun.
-              ja: 構造審査により accepted な module 横断関係は EmbeddingRun-uses-EmbeddingModel だけで、本 module 側 endpoint は EmbeddingRun のみと確認しました。
-    - other_module_id: runtime-actors
-      subject_concept_ids:
-        - EmbeddingModel
-      decision: references
-      owner_module_id: runtime-actors
-      rationale:
-        zh: EmbeddingModel 可被多次运行复用并具有独立模型版本，因此归 runtime-actors；表示本体只记录具体 EmbeddingRun 使用了哪个快照。
-        en: EmbeddingModel is reusable across runs and has independent model-version identity, so it belongs to runtime-actors; the representation ontology only records which snapshot a concrete EmbeddingRun used.
-        ja: EmbeddingModel はrun間で再利用され独立model版同一性を持つため runtime-actors に属し、表現ontologyは具体 EmbeddingRun が使用したsnapshotだけを記録します。
-      relation_ids:
-        - EmbeddingRun-uses-EmbeddingModel
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-embedding-indexes-018
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: EmbeddingModel 可被多次运行复用并具有独立模型版本，因此归 runtime-actors；表示本体只记录具体 EmbeddingRun 使用了哪个快照。
-              en: EmbeddingModel is reusable across runs and has independent model-version identity, so it belongs to runtime-actors; the representation ontology only records which snapshot a concrete EmbeddingRun used.
-              ja: EmbeddingModel はrun間で再利用され独立model版同一性を持つため runtime-actors に属し、表現ontologyは具体 EmbeddingRun が使用したsnapshotだけを記録します。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: EmbeddingModel 可被多次运行复用并具有独立模型版本，因此归 runtime-actors；表示本体只记录具体 EmbeddingRun 使用了哪个快照。
-              en: EmbeddingModel is reusable across runs and has independent model-version identity, so it belongs to runtime-actors; the representation ontology only records which snapshot a concrete EmbeddingRun used.
-              ja: EmbeddingModel はrun間で再利用され独立model版同一性を持つため runtime-actors に属し、表現ontologyは具体 EmbeddingRun が使用したsnapshotだけを記録します。
-    - other_module_id: memory-stores-scopes
-      subject_concept_ids:
-        - VectorDatabase
-      decision: references
-      owner_module_id: memory-stores-scopes
-      rationale:
-        zh: VectorDatabase 的持久化服务身份由 memory-stores-scopes 拥有；本模块仅引用它与 VectorIndex 之间的 hosts 事实，以表达索引部署而不接管数据库本体。
-        en: memory-stores-scopes owns VectorDatabase's persistent-service identity; this module references only its hosts fact with VectorIndex to express index deployment without taking ownership of the database concept.
-        ja: VectorDatabase の永続 service identity は memory-stores-scopes が所有し、本 module は VectorIndex との hosts fact だけを参照して index deployment を表します。
-      relation_ids:
-        - VectorDatabase-hosts-VectorIndex
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-embedding-indexes-019
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: VectorDatabase 由 memory-stores-scopes 拥有；本模块只保留其 hosts VectorIndex 的跨域事实。
-              en: memory-stores-scopes owns VectorDatabase; this module retains only the cross-domain fact that it hosts VectorIndex.
-              ja: VectorDatabase は memory-stores-scopes が所有し、本 module は VectorIndex を hosts する cross-domain fact だけを保持します。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: VectorDatabase 的主父与 owner 在 memory-stores-scopes；此处 hosts 仅作跨域部署事实，不参与索引分类。
-              en: VectorDatabase's primary parent and owner are in memory-stores-scopes; hosts is only a cross-domain deployment fact here and does not enter the index taxonomy.
-              ja: VectorDatabase の primary parent と owner は memory-stores-scopes にあり、ここで hosts は cross-domain deployment fact に限られ index taxonomy へ入りません。
-    - other_module_id: memory-stores-scopes
-      subject_concept_ids:
-        - VectorIndex
-      decision: owns
-      owner_module_id: memory-embedding-indexes
-      rationale:
-        zh: 本条投影表征与索引侧的 VectorIndex。它以 index_id、维数、向量类型和距离度量标识，是可由 VectorDatabase 承载的逻辑检索结构；同一数据库可承载多个索引，索引也不会因承载服务迁移而变成数据库。跨界仍只有 hosts 事实。
-        en: This row projects the representations-and-indexes-side VectorIndex. Identified by index_id, dimensions, vector type, and distance metric, it is a logical retrieval structure that a VectorDatabase may host. One database may host several indexes, and moving the hosting service does not turn an index into a database. hosts remains the sole boundary fact.
-        ja: この行は representation/index 側 VectorIndex を projection します。index_id・dimension・vector type・distance metric で識別され、VectorDatabase が host できる logical retrieval structure です。一 database は複数 index を host でき、hosting service 移動でも index は database になりません。境界 fact は hosts のみです。
-      relation_ids:
-        - VectorDatabase-hosts-VectorIndex
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-embedding-indexes-020
-        - claim-memory-embedding-indexes-021
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-17
-            decision_note:
-              zh: 逐项复核确认 VectorIndex 的身份由索引结构和配置决定，而不是由数据库部署身份决定；本条与对侧共同投影同一条 hosts 事实。
-              en: Point-by-point review confirms that VectorIndex identity is determined by index structure and configuration rather than database deployment identity; this row and its peer project the same hosts fact.
-              ja: 項目別審査により VectorIndex identity は database deployment ではなく index structure/configuration で決まり、本 row と対側が同じ hosts fact を projection することを確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-17
-            decision_note:
-              zh: 结构复核确认 subject 仅包含 memory-embedding-indexes 拥有的真实端点 VectorIndex；存储域内部的 VectorDatabase-is_a-MemoryStore 不进入本边界。
-              en: Ontology review confirms that the subject contains only the genuine memory-embedding-indexes-owned endpoint VectorIndex; the internal stores relation VectorDatabase-is_a-MemoryStore is excluded from this boundary.
-              ja: ontology review は subject が memory-embedding-indexes 所有の実 endpoint VectorIndex のみで、store 域内 VectorDatabase-is_a-MemoryStore が境界から除外されることを確認しました。
-  overlap_checks:
-    - other_module_id: memory-retrieval-ranking
-      semantic_area:
-        zh: 索引条目与检索候选
-        en: Index entries versus retrieval candidates
-        ja: 索引条目と検索候補
-      candidate_concept_ids:
-        - Index
-        - IndexVersion
-      overlap_reason:
-        zh: Index/IndexVersion 是可复用检索结构与不可变快照；RetrievalRequest/Run 是一次读取执行，两者即使连接也不是同一身份。
-        en: Index or IndexVersion is a reusable retrieval structure and immutable snapshot, whereas RetrievalRequest or Run is one read execution; connection does not merge their identities.
-        ja: Index／IndexVersion は再利用検索構造とimmutable snapshot、RetrievalRequest／Run は一read実行であり、接続しても同一identityにはなりません。
-      disambiguation_test:
-        zh: 由 index_id 标识的 Index，或由 index_id 与 version 共同标识的 IndexVersion，归表征与索引；index_kind、configuration_digest 与 built_at 只是其上下文字段。由继承的 artifact_id 与本地 request_id 共同标识的 RetrievalRequest，或由继承的 activity_id 与本地 run_id 共同标识的 RetrievalRun，归检索与排序；index_version_id、requested_limit、request_id 与 started_at 只是检索上下文，不转移索引版本的身份或所有权。
-        en: An Index identified by index_id, or an IndexVersion identified jointly by index_id and version, belongs to representations and indexes; index_kind, configuration_digest, and built_at are contextual fields only. A RetrievalRequest identified jointly by inherited artifact_id and local request_id, or a RetrievalRun identified jointly by inherited activity_id and local run_id, belongs to retrieval and ranking; index_version_id, requested_limit, request_id, and started_at are retrieval context and transfer neither index-version identity nor ownership.
-        ja: index_id で識別される Index、または index_id と version で共同識別される IndexVersion は representation/index に属し、index_kind・configuration_digest・built_at は context field にすぎません。継承した artifact_id と local request_id で共同識別される RetrievalRequest、または継承した activity_id と local run_id で共同識別される RetrievalRun は retrieval/ranking に属し、index_version_id・requested_limit・request_id・started_at は retrieval context であって IndexVersion の identity も owner も移しません。
-      result: distinct
-      owner_module_id: memory-embedding-indexes
-      source_claims:
-        - claim-memory-embedding-indexes-022
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 逐项核验有效身份后，Index 使用 index_id，IndexVersion 使用 index_id+version；index_kind、configuration_digest 与 built_at 仅描述上下文，不再被误写为身份键。
-              en: Point-by-point effective-identity review confirms that Index uses index_id and IndexVersion uses index_id plus version; index_kind, configuration_digest, and built_at describe context only and are no longer misstated as identity keys.
-              ja: effective identity を個別確認し、Index は index_id、IndexVersion は index_id+version を使うと確定しました。index_kind・configuration_digest・built_at は context のみで、identity key として誤記しません。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 结构复核确认 RetrievalRequest —targets→ IndexVersion、RetrievalRun —reads→ IndexVersion 与 RetrievalTrace —records→ IndexVersion 都是跨模块引用；它们不把请求、运行或追踪并入索引层级，也不转移 owner。
-              en: Structure review confirms that RetrievalRequest —targets→ IndexVersion, RetrievalRun —reads→ IndexVersion, and RetrievalTrace —records→ IndexVersion are cross-module references; they place no request, run, or trace in the index hierarchy and transfer no owner.
-              ja: 構造審査により RetrievalRequest —targets→ IndexVersion、RetrievalRun —reads→ IndexVersion、RetrievalTrace —records→ IndexVersion はすべて module 横断 reference で、request・run・trace を index 階層へ入れず owner も移さないと確認しました。
-    - other_module_id: memory-retrieval-ranking
-      semantic_area:
-        zh: 索引条目与检索候选
-        en: Index entries versus retrieval candidates
-        ja: 索引条目と検索候補
-      candidate_concept_ids:
-        - RetrievalRequest
-        - RetrievalRun
-      overlap_reason:
-        zh: 检索请求与运行引用索引版本但不成为索引成员，也不改变版本身份。
-        en: Retrieval requests and runs reference an index version but do not become index members or alter version identity.
-        ja: retrieval request／runはindex版を参照しますがindex memberにならず版identityも変更しません。
-      disambiguation_test:
-        zh: 由 index_id 标识的 Index，或由 index_id 与 version 共同标识的 IndexVersion，归表征与索引；index_kind、configuration_digest 与 built_at 只是其上下文字段。由继承的 artifact_id 与本地 request_id 共同标识的 RetrievalRequest，或由继承的 activity_id 与本地 run_id 共同标识的 RetrievalRun，归检索与排序；index_version_id、requested_limit、request_id 与 started_at 只是检索上下文，不转移索引版本的身份或所有权。
-        en: An Index identified by index_id, or an IndexVersion identified jointly by index_id and version, belongs to representations and indexes; index_kind, configuration_digest, and built_at are contextual fields only. A RetrievalRequest identified jointly by inherited artifact_id and local request_id, or a RetrievalRun identified jointly by inherited activity_id and local run_id, belongs to retrieval and ranking; index_version_id, requested_limit, request_id, and started_at are retrieval context and transfer neither index-version identity nor ownership.
-        ja: index_id で識別される Index、または index_id と version で共同識別される IndexVersion は representation/index に属し、index_kind・configuration_digest・built_at は context field にすぎません。継承した artifact_id と local request_id で共同識別される RetrievalRequest、または継承した activity_id と local run_id で共同識別される RetrievalRun は retrieval/ranking に属し、index_version_id・requested_limit・request_id・started_at は retrieval context であって IndexVersion の identity も owner も移しません。
-      result: distinct
-      owner_module_id: memory-retrieval-ranking
-      source_claims:
-        - claim-memory-embedding-indexes-023
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 逐项核验继承链后，RetrievalRequest 的有效身份是 artifact_id+request_id，RetrievalRun 的有效身份是 activity_id+run_id；index_version_id、requested_limit 与 started_at 是检索上下文，不是索引身份。
-              en: Point-by-point inheritance review confirms effective identity artifact_id plus request_id for RetrievalRequest and activity_id plus run_id for RetrievalRun; index_version_id, requested_limit, and started_at are retrieval context rather than index identity.
-              ja: 継承 chain を個別確認し、RetrievalRequest の effective identity は artifact_id+request_id、RetrievalRun は activity_id+run_id と確定しました。index_version_id・requested_limit・started_at は retrieval context で index identity ではありません。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 结构复核确认请求和运行通过 accepted cross-link 读取目标 IndexVersion；引用只闭合检索流程，不建立 is_a 父子关系，也不改变 IndexVersion 的规范 owner。
-              en: Structure review confirms that requests and runs read their target IndexVersion through accepted cross-links; the reference closes the retrieval flow without creating an is_a parent-child relation or changing the IndexVersion canonical owner.
-              ja: 構造審査により request/run は accepted cross-link で対象 IndexVersion を読み、参照は retrieval flow を閉じるだけで is_a 親子関係も IndexVersion の canonical owner 変更も生じないと確認しました。
-    - other_module_id: runtime-actors
-      semantic_area:
-        zh: 嵌入索引产物与嵌入模型参与者
-        en: Embedding and index artifacts versus embedding-model actors
-        ja: embedding/index artifact と embedding-model actor
-      candidate_concept_ids:
-        - EmbeddingRun
-        - EmbeddingVector
-      overlap_reason:
-        zh: EmbeddingRun 是一次有时间边界的调用，EmbeddingVector 是其保留输出；二者均不同于可复用 EmbeddingModel。
-        en: EmbeddingRun is one time-bounded invocation and EmbeddingVector its retained output; both differ from the reusable EmbeddingModel.
-        ja: EmbeddingRun は一time-bounded invocation、EmbeddingVector は保持outputで、どちらも再利用 EmbeddingModel と異なります。
-      disambiguation_test:
-        zh: 由继承的 activity_id 与本地 run_id 共同标识的 EmbeddingRun，或由继承的 representation_id、vector_id 与本地 embedding_id 共同标识的 EmbeddingVector，归表征与索引；input_digest、model_snapshot、dimensions 与 encoding 只是运行或向量上下文。由 model_id 与 model_version 标识的 Model 或继承这两个键的 EmbeddingModel 归运行主体；model_kind、resolver_ref 与 capability_profile 是模型上下文。uses 只记录本次运行使用的模型，不合并运行、向量与模型身份。
-        en: An EmbeddingRun identified jointly by inherited activity_id and local run_id, or an EmbeddingVector identified jointly by inherited representation_id and vector_id plus local embedding_id, belongs to representations and indexes; input_digest, model_snapshot, dimensions, and encoding are run or vector context only. A Model identified by model_id and model_version, or an EmbeddingModel inheriting those keys, belongs to runtime actors; model_kind, resolver_ref, and capability_profile are model context. uses records only the model used by the run and merges none of the run, vector, or model identities.
-        ja: 継承した activity_id と local run_id で共同識別される EmbeddingRun、または継承した representation_id・vector_id と local embedding_id で共同識別される EmbeddingVector は representation/index に属し、input_digest・model_snapshot・dimensions・encoding は run/vector context にすぎません。model_id と model_version で識別される Model、またはその二キーを継承する EmbeddingModel は runtime actors に属し、model_kind・resolver_ref・capability_profile は model context です。uses は当該 run が使用した model だけを記録し、run・vector・model の identity を統合しません。
-      result: distinct
-      owner_module_id: memory-embedding-indexes
-      source_claims:
-        - claim-memory-embedding-indexes-024
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 逐项核验继承链后，EmbeddingRun 的有效身份是 activity_id+run_id，EmbeddingVector 的有效身份是 representation_id+vector_id+embedding_id；input_digest、model_snapshot、dimensions 与 encoding 只是运行或产物上下文。
-              en: Point-by-point inheritance review confirms effective identity activity_id plus run_id for EmbeddingRun and representation_id plus vector_id plus embedding_id for EmbeddingVector; input_digest, model_snapshot, dimensions, and encoding are run or artifact context only.
-              ja: 継承 chain を個別確認し、EmbeddingRun の effective identity は activity_id+run_id、EmbeddingVector は representation_id+vector_id+embedding_id と確定しました。input_digest・model_snapshot・dimensions・encoding は run/artifact context にすぎません。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 结构复核确认 EmbeddingRun —uses→ EmbeddingModel 是跨模块使用关系；它不把 EmbeddingModel 放进表征层级，也不把运行或向量放进运行主体层级。
-              en: Structure review confirms EmbeddingRun —uses→ EmbeddingModel as a cross-module usage relation; it places neither EmbeddingModel in the representation hierarchy nor the run or vector in the runtime-actor hierarchy.
-              ja: 構造審査により EmbeddingRun —uses→ EmbeddingModel は module 横断 usage relation で、EmbeddingModel を representation 階層へも run/vector を runtime-actor 階層へも入れないと確認しました。
-    - other_module_id: runtime-actors
-      semantic_area:
-        zh: 嵌入索引产物与嵌入模型参与者
-        en: Embedding and index artifacts versus embedding-model actors
-        ja: embedding/index artifact と embedding-model actor
-      candidate_concept_ids:
-        - EmbeddingModel
-        - Model
-      overlap_reason:
-        zh: 模型身份可跨许多 EmbeddingRun 复用，不能因产生某一向量而并入表示产物层级。
-        en: Model identity is reusable across many EmbeddingRuns and does not enter the representation-artifact hierarchy merely by producing one vector.
-        ja: model identityは多くの EmbeddingRun で再利用され、一vector生成だけでrepresentation artifact階層へ入りません。
-      disambiguation_test:
-        zh: 由继承的 activity_id 与本地 run_id 共同标识的 EmbeddingRun，或由继承的 representation_id、vector_id 与本地 embedding_id 共同标识的 EmbeddingVector，归表征与索引；input_digest、model_snapshot、dimensions 与 encoding 只是运行或向量上下文。由 model_id 与 model_version 标识的 Model 或继承这两个键的 EmbeddingModel 归运行主体；model_kind、resolver_ref 与 capability_profile 是模型上下文。uses 只记录本次运行使用的模型，不合并运行、向量与模型身份。
-        en: An EmbeddingRun identified jointly by inherited activity_id and local run_id, or an EmbeddingVector identified jointly by inherited representation_id and vector_id plus local embedding_id, belongs to representations and indexes; input_digest, model_snapshot, dimensions, and encoding are run or vector context only. A Model identified by model_id and model_version, or an EmbeddingModel inheriting those keys, belongs to runtime actors; model_kind, resolver_ref, and capability_profile are model context. uses records only the model used by the run and merges none of the run, vector, or model identities.
-        ja: 継承した activity_id と local run_id で共同識別される EmbeddingRun、または継承した representation_id・vector_id と local embedding_id で共同識別される EmbeddingVector は representation/index に属し、input_digest・model_snapshot・dimensions・encoding は run/vector context にすぎません。model_id と model_version で識別される Model、またはその二キーを継承する EmbeddingModel は runtime actors に属し、model_kind・resolver_ref・capability_profile は model context です。uses は当該 run が使用した model だけを記録し、run・vector・model の identity を統合しません。
-      result: distinct
-      owner_module_id: runtime-actors
-      source_claims:
-        - claim-memory-embedding-indexes-025
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 逐项核验确认 Model 以 model_id+model_version 为身份，EmbeddingModel 继承这两个键且不另设影子 ID；model_kind、resolver_ref 与 capability_profile 只刻画可复用模型上下文。
-              en: Point-by-point review confirms Model identity model_id plus model_version and that EmbeddingModel inherits those keys without a shadow ID; model_kind, resolver_ref, and capability_profile describe reusable model context only.
-              ja: 個別確認により Model の identity は model_id+model_version、EmbeddingModel は shadow ID を追加せずその二キーを継承すると確定しました。model_kind・resolver_ref・capability_profile は再利用 model context のみを記述します。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 结构复核确认一个 EmbeddingModel 可被许多 EmbeddingRun 使用并产生许多向量；uses 与 produces 都不合并模型、活动和信息产物的身份，三者继续保留各自 owner 与层级主干。
-              en: Structure review confirms that one EmbeddingModel can be used by many EmbeddingRuns and produce many vectors; uses and produces merge none of the model, activity, and information-artifact identities, so each retains its owner and hierarchy backbone.
-              ja: 構造審査により一 EmbeddingModel は多数の EmbeddingRun から使用され多数 vector を生成でき、uses/produces は model・activity・information artifact の identity を統合せず、各 owner と hierarchy backbone を保つと確認しました。
-    - other_module_id: memory-stores-scopes
-      semantic_area:
-        zh: 索引逻辑结构与记忆存储边界
-        en: Logical index structure versus memory-storage boundary
-        ja: logical index structure と memory storage boundary
-      candidate_concept_ids:
-        - Index
-      overlap_reason:
-        zh: Index 是本模块拥有的逻辑检索结构；VectorDatabase 是 memory-stores-scopes 拥有的持久化服务。二者只通过 hosts 跨域连接，不能因部署邻接而共享 owner 或形成父子分类。
-        en: Index is a logical retrieval structure owned here, whereas VectorDatabase is a persistent service owned by memory-stores-scopes. They connect only through the cross-domain hosts fact; deployment adjacency does not give them one owner or a taxonomic parent-child relation.
-        ja: Index は本 module 所有の論理検索構造で、VectorDatabase は memory-stores-scopes 所有の永続 service です。両者は cross-domain hosts fact だけで接続し、deployment adjacency から owner 共有や分類親子を導きません。
-      disambiguation_test:
-        zh: 由 index_id 标识的 Index 归表征与索引；index_kind 与 configuration_digest 只是索引上下文。由 memory_store_id 标识的 MemoryStore、由继承的 memory_store_id 与本地 database_id 共同标识的 VectorDatabase，或由继承的 memory_entity_id、entity_version 与本地 memory_record_id、version 共同标识的 MemoryRecord，归存储与作用域；deployment_scope、endpoint、engine_version、memory_scope 与生命周期字段只是存储上下文。hosts 只记录 VectorDatabase 承载 VectorIndex，不建立分类或所有权转移。
-        en: An Index identified by index_id belongs to representations and indexes; index_kind and configuration_digest are index context only. A MemoryStore identified by memory_store_id, a VectorDatabase identified jointly by inherited memory_store_id and local database_id, or a MemoryRecord identified jointly by inherited memory_entity_id and entity_version plus local memory_record_id and version belongs to stores and scopes; deployment_scope, endpoint, engine_version, memory_scope, and lifecycle fields are storage context only. hosts only records that VectorDatabase hosts VectorIndex and establishes neither classification nor ownership transfer.
-        ja: index_id で識別される Index は representation/index に属し、index_kind と configuration_digest は index context にすぎません。memory_store_id で識別される MemoryStore、継承した memory_store_id と local database_id で共同識別される VectorDatabase、または継承した memory_entity_id・entity_version と local memory_record_id・version で共同識別される MemoryRecord は store/scope に属し、deployment_scope・endpoint・engine_version・memory_scope・lifecycle field は storage context にすぎません。hosts は VectorDatabase が VectorIndex を承載する事実だけを記録し、分類も owner 移転も成立させません。
-      result: distinct
-      owner_module_id: memory-embedding-indexes
-      source_claims:
-        - claim-memory-embedding-indexes-026
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 逐项核验确认 Index 的身份键只有 index_id，index_kind 与 configuration_digest 是上下文；MemoryStore、VectorDatabase 和 MemoryRecord 使用各自独立的有效身份链，不能按共同出现的向量字段或部署位置合并。
-              en: Point-by-point review confirms that Index has only index_id as its identity key while index_kind and configuration_digest are context; MemoryStore, VectorDatabase, and MemoryRecord use independent effective-identity chains and cannot be merged by co-occurring vector fields or deployment location.
-              ja: 個別確認により Index の identity key は index_id のみで index_kind・configuration_digest は context と確定しました。MemoryStore・VectorDatabase・MemoryRecord は別々の effective-identity chain を使い、共起する vector field や deployment location で統合できません。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 结构复核保留 VectorDatabase —hosts→ VectorIndex 为跨模块部署事实；hosts 既不是 is_a，也不转移 owner，因此 VectorIndex 留在表征与索引主干，VectorDatabase 留在存储与作用域主干。
-              en: Structure review retains VectorDatabase —hosts→ VectorIndex as a cross-module deployment fact; hosts is neither is_a nor an owner transfer, so VectorIndex remains in the representation-and-index backbone and VectorDatabase in the store-and-scope backbone.
-              ja: 構造審査は VectorDatabase —hosts→ VectorIndex を module 横断 deployment fact として保持します。hosts は is_a でも owner 移転でもないため、VectorIndex は representation/index backbone、VectorDatabase は store/scope backbone に残ります。
-    - other_module_id: memory-stores-scopes
-      semantic_area:
-        zh: 索引逻辑结构与记忆存储边界
-        en: Logical index structure versus memory-storage boundary
-        ja: logical index structure と memory storage boundary
-      candidate_concept_ids:
-        - VectorDatabase
-        - MemoryRecord
-        - MemoryStore
-      overlap_reason:
-        zh: VectorDatabase、MemoryRecord 与 MemoryStore 的服务端点、内容身份、scope 与 retention 不由向量索引配置决定，仍由 memory-stores-scopes 拥有。
-        en: VectorDatabase, MemoryRecord, and MemoryStore service endpoint, content identity, scope, and retention are not determined by vector-index configuration and remain owned by memory-stores-scopes.
-        ja: VectorDatabase、MemoryRecord、MemoryStore の service endpoint・content identity・scope・retention は vector-index 設定で決まらず、memory-stores-scopes が所有します。
-      disambiguation_test:
-        zh: 由 index_id 标识的 Index 归表征与索引；index_kind 与 configuration_digest 只是索引上下文。由 memory_store_id 标识的 MemoryStore、由继承的 memory_store_id 与本地 database_id 共同标识的 VectorDatabase，或由继承的 memory_entity_id、entity_version 与本地 memory_record_id、version 共同标识的 MemoryRecord，归存储与作用域；deployment_scope、endpoint、engine_version、memory_scope 与生命周期字段只是存储上下文。hosts 只记录 VectorDatabase 承载 VectorIndex，不建立分类或所有权转移。
-        en: An Index identified by index_id belongs to representations and indexes; index_kind and configuration_digest are index context only. A MemoryStore identified by memory_store_id, a VectorDatabase identified jointly by inherited memory_store_id and local database_id, or a MemoryRecord identified jointly by inherited memory_entity_id and entity_version plus local memory_record_id and version belongs to stores and scopes; deployment_scope, endpoint, engine_version, memory_scope, and lifecycle fields are storage context only. hosts only records that VectorDatabase hosts VectorIndex and establishes neither classification nor ownership transfer.
-        ja: index_id で識別される Index は representation/index に属し、index_kind と configuration_digest は index context にすぎません。memory_store_id で識別される MemoryStore、継承した memory_store_id と local database_id で共同識別される VectorDatabase、または継承した memory_entity_id・entity_version と local memory_record_id・version で共同識別される MemoryRecord は store/scope に属し、deployment_scope・endpoint・engine_version・memory_scope・lifecycle field は storage context にすぎません。hosts は VectorDatabase が VectorIndex を承載する事実だけを記録し、分類も owner 移転も成立させません。
-      result: distinct
-      owner_module_id: memory-stores-scopes
-      source_claims:
-        - claim-memory-embedding-indexes-027
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 逐项核验继承链后，MemoryStore 使用 memory_store_id，VectorDatabase 使用 memory_store_id+database_id，MemoryRecord 使用 memory_entity_id+entity_version+memory_record_id+version；部署、端点、作用域与生命周期字段只补充上下文。
-              en: Point-by-point inheritance review confirms memory_store_id for MemoryStore, memory_store_id plus database_id for VectorDatabase, and memory_entity_id plus entity_version plus memory_record_id plus version for MemoryRecord; deployment, endpoint, scope, and lifecycle fields add context only.
-              ja: 継承 chain を個別確認し、MemoryStore は memory_store_id、VectorDatabase は memory_store_id+database_id、MemoryRecord は memory_entity_id+entity_version+memory_record_id+version を使うと確定しました。deployment・endpoint・scope・lifecycle field は context のみを補います。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 结构复核确认 VectorDatabase、MemoryStore 与 MemoryRecord 均不进入 Index 分类树；跨模块 hosts 关系只闭合部署事实，不能替代各自的 is_a 主干或规范 owner。
-              en: Structure review confirms that VectorDatabase, MemoryStore, and MemoryRecord do not enter the Index taxonomy tree; the cross-module hosts relation closes a deployment fact only and cannot replace either side's is_a backbone or canonical owner.
-              ja: 構造審査により VectorDatabase・MemoryStore・MemoryRecord は Index taxonomy tree に入らず、module 横断 hosts は deployment fact を閉じるだけで各側の is_a backbone や canonical owner を代替しないと確認しました。
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: openai-embeddings
+    title: OpenAI embeddings guide
+    url: https://developers.openai.com/api/docs/guides/embeddings
+    source_type: official-doc
+    relevance: Documents generated numerical embedding representations for supplied content.
+  - id: pinecone-indexing
+    title: Pinecone indexing overview
+    url: https://docs.pinecone.io/guides/index-data/indexing-overview
+    source_type: official-doc
+    relevance: Documents indexed dense, sparse, text, and metadata fields and explicit indexing operations.
+  - id: pinecone-search
+    title: Pinecone semantic search
+    url: https://docs.pinecone.io/guides/search/semantic-search
+    source_type: official-doc
+    relevance: Documents vector queries over existing indexed records and returned similar records.
 source_claims:
-  - id: claim-memory-embedding-indexes-001
-    source: eng-api-openai-embeddings
-    supports: OpenAI's current embeddings documentation grounds the model-input-vector boundary used for EmbeddingRun and EmbeddingVector; Moonweave adds explicit provenance and subtype placement.
-    locator: Vector embeddings guide > What are embeddings?; Create embeddings API > input, model, dimensions, encoding format, and response vector
-    evidence_kind: design-inference
+  - id: claim-module-embedding-generation
+    source: openai-embeddings
+    supports: OpenAI documents embeddings as numerical representations created from supplied input.
+    locator: "Embeddings guide: numerical representations from input and search use case"
+    evidence_kind: official-documentation
     confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-002
-    source: eng-vector-pinecone-indexing
-    supports: Pinecone's indexing overview grounds dense and sparse vector records, indexes, metadata, and hybrid indexing; Moonweave separates logical Index from immutable version layout.
-    locator: Indexing overview > Indexes, dense and sparse vectors, namespaces, vector embedding, import, upsert, and metadata
-    evidence_kind: design-inference
+  - id: claim-module-indexed-representations
+    source: pinecone-indexing
+    supports: Pinecone documents indexes containing declared dense, sparse, and text ranking fields plus metadata.
+    locator: "Indexing overview: indexes, ranking fields, and metadata"
+    evidence_kind: official-documentation
     confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-003
-    source: eng-vector-qdrant-data-model
-    supports: Qdrant's data model grounds collections, points, vector forms, payload, storage, sharding, and indexing; IndexVersion immutability and the exact ontology layout are Moonweave design inferences.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
-    evidence_kind: design-inference
+  - id: claim-module-query-read-only
+    source: pinecone-search
+    supports: Pinecone documents queries over an index with a supplied vector that return similar records.
+    locator: "Semantic search: search with a dense vector"
+    evidence_kind: official-documentation
     confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-004
-    source: eng-ont-prov-o
-    supports: PROV-O grounds the distinction between activities, used inputs, and generated entities applied to embedding, build, and refresh runs.
-    locator: PROV-O Recommendation > Entity, Activity, used, wasGeneratedBy, and wasDerivedFrom
-    evidence_kind: design-inference
+  - id: claim-module-design
+    source: pinecone-indexing
+    supports: Moonweave separates representation generation, index membership writes, immutable structural snapshots, and read-only retrieval outcomes so that every embedding and index mutation has independent audit evidence.
+    locator: "Moonweave ontology design inference from claim-module-embedding-generation, claim-module-indexed-representations, and claim-module-query-read-only"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-005
-    source: eng-api-openai-embeddings
-    supports: OpenAI documents embedding input, chosen model, dimensions, and returned vectors; this example explicitly binds those operational facts to a Moonweave run and Chunk version.
-    locator: Vector embeddings guide > What are embeddings?; Create embeddings API > input, model, dimensions, encoding format, and response vector
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-006
-    source: eng-api-openai-embeddings
-    supports: OpenAI requires explicit input and model to create an embedding; mere vector co-location does not evidence that invocation.
-    locator: Vector embeddings guide > What are embeddings?; Create embeddings API > input, model, dimensions, encoding format, and response vector
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-007
-    source: eng-vector-qdrant-data-model
-    supports: Qdrant documents collections, shards, points, IDs, vectors, and payloads; Moonweave adds an explicit immutable version layer and verifies every membership boundary.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-008
-    source: eng-vector-qdrant-data-model
-    supports: Qdrant scopes points and shards to collection structure; Moonweave additionally scopes them to one immutable IndexVersion.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-009
-    source: eng-fw-llamaindex-ingestion-code
-    supports: LlamaIndex documents document-ID and hash-driven update handling; Moonweave separates the observed trigger from predecessor consumption and successor generation.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-010
-    source: eng-fw-llamaindex-ingestion-code
-    supports: Incremental processing may skip or fail updates; Moonweave asserts successor generation only for a successfully materialized version.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-011
-    source: eng-api-openai-embeddings
-    supports: OpenAI documents supplied input, selected model, dimensions, and returned embedding; Moonweave binds those facts through explicit run relations.
-    locator: Vector embeddings guide > What are embeddings?; Create embeddings API > input, model, dimensions, encoding format, and response vector
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-012
-    source: eng-vector-qdrant-data-model
-    supports: Qdrant and Pinecone distinguish collection or index configuration, shards, records, and stored vectors; Moonweave versions and binds each level explicitly.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-013
-    source: eng-fw-llamaindex-ingestion-code
-    supports: LlamaIndex implements document-ID and hash comparisons for incremental updates; Moonweave records trigger, predecessor, and successor separately.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-014
-    source: eng-api-openai-embeddings
-    supports: "OpenAI defines an embedding as a floating-point vector produced from an input and records model- and dimension-specific representation details. This provides the negative boundary needed here: textual Chunk identity is not the same as the EmbeddingVector derived from it. The Chunk owner and module split are Moonweave design inferences rather than OpenAI API concepts."
-    locator: Vector embeddings > What are embeddings?; How to get embeddings; Embedding models; Use cases > Reducing embedding dimensions
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-015
-    source: eng-vector-qdrant-data-model
-    supports: Qdrant distinguishes stored collections, shards, and points from query operations; Moonweave additionally makes IndexVersion an immutable owned snapshot.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-016
-    source: eng-vector-pinecone-indexing
-    supports: Pinecone separates index records and configuration from query execution and result handling; Moonweave assigns those execution identities to retrieval and ranking.
-    locator: Indexing overview > Indexes, dense and sparse vectors, namespaces, vector embedding, import, upsert, and metadata
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-017
-    source: eng-api-openai-embeddings
-    supports: OpenAI's embeddings API distinguishes the selected model, supplied input, and returned vector; Moonweave separates reusable model identity from run and output identity.
-    locator: Vector embeddings guide > What are embeddings?; Create embeddings API > input, model, dimensions, encoding format, and response vector
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-018
-    source: eng-api-openai-embeddings
-    supports: OpenAI requires a model identifier for embedding creation but treats the model separately from each request and returned embedding.
-    locator: Vector embeddings guide > What are embeddings?; Create embeddings API > input, model, dimensions, encoding format, and response vector
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-019
-    source: eng-vector-qdrant-data-model
-    supports: Qdrant documents a persistent vector service with collections, points, vectors, payloads, shards, and indexing; Moonweave classifies the service separately from its indexes.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-020
-    source: eng-vector-pinecone-indexing
-    supports: Pinecone defines indexes by vector type and dimension and stores vector records inside them, which supports a logical index identity distinct from the service hosting it. The VectorIndex class, its Moonweave owner, and the exact hosts predicate are design inferences.
-    locator: Indexing overview > Indexes; Indexes with dense vectors; Indexes with sparse vectors
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-021
-    source: eng-vector-qdrant-data-model
-    supports: Qdrant distinguishes the vector service from collections, points, vectors, shards, and index structures managed within it. This supports projecting VectorIndex separately from VectorDatabase; Moonweave's exact ownership split remains a design inference.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-022
-    source: eng-vector-qdrant-data-model
-    supports: Qdrant distinguishes stored collection and point structures from requests that search them.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-023
-    source: eng-vector-pinecone-indexing
-    supports: Pinecone separates index management and data records from query-time search and result ranking.
-    locator: Indexing overview > Indexes, dense and sparse vectors, namespaces, vector embedding, import, upsert, and metadata
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-024
-    source: eng-api-openai-embeddings
-    supports: OpenAI exposes model selection, input, and returned embedding as separate operational data.
-    locator: Vector embeddings guide > What are embeddings?; Create embeddings API > input, model, dimensions, encoding format, and response vector
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-025
-    source: eng-api-openai-embeddings
-    supports: OpenAI identifies the model independently from each embedding request and response.
-    locator: Vector embeddings guide > What are embeddings?; Create embeddings API > input, model, dimensions, encoding format, and response vector
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-026
-    source: eng-vector-qdrant-data-model
-    supports: Qdrant distinguishes the running vector service from collections, point records, and indexing structures it manages.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-embedding-indexes-027
-    source: eng-vector-qdrant-data-model
-    supports: A vector service is one storage specialization; Moonweave keeps generic memory records and store scope independent of that specialization.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

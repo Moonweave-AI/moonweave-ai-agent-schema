@@ -9,6 +9,27 @@ const PRIMARY_BACKBONE_RELATION_KINDS = Object.freeze({
   part_of: "composition",
 });
 
+const RETIRED_GOVERNANCE_KEYS = new Set([
+  "review",
+  "review_status",
+  "reviewers",
+  "maturity",
+  "maturity_changes",
+  "change_history",
+  "change_log",
+  "adaptation_mapping",
+  "adaptation_mappings",
+  "external_mappings",
+  "axioms",
+  "axiom_validation",
+  "axioms_and_validation",
+  "introduced_in",
+  "deprecated_in",
+  "replaced_by_ids",
+  "deprecation_reason",
+  "change_note",
+]);
+
 const deepFreeze = (value, seen = new WeakSet()) => {
   if (!value || typeof value !== "object" || seen.has(value)) return value;
   seen.add(value);
@@ -21,62 +42,15 @@ const localizedFallback = (value, fallback = "Not yet documented") => {
   return Object.freeze({ zh: fallback, en: fallback, ja: fallback });
 };
 
+const withoutRetiredGovernance = (value) => {
+  if (Array.isArray(value)) return value.map(withoutRetiredGovernance);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value)
+    .filter(([key]) => !RETIRED_GOVERNANCE_KEYS.has(key))
+    .map(([key, nested]) => [key, withoutRetiredGovernance(nested)]));
+};
+
 const sourceStatus = (node) => node.status === "accepted" ? "accepted" : "review";
-
-const hasAcceptedReviewClosure = (value) => {
-  if (Array.isArray(value)) return value.every(hasAcceptedReviewClosure);
-  if (!value || typeof value !== "object") return true;
-  return Object.entries(value).every(([key, nested]) => {
-    if (key === "review_status") return nested === "accepted";
-    if (key === "review" && nested && typeof nested === "object" && "status" in nested) {
-      return nested.status === "accepted" && hasAcceptedReviewClosure(nested);
-    }
-    return hasAcceptedReviewClosure(nested);
-  });
-};
-
-const hasManualNodeAcceptance = (node) =>
-  node.status === "accepted" &&
-  node.review?.status === "accepted" &&
-  node.review?.method === "manual-semantic" &&
-  typeof node.review?.reviewer === "string" &&
-  node.review.reviewer.length > 0 &&
-  typeof node.review?.reviewed_on === "string" &&
-  node.review.reviewed_on.length > 0 &&
-  hasAcceptedReviewClosure(node);
-
-const isTreeReleasable = (tree) => {
-  const sources = collectAllSources(tree.nodes);
-  const sourceIds = new Set(sources.map(({ id }) => id));
-  const sourcesAccepted = sources.every((source) =>
-    typeof source.id === "string" &&
-    source.id.length > 0 &&
-    source.review?.status === "accepted" &&
-    typeof source.review?.reviewed_on === "string" &&
-    source.review.reviewed_on.length > 0 &&
-    hasAcceptedReviewClosure(source));
-  const claimsAccepted = tree.nodes.every((node) =>
-    (node.source_claims ?? []).every((claim) =>
-      claim.review_status === "accepted" &&
-      sourceIds.has(claim.source ?? claim.source_id)));
-  return sourcesAccepted && claimsAccepted && tree.nodes.every(hasManualNodeAcceptance);
-};
-
-const canonicalReview = (node) => {
-  const review = node.review ?? {};
-  const accepted = review.status === "accepted" && review.method === "manual-semantic";
-  const note = localizedFallback(review.note, "Pending manual semantic review.");
-  return {
-    review_status: accepted ? "accepted" : "draft",
-    reviewers: review.reviewer ? [{
-      reviewer_id: review.reviewer,
-      reviewer_role: "ontology",
-      reviewer_kind: "automated-agent",
-      reviewed_on: review.reviewed_on ?? "1970-01-01",
-      decision_note: note,
-    }] : [],
-  };
-};
 
 const canonicalClaim = (claim) => ({
   source_id: claim.source ?? claim.source_id,
@@ -84,7 +58,6 @@ const canonicalClaim = (claim) => ({
   locator: claim.locator,
   evidence_kind: claim.evidence_kind,
   confidence: claim.confidence,
-  review_status: claim.review_status ?? "draft",
 });
 
 const createClaimResolver = (node) => {
@@ -111,17 +84,25 @@ const normalizeEmbeddedClaims = (value, resolveClaims) => {
     return value.map((entry) => normalizeEmbeddedClaims(entry, resolveClaims));
   }
   if (!value || typeof value !== "object") return value;
-  return Object.fromEntries(Object.entries(value).map(([key, nested]) => [
-    key,
-    key === "source_claims"
-      ? resolveClaims(nested)
-      : normalizeEmbeddedClaims(nested, resolveClaims),
-  ]));
+  return Object.fromEntries(Object.entries(value)
+    .filter(([key]) => !RETIRED_GOVERNANCE_KEYS.has(key))
+    .map(([key, nested]) => [
+      key,
+      key === "source_claims"
+        ? resolveClaims(nested)
+        : normalizeEmbeddedClaims(nested, resolveClaims),
+    ]));
 };
 
 const commonInformation = (node) => {
   const semantics = node.semantics ?? {};
   const { claims, resolveClaims } = createClaimResolver(node);
+  const engineering = node.engineering
+    ? normalizeEmbeddedClaims(node.engineering, resolveClaims)
+    : undefined;
+  const structure = node.structure
+    ? normalizeEmbeddedClaims(node.structure, resolveClaims)
+    : undefined;
   return {
     labels: localizedFallback(node.labels, node.id),
     short_definitions: localizedFallback(
@@ -133,11 +114,10 @@ const commonInformation = (node) => {
     includes: semantics.includes ?? node.includes ?? [],
     excludes: semantics.excludes ?? node.excludes ?? [],
     examples: normalizeEmbeddedClaims(node.examples ?? [], resolveClaims),
+    ...(engineering ? { engineering } : {}),
+    ...(structure ? { structure } : {}),
     source_claims: claims.map(canonicalClaim),
     status: sourceStatus(node),
-    review: canonicalReview(node),
-    introduced_in: node.introduced_in ?? null,
-    change_note: node.change_note ?? {},
     resolveClaims,
   };
 };
@@ -167,7 +147,7 @@ const emptyInteractionFacet = Object.freeze({
 
 const compileModule = (node, planeId) => {
   const common = commonInformation(node);
-  const contract = node.module_contract ?? {};
+  const contract = withoutRetiredGovernance(node.module_contract ?? {});
   return {
     id: node.id,
     plane_id: planeId,
@@ -181,18 +161,15 @@ const compileModule = (node, planeId) => {
         failure: emptyInteractionFacet,
         recovery: emptyInteractionFacet,
       },
-      review: canonicalReview(node),
     },
     taxonomy_contract: contract.taxonomy_contract ?? {
       applicability: "mixed-backbone",
-      hierarchy_policy: "arbitrary-depth-reviewed-backbone",
+      hierarchy_policy: "arbitrary-depth-backbone",
       key_root_concept_ids: [],
       allowed_backbone_predicates: ["is_a"],
       flat_root_exception_concept_ids: [],
       not_applicable_reason: null,
-      review: canonicalReview(node),
     },
-    competency_questions: contract.competency_questions ?? [],
     key_notion: contract.key_notion ?? null,
     owns_when: contract.owns_when ?? localizedFallback(null),
     references_when: contract.references_when ?? localizedFallback(null),
@@ -216,22 +193,7 @@ const compileConcept = (node, moduleId) => {
     semantic_kind: semantics.semantic_kind ?? node.semantic_kind ?? "entity",
     primary_parent_relation_id: parentRelationId,
     structure,
-    external_mappings: normalizeEmbeddedClaims(
-      node.external_mappings ?? [],
-      common.resolveClaims,
-    ),
-    applicability: node.applicability ?? {
-      description: localizedFallback(null),
-      lifecycle_position: localizedFallback(null),
-      solves_problem: localizedFallback(null),
-      typical_inputs: [],
-      typical_outputs: [],
-    },
-    deprecated_in: null,
-    replaced_by_ids: [],
-    deprecation_reason: {},
     lexical_aliases: semantics.aliases ?? node.lexical_aliases ?? [],
-    sibling_differentiation: node.sibling_differentiation ?? null,
     root_status: parentRelationId ? null : "module-key-root",
   };
 };
@@ -254,12 +216,6 @@ const compileRelation = ({ relation, sourceNode, targetId, primary }) => {
     direction: normalized.direction ?? "source-to-target",
     relation_kind: normalized.relation_kind ?? (predicate === "is_a" ? "hierarchy" : "semantic"),
     status: sourceStatus(sourceNode),
-    review: canonicalReview(sourceNode),
-    introduced_in: normalized.introduced_in ?? null,
-    deprecated_in: null,
-    replaced_by_ids: [],
-    deprecation_reason: {},
-    change_note: normalized.change_note ?? {},
     labels: localizedFallback(normalized.labels, predicate),
     definitions: localizedFallback(normalized.definition ?? normalized.definitions, predicate),
     cardinality: normalized.cardinality ?? null,
@@ -381,7 +337,6 @@ const compileCanonical = (tree) => {
   const relations = compileRelations(tree);
   const common = commonInformation(root);
   const release = root.release ?? { version: "0.0.0", date: "1970-01-01" };
-  const releasable = isTreeReleasable(tree);
   const partial = {
     id: root.id,
     ...withoutResolver(common),
@@ -392,9 +347,9 @@ const compileCanonical = (tree) => {
     modules: compiledModules,
     classes,
     relations,
-    global_constraints: root.global_constraints ?? [],
-    case_paths: root.case_paths ?? [],
-    hygiene_gates: root.hygiene_gates ?? [],
+    global_constraints: withoutRetiredGovernance(root.global_constraints ?? []),
+    case_paths: withoutRetiredGovernance(root.case_paths ?? []),
+    hygiene_gates: withoutRetiredGovernance(root.hygiene_gates ?? []),
   };
   return {
     ...partial,
@@ -409,8 +364,6 @@ const compileCanonical = (tree) => {
       generated_at: `${release.date}T00:00:00.000Z`,
       source_tree_sha256: tree.sourceTreeSha256,
       generated_from: tree.sourceFiles,
-      release_channel: releasable ? "release" : "candidate",
-      releasable,
     },
   };
 };
@@ -568,7 +521,7 @@ const collectAllSources = (nodes) => {
   for (const node of nodes) {
     for (const source of node.sources ?? []) {
       if (source && typeof source === "object" && source.id && !seen.has(source.id)) {
-        seen.set(source.id, source);
+        seen.set(source.id, withoutRetiredGovernance(source));
       }
     }
   }

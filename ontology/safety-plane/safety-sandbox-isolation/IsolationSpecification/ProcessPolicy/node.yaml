@@ -1,0 +1,353 @@
+schema: moonweave.ai/ontology-node/v1
+id: ProcessPolicy
+kind: concept
+status: accepted
+labels:
+  zh: 进程政策
+  en: Process Policy
+  ja: プロセスポリシー
+semantics:
+  short_definition:
+    zh: 规定受限环境内进程可用表面、能力、禁止提权和资源上限证据的静态政策。
+    en: A static policy for the process surface, capabilities, no-escalation controls, and resource-limit evidence inside a constrained environment.
+    ja: 制約環境内の process surface、capability、no-escalation control、resource-limit evidence を定める静的 policy。
+  definition:
+    zh: ProcessPolicy 是 IsolationSpecification 的声明性组成部分，描述是否显式开放 Shell、引用能力配置、要求何种禁止提权控制，以及引用哪些资源限制。它可保留 OpenAI SandboxAgent capability 列表、OCI process 的 capabilities/rlimits/noNewPrivileges、Docker 的 capability/PID/security 选项或 Kubernetes container securityContext，但不把这些不同 API 的字段当作同一个开关。它不是运行中的进程、命令参数、网络出口政策或执行结果。
+    en: ProcessPolicy is a declarative component of an IsolationSpecification that states whether Shell is explicitly exposed, cites capability configuration, requires no-escalation controls, and references resource limits. It may retain an OpenAI SandboxAgent capability list, OCI process capabilities/rlimits/noNewPrivileges, Docker capability/PID/security options, or Kubernetes container securityContext without treating fields from those APIs as one switch. It is not a running process, command arguments, network-egress policy, or execution result.
+    ja: ProcessPolicy は IsolationSpecification の宣言的な構成要素であり、Shell が明示的に公開されるか、capability configuration、no-escalation control、resource limit を記録する。OpenAI SandboxAgent capability list、OCI process の capabilities/rlimits/noNewPrivileges、Docker の capability/PID/security option、Kubernetes container securityContext を保持できるが、異なる API の field を一つの switch と扱わない。実行中の process、command argument、network-egress policy、execution result ではない。
+  why_needed:
+    zh: 只限制路径并不能限制 shell、能力或进程资源；反过来，禁止提权也不等于已限制可写挂载。将进程面单列可以审计“执行什么能力、在什么限制下运行”，同时避免把模型指令或容器名称当作实际强制机制。
+    en: Limiting paths does not limit Shell, capabilities, or process resources; conversely, no-escalation does not make writable mounts safe. A separate process surface makes it auditable which execution capability is exposed and under which limits, while preventing model instructions or a container name from being mistaken for an enforced mechanism.
+    ja: path を制限しても Shell、capability、process resource は制限されず、逆に no-escalation でも writable mount が安全になるわけではない。別の process surface により、どの execution capability がどの制限下で公開されるかを監査でき、model instruction や container name を強制 mechanism と誤認しない。
+  includes:
+    - zh: Shell/Filesystem 等沙箱能力表面、原生能力配置、禁止提权控制和资源限制引用。
+      en: Sandbox capability surface such as Shell/Filesystem, native capability configuration, no-escalation controls, and resource-limit references.
+      ja: Shell/Filesystem などの sandbox capability surface、native capability configuration、no-escalation control、resource-limit reference。
+    - zh: 指向证明这些限制的 OCI、Docker 或 Kubernetes 进程配置来源。
+      en: References to OCI, Docker, or Kubernetes process configuration that evidences those limits.
+      ja: それらの制限を証明する OCI、Docker、Kubernetes process configuration への参照。
+  excludes:
+    - zh: 工作区路径、根文件系统或卷读写模式；它们由 FilesystemPolicy 定义。
+      en: Workspace paths, root filesystem, or volume access modes, which are defined by FilesystemPolicy.
+      ja: workspace path、root filesystem、volume access mode。これらは FilesystemPolicy が定義する。
+    - zh: 用户批准、凭证、网络目的地、模型 tool call 和进程已产生的输出。
+      en: User approval, credentials, network destinations, model tool calls, and output already produced by a process.
+      ja: user approval、credential、network destination、model tool call、process が既に生成した output。
+  semantic_kind: policy
+  aliases: [execution-surface-policy, capability-policy, process-containment-policy]
+engineering:
+  explanation:
+    zh: 将“是否可执行 shell”与“shell 进程具有什么内核权限”分开。OpenAI Shell capability 会把 exec_command（及受支持时的 PTY 输入）绑定到 live session；OCI 的 process 对象可声明 capabilities、rlimits 和 noNewPrivileges；Docker 与 Kubernetes 有各自的权限与 PID 接口。生成本地政策时保留每一来源引用，且不要从模型输出增添能力、放宽 hard limit 或启用特权模式。
+    en: Keep “whether Shell may execute” separate from “which kernel privileges a shell process has.” The OpenAI Shell capability binds exec_command and, when supported, PTY input to a live session; OCI process can declare capabilities, rlimits, and noNewPrivileges; Docker and Kubernetes expose their own privilege and PID interfaces. Retain each source reference when generating a local policy, and do not add capabilities, raise hard limits, or enable privileged mode from model output.
+    ja: 「Shell を実行してよいか」と「shell process がどの kernel privilege を持つか」を分ける。OpenAI Shell capability は exec_command と、サポートされる場合は PTY input を live session に bind する。OCI process は capabilities、rlimits、noNewPrivileges を宣言でき、Docker と Kubernetes は独自の privilege と PID interface を公開する。local policy を生成するときは各 source reference を保持し、model output から capability を追加したり hard limit を上げたり privileged mode を有効にしたりしない。
+  typical_input:
+    - description:
+        zh: 显式的 Agents SDK 能力列表
+        en: Explicit Agents SDK capability list
+        ja: 明示的な Agents SDK capability list
+      format: |-
+        SandboxAgent(name="worker", capabilities=[Filesystem(), Shell()])
+      source_claims: [claim-process-openai-capabilities]
+    - description:
+        zh: OCI 进程限制片段
+        en: OCI process-limit fragment
+        ja: OCI process-limit fragment
+      format: |-
+        {"process":{"args":["/bin/sh"],"noNewPrivileges":true,"rlimits":[{"type":"RLIMIT_NOFILE","soft":1024,"hard":1024}],"capabilities":{"bounding":["CAP_CHOWN"],"effective":["CAP_CHOWN"]}}}
+      source_claims: [claim-process-oci-controls]
+  typical_output:
+    - description:
+        zh: 有来源的本地进程政策
+        en: Local process policy with provenance
+        ja: provenance を持つ local process policy
+      format: |-
+        {"schema_owner":"moonweave-local-design","record_kind":"process_policy","process_policy_id":"proc-policy-17","execution_surface":"shell_enabled","no_new_privileges_required":true,"capability_source_refs":["oci:bundle/config.json#/process/capabilities"],"resource_limit_refs":["oci:bundle/config.json#/process/rlimits/0"],"process_source_refs":["openai:agent/17#capabilities","oci:bundle/config.json#/process"]}
+      source_claims: [claim-process-local-projection]
+  reference_implementations:
+    - name: OpenAI Agents SDK Sandbox concepts
+      url: https://openai.github.io/openai-agents-python/sandbox/guide/
+      description: Defines Shell and Filesystem capabilities and the effect of an explicit capabilities list.
+    - name: OCI Runtime Specification configuration
+      url: https://github.com/opencontainers/runtime-spec/blob/main/config.md
+      description: Defines process capabilities, rlimits, and noNewPrivileges.
+    - name: Docker container run reference
+      url: https://docs.docker.com/reference/cli/docker/container/run/
+      description: Documents PID limits, capability add/drop options, security options, and privileged mode.
+    - name: Kubernetes security context
+      url: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+      description: Documents container securityContext capabilities and allowPrivilegeEscalation behavior.
+structure:
+  identity_keys: [process_policy_id]
+  fields:
+    - id: process_policy_id
+      labels: {zh: 进程政策标识, en: Process-policy ID, ja: process policy ID}
+      definitions:
+        zh: 稳定标识一份本地进程限制政策；不是 PID、容器 ID 或运行命令。
+        en: Stably identifies one local process-restriction policy; it is not a PID, container ID, or command being run.
+        ja: 一つの local process-restriction policy を安定して識別する。PID、container ID、実行中 command ではない。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: ^[a-z0-9-]+$
+      example_value: proc-policy-17
+      source_claims: [claim-process-local-projection]
+    - id: execution_surface
+      labels: {zh: 执行表面, en: Execution surface, ja: execution surface}
+      definitions:
+        zh: 本地声明 sandbox 是否只提供文件操作，还是显式提供 Shell；它不等同于某一进程已执行的命令。
+        en: A local declaration of whether the sandbox exposes filesystem operations only or explicitly exposes Shell; it is not a command that a process has already run.
+        ja: sandbox が filesystem operation だけを公開するか、Shell を明示的に公開するかの local declaration。process が既に実行した command ではない。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: [filesystem_only, shell_enabled]
+      pattern: null
+      example_value: shell_enabled
+      source_claims: [claim-process-openai-capabilities, claim-process-local-projection]
+    - id: no_new_privileges_required
+      labels: {zh: 要求禁止新增权限, en: Requires no new privileges, ja: no new privileges を要求する}
+      definitions:
+        zh: 本地要求进程不能在运行时获得额外权限，并且必须引用实际强制该要求的来源字段或选项。
+        en: A local requirement that a process cannot gain additional privileges at runtime and that cites the source field or option actually enforcing it.
+        ja: process が runtime 中に追加 privilege を得られないという local requirement。実際に強制する source field または option を引用しなければならない。
+      datatype: boolean
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: true
+      source_claims: [claim-process-oci-controls, claim-process-kubernetes-escalation, claim-process-local-projection]
+    - id: capability_source_refs
+      labels: {zh: 能力配置引用, en: Capability configuration references, ja: capability configuration 参照}
+      definitions:
+        zh: 指向实际 OpenAI capability 列表、OCI Linux capabilities、Docker --cap-add/--cap-drop 或 Kubernetes securityContext.capabilities。
+        en: Points to actual OpenAI capability lists, OCI Linux capabilities, Docker --cap-add/--cap-drop, or Kubernetes securityContext.capabilities.
+        ja: 実際の OpenAI capability list、OCI Linux capabilities、Docker --cap-add/--cap-drop、Kubernetes securityContext.capabilities を指す。
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: null}
+      pattern: null
+      example_value: oci:bundle/config.json#/process/capabilities
+      source_claims: [claim-process-openai-capabilities, claim-process-oci-controls, claim-process-docker-privilege, claim-process-kubernetes-escalation]
+    - id: resource_limit_refs
+      labels: {zh: 资源限制引用, en: Resource-limit references, ja: resource-limit 参照}
+      definitions:
+        zh: 可选地指向实际 OCI rlimits、Docker --pids-limit/--ulimit 或其他来源的资源限制；不把未配置的限制假定为存在。
+        en: Optionally points to actual OCI rlimits, Docker --pids-limit/--ulimit, or other source resource limits; it does not assume a limit exists when none is configured.
+        ja: 実際の OCI rlimits、Docker --pids-limit/--ulimit、その他 source の resource limit を任意で指す。設定されていない limit が存在すると仮定しない。
+      datatype: reference
+      required: false
+      cardinality: {min: 0, max: null}
+      pattern: null
+      example_value: oci:bundle/config.json#/process/rlimits/0
+      source_claims: [claim-process-oci-controls, claim-process-docker-privilege]
+    - id: process_source_refs
+      labels: {zh: 进程来源引用, en: Process source references, ja: process source 参照}
+      definitions:
+        zh: 指向支持本地政策的原生进程或 capability 配置，确保本地总结可回溯到实际强制点。
+        en: Points to native process or capability configuration supporting the local policy so its summary remains traceable to actual enforcement points.
+        ja: local policy を支える native process または capability configuration を指し、その summary を実際の enforcement point に追跡可能にする。
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: null}
+      pattern: null
+      example_value: oci:bundle/config.json#/process
+      source_claims: [claim-process-openai-capabilities, claim-process-oci-controls, claim-process-docker-privilege, claim-process-kubernetes-escalation]
+  constraints:
+    - id: process-policy-shell-is-explicit
+      severity: error
+      language: plain
+      expression: execution_surface shell_enabled requires an explicit sandbox capability or native shell-execution configuration reference; a model instruction, tool name, or command string alone cannot enable Shell.
+      explanation:
+        zh: Shell 是受暴露的运行时能力，不应从提示文本或候选工具名称推断出来。
+        en: Shell is an exposed runtime capability and must not be inferred from prompt text, a candidate-tool name, or a command string.
+        ja: Shell は公開される runtime capability であり、prompt text、candidate-tool name、command string から推論してはならない。
+      source_claims: [claim-process-openai-capabilities, claim-process-local-projection]
+    - id: process-policy-no-escalation-has-enforcement
+      severity: error
+      language: plain
+      expression: no_new_privileges_required true requires a process_source_ref naming a source control such as OCI process.noNewPrivileges, Docker security option, or Kubernetes allowPrivilegeEscalation false; do not treat a local Boolean as enforcement by itself.
+      explanation:
+        zh: 本地字段只表达意图；实际禁止提权必须由对应运行时的配置强制。
+        en: The local field expresses intent only; the relevant runtime configuration must actually enforce no escalation.
+        ja: local field は意図だけを表す。関連する runtime configuration が実際に no escalation を強制しなければならない。
+      source_claims: [claim-process-oci-controls, claim-process-kubernetes-escalation, claim-process-local-projection]
+    - id: process-policy-does-not-approve-privilege
+      severity: error
+      language: plain
+      expression: ProcessPolicy must not contain approval_granted, user_authorization, credential, network_destination, tool_call, tool_result, or live_pid fields; privileged or broadened capability configuration is a containment risk requiring separate assessment, not an approval outcome.
+      explanation:
+        zh: 进程限制、授权和执行记录有不同的责任边界；特权配置并不会因被记录而变得安全。
+        en: Process limits, authorization, and execution records have different responsibility boundaries; privileged configuration does not become safe by being recorded.
+        ja: process limit、authorization、execution record の責任境界は異なる。privileged configuration は記録されても安全にはならない。
+      source_claims: [claim-process-docker-privilege, claim-process-local-projection]
+  required_relations: []
+examples:
+  - id: process-policy-e2b
+    labels:
+      zh: 进程政策 - E2B 沙箱 VM
+      en: Process Policy - E2B sandbox VM
+      ja: プロセスポリシー - E2B サンドボックス VM
+    descriptions: {zh: "进程政策(ProcessPolicy) [ProcessPolicy]: 规定受限环境内进程可用表面、能力、禁止提权和资源上限证据的静态政策。. E2B sandbox = Sandbox(); execution = sandbox.run_code(\"print('hello')\") — 网络隔离、文件系统隔离与资源限制。 Fields: capability_source_refs, resource_limit_refs, no_new_privileges_required.", en: "Process Policy (ProcessPolicy) [ProcessPolicy]: A static policy for the process surface, capabilities, no-escalation controls, and resource-limit evidence inside a constrained environment.. E2B sandbox = Sandbox(); execution = sandbox.run_code(\"print('hello')\") — network isolation, filesystem isolation, and resource limits (e2b.dev/docs). Fields include capability_source_refs, resource_limit_refs, no_new_privileges_required.", ja: "プロセスポリシー(ProcessPolicy) [ProcessPolicy]: 制約環境内の process surface、capability、no-escalation control、resource-limit evidence を定める静的 policy。. E2B sandbox = Sandbox(); execution = sandbox.run_code(\"print('hello')\") — network/filesystem isolation と resource limit。 Fields: capability_source_refs, resource_limit_refs, no_new_privileges_required."}
+    field_values:
+      capability_source_refs: "oci:bundle/config.json#/process/capabilities"
+      execution_surface: shell_enabled
+      no_new_privileges_required: true
+      process_policy_id: proc-policy-17
+      process_source_refs: "oci:bundle/config.json#/process"
+      resource_limit_refs: "oci:bundle/config.json#/process/rlimits/0"
+    related_node_ids:
+      - ProcessPolicy
+    related_relation_ids: []
+    example_source: E2B Sandbox API
+    source_claims:
+      - claim-process-openai-capabilities
+  - id: process-policy-firecracker
+    labels:
+      zh: 进程政策 - Firecracker microVM 隔离
+      en: Process Policy - Firecracker microVM isolation
+      ja: プロセスポリシー - Firecracker microVM 分離
+    descriptions: {zh: "进程政策(ProcessPolicy) [ProcessPolicy]: 规定受限环境内进程可用表面、能力、禁止提权和资源上限证据的静态政策。. AWS Firecracker microVM 以最小开销隔离 Lambda 与 Fargate 工作负载。 Fields: capability_source_refs, resource_limit_refs, no_new_privileges_required.", en: "Process Policy (ProcessPolicy) [ProcessPolicy]: A static policy for the process surface, capabilities, no-escalation controls, and resource-limit evidence inside a constrained environment.. AWS Firecracker microVMs isolate Lambda and Fargate workloads with minimal overhead (firecracker-microvm.github.io). Fields include capability_source_refs, resource_limit_refs, no_new_privileges_required.", ja: "プロセスポリシー(ProcessPolicy) [ProcessPolicy]: 制約環境内の process surface、capability、no-escalation control、resource-limit evidence を定める静的 policy。. AWS Firecracker microVM は Lambda/Fargate workload を minimal overhead で isolate する。 Fields: capability_source_refs, resource_limit_refs, no_new_privileges_required."}
+    field_values:
+      capability_source_refs: "oci:bundle/config.json#/process/capabilities"
+      execution_surface: shell_enabled
+      no_new_privileges_required: true
+      process_policy_id: proc-policy-17
+      process_source_refs: "oci:bundle/config.json#/process"
+      resource_limit_refs: "oci:bundle/config.json#/process/rlimits/0"
+    related_node_ids:
+      - ProcessPolicy
+    related_relation_ids: []
+    example_source: AWS Firecracker
+    source_claims:
+      - claim-process-openai-capabilities
+  - id: process-policy-gvisor_runsc
+    labels:
+      zh: 进程政策 - gVisor runsc 内核沙箱
+      en: Process Policy - gVisor runsc kernel sandbox
+      ja: プロセスポリシー - gVisor runsc カーネル sandbox
+    descriptions: {zh: "进程政策(ProcessPolicy) [ProcessPolicy]: 规定受限环境内进程可用表面、能力、禁止提权和资源上限证据的静态政策。. gVisor runsc 通过 user-space kernel Sentry 拦截 syscall，Docker/Kubernetes 可用 runtime=runsc 运行容器，限制内核攻击面（gvisor.dev/docs）。 Fields: capability_source_refs, resource_limit_refs, no_new_privileges_required.", en: "Process Policy (ProcessPolicy) [ProcessPolicy]: A static policy for the process surface, capabilities, no-escalation controls, and resource-limit evidence inside a constrained environment.. gVisor runsc intercepts syscalls via user-space kernel Sentry; Docker/Kubernetes can run containers with runtime=runsc to limit kernel attack surface (gvisor.dev/docs). Fields include capability_source_refs, resource_limit_refs, no_new_privileges_required.", ja: "プロセスポリシー(ProcessPolicy) [ProcessPolicy]: 制約環境内の process surface、capability、no-escalation control、resource-limit evidence を定める静的 policy。. gVisor runsc は user-space kernel Sentry で syscall を intercept し runtime=runsc で kernel 攻撃面を制限する。 Fields: capability_source_refs, resource_limit_refs, no_new_privileges_required."}
+    field_values:
+      capability_source_refs: "oci:bundle/config.json#/process/capabilities"
+      execution_surface: shell_enabled
+      no_new_privileges_required: true
+      process_policy_id: proc-policy-17
+      process_source_refs: "oci:bundle/config.json#/process"
+      resource_limit_refs: "oci:bundle/config.json#/process/rlimits/0"
+    related_node_ids:
+      - ProcessPolicy
+    related_relation_ids: []
+    example_source: gVisor runsc
+    source_claims:
+      - claim-process-openai-capabilities
+  - id: process-policy-docker_network_none
+    labels:
+      zh: 进程政策 - Docker 网络隔离
+      en: Process Policy - Docker network isolation
+      ja: プロセスポリシー - Docker ネットワーク分離
+    descriptions: {zh: "进程政策(ProcessPolicy) [ProcessPolicy]: 规定受限环境内进程可用表面、能力、禁止提权和资源上限证据的静态政策。. Docker run --network=none 为容器分配 lo 以外的无网络接口，agent 代码无法发起出站 TCP/UDP 连接（docs.docker.com/network/none/）。 Fields: capability_source_refs, resource_limit_refs, no_new_privileges_required.", en: "Process Policy (ProcessPolicy) [ProcessPolicy]: A static policy for the process surface, capabilities, no-escalation controls, and resource-limit evidence inside a constrained environment.. Docker run --network=none gives a container only the loopback interface so agent code cannot make outbound TCP/UDP connections (docs.docker.com/network/none/). Fields include capability_source_refs, resource_limit_refs, no_new_privileges_required.", ja: "プロセスポリシー(ProcessPolicy) [ProcessPolicy]: 制約環境内の process surface、capability、no-escalation control、resource-limit evidence を定める静的 policy。. Docker run --network=none は loopback のみの container を作り outbound TCP/UDP を阻止する。 Fields: capability_source_refs, resource_limit_refs, no_new_privileges_required."}
+    field_values:
+      capability_source_refs: "oci:bundle/config.json#/process/capabilities"
+      execution_surface: shell_enabled
+      no_new_privileges_required: true
+      process_policy_id: proc-policy-17
+      process_source_refs: "oci:bundle/config.json#/process"
+      resource_limit_refs: "oci:bundle/config.json#/process/rlimits/0"
+    related_node_ids:
+      - ProcessPolicy
+    related_relation_ids: []
+    example_source: Docker network none
+    source_claims:
+      - claim-process-openai-capabilities
+parent_relation:
+  id: ProcessPolicy-part_of-IsolationSpecification
+  predicate: part_of
+  target: concept:IsolationSpecification
+  endpoint_order: child-to-parent
+  direction: source-to-target
+  relation_kind: composition
+  labels: {zh: 是隔离规范的进程组成, en: is a process component of isolation specification, ja: isolation specification の process 構成要素である}
+  definitions:
+    zh: ProcessPolicy 作为同一静态 IsolationSpecification 的进程限制部分，声明执行表面和强制点；它不是 Sandbox session 或该 session 的执行活动。
+    en: As the process-limitation portion of the same static IsolationSpecification, ProcessPolicy declares execution surface and enforcement points; it is not a Sandbox session or an activity performed in that session.
+    ja: 同じ静的 IsolationSpecification の process-limitation 部分として、ProcessPolicy は execution surface と enforcement point を宣言する。Sandbox session またはその session で行われる activity ではない。
+  cardinality: {source: {min: 1, max: 1}, target: {min: 1, max: 1}}
+  cardinality_not_applicable_reason: null
+  inverse_reading:
+    predicate: has_process_policy
+    labels: {zh: 具有进程政策, en: has process policy, ja: process policy を持つ}
+  conditions:
+    - id: process-policy-parent-source-alignment
+      severity: error
+      expression: process_source_refs must be traceable to the parent IsolationSpecification source_object_refs, and this policy may not add capability or resource authority absent from those sources.
+      explanations: {zh: 子政策细化规范的进程面，不能脱离来源证据而自行扩大执行权限。, en: The child policy refines the specification's process surface and cannot expand execution authority without source evidence., ja: child policy は specification の process surface を具体化し、source evidence なしに execution authority を広げられない。}
+      source_claims: [claim-process-local-projection]
+  temporal_scope: timeless
+  boundary_context: This composition is between declarative contract records; a live Sandbox that realizes the contract is represented by a separate association.
+  constraints: []
+  examples: []
+  source_claims: [claim-process-local-projection]
+  distinct_fact_rationale:
+    zh: 组成关系仅表示静态契约中的进程限制部分，不将运行环境或一次命令执行伪装为规范子部件。
+    en: The composition denotes only the process-limitation part of a static contract and does not disguise a runtime environment or a command execution as a specification subcomponent.
+    ja: composition は静的 contract の process-limitation 部分だけを表し、runtime environment または command execution を specification subcomponent と偽装しない。
+  layout_role: primary-backbone
+relations: []
+sources:
+  - id: moonweave-ontology-design
+    title: Moonweave ontology profile design
+    publisher: Moonweave
+    url: https://github.com/Moonweave-AI/moonweave-ai-agent-schema
+    accessed_on: 2026-07-19
+    source_type: design-inference
+    relevance: Defines the project-local process-policy record that retains native execution controls without treating a policy record as a live process.
+  - id: openai-agents-sdk-sandbox-guide
+    title: OpenAI Agents SDK — Sandbox concepts
+    url: https://openai.github.io/openai-agents-python/sandbox/guide/
+    source_type: official-doc
+    relevance: Defines Shell and Filesystem capability behavior and explicit capability-list replacement of defaults.
+  - id: oci-runtime-spec-config
+    title: OCI Runtime Specification — configuration
+    url: https://github.com/opencontainers/runtime-spec/blob/main/config.md
+    source_type: official-spec
+    relevance: Defines process rlimits, Linux capabilities, and noNewPrivileges.
+  - id: docker-container-run-reference
+    title: Docker Docs — docker container run
+    url: https://docs.docker.com/reference/cli/docker/container/run/
+    source_type: official-doc
+    relevance: Documents PID limits, capabilities, security options, and privileged-container consequences.
+  - id: kubernetes-security-context
+    title: Kubernetes — Configure a Security Context
+    url: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+    source_type: official-doc
+    relevance: Documents securityContext capabilities and allowPrivilegeEscalation behavior.
+source_claims:
+  - id: claim-process-openai-capabilities
+    source: openai-agents-sdk-sandbox-guide
+    supports: Shell adds exec_command and, where PTY is supported, write_stdin; Filesystem adds file tools, and passing an explicit SandboxAgent capabilities list replaces the default list.
+    locator: Concepts — Built-in capabilities
+    evidence_kind: official-doc
+    confidence: high
+  - id: claim-process-oci-controls
+    source: oci-runtime-spec-config
+    supports: OCI process supports rlimits, Linux capabilities, and noNewPrivileges; true noNewPrivileges prevents a process from gaining additional privileges.
+    locator: Configuration — POSIX process and Linux process
+    evidence_kind: normative
+    confidence: high
+  - id: claim-process-docker-privilege
+    source: docker-container-run-reference
+    supports: Docker exposes --pids-limit and capability controls, while --privileged enables broad host-facing privileges and is not a securely sandboxed process.
+    locator: docker container run — options and Escalate container privileges (--privileged)
+    evidence_kind: official-doc
+    confidence: high
+  - id: claim-process-kubernetes-escalation
+    source: kubernetes-security-context
+    supports: Kubernetes securityContext controls capabilities and allowPrivilegeEscalation, which controls the no_new_privs flag; readOnlyRootFilesystem is a separate filesystem setting.
+    locator: Configure a Security Context — security context settings and Set capabilities for a Container
+    evidence_kind: official-doc
+    confidence: high
+  - id: claim-process-local-projection
+    source: moonweave-ontology-design
+    supports: process_policy_id, execution_surface, local source references, and separation of process policy from filesystem policy and live execution are Moonweave-local design inferences retaining native process semantics.
+    locator: ontology/safety-plane/safety-sandbox-isolation/IsolationSpecification/ProcessPolicy/node.yaml — local process-policy projection
+    evidence_kind: design-inference
+    confidence: high

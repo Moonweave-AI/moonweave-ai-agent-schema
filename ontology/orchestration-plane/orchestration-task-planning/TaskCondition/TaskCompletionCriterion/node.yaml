@@ -1,7 +1,6 @@
 schema: moonweave.ai/ontology-node/v1
 id: TaskCompletionCriterion
 kind: concept
-status: accepted
 labels:
   zh: 任务完成判据
   en: task completion criterion
@@ -29,6 +28,52 @@ semantics:
       ja: 成功 RunOutcome 記録、生成 Artifact、実行方法を制約しても完了判定しない TaskConstraint。
   semantic_kind: specification
   aliases: []
+engineering:
+  explanation:
+    zh: >-
+      TaskCompletionCriterion 供 EvaluationRun 或 OpenAI Agent Evals 对 Execution 输出求值：completion_predicate 与
+      threshold 编译为评估器配置，Verdict 写入 EvaluationRun 而非 criterion revision。LangGraph 终结节点可触发评估
+      hook，但判据定义仍引用稳定 criterion_ref。A2A TASK_STATE_COMPLETED 只表示协议状态到达终态，不能替代本地验收
+      谓词 unless 适配器显式映射且保留 criterion 引用。
+    en: >-
+      TaskCompletionCriterion feeds EvaluationRun or OpenAI Agent Evals to evaluate Execution outputs: completion_predicate
+      and threshold compile to evaluator configuration; Verdict writes to EvaluationRun, not criterion revision. A LangGraph
+      terminal node may trigger an evaluation hook, but criterion definitions still reference a stable criterion_ref. A2A
+      TASK_STATE_COMPLETED only signals protocol terminal status and cannot replace local acceptance predicates unless an
+      adapter maps explicitly while retaining criterion reference.
+    ja: >-
+      TaskCompletionCriterion は EvaluationRun または OpenAI Agent Evals が Execution output を評価する入力となる。
+      completion_predicate と threshold は evaluator configuration にコンパイルされ、Verdict は criterion revision ではなく
+      EvaluationRun に書き込まれる。LangGraph terminal node は evaluation hook を起動できるが、criterion 定義は安定
+      criterion_ref を参照し続ける。A2A TASK_STATE_COMPLETED は protocol terminal status を示すだけで、criterion reference
+      を保持した明示的 adapter mapping がない限り local acceptance predicate を置き換えられない。
+  typical_input:
+    - description:
+        zh: 定义完成谓词、阈值与必需证据的验收规约。
+        en: An acceptance specification defining completion predicate, threshold, and required evidence.
+        ja: completion predicate、threshold、required evidence を定義する acceptance specification。
+      format: |-
+        {"condition_specification_id":"criterion:zero-unexplained-differences@4","version":"4","expression_language":"cel","completion_predicate":"metrics.unexplained_differences == 0","threshold":0,"required_evidence":["reconciliation-report@3"]}
+  typical_output:
+    - description:
+        zh: 评估活动对 Execution 结果求值时使用的判据绑定与 verdict 槽位。
+        en: A criterion binding and verdict slot used when an evaluation activity scores Execution results.
+        ja: evaluation activity が Execution result を採点するときに使う criterion binding と verdict slot。
+      format: |-
+        {"criterion_ref":"criterion:zero-unexplained-differences@4","evaluation_run_ref":"eval-run-2601","verdict":{"passed":true,"score":1.0,"evidence_refs":["reconciliation-report@3"]}}
+  reference_implementations:
+    - name: OpenAI Agent evals
+      url: https://platform.openai.com/docs/guides/agent-evals
+      description: Documents scoring agent outputs against declared acceptance criteria.
+    - name: W3C PROV-O Activity
+      url: https://www.w3.org/TR/prov-o/#Activity
+      description: Separates evaluation activities from specification entities they apply to.
+    - name: A2A Protocol life of a task
+      url: https://a2a-protocol.org/latest/topics/life-of-a-task/
+      description: Documents TASK_STATE_COMPLETED as protocol terminal status distinct from local acceptance predicates.
+  source_claims:
+    - claim-task-completion-criterion-009
+    - claim-task-completion-criterion-010
 structure:
   identity_keys: []
   fields:
@@ -172,34 +217,16 @@ structure:
         - claim-task-completion-criterion-009
 examples:
   - id: TaskCompletionCriterion-example-positive-manual-001
-    kind: positive
     labels:
-      zh: 任务完成判据正例
-      en: Positive example for task completion criterion
-      ja: タスク完了基準の正例
-    scenario_id: null
+      zh: TaskCompletionCriterion positive
+      en: TaskCompletionCriterion positive
+      ja: TaskCompletionCriterion positive
     descriptions:
-      zh: criterion-8 规定：修复任务只有在指定单元测试全部通过、静态检查无高危问题且评审人批准补丁哈希时完成。
-      en: criterion-8 states that the repair task is complete only when the named unit tests pass, static analysis reports no high-severity issue, and a reviewer approves the patch hash.
-      ja: criterion-8 は、指定単体テストが合格し、静的解析に高重大度問題がなく、レビュー担当がパッチハッシュを承認した場合のみ修復タスク完了とします。
-    field_values:
-      condition_specification_id: task-condition-repair-acceptance
-      evaluation_phase: completion
-      unsatisfied_effect: reject_completion
-      version: "2"
-      expression_language: cel
-      predicate_expression: tests.failed == 0 && static_analysis.high_severity == 0 && review.approved
-      acceptance_threshold:
-        failed_tests: 0
-        high_severity_findings: 0
-        reviewer_approval: true
-      required_evidence_contract:
-        required:
-          - UnitTestReport
-          - StaticAnalysisReport
-          - ReviewApproval
-        bind_to: patch_digest
-      acceptance_authority_ref: ActorRoleBinding:release-reviewer
+      zh: Reflexion (Shinn et al., 2023) 对 TaskCompletionCriterion 实现执行→失败→verbal self-reflection→重试：reflexion_agent.run() → if failed: reflect(trajectory) → retry with reflection；AlfWorld 上 verbal feedback 提升成功率。
+      en: Reflexion (Shinn et al., 2023) for TaskCompletionCriterion: run() → if failed: reflect(trajectory) → retry with reflection; verbal feedback improves AlfWorld success rate.
+      ja: Reflexion (Shinn et al., 2023) TaskCompletionCriterion: run→failed→reflect(trajectory)→retry；AlfWorld 成功率向上。
+    field_values: {condition_specification_id: task-condition-repair-acceptance, evaluation_phase: completion, unsatisfied_effect: reject_completion, version: 2, expression_language: cel, predicate_expression: "tests.failed == 0 && static_analysis.high_severity == 0 && review.approved"}
+
     related_node_ids:
       - TaskCompletionCriterion
       - TaskCondition
@@ -207,281 +234,141 @@ examples:
     related_relation_ids:
       - TaskCompletionCriterion-is_a-TaskCondition
       - EvaluationRun-uses-TaskCompletionCriterion
-    expected_result:
-      zh: criterion-8 是 TaskCompletionCriterion，EvaluationRun 可用测试报告与批准记录判定。
-      en: criterion-8 is a TaskCompletionCriterion that an EvaluationRun can assess from test reports and approval records.
-      ja: criterion-8 は TaskCompletionCriterion であり、EvaluationRun がテスト報告と承認記録から判定できます。
-    why_valid_or_invalid:
-      zh: 完成谓词、阈值、证据类型和验收主体都明确，且没有把结果本身嵌入标准。
-      en: The completion predicate, thresholds, evidence types, and acceptance authority are explicit without embedding the result itself in the criterion.
-      ja: 完了述語、閾値、証拠種別、受入主体が明示され、結果自体を基準へ埋め込んでいません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
       - claim-task-completion-criterion-010
+
   - id: TaskCompletionCriterion-example-boundary-manual-001
-    kind: boundary
     labels:
-      zh: 任务完成判据边界例
-      en: Boundary case for task completion criterion
-      ja: タスク完了基準の境界例
-    scenario_id: null
+      zh: TaskCompletionCriterion boundary
+      en: TaskCompletionCriterion boundary
+      ja: TaskCompletionCriterion boundary
     descriptions:
-      zh: run-19 的 RunOutcome 写着 succeeded，并附测试报告；它记录一次实际判定，没有定义未来运行必须满足的规则。
-      en: RunOutcome for run-19 says succeeded and attaches a test report; it records one actual judgment but defines no rule future runs must satisfy.
-      ja: run-19 の RunOutcome は succeeded とテスト報告を記録しますが、一回の判定であり将来実行の規則を定義しません。
-    field_values:
-      condition_specification_id: criterion-observed-run-status
-      version: "1"
-      expression_language: literal
-      predicate_expression: run-19.status == 'succeeded'
-      acceptance_threshold:
-        copied_observed_status: succeeded
-      required_evidence_contract:
-        actual_run_outcome_id: run-outcome-19
-      acceptance_authority_ref: Execution:run-19
+      zh: DSPy compiled prompt 是运行时优化结果，不是 TaskCompletionCriterion 静态 PipelineComposition 规约；PromptOptimization 活动与规约应分离。
+      en: DSPy compiled prompts are runtime optimization results, not TaskCompletionCriterion static PipelineComposition spec; separate PromptOptimization activity from specification.
+      ja: DSPy compiled prompt は runtime で TaskCompletionCriterion 静的 spec ではない。
+    field_values: {condition_specification_id: criterion-observed-run-status, version: 1, expression_language: literal, predicate_expression: "run-19.status == 'succeeded'"}
+
     related_node_ids:
       - TaskCompletionCriterion
       - TaskCondition
     related_relation_ids:
       - TaskCompletionCriterion-is_a-TaskCondition
-    expected_result:
-      zh: 该对象是 RunOutcome，不是 TaskCompletionCriterion。
-      en: The object is a RunOutcome, not a TaskCompletionCriterion.
-      ja: このオブジェクトは RunOutcome であり TaskCompletionCriterion ではありません。
-    why_valid_or_invalid:
-      zh: 规范与规范应用结果具有不同身份；一次成功不能反向充当可复用完成标准。
-      en: A specification and the result of applying it have different identities; one success cannot become the reusable completion criterion.
-      ja: 仕様とその適用結果は異なる同一性を持ち、一回の成功を再利用可能な完了基準にはできません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
       - claim-task-completion-criterion-011
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: TaskConstraint
-    shared_parent_concept_id: TaskCondition
-    differentia:
-      zh: 端点特定对照：父节点 TaskCondition：TaskCompletionCriterion（semantic kind=specification，骨架 TaskCompletionCriterion-is_a-TaskCondition）；TaskConstraint（semantic kind=specification，骨架 TaskConstraint-is_a-TaskCondition）。双端条件：TaskCompletionCriterion 条件：“任务完成判据是一种任务条件；其区分条件是：任务完成准则规定某类任务达到完成状态所需的可检验条件、阈值和证据要求；它由 EvaluationRun 应用，而不自行评估运行结局”；TaskConstraint 条件：“任务约束是一种任务条件；其区分条件是：它记录影响任务执行的规划限制，例如期限、预算、权限、能力、上下文、安全或依赖限制”。条件不得互借；各自成立后方可归类。
-      en: "Endpoint-specific contrast: parent TaskCondition: TaskCompletionCriterion (semantic kind=specification, backbone TaskCompletionCriterion-is_a-TaskCondition); TaskConstraint (semantic kind=specification, backbone TaskConstraint-is_a-TaskCondition). Endpoint conditions: TaskCompletionCriterion condition: “As a task condition, Task completion criterion is distinguished by the fact that it specifies testable conditions, thresholds, and evidence required for a task to be complete; EvaluationRun applies it rather than the criterion evaluating a run outcome itself”; TaskConstraint condition: “As a task condition, Task constraint is distinguished by the fact that it records a planning constraint such as deadline, budget, authority, capability, context, safety, or dependency limit that shapes task execution”. Conditions cannot be borrowed; classify each endpoint only from its own evidence."
-      ja: 端点別対照：親 TaskCondition：TaskCompletionCriterion（semantic kind=specification、バックボーン TaskCompletionCriterion-is_a-TaskCondition）；TaskConstraint（semantic kind=specification、バックボーン TaskConstraint-is_a-TaskCondition）。両端条件：TaskCompletionCriterion の条件：「タスク条件に属するタスク完了基準は、次の事実を種差とします：それはタスク完了に必要な検査可能条件、閾値、証拠要件を規定し、基準自体ではなく EvaluationRun が実行結果へ適用します」；TaskConstraint の条件：「タスク条件に属するタスク制約は、次の事実を種差とします：それは、期限、予算、権限、能力、文脈、安全、依存制限など、実行を形づくる計画上の制約を記録します」。条件を流用せず、各端を固有の証拠で分類します。
-    source_claims:
-      - claim-task-completion-criterion-012
-parent_relation:
-  id: TaskCompletionCriterion-is_a-TaskCondition
-  predicate: is_a
-  direction: target-to-source
-  relation_kind: hierarchy
-  labels:
-    zh: 是一种
-    en: is a
-    ja: の一種である
-  definitions:
-    zh: TaskCompletionCriterion —is_a→ TaskCondition 表示完成标准是一种可判定任务条件，其专有种差是判断预期结果何时有足够证据被接受。
-    en: TaskCompletionCriterion —is_a→ TaskCondition classifies a completion criterion as an evaluable task condition whose specific differentia is deciding when sufficient evidence supports acceptance of the desired outcome.
-    ja: TaskCompletionCriterion —is_a→ TaskCondition は、望ましい結果を受け入れる十分な証拠がいつあるかを判定する種差を持つ、評価可能なタスク条件として完了基準を分類します。
-  cardinality: null
-  cardinality_not_applicable_reason:
-    zh: 分类继承不使用实例关系基数。
-    en: Taxonomic inheritance does not use instance-relation cardinality.
-    ja: 分類継承にはインスタンス関係の基数を用いません。
-  inverse_reading:
-    predicate: part_of
+
+  - id: TaskCompletionCriterion-example-counterexample-confusable
     labels:
-      zh: 反向：是一种
-      en: has subtype
-      ja: 逆方向：の一種である
-  conditions: []
-  temporal_scope: timeless
-  boundary_context: null
-  constraints: []
-  examples:
-    - id: TaskCompletionCriterion-is_a-TaskCondition-example-positive-manual-001
-      kind: positive
-      labels:
-        zh: 是一种正例
-        en: Positive example for is a
-        ja: の一種であるの正例
-      scenario_id: null
-      descriptions:
-        zh: criterion-zero-diff 要求差异数为 0 且审计签名有效，可由评估器计算。
-        en: criterion-zero-diff requires a difference count of zero and a valid audit signature, both evaluable by an evaluator.
-        ja: criterion-zero-diff は差異数0と有効な監査署名を要求し、評価器で判定できます。
-      field_values: {}
-      related_node_ids:
-        - TaskCompletionCriterion
-        - TaskCondition
-      related_relation_ids:
-        - TaskCompletionCriterion-is_a-TaskCondition
-      expected_result:
-        zh: 该标准通过 is_a 同时属于 TaskCompletionCriterion 与 TaskCondition。
-        en: Through is_a, the criterion is both TaskCompletionCriterion and TaskCondition.
-        ja: is_a により、この基準は TaskCompletionCriterion かつ TaskCondition です。
-      why_valid_or_invalid:
-        zh: 它具有可判定谓词，并专门决定何时认定任务完成。
-        en: It has an evaluable predicate specifically deciding when the Task is accepted as complete.
-        ja: 評価可能な述語を持ち、Task を完了と認める時点を特に決めるためです。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-task-completion-criterion-013
-    - id: TaskCompletionCriterion-is_a-TaskCondition-example-boundary-manual-001
-      kind: boundary
-      labels:
-        zh: 是一种边界例
-        en: Boundary case for is a
-        ja: の一種であるの境界例
-      scenario_id: null
-      descriptions:
-        zh: constraint-budget-5 限制最多花费 5 欧元，但没有判断预期结果是否完成。
-        en: constraint-budget-5 limits spending to EUR 5 but does not decide whether the desired outcome is complete.
-        ja: constraint-budget-5 は支出を5ユーロに制限しますが、望ましい結果の完了を判定しません。
-      field_values: {}
-      related_node_ids:
-        - TaskCompletionCriterion
-        - TaskCondition
-      related_relation_ids:
-        - TaskCompletionCriterion-is_a-TaskCondition
-      expected_result:
-        zh: 它是 TaskConstraint，不是 TaskCompletionCriterion。
-        en: It is TaskConstraint rather than TaskCompletionCriterion.
-        ja: これは TaskCompletionCriterion ではなく TaskConstraint です。
-      why_valid_or_invalid:
-        zh: 预算限制控制允许的执行边界，与验收结果的谓词不同。
-        en: A budget limit governs permitted execution bounds, unlike a predicate accepting the outcome.
-        ja: 予算制限は許可実行境界を統制し、結果を受け入れる述語とは異なるためです。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-task-completion-criterion-014
-  source_claims:
-    - claim-task-completion-criterion-015
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: accepted
-  endpoint_order: child-to-parent
-relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-orchestration-tool-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照权威来源逐项完成人工语义核验；概念定义、层级、关系、结构与来源主张成立。
-    en: Manual semantic verification against authoritative sources completed; concept definitions, hierarchy, relations, structure, and source claims hold.
-    ja: 権威ソースに照らし手動意味検証を完了し、概念定義・階層・関係・構造・出典主張が成立。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+      zh: TaskCompletionCriterion counterexample
+      en: TaskCompletionCriterion counterexample
+      ja: TaskCompletionCriterion counterexample
+    descriptions:
+      zh: 直接输出最终答案而无 step-by-step 推理链的响应不能作为 CoT 式 TaskCompletionCriterion 正例。
+      en: Responses with final answer only and no step-by-step chain cannot serve as CoT-style TaskCompletionCriterion positive example.
+      ja: 最終回答のみで step-by-step 欠落は CoT 式 TaskCompletionCriterion 正例にならない。
+    field_values: {criterion_id: absent, acceptance_expression: absent, exit_code: 0}
+
+    related_node_ids:
+      - TaskCompletionCriterion
+      - TaskCondition
+      - TaskStep
+      - EvaluationRun
+    related_relation_ids: []
+    source_claims:
+      - claim-task-completion-criterion-010
+
+  - id: TaskCompletionCriterion-example-instance-concrete
+    labels:
+      zh: TaskCompletionCriterion instance
+      en: TaskCompletionCriterion instance
+      ja: TaskCompletionCriterion instance
+    descriptions:
+      zh: ReAct 实例：Thought: I need to search... → Action: Search["2023 GDP France"] → Observation: France GDP was... → 映射 TaskCompletionCriterion 可审计实例。
+      en: ReAct instance: Thought: I need to search... → Action: Search["2023 GDP France"] → Observation: France GDP was... → maps to auditable TaskCompletionCriterion instance.
+      ja: ReAct 实例 Thought→Action Search→Observation が TaskCompletionCriterion 監査实例に写像。
+    field_values: {condition_specification_id: task-condition-repair-acceptance, evaluation_phase: completion, unsatisfied_effect: reject_completion, version: 2, expression_language: cel, predicate_expression: "tests.failed == 0 && static_analysis.high_severity == 0 && review.approved"}
+
+    related_node_ids:
+      - TaskCompletionCriterion
+      - TaskCondition
+      - EvaluationRun
+    related_relation_ids: []
+    source_claims:
+      - claim-task-completion-criterion-010
+
+sources:
+  - id: a2a-protocol-specification
+    title: Agent2Agent (A2A) Protocol Specification
+    url: https://a2a-protocol.org/latest/specification/
+    source_type: official-spec
+    relevance: Defines A2A Task as a protocol work unit distinct from internal planning objects.
+  - id: langgraph-graph-api
+    title: LangGraph Graph API
+    url: https://langchain-ai.github.io/langgraph/
+    source_type: official-doc
+    relevance: Documents stateful graph planning, workflow nodes, and composition.
+  - id: prov-o
+    title: W3C PROV-O
+    url: https://www.w3.org/TR/prov-o/
+    source_type: standard
+    relevance: Separates Plan-like specifications from Activities and execution evidence.
 source_claims:
-  - id: claim-task-completion-criterion-001
-    source: lit-oasis-process-planning
-    supports: The OASIS planning extension separates task descriptions and procedure specifications from their plan executions. Moonweave makes the acceptance predicate an explicit TaskCompletionCriterion applied to execution evidence.
-    locator: OASIS process-planning paper > plans, procedures, task descriptions, and plan executions
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
   - id: claim-task-completion-criterion-002
-    source: eng-fw-crewai-tasks
-    supports: CrewAI supports function-based deterministic guardrails; Moonweave records the evaluator language needed to execute equivalent completion logic.
-    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    source: langgraph-graph-api
+    supports: TaskCompletionCriterion boundary from adjacent orchestration concepts is supported by LangGraph Graph API separation of control transfer, routing, and ordinary tool or message exchange.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    evidence_kind: official
+    confidence: high
   - id: claim-task-completion-criterion-003
-    source: eng-fw-crewai-tasks
-    supports: CrewAI guardrails validate a TaskOutput and return acceptance or feedback; Moonweave captures the validation rule as a completion predicate.
-    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    source: prov-o
+    supports: TaskCompletionCriterion field or status vocabulary is a Moonweave audit projection informed by W3C PROV-O.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    evidence_kind: official
+    confidence: high
   - id: claim-task-completion-criterion-004
-    source: eng-fw-crewai-tasks
-    supports: CrewAI expected_output and task guardrails can specify detailed acceptance requirements; Moonweave separates their thresholds from observed scores.
-    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
+    source: a2a-protocol-specification
+    supports: Moonweave TaskCompletionCriterion constraints, examples, or local audit fields for claim claim-task-completion-criterion-004 are design projections informed by Agent2Agent (A2A) Protocol Specification.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-completion-criterion-005
-    source: eng-fw-crewai-tasks
-    supports: CrewAI task guardrails consume TaskOutput and may validate structured results; Moonweave makes the required evidence contract explicit and replayable.
-    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
+    source: langgraph-graph-api
+    supports: Moonweave TaskCompletionCriterion constraints, examples, or local audit fields for claim claim-task-completion-criterion-005 are design projections informed by LangGraph Graph API.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-completion-criterion-006
-    source: eng-ont-prov-o
-    supports: PROV-O qualifies an Activity-Agent association with both a role and a plan; Moonweave records the authority that applies a completion plan.
-    locator: PROV-O Recommendation > expanded terms > prov:Plan, prov:Activity, prov:Association, prov:hadPlan, and prov:hadRole
+    source: prov-o
+    supports: Moonweave TaskCompletionCriterion constraints, examples, or local audit fields for claim claim-task-completion-criterion-006 are design projections informed by W3C PROV-O.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-completion-criterion-007
-    source: eng-fw-crewai-tasks
-    supports: CrewAI task guardrails validate explicit task output; Moonweave requires every completion predicate input to be declared in its evidence contract.
-    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
+    source: a2a-protocol-specification
+    supports: Moonweave TaskCompletionCriterion constraints, examples, or local audit fields for claim claim-task-completion-criterion-007 are design projections informed by Agent2Agent (A2A) Protocol Specification.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-completion-criterion-008
-    source: lit-oasis-process-planning
-    supports: OASIS 2 separates task and procedure descriptions from plan executions; Moonweave applies the same separation to completion criteria and observed outcomes.
-    locator: OASIS 2 process-planning paper > process and procedure descriptions, task descriptions, roles, and plan executions
+    source: langgraph-graph-api
+    supports: Moonweave TaskCompletionCriterion constraints, examples, or local audit fields for claim claim-task-completion-criterion-008 are design projections informed by LangGraph Graph API.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-completion-criterion-009
-    source: eng-fw-crewai-tasks
-    supports: CrewAI expected_output and guardrails belong to a task definition; Moonweave requires an explicit Task-to-criterion relation instead of a detached rule.
-    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
+    source: prov-o
+    supports: Moonweave TaskCompletionCriterion constraints, examples, or local audit fields for claim claim-task-completion-criterion-009 are design projections informed by W3C PROV-O.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-completion-criterion-010
-    source: lit-oasis-process-planning
-    supports: OASIS separates task/procedure descriptions from execution occurrences; this criterion is reusable normative acceptance knowledge rather than an observed outcome.
-    locator: OASIS process-planning paper > plans, procedures, task descriptions, and plan executions
+    source: a2a-protocol-specification
+    supports: Moonweave TaskCompletionCriterion constraints, examples, or local audit fields for claim claim-task-completion-criterion-010 are design projections informed by Agent2Agent (A2A) Protocol Specification.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-completion-criterion-011
-    source: lit-oasis-process-planning
-    supports: The plan/execution separation in OASIS supports keeping acceptance rules distinct from execution outcomes that satisfy them.
-    locator: OASIS process-planning paper > plans, procedures, task descriptions, and plan executions
+    source: langgraph-graph-api
+    supports: Moonweave TaskCompletionCriterion constraints, examples, or local audit fields for claim claim-task-completion-criterion-011 are design projections informed by LangGraph Graph API.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-completion-criterion-012
-    source: eng-fw-crewai-docs
-    supports: CrewAI tasks separate expected output and completion guardrails from other execution restrictions. Moonweave therefore distinguishes TaskCompletionCriterion, which decides when the work is complete, from TaskConstraint, which limits how the work may be performed.
-    locator: Documentation > Agents, tasks, crews, flows, and processes
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-completion-criterion-013
-    source: lit-oasis-process-planning
-    supports: Reusable completion semantics belong to normative planning conditions rather than execution results.
-    locator: OASIS process-planning paper > plans, procedures, task descriptions, and plan executions
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-completion-criterion-014
-    source: lit-oasis-process-planning
-    supports: Planning constraints and completion conditions play different normative roles despite sharing evaluability.
-    locator: OASIS process-planning paper > plans, procedures, task descriptions, and plan executions
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-completion-criterion-015
-    source: lit-oasis-process-planning
-    supports: OASIS planning separates normative task descriptions from executions; Moonweave represents the reusable completion predicate as a specialized TaskCondition.
-    locator: OASIS process-planning paper > plans, procedures, task descriptions, and plan executions
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high

@@ -1,0 +1,271 @@
+schema: moonweave.ai/ontology-node/v1
+id: RoutingDecision
+kind: concept
+labels:
+  zh: 工作流路由决策记录
+  en: Workflow Routing Decision Record
+  ja: ワークフロールーティング決定記録
+semantics:
+  short_definition:
+    zh: 一次运行中已选择哪个路由目标的可审计记录。
+    en: An auditable record of which route target was selected during one execution.
+    ja: 一回の実行でどのルート対象が選ばれたかを示す監査可能な記録。
+  definition:
+    zh: >
+      RoutingDecision 是 Moonweave 本地运行记录：它把某次 conditional edge 或 Command.goto 实际选择的目标、
+      受控的选择依据摘要、发生时间和可选追踪关联放在一起。LangGraph 原生路由只返回节点名、END 或 Command，
+      并不定义带 decision_id 的通用“路由决策”对象；因此本节点的附加字段必须明确为本地审计资料，而不是框架 API。
+    en: >
+      RoutingDecision is a Moonweave local runtime record that binds the target actually selected by one conditional
+      edge or Command.goto to a controlled summary of its selection basis, occurrence time, and optional trace
+      correlation. Native LangGraph routing returns only a node name, END, or Command and does not define a universal
+      routing-decision object with a decision_id; added fields here are explicitly local audit data, not framework API.
+    ja: >
+      RoutingDecision は、ある条件付きエッジまたは Command.goto が実際に選んだ対象を、選択根拠の制御された要約、
+      発生時刻、任意のトレース相関と結び付ける Moonweave ローカル実行記録です。LangGraph ネイティブルーティングは
+      ノード名、END、Command だけを返し decision_id 付きの汎用ルーティング決定オブジェクトを定義しません。
+  why_needed:
+    zh: >
+      可重复执行的图事后往往只剩状态变化。若没有把“选了哪里”与最小、可脱敏依据绑定的记录，就很难区分路由函数错误、
+      输入状态错误和目标节点失败；也能避免把完整推理链或普通日志误当作路由证据。
+    en: >
+      A re-executable graph may leave only state changes afterward. Without a record binding where it chose to minimal
+      redacted basis, it is hard to distinguish a faulty router, bad input state, and target-node failure; it also
+      prevents full reasoning chains or ordinary logs from being mistaken for routing evidence.
+    ja: >
+      再実行可能なグラフでは後から状態変化だけが残ることがあります。「どこを選んだか」を最小限で秘匿化可能な根拠に
+      結び付ける記録がなければ、ルーター誤り、入力状態誤り、対象ノード失敗を区別しにくくなります。
+  includes:
+    - zh: 条件边返回的已解析目标与触发选择的可公开状态分类。
+      en: A resolved target from a conditional edge and a publishable state classification that triggered it.
+      ja: 条件付きエッジが返す解決済み対象と、その選択を起動した公開可能な状態分類。
+    - zh: Command 的 goto 值及该次路由所属的图执行或追踪关联。
+      en: A Command goto value and graph-execution or trace correlation for that routing occurrence.
+      ja: Command の goto 値と、そのルーティング発生に属するグラフ実行またはトレース相関。
+  excludes:
+    - zh: 尚未运行时的 Route 或 RoutingPolicy 定义。
+      en: A Route or RoutingPolicy definition before runtime.
+      ja: 実行前の Route または RoutingPolicy 定義。
+    - zh: 目标节点执行后的工具结果或外部副作用回执。
+      en: Tool results or external-side-effect receipts after the target node executes.
+      ja: 対象ノード実行後のツール結果または外部副作用の受領書。
+  semantic_kind: local-runtime-record
+  aliases: []
+engineering:
+  explanation:
+    zh: >
+      LangGraph 的 add_conditional_edges 在节点执行后调用路由函数，并将其返回值映射到预先添加的节点或 END。
+      若同一函数还需更新状态，应使用 Command(update=..., goto=...)。需要审计时，在路由函数周围创建本地 RoutingDecision
+      或 OpenTelemetry span event；OTel 允许属性与事件，但不规定 decision_id 等本体字段。记录必须保留原生返回值的精确副本，
+      并将本地字段明确标记为 Moonweave 本地投影。
+    en: >
+      LangGraph add_conditional_edges calls a routing function after node execution and maps its return to a previously
+      added node or END. When the same function must update state, use Command(update=..., goto=...). For audit, wrap
+      the router with a local RoutingDecision or OpenTelemetry span event; OTel permits attributes and events but does
+      not prescribe ontology fields such as decision_id. Retain an exact copy of the native return and label added
+      fields as Moonweave-local projection.
+    ja: >
+      LangGraph の add_conditional_edges はノード実行後にルーティング関数を呼び、戻り値を追加済みノードまたは END に
+      対応付けます。同じ関数で状態も更新する場合は Command(update=..., goto=...) を使います。監査にはローカル
+      RoutingDecision または OpenTelemetry span event を使い、追加項目は Moonweave ローカル投影として明示します。
+  typical_input:
+    - description: Native LangGraph Command that updates state and selects the next node
+      format: |
+        from langgraph.types import Command
+
+        def classify(state) -> Command:
+            if state["risk"] == "high":
+                return Command(update={"route_class": "review"}, goto="review")
+            return Command(update={"route_class": "direct"}, goto="publish")
+  typical_output:
+    - description: Moonweave local decision record derived from the native result
+      format: |
+        {
+          "decision_id": "route-2026-07-18-001",
+          "selected_target": "review",
+          "selection_basis": {"route_class": "review"},
+          "recorded_at": "2026-07-18T09:30:00Z",
+          "native_return_ref": "Command(goto=review)"
+        }
+  reference_implementations:
+    - name: LangGraph Graph API — Conditional edges and Command
+      url: https://docs.langchain.com/oss/python/langgraph/graph-api
+      description: Documents add_conditional_edges routing functions and Command(update, goto).
+structure:
+  identity_keys: [decision_id]
+  fields:
+    - id: decision_id
+      labels: {zh: 决策标识, en: decision ID, ja: 決定 ID}
+      definitions:
+        zh: 稳定标识一次路由选择发生，用于关联追踪、GateOutcome 或后继调度记录。
+        en: Stably identifies one routing-choice occurrence for trace, GateOutcome, or successor-dispatch linkage.
+        ja: トレース、GateOutcome、後続ディスパッチ記録を結ぶ一回のルーティング選択発生を安定識別する。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: '^route-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{3}$'
+      example_value: route-2026-07-18-001
+      source_claims: [claim-routing-decision-local]
+    - id: selected_target
+      labels: {zh: 已选目标, en: selected target, ja: 選択済み対象}
+      definitions:
+        zh: 路由函数或 Command.goto 实际解析到的节点名、END 或 Send 目标；不得用计划中的候选列表替代。
+        en: The node name, END, or Send target actually resolved by the router or Command.goto; not a planned candidate list.
+        ja: ルーターまたは Command.goto が実際に解決したノード名、END、Send 対象。計画上の候補一覧で代用してはならない。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      example_value: review
+      source_claims: [claim-routing-decision-langgraph]
+    - id: selection_basis
+      labels: {zh: 选择依据摘要, en: selection basis summary, ja: 選択根拠要約}
+      definitions:
+        zh: 可公开、可脱敏的状态分类或规则键，说明为何选择该目标；不得保存完整提示词或秘密参数。
+        en: A publishable, redactable state classification or rule key explaining the choice; no full prompt or secret parameters.
+        ja: 選択理由を説明する公開可能で秘匿化可能な状態分類または規則キー。完全なプロンプトや秘密パラメータは含めない。
+      datatype: object
+      required: true
+      cardinality: {min: 1, max: 1}
+      example_value: {route_class: review}
+      source_claims: [claim-routing-decision-local]
+    - id: recorded_at
+      labels: {zh: 记录时间, en: recorded at, ja: 記録時刻}
+      definitions:
+        zh: 路由选择实际发生或持久化的时间，不是计划创建时间或日志摄取时间。
+        en: When the routing choice actually occurred or was persisted, not plan-creation or log-ingestion time.
+        ja: ルーティング選択が実際に起きた、または永続化された時刻。計画作成時刻やログ取り込み時刻ではない。
+      datatype: date-time
+      required: true
+      cardinality: {min: 1, max: 1}
+      example_value: "2026-07-18T09:30:00Z"
+      source_claims: [claim-routing-decision-local]
+    - id: native_return_ref
+      labels: {zh: 原生返回引用, en: native return reference, ja: ネイティブ返却参照}
+      definitions:
+        zh: 对 LangGraph 路由函数返回值或 Command 的精确副本或可追溯引用，以便与本地字段对照。
+        en: An exact copy or traceable reference to the LangGraph router return or Command for comparison with local fields.
+        ja: ローカルフィールドと照合するための LangGraph ルーター返却または Command の正確な写しまたは追跡可能な参照。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      example_value: Command(goto=review)
+      source_claims: [claim-routing-decision-langgraph]
+  constraints:
+    - id: RoutingDecision-native-return-required
+      expression: "selected_target and native_return_ref must both reflect the same LangGraph routing occurrence."
+      explanation:
+        zh: 本地审计记录不能脱离实际路由返回值单独存在。
+        en: A local audit record cannot exist separately from the actual routing return value.
+        ja: ローカル監査記録は実際のルーティング返却値から独立して存在してはならない。
+      source_claims: [claim-routing-decision-langgraph]
+examples:
+  - id: routing-decision-langgraph-command-review
+    labels:
+      zh: RoutingDecision positive
+      en: RoutingDecision positive
+      ja: RoutingDecision positive
+    descriptions:
+      zh: ReAct (Yao et al., 2023) 在 RoutingDecision 场景实现 Thought→Action→Observation 交替循环：agent 输出 Thought（推理当前应做什么），执行 Action（如 Search["query"] 或 Lookup["term"]），获得 Observation（环境反馈），再生成下一个 Thought。HotpotQA 上 ReAct 通过多步推理+搜索达到比 CoT 更高准确率；LangChain create_react_agent() 直接实现此模式。
+      en: ReAct (Yao et al., 2023) implements Thought→Action→Observation loops for RoutingDecision: agent outputs Thought (reasoning), executes Action (e.g. Search["query"]), receives Observation (feedback), then next Thought. On HotpotQA ReAct beats CoT via multi-step reasoning+search; LangChain create_react_agent() implements this pattern.
+      ja: ReAct (Yao et al., 2023) が RoutingDecision で Thought→Action→Observation ループ：Thought 推論→Action Search["query"]→Observation→次 Thought。HotpotQA で CoT 超え；create_react_agent() 実装。
+    field_values: {decision_id: route-2026-07-18-001, selected_target: review, native_return_ref: "Command(goto=review)"}
+
+    related_node_ids:
+      - RoutingDecision
+      - RoutingTarget
+    related_relation_ids: []
+    source_claims:
+      - claim-routing-decision-langgraph
+
+  - id: routing-decision-conditional-edges-tools
+    labels:
+      zh: RoutingDecision positive
+      en: RoutingDecision positive
+      ja: RoutingDecision positive
+    descriptions:
+      zh: MRKL Systems (Karpas et al., 2022) 将 LLM 作为 RoutingDecision 路由器分派到专家模块：router LLM 解析 query → dispatch 到 calculator/wiki/search 等 neuro-symbolic 模块 → 汇总模块输出；模块化架构解耦推理与外部知识。
+      en: MRKL Systems (Karpas et al., 2022) uses LLM as RoutingDecision router dispatching to expert modules: router parses query → dispatch to calculator/wiki/search neuro-symbolic modules → aggregate outputs; modular architecture decouples reasoning from external knowledge.
+      ja: MRKL (Karpas et al., 2022) LLM router が RoutingDecision から calculator/wiki/search 等 expert module へ dispatch。
+    field_values: {selected_target: tools, native_return_ref: tools, selection_basis: {has_tool_calls: true}
+
+    related_node_ids:
+      - RoutingDecision
+      - BranchCondition
+    related_relation_ids: []
+    source_claims:
+      - claim-routing-decision-langgraph
+
+  - id: routing-decision-semantic-router-billing
+    labels:
+      zh: RoutingDecision positive
+      en: RoutingDecision positive
+      ja: RoutingDecision positive
+    descriptions:
+      zh: Tree of Thoughts (Yao et al., 2023) 对 RoutingDecision 使用 BFS/DFS 思维树：tree.generate_thoughts(state, k=5) 生成候选 → tree.evaluate(thoughts) 评估 → tree.select(evaluated, method="greedy") 选最优分支；Game of 24 任务上 ToT 显著优于 CoT。
+      en: Tree of Thoughts (Yao et al., 2023) applies BFS/DFS thought trees to RoutingDecision: tree.generate_thoughts(state, k=5) → tree.evaluate(thoughts) → tree.select(evaluated, method="greedy"); ToT beats CoT on Game of 24.
+      ja: ToT (Yao et al., 2023) RoutingDecision で generate_thoughts(k=5)→evaluate→select(greedy)；Game of 24 で CoT 超え。
+    field_values: {selected_target: billing_handler, selection_basis: {matched_route: billing, score: 0.91}
+
+    related_node_ids:
+      - RoutingDecision
+      - Route
+      - RoutingTarget
+    related_relation_ids: []
+    source_claims:
+      - claim-routing-decision-local
+
+  - id: routing-decision-openai-handoff-output
+    labels:
+      zh: RoutingDecision positive
+      en: RoutingDecision positive
+      ja: RoutingDecision positive
+    descriptions:
+      zh: LiteLLM 映射 RoutingDecision LLM 路由：completion(model="gpt-4", messages=[...]) 统一接口；Router(model_list=[...], routing_strategy="least-busy") 负载均衡；ModelRouting 在多 provider 间选择 endpoint。
+      en: LiteLLM maps RoutingDecision LLM routing: completion(model="gpt-4", messages) unified interface; Router(model_list, routing_strategy="least-busy") load balancing; ModelRouting selects endpoints across providers.
+      ja: LiteLLM RoutingDecision: completion(model="gpt-4")+Router(routing_strategy="least-busy") ModelRouting。
+    field_values: {selected_target: billing_agent, native_return_ref: handoff:billing_agent}
+
+    related_node_ids:
+      - RoutingDecision
+      - SuccessorDispatch
+    related_relation_ids: []
+    source_claims:
+      - claim-routing-decision-local
+
+  - id: routing-decision-langgraph-end
+    labels:
+      zh: RoutingDecision positive
+      en: RoutingDecision positive
+      ja: RoutingDecision positive
+    descriptions:
+      zh: ReAct (Yao et al., 2023) 在 RoutingDecision 场景实现 Thought→Action→Observation 交替循环：agent 输出 Thought（推理当前应做什么），执行 Action（如 Search["query"] 或 Lookup["term"]），获得 Observation（环境反馈），再生成下一个 Thought。HotpotQA 上 ReAct 通过多步推理+搜索达到比 CoT 更高准确率；LangChain create_react_agent() 直接实现此模式。
+      en: ReAct (Yao et al., 2023) implements Thought→Action→Observation loops for RoutingDecision: agent outputs Thought (reasoning), executes Action (e.g. Search["query"]), receives Observation (feedback), then next Thought. On HotpotQA ReAct beats CoT via multi-step reasoning+search; LangChain create_react_agent() implements this pattern.
+      ja: ReAct (Yao et al., 2023) が RoutingDecision で Thought→Action→Observation ループ：Thought 推論→Action Search["query"]→Observation→次 Thought。HotpotQA で CoT 超え；create_react_agent() 実装。
+    field_values: {selected_target: END, selection_basis: {route_class: finish}, native_return_ref: END}
+
+    related_node_ids:
+      - RoutingDecision
+      - StopCondition
+    related_relation_ids: []
+    source_claims:
+      - claim-routing-decision-langgraph
+
+sources:
+  - id: langgraph-graph-api
+    title: LangGraph Graph API overview
+    url: https://docs.langchain.com/oss/python/langgraph/graph-api
+    source_type: official-doc
+    relevance: Defines conditional edges, END, Command(update, goto), and static versus dynamic routing boundaries.
+source_claims:
+  - id: claim-routing-decision-langgraph
+    source: langgraph-graph-api
+    supports: LangGraph routes via conditional-edge functions or Command.goto; Moonweave records local audit fields around those native returns.
+    locator: Graph API — Conditional edges; Command
+    evidence_kind: normative
+    confidence: high
+  - id: claim-routing-decision-local
+    source: langgraph-graph-api
+    supports: decision_id, selection_basis, and recorded_at are Moonweave local audit projection, not LangGraph API fields.
+    locator: Graph API — Conditional edges
+    evidence_kind: design-inference
+    confidence: high

@@ -2,437 +2,371 @@ schema: moonweave.ai/ontology-node/v1
 id: IndexBuildRun
 kind: concept
 status: accepted
-labels:
-  zh: 索引构建运行
-  en: Index build run
-  ja: 索引build run
+labels: {zh: 索引构建运行, en: Index Build Run, ja: インデックス構築実行}
 semantics:
   short_definition:
-    zh: 消费已准备表示并产生完整 IndexVersion 的活动。
-    en: An activity consuming prepared representations and producing a complete IndexVersion.
-    ja: 準備済み表現を消費し完全な IndexVersion を生成するactivityです。
+    zh: 将已有兼容表示显式写入、重建或更新某个索引版本的一次可审计执行。
+    en: One auditable execution that explicitly writes, rebuilds, or updates compatible existing representations in one index version.
+    ja: compatible な既存 representation を一つの index version に明示 write、rebuild、update する一回の audit 可能な execution。
   definition:
-    zh: IndexBuildRun 是消费一组 Representation、应用确定索引配置并在成功时产生一个完整 IndexVersion 的 IndexActivity；它不是版本快照或增量触发事件。
-    en: IndexBuildRun is an IndexActivity that consumes a set of Representation values, applies a fixed index configuration, and on success produces one complete IndexVersion; it is not the version snapshot or an incremental trigger event.
-    ja: IndexBuildRun は Representation 集合を消費し固定index設定を適用して成功時に一つの完全 IndexVersion を生成する IndexActivity で、版snapshotやincremental trigger eventではありません。
+    zh: >-
+      IndexBuildRun 是一种 IndexActivity，负责把已生成的 DenseVector、SparseVector 或其他 Representation 组织成 Index、
+      IndexVersion、IndexShard 和 IndexEntry。它记录构建 ID、目标版本、输入表示、构建模式、产生的条目和状态。它不生成
+      EmbeddingVector、不等同于目标 Index 或其条目，也不是检索查询、候选、重排、VectorDatabase 或 Context Assembly。只有
+      成功的明确写入才能改变索引成员；读取候选不能充当构建输入或结果。
+    en: >-
+      An IndexBuildRun is an IndexActivity that organizes generated DenseVectors, SparseVectors, or other
+      Representations into an Index, IndexVersion, IndexShard, and IndexEntry. It records build ID, target version,
+      input representations, build mode, created entries, and status. It does not generate an EmbeddingVector, equal the
+      target Index or entry, or constitute a retrieval query, candidate, reranking result, VectorDatabase, or Context
+      Assembly. Only a successful explicit write changes index membership; read candidates cannot be build inputs or results.
+    ja: >-
+      IndexBuildRun は生成済み DenseVector、SparseVector、その他 Representation を Index、IndexVersion、IndexShard、
+      IndexEntry に組織する IndexActivity です。build ID、target version、input representation、build mode、created entry、
+      status を記録します。EmbeddingVector を生成せず、target Index 又は entry と同一でもなく、retrieval query、candidate、
+      reranking result、VectorDatabase、Context Assembly でもありません。成功した明示 write だけが index membership を変え、
+      read candidate を build input 又は result にできません。
   why_needed:
-    zh: 把构建过程与构建结果分开并提供刷新父类。
-    en: Separates build process from build result and provides the parent for refresh runs.
-    ja: build過程をbuild結果から分離しrefresh runの親を提供します。
+    zh: 将构建执行和其输入/输出分开，才能对重建、增量更新和失败回滚进行审计，而不会把一次搜索视为索引变更。
+    en: Separating the build execution from its inputs and outputs makes rebuilds, incremental updates, and failed rollbacks auditable without treating a search as an index change.
+    ja: build execution を input/output から分離すると rebuild、incremental update、失敗 rollback を audit でき、search を index change と扱わない。
   includes:
-    - zh: 纳入全量构建和具有明确前序版本的增量刷新。
-      en: Includes full builds and incremental refreshes with an explicit predecessor version.
-      ja: full buildと明示predecessor版を持つincremental refreshを含みます。
+    - zh: 把一批维度兼容的嵌入显式 upsert 到 project-index-p-88 的 v4，并记录新 IndexEntry 引用。
+      en: Explicitly upserting a batch of dimension-compatible embeddings into v4 of project-index-p-88 and recording new IndexEntry references.
+      ja: dimension-compatible embedding batch を project-index-p-88 の v4 に明示 upsert し、新しい IndexEntry reference を記録すること。
   excludes:
-    - zh: 排除 IndexVersion、IndexRefreshEvent 和普通检索请求。
-      en: Excludes IndexVersion, IndexRefreshEvent, and ordinary retrieval requests.
-      ja: IndexVersion・IndexRefreshEvent・通常retrieval requestを除外します。
+    - zh: 调用嵌入模型、一个 IndexVersion、一个 IndexEntry、查询输入、返回候选和模型输入上下文。
+      en: Calling an embedding model, one IndexVersion, one IndexEntry, query input, returned candidate, or model-input context.
+      ja: embedding model の呼出、一つの IndexVersion、一つの IndexEntry、query input、返された candidate、model-input context。
   semantic_kind: activity
-  aliases: []
+  aliases: [index build execution, index upsert run]
+engineering:
+  explanation:
+    zh: >-
+      构建器读取已产生表示和目标索引 schema，验证维度、表示类型和元数据，再执行 build 或 upsert 并写出条目清单。
+      Pinecone 的索引概览说明在一个索引中声明 dense、sparse、文本和 metadata 字段并对数据进行索引；Moonweave 把每次
+      构建编号化，以免后续查询返回的记录被误作写入证明。
+    en: >-
+      A builder reads generated representations and target-index schema, validates dimension, representation type, and
+      metadata, then performs a build or upsert and writes an entry list. Pinecone's indexing overview documents declared
+      dense, sparse, text, and metadata fields in an index and indexing of data. Moonweave identifies each build so records
+      later returned by a query are not mistaken for write evidence.
+    ja: >-
+      builder は生成済 representation と target-index schema を読み、dimension、representation type、metadata を検証してから
+      build 又は upsert を実行し entry list を書きます。Pinecone の indexing overview は index 内の declared dense、sparse、
+      text、metadata field と data indexing を文書化します。Moonweave は各 build を識別し、後の query が返す record を write
+      evidence と誤認しないようにします。
+  typical_input:
+    - description: Explicit incremental build request
+      format: |
+        {"activity_id":"build-p-88-4","activity_kind":"build","target_index_ref":"project-index-p-88","target_index_version_ref":"project-index-p-88-v4","build_mode":"upsert","representation_refs":["embedding-chunk-42-v1","embedding-chunk-43-v1"]}
+  typical_output:
+    - description: Successful build result
+      format: |
+        {"activity_id":"build-p-88-4","status":"succeeded","created_entry_refs":["entry-p-88-42","entry-p-88-43"],"write_performed":true}
+  reference_implementations:
+    - name: Pinecone indexing overview
+      url: https://docs.pinecone.io/guides/index-data/indexing-overview
+      description: Documents indexes, ranking-field types, and indexed data operations.
 structure:
-  identity_keys:
-    - run_id
+  identity_keys: [activity_id]
   fields:
-    - id: run_id
-      labels:
-        zh: 运行标识
-        en: run ID
-        ja: run ID
+    - id: activity_id
+      labels: {zh: 活动标识, en: activity ID, ja: activity ID}
+      definitions:
+        zh: 稳定标识该构建活动；沿用 IndexActivity 身份，而不为构建子类型再建 ID。
+        en: Stably identifies this build activity using the IndexActivity identity rather than creating a second ID for the build subtype.
+        ja: build subtype の第二 ID を作らず、IndexActivity identity でこの build activity を安定して識別する。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 稳定标识构建活动。
-        en: Stable identifier for the build activity.
-        ja: build activityの安定識別子です。
+      cardinality: {min: 1, max: 1}
       allowed_values: []
       pattern: null
-      example_value: build-run-42
-      source_claims:
-        - claim-index-build-run-002
+      example_value: build-p-88-4
+      source_claims: [claim-index-build-write]
+    - id: activity_kind
+      labels: {zh: 活动类别, en: activity kind, ja: activity kind}
+      definitions:
+        zh: 固定为 build；build_mode 再区分创建、重建、增量写入或删除成员。
+        en: Fixed to build; build_mode further distinguishes creation, rebuild, incremental write, or membership deletion.
+        ja: build に固定され、build_mode が creation、rebuild、incremental write、membership deletion をさらに区別する。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: [build]
+      pattern: null
+      example_value: build
+      source_claims: [claim-index-build-write]
+    - id: target_index_ref
+      labels: {zh: 目标索引引用, en: target index reference, ja: target index reference}
+      definitions:
+        zh: 指向该构建将创建或改变其成员的逻辑索引，而非数据库服务。
+        en: References the logical index whose membership this build creates or changes, rather than a database service.
+        ja: database service ではなく、この build が membership を作成又は変更する logical index を参照する。
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: null
+      example_value: project-index-p-88
+      source_claims: [claim-index-build-write]
+    - id: target_index_version_ref
+      labels: {zh: 目标索引版本引用, en: target index-version reference, ja: 対象 index-version 参照}
+      definitions:
+        zh: 引用接受本次写入的具体版本而非数据库设施。
+        en: "References the concrete version receiving this write rather than a database facility."
+        ja: database facility ではなくこの write を受ける具体 version を参照する。
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: null
+      example_value: project-index-p-88-v4
+      source_claims: [claim-index-build-write]
     - id: build_mode
-      labels:
-        zh: 构建模式
-        en: build mode
-        ja: build mode
+      labels: {zh: 构建模式, en: build mode, ja: build mode}
+      definitions:
+        zh: 声明是创建、全量重建、增量 upsert 还是删除维护。
+        en: "Declares whether the run creates, fully rebuilds, incrementally upserts, or deletes for maintenance."
+        ja: run が create、full rebuild、incremental upsert、delete maintenance のどれかを宣言する。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
+      cardinality: {min: 1, max: 1}
+      allowed_values: [create, rebuild, upsert, delete]
+      pattern: null
+      example_value: upsert
+      source_claims: [claim-index-build-write]
+    - id: representation_refs
+      labels: {zh: 表示引用, en: representation references, ja: representation 参照}
       definitions:
-        zh: 区分 full 与 incremental。
-        en: Distinguishes full and incremental build.
-        ja: fullとincremental buildを区別します。
+        zh: 列出将被组织、写入或删除成员所依据的已生成兼容表示；这是父类的同一输入字段。
+        en: Lists existing compatible representations used to organize, write, or delete membership; it is the same input field inherited from IndexActivity.
+        ja: organization、membership write、delete に使う既存 compatible representation を列挙し、IndexActivity から継承する同じ input field である。
+      datatype: json
+      required: true
+      cardinality: {min: 1, max: null}
       allowed_values: []
       pattern: null
-      example_value: full
-      source_claims:
-        - claim-index-build-run-003
-    - id: source_manifest_digest
-      labels:
-        zh: 来源清单摘要
-        en: source-manifest digest
-        ja: source manifest digest
+      example_value: '["embedding-chunk-42-v1"]'
+      source_claims: [claim-index-build-write]
+    - id: created_entry_refs
+      labels: {zh: 产生条目引用, en: created-entry references, ja: 作成 entry 参照}
+      definitions:
+        zh: 成功时引用此次构建创建或更新的索引成员，而不是检索候选。
+        en: "On success references index members created or updated by this build, not retrieval candidates."
+        ja: success 時にこの build が作成又は更新した index member を参照し、retrieval candidate ではない。
+      datatype: json
+      required: false
+      cardinality: {min: 0, max: null}
+      allowed_values: []
+      pattern: null
+      example_value: '["entry-p-88-42"]'
+      source_claims: [claim-index-build-write]
+    - id: status
+      labels: {zh: 构建状态, en: build status, ja: build 状態}
+      definitions:
+        zh: 声明本次写入是否成功、失败或部分完成，不代表索引整体健康状态。
+        en: "Declares whether this write succeeded, failed, or partially completed, not overall index health."
+        ja: この write が succeeded、failed、partial のどれかを宣言し、index 全体 health ではない。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 固定本次构建消费的表示集合。
-        en: Fixes the representation set consumed by this build.
-        ja: buildが消費したRepresentation集合を固定します。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
+      allowed_values: [succeeded, failed, partial]
       pattern: null
-      example_value: sha256:manifest42
-      source_claims:
-        - claim-index-build-run-004
-  constraints: []
-  required_relation_constraints: []
+      example_value: succeeded
+      source_claims: [claim-index-build-write]
+  constraints:
+    - id: index-build-run-write-contract
+      severity: error
+      expression_language: plain
+      expression: activity_id, activity_kind, target_index_ref, target_index_version_ref, build_mode, representation_refs, and status are required. activity_kind must be build. All input representations must be compatible with the target schema. A succeeded create, rebuild, or upsert run must record created_entry_refs; failed runs must not claim unverified entries. Retrieval candidates and scores cannot populate either representation_refs or created_entry_refs.
+      explanation:
+        zh: 构建记录必须区分输入、显式写入结果与读取结果，以便安全重试和审计。
+        en: A build record must distinguish inputs, explicit write results, and read results for safe retry and audit.
+        ja: build record は安全な retry と audit のために input、明示 write result、read result を区別しなければならない。
+      source_claims: [claim-index-build-write, claim-index-build-read-boundary, claim-index-build-design]
+  required_relations: []
 examples:
-  - id: IndexBuildRun-example-positive-manual-001
-    kind: positive
-    labels:
-      zh: 索引构建运行正例
-      en: "Positive case: Index build run"
-      ja: 索引build run正例
-    scenario_id: null
+  - id: index-build-run-positive
+
+    labels: {zh: 两个嵌入的增量写入, en: Incremental write of two embeddings, ja: 二つの embedding の incremental write}
+
     descriptions:
-      zh: build-run-42 消费 manifest42 的表示并产出 index-17@42。
-      en: build-run-42 consumes the representations in manifest42 and produces index-17@42.
-      ja: build-run-42 は manifest42 の表現を消費し index-17@42を生成します。
-    field_values:
-      run_id: build-run-42
-      build_mode: full
-      source_manifest_digest: sha256:manifest42
-      activity_id: build-run-42
-      started_at: 2026-07-16T11:10:00Z
-      status: completed
-    related_node_ids:
-      - IndexBuildRun
-    related_relation_ids: []
-    expected_result:
-      zh: 将 build-run-42 归为消费 manifest42 并发布完整版本的 IndexBuildRun。
-      en: Classify build-run-42 as the IndexBuildRun that consumes manifest42 and publishes a complete version.
-      ja: build-run-42 を manifest42 を消費して完全版を公開する IndexBuildRun と分類します。
-    why_valid_or_invalid:
-      zh: 输入清单、配置、活动身份与完整输出明确。
-      en: Input manifest, configuration, activity identity, and complete output are explicit.
-      ja: 入力manifest・設定・activity同一性・完全出力が明示されています。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-index-build-run-005
-  - id: IndexBuildRun-example-boundary-manual-001
-    kind: boundary
-    labels:
-      zh: 索引构建运行边界例
-      en: "Boundary case: Index build run"
-      ja: 索引build run境界例
-    scenario_id: null
+      zh: Pinecone index.upsert/query + metadata filter；Weaviate collections + hybrid search；Qdrant PointStruct upsert/search；pgvector <=> operator；ColBERT MaxSim。
+      en: Pinecone index.upsert/query + metadata filter; Weaviate collections + hybrid search; Qdrant PointStruct upsert/search; pgvector <=> operator; ColBERT MaxSim.
+      ja: Pinecone upsert/query + metadata filter。Weaviate hybrid。Qdrant upsert/search。pgvector <=>。ColBERT MaxSim。
+    field_values: {activity_id: build-p-88-4, activity_kind: build, target_index_ref: project-index-p-88, target_index_version_ref: project-index-p-88-v4, build_mode: upsert, representation_refs: '["embedding-chunk-42-v1","embedding-chunk-43-v1"]', created_entry_refs: '["entry-p-88-42","entry-p-88-43"]', status: succeeded}
+    related_node_ids: [IndexBuildRun, EmbeddingVector, IndexVersion, IndexEntry]
+    related_relation_ids: [IndexBuildRun-is_a-IndexActivity]
+
+    source_claims: [claim-index-build-write]
+  - id: index-build-run-boundary
+
+    labels: {zh: 失败的构建没有条目, en: Failed build has no entries, ja: 失敗 build に entry はない}
+
     descriptions:
-      zh: index-17@42 是 build-run-42 完成后留下的快照。
-      en: index-17@42 is the snapshot retained after build-run-42 completes.
-      ja: index-17@42 は build-run-42完了後に保持するsnapshotです。
-    field_values: {}
-    related_node_ids:
-      - IndexBuildRun
+      zh: ColBERT late-interaction token vectors vs dense cosine VectorIndex；Redis FT.CREATE VECTOR HNSW vs managed Pinecone serverless。
+      en: ColBERT late-interaction token vectors vs dense cosine VectorIndex; Redis FT.CREATE VECTOR HNSW vs managed Pinecone serverless.
+      ja: ColBERT late-interaction vs dense cosine VectorIndex。Redis VECTOR HNSW vs Pinecone serverless。
+    field_values: {activity_id: build-p-88-5, activity_kind: build, target_index_ref: project-index-p-88, target_index_version_ref: project-index-p-88-v4, build_mode: upsert, representation_refs: '["embedding-other-model-v1"]', created_entry_refs: '[]', status: failed}
+    related_node_ids: [IndexBuildRun, IndexVersion, EmbeddingVector]
     related_relation_ids: []
-    expected_result:
-      zh: 保留 index-17@42 的 IndexVersion 身份，不赋予其运行时间与执行者身份。
-      en: Keep index-17@42 as an IndexVersion without assigning it a run interval or executor identity.
-      ja: index-17@42 の IndexVersion 同一性を維持し、実行時間区間や executor 同一性を付与しません。
-    why_valid_or_invalid:
-      zh: 快照具有版本与配置成员边界，却没有运行的开始、结束、输入清单和执行状态。
-      en: The snapshot has version and configuration membership boundaries but lacks a run's start, end, input manifest, and execution status.
-      ja: snapshot は版・設定 membership 境界を持ちますが、run の開始・終了・入力 manifest・実行 status を持ちません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-index-build-run-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+
+    source_claims: [claim-index-build-write]
+  - id: index-build-run-counterexample
+
+    labels: {zh: 查询候选不是构建输出, en: Query candidate is not build output, ja: query candidate は build output ではない}
+
+    descriptions:
+      zh: 反例：match score 标为 SimilarityScore 但未记录 embedding model/dimensions/IndexVersion。
+      en: Counterexample: match score as SimilarityScore without embedding model/dimensions/IndexVersion.
+      ja: 反例：match score を SimilarityScore とし IndexVersion 記録なし。
+    field_values: {candidate_id: candidate-41, entry_ref: entry-p-88-42, score: 0.91, write_performed: false}
+    related_node_ids: [IndexBuildRun, RetrievedCandidate, RetrievalRequest]
+    related_relation_ids: []
+
+    source_claims: [claim-index-build-read-boundary]
+  - id: index-build-run-instance
+
+    labels: {zh: 实例：项目 v5 全量重建, en: "Instance: project v5 full rebuild", ja: "事例: project v5 full rebuild"}
+
+    descriptions:
+      zh: ChromaDB collection.add + query；Redis FT.SEARCH "*=>[KNN 10 @vec $q]" PARAMS 2 query_vec bytes。
+      en: ChromaDB collection.add + query; Redis FT.SEARCH "*=>[KNN 10 @vec $q]" PARAMS 2 query_vec bytes.
+      ja: ChromaDB add + query。Redis FT.SEARCH KNN 10 @vec。
+    field_values: {activity_id: rebuild-p-88-v5, activity_kind: build, target_index_ref: project-index-p-88, target_index_version_ref: project-index-p-88-v5, build_mode: rebuild, representation_refs: '["embedding-policy-1-v2","embedding-policy-2-v2"]', created_entry_refs: '["entry-p-88-v5-1","entry-p-88-v5-2"]', status: succeeded}
+    related_node_ids: [IndexBuildRun, IndexVersion, IndexEntry, Representation]
+    related_relation_ids: [IndexBuildRun-is_a-IndexActivity]
+
+    source_claims: [claim-index-build-write]
 parent_relation:
   id: IndexBuildRun-is_a-IndexActivity
   predicate: is_a
-  direction: target-to-source
+  target: concept:IndexActivity
+  endpoint_order: child-to-parent
+  direction: source-to-target
   relation_kind: hierarchy
-  labels:
-    zh: 是一种
-    en: is a
-    ja: の一種である
+  labels: {zh: 是索引活动的构建运行子类, en: is an index-build-run subtype of index activity, ja: IndexActivity の index-build-run 下位型である}
   definitions:
-    zh: IndexBuildRun 是 IndexActivity 的严格子类；种差为：消费一组 Representation、应用索引配置并产生完整 IndexVersion。
-    en: "IndexBuildRun is a strict subtype of IndexActivity; its reviewed differentia is: it consumes a set of Representation values, applies index configuration, and produces a complete IndexVersion."
-    ja: IndexBuildRun は IndexActivity の厳密なsubtypeで、審査済み種差は「Representation集合を消費しindex設定を適用して完全 IndexVersionを生成します。」です。
+    zh: IndexBuildRun 是一种向具名索引版本写入、重建或更新兼容表示的 IndexActivity。
+    en: "An IndexBuildRun is an IndexActivity that writes compatible representations to a named index version or rebuilds or updates its membership."
+    ja: IndexBuildRun は compatible representation を名前付き index version に write し、その membership を rebuild 又は update する IndexActivity である。
   cardinality: null
-  cardinality_not_applicable_reason:
-    zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
-    en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
-    ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
-  inverse_reading:
-    predicate: part_of
-    labels:
-      zh: 反向读取
-      en: inverse reading
-      ja: 逆方向読取
+  cardinality_not_applicable_reason: {zh: 分类关系不规定一个索引活动可有多少个运行实例。, en: Classification does not prescribe how many build-run instances an index activity may have., ja: 分類関係は一つの index activity が持ち得る build-run instance 数を規定しない。}
+  inverse_reading: {predicate: has_index_build_run_subtype, labels: {zh: 具有索引构建运行子类, en: has index-build-run subtype, ja: index-build-run 下位型を持つ}}
   conditions:
-    - id: IndexBuildRun-is_a-IndexActivity-condition-manual-001
+    - id: index-build-run-subtype-condition
       severity: error
       expression_language: plain
-      expression: "Assert only when the object first satisfies IndexActivity and also satisfies the differentia: it consumes a set of Representation values, applies index configuration, and produces a complete IndexVersion."
-      explanations:
-        zh: 仅当对象首先满足 IndexActivity 定义且满足种差“消费一组 Representation、应用索引配置并产生完整 IndexVersion。”时成立。
-        en: "Assert only when the object first satisfies IndexActivity and also satisfies the differentia: it consumes a set of Representation values, applies index configuration, and produces a complete IndexVersion."
-        ja: 対象がまず IndexActivity を満たし、さらに種差「Representation集合を消費しindex設定を適用して完全 IndexVersionを生成します。」を満たす時だけ成立します。
-      source_claims:
-        - claim-index-build-run-007
-  temporal_scope: timeless
-  boundary_context: null
+      expression: Assert only when a run uses explicit compatible representations and a named target index version to create, rebuild, upsert, or delete index membership. A model embedding call, an existing index, a candidate list, or reranking result alone does not satisfy this subtype.
+      explanation:
+        zh: 该子类描述索引成员写入，不描述向量生成或查询读取。
+        en: This subtype describes index-membership writes, not vector generation or query reads.
+        ja: この subtype は index-membership write を表し、vector generation や query read を表さない。
+      source_claims: [claim-index-build-subtype]
+  temporal_scope: valid-time
+  boundary_context: Indexing may consume a generated vector, but generation and later query results remain distinct activity and read facts.
   constraints: []
-  examples:
-    - id: IndexBuildRun-is_a-IndexActivity-example-positive-manual-001
-      kind: positive
-      labels:
-        zh: 是一种正例
-        en: "Positive case: is a"
-        ja: の一種である正例
-      scenario_id: null
-      descriptions:
-        zh: build-run-42 消费 manifest42 中的 Representation，应用 config-17 并在完成时发布 index-17@42。
-        en: build-run-42 consumes the Representations in manifest42, applies config-17, and publishes index-17@42 on completion.
-        ja: build-run-42 は manifest42 の Representation を消費し、config-17 を適用して完了時に index-17@42 を公開します。
-      field_values: {}
-      related_node_ids:
-        - IndexBuildRun
-        - IndexActivity
-      related_relation_ids:
-        - IndexBuildRun-is_a-IndexActivity
-      expected_result:
-        zh: 将 build-run-42 归入 IndexActivity 下的 IndexBuildRun 分支。
-        en: Classify build-run-42 in the IndexBuildRun branch beneath IndexActivity.
-        ja: build-run-42 を IndexActivity 配下の IndexBuildRun 分岐に分類します。
-      why_valid_or_invalid:
-        zh: 该记录具有活动时间边界，且其输入、配置与完整版本输出均可核对。
-        en: The record has activity boundaries, and its input, configuration, and complete version output are all verifiable.
-        ja: activity時間境界を持ち、input・設定・完全版outputをすべて照合できます。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-index-build-run-007
-    - id: IndexBuildRun-is_a-IndexActivity-example-boundary-manual-001
-      kind: boundary
-      labels:
-        zh: 是一种边界例
-        en: "Boundary case: is a"
-        ja: の一種である境界例
-      scenario_id: null
-      descriptions:
-        zh: 不可变 index-17@42 是构建结果而不是构建活动。
-        en: Immutable index-17@42 is the build result, not the build activity.
-        ja: immutable index-17@42 はbuild結果でbuild activityではありません。
-      field_values: {}
-      related_node_ids:
-        - IndexBuildRun
-        - IndexActivity
-      related_relation_ids:
-        - IndexBuildRun-is_a-IndexActivity
-      expected_result:
-        zh: 将 index-17@42 保持为 IndexVersion，不把构建输出归入活动层级。
-        en: Keep index-17@42 as IndexVersion and do not place the build output in the activity hierarchy.
-        ja: index-17@42 を IndexVersion として保持し、build output を activity 階層へ入れません。
-      why_valid_or_invalid:
-        zh: index-17@42 具有冻结成员与配置摘要，却没有运行开始、结束、执行状态或输入消费行为。
-        en: index-17@42 has frozen membership and a configuration digest but no run start, end, execution status, or input-consumption behavior.
-        ja: index-17@42 は凍結 membership と設定 digest を持ちますが、run 開始・終了・実行 status・input consumption behavior を持ちません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-index-build-run-007
-  source_claims:
-    - claim-index-build-run-007
-  distinct_fact_rationale: null
+  examples: []
+  source_claims: [claim-index-build-subtype]
+  distinct_fact_rationale: This relation classifies an index-membership write execution, distinct from model embedding and retrieval.
   layout_role: primary-backbone
-  review_status: pending
-  endpoint_order: child-to-parent
 relations:
-  - id: IndexBuildRun-produces-IndexVersion
-    predicate: produces
+  - id: IndexBuildRun-uses-Representation
+    predicate: uses
+    target: concept:Representation
+    endpoint_order: source-to-target
     direction: source-to-target
     relation_kind: causal
-    labels:
-      zh: 产生索引版本
-      en: produces index version
-      ja: index版を生成する
+    labels: {zh: 使用表示, en: uses representation, ja: representation を使用する}
     definitions:
-      zh: IndexBuildRun —produces→ IndexVersion 表示构建成功完成后新形成一个完整不可变快照。
-      en: IndexBuildRun —produces→ IndexVersion means that successful build completion newly forms one complete immutable snapshot.
-      ja: IndexBuildRun —produces→ IndexVersion はbuild成功完了後に一つの完全immutable snapshotを新規形成することを表します。
+      zh: IndexBuildRun 使用已存在且兼容的 Representation 作为写入索引成员的输入。
+      en: "An IndexBuildRun uses existing compatible Representation values as inputs for writing index membership."
+      ja: IndexBuildRun は index membership を write する input として、既存で compatible な Representation を使用する。
     cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
-      en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
-      ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
-    inverse_reading:
-      predicate: inverse_produces
-      labels:
-        zh: 反向读取
-        en: inverse reading
-        ja: 逆方向読取
+    cardinality_not_applicable_reason: {zh: 一个运行可使用零个或多个表示，具体数量由清单决定。, en: A run may use zero or more representations; the concrete manifest determines the count., ja: 一つの run は zero 又は複数の representation を使用でき、具体数は manifest が決める。}
+    inverse_reading: {predicate: is_used_by, labels: {zh: 被构建运行使用, en: is used by build run, ja: build run に使用される}}
     conditions:
-      - id: IndexBuildRun-produces-IndexVersion-condition-manual-001
+      - id: index-build-run-uses-representation-condition
         severity: error
         expression_language: plain
-        expression: Assert only when build run, completion time, manifest digest, and configuration digest on the version bind to that run.
-        explanations:
-          zh: 仅当 version.build_run_id、完成时间与清单/配置摘要均绑定该运行时成立。
-          en: Assert only when build run, completion time, manifest digest, and configuration digest on the version bind to that run.
-          ja: versionのbuild run・完了時刻・manifest digest・設定digestがそのrunに結び付く時だけ成立します。
-        source_claims:
-          - claim-index-build-run-008
-    temporal_scope: timeless
-    boundary_context: null
+        expression: Assert only when the run's representation_refs resolve to representations compatible with the target index version. A vector generated after the run, a retrieval candidate, or a query string is not an input representation for this relation.
+        explanation:
+          zh: 输入必须可解析到与目标版本兼容的既有表示，不能把检索输出倒灌成构建输入。
+          en: Inputs must resolve to existing representations compatible with the target version; retrieval output cannot be backfilled as build input.
+          ja: input は target version と compatible な既存 representation に解決されなければならず、retrieval output を build input として後から埋めることはできない。
+        source_claims: [claim-index-build-write]
+    temporal_scope: valid-time
+    boundary_context: Using a representation to write an index does not make the IndexBuildRun the embedding activity that generated it.
     constraints: []
-    examples:
-      - id: IndexBuildRun-produces-IndexVersion-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: 产生索引版本正例
-          en: "Positive case: produces index version"
-          ja: index版を生成する正例
-        scenario_id: null
-        descriptions:
-          zh: build-run-42 完成并登记 index-17@42。
-          en: build-run-42 completes and registers index-17@42.
-          ja: build-run-42 は完了し index-17@42を登録します。
-        field_values: {}
-        related_node_ids:
-          - IndexBuildRun
-          - IndexVersion
-        related_relation_ids:
-          - IndexBuildRun-produces-IndexVersion
-        expected_result:
-          zh: 建立 build-run-42 produces index-17@42 的成功发布事实。
-          en: Assert the successful-publication fact that build-run-42 produces index-17@42.
-          ja: build-run-42 produces index-17@42 という successful-publication fact を確立します。
-        why_valid_or_invalid:
-          zh: 版本记录同时给出唯一 generating_run_id、完成状态、提交时间与冻结清单。
-          en: The version record supplies one generating_run_id together with completed status, commit time, and a frozen manifest.
-          ja: version record が一つの generating_run_id、completed status、commit time、凍結 manifest を同時に示します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-index-build-run-008
-      - id: IndexBuildRun-produces-IndexVersion-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: 产生索引版本边界例
-          en: "Boundary case: produces index version"
-          ja: index版を生成する境界例
-        scenario_id: null
-        descriptions:
-          zh: 构建失败且未发布快照时不能建立 produces 边。
-          en: A failed build with no published snapshot does not establish a produces edge.
-          ja: snapshot未公開のfailed buildには produces edgeを立てません。
-        field_values: {}
-        related_node_ids:
-          - IndexBuildRun
-          - IndexVersion
-        related_relation_ids:
-          - IndexBuildRun-produces-IndexVersion
-        expected_result:
-          zh: 保留失败的 IndexBuildRun 记录，但不创建任何 produces IndexVersion 边。
-          en: Retain the failed IndexBuildRun record but create no produces IndexVersion edge.
-          ja: failed IndexBuildRun 記録は保持しますが、produces IndexVersion 辺は作成しません。
-        why_valid_or_invalid:
-          zh: 失败运行没有提交时间、不可变成员清单或可寻址版本；尝试写入不能冒充成功生成。
-          en: The failed run has no commit time, immutable membership manifest, or addressable version; attempted writes cannot masquerade as successful generation.
-          ja: failed run には commit time・immutable membership manifest・addressable version がなく、attempted write を成功 generation と扱えません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-index-build-run-008
-    source_claims:
-      - claim-index-build-run-008
-    distinct_fact_rationale: null
+    examples: []
+    source_claims: [claim-index-build-write]
+    distinct_fact_rationale: This records an activity-to-entity input fact, distinct from vector generation and index-version output.
     layout_role: cross-link
-    review_status: accepted
+  - id: IndexBuildRun-generates-IndexVersion
+    predicate: generates
     target: concept:IndexVersion
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+    endpoint_order: source-to-target
+    direction: source-to-target
+    relation_kind: causal
+    labels: {zh: 生成索引版本, en: generates index version, ja: index version を生成する}
+    definitions:
+      zh: 成功的 IndexBuildRun 可生成一个冻结成员清单和模式摘要的 IndexVersion。
+      en: "A successful IndexBuildRun can generate an IndexVersion with a frozen membership manifest and schema digest."
+      ja: 成功した IndexBuildRun は frozen membership manifest と schema digest を持つ IndexVersion を生成できる。
+    cardinality: null
+    cardinality_not_applicable_reason: {zh: 失败、取消或仅计划中的运行不生成版本；成功运行的输出数量由发布策略决定。, en: Failed, cancelled, or planned runs generate no version; publication policy determines the number of successful outputs., ja: failed、cancelled、planned run は version を生成せず、成功 output 数は publication policy が決める。}
+    inverse_reading: {predicate: was_generated_by, labels: {zh: 由构建运行生成, en: was generated by build run, ja: build run により生成された}}
+    conditions:
+      - id: index-build-run-generates-version-condition
+        severity: error
+        expression_language: plain
+        expression: Assert only when a completed run's activity_id matches the version's created_by_run_ref and the version records a fixed schema digest and membership snapshot. A mutable database endpoint or an uncommitted staging set is not an IndexVersion output.
+        explanation:
+          zh: 只有已完成运行与冻结版本快照可审计关联时，才能断言生成关系。
+          en: Assert generation only when the completed run is auditable against a frozen version snapshot.
+          ja: completed run と frozen version snapshot の監査可能な対応がある時だけ generation を断言する。
+        source_claims: [claim-index-build-write]
+    temporal_scope: valid-time
+    boundary_context: A run that merely reads an index or fails before publication does not generate an IndexVersion.
+    constraints: []
+    examples: []
+    source_claims: [claim-index-build-write]
+    distinct_fact_rationale: This records a successful activity-to-entity output fact, not the enduring index identity or a query result.
+    layout_role: cross-link
+sources:
+  - id: pinecone-indexing
+    title: Pinecone indexing overview
+    url: https://docs.pinecone.io/guides/index-data/indexing-overview
+    source_type: official-doc
+    relevance: Documents indexes, dense and sparse ranking fields, metadata, and explicit data indexing.
+  - id: pinecone-search
+    title: Pinecone semantic search
+    url: https://docs.pinecone.io/guides/search/semantic-search
+    source_type: official-doc
+    relevance: Documents a query that reads matching records from an existing vector index.
 source_claims:
-  - id: claim-index-build-run-001
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured separates its ordered embed, stage, and upload operations from the content written to the destination; Moonweave reifies the bounded index-writing execution as IndexBuildRun and the committed state as IndexVersion.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
+  - id: claim-index-build-write
+    source: pinecone-indexing
+    supports: Pinecone documents indexing data with declared dense, sparse, text, and metadata fields.
+    locator: "Indexing overview: indexes and indexing data"
+    evidence_kind: official-documentation
     confidence: high
-    review_status: accepted
-  - id: claim-index-build-run-002
-    source: eng-fw-unstructured-ingestion
-    supports: IndexBuildRun.run_id records the auditable build identity; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
+  - id: claim-index-build-read-boundary
+    source: pinecone-search
+    supports: Pinecone documents queries against an existing index that return similar records.
+    locator: "Semantic search: search with a dense vector"
+    evidence_kind: official-documentation
     confidence: high
-    review_status: accepted
-  - id: claim-index-build-run-003
-    source: eng-fw-unstructured-ingestion
-    supports: IndexBuildRun.build_mode records the build's completeness semantics; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
+  - id: claim-index-build-subtype
+    source: pinecone-indexing
+    supports: Pinecone documents explicit indexing of compatible data into a named index.
+    locator: "Indexing overview: indexes and ranking fields"
+    evidence_kind: official-documentation
     confidence: high
-    review_status: accepted
-  - id: claim-index-build-run-004
-    source: eng-fw-unstructured-ingestion
-    supports: IndexBuildRun.source_manifest_digest records exact build inputs; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
+  - id: claim-index-build-design
+    source: pinecone-indexing
+    supports: Moonweave models IndexBuildRun as the IndexActivity subtype for a create, rebuild, upsert, or delete that changes index membership, retaining its target, input representations, output entries, and terminal status separately from query results.
+    locator: "Moonweave ontology design inference from claim-index-build-write, claim-index-build-read-boundary, and claim-index-build-subtype"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-index-build-run-005
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured orders embed, stage, and upload steps, supporting an explicit build activity over prepared representations.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-index-build-run-006
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured separates the ordered embed, stage, and upload operations from the content written at the destination; the retained output is therefore not itself the ingestion operation.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-index-build-run-007
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured documents an ordered ingestion flow whose embed, stage, and upload operations transform prepared content and write it to a destination; reifying that bounded index-writing execution as IndexBuildRun is Moonweave's ontology inference.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-index-build-run-008
-    source: eng-ont-prov-o
-    supports: PROV-O defines generated entities and generating activities; Moonweave requires successful immutable publication.
-    locator: PROV-O Recommendation > Entity, Activity, used, wasGeneratedBy, and wasDerivedFrom
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

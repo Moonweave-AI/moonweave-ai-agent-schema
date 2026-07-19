@@ -8,18 +8,18 @@ import {
   ontologyMetricValue,
 } from "../src/lib/ontology-runtime";
 import type {
-  CanonicalArtifact,
+  CanonicalAgentOntology,
+  CanonicalConceptContract,
+  CanonicalModuleContract,
+  CanonicalPlaneContract,
+  CanonicalRelationContract,
+  CanonicalSourceClaim as GeneratedCanonicalSourceClaim,
   CasePath,
   CasePathStep,
-  Concept,
   Constraint,
   Example,
   Field,
   LocalizedText,
-  Module,
-  Plane,
-  Relation,
-  SourceClaim,
 } from "../src/lib/canonical-ontology-types";
 import type {
   CanonicalCasePath,
@@ -46,16 +46,10 @@ const sourceIndex = {
 
 const runtimeOntologyFixture = {
   ...ontologyViewModelFixture,
-  review: {
-    review_status: "accepted",
-    reviewers: [],
-  },
   artifact_metadata: {
     ...ontologyViewModelFixture.artifact_metadata,
     artifact_kind: "canonical-agent-ontology",
     contract_version: "2.0.0",
-    release_channel: "candidate",
-    releasable: false,
     generated_at: "2026-07-13T00:00:00.000Z",
     source_tree_sha256: "0".repeat(64),
   },
@@ -63,15 +57,15 @@ const runtimeOntologyFixture = {
 
 describe("ontology application runtime boundary", () => {
   it("uses the generated artifact contract as the consumer type source of truth", () => {
-    expectTypeOf<CanonicalOntology>().toEqualTypeOf<CanonicalArtifact>();
-    expectTypeOf<CanonicalPlane>().toEqualTypeOf<Plane>();
-    expectTypeOf<CanonicalModule>().toEqualTypeOf<Module>();
-    expectTypeOf<CanonicalConcept>().toEqualTypeOf<Concept>();
-    expectTypeOf<CanonicalRelation>().toEqualTypeOf<Relation>();
+    expectTypeOf<CanonicalOntology>().toEqualTypeOf<CanonicalAgentOntology>();
+    expectTypeOf<CanonicalPlane>().toEqualTypeOf<CanonicalPlaneContract>();
+    expectTypeOf<CanonicalModule>().toEqualTypeOf<CanonicalModuleContract>();
+    expectTypeOf<CanonicalConcept>().toEqualTypeOf<CanonicalConceptContract>();
+    expectTypeOf<CanonicalRelation>().toEqualTypeOf<CanonicalRelationContract>();
     expectTypeOf<CanonicalField>().toEqualTypeOf<Field>();
     expectTypeOf<CanonicalConstraint>().toEqualTypeOf<Constraint>();
     expectTypeOf<CanonicalExample>().toEqualTypeOf<Example>();
-    expectTypeOf<CanonicalSourceClaim>().toEqualTypeOf<SourceClaim>();
+    expectTypeOf<CanonicalSourceClaim>().toEqualTypeOf<GeneratedCanonicalSourceClaim>();
     expectTypeOf<CanonicalCasePath>().toEqualTypeOf<CasePath>();
     expectTypeOf<CanonicalCasePathStep>().toEqualTypeOf<CasePathStep>();
     expectTypeOf<ConsumerLocalizedText>().toEqualTypeOf<LocalizedText>();
@@ -158,22 +152,12 @@ describe("ontology application runtime boundary", () => {
       },
     },
     {
-      name: "candidate metadata claiming to be releasable",
+      name: "metadata carrying retired release state",
       value: {
         ...runtimeOntologyFixture,
         artifact_metadata: {
           ...runtimeOntologyFixture.artifact_metadata,
-          releasable: true,
-        },
-      },
-    },
-    {
-      name: "release metadata claiming not to be releasable",
-      value: {
-        ...runtimeOntologyFixture,
-        artifact_metadata: {
-          ...runtimeOntologyFixture.artifact_metadata,
-          release_channel: "release",
+          release_channel: "candidate",
           releasable: false,
         },
       },

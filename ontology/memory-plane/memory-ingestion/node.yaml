@@ -3,1318 +3,349 @@ id: memory-ingestion
 kind: module
 status: accepted
 labels:
-  zh: 外部资源接入
-  en: External-resource ingestion
-  ja: 外部資源の取り込み
+  zh: 记忆摄入
+  en: Memory Ingestion
+  ja: 記憶取り込み
 semantics:
   short_definition:
-    zh: 外部资源接入描述如何在已声明的接入政策下，用加载器读取文件、数据库或图存储等外部资源，经规范化与去重后产生可交给分块阶段的 Document 与附件信息。它分开资源实体、接入活动和可复用政策，不把来源引用或持久记忆写入并入本树。
-    en: External-resource ingestion describes how a declared ingestion policy and loader read a file, database, graph store, or other outside resource and turn it, through normalization and deduplication, into a Document and attachment information ready for chunking. It keeps the resource entity, ingestion activity, and reusable policy distinct from source-reference records and persistent-memory writes.
-    ja: memory ingestion は reusable specification・resource type・一 execution fact を分離します。IngestionPolicy は reusable specification root、IngestibleResource は FileSystem・DirectoryResource・FileResource・Database・GraphStore へ特化し、IngestionRun は reads・governed_by・hosts/contains cross-link で具体 resource state を参照します。NormalizationActivity/DeduplicationActivity は Document・version-pinned SourceAttachment・DocumentMetadata・DeduplicationDecision を形成します。
+    en: Defines how external content is loaded, parsed, and prepared for the memory pipeline.
+    zh: 定义外部内容如何被加载、解析并准备进入记忆管线。
+    ja: 外部コンテンツをメモリパイプラインに取り込み・解析・準備する方法を定義します。
   definition:
-    zh: 记忆接入分开表达可复用规范、资源类型和一次执行事实：IngestionPolicy 是跨运行复用的规范根；IngestibleResource 以类型骨架展开 FileSystem、DirectoryResource、FileResource、Database 与 GraphStore；IngestionRun 通过 reads、governed_by、hosts/contains 等横向事实引用具体资源状态，并由 NormalizationActivity 与 DeduplicationActivity 形成 Document、版本固定的 SourceAttachment、DocumentMetadata 与 DeduplicationDecision。
-    en: IngestionActivity owns the run and its loading, normalization, and deduplication phases; IngestibleResource owns the external entity being read; IngestionPolicy owns the reusable operational specification. A SourceReference only points to a resource and therefore remains in source references and evidence location. Chunking, embedding, index construction, and persistent-memory writes are later activities owned by their respective modules.
-    ja: memory ingestion は reusable specification・resource type・一 execution fact を分離します。IngestionPolicy は reusable specification root、IngestibleResource は FileSystem・DirectoryResource・FileResource・Database・GraphStore へ特化し、IngestionRun は reads・governed_by・hosts/contains cross-link で具体 resource state を参照します。NormalizationActivity/DeduplicationActivity は Document・version-pinned SourceAttachment・DocumentMetadata・DeduplicationDecision を形成します。
+    en: >
+      Memory Ingestion covers the acquisition of raw content from external sources and its
+      transformation into a normalized document representation ready for downstream processing
+      (chunking, embedding, indexing). This includes: document loaders (PDF, HTML, Markdown,
+      code files, databases, APIs, web scraping), format detection and parsing (extracting
+      text and structure from heterogeneous formats), content normalization (encoding handling,
+      whitespace normalization, boilerplate removal), metadata extraction from source
+      (title, author, URL, last_modified), and pipeline orchestration (scheduling, deduplication,
+      incremental vs full re-ingestion). This maps to LangChain's DocumentLoader interface,
+      LlamaIndex's data connectors (SimpleDirectoryReader, web loaders), and Unstructured.io's
+      document parsing capabilities.
+    zh: >
+      记忆摄入覆盖从外部源获取原始内容并将其转换为规范化文档表示，准备供下游处理（分块、嵌入、
+      索引）。包括：文档加载器（PDF、HTML、Markdown、代码文件、数据库、API、网页抓取）、格式
+      检测与解析（从异构格式提取文本和结构）、内容规范化（编码处理、空白规范化、样板移除）、
+      从源提取元数据（标题、作者、URL、最后修改时间）、以及管线编排（调度、去重、增量 vs 全量
+      重新摄入）。映射到 LangChain 的 DocumentLoader 接口、LlamaIndex 的数据连接器和
+      Unstructured.io 的文档解析能力。
+    ja: >
+      記憶取り込みは、外部ソースから生コンテンツを取得し、下流処理（チャンク化、埋め込み、
+      インデックス化）に備えた正規化 Document 表現へ変換する工程を扱います。DocumentLoader
+      （PDF、HTML、Markdown、コード、データベース、API、Web スクレイピング）、形式検出と解析
+      （異種フォーマットからのテキストと構造抽出）、内容正規化（エンコーディング、空白、
+      ボイラープレート除去）、ソースメタデータ抽出（title、author、URL、last_modified）、
+      パイプライン编排（スケジューリング、重複排除、増分 vs 全量再取り込み）を含みます。
+      LangChain の DocumentLoader、LlamaIndex の data connector、Unstructured.io の解析能力に
+      対応する境界です。
   why_needed:
-    zh: 把文件、数据库和图等外部资源，经可追踪的读取、规范化与去重决定，转为可供后续分块、表示和存储使用的文档信息。
-    en: Turn external resources such as files, databases, and graphs into document information for later chunking, representation, and storage through traceable reading, normalization, and deduplication decisions.
-    ja: ファイル、データベース、グラフなどの外部資源を、追跡可能な読取り、正規化、重複排除判断によって、後続の分割、表現、保存に利用できる文書情報へ変換します。
+    en: >
+      Agents need access to knowledge from diverse sources—PDFs, web pages, code repositories,
+      databases, conversations. Each source has a different format, encoding, and structure.
+      Without a proper ingestion layer, you'd have to write custom parsing for every source.
+      LangChain has 100+ document loaders precisely because this variety is real and unavoidable.
+      Ingestion is the entry point of the RAG pipeline: garbage in = garbage out.
+    zh: >
+      智能体需要访问来自多样来源的知识——PDF、网页、代码仓库、数据库、对话。每个来源有不同的
+      格式、编码和结构。没有适当的摄入层，就必须为每个来源写自定义解析。LangChain 有 100 多个
+      文档加载器正是因为这种多样性是真实且不可避免的。摄入是 RAG 管线的入口：垃圾进=垃圾出。
+    ja: >
+      エージェントは PDF、Web ページ、コードリポジトリ、データベース、会話など多様なソースの
+      知識にアクセスする必要があり、各ソースは形式・エンコーディング・構造が異なります。
+      適切な取り込み層がなければソースごとに独自パーサーを書く必要があります。LangChain が
+      100 以上の document loader を持つのは、この多様性が現実的かつ避けられないためです。
+      取り込みは RAG パイプラインの入口であり、garbage in = garbage out です。
   includes:
-    - zh: IngestibleResource 下并列的 FileSystem、DirectoryResource、FileResource、Database 与 GraphStore 等资源类型，以及另由 hosts、contains、has_table 表达的实例结构；Document 与语料集合保持在信息和集合分支。
-      en: Sibling resource types under IngestibleResource—FileSystem, DirectoryResource, FileResource, Database, GraphStore, and peers—plus instance structure expressed separately through hosts, contains, and has_table; Document and corpora remain on information and collection branches.
-      ja: IngestibleResource 配下の sibling resource type（FileSystem・DirectoryResource・FileResource・Database・GraphStore 等）と、hosts・contains・has_table で別に表す instance structure。Document/corpus は information/collection branch に保ちます。
-    - zh: 独立可复用的 IngestionPolicy 与 DocumentLoader，完整 IngestionRun 及其 NormalizationActivity、DeduplicationActivity，以及 Document、DocumentMetadata、DeduplicationDecision 和由 Document 组成并固定资源版本与摘要的 SourceAttachment。
-      en: Independent reusable IngestionPolicy and DocumentLoader, a complete IngestionRun and its NormalizationActivity and DeduplicationActivity phases, plus Document, DocumentMetadata, DeduplicationDecision, and SourceAttachment records composed by a Document and pinned to a resource version and digest.
-      ja: independent reusable IngestionPolicy・DocumentLoader、complete IngestionRun と NormalizationActivity/DeduplicationActivity、Document・DocumentMetadata・DeduplicationDecision、および Document が構成し resource version/digest を固定する SourceAttachment。
+    - en: "Document loaders: PDF (PyPDF, pdfplumber), HTML (Beautiful Soup, Playwright), Markdown, code files, database connectors, API data sources, web scrapers (Firecrawl, Crawl4AI)"
+      zh: "文档加载器：PDF（PyPDF、pdfplumber）、HTML（Beautiful Soup、Playwright）、Markdown、代码文件、数据库连接器、API 数据源、网页抓取器（Firecrawl、Crawl4AI）"
+      ja: PDF、HTML、Markdown、code file、database connector、API data source、web scraper を扱う document loader。
+    - en: "Format parsing: text extraction with structure preservation, table detection, image extraction, code block identification, metadata parsing from document headers"
+      zh: "格式解析：保持结构的文本提取、表格检测、图片提取、代码块识别、从文档头部的元数据解析"
+      ja: structure を保持した text extraction、table・image・code block の識別、document header からの metadata parsing。
+    - en: "Content normalization: encoding detection/conversion, whitespace normalization, boilerplate removal (ads, navigation), deduplication"
+      zh: "内容规范化：编码检测/转换、空白规范化、样板移除（广告、导航）、去重"
+      ja: encoding detection と conversion、whitespace normalization、boilerplate removal、deduplication。
+    - en: "Source metadata: title, author, URL/path, last_modified, content_type, word_count, language detection"
+      zh: "源元数据：标题、作者、URL/路径、最后修改时间、内容类型、词计数、语言检测"
+      ja: title、author、URL 又は path、last_modified、content_type、word_count、language detection を含む source metadata。
+    - en: "Pipeline orchestration: scheduling (cron, event-driven), incremental ingestion (only new/changed), full re-ingestion, retry on failure"
+      zh: "管线编排：调度（cron、事件驱动）、增量摄入（仅新增/变化）、全量重新摄入、失败重试"
+      ja: scheduling、incremental ingestion、full re-ingestion、failure retry を含む pipeline orchestration。
   excludes:
-    - zh: SourceReference、Location 和版本核验身份归来源与定位；接入只引用它们记录来源。
-      en: SourceReference, Location, and version-verification identity belong to sources and locations; ingestion references them to record provenance.
-      ja: SourceReference、Location、版検証同一性は出典と位置に属し、取込は来歴記録のため参照します。
-    - zh: FileSystem 在此是可读取的 IngestibleResource；持久 MemoryStore、MemoryWrite、分块和嵌入分别属于存储、生命周期、分块与索引模块，不能混入接入活动。
-      en: FileSystem is a readable IngestibleResource here; persistent MemoryStore, MemoryWrite, chunking, and embedding belong to the stores, lifecycle, chunking, and indexing modules respectively and must not be folded into ingestion activity.
-      ja: FileSystem はここで読取り可能な IngestibleResource です。永続 MemoryStore、MemoryWrite、分割、埋込みはそれぞれ保存、ライフサイクル、分割、索引モジュールに属します。
-  semantic_kind: null
-  aliases: []
-purpose:
-  zh: 把文件、数据库和图等外部资源，经可追踪的读取、规范化与去重决定，转为可供后续分块、表示和存储使用的文档信息。
-  en: Turn external resources such as files, databases, and graphs into document information for later chunking, representation, and storage through traceable reading, normalization, and deduplication decisions.
-  ja: ファイル、データベース、グラフなどの外部資源を、追跡可能な読取り、正規化、重複排除判断によって、後続の分割、表現、保存に利用できる文書情報へ変換します。
-structure: null
-examples:
-  - id: memory-ingestion-cq-loader-selection-v3-example-positive
-    kind: positive
-    labels:
-      zh: 来源—加载器—文档链正例
-      en: Positive source-loader-document chain
-      ja: source-loader-document chain正例
-    scenario_id: ingestion-loader-17
-    descriptions:
-      zh: ingest-run-17 的清单读取 file-policy-v7@digest，调用支持 PDF 的 loader-pdf-v3@3.2.1，并把 normalize-17 作为 sequence=1 阶段产生 document-policy-v7。
-      en: ingest-run-17's manifest reads file-policy-v7@digest, invokes PDF-capable loader-pdf-v3@3.2.1, and includes normalize-17 as sequence 1 producing document-policy-v7.
-      ja: ingest-run-17 のmanifestは file-policy-v7@digest を読み、PDF対応 loader-pdf-v3@3.2.1 を呼び、sequence=1 の normalize-17 が document-policy-v7 を生成します。
-    field_values:
-      run_id: ingest-run-17
-      resource: file-policy-v7@digest
-      loader: loader-pdf-v3@3.2.1
-      phase: normalize-17
-      document: document-policy-v7
-    related_node_ids:
-      - IngestionRun
-      - IngestibleResource
-      - DocumentLoader
-      - NormalizationActivity
-      - Document
-    related_relation_ids:
-      - IngestionRun-reads-IngestibleResource
-      - IngestionRun-uses-DocumentLoader
-      - IngestionRun-has_phase-NormalizationActivity
-      - NormalizationActivity-produces-Document
-    expected_result:
-      zh: 返回同一运行范围内的来源版本、实际加载器、阶段归属和新文档四段链。
-      en: Return the source version, actually invoked loader, phase membership, and new document within one run scope.
-      ja: 同一run scope内のsource版、実際にinvokeしたloader、phase所属、新documentの四段chainを返します。
-    why_valid_or_invalid:
-      zh: 资源摘要、媒体能力、run_id、阶段顺序与 generating_phase_id 能逐项对齐。
-      en: Resource digest, media capability, run ID, phase order, and generating_phase_id align item by item.
-      ja: resource digest、media capability、run ID、phase順序、generating_phase_idを個別照合できます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-ingestion-005
-  - id: memory-ingestion-cq-loader-selection-v3-example-counter
-    kind: counterexample
-    labels:
-      zh: 来源—加载器—文档链反例
-      en: "Counterexample: uninvoked loader"
-      ja: source-loader-document chain反例
-    scenario_id: ingestion-loader-uninvoked
-    descriptions:
-      zh: loader-html 已安装且 file-policy-v7 与目标文件同目录，但 ingest-run-17 没有读取该资源也没有调用该加载器；安装和可发现性不能形成 uses/reads。
-      en: loader-html is installed and file-policy-v7 shares a directory with the target, but ingest-run-17 neither reads that resource nor invokes the loader; installation and discoverability do not establish uses or reads.
-      ja: loader-html はinstall済みで file-policy-v7 もtargetと同directoryですが、ingest-run-17 はresourceをreadせずloaderもinvokeしません。installとdiscoverabilityから uses／reads は成立しません。
-    field_values:
-      run_id: ingest-run-17
-      installed_loader: loader-html
-      discovered_resource: file-policy-v7
-      invoked: false
-    related_node_ids:
-      - IngestionRun
-      - IngestibleResource
-      - DocumentLoader
-    related_relation_ids:
-      - IngestionRun-reads-IngestibleResource
-      - IngestionRun-uses-DocumentLoader
-    expected_result:
-      zh: 不得返回来源读取或加载器使用关系，也不能把无归属的文档归因于该运行。
-      en: Do not return source-read or loader-use relations and do not attribute an unbound document to the run.
-      ja: source-read・loader-use relationを返さず、未binding documentをrunへ帰属させません。
-    why_valid_or_invalid:
-      zh: 可用能力、目录邻接与实际运行事实是三类不同信息。
-      en: Available capability, directory adjacency, and actual run facts are three distinct kinds of information.
-      ja: available capability、directory隣接、actual run factは三種の異なるinformationです。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-ingestion-006
-  - id: memory-ingestion-cq-deduplication-decision-v3-example-positive
-    kind: positive
-    labels:
-      zh: 去重决定链正例
-      en: Positive deduplication-decision chain
-      ja: deduplication decision chain正例
-    scenario_id: deduplication-decision-17
-    descriptions:
-      zh: normalize-17 先产生 document-policy-v7；同一 ingest-run-17 中 dedup-17 随后消费该确切摘要，比较 prior-v6，并产生 outcome=update 的 decision-17，决定明确 about document-policy-v7。
-      en: normalize-17 first produces document-policy-v7; in the same ingest-run-17, dedup-17 then consumes that exact digest, compares prior-v6, and produces decision-17 with outcome=update explicitly about document-policy-v7.
-      ja: normalize-17 が document-policy-v7 を生成し、同じ ingest-run-17 の dedup-17 がそのexact digestを消費して prior-v6 と比較し、document-policy-v7 について outcome=update の decision-17 を生成します。
-    field_values:
-      normalization_phase: normalize-17
-      document: document-policy-v7
-      dedup_phase: dedup-17
-      prior_digest: prior-v6
-      decision: decision-17
-      outcome: update
-    related_node_ids:
-      - NormalizationActivity
-      - Document
-      - DeduplicationActivity
-      - DeduplicationDecision
-    related_relation_ids:
-      - NormalizationActivity-produces-Document
-      - NormalizationActivity-precedes-DeduplicationActivity
-      - DeduplicationActivity-consumes-Document
-      - DeduplicationActivity-produces-DeduplicationDecision
-      - DeduplicationDecision-about-Document
-    expected_result:
-      zh: 返回规范化输出、同运行阶段顺序、去重输入、决定生成和决定对象的完整链。
-      en: Return the complete chain of normalization output, same-run phase order, deduplication input, decision generation, and decision subject.
-      ja: normalization output、同run phase順序、dedup input、decision生成、decision対象の完全chainを返します。
-    why_valid_or_invalid:
-      zh: 文档 ID 与摘要在产生、消费和 about 三处一致，决定是信息记录而不是伪事件或 MemoryWrite。
-      en: Document ID and digest agree across production, consumption, and about; the decision is an information record, not a pseudo-event or MemoryWrite.
-      ja: document IDとdigestがproduce・consume・aboutで一致し、decisionはpseudo-eventや MemoryWrite でなくinformation recordです。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-ingestion-007
-  - id: memory-ingestion-cq-deduplication-decision-v3-example-counter
-    kind: counterexample
-    labels:
-      zh: 去重决定链反例
-      en: "Counterexample: stale deduplication decision"
-      ja: deduplication decision chain反例
-    scenario_id: deduplication-decision-stale
-    descriptions:
-      zh: decision-16 关于 document-policy-v6，只有 document_id 相同但 content_digest 与 v7 不同；把它复用于 v7 会丢失版本边界。
-      en: decision-16 is about document-policy-v6; only the document_id matches while content_digest differs from v7, so reusing it for v7 loses the version boundary.
-      ja: decision-16 は document-policy-v6 についての判断で、document_idだけ同じで content_digest は v7 と異なります。v7へ再利用すると版境界を失います。
-    field_values:
-      decision: decision-16
-      actual_document: document-policy-v6
-      proposed_document: document-policy-v7
-      digest_match: false
-    related_node_ids:
-      - DeduplicationDecision
-      - Document
-      - DeduplicationActivity
-    related_relation_ids:
-      - DeduplicationActivity-produces-DeduplicationDecision
-      - DeduplicationDecision-about-Document
-    expected_result:
-      zh: 拒绝 decision-16 → document-policy-v7 的 about 关系，并要求对 v7 重新比较。
-      en: Reject decision-16 about document-policy-v7 and require a new comparison for v7.
-      ja: decision-16 → document-policy-v7 の about relationを拒否し、v7への再比較を要求します。
-    why_valid_or_invalid:
-      zh: 相同业务 ID 不等于相同文档版本；去重判断必须绑定比较时的内容摘要。
-      en: Equal business ID is not equal document version; a deduplication decision must bind the compared content digest.
-      ja: 同business IDは同document版ではなく、deduplication decisionは比較時content digestへbindingする必要があります。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-ingestion-008
-  - id: memory-ingestion-cq-provenance-chain-v3-example-positive
-    kind: positive
-    labels:
-      zh: 文档来源证据链正例
-      en: Positive document-provenance chain
-      ja: document来歴evidence chain正例
-    scenario_id: document-provenance-17
-    descriptions:
-      zh: document-policy-v7 组成 attachment-17；附件固定 file-policy-v7 的 object-version:7 与内容摘要，ingest-run-17 的读取清单也含同一版本和摘要，并由 normalize-17 产生该文档。
-      en: document-policy-v7 composes attachment-17, which pins file-policy-v7 object-version:7 and its content digest; ingest-run-17's read manifest contains that same version and digest, and normalize-17 produces the Document.
-      ja: document-policy-v7 は attachment-17 を構成し、attachment は file-policy-v7 object-version:7/content digest を固定します。ingest-run-17 read manifest も同じ version/digest を持ち normalize-17 が Document を生成します。
-    field_values:
-      document: document-policy-v7
-      attachment: attachment-17
-      resource_id: file-policy-v7
-      resource_version_ref: object-version:7
-      resource_content_digest: "sha-256=:ZGlnZXN0LWE=:"
-      run: ingest-run-17
-      phase: normalize-17
-    related_node_ids:
-      - Document
-      - SourceAttachment
-      - IngestibleResource
-      - IngestionRun
-      - NormalizationActivity
-    related_relation_ids:
-      - Document-has_source_attachment-SourceAttachment
-      - SourceAttachment-describes-IngestibleResource
-      - IngestionRun-reads-IngestibleResource
-      - NormalizationActivity-produces-Document
-    expected_result:
-      zh: 返回文档—附件—资源与运行—规范化输出两条相互校验的路径，资源 ID、逻辑版本引用和内容摘要必须分别相同。
-      en: Return the Document–attachment–resource and run–normalization-output paths as mutual checks, requiring separate agreement on resource ID, logical version reference, and content digest.
-      ja: Document-attachment-resource path と run-normalization-output path を相互検証し resource ID・logical version reference・content digest の個別一致を要求します。
-    why_valid_or_invalid:
-      zh: 附件证据、运行输入与生成阶段三处都指向同一不可歧义来源版本。
-      en: Attachment evidence, run input, and generating phase all point to one unambiguous source version.
-      ja: attachment evidence、run input、generating phaseの三箇所が同一の曖昧でないsource版を指します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-ingestion-009
-  - id: memory-ingestion-cq-provenance-chain-v3-example-counter
-    kind: counterexample
-    labels:
-      zh: 文档来源证据链反例
-      en: "Counterexample: source-version mismatch"
-      ja: document来歴evidence chain反例
-    scenario_id: document-provenance-digest-mismatch
-    descriptions:
-      zh: attachment-17 仍描述 file-policy-v7@digest-a，但运行读取的是同路径 file-policy-v8@digest-b；URI 相同不能把 v7 附件当成 v8 文档的来源证据。
-      en: attachment-17 still describes file-policy-v7@digest-a, while the run reads same-path file-policy-v8@digest-b; equal URI cannot make the v7 attachment provenance for a v8 document.
-      ja: attachment-17 は file-policy-v7@digest-a を記述しますが、runは同pathの file-policy-v8@digest-b を読みます。同URIでもv7 attachmentをv8 documentの来歴根拠にはできません。
-    field_values:
-      attachment_resource_id: file-policy-v7
-      attachment_version_ref: object-version:7
-      attachment_content_digest: "sha-256=:ZGlnZXN0LWE=:"
-      run_resource_id: file-policy-v8
-      run_version_ref: object-version:8
-      run_content_digest: "sha-256=:ZGlnZXN0LWI=:"
-      same_uri: true
-      same_digest: false
-    related_node_ids:
-      - Document
-      - SourceAttachment
-      - IngestibleResource
-      - IngestionRun
-    related_relation_ids:
-      - Document-has_source_attachment-SourceAttachment
-      - SourceAttachment-describes-IngestibleResource
-      - IngestionRun-reads-IngestibleResource
-    expected_result:
-      zh: 报告来源版本冲突，拒绝闭合 provenance chain，直到附件与运行清单摘要一致。
-      en: Report the source-version conflict and refuse to close the provenance chain until attachment and run-manifest digests agree.
-      ja: source版conflictを報告し、attachmentとrun manifestのdigest一致までprovenance chainを閉じません。
-    why_valid_or_invalid:
-      zh: 定位符用于寻找资源，内容摘要才区分同路径的不同版本。
-      en: A locator finds a resource, while the content digest distinguishes versions at the same path.
-      ja: locatorはresourceを見つけますが、同pathの別版を区別するのはcontent digestです。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-ingestion-010
-parent_relation: null
-relations: []
+    - en: "Chunking the loaded documents (belongs to Chunking & Situating—ingestion produces whole documents, chunking splits them)"
+      zh: "对加载文档进行分块（属于分块与定位模块——摄入产生完整文档，分块分割它们）"
+      ja: memory-chunking-situating に属する loaded Document の chunking。ingestion は whole Document を生成し、chunking はそれを分割する。
+    - en: "Embedding and indexing (belongs to Embeddings & Indexes—ingestion provides normalized text, not vectors)"
+      zh: "嵌入和索引（属于嵌入与索引模块——摄入提供规范化文本，不是向量）"
+      ja: memory-embedding-indexes に属する embedding と indexing。ingestion は normalized text を提供し、vector を生成しない。
+    - en: "Memory object creation in stores (belongs to Memory Stores & Scopes—ingestion feeds documents into the pipeline, stores persist the final results)"
+      zh: "在存储中创建记忆对象（属于记忆存储与作用域——摄入将文档送入管线，存储持久化最终结果）"
+      ja: memory-stores-scopes に属する memory object creation。ingestion は Document を pipeline に渡し、store が最終結果を persist する。
+  semantic_kind: module
+  aliases: [document ingestion pipeline, RAG ingestion layer]
+engineering:
+  explanation:
+    en: >
+      The ingestion layer follows the adapter pattern: each source type has a loader that
+      implements a common interface (LangChain's BaseLoader.load() -> list[Document]).
+      In LangChain, a Document has page_content (str) and metadata (dict). LlamaIndex uses
+      a similar pattern with its Reader interface producing Document nodes. For production
+      scale, Unstructured.io provides robust parsing that handles complex layouts (tables,
+      multi-column, headers/footers) across 20+ file formats. The ingestion pipeline typically
+      runs as a background job: detect new/changed files -> load -> parse -> normalize ->
+      emit Document objects for the chunking stage.
+    zh: >
+      摄入层遵循适配器模式：每个源类型有一个加载器实现公共接口（LangChain 的
+      BaseLoader.load() -> list[Document]）。在 LangChain 中，Document 有 page_content (str)
+      和 metadata (dict)。LlamaIndex 使用类似模式。对于生产规模，Unstructured.io 提供
+      跨 20+ 文件格式处理复杂布局的健壮解析。
+    ja: >-
+      ingestion layer は adapter pattern を用い、各 source type の loader が共通 interface を実装します。loader は
+      versioned resource を read し、format parsing と normalization を経て source metadata 付きの Document を出力します。
+      production parser は layout を扱えますが、loader execution、source resource、生成 Document は別々に記録します。
+  typical_input:
+    - description: "LangChain PyPDFLoader - Load PDF"
+      format: |
+        loader = PyPDFLoader("path/to/document.pdf")
+        documents = loader.load()
+    - description: "LangChain WebBaseLoader - Load web page"
+      format: |
+        loader = WebBaseLoader("https://example.com/article")
+        documents = loader.load()
+    - description: "Firecrawl API - Crawl and extract"
+      format: |
+        app.scrape_url(
+          url="https://docs.example.com/guide",
+          params={"formats": ["markdown"]}
+        )
+  typical_output:
+    - description: "LangChain Document object"
+      format: |
+        Document(
+          page_content="# Introduction\n\nThis guide covers...",
+          metadata={
+            "source": "https://docs.example.com/guide",
+            "title": "Getting Started Guide",
+            "content_type": "text/markdown",
+            "last_modified": "2026-07-15T10:00:00Z",
+            "word_count": 2847
+          }
+        )
+  reference_implementations:
+    - name: LangChain Document Loaders
+      url: https://docs.langchain.com/oss/python/langchain/document_loaders
+      description: 100+ loaders for PDF, HTML, CSV, JSON, databases, cloud storage, APIs
+    - name: LlamaIndex Data Connectors
+      url: https://docs.llamaindex.ai/en/stable/module_guides/loading/
+      description: SimpleDirectoryReader, web readers, database readers, and custom connectors
+    - name: Unstructured.io
+      url: https://docs.unstructured.io/
+      description: Production document parsing for complex layouts across 20+ file formats
+    - name: Firecrawl
+      url: https://docs.firecrawl.dev/
+      description: Web crawling and scraping optimized for LLM consumption with markdown output
+structure:
+  identity_keys: [module_id]
+  fields:
+    - id: module_id
+      labels: {zh: 模块标识, en: module ID, ja: モジュール ID}
+      definitions:
+        zh: 稳定标识本模块的外部来源读取和文档规范化边界，而不是其中的一个资源、运行或文档。
+        en: Stably identifies this module's external-source read and document-normalization boundary, not an individual resource, run, or document inside it.
+        ja: この module の external-source read と document-normalization boundary を安定して識別し、内部の個別 resource、run、Document ではない。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: [memory-ingestion]
+      pattern: null
+      example_value: memory-ingestion
+      source_claims: [claim-ingestion-loader-boundary]
+    - id: ingestion_boundary
+      labels: {zh: 摄入边界, en: ingestion boundary, ja: ingestion 境界}
+      definitions:
+        zh: 声明版本化外部资源如何通过加载、解析和规范化成为 Document，同时将分块、嵌入、索引和存储写入排除在外。
+        en: Declares how a versioned external resource becomes a Document through loading, parsing, and normalization while excluding chunking, embedding, indexing, and store writes.
+        ja: versioned external resource が loading、parsing、normalization を通じて Document になる方法と、chunking、embedding、indexing、store write を除外することを宣言する。
+      datatype: json
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: null
+      example_value: '{"resource":"file-policy-v7","run":"ingest-policy-17","document":"document-policy-v7"}'
+      source_claims: [claim-ingestion-loader-boundary, claim-ingestion-source-lineage]
+  constraints:
+    - id: memory-ingestion-module-boundary
+      severity: error
+      expression_language: plain
+      expression: Ingestion must read a versioned IngestibleResource through an explicit loader or ingestion activity and produce a separately identified Document or IngestibleInformation artifact with source metadata. It must not silently treat a raw locator, loader configuration, Chunk, embedding vector, index entry, retrieval result, or persistent memory record as the ingested document.
+      explanation:
+        zh: 来源资源、加载或规范化活动、生成文档以及下游块或向量由不同证据产生；保留这些边界使重读、去重和来源审计成为可能。
+        en: Source resources, loading or normalization activities, generated documents, and downstream chunks or vectors arise from different evidence. Keeping those boundaries makes replay, deduplication, and provenance audit possible.
+        ja: source resource、loading 又は normalization activity、生成 Document、後続 Chunk 又は vector は異なる evidence から生じます。これらの boundary を保つことで replay、deduplication、provenance audit が可能になります。
+      source_claims: [claim-ingestion-loader-boundary, claim-ingestion-normalization, claim-ingestion-source-lineage]
+  required_relations: []
 module_contract:
   interaction_contract:
     applicability: operational
     facets:
       input:
         applicable: true
-        description:
-          zh: 摄入输入由来源资源、加载能力和已读取信息组成，分别由 reads、uses 与 consumes 关系绑定。
-          en: Ingestion input consists of source resources, loader capability, and already-read information, bound separately by reads, uses, and consumes relations.
-          ja: 取込入力はsource resource・loader capability・read済みinformationからなりreads・uses・consumes関係で別々にbindingします。
-        family_concept_ids:
-          - IngestibleResource
-          - DocumentLoader
-          - IngestibleInformation
-        relation_ids:
-          - IngestionRun-reads-IngestibleResource
-          - IngestionRun-uses-DocumentLoader
-          - NormalizationActivity-consumes-IngestibleInformation
-        not_applicable_reason: null
+        description: "External sources (files, URLs, APIs, databases) to load"
+        reference_api: "LangChain BaseLoader(source) or LlamaIndex SimpleDirectoryReader(input_dir)"
       output:
         applicable: true
-        description:
-          zh: 摄入只交付规范 Document、其 DocumentMetadata 与去重判断；MemoryRecord 持久写入留给 memory-lifecycle。
-          en: Ingestion hands off only canonical Document, its DocumentMetadata, and a deduplication judgment; MemoryRecord persistence remains owned by memory-lifecycle.
-          ja: ingestionはcanonical Document・その DocumentMetadata・deduplication judgmentだけをhandoffしMemoryRecord永続writeは memory-lifecycle 所有とします。
-        family_concept_ids:
-          - Document
-          - DocumentMetadata
-          - DeduplicationDecision
-        relation_ids:
-          - NormalizationActivity-produces-Document
-          - document_has_document_metadata
-          - DeduplicationActivity-produces-DeduplicationDecision
-        not_applicable_reason: null
-      failure:
-        applicable: true
-        description:
-          zh: 记忆接入的失败概念族为错误事件；责任交接由已接受事实 摄入运行 —may_emit→ 错误事件 (IngestionRun-may_emit-ErrorEvent) 明确给出。
-          en: The failure families for Memory ingestion are error event; the accepted facts ingestion run —may_emit→ error event (IngestionRun-may_emit-ErrorEvent) make the responsibility handoff explicit.
-          ja: 記憶取り込みの失敗概念族はエラーイベントです。責任の受け渡しは承認済み事実 取込実行 —may_emit→ エラーイベント (IngestionRun-may_emit-ErrorEvent) により明示されます。
-        family_concept_ids:
-          - ErrorEvent
-        relation_ids:
-          - IngestionRun-may_emit-ErrorEvent
-        not_applicable_reason: null
-      recovery:
-        applicable: false
-        description: null
-        family_concept_ids: []
-        relation_ids: []
-        not_applicable_reason:
-          zh: 接入本体不启动恢复流程；下游若需重试或回滚，应引用 IngestionRun、ErrorEvent、SourceAttachment、Document 和 DeduplicationDecision 的确切身份，而不把恢复活动并入接入层级。
-          en: The ingestion ontology does not initiate recovery; downstream retry or rollback should reference exact IngestionRun, ErrorEvent, SourceAttachment, Document, and DeduplicationDecision identities without folding recovery activity into the ingestion hierarchy.
-          ja: ingestion ontologyはrecoveryを開始しません。下流のretry／rollbackは IngestionRun・ErrorEvent・SourceAttachment・Document・DeduplicationDecision のexact identityを参照し、recovery activityをingestion階層へ混在させません。
-    review:
-      review_status: accepted
-      reviewers:
-        - reviewer_id: moonweave-memory-domain-reviewer
-          reviewer_role: domain
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 接入读取 Resource、使用 Loader、规范化 Information，并交付 Document、DocumentMetadata 与 DeduplicationDecision；MemoryRecord 持久写入明确留给 lifecycle。
-            en: Ingestion reads Resource, uses Loader, normalizes Information, and hands off Document, DocumentMetadata, and DeduplicationDecision; MemoryRecord persistence is explicitly left to lifecycle.
-            ja: ingestionはResourceをreadしLoaderをuseしInformationをnormalizeして Document・DocumentMetadata・DeduplicationDecisionをhandoffし、MemoryRecord永続writeはlifecycleへ明示的に残します。
-        - reviewer_id: moonweave-ontology-structure-reviewer
-          reviewer_role: ontology
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 接入读取 Resource、使用 Loader、规范化 Information，并交付 Document、DocumentMetadata 与 DeduplicationDecision；MemoryRecord 持久写入明确留给 lifecycle。
-            en: Ingestion reads Resource, uses Loader, normalizes Information, and hands off Document, DocumentMetadata, and DeduplicationDecision; MemoryRecord persistence is explicitly left to lifecycle.
-            ja: ingestionはResourceをreadしLoaderをuseしInformationをnormalizeして Document・DocumentMetadata・DeduplicationDecisionをhandoffし、MemoryRecord永続writeはlifecycleへ明示的に残します。
-  taxonomy_contract:
-    applicability: mixed-backbone
-    not_applicable_reason: null
-    hierarchy_policy: arbitrary-depth-reviewed-backbone
-    key_root_concept_ids:
-      - IngestionActivity
-      - IngestibleResource
-      - IngestionPolicy
-    allowed_backbone_predicates:
-      - consumes
-      - contains
-      - document_has_document_metadata
-      - has_table
-      - has_source_attachment
-      - is_a
-      - produces
-      - uses
-    flat_root_exception_concept_ids: []
-    review:
-      review_status: accepted
-      reviewers:
-        - reviewer_id: moonweave-memory-domain-reviewer
-          reviewer_role: domain
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 逐项核验后保留六种互不混同的上位身份，但不把它们都伪装成图根：IngestionActivity 是模块关键根；IngestibleResource 与 IngestionPolicy 是不依附其他主干的结构根；IngestibleCollection、DocumentLoader 与 IngestibleInformation 分别由 IngestionRun 的 consumes/uses 和 NormalizationActivity 的 consumes 进入主干。DeduplicationDecision 由 DeduplicationActivity 首次产生，也不是新的平级根。
-            en: Point-by-point review retains six non-interchangeable upper identities without pretending that all are graph roots. IngestionActivity is the module key root; IngestibleResource and IngestionPolicy are independent composition roots; IngestibleCollection, DocumentLoader, and IngestibleInformation enter the backbone through IngestionRun consumes or uses and NormalizationActivity consumes, respectively. DeduplicationDecision is first produced by DeduplicationActivity and is not another peer root.
-            ja: 個別審査後も六つの相互非同一な upper identity を保ちますが、すべてを graph root には見せません。IngestionActivity は module key root、IngestibleResource と IngestionPolicy は独立 composition root です。IngestibleCollection・DocumentLoader・IngestibleInformation はそれぞれ IngestionRun の consumes/uses と NormalizationActivity の consumes で backbone に入ります。DeduplicationDecision は DeduplicationActivity が初めて生成し、新たな同列 root ではありません。
-        - reviewer_id: moonweave-ontology-structure-reviewer
-          reviewer_role: ontology
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 本体审查确认 root_status 与显示主干承担不同但一致的职责：IngestionActivity、IngestibleResource、IngestionPolicy 保持三个真实入口；consumes 与 uses 只把集合、内容和加载能力组织进摄入流程，不产生 is_a 含义或 owner 转移。reads 与 governed_by 保持横向治理事实；Document 通过 has_source_attachment 组成版本固定的 SourceAttachment，再以 describes 指向独立资源。
-            en: Ontology review confirms distinct but consistent roles for root_status and the display backbone. IngestionActivity, IngestibleResource, and IngestionPolicy remain three true entry points; consumes and uses organize collections, information, and loader capability into the ingestion flow without implying is_a or transferring ownership. reads and governed_by remain lateral governance facts. Document composes a version-pinned SourceAttachment through has_source_attachment, which then points to the independent resource through describes.
-            ja: 本体審査は root_status と display backbone が別々だが整合する役割を持つと確認しました。IngestionActivity・IngestibleResource・IngestionPolicy は三つの真正 entry point を保ち、consumes/uses は collection・information・loader capability を ingestion flow に組織するだけで is_a 意味も owner 移転も生じません。reads/governed_by は横断 governance fact のままです。Document は has_source_attachment で version-pinned SourceAttachment を構成し、describes で independent resource を指します。
+        description: "Normalized Document objects with content and metadata"
+        reference_api: "list[Document(page_content: str, metadata: dict)]"
   competency_questions:
-    - id: memory-ingestion-cq-loader-selection-v3
-      semantic_key: memory-ingestion.loader-selection
-      primary_owner_module_id: memory-ingestion
-      related_module_ids: []
-      questions:
-        zh: 一次摄入运行读取哪个来源、使用哪个加载器并由哪个规范化阶段产生文档？
-        en: Which source did an ingestion run read, which loader did it use, and which normalization phase produced the document?
-        ja: 取込runはどのsourceをreadしどのloaderを使いどのnormalization phaseがdocumentを生成しましたか。
-      query: Trace IngestionRun to the source resource and loader, then through its NormalizationActivity to the generated Document.
-      expected_assertion: The source version, compatible loader version, phase membership, and generated document all form one accepted chain.
-      evidence_binding:
-        applicability: owner-only
-        owner_concept_ids:
-          - IngestionRun
-          - IngestibleResource
-          - DocumentLoader
-          - NormalizationActivity
-          - Document
-        related_concept_ids: []
-        relation_ids: []
-        not_applicable_reason:
-          zh: 来源资源、加载能力、摄入运行、规范化阶段和 Document 都由摄入模块拥有；本查询不依赖信息来源模块中的另一概念。
-          en: The source resource, loader capability, ingestion run, normalization phase, and Document are all owned by ingestion; this query does not depend on another concept from the information-source module.
-          ja: source resource・loader capability・ingestion run・normalization phase・Documentはすべてingestion moduleが所有し、information-source moduleの別概念に依存しません。
-      positive_example_ids:
-        - memory-ingestion-cq-loader-selection-v3-example-positive
-      counterexample_ids:
-        - memory-ingestion-cq-loader-selection-v3-example-counter
-      source_claims:
-        - claim-memory-ingestion-011
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 该 CQ 已按可执行关系链重新绑定，不再依靠概念并列或边界对照。
-              en: This CQ was rebound to an executable relation chain rather than concept juxtaposition or boundary comparison.
-              ja: このCQは概念並置や境界比較でなく実行可能relation chainへ再bindingしました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 证据链由已接受关系 IngestionRun-reads-IngestibleResource、IngestionRun-uses-DocumentLoader、IngestionRun-has_phase-NormalizationActivity、NormalizationActivity-produces-Document 构成。
-              en: The evidence chain consists of accepted relations IngestionRun-reads-IngestibleResource, IngestionRun-uses-DocumentLoader, IngestionRun-has_phase-NormalizationActivity, NormalizationActivity-produces-Document.
-              ja: evidence chainは承認済みrelation IngestionRun-reads-IngestibleResource、IngestionRun-uses-DocumentLoader、IngestionRun-has_phase-NormalizationActivity、NormalizationActivity-produces-Document で構成されます。
-    - id: memory-ingestion-cq-deduplication-decision-v3
-      semantic_key: memory-ingestion.deduplication-decision
-      primary_owner_module_id: memory-ingestion
-      related_module_ids: []
-      questions:
-        zh: 规范化文档经过哪次去重比较，决定关于哪个版本且结果是什么？
-        en: Which deduplication comparison examined a normalized document, which version is the decision about, and what was the outcome?
-        ja: normalized documentはどのdedup比較を受けdecisionはどの版について何outcomeですか。
-      query: Follow normalization output into the ordered DeduplicationActivity and resolve its DeduplicationDecision plus about-Document binding.
-      expected_assertion: The compared document version, comparison phase, evidence digests, and outcome are bound without any pseudo-event or direct MemoryWrite edge.
-      evidence_binding:
-        applicability: owner-only
-        owner_concept_ids:
-          - NormalizationActivity
-          - Document
-          - DeduplicationActivity
-          - DeduplicationDecision
-        related_concept_ids: []
-        relation_ids: []
-        not_applicable_reason:
-          zh: 规范化输出、Document、DeduplicationActivity 与 DeduplicationDecision 均为域内事实；内部解析必须沿 DeduplicationActivity-produces-DeduplicationDecision 核实新判断记录。owner-only 契约不重复列内部关系，且不建立到 MemoryWrite 的伪边。
-          en: Normalization output, Document, DeduplicationActivity, and DeduplicationDecision are all domain-internal facts; internal resolution must verify a new decision record through DeduplicationActivity-produces-DeduplicationDecision. The owner-only contract does not duplicate internal relation IDs and does not invent a MemoryWrite edge.
-          ja: normalization output・Document・DeduplicationActivity・DeduplicationDecision は domain 内 fact で、内部解析は DeduplicationActivity-produces-DeduplicationDecision で新判断記録を検証します。owner-only 契約は内部 relation ID を重複せず MemoryWrite への擬似 edge も作りません。
-      positive_example_ids:
-        - memory-ingestion-cq-deduplication-decision-v3-example-positive
-      counterexample_ids:
-        - memory-ingestion-cq-deduplication-decision-v3-example-counter
-      source_claims:
-        - claim-memory-ingestion-012
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 该 CQ 已按可执行关系链重新绑定，不再依靠概念并列或边界对照。
-              en: This CQ was rebound to an executable relation chain rather than concept juxtaposition or boundary comparison.
-              ja: このCQは概念並置や境界比較でなく実行可能relation chainへ再bindingしました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 证据链由已接受关系 NormalizationActivity-produces-Document、NormalizationActivity-precedes-DeduplicationActivity、DeduplicationActivity-consumes-Document、DeduplicationActivity-produces-DeduplicationDecision、DeduplicationDecision-about-Document 构成。
-              en: The evidence chain consists of accepted relations NormalizationActivity-produces-Document, NormalizationActivity-precedes-DeduplicationActivity, DeduplicationActivity-consumes-Document, DeduplicationActivity-produces-DeduplicationDecision, DeduplicationDecision-about-Document.
-              ja: evidence chainは承認済みrelation NormalizationActivity-produces-Document、NormalizationActivity-precedes-DeduplicationActivity、DeduplicationActivity-consumes-Document、DeduplicationActivity-produces-DeduplicationDecision、DeduplicationDecision-about-Document で構成されます。
-    - id: memory-ingestion-cq-provenance-chain-v3
-      semantic_key: memory-ingestion.provenance-chain
-      primary_owner_module_id: memory-ingestion
-      related_module_ids: []
-      questions:
-        zh: 一份文档通过哪条附件证据追溯到哪个来源资源与版本？
-        en: Through which attachment evidence does a document trace to which source resource and version?
-        ja: documentはどのattachment evidenceを通じどのsource resource・版へ追跡できますか。
-      query: Walk from Document to SourceAttachment and its described IngestibleResource, then verify that the run read that same source version.
-      expected_assertion: Document, attachment, resource, and ingestion-run manifest agree separately on resource identity, logical version reference, and content digest.
-      evidence_binding:
-        applicability: owner-only
-        owner_concept_ids:
-          - Document
-          - SourceAttachment
-          - IngestibleResource
-          - IngestionRun
-        related_concept_ids: []
-        relation_ids: []
-        not_applicable_reason:
-          zh: Document、SourceAttachment、IngestibleResource 与 IngestionRun 共同构成本模块内部的来源链；分块模块不拥有这些端点。
-          en: Document, SourceAttachment, IngestibleResource, and IngestionRun form an internal ingestion provenance chain; the chunking module owns none of these endpoints.
-          ja: Document・SourceAttachment・IngestibleResource・IngestionRunはingestion内部のprovenance chainを構成し、chunking moduleはこれらendpointを所有しません。
-      positive_example_ids:
-        - memory-ingestion-cq-provenance-chain-v3-example-positive
-      counterexample_ids:
-        - memory-ingestion-cq-provenance-chain-v3-example-counter
-      source_claims:
-        - claim-memory-ingestion-013
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 该 CQ 已按可执行关系链重新绑定，不再依靠概念并列或边界对照。
-              en: This CQ was rebound to an executable relation chain rather than concept juxtaposition or boundary comparison.
-              ja: このCQは概念並置や境界比較でなく実行可能relation chainへ再bindingしました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 证据链由已接受关系 Document-has_source_attachment-SourceAttachment、SourceAttachment-describes-IngestibleResource、IngestionRun-reads-IngestibleResource、NormalizationActivity-produces-Document 构成。
-              en: The evidence chain consists of accepted relations Document-has_source_attachment-SourceAttachment, SourceAttachment-describes-IngestibleResource, IngestionRun-reads-IngestibleResource, and NormalizationActivity-produces-Document.
-              ja: evidence chain は accepted relation Document-has_source_attachment-SourceAttachment・SourceAttachment-describes-IngestibleResource・IngestionRun-reads-IngestibleResource・NormalizationActivity-produces-Document で構成されます。
-  key_notion:
-    zh: 外部资源接入
-    en: Ingestion run
-    ja: 取込run
-  owns_when:
-    zh: 当对象是可被加载器读取的外部资源实体、接入政策、完整接入运行或其规范化/去重阶段，以及这些阶段产生的 Document、Metadata、SourceAttachment 或 DeduplicationDecision 时，由本模块拥有。
-    en: Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.
-    ja: external resource／read済みinformation、loader／ingestion policy、complete run／local phase、またはphase生成 Document・Metadata・Attachment・DeduplicationDecisionで複合同一性が決まる対象を本moduleが所有します。
-  references_when:
-    zh: 来源本体拥有稳定 SourceReference；分块本体拥有 Chunk/ChunkingRun；生命周期与存储本体拥有 MemoryWrite、MemoryRecord 和 MemoryStore，接入模块不保留直接写边。
-    en: Source ontology owns stable SourceReference; chunking owns Chunk and ChunkingRun; lifecycle and storage own MemoryWrite, MemoryRecord, and MemoryStore, and ingestion retains no direct write edge.
-    ja: source ontologyはstable SourceReference、chunkingは Chunk／ChunkingRun、lifecycle／storageは MemoryWrite・MemoryRecord・MemoryStoreを所有し、ingestionは直接write edgeを保持しません。
-  boundary_decisions:
-    - other_module_id: info-storage-sources
-      subject_concept_ids:
-        - TextDocumentReference
-      decision: references
-      owner_module_id: info-storage-sources
-      rationale:
-        zh: TextDocumentReference 只负责跨阶段稳定定位文档并归 info-storage-sources；接入本体拥有引用所指向的规范 TextDocument。
-        en: TextDocumentReference only provides stable cross-stage document location and belongs to info-storage-sources; ingestion owns the normalized TextDocument it refers to.
-        ja: TextDocumentReference は段階横断の安定document定位だけを担い info-storage-sources に属し、ingestionは参照先の正規 TextDocument を所有します。
-      relation_ids:
-        - TextDocumentReference-refers_to-TextDocument
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-ingestion-014
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: TextDocumentReference 只负责跨阶段稳定定位文档并归 info-storage-sources；接入本体拥有引用所指向的规范 TextDocument。
-              en: TextDocumentReference only provides stable cross-stage document location and belongs to info-storage-sources; ingestion owns the normalized TextDocument it refers to.
-              ja: TextDocumentReference は段階横断の安定document定位だけを担い info-storage-sources に属し、ingestionは参照先の正規 TextDocument を所有します。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: TextDocumentReference 只负责跨阶段稳定定位文档并归 info-storage-sources；接入本体拥有引用所指向的规范 TextDocument。
-              en: TextDocumentReference only provides stable cross-stage document location and belongs to info-storage-sources; ingestion owns the normalized TextDocument it refers to.
-              ja: TextDocumentReference は段階横断の安定document定位だけを担い info-storage-sources に属し、ingestionは参照先の正規 TextDocument を所有します。
-    - other_module_id: info-storage-sources
-      subject_concept_ids:
-        - TextDocument
-      decision: owns
-      owner_module_id: memory-ingestion
-      rationale:
-        zh: TextDocument 的身份包含规范化内容摘要、字符集与语言，是接入结果；稳定定位它的 TextDocumentReference 仍由来源与定位拥有。
-        en: TextDocument identity includes normalized content digest, charset, and language and is an ingestion result; its stable TextDocumentReference remains owned by sources and locations.
-        ja: TextDocument同一性は正規化content digest・charset・languageを含むingestion結果で、安定定位する TextDocumentReference はsources/locationsが所有します。
-      relation_ids:
-        - TextDocumentReference-refers_to-TextDocument
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-ingestion-015
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: TextDocument 的身份包含规范化内容摘要、字符集与语言，是接入结果；稳定定位它的 TextDocumentReference 仍由来源与定位拥有。
-              en: TextDocument identity includes normalized content digest, charset, and language and is an ingestion result; its stable TextDocumentReference remains owned by sources and locations.
-              ja: TextDocument同一性は正規化content digest・charset・languageを含むingestion結果で、安定定位する TextDocumentReference はsources/locationsが所有します。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: TextDocument 的身份包含规范化内容摘要、字符集与语言，是接入结果；稳定定位它的 TextDocumentReference 仍由来源与定位拥有。
-              en: TextDocument identity includes normalized content digest, charset, and language and is an ingestion result; its stable TextDocumentReference remains owned by sources and locations.
-              ja: TextDocument同一性は正規化content digest・charset・languageを含むingestion結果で、安定定位する TextDocumentReference はsources/locationsが所有します。
-    - other_module_id: memory-stores-scopes
-      subject_concept_ids:
-        - IngestionRun
-      decision: owns
-      owner_module_id: memory-ingestion
-      rationale:
-        zh: IngestionRun 的身份来自来源清单、加载器、政策与有序阶段，归接入；它不因下游可能持久化结果而成为存储或生命周期活动。
-        en: IngestionRun identity comes from source manifest, loader, policy, and ordered phases and belongs to ingestion; downstream persistence does not make it a store or lifecycle activity.
-        ja: IngestionRun同一性はsource manifest・loader・policy・ordered phaseから成りingestionに属し、下流永続化でstore／lifecycle activityにはなりません。
-      relation_ids: []
-      relation_not_applicable_reason:
-        zh: IngestionRun 只交付 Document/Metadata/Decision；到 MemoryStore 的持久写入由 memory-lifecycle 承接，因此不保留直接跨域写边。
-        en: IngestionRun only hands off Document, Metadata, and Decision; memory-lifecycle performs persistence to MemoryStore, so no direct cross-domain write edge is retained.
-        ja: IngestionRunは Document／Metadata／Decisionだけをhandoffし、MemoryStoreへの永続writeは memory-lifecycle が担うため直接cross-domain write edgeを保持しません。
-      source_claims:
-        - claim-memory-ingestion-016
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: IngestionRun 的身份来自来源清单、加载器、政策与有序阶段，归接入；它不因下游可能持久化结果而成为存储或生命周期活动。
-              en: IngestionRun identity comes from source manifest, loader, policy, and ordered phases and belongs to ingestion; downstream persistence does not make it a store or lifecycle activity.
-              ja: IngestionRun同一性はsource manifest・loader・policy・ordered phaseから成りingestionに属し、下流永続化でstore／lifecycle activityにはなりません。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: IngestionRun 的身份来自来源清单、加载器、政策与有序阶段，归接入；它不因下游可能持久化结果而成为存储或生命周期活动。
-              en: IngestionRun identity comes from source manifest, loader, policy, and ordered phases and belongs to ingestion; downstream persistence does not make it a store or lifecycle activity.
-              ja: IngestionRun同一性はsource manifest・loader・policy・ordered phaseから成りingestionに属し、下流永続化でstore／lifecycle activityにはなりません。
-    - other_module_id: memory-stores-scopes
-      subject_concept_ids:
-        - MemoryRecord
-        - MemoryStore
-      decision: references
-      owner_module_id: memory-stores-scopes
-      rationale:
-        zh: MemoryRecord 与 MemoryStore 的身份、scope、namespace、retention 和写操作归存储/生命周期；接入仅交付其可消费的 Document 与决定。
-        en: MemoryRecord and MemoryStore identity, scope, namespace, retention, and writes belong to stores or lifecycle; ingestion only hands off consumable Document and decisions.
-        ja: MemoryRecord／MemoryStore同一性・scope・namespace・retention・writeはstore／lifecycleに属し、ingestionは消費可能 Document とdecisionだけをhandoffします。
-      relation_ids: []
-      relation_not_applicable_reason:
-        zh: 接入输出与持久存储之间必须经过 memory-lifecycle 的 MemoryWrite/MemoryOperation，不能由接入模块伪造直接写边。
-        en: Persistence between ingestion output and storage must pass through memory-lifecycle MemoryWrite or MemoryOperation; ingestion must not invent a direct write edge.
-        ja: ingestion outputとstorage間の永続化は memory-lifecycle の MemoryWrite／MemoryOperationを通り、ingestionは直接write edgeを作りません。
-      source_claims:
-        - claim-memory-ingestion-017
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: MemoryRecord 与 MemoryStore 的身份、scope、namespace、retention 和写操作归存储/生命周期；接入仅交付其可消费的 Document 与决定。
-              en: MemoryRecord and MemoryStore identity, scope, namespace, retention, and writes belong to stores or lifecycle; ingestion only hands off consumable Document and decisions.
-              ja: MemoryRecord／MemoryStore同一性・scope・namespace・retention・writeはstore／lifecycleに属し、ingestionは消費可能 Document とdecisionだけをhandoffします。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: MemoryRecord 与 MemoryStore 的身份、scope、namespace、retention 和写操作归存储/生命周期；接入仅交付其可消费的 Document 与决定。
-              en: MemoryRecord and MemoryStore identity, scope, namespace, retention, and writes belong to stores or lifecycle; ingestion only hands off consumable Document and decisions.
-              ja: MemoryRecord／MemoryStore同一性・scope・namespace・retention・writeはstore／lifecycleに属し、ingestionは消費可能 Document とdecisionだけをhandoffします。
-    - other_module_id: memory-chunking-situating
-      subject_concept_ids:
-        - Chunk
-        - ChunkingRun
-      decision: references
-      owner_module_id: memory-chunking-situating
-      rationale:
-        zh: Chunk 与 ChunkingRun 的身份由文档范围、分块策略和派生运行决定，归分块与语境化；接入只提供其输入 Document。
-        en: Chunk and ChunkingRun identity is determined by document range, chunking policy, and derivation run and belongs to chunking and situating; ingestion only supplies their Document input.
-        ja: Chunk／ChunkingRun同一性はdocument range・chunking policy・derivation runで決まりchunking/situatingに属し、ingestionは入力 Document だけを提供します。
-      relation_ids:
-        - chunk_derived_from_document
-        - ChunkingRun-consumes-Document
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-ingestion-018
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: Chunk 与 ChunkingRun 的身份由文档范围、分块策略和派生运行决定，归分块与语境化；接入只提供其输入 Document。
-              en: Chunk and ChunkingRun identity is determined by document range, chunking policy, and derivation run and belongs to chunking and situating; ingestion only supplies their Document input.
-              ja: Chunk／ChunkingRun同一性はdocument range・chunking policy・derivation runで決まりchunking/situatingに属し、ingestionは入力 Document だけを提供します。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: Chunk 与 ChunkingRun 的身份由文档范围、分块策略和派生运行决定，归分块与语境化；接入只提供其输入 Document。
-              en: Chunk and ChunkingRun identity is determined by document range, chunking policy, and derivation run and belongs to chunking and situating; ingestion only supplies their Document input.
-              ja: Chunk／ChunkingRun同一性はdocument range・chunking policy・derivation runで決まりchunking/situatingに属し、ingestionは入力 Document だけを提供します。
-    - other_module_id: memory-chunking-situating
-      subject_concept_ids:
-        - Document
-      decision: owns
-      owner_module_id: memory-ingestion
-      rationale:
-        zh: Document 是规范化接入输出并保留来源摘要，归接入；下游 ChunkingRun 消费它但不接管文档身份。
-        en: Document is normalized ingestion output with source digest and belongs to ingestion; downstream ChunkingRun consumes it without taking over document identity.
-        ja: Documentはsource digestを保持する正規ingestion outputでingestionに属し、下流 ChunkingRun が消費してもdocument同一性を引き継ぎません。
-      relation_ids:
-        - chunk_derived_from_document
-        - ChunkingRun-consumes-Document
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-ingestion-019
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: Document 是规范化接入输出并保留来源摘要，归接入；下游 ChunkingRun 消费它但不接管文档身份。
-              en: Document is normalized ingestion output with source digest and belongs to ingestion; downstream ChunkingRun consumes it without taking over document identity.
-              ja: Documentはsource digestを保持する正規ingestion outputでingestionに属し、下流 ChunkingRun が消費してもdocument同一性を引き継ぎません。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: Document 是规范化接入输出并保留来源摘要，归接入；下游 ChunkingRun 消费它但不接管文档身份。
-              en: Document is normalized ingestion output with source digest and belongs to ingestion; downstream ChunkingRun consumes it without taking over document identity.
-              ja: Documentはsource digestを保持する正規ingestion outputでingestionに属し、下流 ChunkingRun が消費してもdocument同一性を引き継ぎません。
-  overlap_checks:
-    - other_module_id: info-storage-sources
-      semantic_area:
-        zh: 接入对象与来源引用
-        en: Ingested objects versus source references
-        ja: 取込対象と出典参照
-      candidate_concept_ids:
-        - TextDocument
-      overlap_reason:
-        zh: 两者都记录来源身份，但接入对象具有 Loader、接入结果和持久处理生命周期，来源引用只负责定位。 本条仅记录 TextDocument；其 canonical owner 是记忆接入（memory-ingestion），因此 memory-ingestion 在此拥有这些概念。
-        en: Both record source identity, but an ingested object has a Loader, ingestion result, and processing lifecycle while a source reference only locates. This record is limited to TextDocument; their canonical owner is Memory ingestion (memory-ingestion), so memory-ingestion owns these concepts here.
-        ja: どちらも出典同一性を記録しますが、取込対象は Loader、取込結果、処理ライフサイクルを持ち、出典参照は位置付けだけを担います。 この記録は TextDocument だけを対象とし、canonical owner は記憶取り込み（memory-ingestion）です。したがって memory-ingestion はここでこれらを所有します。
-      disambiguation_test:
-        zh: 若对象未经过载入也能完整存在，则归来源与定位；若身份包含某次 Loader 运行或规范化结果，则归记忆接入。
-        en: If the object is complete without loading, it belongs to sources and locations; if identity includes a loader run or normalization result, it belongs to memory ingestion.
-        ja: 読込なしで完全に存在できれば出典と位置、同一性に Loader 実行または正規化結果を含むなら記憶取込に属します。
-      result: distinct
-      owner_module_id: memory-ingestion
-      source_claims:
-        - claim-memory-ingestion-020
-        - claim-memory-ingestion-021
-        - claim-memory-ingestion-022
-        - claim-memory-ingestion-023
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 由 URI/版本标识且可被读取者是资源；由内容摘要/字符集/语言标识且可被下游消费者是文档信息。
-              en: Identity by URI and version and being readable indicates a resource; identity by content digest, charset, and language and downstream consumability indicates document information.
-              ja: URI・版で識別されread可能ならresource、content digest・charset・languageで識別され下流消費可能ならdocument informationです。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 由 URI/版本标识且可被读取者是资源；由内容摘要/字符集/语言标识且可被下游消费者是文档信息。
-              en: Identity by URI and version and being readable indicates a resource; identity by content digest, charset, and language and downstream consumability indicates document information.
-              ja: URI・版で識別されread可能ならresource、content digest・charset・languageで識別され下流消費可能ならdocument informationです。
-    - other_module_id: info-storage-sources
-      semantic_area:
-        zh: 接入对象与来源引用
-        en: Ingested objects versus source references
-        ja: 取込対象と出典参照
-      candidate_concept_ids:
-        - TextDocumentReference
-      overlap_reason:
-        zh: 两者都记录来源身份，但接入对象具有 Loader、接入结果和持久处理生命周期，来源引用只负责定位。 本条仅记录 TextDocumentReference；其 canonical owner 是来源引用与核验（info-storage-sources），因此 memory-ingestion 在此引用这些概念。
-        en: Both record source identity, but an ingested object has a Loader, ingestion result, and processing lifecycle while a source reference only locates. This record is limited to TextDocumentReference; their canonical owner is Source references and verification (info-storage-sources), so memory-ingestion references these concepts here.
-        ja: どちらも出典同一性を記録しますが、取込対象は Loader、取込結果、処理ライフサイクルを持ち、出典参照は位置付けだけを担います。 この記録は TextDocumentReference だけを対象とし、canonical owner は出典参照と検証（info-storage-sources）です。したがって memory-ingestion はここでこれらを参照します。
-      disambiguation_test:
-        zh: 若对象未经过载入也能完整存在，则归来源与定位；若身份包含某次 Loader 运行或规范化结果，则归记忆接入。
-        en: If the object is complete without loading, it belongs to sources and locations; if identity includes a loader run or normalization result, it belongs to memory ingestion.
-        ja: 読込なしで完全に存在できれば出典と位置、同一性に Loader 実行または正規化結果を含むなら記憶取込に属します。
-      result: distinct
-      owner_module_id: info-storage-sources
-      source_claims:
-        - claim-memory-ingestion-024
-        - claim-memory-ingestion-025
-        - claim-memory-ingestion-026
-        - claim-memory-ingestion-027
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 由 URI/版本标识且可被读取者是资源；由内容摘要/字符集/语言标识且可被下游消费者是文档信息。
-              en: Identity by URI and version and being readable indicates a resource; identity by content digest, charset, and language and downstream consumability indicates document information.
-              ja: URI・版で識別されread可能ならresource、content digest・charset・languageで識別され下流消費可能ならdocument informationです。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 由 URI/版本标识且可被读取者是资源；由内容摘要/字符集/语言标识且可被下游消费者是文档信息。
-              en: Identity by URI and version and being readable indicates a resource; identity by content digest, charset, and language and downstream consumability indicates document information.
-              ja: URI・版で識別されread可能ならresource、content digest・charset・languageで識別され下流消費可能ならdocument informationです。
-    - other_module_id: memory-stores-scopes
-      semantic_area:
-        zh: 资源摄取活动与记忆持久容器
-        en: Resource-ingestion activity versus persistent memory container
-        ja: resource ingestion activity と persistent memory container
-      candidate_concept_ids:
-        - DocumentLoader
-      overlap_reason:
-        zh: 一次 IngestionRun 可写入不同 Store，Store 也可接收多次摄取和生命周期操作；加载过程不拥有存储保留策略。 本条仅记录 DocumentLoader；其 canonical owner 是记忆接入（memory-ingestion），因此 memory-ingestion 在此拥有这些概念。
-        en: One IngestionRun can write to different Stores and a Store can receive many ingestions and lifecycle operations; the loading process does not own retention policy. This record is limited to DocumentLoader; their canonical owner is Memory ingestion (memory-ingestion), so memory-ingestion owns these concepts here.
-        ja: 一 IngestionRun は複数 Store へ書け、Store は複数 ingestion/lifecycle operation を受け、loading process は retention policy を所有しません。 この記録は DocumentLoader だけを対象とし、canonical owner は記憶取り込み（memory-ingestion）です。したがって memory-ingestion はここでこれらを所有します。
-      disambiguation_test:
-        zh: 由 loader、policy、source attachment 和 ingestion run 识别的对象归摄取；由 store id、scope、namespace 和 retention 识别的对象归存储与作用域。
-        en: An object identified by loader, policy, source attachment, and ingestion run belongs to ingestion; one identified by store ID, scope, namespace, and retention belongs to stores and scopes.
-        ja: loader・policy・source attachment・ingestion run で識別されれば ingestion、store id・scope・namespace・retention で識別されれば store/scope に属します。
-      result: distinct
-      owner_module_id: memory-ingestion
-      source_claims:
-        - claim-memory-ingestion-028
-        - claim-memory-ingestion-029
-        - claim-memory-ingestion-030
-        - claim-memory-ingestion-031
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 由实现/版本/支持媒体标识者是 Loader；由定位符/版本/内容摘要标识者是 Resource。
-              en: Identity by implementation, version, and supported media is Loader; identity by locator, version, and content digest is Resource.
-              ja: implementation・版・supported mediaならLoader、locator・版・content digestならResourceです。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 由实现/版本/支持媒体标识者是 Loader；由定位符/版本/内容摘要标识者是 Resource。
-              en: Identity by implementation, version, and supported media is Loader; identity by locator, version, and content digest is Resource.
-              ja: implementation・版・supported mediaならLoader、locator・版・content digestならResourceです。
-    - other_module_id: memory-stores-scopes
-      semantic_area:
-        zh: 资源摄取活动与记忆持久容器
-        en: Resource-ingestion activity versus persistent memory container
-        ja: resource ingestion activity と persistent memory container
-      candidate_concept_ids:
-        - MemoryStore
-      overlap_reason:
-        zh: 一次 IngestionRun 可写入不同 Store，Store 也可接收多次摄取和生命周期操作；加载过程不拥有存储保留策略。 本条仅记录 MemoryStore；其 canonical owner 是记忆对象与存储（memory-stores-scopes），因此 memory-ingestion 在此引用这些概念。
-        en: One IngestionRun can write to different Stores and a Store can receive many ingestions and lifecycle operations; the loading process does not own retention policy. This record is limited to MemoryStore; their canonical owner is Memory objects and stores (memory-stores-scopes), so memory-ingestion references these concepts here.
-        ja: 一 IngestionRun は複数 Store へ書け、Store は複数 ingestion/lifecycle operation を受け、loading process は retention policy を所有しません。 この記録は MemoryStore だけを対象とし、canonical owner は記憶オブジェクトとストア（memory-stores-scopes）です。したがって memory-ingestion はここでこれらを参照します。
-      disambiguation_test:
-        zh: 由 loader、policy、source attachment 和 ingestion run 识别的对象归摄取；由 store id、scope、namespace 和 retention 识别的对象归存储与作用域。
-        en: An object identified by loader, policy, source attachment, and ingestion run belongs to ingestion; one identified by store ID, scope, namespace, and retention belongs to stores and scopes.
-        ja: loader・policy・source attachment・ingestion run で識別されれば ingestion、store id・scope・namespace・retention で識別されれば store/scope に属します。
-      result: distinct
-      owner_module_id: memory-stores-scopes
-      source_claims:
-        - claim-memory-ingestion-032
-        - claim-memory-ingestion-033
-        - claim-memory-ingestion-034
-        - claim-memory-ingestion-035
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 由实现/版本/支持媒体标识者是 Loader；由定位符/版本/内容摘要标识者是 Resource。
-              en: Identity by implementation, version, and supported media is Loader; identity by locator, version, and content digest is Resource.
-              ja: implementation・版・supported mediaならLoader、locator・版・content digestならResourceです。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 由实现/版本/支持媒体标识者是 Loader；由定位符/版本/内容摘要标识者是 Resource。
-              en: Identity by implementation, version, and supported media is Loader; identity by locator, version, and content digest is Resource.
-              ja: implementation・版・supported mediaならLoader、locator・版・content digestならResourceです。
-    - other_module_id: memory-chunking-situating
-      semantic_area:
-        zh: 文档摄取与文档分块
-        en: Document ingestion versus document chunking
-        ja: document ingestion と document chunking
-      candidate_concept_ids:
-        - Document
-      overlap_reason:
-        zh: Document 是分块输入并保留来源身份；Chunk 是由特定 ChunkingRun、range 和策略产生的派生对象。 本条仅记录 Document；其 canonical owner 是记忆接入（memory-ingestion），因此 memory-ingestion 在此拥有这些概念。
-        en: Document is chunking input and retains source identity; Chunk is a derived object produced by a specific ChunkingRun, range, and policy. This record is limited to Document; their canonical owner is Memory ingestion (memory-ingestion), so memory-ingestion owns these concepts here.
-        ja: Document は chunking input で source identity を保持し、Chunk は特定 ChunkingRun・range・policy により生成される derived object です。 この記録は Document だけを対象とし、canonical owner は記憶取り込み（memory-ingestion）です。したがって memory-ingestion はここでこれらを所有します。
-      disambiguation_test:
-        zh: 由外部资源、loader 和 normalization 识别的对象归摄取；由 document range、chunk sequence、overlap 或 situating run 识别的对象归分块与情境化。
-        en: An object identified by external resource, loader, and normalization belongs to ingestion; one identified by document range, chunk sequence, overlap, or situating run belongs to chunking and situating.
-        ja: external resource・loader・normalization で識別されれば ingestion、document range・chunk sequence・overlap・situating run で識別されれば chunking/situating に属します。
-      result: distinct
-      owner_module_id: memory-ingestion
-      source_claims:
-        - claim-memory-ingestion-036
-        - claim-memory-ingestion-037
-        - claim-memory-ingestion-038
-        - claim-memory-ingestion-039
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 资源能够独立存在并被多次读取；Document 必须有内容摘要和生成/规范化来源。
-              en: A resource can exist independently and be read many times; a Document must have content digest and generating or normalization provenance.
-              ja: resourceは独立存在し複数回readでき、Documentはcontent digestとgenerating／normalization来歴が必要です。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 资源能够独立存在并被多次读取；Document 必须有内容摘要和生成/规范化来源。
-              en: A resource can exist independently and be read many times; a Document must have content digest and generating or normalization provenance.
-              ja: resourceは独立存在し複数回readでき、Documentはcontent digestとgenerating／normalization来歴が必要です。
-    - other_module_id: memory-chunking-situating
-      semantic_area:
-        zh: 文档摄取与文档分块
-        en: Document ingestion versus document chunking
-        ja: document ingestion と document chunking
-      candidate_concept_ids:
-        - Chunk
-        - ChunkingRun
-      overlap_reason:
-        zh: Document 是分块输入并保留来源身份；Chunk 是由特定 ChunkingRun、range 和策略产生的派生对象。 本条仅记录 Chunk、ChunkingRun；其 canonical owner 是分块与语境化（memory-chunking-situating），因此 memory-ingestion 在此引用这些概念。
-        en: Document is chunking input and retains source identity; Chunk is a derived object produced by a specific ChunkingRun, range, and policy. This record is limited to Chunk, ChunkingRun; their canonical owner is Chunking and contextualization (memory-chunking-situating), so memory-ingestion references these concepts here.
-        ja: Document は chunking input で source identity を保持し、Chunk は特定 ChunkingRun・range・policy により生成される derived object です。 この記録は Chunk、ChunkingRun だけを対象とし、canonical owner はチャンク化と文脈化（memory-chunking-situating）です。したがって memory-ingestion はここでこれらを参照します。
-      disambiguation_test:
-        zh: 由外部资源、loader 和 normalization 识别的对象归摄取；由 document range、chunk sequence、overlap 或 situating run 识别的对象归分块与情境化。
-        en: An object identified by external resource, loader, and normalization belongs to ingestion; one identified by document range, chunk sequence, overlap, or situating run belongs to chunking and situating.
-        ja: external resource・loader・normalization で識別されれば ingestion、document range・chunk sequence・overlap・situating run で識別されれば chunking/situating に属します。
-      result: distinct
-      owner_module_id: memory-chunking-situating
-      source_claims:
-        - claim-memory-ingestion-040
-        - claim-memory-ingestion-041
-        - claim-memory-ingestion-042
-        - claim-memory-ingestion-043
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 资源能够独立存在并被多次读取；Document 必须有内容摘要和生成/规范化来源。
-              en: A resource can exist independently and be read many times; a Document must have content digest and generating or normalization provenance.
-              ja: resourceは独立存在し複数回readでき、Documentはcontent digestとgenerating／normalization来歴が必要です。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 资源能够独立存在并被多次读取；Document 必须有内容摘要和生成/规范化来源。
-              en: A resource can exist independently and be read many times; a Document must have content digest and generating or normalization provenance.
-              ja: resourceは独立存在し複数回readでき、Documentはcontent digestとgenerating／normalization来歴が必要です。
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-ingestion-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 Anthropic Contextual Retrieval、LangChain text splitters/document loaders、LlamaIndex node parsers/ingestion pipeline、Unstructured 解析模式与 ETL 去重策略逐项人工语义核验通过。
-    en: Manually verified against Anthropic Contextual Retrieval, LangChain text splitters and document loaders, LlamaIndex node parsers and ingestion pipeline, Unstructured parsing patterns, and ETL deduplication strategies.
-    ja: Anthropic Contextual Retrieval、LangChain text splitters/document loaders、LlamaIndex node parsers/ingestion pipeline、Unstructured 解析パターン、ETL 重複排除戦略に照らし手動意味審査を完了しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+    - id: cq-loader-selection
+      question:
+        en: How is the appropriate document loader selected for a given source?
+        zh: 如何为给定来源选择适当的文档加载器？
+      answer:
+        en: >
+          Selection is based on: (1) Source type—file extension for local files, content-type
+          header for URLs, connector type for APIs/databases. (2) Parsing needs—simple text
+          files use basic loaders; complex PDFs with tables need Unstructured.io or specialized
+          parsers. (3) Scale—individual files use synchronous loaders; large collections use
+          async batch loaders with progress tracking.
+    - id: cq-incremental-ingestion
+      question:
+        en: How does incremental ingestion avoid re-processing unchanged content?
+        zh: 增量摄入如何避免重新处理未变化的内容？
+      answer:
+        en: >
+          Track source fingerprints (content hash, last_modified timestamp, etag from HTTP).
+          On each ingestion run, compare current fingerprints against stored ones. Only process
+          sources where fingerprints differ. This maps to standard cache invalidation patterns
+          and is critical for production RAG systems processing thousands of documents.
+examples:
+  - id: memory-ingestion-module-positive
+
+    labels:
+      zh: 明确的文件摄入运行
+      en: Explicit file-ingestion run
+      ja: 明示的な file-ingestion run
+
+    descriptions:
+      zh: Generative Agents Memory Stream + Reflection；MemGPT core_memory_append/archival_memory_insert；Redis SET EX TTL + FT.SEARCH vector eviction。
+      en: Generative Agents Memory Stream + Reflection; MemGPT core_memory_append/archival_memory_insert; Redis SET EX TTL + FT.SEARCH vector eviction.
+      ja: Generative Agents Memory Stream + Reflection。MemGPT core_memory_append/archival_memory_insert。Redis SET EX TTL + vector eviction。
+    field_values: {module_id: memory-ingestion, ingestion_boundary: '{"resource":"file-policy-v7","loader":"pdf-loader-v3","run":"ingest-policy-17","document":"document-policy-v7"}'}
+    related_node_ids: [FileResource, DocumentLoader, IngestionRun, NormalizationActivity, Document]
+    related_relation_ids: [IngestionRun-reads-IngestibleResource, IngestionRun-uses-DocumentLoader, NormalizationActivity-produces-Document]
+
+    source_claims: [claim-ingestion-loader-boundary, claim-ingestion-source-lineage]
+  - id: memory-ingestion-module-boundary
+
+    labels:
+      zh: 文档交给分块处理
+      en: Document handed to chunking
+      ja: chunking に渡される Document
+
+    descriptions:
+      zh: MemGPT main_context vs archival vs recall 生命周期阶段；Generative Agents importance 累计 vs MemoryDecay recency 衰减。
+      en: MemGPT main_context vs archival vs recall lifecycle stages; Generative Agents importance accumulation vs MemoryDecay recency decay.
+      ja: MemGPT main/recall/archival lifecycle 段階。Generative Agents importance 累計 vs MemoryDecay recency 減衰。
+    field_values: {module_id: memory-ingestion, ingestion_boundary: '{"document":"document-policy-v7","downstream_activity":"ChunkingRun","ingestion_write":false}'}
+    related_node_ids: [Document, ChunkingRun, Chunk]
+    related_relation_ids: []
+
+    source_claims: [claim-ingestion-loader-boundary]
+  - id: memory-ingestion-module-counterexample
+
+    labels:
+      zh: 仅有地址和加载器配置
+      en: Locator and loader configuration only
+      ja: locator と loader configuration のみ
+
+    descriptions:
+      zh: 反例：ephemeral tool output 无 MemoryRetentionPolicy/Redis EX TTL 就永久 MemoryWrite。
+      en: Counterexample: ephemeral tool output MemoryWrite permanently without MemoryRetentionPolicy/Redis EX TTL.
+      ja: 反例：ephemeral tool output が MemoryRetentionPolicy/Redis EX TTL なしで永久 MemoryWrite。
+    field_values: {module_id: memory-ingestion, ingestion_boundary: '{"locator":"https://docs.example.com/guide","loader":"web-loader-v2","run":null,"document":null}'}
+    related_node_ids: [IngestibleResource, DocumentLoader, IngestionRun, Document]
+    related_relation_ids: []
+
+    source_claims: [claim-ingestion-loader-boundary]
+  - id: memory-ingestion-module-instance
+
+    labels:
+      zh: 实例：政策文档来源链
+      en: "Instance: policy-document source lineage"
+      ja: "事例: policy-document source lineage"
+
+    descriptions:
+      zh: MemGPT core_memory_replace(key="human", old="Bob", new="Alice")；Generative Agents reflection importance threshold=150 触发。
+      en: MemGPT core_memory_replace(key="human", old="Bob", new="Alice"); Generative Agents reflection importance threshold=150 triggers.
+      ja: MemGPT core_memory_replace。Generative Agents reflection importance threshold=150 トリガー。
+    field_values: {module_id: memory-ingestion, ingestion_boundary: '{"file":"file-policy-v7","run":"ingest-policy-17","document":"document-policy-v7","source_attachment":"source-policy-v7"}'}
+    related_node_ids: [FileResource, IngestionRun, Document, SourceAttachment, ChunkingRun]
+    related_relation_ids: [IngestionRun-reads-IngestibleResource, SourceAttachment-describes-IngestibleResource]
+
+    source_claims: [claim-ingestion-source-lineage, claim-ingestion-normalization]
+parent_relation: null
+relations: []
+sources:
+  - id: langchain-document-loaders
+    title: "LangChain Document Loaders"
+    url: https://docs.langchain.com/oss/python/langchain/document_loaders
+    source_type: official-documentation
+    relevance: >
+      Defines the BaseLoader interface and 100+ implementations for diverse source types,
+      establishing the standard pattern for document ingestion in RAG pipelines.
+  - id: llamaindex-loading
+    title: "LlamaIndex Data Loading"
+    url: https://docs.llamaindex.ai/en/stable/module_guides/loading/
+    source_type: official-documentation
+    relevance: >
+      Defines SimpleDirectoryReader, LlamaHub connectors, and the ingestion pipeline pattern
+      for loading, transforming, and indexing documents.
+  - id: unstructured-io
+    title: "Unstructured.io Documentation"
+    url: https://docs.unstructured.io/
+    source_type: official-documentation
+    relevance: >
+      Production document parsing across 20+ formats with structure-aware extraction,
+      handling complex layouts that simple parsers miss.
+  - id: firecrawl-docs
+    title: "Firecrawl Documentation"
+    url: https://docs.firecrawl.dev/
+    source_type: official-documentation
+    relevance: >
+      Web crawling optimized for LLM consumption, producing clean markdown from web pages
+      with metadata extraction and JavaScript rendering.
 source_claims:
-  - id: claim-memory-ingestion-001
-    source: eng-fw-langchain-document-loaders
-    supports: LangChain's current loader interface grounds reusable loader capability and source-to-Document behavior; Moonweave separately identifies run, phase, resource, and normalized information.
-    locator: Document loader integrations > Interface > BaseLoader load() and lazy_load() source-to-Document behavior
-    evidence_kind: design-inference
+  - id: claim-ingestion-loader-boundary
+    source: langchain-document-loaders
+    supports: >-
+      LangChain documents source-specific loaders that produce Documents through a common loading interface. Moonweave
+      represents the source resource, loader use, ingestion activity, and generated document separately so their
+      provenance can be inspected independently.
+    locator: Document loaders overview and common loading interface
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-002
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured's ordered ingestion flow grounds source indexing, download, partition, optional chunk or embed, staging, and destination boundaries; Moonweave stops ingestion ownership before memory persistence.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
+  - id: claim-ingestion-normalization
+    source: unstructured-io
+    supports: >-
+      Unstructured documents extracting structured content from multiple file formats. Moonweave treats parsing and
+      normalization as explicit ingestion activities whose Document outputs remain distinct from their source resources.
+    locator: Unstructured parsing and partitioning documentation
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-003
-    source: eng-fw-llamaindex-ingestion-code
-    supports: LlamaIndex's IngestionPipeline grounds transformation sequencing and document-ID or hash duplicate and upsert decisions used by DeduplicationActivity and DeduplicationDecision.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
+  - id: claim-ingestion-source-lineage
+    source: llamaindex-loading
+    supports: >-
+      LlamaIndex documents loading source data into document and node forms with retained metadata. Moonweave uses
+      FileResource, IngestibleResource, SourceAttachment, and Document nodes to retain source lineage before chunking.
+    locator: LlamaIndex data loading guide
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-004
-    source: eng-api-openai-vector-store-files
-    supports: OpenAI vector-store file records ground attachment identity, file reference, processing status, errors, attributes, parsed content, and deletion used for SourceAttachment provenance.
-    locator: Vector store files API > create and retrieve file; status, last_error, attributes, chunking_strategy, content, and delete
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-005
-    source: eng-fw-langchain-document-loaders
-    supports: LangChain BaseLoader documents concrete loader invocation and source-to-Document output; the example additionally binds phase membership explicitly.
-    locator: Document loader integrations > Interface > BaseLoader load() and lazy_load() source-to-Document behavior
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-006
-    source: eng-fw-langchain-document-loaders
-    supports: BaseLoader availability does not prove that a specific run invoked it or read a particular source.
-    locator: Document loader integrations > Interface > BaseLoader load() and lazy_load() source-to-Document behavior
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-007
-    source: eng-fw-llamaindex-ingestion-code
-    supports: LlamaIndex compares document IDs and hashes and distinguishes duplicate, changed, and deletion paths; this example preserves the comparison as an explicit decision record.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-008
-    source: eng-fw-llamaindex-ingestion-code
-    supports: LlamaIndex duplicate and upsert handling compares both document identity and hash, so a stale hash cannot support a current-version decision.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-009
-    source: eng-api-openai-vector-store-files
-    supports: OpenAI vector-store file records expose file identity, attachment status, parsed content, and errors; Moonweave uses the attachment as explicit provenance evidence.
-    locator: Vector store files API > create and retrieve file; status, last_error, attributes, chunking_strategy, content, and delete
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-010
-    source: eng-api-openai-vector-store-files
-    supports: Vector-store file identity and processing status are attached to a concrete underlying file; same-path replacement is not the same file version.
-    locator: Vector store files API > create and retrieve file; status, last_error, attributes, chunking_strategy, content, and delete
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-011
-    source: eng-fw-langchain-document-loaders
-    supports: LangChain defines loader capabilities and source-to-Document output; Unstructured supplies ordered ingestion stages.
-    locator: Document loader integrations > Interface > BaseLoader load() and lazy_load() source-to-Document behavior
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-012
-    source: eng-fw-llamaindex-ingestion-code
-    supports: LlamaIndex's current pipeline compares document IDs and hashes and branches into duplicate, update, and deletion behavior.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-013
-    source: eng-api-openai-vector-store-files
-    supports: OpenAI vector-store files expose attachment identity, source-file reference, processing state, parsed content, and deletion.
-    locator: Vector store files API > create and retrieve file; status, last_error, attributes, chunking_strategy, content, and delete
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-014
-    source: eng-fw-langchain-document-loaders
-    supports: LangChain loaders produce Document objects from sources; Moonweave keeps stable source-reference identity in the source-and-location owner.
-    locator: Document loader integrations > Interface > BaseLoader load() and lazy_load() source-to-Document behavior
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-015
-    source: eng-fw-langchain-document-loaders
-    supports: LangChain BaseLoader returns Document information after reading a configured source.
-    locator: Document loader integrations > Interface > BaseLoader load() and lazy_load() source-to-Document behavior
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-016
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured defines an ordered ingest flow with a destination-upload boundary; Moonweave stops ingestion ownership at canonical output handoff.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-017
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured separates source transformation from destination upload; Moonweave further assigns memory persistence to lifecycle and stores.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-018
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured lists partition and optional chunk as separate steps; Moonweave gives chunk identity and runs to the dedicated downstream module.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-019
-    source: eng-fw-langchain-document-loaders
-    supports: LangChain loaders return Document information, while downstream text splitters consume Documents to create chunks.
-    locator: Document loader integrations > Interface > BaseLoader load() and lazy_load() source-to-Document behavior
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-020
-    source: eng-fw-langchain-document-loaders
-    supports: Source eng-fw-langchain-document-loaders at Document loader integrations > Interface > BaseLoader load() and lazy_load() source-to-Document behavior supports operational notions used to compare memory-ingestion with info-storage-sources, including TextDocument. The source does not define Moonweave Modules memory-ingestion or info-storage-sources, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when "Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.", Moonweave applies the disambiguation test "If the object is complete without loading, it belongs to sources and locations; if identity includes a loader run or normalization result, it belongs to memory ingestion."; result=distinct and owner=memory-ingestion are a Moonweave design inference over the registered evidence.
-    locator: Document loader integrations > Interface > BaseLoader load() and lazy_load() source-to-Document behavior
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-021
-    source: eng-fw-unstructured-ingestion
-    supports: "Source eng-fw-unstructured-ingestion at Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload supports operational notions used to compare memory-ingestion with info-storage-sources, including TextDocument. The source does not define Moonweave Modules memory-ingestion or info-storage-sources, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when \"Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.\", Moonweave applies the disambiguation test \"If the object is complete without loading, it belongs to sources and locations; if identity includes a loader run or normalization result, it belongs to memory ingestion.\"; result=distinct and owner=memory-ingestion are a Moonweave design inference over the registered evidence."
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-022
-    source: eng-fw-llamaindex-ingestion-code
-    supports: Source eng-fw-llamaindex-ingestion-code at pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts supports operational notions used to compare memory-ingestion with info-storage-sources, including TextDocument. The source does not define Moonweave Modules memory-ingestion or info-storage-sources, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when "Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.", Moonweave applies the disambiguation test "If the object is complete without loading, it belongs to sources and locations; if identity includes a loader run or normalization result, it belongs to memory ingestion."; result=distinct and owner=memory-ingestion are a Moonweave design inference over the registered evidence.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-023
-    source: eng-api-openai-vector-store-files
-    supports: Source eng-api-openai-vector-store-files at Vector store files API > create and retrieve file; status, last_error, attributes, chunking_strategy, content, and delete supports operational notions used to compare memory-ingestion with info-storage-sources, including TextDocument. The source does not define Moonweave Modules memory-ingestion or info-storage-sources, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when "Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.", Moonweave applies the disambiguation test "If the object is complete without loading, it belongs to sources and locations; if identity includes a loader run or normalization result, it belongs to memory ingestion."; result=distinct and owner=memory-ingestion are a Moonweave design inference over the registered evidence.
-    locator: Vector store files API > create and retrieve file; status, last_error, attributes, chunking_strategy, content, and delete
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-024
-    source: eng-fw-langchain-document-loaders
-    supports: Source eng-fw-langchain-document-loaders at Document loader integrations > Interface > BaseLoader load() and lazy_load() source-to-Document behavior supports operational notions used to compare memory-ingestion with info-storage-sources, including TextDocumentReference. The source does not define Moonweave Modules memory-ingestion or info-storage-sources, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when "Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.", Moonweave applies the disambiguation test "If the object is complete without loading, it belongs to sources and locations; if identity includes a loader run or normalization result, it belongs to memory ingestion."; result=distinct and owner=info-storage-sources are a Moonweave design inference over the registered evidence.
-    locator: Document loader integrations > Interface > BaseLoader load() and lazy_load() source-to-Document behavior
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-025
-    source: eng-fw-unstructured-ingestion
-    supports: "Source eng-fw-unstructured-ingestion at Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload supports operational notions used to compare memory-ingestion with info-storage-sources, including TextDocumentReference. The source does not define Moonweave Modules memory-ingestion or info-storage-sources, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when \"Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.\", Moonweave applies the disambiguation test \"If the object is complete without loading, it belongs to sources and locations; if identity includes a loader run or normalization result, it belongs to memory ingestion.\"; result=distinct and owner=info-storage-sources are a Moonweave design inference over the registered evidence."
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-026
-    source: eng-fw-llamaindex-ingestion-code
-    supports: Source eng-fw-llamaindex-ingestion-code at pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts supports operational notions used to compare memory-ingestion with info-storage-sources, including TextDocumentReference. The source does not define Moonweave Modules memory-ingestion or info-storage-sources, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when "Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.", Moonweave applies the disambiguation test "If the object is complete without loading, it belongs to sources and locations; if identity includes a loader run or normalization result, it belongs to memory ingestion."; result=distinct and owner=info-storage-sources are a Moonweave design inference over the registered evidence.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-027
-    source: eng-api-openai-vector-store-files
-    supports: Source eng-api-openai-vector-store-files at Vector store files API > create and retrieve file; status, last_error, attributes, chunking_strategy, content, and delete supports operational notions used to compare memory-ingestion with info-storage-sources, including TextDocumentReference. The source does not define Moonweave Modules memory-ingestion or info-storage-sources, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when "Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.", Moonweave applies the disambiguation test "If the object is complete without loading, it belongs to sources and locations; if identity includes a loader run or normalization result, it belongs to memory ingestion."; result=distinct and owner=info-storage-sources are a Moonweave design inference over the registered evidence.
-    locator: Vector store files API > create and retrieve file; status, last_error, attributes, chunking_strategy, content, and delete
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-028
-    source: eng-fw-langchain-document-loaders
-    supports: Source eng-fw-langchain-document-loaders at Document loader integrations > Interface > BaseLoader load() and lazy_load() source-to-Document behavior supports operational notions used to compare memory-ingestion with memory-stores-scopes, including DocumentLoader. The source does not define Moonweave Modules memory-ingestion or memory-stores-scopes, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when "Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.", Moonweave applies the disambiguation test "An object identified by loader, policy, source attachment, and ingestion run belongs to ingestion; one identified by store ID, scope, namespace, and retention belongs to stores and scopes."; result=distinct and owner=memory-ingestion are a Moonweave design inference over the registered evidence.
-    locator: Document loader integrations > Interface > BaseLoader load() and lazy_load() source-to-Document behavior
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-029
-    source: eng-fw-unstructured-ingestion
-    supports: "Source eng-fw-unstructured-ingestion at Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload supports operational notions used to compare memory-ingestion with memory-stores-scopes, including DocumentLoader. The source does not define Moonweave Modules memory-ingestion or memory-stores-scopes, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when \"Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.\", Moonweave applies the disambiguation test \"An object identified by loader, policy, source attachment, and ingestion run belongs to ingestion; one identified by store ID, scope, namespace, and retention belongs to stores and scopes.\"; result=distinct and owner=memory-ingestion are a Moonweave design inference over the registered evidence."
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-030
-    source: eng-fw-llamaindex-ingestion-code
-    supports: Source eng-fw-llamaindex-ingestion-code at pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts supports operational notions used to compare memory-ingestion with memory-stores-scopes, including DocumentLoader. The source does not define Moonweave Modules memory-ingestion or memory-stores-scopes, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when "Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.", Moonweave applies the disambiguation test "An object identified by loader, policy, source attachment, and ingestion run belongs to ingestion; one identified by store ID, scope, namespace, and retention belongs to stores and scopes."; result=distinct and owner=memory-ingestion are a Moonweave design inference over the registered evidence.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-031
-    source: eng-api-openai-vector-store-files
-    supports: Source eng-api-openai-vector-store-files at Vector store files API > create and retrieve file; status, last_error, attributes, chunking_strategy, content, and delete supports operational notions used to compare memory-ingestion with memory-stores-scopes, including DocumentLoader. The source does not define Moonweave Modules memory-ingestion or memory-stores-scopes, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when "Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.", Moonweave applies the disambiguation test "An object identified by loader, policy, source attachment, and ingestion run belongs to ingestion; one identified by store ID, scope, namespace, and retention belongs to stores and scopes."; result=distinct and owner=memory-ingestion are a Moonweave design inference over the registered evidence.
-    locator: Vector store files API > create and retrieve file; status, last_error, attributes, chunking_strategy, content, and delete
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-032
-    source: eng-fw-langchain-document-loaders
-    supports: Source eng-fw-langchain-document-loaders at Document loader integrations > Interface > BaseLoader load() and lazy_load() source-to-Document behavior supports operational notions used to compare memory-ingestion with memory-stores-scopes, including MemoryStore. The source does not define Moonweave Modules memory-ingestion or memory-stores-scopes, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when "Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.", Moonweave applies the disambiguation test "An object identified by loader, policy, source attachment, and ingestion run belongs to ingestion; one identified by store ID, scope, namespace, and retention belongs to stores and scopes."; result=distinct and owner=memory-stores-scopes are a Moonweave design inference over the registered evidence.
-    locator: Document loader integrations > Interface > BaseLoader load() and lazy_load() source-to-Document behavior
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-033
-    source: eng-fw-unstructured-ingestion
-    supports: "Source eng-fw-unstructured-ingestion at Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload supports operational notions used to compare memory-ingestion with memory-stores-scopes, including MemoryStore. The source does not define Moonweave Modules memory-ingestion or memory-stores-scopes, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when \"Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.\", Moonweave applies the disambiguation test \"An object identified by loader, policy, source attachment, and ingestion run belongs to ingestion; one identified by store ID, scope, namespace, and retention belongs to stores and scopes.\"; result=distinct and owner=memory-stores-scopes are a Moonweave design inference over the registered evidence."
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-034
-    source: eng-fw-llamaindex-ingestion-code
-    supports: Source eng-fw-llamaindex-ingestion-code at pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts supports operational notions used to compare memory-ingestion with memory-stores-scopes, including MemoryStore. The source does not define Moonweave Modules memory-ingestion or memory-stores-scopes, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when "Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.", Moonweave applies the disambiguation test "An object identified by loader, policy, source attachment, and ingestion run belongs to ingestion; one identified by store ID, scope, namespace, and retention belongs to stores and scopes."; result=distinct and owner=memory-stores-scopes are a Moonweave design inference over the registered evidence.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-035
-    source: eng-api-openai-vector-store-files
-    supports: Source eng-api-openai-vector-store-files at Vector store files API > create and retrieve file; status, last_error, attributes, chunking_strategy, content, and delete supports operational notions used to compare memory-ingestion with memory-stores-scopes, including MemoryStore. The source does not define Moonweave Modules memory-ingestion or memory-stores-scopes, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when "Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.", Moonweave applies the disambiguation test "An object identified by loader, policy, source attachment, and ingestion run belongs to ingestion; one identified by store ID, scope, namespace, and retention belongs to stores and scopes."; result=distinct and owner=memory-stores-scopes are a Moonweave design inference over the registered evidence.
-    locator: Vector store files API > create and retrieve file; status, last_error, attributes, chunking_strategy, content, and delete
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-036
-    source: eng-fw-langchain-document-loaders
-    supports: Source eng-fw-langchain-document-loaders at Document loader integrations > Interface > BaseLoader load() and lazy_load() source-to-Document behavior supports operational notions used to compare memory-ingestion with memory-chunking-situating, including Document. The source does not define Moonweave Modules memory-ingestion or memory-chunking-situating, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when "Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.", Moonweave applies the disambiguation test "An object identified by external resource, loader, and normalization belongs to ingestion; one identified by document range, chunk sequence, overlap, or situating run belongs to chunking and situating."; result=distinct and owner=memory-ingestion are a Moonweave design inference over the registered evidence.
-    locator: Document loader integrations > Interface > BaseLoader load() and lazy_load() source-to-Document behavior
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-037
-    source: eng-fw-unstructured-ingestion
-    supports: "Source eng-fw-unstructured-ingestion at Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload supports operational notions used to compare memory-ingestion with memory-chunking-situating, including Document. The source does not define Moonweave Modules memory-ingestion or memory-chunking-situating, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when \"Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.\", Moonweave applies the disambiguation test \"An object identified by external resource, loader, and normalization belongs to ingestion; one identified by document range, chunk sequence, overlap, or situating run belongs to chunking and situating.\"; result=distinct and owner=memory-ingestion are a Moonweave design inference over the registered evidence."
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-038
-    source: eng-fw-llamaindex-ingestion-code
-    supports: Source eng-fw-llamaindex-ingestion-code at pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts supports operational notions used to compare memory-ingestion with memory-chunking-situating, including Document. The source does not define Moonweave Modules memory-ingestion or memory-chunking-situating, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when "Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.", Moonweave applies the disambiguation test "An object identified by external resource, loader, and normalization belongs to ingestion; one identified by document range, chunk sequence, overlap, or situating run belongs to chunking and situating."; result=distinct and owner=memory-ingestion are a Moonweave design inference over the registered evidence.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-039
-    source: eng-api-openai-vector-store-files
-    supports: Source eng-api-openai-vector-store-files at Vector store files API > create and retrieve file; status, last_error, attributes, chunking_strategy, content, and delete supports operational notions used to compare memory-ingestion with memory-chunking-situating, including Document. The source does not define Moonweave Modules memory-ingestion or memory-chunking-situating, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when "Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.", Moonweave applies the disambiguation test "An object identified by external resource, loader, and normalization belongs to ingestion; one identified by document range, chunk sequence, overlap, or situating run belongs to chunking and situating."; result=distinct and owner=memory-ingestion are a Moonweave design inference over the registered evidence.
-    locator: Vector store files API > create and retrieve file; status, last_error, attributes, chunking_strategy, content, and delete
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-040
-    source: eng-fw-langchain-document-loaders
-    supports: Source eng-fw-langchain-document-loaders at Document loader integrations > Interface > BaseLoader load() and lazy_load() source-to-Document behavior supports operational notions used to compare memory-ingestion with memory-chunking-situating, including Chunk, ChunkingRun. The source does not define Moonweave Modules memory-ingestion or memory-chunking-situating, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when "Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.", Moonweave applies the disambiguation test "An object identified by external resource, loader, and normalization belongs to ingestion; one identified by document range, chunk sequence, overlap, or situating run belongs to chunking and situating."; result=distinct and owner=memory-chunking-situating are a Moonweave design inference over the registered evidence.
-    locator: Document loader integrations > Interface > BaseLoader load() and lazy_load() source-to-Document behavior
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-041
-    source: eng-fw-unstructured-ingestion
-    supports: "Source eng-fw-unstructured-ingestion at Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload supports operational notions used to compare memory-ingestion with memory-chunking-situating, including Chunk, ChunkingRun. The source does not define Moonweave Modules memory-ingestion or memory-chunking-situating, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when \"Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.\", Moonweave applies the disambiguation test \"An object identified by external resource, loader, and normalization belongs to ingestion; one identified by document range, chunk sequence, overlap, or situating run belongs to chunking and situating.\"; result=distinct and owner=memory-chunking-situating are a Moonweave design inference over the registered evidence."
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-042
-    source: eng-fw-llamaindex-ingestion-code
-    supports: Source eng-fw-llamaindex-ingestion-code at pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts supports operational notions used to compare memory-ingestion with memory-chunking-situating, including Chunk, ChunkingRun. The source does not define Moonweave Modules memory-ingestion or memory-chunking-situating, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when "Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.", Moonweave applies the disambiguation test "An object identified by external resource, loader, and normalization belongs to ingestion; one identified by document range, chunk sequence, overlap, or situating run belongs to chunking and situating."; result=distinct and owner=memory-chunking-situating are a Moonweave design inference over the registered evidence.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-ingestion-043
-    source: eng-api-openai-vector-store-files
-    supports: Source eng-api-openai-vector-store-files at Vector store files API > create and retrieve file; status, last_error, attributes, chunking_strategy, content, and delete supports operational notions used to compare memory-ingestion with memory-chunking-situating, including Chunk, ChunkingRun. The source does not define Moonweave Modules memory-ingestion or memory-chunking-situating, their class or relation placement, or their ownership split. Under memory-ingestion's owns_when "Own an object here when its composite identity is determined by an external resource or read information, loader and ingestion policy, complete run or local phase, or the Document, Metadata, Attachment, or DeduplicationDecision produced by those phases.", Moonweave applies the disambiguation test "An object identified by external resource, loader, and normalization belongs to ingestion; one identified by document range, chunk sequence, overlap, or situating run belongs to chunking and situating."; result=distinct and owner=memory-chunking-situating are a Moonweave design inference over the registered evidence.
-    locator: Vector store files API > create and retrieve file; status, last_error, attributes, chunking_strategy, content, and delete
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
+  - id: claim-ingestion-web-acquisition
+    source: firecrawl-docs
+    supports: >-
+      Firecrawl documents fetching web content and producing structured or markdown output. Moonweave records a fetched
+      resource and its ingestion activity separately from later normalized documents and downstream chunks.
+    locator: Firecrawl scraping documentation
+    evidence_kind: ontology-design-inference
+    confidence: medium

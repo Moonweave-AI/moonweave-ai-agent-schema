@@ -52,11 +52,6 @@ const isLocalizedText = (value: unknown): boolean =>
     isNonEmptyString(value[language]),
   );
 
-const isRootReview = (value: unknown): boolean =>
-  isRecord(value) &&
-  (value.review_status === "draft" || value.review_status === "accepted") &&
-  Array.isArray(value.reviewers);
-
 const isOntologyMetrics = (value: unknown): boolean =>
   isRecord(value) && ONTOLOGY_METRIC_FIELDS.every((field) => {
     const metric = value[field];
@@ -89,9 +84,7 @@ const isArtifactMetadata = (value: unknown): boolean => {
     return false;
   }
 
-  return value.release_channel === "release"
-    ? value.releasable === true
-    : value.release_channel === "candidate" && value.releasable === false;
+  return !("release_channel" in value) && !("releasable" in value);
 };
 
 const isCanonicalOntology = (value: unknown): value is CanonicalOntology => {
@@ -106,7 +99,6 @@ const isCanonicalOntology = (value: unknown): value is CanonicalOntology => {
     (candidate.status === "draft-hierarchy-upgrade" ||
       candidate.status === "review" ||
       candidate.status === "accepted") &&
-    isRootReview(candidate.review) &&
     typeof candidate.date === "string" &&
     /^\d{4}-\d{2}-\d{2}$/u.test(candidate.date) &&
     ROOT_ARRAY_FIELDS.every((name) => Array.isArray(candidate[name])) &&

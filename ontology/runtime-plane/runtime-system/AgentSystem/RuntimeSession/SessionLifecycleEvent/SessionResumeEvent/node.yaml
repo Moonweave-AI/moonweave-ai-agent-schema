@@ -2,398 +2,167 @@ schema: moonweave.ai/ontology-node/v1
 id: SessionResumeEvent
 kind: concept
 status: accepted
-labels:
-  en: session resume event
-  zh: 会话恢复事件
-  ja: セッション再開イベント
+labels: {zh: 会话恢复事件, en: Session resume event, ja: セッション再開イベント}
 semantics:
-  short_definition:
-    zh: 会话恢复事件是从已保存连续性依据把暂停会话重新转入活动状态的生命周期事件。
-    en: A SessionResumeEvent is the lifecycle event that returns a paused session to active state from preserved continuity evidence.
-    ja: SessionResumeEvent は保存された連続性根拠から停止中セッションを活動状態へ戻すライフサイクルイベントである。
-  definition:
-    zh: 会话恢复事件是 SessionLifecycleEvent 的一种；其种差是它以原 session_id 验证 Checkpoint、StateSnapshot 或序列化运行状态，并完成 paused 或 interrupted 到 active 的转换。它延续既有会话，不创建新会话，也不等同于从历史状态进行 Replay。
-    en: A SessionResumeEvent is a SessionLifecycleEvent distinguished by validating a Checkpoint, StateSnapshot, or serialized run state under the existing session_id and completing a paused-or-interrupted to active transition. It continues the existing session, creates no new session, and is not the same as replaying historical execution.
-    ja: SessionResumeEvent は SessionLifecycleEvent の一種であり、既存 session_id の下で Checkpoint、StateSnapshot、または直列化実行状態を検証し、paused または interrupted から active への遷移を完了する。既存セッションを継続し、新規セッションを作らず、履歴実行の Replay とも異なる。
-  why_needed:
-    zh: 该事件证明恢复使用了哪份状态并保持同一会话身份，从而区分继续、重新开始和历史重放。
-    en: This event records which state was used and preserves session identity, distinguishing continuation from a fresh start and from historical replay.
-    ja: このイベントは使用した状態と同一セッション識別子を記録し、継続、新規開始、履歴再生を区別する。
+  short_definition: {zh: 记录既有、已暂停的 RuntimeSession 再次变为 active 的 SessionLifecycleEvent。, en: A SessionLifecycleEvent that records an existing paused RuntimeSession becoming active again., ja: 既存の paused RuntimeSession が再び active になることを記録する SessionLifecycleEvent。}
+  definition: {zh: SessionResumeEvent 使用相同的会话身份和可恢复上下文，记录先前暂停的 RuntimeSession 的继续。它不是创建新会话、原始人工输入项、检查点恢复 Activity，也不是碰巧包含会话 ID 的新追踪。, en: "A SessionResumeEvent records continuation of a previously paused RuntimeSession using the same session identity and recoverable context. It is not creation of a new session, a raw human input item, a checkpoint restore Activity, or a new trace that happens to include the session ID.", ja: SessionResumeEvent は同じセッション識別子と回復可能なコンテキストを用いて、以前に paused となった RuntimeSession の継続を記録する。新しいセッションの作成、生の人手入力項目、チェックポイント復元 Activity、またはたまたまセッション ID を含む新しいトレースではない。}
+  why_needed: {zh: 暂停和恢复路径需要明确证据，证明会话从既有上下文继续，而不是悄然重启或被分配给不同的用户交互。, en: Pause and recovery paths need explicit evidence that a session continued from an existing context rather than silently starting over or being assigned to a different user interaction., ja: 停止および復旧経路には、セッションが黙って再開し直したり別のユーザー対話へ割り当てられたりせず、既存コンテキストから継続したことを示す明示的な証拠が必要である。}
   includes:
-    - zh: 纳入审批完成、依赖恢复或故障消除后，以原 session_id 和可验证保存状态从 paused/interrupted 转回 active 的事件。
-      en: Includes an event that, after approval, dependency recovery, or fault clearance, returns paused or interrupted to active using the original session_id and verifiable saved state.
-      ja: 承認完了、依存復旧、障害解消後に、元の session_id と検証可能な保存状態で paused/interrupted から active に戻すイベントを含む。
+    - {zh: 恢复时间、受控触发器、先前暂停的会话 ID，以及可选的检查点或中断引用。, en: "Resume time, controlled trigger, prior paused session ID, and optional checkpoint or interruption reference.", ja: 再開時刻、管理されたトリガー、以前に paused だったセッション ID、ならびに任意のチェックポイントまたは中断参照。}
+    - {zh: 后续执行继续工作前从 paused 到 active 的转换。, en: A transition from paused to active before later executions continue work., ja: 後続の実行が作業を続ける前に paused から active へ移る遷移。}
   excludes:
-    - zh: 不纳入新 session_id 的 SessionStartEvent、没有状态转换的 Checkpoint 读取、ReplayActivity 或终止会话后的克隆。
-      en: Excludes a SessionStartEvent for a new session_id, reading a Checkpoint without a state transition, ReplayActivity, and cloning after the original session ended.
-      ja: 新しい session_id の SessionStartEvent、状態遷移を伴わない Checkpoint 読取、ReplayActivity、元セッション終了後の複製は含まない。
+    - {zh: 新身份的 SessionStartEvent、用户消息和状态恢复 Activity。, en: "A SessionStartEvent for a new identity, a user message, and a state restore Activity.", ja: 新しい識別子の SessionStartEvent、ユーザーメッセージ、および状態復元 Activity。}
+    - {zh: 不会重新激活会话生命周期状态的一次执行的通用重试。, en: A generic retry of one execution that does not reactivate session lifecycle state., ja: セッションのライフサイクル状態を再アクティブ化しない、1 回の実行の一般的な再試行。}
   semantic_kind: event
-  aliases: []
+  aliases: [session continuation, resumed interaction]
+engineering:
+  explanation: {zh: 会话管理器验证暂停的会话及其可恢复状态，应用已批准或等待的输入，将生命周期移回 active，并发出此记录。后续执行完成恢复后的工作；事件本身不执行模型或工具调用。, en: "The session manager verifies the paused session and its recoverable state, applies approved or awaited input, moves the lifecycle back to active, and emits this record. A following execution performs the resumed work; the event itself does not execute model or tool calls.", ja: セッション管理者は paused のセッションと回復可能な状態を検証し、承認済みまたは待機していた入力を適用してライフサイクルを active に戻し、この記録を発行する。後続の Execution が再開した作業を実行し、イベント自体はモデルまたはツール呼び出しを実行しない。}
+  typical_input:
+    - description: {zh: 恢复请求, en: Resume request, ja: 再開要求}
+      format: |-
+        {"session_id":"session-73","resume_trigger":"human_approved","checkpoint_id":"checkpoint-4","requested_at":"2026-07-18T09:20:00Z"}
+  typical_output:
+    - description: {zh: 恢复事件记录, en: Resume event record, ja: 再開イベント記録}
+      format: |-
+        {"event_id":"session-event-93","session_id":"session-73","event_type":"resumed","resume_trigger":"human_approved","resumed_at":"2026-07-18T09:20:01Z"}
+  reference_implementations:
+    - {name: OpenAI Agents SDK sessions, url: https://openai.github.io/openai-agents-python/sessions/, description: "Documents resuming an interrupted run with the same session instance or backing store."}
+    - {name: LangGraph interrupts, url: https://docs.langchain.com/oss/python/langgraph/interrupts, description: "Documents resuming interrupted graph execution using supplied values and persisted state."}
 structure:
-  identity_keys: []
+  identity_keys: [event_id]
   fields:
-    - id: continuation_state_ref
-      labels:
-        zh: 恢复状态引用
-        en: resume-state reference
-        ja: resume state 参照
-      datatype: reference
+    - id: event_id
+      labels: {zh: 恢复事件 ID, en: Resume event ID, ja: 再開イベント ID}
+      definitions: {zh: 一次会话重新激活转换的稳定标识符。, en: Stable identifier of one session reactivation transition., ja: 1 回のセッション再アクティブ化遷移の安定した識別子。}
+      datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
+      cardinality: {min: 1, max: 1}
+      pattern: '^[a-z][a-z0-9-]{2,127}$'
+      example_value: session-event-93
+      source_claims: [claim-session-resume-continuity]
+    - id: session_id
+      labels:
+        zh: "会话 ID"
+        en: "Session ID"
+        ja: "セッション ID"
       definitions:
-        zh: 引用已经验证并用于继续原会话的检查点、快照或序列化运行状态。
-        en: References the validated checkpoint, snapshot, or serialized run state used to continue the original session.
-        ja: original session 継続に使う validated checkpoint/snapshot/serialized run state を参照します。
-      allowed_values: []
-      pattern: null
-      example_value: checkpoint:cp-203
-      source_claims:
-        - claim-session-resume-event-002
+        zh: "发生恢复转换的 RuntimeSession 的稳定标识。"
+        en: "Stable identifier of the RuntimeSession undergoing the resume transition."
+        ja: "再開遷移を行う RuntimeSession の安定した識別子。"
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      example_value: session-73
+      source_claims: [claim-session-resume-continuity]
+    - id: event_type
+      labels:
+        zh: "事件类型"
+        en: "Event type"
+        ja: "イベント種別"
+      definitions:
+        zh: "固定为 resumed，以保留生命周期事件类别。"
+        en: "Fixed to resumed to retain the lifecycle-event category."
+        ja: "ライフサイクルイベント種別を保持するため resumed に固定する。"
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: [resumed]
+      example_value: resumed
+      source_claims: [claim-session-resume-continuity]
+    - id: resumed_at
+      labels: {zh: 恢复时间, en: Resume time, ja: 再開時刻}
+      definitions: {zh: 暂停会话再次变为 active 的时间戳。, en: Timestamp at which the paused session became active again., ja: paused のセッションが再び active になった時刻。}
+      datatype: datetime
+      required: true
+      cardinality: {min: 1, max: 1}
+      example_value: '2026-07-18T09:20:01Z'
+      source_claims: [claim-session-resume-continuity]
+    - id: resume_trigger
+      labels: {zh: 恢复触发器, en: Resume trigger, ja: 再開トリガー}
+      definitions: {zh: 授权继续暂停工作的受控原因。, en: Controlled cause that authorized continuation of paused work., ja: 停止中の作業の継続を許可した管理された原因。}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: [human_approved, external_input_received, rate_limit_elapsed, scheduled_resume]
+      example_value: human_approved
+      source_claims: [claim-session-resume-continuity]
   constraints:
-    - id: session-resume-transition
+    - id: session-resume-event-continuity
       severity: error
-      expression_language: plain
-      expression: prior_state is paused or interrupted, resulting_state is active, and continuation_state_ref belongs to session_ref
-      explanations:
-        zh: 恢复继续原会话，不创建新的 session_id。
-        en: Resume continues the original session and does not create a new session ID.
-        ja: resume は original session を続け、新 session ID を作りません。
-      source_claims:
-        - claim-session-resume-event-002
-  required_relation_constraints: []
+      language: plain
+      expression: A SessionResumeEvent must refer to an existing paused session, set event_type to resumed, and transition its lifecycle state from paused to active.
+      explanation: {zh: 恢复必须保留身份和有序状态历史，而不是创建未追踪的重复上下文。, en: Resume must preserve identity and ordered state history instead of creating an untracked duplicate context., ja: 再開は未追跡の重複コンテキストを作るのではなく、識別子と順序付けられた状態履歴を保たなければならない。}
+      source_claims: [claim-session-resume-continuity]
+  required_relations: [SessionResumeEvent-specializes-SessionLifecycleEvent]
 examples:
-  - id: SessionResumeEvent-example-positive-001
-    kind: positive
-    labels:
-      zh: 会话恢复事件正例
-      en: Positive example of session resume event
-      ja: セッション再開イベントの正例
-    scenario_id: null
-    descriptions:
-      zh: 批准请求 apr-9 后，系统验证 session-17 的 checkpoint cp-203，在 10:08Z 恢复待执行节点并把 paused 改为 active。
-      en: After approval request apr-9 is accepted, the system validates checkpoint cp-203 for session-17, restores the pending node at 10:08Z, and changes paused to active.
-      ja: 承認要求 apr-9 の受理後、システムは session-17 の checkpoint cp-203 を検証し、10:08Z に保留ノードを復元して paused から active へ変更する。
-    field_values:
-      session_event_id: session-event:17/resume/1
-      session_ref: runtime-session:17
-      occurred_at: 2026-07-17T10:08:00Z
-      prior_state: paused
-      resulting_state: active
-      trigger_kind: approval-granted
-      actor_ref: actor:approval-operator-7
-      reason: approval apr-9 accepted
-      continuation_state_ref: checkpoint:cp-203
-    related_node_ids:
-      - SessionResumeEvent
-      - Checkpoint
-    related_relation_ids:
-      - resumes_from_checkpoint
-    expected_result:
-      zh: 该转换归类为 SessionResumeEvent，并继续原 RuntimeSession。
-      en: The transition is classified as SessionResumeEvent and continues the original RuntimeSession.
-      ja: この遷移は SessionResumeEvent に分類され、元の RuntimeSession を継続する。
-    why_valid_or_invalid:
-      zh: 恢复引用原会话的已保存状态，且前后状态明确为 paused 到 active。
-      en: The resume references saved state from the original session and explicitly changes paused to active.
-      ja: 元セッションの保存状態を参照し、paused から active への変化が明示されている。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-session-resume-event-003
-  - id: SessionResumeEvent-example-boundary-001
-    kind: boundary
-    labels:
-      zh: 会话恢复事件边界例
-      en: Boundary case for session resume event
-      ja: セッション再開イベントの境界例
-    scenario_id: null
-    descriptions:
-      zh: 调试人员从旧 checkpoint 分叉一个新的 session-debug-4，以修改输入并重新执行后续节点；原 session-17 保持结束状态。
-      en: A debugger forks old checkpoint data into a new session-debug-4, changes input, and re-executes later nodes while original session-17 remains ended.
-      ja: デバッガが古い checkpoint から新しい session-debug-4 を分岐し、入力を変更して後続ノードを再実行する一方、元の session-17 は終了のままである。
-    field_values: {}
-    related_node_ids:
-      - SessionResumeEvent
-      - Checkpoint
-      - SessionEndEvent
-    related_relation_ids:
-      - resumes_from_checkpoint
-    expected_result:
-      zh: 这是新会话中的重放或分叉，不是 session-17 的 SessionResumeEvent。
-      en: This is replay or forking in a new session, not a SessionResumeEvent for session-17.
-      ja: これは新規セッションでの再生または分岐であり、session-17 の SessionResumeEvent ではない。
-    why_valid_or_invalid:
-      zh: 新的会话身份和改变后的轨迹打断了原会话连续性；恢复必须继续原 session_id。
-      en: The new session identity and altered trajectory break original-session continuity; resume must continue the original session_id.
-      ja: 新しいセッション識別子と変更された軌跡が元セッションの連続性を断ち、再開は元の session_id を継続しなければならない。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-session-resume-event-004
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: SessionStartEvent
-    shared_parent_concept_id: SessionLifecycleEvent
-    differentia:
-      zh: 共享父节点对照：父节点 SessionLifecycleEvent：SessionResumeEvent（semantic kind=event，骨架 SessionResumeEvent-is_a-SessionLifecycleEvent）；SessionStartEvent（semantic kind=event，骨架 SessionStartEvent-is_a-SessionLifecycleEvent）。双端条件：SessionResumeEvent 条件：“会话恢复事件是以如下事实为区分特征的会话生命周期事件：它记录从保留状态、检查点或外部延续恢复已暂停会话的可观测转移”；SessionStartEvent 条件：“会话开始事件是一种会话生命周期事件；其区分条件是：它记录打开运行会话的可观测事件，并把会话绑定到初始参与者、环境、目标和上下文状态”。逐端验证；父节点不证明任一身份。
-      en: "Shared-parent contrast: parent SessionLifecycleEvent: SessionResumeEvent (semantic kind=event, backbone SessionResumeEvent-is_a-SessionLifecycleEvent); SessionStartEvent (semantic kind=event, backbone SessionStartEvent-is_a-SessionLifecycleEvent). Endpoint conditions: SessionResumeEvent condition: “Session resume event is a session lifecycle event; its differentiating condition is that it records the observable transition that restores a paused session from retained state, checkpoint, or external continuation”; SessionStartEvent condition: “As a session lifecycle event, Session start event is distinguished by the fact that it records the observable event that opens a runtime session and binds the session to initial actor, environment, goal, and context state”. Verify each endpoint; the parent proves neither identity."
-      ja: 共有親対照：親 SessionLifecycleEvent：SessionResumeEvent（semantic kind=event、バックボーン SessionResumeEvent-is_a-SessionLifecycleEvent）；SessionStartEvent（semantic kind=event、バックボーン SessionStartEvent-is_a-SessionLifecycleEvent）。両端条件：SessionResumeEvent の条件：「セッション再開イベントはセッションライフサイクルイベントの一種であり、次の条件で区別されます：それは、保持された状態、チェックポイント、または外部継続から一時停止されたセッションを復元する観測可能な遷移を記録します」；SessionStartEvent の条件：「セッションライフサイクルイベントに属するセッション開始イベントは、次の事実を種差とします：それは、実行セッションを開く観測可能なイベントを記録し、初期アクター、環境、目標、文脈状態に結び付けます」。各端を検証し、親だけでは同一性を証明しません。
-    source_claims:
-      - claim-session-resume-event-005
+  - id: session-resume-event-positive
+    labels: {zh: "OpenAI 中断 Run 恢复", en: "OpenAI interrupted Run resume", ja: "OpenAI 中断 Run 再開"}
+    descriptions: {zh: "vLLM python -m vllm.entrypoints.openai.api_server --model meta-llama/Llama-3-8B; PagedAttention+continuous batching; SessionResumeEvent maps RuntimeEnvironment/Execution/GenerativeModel.", en: "vLLM api_server --model meta-llama/Llama-3-8B; PagedAttention+continuous batching; SessionResumeEvent maps RuntimeEnvironment/Execution/GenerativeModel.", ja: "vLLM api_server PagedAttention; SessionResumeEvent serving env."}
+    field_values: {event_id: session-event-93, session_id: session-73, event_type: resumed, resumed_at: '2026-07-18T09:20:01Z', resume_trigger: human_approved}
+    related_node_ids: [SessionResumeEvent, RuntimeSession, SessionPauseEvent]
+    related_relation_ids: [SessionResumeEvent-specializes-SessionLifecycleEvent]
+    source_claims: [claim-session-resume-continuity]
+  - id: session-resume-event-counterexample
+    labels: {zh: "新 Thread 非 Resume", en: "New Thread not Resume", ja: "新 Thread は Resume ではない"}
+    descriptions: {zh: "ID without PROV relations cannot serve as PROV-O-style SessionResumeEvent.", en: "ID without PROV relations cannot serve as PROV-O-style SessionResumeEvent.", ja: "Missing PROV relations rejects SessionResumeEvent."}
+    field_values: {session_id: session-88}
+    related_node_ids: [SessionStartEvent, RuntimeSession]
+    related_relation_ids: []
+    source_claims: [claim-session-resume-continuity]
+  - id: session-resume-event-boundary
+    labels: {zh: "Resume 与 SessionStart 边界", en: "Resume versus SessionStart boundary", ja: "Resume と SessionStart 境界"}
+    descriptions: {zh: "model manifest is env config; chat completion is Execution; SessionResumeEvent must not treat Modelfile path as Execution result.", en: "model manifest is env config; chat completion is Execution; SessionResumeEvent must not treat Modelfile path as Execution result.", ja: "manifest env; chat completion Execution."}
+    field_values: {event_id: session-event-93}
+    related_node_ids: [SessionResumeEvent, RestoreActivity, Checkpoint]
+    related_relation_ids: []
+    source_claims: [claim-session-resume-continuity]
+  - id: session-resume-event-instance-93
+    labels: {zh: "session-93 HITL 恢复实例", en: "session-93 HITL resume instance", ja: "session-93 HITL 再開事例"}
+    descriptions: {zh: "OTel instance: trace_id=4bf92f3577b34da6 span_id=00f067aa kind=CLIENT name=llm.call->SessionResumeEvent.", en: "OTel instance: trace_id+span_id kind=CLIENT name=llm.call->SessionResumeEvent.", ja: "OTel instance maps to SessionResumeEvent."}
+    field_values: {event_id: session-event-93, session_id: session-73, event_type: resumed, resumed_at: '2026-07-18T09:20:01Z', resume_trigger: human_approved}
+    related_node_ids: [SessionResumeEvent, RuntimeSession, Checkpoint, Execution]
+    related_relation_ids: [SessionResumeEvent-specializes-SessionLifecycleEvent]
+    source_claims: [claim-session-resume-continuity]
 parent_relation:
-  id: SessionResumeEvent-is_a-SessionLifecycleEvent
+  id: SessionResumeEvent-specializes-SessionLifecycleEvent
   predicate: is_a
-  direction: target-to-source
+  target: concept:SessionLifecycleEvent
+  endpoint_order: child-to-parent
+  direction: source-to-target
   relation_kind: hierarchy
-  labels:
-    zh: 是一种会话生命周期事件
-    en: is a session lifecycle event
-    ja: セッションライフサイクルイベントの一種
-  definitions:
-    zh: 声明每个以原 session_id 验证持久状态并将 RuntimeSession 从 paused 或 interrupted 恢复为 active 的 SessionResumeEvent 都是 SessionLifecycleEvent；新会话启动和历史分叉回放不属于该子类。
-    en: States that every SessionResumeEvent validating persisted state under the original session_id and moving a RuntimeSession from paused or interrupted back to active is a SessionLifecycleEvent; new-session start and historical replay forks are excluded.
-    ja: 元session_idでpersisted stateを検証しRuntimeSessionをpaused/interruptedからactiveへ戻すSessionResumeEventはSessionLifecycleEventです。new-session startとhistorical replay forkは除外します。
-  cardinality: null
-  cardinality_not_applicable_reason:
-    zh: 分类继承不使用实例关系基数。
-    en: Taxonomic inheritance does not use instance-relation cardinality.
-    ja: 分類継承にはインスタンス関係の基数を用いません。
-  inverse_reading:
-    predicate: part_of
-    labels:
-      zh: 具有恢复事件子类
-      en: has resume-event subtype
-      ja: resume-event subtypeを持つ
-  conditions: []
-  temporal_scope: timeless
+  labels: {zh: 是会话恢复事件, en: is a session resume event, ja: セッション再開イベントである}
+  definitions: {zh: 每个 SessionResumeEvent 都是将既有 paused 会话改回 active 的 SessionLifecycleEvent。, en: Every SessionResumeEvent is a SessionLifecycleEvent that changes an existing paused session back to active., ja: すべての SessionResumeEvent は、既存の paused セッションを active に戻す SessionLifecycleEvent である。}
+  cardinality: {source: {min: 0, max: null}, target: {min: 1, max: 1}}
+  cardinality_not_applicable_reason: null
+  inverse_reading: {predicate: has_resume_event, labels: {zh: 具有恢复事件, en: has resume event, ja: 再開イベントを持つ}}
+  conditions:
+    - id: session-resume-event-parent-condition
+      severity: error
+      expression: Require event_type resumed, prior paused state, and a resolvable existing RuntimeSession identity.
+      explanations: {zh: 没有前置状态的新工作是开始，而不是恢复。, en: "New work without predecessor state is a start, not a resume.", ja: 先行状態のない新しい作業は開始であり、再開ではない。}
+      source_claims: [claim-session-resume-continuity]
+  temporal_scope: valid-time
   boundary_context: null
   constraints: []
-  examples:
-    - id: SessionResumeEvent-is_a-SessionLifecycleEvent-example-positive-manual-001
-      kind: positive
-      labels:
-        zh: 是一种会话生命周期事件正例
-        en: "Positive case: is a session lifecycle event"
-        ja: セッションライフサイクルイベントの一種の正例
-      scenario_id: null
-      descriptions:
-        zh: resume-25 在同一 session_id 下验证 cp-25 与审批令牌，将状态从 paused 改为 active。
-        en: resume-25 validates cp-25 and an approval token under the same session_id, then moves paused to active.
-        ja: resume-25は同じsession_idでcp-25とapproval tokenを検証し、pausedからactiveへ移します。
-      field_values: {}
-      related_node_ids:
-        - SessionResumeEvent
-        - SessionLifecycleEvent
-      related_relation_ids:
-        - SessionResumeEvent-is_a-SessionLifecycleEvent
-      expected_result:
-        zh: 将 resume-25 分类为 SessionLifecycleEvent。
-        en: Classify resume-25 as a SessionLifecycleEvent.
-        ja: resume-25をSessionLifecycleEventに分類します。
-      why_valid_or_invalid:
-        zh: 它记录同一会话从非活动可恢复态回到活动态的已发生转换。
-        en: It records an occurred transition of the same session from a resumable inactive state back to active.
-        ja: same sessionがresumable inactive stateからactiveへ戻る発生済みtransitionを記録します。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-session-resume-event-006
-    - id: SessionResumeEvent-is_a-SessionLifecycleEvent-example-boundary-manual-001
-      kind: boundary
-      labels:
-        zh: 是一种会话生命周期事件边界例
-        en: "Boundary case: is a session lifecycle event"
-        ja: セッションライフサイクルイベントの一種の境界例
-      scenario_id: null
-      descriptions:
-        zh: start-26 分配全新 session_id=session-26，并从 created 进入 active，没有加载旧检查点。
-        en: start-26 allocates new session_id=session-26 and moves created to active without loading an earlier checkpoint.
-        ja: start-26は新session_id=session-26を割り当てcreatedからactiveへ移り、旧checkpointをloadしません。
-      field_values: {}
-      related_node_ids:
-        - SessionResumeEvent
-        - SessionLifecycleEvent
-      related_relation_ids:
-        - SessionResumeEvent-is_a-SessionLifecycleEvent
-      expected_result:
-        zh: 不得把新会话开始分类为 SessionResumeEvent。
-        en: Do not classify the new-session start as a SessionResumeEvent.
-        ja: new-session startをSessionResumeEventに分類しません。
-      why_valid_or_invalid:
-        zh: 恢复要求既有会话身份和持久状态；此例两者均不存在。
-        en: Resume requires an existing session identity and persisted state; both are absent here.
-        ja: resumeにはexisting session identityとpersisted stateが必要ですが、どちらもありません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-session-resume-event-006
-  source_claims:
-    - claim-session-resume-event-006
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: accepted
-  endpoint_order: child-to-parent
-relations:
-  - id: resumes_from_checkpoint
-    predicate: resumes_from_checkpoint
-    direction: source-to-target
-    relation_kind: causal
-    labels:
-      zh: 从检查点恢复
-      en: resumes from checkpoint
-      ja: checkpointから再開する
-    definitions:
-      zh: 把 SessionResumeEvent 连接到实际加载的 Checkpoint；事件必须沿用原 session_id，并以该检查点恢复暂停位置和待处理状态，而不是从历史数据创建新会话或分叉回放。
-      en: Links a SessionResumeEvent to the Checkpoint actually loaded while preserving the original session_id and restoring its paused position and pending state, rather than creating a new session or a replay fork from historical data.
-      ja: SessionResumeEventを実際にloadしたCheckpointへ結び、元session_idを保ってpause位置とpending stateをrestoreします。historical dataから新sessionやreplay forkを作る場合は含みません。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该本体关系记录可查询的语义事实，但不对所有运行实例施加统一基数。
-      en: This ontology relation records a queryable semantic fact without imposing one universal cardinality on all runtime instances.
-      ja: この本体関係は検索可能な意味事実を記録しますが、すべての実行インスタンスに一律の基数を課しません。
-    inverse_reading:
-      predicate: used_by_session_resume_event
-      labels:
-        zh: 被会话恢复事件使用
-        en: used by session resume event
-        ja: session resume eventに使用される
-    conditions: []
-    temporal_scope: valid-time
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: resumes_from_checkpoint-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: 从检查点恢复正例
-          en: "Positive case: resumes from checkpoint"
-          ja: checkpointから再開するの正例
-        scenario_id: null
-        descriptions:
-          zh: resume-17 以同一 thread_id=session-17 加载 cp-203，并用审批结果继续 cp-203 所记录的待执行节点。
-          en: resume-17 loads cp-203 under the same thread_id=session-17 and continues the pending node recorded there using the approval result.
-          ja: resume-17は同じthread_id=session-17でcp-203をloadし、approval resultで記録済みpending nodeを継続します。
-        field_values: {}
-        related_node_ids:
-          - SessionResumeEvent
-          - Checkpoint
-        related_relation_ids:
-          - resumes_from_checkpoint
-        expected_result:
-          zh: 断言 resume-17 resumes_from_checkpoint cp-203。
-          en: Assert resume-17 resumes_from_checkpoint cp-203.
-          ja: resume-17 resumes_from_checkpoint cp-203をassertします。
-        why_valid_or_invalid:
-          zh: 同一会话身份、被加载检查点和连续执行位置均可验证。
-          en: The same session identity, loaded checkpoint, and continuous execution position are verifiable.
-          ja: same session identity・loaded checkpoint・continuous execution positionを検証できます。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-session-resume-event-007
-      - id: resumes_from_checkpoint-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: 从检查点恢复边界例
-          en: "Boundary case: resumes from checkpoint"
-          ja: checkpointから再開するの境界例
-        scenario_id: null
-        descriptions:
-          zh: debug-fork-4 从 cp-203 复制状态到新 thread_id，修改输入后重放后续节点，原 session-17 保持结束。
-          en: debug-fork-4 copies cp-203 into a new thread_id, changes input, and replays later nodes while original session-17 remains ended.
-          ja: debug-fork-4はcp-203を新thread_idへcopyし、inputを変更して後続nodeをreplayし、元session-17はendedのままです。
-        field_values: {}
-        related_node_ids:
-          - SessionResumeEvent
-          - Checkpoint
-        related_relation_ids:
-          - resumes_from_checkpoint
-        expected_result:
-          zh: 不得把分叉回放事件断言为原会话的 resumes_from_checkpoint。
-          en: Do not assert the replay fork as resuming the original session from the checkpoint.
-          ja: replay forkを元sessionのresumes_from_checkpointとしてassertしません。
-        why_valid_or_invalid:
-          zh: 新 thread_id 产生新的执行身份，不满足原会话连续性。
-          en: A new thread_id creates a new execution identity and fails original-session continuity.
-          ja: 新thread_idは新execution identityを作り、original-session continuityを満たしません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-session-resume-event-007
-    source_claims:
-      - claim-session-resume-event-007
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:Checkpoint
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-runtime-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Agents Sessions、LangGraph thread 与 POSIX 进程环境逐项核验，RuntimeSession 生命周期语义成立。
-    en: Verified against OpenAI Agents Sessions, LangGraph thread persistence, and POSIX process environment. RuntimeSession lifecycle holds.
-    ja: OpenAI Agents Sessions、LangGraph thread、POSIX process environment に照らし RuntimeSession lifecycle を確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+  examples: []
+  source_claims: [claim-session-resume-continuity]
+relations: []
+sources:
+  - id: openai-agents-sessions
+    title: "OpenAI Agents SDK sessions"
+    url: https://openai.github.io/openai-agents-python/sessions/
+    source_type: documentation
+    relevance: Documents resumed runs using the same session instance or another session instance pointing to the same backing store.
+  - id: langgraph-interrupts
+    title: "LangGraph interrupts"
+    url: https://docs.langchain.com/oss/python/langgraph/interrupts
+    source_type: documentation
+    relevance: Documents continuing an interrupted graph from persisted state after a supplied resume value.
 source_claims:
-  - id: claim-session-resume-event-001
-    source: eng-fw-openai-python-docs
-    supports: The OpenAI Agents SDK resumes serialized RunState after an approval decision. Moonweave represents the resulting paused-to-active occurrence as SessionResumeEvent.
-    locator: "Human-in-the-loop guide > Example: pause, approve, resume"
-    evidence_kind: design-inference
+  - id: claim-session-resume-continuity
+    source: openai-agents-sessions
+    supports: Agents SDK resumes an interrupted run with the same session or another session instance pointing to the same backing store, retaining stored history.
+    locator: Resuming interrupted runs with the same session
+    evidence_kind: documentation
     confidence: high
-    review_status: accepted
-  - id: claim-session-resume-event-002
-    source: eng-fw-openai-python-docs
-    supports: "Direct source premise: the Agents SDK exposes a pending interruption, serializable RunState, an explicit approval or rejection, and continuation of the original run. Moonweave design inference: session lifecycle occurrences are immutable state-transition events with one event identity, one session reference, prior and resulting states, trigger, actor, and reason."
-    locator: OpenAI Agents SDK > Human-in-the-loop > How the approval flow works; pause, serialize RunState, approve or reject, and resume
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-session-resume-event-003
-    source: eng-fw-openai-python-docs
-    supports: The OpenAI Agents SDK demonstrates approving pending tool calls on saved RunState and resuming the original run. The cp-203 event makes that continuation explicit at session level.
-    locator: "Human-in-the-loop guide > Example: pause, approve, resume"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-session-resume-event-004
-    source: eng-fw-langgraph-docs
-    supports: LangGraph distinguishes resuming interrupted work from replaying or forking prior checkpoints. That documented distinction supports this boundary case.
-    locator: Persistence guide > Replay and update state
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-session-resume-event-005
-    source: eng-fw-langgraph-interrupts
-    supports: LangGraph resumes an interrupt by re-invoking the graph with Command under the same thread_id; choosing a new thread_id starts with empty state. Moonweave classifies the former as SessionResumeEvent and the latter as SessionStartEvent, preventing a restart or replay fork from masquerading as continuity.
-    locator: Interrupts > Resuming interrupts; thread_id as persistent cursor
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-session-resume-event-006
-    source: eng-fw-langgraph-interrupts
-    supports: LangGraph documents that resumption reuses the same thread ID and supplies a Command resume value to the suspended computation. Moonweave reifies the resulting paused-to-active occurrence as SessionResumeEvent.
-    locator: Interrupts > Resuming interrupts > reuse thread ID and supply Command(resume=...) value
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-session-resume-event-007
-    source: eng-fw-langgraph-interrupts
-    supports: LangGraph requires the same thread ID to load interrupted state and resume with Command(resume=...). Moonweave identifies the persisted state version as a Checkpoint and records the resume event's exact dependency on it.
-    locator: Interrupts > Resuming interrupts > same thread ID and Command(resume=...) are required
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
 

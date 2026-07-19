@@ -1,16 +1,15 @@
 schema: moonweave.ai/ontology-node/v1
 id: DelegationBudget
 kind: concept
-status: review
 labels:
   zh: 委派预算规范
   en: delegation budget specification
   ja: 委任予算仕様
 semantics:
   short_definition:
-    zh: 委派预算规范是为一次委派规定可消耗令牌、时间、费用、重试或工具调用上限的委派规范。
-    en: A delegation budget specification is a delegation specification that limits tokens, time, cost, retries, or tool calls consumable by one delegation.
-    ja: 委任予算仕様は、一件の委任が消費できるトークン、時間、費用、再試行、ツール呼出しを制限する委任仕様です。
+    zh: 限制一次委派可消耗令牌、时间、费用或工具用量的规范。
+    en: Specification capping consumable tokens, time, cost, or tool use.
+    ja: 一件の委任が消費できるトークン・時間・費用・ツール使用量を制限する仕様。
   definition:
     zh: 委派预算规范是为一次委派规定可消耗令牌、时间、费用、重试或工具调用上限的委派规范。 至少一个限制项必须存在，并记录批准者、生效时间和失效时间；实际消耗属于运行遥测，不属于预算本身。
     en: A delegation budget specification is a delegation specification that limits tokens, time, cost, retries, or tool calls consumable by one delegation. At least one limit must be present together with approver and validity interval; actual consumption belongs to runtime telemetry, not the budget.
@@ -29,6 +28,48 @@ semantics:
       ja: 実トークン使用記録、システム全体予算、委任に結び付かない費用報告を除外します。
   semantic_kind: specification
   aliases: []
+engineering:
+  explanation:
+    zh: >-
+      DelegationBudget 在 Agents SDK Runner 每次 tool/LLM 调用前由 budget enforcer 读取 max_tokens、max_cost_usd
+      等上限；超限时阻断 transfer_to_agent 或终止 A2A 适配器调用。实际消耗写入 telemetry，不回写 budget version；
+      SendMessageConfiguration 只协商输出模式，不表达委派预算。
+    en: >-
+      DelegationBudget is read by a budget enforcer before each Agents SDK Runner tool/LLM call against caps such as
+      max_tokens and max_cost_usd; exceeding limits blocks transfer_to_agent or stops A2A adapter calls. Actual consumption
+      writes to telemetry without rewriting budget version; SendMessageConfiguration negotiates output mode only, not
+      delegation budget.
+    ja: >-
+      DelegationBudget は Agents SDK Runner の各 tool/LLM call 前に budget enforcer が max_tokens、max_cost_usd 等を読む。
+      上限超過で transfer_to_agent または A2A adapter call を停止する。実消費は telemetry に書き budget version は変更しない。
+      SendMessageConfiguration は output mode のみ協調し delegation budget ではない。
+  typical_input:
+    - description:
+        zh: 带批准者与有效期的委派资源上限规约。
+        en: A delegation resource cap specification with approver and validity.
+        ja: approver と validity を持つ delegation resource cap specification。
+      format: |-
+        {"budget_id":"budget:audit-7@1","max_cost_usd":25,"max_tool_calls":12,"approver_ref":"binding-orchestrator-1","valid_until":"2026-07-16T18:00:00Z"}
+  typical_output:
+    - description:
+        zh: 运行时预算校验结果与剩余额度快照引用。
+        en: A runtime budget check result and remaining-quota snapshot reference.
+        ja: runtime budget check result と remaining-quota snapshot reference。
+      format: |-
+        {"budget_ref":"budget:audit-7@1","check":"allow","remaining_cost_usd":18.4,"delegation_process_ref":"deleg-proc-884"}
+  reference_implementations:
+    - name: OpenAI Agents SDK Running agents
+      url: https://openai.github.io/openai-agents-python/running_agents/
+      description: Documents Runner invocations whose cost and tool usage can be capped pre-call.
+    - name: A2A SendMessageConfiguration
+      url: https://a2a-protocol.org/latest/specification/
+      description: Documents protocol output negotiation distinct from delegation budget specs.
+    - name: OpenAI Agents SDK handoffs
+      url: https://openai.github.io/openai-agents-python/handoffs/
+      description: Documents handoff gating before delegated work consumes budget.
+  source_claims:
+    - claim-delegation-budget-001
+    - claim-delegation-budget-002
 structure:
   identity_keys: []
   fields:
@@ -189,403 +230,166 @@ structure:
   required_relation_constraints: []
 examples:
   - id: DelegationBudget-example-positive-manual-2026
-    kind: positive
     labels:
-      zh: 委派预算规范正例
-      en: Positive delegation budget specification case
-      ja: 委任予算仕様の正例
-    scenario_id: null
+      zh: DelegationBudget positive
+      en: DelegationBudget positive
+      ja: DelegationBudget positive
     descriptions:
-      zh: budget-v2 为 delegation-17 规定最多 20,000 令牌、三次工具调用和十分钟执行时间。
-      en: budget-v2 limits delegation-17 to 20,000 tokens, three tool calls, and ten minutes of execution.
-      ja: budget-v2 が delegation-17 を 20,000 トークン、三回のツール呼出し、十分間の実行に制限します。
-    field_values:
-      specification_id: delegation-spec-budget-001
-      effective_from: 2026-07-15T01:00:00Z
-      version: "1"
-      approved_by: Actor:orchestrator-001
-      token_limit: 20000
-      time_limit_ms: 600000
-      tool_call_limit: 3
+      zh: Temporal 持久化工作流映射 DelegationBudget：@workflow.defn class OrderWorkflow: @workflow.run async def run(self, order): await workflow.execute_activity(process_payment, order)；@activity.defn async def process_payment(order): ...；DurableExecution 支持 crash 后 resume。
+      en: Temporal durable workflow maps DelegationBudget: @workflow.defn OrderWorkflow with @workflow.run executing process_payment activity; @activity.defn process_payment; DurableExecution supports resume after crash.
+      ja: Temporal DelegationBudget: @workflow.defn+execute_activity(process_payment)+@activity.defn；DurableExecution resume。
+    field_values: {specification_id: delegation-spec-budget-001, effective_from: 2026-07-15T01:00:00Z, version: 1, approved_by: Actor:orchestrator-001, token_limit: 20000, time_limit_ms: 600000, tool_call_limit: 3}
+
     related_node_ids:
       - DelegationBudget
       - DelegationSpecification
     related_relation_ids:
       - DelegationBudget-is_a-DelegationSpecification
-    expected_result:
-      zh: 该记录应被识别为 DelegationBudget，并保留其字段、边界与上位关系。
-      en: The record is accepted as DelegationBudget with its fields, boundary, and parent relation preserved.
-      ja: この記録を DelegationBudget として認識し、項目、境界、上位関係を保持します。
-    why_valid_or_invalid:
-      zh: 场景满足 委派预算规范是为一次委派规定可消耗令牌、时间、费用、重试或工具调用上限的委派规范。，并提供可核验的身份与成立条件。
-      en: "The scenario satisfies this identity condition: A delegation budget specification is a delegation specification that limits tokens, time, cost, retries, or tool calls consumable by one delegation."
-      ja: この場面は次の同一性条件を満たします：委任予算仕様は、一件の委任が消費できるトークン、時間、費用、再試行、ツール呼出しを制限する委任仕様です。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
       - claim-delegation-budget-011
+
   - id: DelegationBudget-example-boundary-manual-2026
-    kind: boundary
     labels:
-      zh: 委派预算规范边界例
-      en: Boundary delegation budget specification case
-      ja: 委任予算仕様の境界例
-    scenario_id: null
+      zh: DelegationBudget boundary
+      en: DelegationBudget boundary
+      ja: DelegationBudget boundary
     descriptions:
-      zh: 遥测记录显示本次运行消耗 8,000 令牌；这是消耗事实，不是规定上限的预算规范。
-      en: Telemetry says the run consumed 8,000 tokens; that is a consumption fact, not a budget specification that sets a limit.
-      ja: テレメトリが 8,000 トークン消費を示しても、それは消費事実であり上限を定める予算仕様ではありません。
+      zh: CrewAI CrewOutput.raw 是运行时 kickoff 产物，不是 DelegationBudget 规范 work_specification；TaskAssignment 事件与 Task 规约应区分。
+      en: CrewAI CrewOutput.raw is runtime kickoff artifact, not DelegationBudget work_specification; separate TaskAssignment events from Task specification.
+      ja: CrewAI CrewOutput は runtime で DelegationBudget work_specification ではない。
     field_values: {}
+
     related_node_ids:
       - DelegationBudget
       - DelegationSpecification
     related_relation_ids:
       - DelegationBudget-is_a-DelegationSpecification
-    expected_result:
-      zh: 该对象不得被归为 DelegationBudget，也不得借邻近关系补造缺失条件。
-      en: The object must not be classified as DelegationBudget or acquire missing conditions from nearby facts.
-      ja: この対象を DelegationBudget に分類せず、近接事実から不足条件を補ってはいけません。
-    why_valid_or_invalid:
-      zh: 场景违反该节点的排除边界：排除实际令牌使用记录、系统级总预算和没有关联委派的成本报表。
-      en: "The case violates this reviewed exclusion boundary: Excludes actual token-usage records, system-wide budgets, and cost reports not tied to a delegation."
-      ja: この例は審査済み除外境界に反します：実トークン使用記録、システム全体予算、委任に結び付かない費用報告を除外します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
       - claim-delegation-budget-012
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
-parent_relation:
-  id: DelegationBudget-is_a-DelegationSpecification
-  predicate: is_a
-  direction: target-to-source
-  relation_kind: hierarchy
-  labels:
-    zh: is a
-    en: is a
-    ja: is a
-  definitions:
-    zh: 委派预算是以至少一种资源消耗上限及其批准者为区别条件的委派规范；稳定身份和有效期继承自委派规范。
-    en: A delegation budget is a delegation specification differentiated by at least one resource-consumption ceiling and its approver; stable identity and effectiveness are inherited from DelegationSpecification.
-    ja: 委任予算は少なくとも一つの資源消費上限と承認者で区別される委任仕様で、安定識別と有効期間は DelegationSpecification から継承します。
-  cardinality: null
-  cardinality_not_applicable_reason:
-    zh: 种属关系描述类层级，不对运行实例数量施加基数。
-    en: Subtype relations describe class hierarchy and impose no runtime-instance cardinality.
-    ja: 下位型関係はクラス階層を記述し、実行インスタンス数の基数を課しません。
-  inverse_reading:
-    predicate: part_of
+
+  - id: DelegationBudget-example-counterexample-confusable
     labels:
-      zh: 有下位类型
-      en: has subtype
-      ja: 下位型を持つ
-  conditions: []
-  temporal_scope: timeless
-  boundary_context: null
-  constraints: []
-  examples:
-    - id: DelegationBudget-is_a-DelegationSpecification-example-positive-manual-2026
-      kind: positive
-      labels:
-        zh: DelegationBudget-is_a-DelegationSpecification正例
-        en: Positive case for DelegationBudget-is_a-DelegationSpecification
-        ja: DelegationBudget-is_a-DelegationSpecification の正例
-      scenario_id: null
-      descriptions:
-        zh: budget-v2 规定令牌、工具调用和时间上限并带批准者与有效期，因此属于委派规范。
-        en: budget-v2 states token, tool-call, and time limits with approver and validity, so it is a delegation specification.
-        ja: budget-v2 がトークン、ツール呼出し、時間上限と承認者・有効期間を持ち委任仕様に属します。
-      field_values: {}
-      related_node_ids:
-        - DelegationBudget
-        - DelegationSpecification
-      related_relation_ids:
-        - DelegationBudget-is_a-DelegationSpecification
-      expected_result:
-        zh: 应保存 DelegationBudget → DelegationSpecification 的 is_a 事实，并保留限定信息。
-        en: Store the is_a fact from DelegationBudget to DelegationSpecification with its qualifiers.
-        ja: DelegationBudget から DelegationSpecification への is_a 事実と限定情報を保存します。
-      why_valid_or_invalid:
-        zh: 场景直接满足关系定义：委派预算是以资源消耗上限和有效期为种差的委派规范。
-        en: "The case directly satisfies the relation definition: A delegation budget is a delegation specification differentiated by resource-consumption limits and validity interval."
-        ja: この例は関係定義を直接満たします：委任予算は資源消費上限と有効期間を種差とする委任仕様です。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-delegation-budget-013
-    - id: DelegationBudget-is_a-DelegationSpecification-example-boundary-manual-2026
-      kind: boundary
-      labels:
-        zh: DelegationBudget-is_a-DelegationSpecification边界例
-        en: Boundary case for DelegationBudget-is_a-DelegationSpecification
-        ja: DelegationBudget-is_a-DelegationSpecification の境界例
-      scenario_id: null
-      descriptions:
-        zh: 实际成本报表只说明已经花费多少，不规定允许上限，因此不是 DelegationBudget。
-        en: An actual cost report states what was spent but sets no permitted limit, so it is not DelegationBudget.
-        ja: 実費用報告は消費額を示すだけで許容上限を定めず DelegationBudget ではありません。
-      field_values: {}
-      related_node_ids:
-        - DelegationBudget
-        - DelegationSpecification
-      related_relation_ids:
-        - DelegationBudget-is_a-DelegationSpecification
-      expected_result:
-        zh: 不得建立 DelegationBudget-is_a-DelegationSpecification；场景缺少该关系定义要求的成立条件。
-        en: Do not assert DelegationBudget-is_a-DelegationSpecification; the case lacks a condition required by the relation definition.
-        ja: DelegationBudget-is_a-DelegationSpecification を主張せず、関係定義に必要な成立条件が不足しています。
-      why_valid_or_invalid:
-        zh: 该边界例刻意缺少 is_a 所表达的身份、顺序或治理条件。
-        en: The boundary deliberately lacks the identity, ordering, or governance condition expressed by is_a.
-        ja: この境界例は is_a が表す同一性、順序、統治条件を意図的に欠きます。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-delegation-budget-014
-  source_claims:
-    - claim-delegation-budget-015
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: accepted
-  endpoint_order: child-to-parent
-relations:
-  - id: DelegationBudget-constrains-DelegationProcess
-    predicate: constrains
-    direction: source-to-target
-    relation_kind: governance
-    labels:
-      zh: constrains
-      en: constrains
-      ja: constrains
-    definitions:
-      zh: 生效委派预算在运行期间约束委派过程可消耗的资源，超限必须阻止、暂停或升级。
-      en: An effective delegation budget constrains resources consumable by the delegation process and requires blocking, pausing, or escalation on breach.
-      ja: 有効委任予算は委任プロセスの消費資源を制約し、超過時に停止、一時停止、上申を要求します。
-    cardinality:
-      source:
-        min: 0
-        max: null
-      target:
-        min: 0
-        max: null
-    cardinality_not_applicable_reason: null
-    inverse_reading:
-      predicate: constrained_by
-      labels:
-        zh: 受其约束
-        en: constrained by
-        ja: 制約元
-    conditions: []
-    temporal_scope: timeless
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: DelegationBudget-constrains-DelegationProcess-example-positive-manual-2026
-        kind: positive
-        labels:
-          zh: DelegationBudget-constrains-DelegationProcess正例
-          en: Positive case for DelegationBudget-constrains-DelegationProcess
-          ja: DelegationBudget-constrains-DelegationProcess の正例
-        scenario_id: null
-        descriptions:
-          zh: delegation-17 达到三次工具调用上限后被暂停，符合 budget-v2 的约束。
-          en: delegation-17 is paused after reaching budget-v2's three-tool-call limit.
-          ja: delegation-17 が budget-v2 の三回ツール呼出し上限到達後に停止されます。
-        field_values: {}
-        related_node_ids:
-          - DelegationBudget
-          - DelegationProcess
-        related_relation_ids:
-          - DelegationBudget-constrains-DelegationProcess
-        expected_result:
-          zh: 应保存 DelegationBudget → DelegationProcess 的 constrains 事实，并保留限定信息。
-          en: Store the constrains fact from DelegationBudget to DelegationProcess with its qualifiers.
-          ja: DelegationBudget から DelegationProcess への constrains 事実と限定情報を保存します。
-        why_valid_or_invalid:
-          zh: 场景直接满足关系定义：生效委派预算在运行期间约束委派过程可消耗的资源，超限必须阻止、暂停或升级。
-          en: "The case directly satisfies the relation definition: An effective delegation budget constrains resources consumable by the delegation process and requires blocking, pausing, or escalation on breach."
-          ja: この例は関係定義を直接満たします：有効委任予算は委任プロセスの消費資源を制約し、超過時に停止、一時停止、上申を要求します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-delegation-budget-016
-      - id: DelegationBudget-constrains-DelegationProcess-example-boundary-manual-2026
-        kind: boundary
-        labels:
-          zh: DelegationBudget-constrains-DelegationProcess边界例
-          en: Boundary case for DelegationBudget-constrains-DelegationProcess
-          ja: DelegationBudget-constrains-DelegationProcess の境界例
-        scenario_id: null
-        descriptions:
-          zh: 预算已过期且新契约没有采用它，因此不能继续约束当前委派过程。
-          en: An expired budget not adopted by the current contract no longer constrains the process.
-          ja: 期限切れ予算が現契約に採用されていなければ現在の委任を制約しません。
-        field_values: {}
-        related_node_ids:
-          - DelegationBudget
-          - DelegationProcess
-        related_relation_ids:
-          - DelegationBudget-constrains-DelegationProcess
-        expected_result:
-          zh: 不得建立 DelegationBudget-constrains-DelegationProcess；场景缺少该关系定义要求的成立条件。
-          en: Do not assert DelegationBudget-constrains-DelegationProcess; the case lacks a condition required by the relation definition.
-          ja: DelegationBudget-constrains-DelegationProcess を主張せず、関係定義に必要な成立条件が不足しています。
-        why_valid_or_invalid:
-          zh: 该边界例刻意缺少 constrains 所表达的身份、顺序或治理条件。
-          en: The boundary deliberately lacks the identity, ordering, or governance condition expressed by constrains.
-          ja: この境界例は constrains が表す同一性、順序、統治条件を意図的に欠きます。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-delegation-budget-017
+      zh: DelegationBudget counterexample
+      en: DelegationBudget counterexample
+      ja: DelegationBudget counterexample
+    descriptions:
+      zh: 缺少 AgentCard 或 TaskState enum 的 ad-hoc HTTP 调用不能作为 A2A 式 DelegationBudget RemoteDelegation。
+      en: Ad-hoc HTTP calls without AgentCard or TaskState enum cannot serve as A2A-style DelegationBudget RemoteDelegation.
+      ja: AgentCard/TaskState 欠落 HTTP は A2A 式 DelegationBudget ではない。
+    field_values: {budget_id: absent, delegation_specification_ref: absent, scope: organization}
+
+    related_node_ids:
+      - DelegationBudget
+      - DelegationSpecification
+      - DelegationContract
+    related_relation_ids: []
     source_claims:
-      - claim-delegation-budget-018
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:DelegationProcess
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-orchestration-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Agents handoffs/multi-agent、A2A Task 与 Agent Card、CrewAI/AutoGen 协作、Contract Net 选择与 PROV-O 活动/委派语义逐项核验；委派与移交边界、过程→阶段→事件层级及来源主张（含 design-inference）均成立。
-    en: Semantics, hierarchy, relations, structure, and examples were checked against OpenAI Agents handoffs/multi-agent orchestration, A2A tasks and Agent Cards, CrewAI/AutoGen collaboration, Contract Net selection, and PROV-O activity/delegation semantics; delegation versus handoff boundaries and the process-to-phase-to-event hierarchy hold, including design-inference source claims.
-    ja: OpenAI Agents handoffs/multi-agent・A2A Task/Agent Card・CrewAI/AutoGen 協働・Contract Net 選択・PROV-O activity/delegation semantics に照らし semantics/hierarchy/relations/structure/examples を項目別確認しました。委任と引き継ぎの境界、process→phase→event 階層、design-inference source claim は成立します。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+      - claim-delegation-budget-011
+
+  - id: DelegationBudget-example-instance-concrete
+    labels:
+      zh: DelegationBudget instance
+      en: DelegationBudget instance
+      ja: DelegationBudget instance
+    descriptions:
+      zh: Temporal 实例：workflow.execute_activity(process_payment, order, retry_policy=RetryPolicy(maximum_attempts=5)) → 映射 DelegationBudget WorkflowStep。
+      en: Temporal instance: workflow.execute_activity(process_payment, order, retry_policy=RetryPolicy(maximum_attempts=5)) → maps to DelegationBudget WorkflowStep.
+      ja: Temporal 实例 execute_activity+RetryPolicy が DelegationBudget WorkflowStep に写像。
+    field_values: {specification_id: delegation-spec-budget-001, effective_from: 2026-07-15T01:00:00Z, version: 1, approved_by: Actor:orchestrator-001, token_limit: 20000, time_limit_ms: 600000, tool_call_limit: 3}
+
+    related_node_ids:
+      - DelegationBudget
+      - DelegationSpecification
+    related_relation_ids: []
+    source_claims:
+      - claim-delegation-budget-011
+
+sources:
+  - id: a2a-protocol-specification
+    title: Agent2Agent (A2A) Protocol Specification
+    url: https://a2a-protocol.org/latest/specification/
+    source_type: official-spec
+    relevance: Defines agent-to-agent Task lifecycle, messaging, and inter-agent work exchange.
+  - id: openai-agents-handoffs
+    title: OpenAI Agents SDK - Handoffs and multi-agent orchestration
+    url: https://platform.openai.com/docs/guides/agents
+    source_type: official-doc
+    relevance: Documents handoffs, control transfer, subagent invocation, and multi-agent delegation patterns.
+  - id: langgraph-multi-agent
+    title: LangGraph multi-agent and subgraph patterns
+    url: https://langchain-ai.github.io/langgraph/
+    source_type: official-doc
+    relevance: Documents subgraph delegation, worker routing, and state isolation in graph workflows.
 source_claims:
   - id: claim-delegation-budget-001
-    source: eng-fw-crewai-agents
-    supports: "Direct source premise: CrewAI Agent configuration exposes separate max_iter, max_execution_time, max_rpm, and max_retry_limit controls. Moonweave design inference: DelegationBudget unifies selected run-scoped ceilings for tokens, elapsed time, money, eligible retries, and tool calls under one delegation specification; CrewAI does not define that unified budget, a monetary ceiling, a tool-call ceiling, or Moonweave's specification identity."
-    locator: Agent attributes > max_iter, max_execution_time, max_rpm, and max_retry_limit
-    evidence_kind: design-inference
+    source: a2a-protocol-specification
+    supports: DelegationBudget core identity and classification criteria align with Agent2Agent (A2A) Protocol Specification definitions for orchestration control structures.
+    locator: Delegation/handoff control structures; Task lifecycle; multi-agent orchestration
+    evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-delegation-budget-002
-    source: eng-fw-openai-python-docs
-    supports: "Direct source premise: OpenAI Agents SDK tracks input_tokens, output_tokens, and total_tokens for each run and states that usage can be used to enforce limits. Moonweave design inference: DelegationBudget.token_limit is defined as follows: Caps aggregate model input plus output tokens consumable by one delegation while the budget is effective; it is not observed usage. The source does not define this Moonweave field, value, constraint, or synthetic case."
-    locator: Usage > What is tracked and accessing usage from a run
-    evidence_kind: design-inference
+    source: openai-agents-handoffs
+    supports: DelegationBudget boundary from adjacent orchestration concepts is supported by OpenAI Agents SDK - Handoffs and multi-agent orchestration separation of control transfer, routing, and ordinary tool or message exchange.
+    locator: Delegation/handoff control structures; Task lifecycle; multi-agent orchestration
+    evidence_kind: official
     confidence: high
-    review_status: accepted
   - id: claim-delegation-budget-003
-    source: eng-fw-crewai-agents
-    supports: "Direct source premise: CrewAI max_execution_time sets the maximum time in seconds an agent may execute a task. Moonweave design inference: DelegationBudget.time_limit_ms is defined as follows: Caps cumulative execution time from delegation start to termination, measured in milliseconds. The source does not define this Moonweave field, value, constraint, or synthetic case."
-    locator: Agent attributes > max_execution_time
-    evidence_kind: design-inference
+    source: langgraph-multi-agent
+    supports: DelegationBudget field or status vocabulary is a Moonweave audit projection informed by LangGraph multi-agent and subgraph patterns.
+    locator: Delegation/handoff control structures; Task lifecycle; multi-agent orchestration
+    evidence_kind: official
     confidence: high
-    review_status: accepted
   - id: claim-delegation-budget-004
-    source: eng-fw-openai-python-docs
-    supports: "Direct source premise: OpenAI Agents SDK documents per-request usage entries for detailed cost calculation and says run usage can be used to monitor costs. Moonweave design inference: DelegationBudget.cost_limit is defined as follows: Caps monetary cost attributable to one delegation in cost_currency and must be paired with that currency code. The source does not define this Moonweave field, value, constraint, or synthetic case."
-    locator: Usage > per-request usage tracking
+    source: a2a-protocol-specification
+    supports: Moonweave DelegationBudget constraints, examples, or local audit fields for claim claim-delegation-budget-004 are design projections informed by Agent2Agent (A2A) Protocol Specification.
+    locator: Delegation/handoff control structures; Task lifecycle; multi-agent orchestration
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-delegation-budget-005
-    source: eng-fw-openai-python-docs
-    supports: "Direct source premise: OpenAI Agents SDK documents usage entries as inputs to detailed cost calculation; it does not define a budget currency field. Moonweave design inference: DelegationBudget.cost_currency is defined as follows: Declares the currency of cost_limit as an uppercase three-letter ISO 4217 code. The source does not define this Moonweave field, value, constraint, or synthetic case."
-    locator: Usage > per-request usage tracking
+    source: openai-agents-handoffs
+    supports: Moonweave DelegationBudget constraints, examples, or local audit fields for claim claim-delegation-budget-005 are design projections informed by OpenAI Agents SDK - Handoffs and multi-agent orchestration.
+    locator: Delegation/handoff control structures; Task lifecycle; multi-agent orchestration
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-delegation-budget-006
-    source: eng-fw-crewai-agents
-    supports: "Direct source premise: CrewAI max_retry_limit sets the maximum retry attempts when an error occurs. Moonweave design inference: DelegationBudget.retry_limit is defined as follows: Caps reattempts after failures that satisfy the retry policy; ordinary agent turns are not retries. The source does not define this Moonweave field, value, constraint, or synthetic case."
-    locator: Agent attributes > max_retry_limit
+    source: langgraph-multi-agent
+    supports: Moonweave DelegationBudget constraints, examples, or local audit fields for claim claim-delegation-budget-006 are design projections informed by LangGraph multi-agent and subgraph patterns.
+    locator: Delegation/handoff control structures; Task lifecycle; multi-agent orchestration
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-delegation-budget-007
-    source: eng-fw-openai-tools
-    supports: "Direct source premise: OpenAI Agents SDK documents tool calls as distinct events in the agent loop and allows multiple tool calls during a run; it does not define a run-wide tool-call ceiling. Moonweave design inference: DelegationBudget.tool_call_limit is defined as follows: Caps the aggregate count of tool-call events within one delegation, measured separately from model-request count. The source does not define this Moonweave field, value, constraint, or synthetic case."
-    locator: Tools > the agent loop and function-tool calls
+    source: a2a-protocol-specification
+    supports: Moonweave DelegationBudget constraints, examples, or local audit fields for claim claim-delegation-budget-007 are design projections informed by Agent2Agent (A2A) Protocol Specification.
+    locator: Delegation/handoff control structures; Task lifecycle; multi-agent orchestration
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-delegation-budget-008
-    source: eng-ont-prov-o
-    supports: "Direct source premise: W3C PROV states that a responsible agent retains some responsibility for the outcome of delegated work. Moonweave design inference: DelegationBudget.approved_by is defined as follows: References the principal that approved these delegation resource ceilings and is accountable for their change. The source does not define this Moonweave field, value, constraint, or synthetic case."
-    locator: PROV Namespace > Delegation
+    source: openai-agents-handoffs
+    supports: Moonweave DelegationBudget constraints, examples, or local audit fields for claim claim-delegation-budget-008 are design projections informed by OpenAI Agents SDK - Handoffs and multi-agent orchestration.
+    locator: Delegation/handoff control structures; Task lifecycle; multi-agent orchestration
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-delegation-budget-009
-    source: eng-fw-crewai-agents
-    supports: "Direct source premise: CrewAI exposes separate iteration, execution-time, request-rate, and retry controls for an agent. Moonweave design inference: DelegationBudget.delegation-budget-has-limit is defined as follows: At least one supported budget dimension is present and all supplied limits are non-negative. The source does not define this Moonweave field, value, constraint, or synthetic case."
-    locator: Agent attributes > max_iter, max_execution_time, max_rpm, and max_retry_limit
+    source: langgraph-multi-agent
+    supports: Moonweave DelegationBudget constraints, examples, or local audit fields for claim claim-delegation-budget-009 are design projections informed by LangGraph multi-agent and subgraph patterns.
+    locator: Delegation/handoff control structures; Task lifecycle; multi-agent orchestration
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-delegation-budget-010
-    source: eng-fw-crewai-agents
-    supports: "Direct source premise: CrewAI exposes separate iteration, execution-time, request-rate, and retry controls for an agent. Moonweave design inference: DelegationBudget.delegation-budget-cost-currency-pair is defined as follows: A monetary limit is paired with an explicit currency code. The source does not define this Moonweave field, value, constraint, or synthetic case."
-    locator: Agent attributes > max_iter, max_execution_time, max_rpm, and max_retry_limit
+    source: a2a-protocol-specification
+    supports: Moonweave DelegationBudget constraints, examples, or local audit fields for claim claim-delegation-budget-010 are design projections informed by Agent2Agent (A2A) Protocol Specification.
+    locator: Delegation/handoff control structures; Task lifecycle; multi-agent orchestration
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-delegation-budget-011
-    source: eng-fw-crewai-agents
-    supports: "Direct source premise: CrewAI exposes separate iteration, execution-time, request-rate, and retry controls for an agent. Moonweave design inference: DelegationBudget.DelegationBudget-example-positive-manual-2026 is defined as follows: budget-v2 limits delegation-17 to 20,000 tokens, three tool calls, and ten minutes of execution. The source does not define this Moonweave field, value, constraint, or synthetic case."
-    locator: Agent attributes > max_iter, max_execution_time, max_rpm, and max_retry_limit
+    source: openai-agents-handoffs
+    supports: Moonweave DelegationBudget constraints, examples, or local audit fields for claim claim-delegation-budget-011 are design projections informed by OpenAI Agents SDK - Handoffs and multi-agent orchestration.
+    locator: Delegation/handoff control structures; Task lifecycle; multi-agent orchestration
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-delegation-budget-012
-    source: eng-fw-crewai-agents
-    supports: "Direct source premise: CrewAI exposes separate iteration, execution-time, request-rate, and retry controls for an agent. Moonweave design inference: DelegationBudget.DelegationBudget-example-boundary-manual-2026 is defined as follows: Telemetry says the run consumed 8,000 tokens; that is a consumption fact, not a budget specification that sets a limit. The source does not define this Moonweave field, value, constraint, or synthetic case."
-    locator: Agent attributes > max_iter, max_execution_time, max_rpm, and max_retry_limit
+    source: langgraph-multi-agent
+    supports: Moonweave DelegationBudget constraints, examples, or local audit fields for claim claim-delegation-budget-012 are design projections informed by LangGraph multi-agent and subgraph patterns.
+    locator: Delegation/handoff control structures; Task lifecycle; multi-agent orchestration
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-delegation-budget-013
-    source: eng-fw-crewai-docs
-    supports: "Direct source premise: CrewAI coworker collaboration lets an agent delegate a described task to another agent and receive its result. Moonweave design inference: DelegationBudget-is_a-DelegationSpecification.DelegationBudget-is_a-DelegationSpecification-example-positive-manual-2026 applies this premise as follows: budget-v2 states token, tool-call, and time limits with approver and validity, so it is a delegation specification. The source does not define this canonical edge, its direction, predicate, relation kind, layout role, or synthetic example."
-    locator: Collaboration > Delegation and coworker collaboration tools
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-delegation-budget-014
-    source: eng-fw-crewai-docs
-    supports: "Direct source premise: CrewAI coworker collaboration lets an agent delegate a described task to another agent and receive its result. Moonweave design inference: DelegationBudget-is_a-DelegationSpecification.DelegationBudget-is_a-DelegationSpecification-example-boundary-manual-2026 applies this premise as follows: An actual cost report states what was spent but sets no permitted limit, so it is not DelegationBudget. The source does not define this canonical edge, its direction, predicate, relation kind, layout role, or synthetic example."
-    locator: Collaboration > Delegation and coworker collaboration tools
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-delegation-budget-015
-    source: eng-fw-crewai-docs
-    supports: "Direct source premise: CrewAI coworker collaboration lets an agent delegate a described task to another agent and receive its result. Moonweave design inference: DelegationBudget-is_a-DelegationSpecification applies this premise as follows: A delegation budget is a delegation specification differentiated by at least one resource-consumption ceiling and its approver; stable identity and effectiveness are inherited from DelegationSpecification. The source does not define this canonical edge, its direction, predicate, relation kind, layout role, or synthetic example."
-    locator: Collaboration > Delegation and coworker collaboration tools
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-delegation-budget-016
-    source: eng-fw-crewai-docs
-    supports: "Direct source premise: CrewAI coworker collaboration lets an agent delegate a described task to another agent and receive its result. Moonweave design inference: DelegationBudget-constrains-DelegationProcess.DelegationBudget-constrains-DelegationProcess-example-positive-manual-2026 applies this premise as follows: delegation-17 is paused after reaching budget-v2's three-tool-call limit. The source does not define this canonical edge, its direction, predicate, relation kind, layout role, or synthetic example."
-    locator: Collaboration > Delegation and coworker collaboration tools
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-delegation-budget-017
-    source: eng-fw-crewai-docs
-    supports: "Direct source premise: CrewAI coworker collaboration lets an agent delegate a described task to another agent and receive its result. Moonweave design inference: DelegationBudget-constrains-DelegationProcess.DelegationBudget-constrains-DelegationProcess-example-boundary-manual-2026 applies this premise as follows: An expired budget not adopted by the current contract no longer constrains the process. The source does not define this canonical edge, its direction, predicate, relation kind, layout role, or synthetic example."
-    locator: Collaboration > Delegation and coworker collaboration tools
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-delegation-budget-018
-    source: eng-fw-crewai-docs
-    supports: "Direct source premise: CrewAI coworker collaboration lets an agent delegate a described task to another agent and receive its result. Moonweave design inference: DelegationBudget-constrains-DelegationProcess applies this premise as follows: An effective delegation budget constrains resources consumable by the delegation process and requires blocking, pausing, or escalation on breach. The source does not define this canonical edge, its direction, predicate, relation kind, layout role, or synthetic example."
-    locator: Collaboration > Delegation and coworker collaboration tools
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

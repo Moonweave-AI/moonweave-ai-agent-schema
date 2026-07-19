@@ -1,0 +1,351 @@
+schema: moonweave.ai/ontology-node/v1
+id: MemoryRetentionPolicy
+kind: concept
+status: accepted
+labels:
+  zh: 记忆保留策略
+  en: Memory Retention Policy
+  ja: 記憶保持ポリシー
+semantics:
+  short_definition:
+    zh: 声明何种保留触发条件会使一组记忆记录符合归档、墓碑化或删除处理条件的规则。
+    en: A declaration of which retention trigger makes a set of memory records eligible for archive, tombstone, or deletion handling.
+    ja: どの retention trigger により一群の memory record が archive、tombstone、deletion handling の対象になるかを宣言する規則。
+  definition:
+    zh: >-
+      MemoryRetentionPolicy 是一个可审计的声明，定义时间到期、非活动窗口或容量压力等触发条件，以及满足条件时允许的
+      archive、tombstone 或 delete 处理。它可通过 retention_policy_ref 关联到 MemoryRecord，但策略本身不改变记录、
+      不创建 MemoryTombstone，也不执行删除。实际保留处理必须由独立的 MemoryOperation、结果和来源证据记录。它不是
+      MemoryScope、MemoryNamespace、MemoryStore、记录内容、访问授权或某次已发生的生命周期事件。
+    en: >-
+      A MemoryRetentionPolicy is an auditable declaration of triggers such as time expiry, inactivity window, or capacity
+      pressure and of permitted archive, tombstone, or delete handling when a trigger is met. It can be linked to a
+      MemoryRecord through retention_policy_ref, but the policy itself does not alter a record, create a MemoryTombstone,
+      or execute deletion. Actual retention handling must be recorded by a separate MemoryOperation, result, and
+      provenance evidence. It is not MemoryScope, MemoryNamespace, MemoryStore, record content, access authorization,
+      or one lifecycle event that has already occurred.
+    ja: >-
+      MemoryRetentionPolicy は time expiry、inactivity window、capacity pressure などの trigger と、それを満たした時に
+      許可される archive、tombstone、delete handling を定義する audit 可能な宣言です。retention_policy_ref を通じて
+      MemoryRecord に link できるが、policy 自体は record を変更せず、MemoryTombstone を作成せず、deletion を実行しません。
+      実際の retention handling は別の MemoryOperation、result、provenance evidence で記録しなければなりません。MemoryScope、
+      MemoryNamespace、MemoryStore、record content、access authorization、既に発生した lifecycle event ではありません。
+  why_needed:
+    zh: >-
+      长期记忆需要可预测的保留边界以控制成本、过期内容和合规需求，但策略定义与实际删除必须分开。这样审计可解释
+      “为何有资格处理”与“何时、由谁、对哪个版本执行了处理”。
+    en: >-
+      Long-term memory needs predictable retention boundaries for cost, stale content, and compliance needs, yet policy
+      definition must stay separate from actual deletion. This lets audits explain both why a record was eligible and when,
+      by whom, and against which version handling was performed.
+    ja: >-
+      長期 memory には cost、stale content、compliance のため予測可能な retention boundary が必要だが、policy definition は
+      実際の deletion と分けなければならない。これにより audit は record がなぜ対象だったか、いつ誰がどの version に
+      handling を実行したかを説明できる。
+  includes:
+    - zh: 30 天 TTL 后墓碑化的策略、容量达到上限后使用 LRU 候选归档的策略，以及基于非活动期的归档策略。
+      en: A policy that tombstones after 30-day TTL, a capacity-limit policy that selects LRU candidates for archive, and an inactivity-based archive policy.
+      ja: 30-day TTL 後に tombstone 化する policy、capacity limit 後に LRU candidate を archive 用に選ぶ policy、inactivity-based archive policy。
+  excludes:
+    - zh: 已存在的 MemoryTombstone、一次 delete 操作、记录的当前生命周期状态、访问控制规则、存储命名空间或向量淘汰算法实现。
+      en: An existing MemoryTombstone, one delete operation, a record's current lifecycle state, an access-control rule, a storage namespace, or a vector-eviction algorithm implementation.
+      ja: 既存の MemoryTombstone、一回の delete operation、record の現在 lifecycle state、access-control rule、storage namespace、vector-eviction algorithm implementation。
+  semantic_kind: policy
+  aliases: [memory lifecycle retention rule, memory expiry policy]
+engineering:
+  explanation:
+    zh: >-
+      策略评估读取记录的 retention_policy_ref、创建或最后访问时间、容量统计和可选的访问指标，并输出“符合处理条件”的
+      候选列表。执行器随后在独立生命周期操作中归档、创建墓碑或删除，并记录实际结果。Redis 的 TTL 和 LRU/LFU 说明了
+      触发与淘汰策略的通用模式，但 Moonweave 的记录级策略字段和审计关系是本地建模选择。
+    en: >-
+      Policy evaluation reads a record's retention_policy_ref, creation or last-access time, capacity statistics, and
+      optional access metrics and outputs a candidate list that is eligible for handling. An executor then archives,
+      creates tombstones, or deletes in an independent lifecycle operation and records the actual result. Redis TTL and
+      LRU/LFU illustrate general trigger and eviction patterns, while Moonweave record-level policy fields and audit
+      relations are local modeling choices.
+    ja: >-
+      policy evaluation は record の retention_policy_ref、作成又は最終 access 時刻、capacity statistics、任意の access
+      metric を読み、handling 対象の candidate list を出力します。executor はその後、独立した lifecycle operation で
+      archive、tombstone 作成、delete を行い実際の result を記録します。Redis の TTL と LRU/LFU は一般的な trigger と
+      eviction pattern を示しますが、Moonweave の record-level policy field と audit relation はローカルな modeling choice です。
+  typical_input:
+    - description: Evaluate a TTL retention policy
+      format: |
+        policy = {
+          "retention_policy_id": "ttl-30d-tombstone",
+          "trigger_kind": "ttl",
+          "duration": "P30D",
+          "expiry_action": "tombstone"
+        }
+        record = {"memory_record_id": "pref-u-123-v2", "retention_policy_ref": "ttl-30d-tombstone"}
+  typical_output:
+    - description: Eligibility result before lifecycle execution
+      format: |
+        {
+          "record_ref": "pref-u-123-v2",
+          "retention_eligible": true,
+          "permitted_action": "tombstone",
+          "operation_performed": false
+        }
+  reference_implementations:
+    - name: Redis key eviction
+      url: https://redis.io/docs/latest/develop/reference/eviction/
+      description: Documents memory limits, TTL-aware eviction, and LRU, LFU, LRM, and random policy choices.
+structure:
+  identity_keys: [retention_policy_id]
+  fields:
+    - id: retention_policy_id
+      labels:
+        zh: 保留策略标识
+        en: retention policy ID
+        ja: retention policy ID
+      definitions:
+        zh: 稳定标识可被 MemoryRecord 的 retention_policy_ref 引用的一个策略声明。
+        en: Stably identifies one policy declaration that a MemoryRecord retention_policy_ref can reference.
+        ja: MemoryRecord の retention_policy_ref が参照できる一つの policy declaration を安定して識別する。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: null
+      example_value: ttl-30d-tombstone
+      source_claims: [claim-memory-retention-policy-binding]
+    - id: trigger_kind
+      labels:
+        zh: 保留触发类别
+        en: retention trigger kind
+        ja: retention trigger 種別
+      definitions:
+        zh: 指明策略按时间到期、非活动窗口或容量压力评估记录是否符合处理条件。
+        en: States whether the policy evaluates eligibility from time expiry, inactivity window, or capacity pressure.
+        ja: policy が time expiry、inactivity window、capacity pressure のどれで record の eligibility を評価するかを表す。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: [ttl, inactivity, capacity]
+      pattern: null
+      example_value: ttl
+      source_claims: [claim-memory-retention-trigger]
+    - id: duration
+      labels:
+        zh: 保留时长
+        en: retention duration
+        ja: retention duration
+      definitions:
+        zh: 对 ttl 或 inactivity 触发器，声明记录达到处理资格前必须经过的 ISO 8601 持续时间。
+        en: For ttl or inactivity triggers, declares the ISO 8601 duration that must elapse before a record is eligible for handling.
+        ja: ttl 又は inactivity trigger で、record が handling の対象になるまでに経過すべき ISO 8601 duration を宣言する。
+      datatype: string
+      required: false
+      cardinality: {min: 0, max: 1}
+      allowed_values: []
+      pattern: null
+      example_value: P30D
+      source_claims: [claim-memory-retention-trigger]
+    - id: capacity_limit
+      labels:
+        zh: 容量上限
+        en: capacity limit
+        ja: capacity limit
+      definitions:
+        zh: 对 capacity 触发器，声明评估存储集合时的最大记录数或容量单位；它不是当前使用量。
+        en: For a capacity trigger, declares the maximum record count or capacity unit used for evaluating a storage collection; it is not current usage.
+        ja: capacity trigger で、storage collection を評価する最大 record count 又は capacity unit を宣言する。現在 usage ではない。
+      datatype: integer
+      required: false
+      cardinality: {min: 0, max: 1}
+      allowed_values: []
+      pattern: null
+      example_value: 10000
+      source_claims: [claim-memory-retention-capacity]
+    - id: selection_strategy
+      labels:
+        zh: 候选选择策略
+        en: candidate selection strategy
+        ja: candidate selection strategy
+      definitions:
+        zh: 对 capacity 触发器，声明从符合条件的记录中选择处理候选的策略；它不表示某个候选已被处理。
+        en: For a capacity trigger, declares how to select handling candidates among eligible records; it does not mean any candidate has already been handled.
+        ja: capacity trigger で、eligible record の中から handling candidate を選ぶ方法を宣言する。candidate が既に handling されたことは意味しない。
+      datatype: string
+      required: false
+      cardinality: {min: 0, max: 1}
+      allowed_values: [lru, lfu, lrm, random, shortest-ttl]
+      pattern: null
+      example_value: lru
+      source_claims: [claim-memory-retention-capacity]
+    - id: expiry_action
+      labels:
+        zh: 到期处理动作
+        en: expiry handling action
+        ja: expiry handling action
+      definitions:
+        zh: 声明策略允许执行器对符合条件的记录归档、创建墓碑或删除；策略本身不执行该动作。
+        en: Declares whether an executor may archive, create a tombstone for, or delete an eligible record; the policy does not execute the action itself.
+        ja: executor が eligible record を archive、tombstone 化、delete のいずれで扱えるかを宣言する。policy 自体は action を実行しない。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: [archive, tombstone, delete]
+      pattern: null
+      example_value: tombstone
+      source_claims: [claim-memory-retention-policy-action]
+  constraints:
+    - id: memory-retention-policy-trigger-parameters
+      severity: error
+      expression_language: plain
+      expression: retention_policy_id, trigger_kind, and expiry_action are required. trigger_kind ttl or inactivity requires duration and forbids capacity-only selection fields. trigger_kind capacity requires capacity_limit and selection_strategy. A candidate selected by this policy remains unmodified until a separate lifecycle operation records the action.
+      explanation:
+        zh: 触发依据必须具有足够参数，且策略评估、候选选择和实际生命周期写入必须保持分离。
+        en: A trigger must have sufficient parameters, and policy evaluation, candidate selection, and actual lifecycle write must remain separate.
+        ja: trigger には十分な parameter が必要であり、policy evaluation、candidate selection、実際の lifecycle write は分離したままでなければならない。
+      source_claims: [claim-memory-retention-trigger, claim-memory-retention-capacity, claim-memory-retention-policy-action]
+    - id: memory-retention-policy-role-boundary
+      severity: error
+      expression_language: plain
+      expression: MemoryRetentionPolicy is a declarative rule, not a MemoryTombstone, MemoryOperation, MemoryOperationResult, MemoryScope, MemoryNamespace, access grant, or current record lifecycle state. Actual archive, tombstone, or deletion requires independently recorded execution and provenance evidence.
+      explanation:
+        zh: 为什么记录符合处理条件与处理是否已经发生是不同事实；策略不应掩盖执行来源或授权边界。
+        en: Why a record is eligible and whether handling has happened are different facts; a policy must not conceal execution provenance or access boundaries.
+        ja: record がなぜ handling 対象かと handling が既に発生したかは別の fact である。policy は execution provenance や access boundary を隠してはならない。
+      source_claims: [claim-memory-retention-policy-action]
+  required_relations: []
+examples:
+  - id: memory-retention-policy-positive-example
+
+    labels:
+      zh: 30 天后墓碑化策略
+      en: 30-day tombstone policy
+      ja: 30-day tombstone policy
+
+    descriptions:
+      zh: Generative Agents Memory Stream + Reflection；MemGPT core_memory_append/archival_memory_insert；Redis SET EX TTL + FT.SEARCH vector eviction。
+      en: Generative Agents Memory Stream + Reflection; MemGPT core_memory_append/archival_memory_insert; Redis SET EX TTL + FT.SEARCH vector eviction.
+      ja: Generative Agents Memory Stream + Reflection。MemGPT core_memory_append/archival_memory_insert。Redis SET EX TTL + vector eviction。
+    field_values: {retention_policy_id: ttl-30d-tombstone, trigger_kind: ttl, duration: P30D, expiry_action: tombstone}
+    related_node_ids: [MemoryRetentionPolicy, MemoryRecord, MemoryTombstone]
+    related_relation_ids: [MemoryRetentionPolicy-governs-MemoryRecord]
+
+    source_claims: [claim-memory-retention-trigger, claim-memory-retention-policy-action, claim-memory-retention-policy-binding]
+  - id: memory-retention-policy-boundary-example
+
+    labels:
+      zh: 已配置但尚未执行的容量策略
+      en: Configured capacity policy not yet executed
+      ja: 設定済みだが未実行の capacity policy
+
+    descriptions:
+      zh: MemGPT main_context vs archival vs recall 生命周期阶段；Generative Agents importance 累计 vs MemoryDecay recency 衰减。
+      en: MemGPT main_context vs archival vs recall lifecycle stages; Generative Agents importance accumulation vs MemoryDecay recency decay.
+      ja: MemGPT main/recall/archival lifecycle 段階。Generative Agents importance 累計 vs MemoryDecay recency 減衰。
+    field_values: {retention_policy_id: capacity-10000-archive, trigger_kind: capacity, capacity_limit: 10000, selection_strategy: lru, expiry_action: archive}
+    related_node_ids: [MemoryRetentionPolicy, MemoryStore, MemoryRecord]
+    related_relation_ids: []
+
+    source_claims: [claim-memory-retention-capacity, claim-memory-retention-policy-action]
+  - id: memory-retention-policy-counterexample-example
+
+    labels:
+      zh: 已存在墓碑不是策略
+      en: Existing tombstone is not a policy
+      ja: 既存 tombstone は policy ではない
+
+    descriptions:
+      zh: 反例：ephemeral tool output 无 MemoryRetentionPolicy/Redis EX TTL 就永久 MemoryWrite。
+      en: Counterexample: ephemeral tool output MemoryWrite permanently without MemoryRetentionPolicy/Redis EX TTL.
+      ja: 反例：ephemeral tool output が MemoryRetentionPolicy/Redis EX TTL なしで永久 MemoryWrite。
+    field_values: {tombstone_id: tombstone-pref-u-123-v1, record_ref: pref-u-123-v1, tombstoned_at: '2026-07-18T10:00:00Z', reason_code: retention-expiry}
+    related_node_ids: [MemoryRetentionPolicy, MemoryTombstone, MemoryRecord]
+    related_relation_ids: []
+
+    source_claims: [claim-memory-retention-policy-action]
+  - id: memory-retention-policy-instance-example
+
+    labels:
+      zh: 实例：项目政策 90 天归档策略
+      en: "Instance: 90-day project-policy archive policy"
+      ja: "事例: 90-day project-policy archive policy"
+
+    descriptions:
+      zh: MemGPT core_memory_replace(key="human", old="Bob", new="Alice")；Generative Agents reflection importance threshold=150 触发。
+      en: MemGPT core_memory_replace(key="human", old="Bob", new="Alice"); Generative Agents reflection importance threshold=150 triggers.
+      ja: MemGPT core_memory_replace。Generative Agents reflection importance threshold=150 トリガー。
+    field_values: {retention_policy_id: project-policy-retention-90d, trigger_kind: inactivity, duration: P90D, expiry_action: archive}
+    related_node_ids: [MemoryRetentionPolicy, MemoryRecord, MemoryOperation]
+    related_relation_ids: [MemoryRetentionPolicy-governs-MemoryRecord]
+
+    source_claims: [claim-memory-retention-trigger, claim-memory-retention-policy-binding]
+parent_relation: null
+relations:
+  - id: MemoryRetentionPolicy-governs-MemoryRecord
+    predicate: governs
+    target: concept:MemoryRecord
+    endpoint_order: child-to-parent
+    direction: source-to-target
+    relation_kind: governance
+    labels:
+      zh: 治理记忆记录的保留资格
+      en: governs retention eligibility of memory record
+      ja: memory record の retention eligibility を統治する
+    definitions:
+      zh: 一个 MemoryRetentionPolicy 仅当 MemoryRecord 的 retention_policy_ref 等于该策略标识时，声明其保留触发和允许处理动作。
+      en: A MemoryRetentionPolicy declares retention triggers and permitted handling for a MemoryRecord only when the record's retention_policy_ref equals this policy identifier.
+      ja: MemoryRetentionPolicy は MemoryRecord の retention_policy_ref がこの policy identifier と一致する場合にのみ、retention trigger と許可 handling を宣言する。
+    cardinality: {source: {min: 0, max: null}, target: {min: 0, max: 1}}
+    cardinality_not_applicable_reason: null
+    inverse_reading:
+      predicate: governed_by_retention_policy
+      labels:
+        zh: 受保留策略治理
+        en: governed by retention policy
+        ja: retention policy により統治される
+    conditions:
+      - id: memory-retention-policy-governs-record-condition
+        severity: error
+        expression_language: plain
+        expression: Assert only when record.retention_policy_ref equals retention_policy.retention_policy_id and the policy trigger parameters are valid for trigger_kind. This relation declares eligibility only and never proves archive, tombstone, or deletion occurred.
+        explanation:
+          zh: 关联需要明确策略引用和有效参数；实际处理需要独立的操作和结果证据。
+          en: The relation needs an explicit policy reference and valid parameters; actual handling needs separate operation and result evidence.
+          ja: relation には明示的 policy reference と有効 parameter が必要である。実際の handling には別の operation と result evidence が必要である。
+        source_claims: [claim-memory-retention-policy-binding, claim-memory-retention-policy-action]
+    temporal_scope: valid-time
+    boundary_context: A matching namespace, scope, stale timestamp, or capacity observation alone does not bind a policy to a record or prove that lifecycle handling occurred.
+    constraints: []
+    examples: []
+    source_claims: [claim-memory-retention-policy-binding]
+    distinct_fact_rationale: This relation captures declarative retention governance, not actual lifecycle execution, access authorization, storage membership, or model visibility.
+    layout_role: primary-backbone
+sources:
+  - id: redis-key-eviction
+    title: Redis key eviction
+    url: https://redis.io/docs/latest/develop/reference/eviction/
+    type: official-doc
+    source_type: official-doc
+    relevance: Documents memory limits, TTL-aware policies, and LRU, LFU, LRM, random, and shortest-TTL eviction choices.
+source_claims:
+  - id: claim-memory-retention-trigger
+    source: redis-key-eviction
+    supports: Redis documents keys with expiration and TTL-aware eviction policies. Moonweave uses ttl and inactivity duration declarations as explicit retention triggers for memory records.
+    locator: "Key eviction: eviction policies and volatile TTL policies"
+    evidence_kind: ontology-design-inference
+    confidence: medium
+  - id: claim-memory-retention-capacity
+    source: redis-key-eviction
+    supports: Redis documents eviction when memory exceeds a configured limit and documents LRU, LFU, LRM, random, and shortest-TTL choices. Moonweave models capacity limit and candidate selection as policy parameters rather than completed deletion facts.
+    locator: "Key eviction: maxmemory and eviction policies"
+    evidence_kind: ontology-design-inference
+    confidence: high
+  - id: claim-memory-retention-policy-action
+    source: redis-key-eviction
+    supports: Redis distinguishes configured eviction policy from commands that add data and trigger eviction. Moonweave further distinguishes a declarative retention policy from an independently audited archive, tombstone, or delete operation.
+    locator: "Key eviction: policy configuration and eviction when memory limit is exceeded"
+    evidence_kind: ontology-design-inference
+    confidence: medium
+  - id: claim-memory-retention-policy-binding
+    source: redis-key-eviction
+    supports: Redis associates expiry and eviction behavior with stored keys. Moonweave models an explicit retention_policy_ref from MemoryRecord to one policy so applicability is auditable independently from storage namespace and lifecycle execution.
+    locator: "Key eviction: expiration and eviction policy overview"
+    evidence_kind: ontology-design-inference
+    confidence: medium

@@ -3,886 +3,936 @@ id: IngestionRun
 kind: concept
 status: accepted
 labels:
-  zh: 摄入运行
-  en: Ingestion run
-  ja: 取込run
+  zh: 摄入端到端运行
+  en: End-to-end ingestion run
+  ja: エンドツーエンド取込み実行
 semantics:
   short_definition:
-    zh: 按一份政策协调来源读取与有序阶段的完整摄入活动。
-    en: A complete ingestion activity coordinating source reading and ordered phases under one policy.
-    ja: 一policy下でsource読込と順序phaseを調整する完全取込activityです。
+    zh: 在固定政策和输入边界下编排读取、加载和有序阶段的完整摄入活动。
+    en: A complete ingestion activity that orchestrates reading, loading, and ordered phases under fixed policy and input boundary.
+    ja: 固定された方針と入力境界の下で、読取り、ロード、順序付きフェーズを編成する完全な取込み活動です。
   definition:
-    zh: IngestionRun 是一次端到端 IngestionActivity：它由稳定 run_id 标识，在一个 IngestionPolicy 下读取来源、选择 DocumentLoader、编排阶段并交付结果；它不是某一个阶段或存储写入。
-    en: IngestionRun is one end-to-end IngestionActivity identified by a stable run_id that reads sources, selects a DocumentLoader, orders phases, and hands off results under one IngestionPolicy; it is not one phase or the storage write itself.
-    ja: IngestionRun は安定run_idで識別し一 IngestionPolicy 下でsourceを読み DocumentLoader を選びphaseを順序化して結果をhandoffするend-to-end IngestionActivityで、単一phaseやstorage write自体ではありません。
+    zh: >-
+      IngestionRun 是 IngestionActivity 的端到端特化，保留 activity_id 和实际 input_resource_refs，并由 ingestion_run_id、政策引用、输入集合引用、运行清单摘要、
+      实际加载器和阶段引用、时间边界及状态标识。它协调资源读取、信息规范化和后续交接，但不等同于单一
+      IngestionPhase、DocumentLoader、IngestibleCollection、Document、DeduplicationDecision、MemoryWrite 或某个
+      ObservabilityEvent。
+    en: >-
+      IngestionRun is an end-to-end specialization of IngestionActivity identified by ingestion_run_id, policy reference,
+      input-collection reference, run-manifest digest, actual loader and phase references, time bounds, and status. It retains activity_id and actual input_resource_refs. It
+      coordinates resource reading, information normalization, and later handoff, but is not one IngestionPhase,
+      DocumentLoader, IngestibleCollection, Document, DeduplicationDecision, MemoryWrite, or ObservabilityEvent.
+    ja: >-
+      IngestionRun はIngestionActivityのエンドツーエンド特化であり、ingestion_run_id、方針参照、入力集合参照、
+      実行マニフェストダイジェスト、実際のローダーとフェーズ参照、時間境界、状態で識別されます。activity_id と実際の input_resource_refs を保持します。資源読取り、
+      情報正規化、後続引渡しを調整しますが、一つのIngestionPhase、DocumentLoader、IngestibleCollection、
+      Document、DeduplicationDecision、MemoryWrite、ObservabilityEventではありません。
   why_needed:
-    zh: 保留完整运行身份而不把阶段输出直接提升为运行输出。
-    en: Preserves complete-run identity without promoting every phase output to a run-level output.
-    ja: 完全run同一性を保ち各phase出力をrun-level出力へ引き上げません。
+    zh: 将完整工作流责任与各局部阶段、资源和输出实体分开，以重放实际输入、解释政策约束并安全处理失败或重试。
+    en: Separates complete-workflow responsibility from local phases, resources, and output entities so actual input can be replayed, policy constraints explained, and failure or retry handled safely.
+    ja: 完全ワークフローの責任を局所フェーズ、資源、出力実体から分離し、実際の入力の再生、方針制約の説明、失敗または再試行の安全な処理を可能にします。
   includes:
-    - zh: 纳入有政策、来源、加载器与阶段序列的端到端运行。
-      en: Includes end-to-end runs with policy, source, loader, and phase sequence.
-      ja: policy・source・loader・phase sequenceを持つend-to-end runを含みます。
+    - zh: 一个固定政策下的输入集合、资源读取证据、实际加载器、顺序阶段清单、时间边界和终态输出或失败交接。
+      en: An input collection under one fixed policy, resource-read evidence, actual loader, ordered phase manifest, time bounds, and terminal output or failure handoff.
+      ja: 一つの固定方針下の入力集合、資源読取り証拠、実際のローダー、順序付きフェーズマニフェスト、時間境界、終端出力または失敗引渡しを含みます。
   excludes:
-    - zh: 排除单个 IngestionPhase、Document 与 MemoryWrite。
-      en: Excludes a single IngestionPhase, Document, and MemoryWrite.
-      ja: 単一IngestionPhase・Document・MemoryWriteを除外します。
+    - zh: 只解析一个信息快照的规范化活动、仅表示资源的来源文件、加载器实现、一个去重决定、一次记忆写入或没有端到端协调边界的查询。
+      en: A normalization activity that parses only one information snapshot, a source file that merely represents a resource, a loader implementation, one deduplication decision, one memory write, or a query without end-to-end coordination bounds.
+      ja: 一つの情報スナップショットだけを解析する正規化活動、資源を表すだけのソースファイル、ローダー実装、一つの重複排除決定、一つの記憶書込み、エンドツーエンド調整境界のない問合せを除きます。
   semantic_kind: activity
-  aliases: []
+  aliases:
+    - ingestion job
+    - ingestion workflow execution
+engineering:
+  explanation:
+    zh: >-
+      运行开始时冻结政策、输入集合和运行清单摘要，选择实际加载器，并记录每个读取的资源版本和每个阶段的局部输出。
+      完成时只交接已形成的 Document 与决定引用；失败时保留输入、时间边界和诊断事件引用而不伪造成功输出。重新运行应建立新运行身份，
+      即使使用相同政策和输入。
+    en: >-
+      At start, a run freezes policy, input collection, and run-manifest digest, selects the actual loader, and records
+      each resource version read and each phase's local output. On completion it hands off only formed Documents and
+      decision references; on failure it retains input, time bounds, and diagnostic-event references without fabricating
+      successful output. A rerun receives a new run identity even with same policy and input.
+    ja: >-
+      実行開始時に方針、入力集合、実行マニフェストダイジェストを固定し、実際のローダーを選び、読んだ各資源版と各フェーズの
+      局所出力を記録します。完了時は形成済みDocumentと決定参照だけを引渡し、失敗時は成功出力を捏造せず入力、時間境界、
+      診断イベント参照を保持します。同じ方針と入力でも再実行には新しい実行同一性を与えます。
+  typical_input:
+    - description: Frozen run start request
+      format: |
+        {
+          "ingestion_run_id": "ingest-policy-directory-42",
+          "activity_id": "ingest-policy-directory-42",
+          "policy_ref": "ingestion-policy-42-v3",
+          "input_collection_ref": "collection-policy-directory-42",
+          "input_resource_refs": ["dir-policy-2026-07"],
+          "run_manifest_digest": "sha256:ingest-manifest-policy-directory-42-v1",
+          "loader_refs": ["loader-pdf:3.2.1"],
+          "started_at": "2026-07-18T08:58:59Z",
+          "status": "running"
+        }
+  typical_output:
+    - description: Terminal completed run handoff
+      format: |
+        {
+          "ingestion_run_id": "ingest-policy-directory-42",
+          "phase_refs": ["normalize-policy-42-02", "deduplicate-policy-42-03"],
+          "output_document_refs": ["document-policy-42-v1"],
+          "decision_refs": ["decision-policy-42-v1"],
+          "ended_at": "2026-07-18T08:59:31Z",
+          "status": "completed"
+        }
+  reference_implementations:
+    - name: LangChain document loaders
+      url: https://docs.langchain.com/oss/python/integrations/document_loaders/index
+      description: Documents loaders that read varied source systems into Document values.
+    - name: Node.js crypto createHash
+      url: https://nodejs.org/api/crypto.html
+      description: Documents createHash for generating manifest and content digests with algorithms such as SHA-256.
+    - name: W3C PROV-O
+      url: https://www.w3.org/TR/prov-o/
+      description: Defines time-bounded activities that use entities and generate separate entities.
 structure:
   identity_keys:
+    - activity_id
     - ingestion_run_id
   fields:
+    - id: activity_id
+      labels:
+        zh: 父活动标识
+        en: parent activity ID
+        ja: 親アクティビティID
+      definitions:
+        zh: 保留 IngestionActivity 的实际活动身份；它可与 ingestion_run_id 取同值，但不是政策、集合或阶段标识。
+        en: Retains IngestionActivity's actual activity identity; it may equal ingestion_run_id but is not a policy, collection, or phase identifier.
+        ja: IngestionActivity の実際の activity ID を保持し、ingestion_run_id と同値でも policy、collection、phase の識別子ではありません。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      allowed_values: []
+      pattern: null
+      example_value: ingest-policy-directory-42
+      source_claims:
+        - claim-ingestion-run-parent-contract
     - id: ingestion_run_id
       labels:
-        zh: 运行标识
+        zh: 摄入运行标识
         en: ingestion run ID
-        ja: 取込run ID
+        ja: 取込み実行ID
+      definitions:
+        zh: 稳定标识一次端到端摄入执行，不是政策版本、阶段标识、加载器版本或产生的文档标识。
+        en: Stably identifies one end-to-end ingestion execution, not policy version, phase ID, loader version, or generated Document ID.
+        ja: 方針版、フェーズID、ローダー版、生成Document IDではなく、一つのエンドツーエンド取込み実行を安定して識別します。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 稳定标识端到端摄入。
-        en: Stable identifier for end-to-end ingestion.
-        ja: end-to-end取込の安定識別子です。
       allowed_values: []
       pattern: null
-      example_value: ingest-run-17
+      example_value: ingest-policy-directory-42
       source_claims:
-        - claim-ingestion-run-002
-    - id: policy_version
+        - claim-ingestion-run-identity
+    - id: policy_ref
       labels:
-        zh: 政策版本
-        en: policy version
-        ja: policy版
+        zh: 摄入政策引用
+        en: ingestion policy reference
+        ja: 取込み方針参照
+      definitions:
+        zh: 引用本次运行开始时固定并需遵守的 IngestionPolicy 版本，而不是输入资源的标签或加载器配置文件。
+        en: References the IngestionPolicy version fixed and required at run start, rather than a label on input resource or a loader configuration file.
+        ja: 入力資源のラベルやローダー設定ファイルではなく、実行開始時に固定され遵守が必要なIngestionPolicy版を参照します。
+      datatype: reference
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      allowed_values: []
+      pattern: null
+      example_value: ingestion-policy-42-v3
+      source_claims:
+        - claim-ingestion-run-policy
+    - id: input_collection_ref
+      labels:
+        zh: 输入集合引用
+        en: input collection reference
+        ja: 入力集合参照
+      definitions:
+        zh: 引用本次运行实际消费的 IngestibleCollection，而不是所有可发现资源或仅被元数据提及的集合。
+        en: References the IngestibleCollection actually consumed by this run, rather than every discoverable resource or a collection mentioned only in metadata.
+        ja: 発見可能なすべての資源やメタデータで言及されただけの集合ではなく、この実行が実際に消費したIngestibleCollectionを参照します。
+      datatype: reference
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      allowed_values: []
+      pattern: null
+      example_value: collection-policy-directory-42
+      source_claims:
+        - claim-ingestion-run-input
+    - id: input_resource_refs
+      labels:
+        zh: 输入资源引用
+        en: input resource references
+        ja: 入力リソース参照
+      definitions:
+        zh: 保留本运行实际读取的版本化 IngestibleResource，不用输入集合引用或可发现资源清单替代具体来源事实。
+        en: Retains versioned IngestibleResources actually read by this run rather than substituting its input-collection reference or a list of discoverable resources for concrete source facts.
+        ja: input collection reference や発見可能な resource 一覧で具体的 source fact を置き換えず、この run が実際に読んだ versioned IngestibleResource を保持します。
+      datatype: array
+      required: true
+      cardinality:
+        min: 1
+        max: null
+      allowed_values: []
+      pattern: null
+      example_value:
+        - dir-policy-2026-07
+      source_claims:
+        - claim-ingestion-run-parent-contract
+    - id: run_manifest_digest
+      labels:
+        zh: 运行清单摘要
+        en: run manifest digest
+        ja: 実行マニフェストダイジェスト
+      definitions:
+        zh: 记录输入集合成员、资源版本、策略、加载器与计划阶段的冻结清单摘要，以便重放此运行边界。
+        en: Records a digest of frozen manifest covering input members, resource versions, policy, loaders, and planned phases so this run boundary can be replayed.
+        ja: 入力メンバー、資源版、方針、ローダー、予定フェーズを含む固定マニフェストのダイジェストを記録し、この実行境界を再生可能にします。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 固定本次运行适用政策。
-        en: Fixes the policy applied by this run.
-        ja: run適用policyを固定します。
       allowed_values: []
       pattern: null
-      example_value: ingest-policy@4
+      example_value: sha256:ingest-manifest-policy-directory-42-v1
       source_claims:
-        - claim-ingestion-run-003
+        - claim-ingestion-run-digest
+    - id: loader_refs
+      labels:
+        zh: 实际加载器引用
+        en: actual loader references
+        ja: 実際のローダー参照
+      definitions:
+        zh: 引用本次运行实际调用的 DocumentLoader 版本，而不是仅在环境中可用或策略中允许的加载器。
+        en: References DocumentLoader versions actually invoked by this run, rather than loaders merely available in the environment or allowed by policy.
+        ja: 環境で利用可能または方針で許可されただけのローダーではなく、この実行が実際に呼び出したDocumentLoader版を参照します。
+      datatype: array
+      required: true
+      cardinality:
+        min: 1
+        max: null
+      allowed_values: []
+      pattern: null
+      example_value:
+        - loader-pdf:3.2.1
+      source_claims:
+        - claim-ingestion-run-loader
+    - id: phase_refs
+      labels:
+        zh: 阶段引用
+        en: phase references
+        ja: フェーズ参照
+      definitions:
+        zh: 可选地按执行顺序引用该运行内实际发生的 IngestionPhase，而不是将阶段类型或尚未执行的计划步骤作为运行历史。
+        en: Optionally references IngestionPhases that actually occurred in this run in execution order, rather than phase types or planned steps that never executed.
+        ja: 実行されなかったフェーズ型や予定手順ではなく、この実行で実際に起きたIngestionPhaseを実行順に任意に参照します。
+      datatype: array
+      required: false
+      cardinality:
+        min: 0
+        max: null
+      allowed_values: []
+      pattern: null
+      example_value:
+        - normalize-policy-42-02
+        - deduplicate-policy-42-03
+      source_claims:
+        - claim-ingestion-run-phase
+    - id: output_document_refs
+      labels:
+        zh: 输出文档引用
+        en: output document references
+        ja: 出力Document参照
+      definitions:
+        zh: 可选地引用本运行中已完成规范化并可交接的 Document，不包括中间缓冲区、失败输出或仅被读取的既有文档。
+        en: Optionally references Documents completed and handoffable in this run, excluding intermediate buffers, failed outputs, or pre-existing Documents merely read.
+        ja: この実行で完了し引渡し可能なDocumentを任意に参照し、中間バッファ、失敗出力、単に読んだ既存Documentを除きます。
+      datatype: array
+      required: false
+      cardinality:
+        min: 0
+        max: null
+      allowed_values: []
+      pattern: null
+      example_value:
+        - document-policy-42-v1
+      source_claims:
+        - claim-ingestion-run-generation
+    - id: decision_refs
+      labels:
+        zh: 去重决定引用
+        en: deduplication decision references
+        ja: 重複排除決定参照
+      definitions:
+        zh: 可选地引用运行内由去重活动产生的独立 DeduplicationDecision，不将保留或更新结果混入运行状态。
+        en: Optionally references separate DeduplicationDecisions produced by deduplication activity in the run, without folding keep or update outcome into run status.
+        ja: 実行内の重複排除活動が生成した独立DeduplicationDecisionを任意に参照し、keepまたはupdate結果を実行状態に混ぜません。
+      datatype: array
+      required: false
+      cardinality:
+        min: 0
+        max: null
+      allowed_values: []
+      pattern: null
+      example_value:
+        - decision-policy-42-v1
+      source_claims:
+        - claim-ingestion-run-generation
     - id: started_at
       labels:
         zh: 开始时间
         en: started at
         ja: 開始時刻
+      definitions:
+        zh: 记录运行开始冻结输入和协调读取的时刻，不等同于某个资源创建时间或局部阶段开始时间。
+        en: Records when the run began freezing inputs and coordinating reads, not creation time of a resource or start time of one local phase.
+        ja: 実行が入力固定と読取り調整を始めた時刻を記録し、資源作成時刻や一つの局所フェーズ開始時刻とは区別します。
       datatype: date-time
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 记录完整运行开始。
-        en: Records complete-run start time.
-        ja: 完全run開始時刻を記録します。
       allowed_values: []
       pattern: null
-      example_value: 2026-07-16T10:00:00Z
+      example_value: "2026-07-18T08:58:59Z"
       source_claims:
-        - claim-ingestion-run-004
-  constraints: []
-  required_relation_constraints: []
+        - claim-ingestion-run-temporal
+    - id: ended_at
+      labels:
+        zh: 结束时间
+        en: ended at
+        ja: 終了時刻
+      definitions:
+        zh: 可选地记录运行完成、失败或取消的终态时刻；运行中状态不得有结束时间。
+        en: Optionally records terminal time of completed, failed, or cancelled run; a running status must not have an end time.
+        ja: 完了、失敗、取消された実行の終端時刻を任意に記録し、実行中状態には終了時刻を持たせてはいけません。
+      datatype: date-time
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      allowed_values: []
+      pattern: null
+      example_value: "2026-07-18T08:59:31Z"
+      source_claims:
+        - claim-ingestion-run-temporal
+    - id: status
+      labels:
+        zh: 运行状态
+        en: run status
+        ja: 実行状態
+      definitions:
+        zh: 声明端到端运行状态，不使用单个去重结果、资源可用性或附件处理结果作为运行状态。
+        en: Declares end-to-end run state without using one deduplication outcome, resource availability, or attachment processing result as run status.
+        ja: 一つの重複排除結果、資源可用性、添付処理結果を実行状態に使わず、エンドツーエンド実行状態を宣言します。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      allowed_values:
+        - running
+        - completed
+        - failed
+        - cancelled
+      pattern: null
+      example_value: completed
+      source_claims:
+        - claim-ingestion-run-temporal
+    - id: observability_event_refs
+      labels:
+        zh: 可观测性事件引用
+        en: observability event references
+        ja: 可観測性イベント参照
+      definitions:
+        zh: 可选地引用此运行或其阶段的命名诊断事件，不把事件本身作为运行或活动输出。
+        en: Optionally references named diagnostic events for this run or its phases without treating an event itself as the run or activity output.
+        ja: 実行またはそのフェーズの命名診断イベントを任意に参照し、イベント自体を実行または活動出力として扱いません。
+      datatype: array
+      required: false
+      cardinality:
+        min: 0
+        max: null
+      allowed_values: []
+      pattern: null
+      example_value:
+        - observability-ingest-policy-42-timeout
+      source_claims:
+        - claim-ingestion-run-observability
+  constraints:
+    - id: ingestion-run-required-start
+      expression: activity_id, ingestion_run_id, policy_ref, input_collection_ref, input_resource_refs, run_manifest_digest, loader_refs, started_at, and status are required; a rerun must use a new ingestion_run_id even when policy and input collection are unchanged.
+      explanation:
+        zh: 运行身份、适用政策、实际输入边界、加载器和开始时间共同界定一次执行；重试不能覆盖原运行的可审计时间线。
+        en: Run identity, applicable policy, actual input boundary, loader, and start time jointly delimit one execution; a retry cannot overwrite the original run's auditable timeline.
+        ja: 実行同一性、適用方針、実際の入力境界、ローダー、開始時刻が一回の実行を共同で区切り、再試行は元の実行の監査可能な時間線を上書きできません。
+    - id: ingestion-run-terminal-handoff
+      expression: When status is completed, ended_at, at least one phase_refs value, and at least one output_document_refs or decision_refs value are required; when status is running, ended_at, output_document_refs, and decision_refs must be absent.
+      explanation:
+        zh: 完成运行需要有终态边界、实际阶段和可交接结果；运行中记录不能提前把计划或中间状态宣称为完成输出。
+        en: A completed run requires a terminal boundary, actual phases, and handoffable results; a running record cannot declare plans or intermediates as completed output early.
+        ja: 完了した実行には終端境界、実際のフェーズ、引渡し可能な結果が必要であり、実行中記録は予定や中間状態を完了出力として早期に宣言できません。
+    - id: ingestion-run-failure-handoff
+      expression: When status is failed or cancelled, ended_at is required; output_document_refs and decision_refs may contain only independently completed facts, and any observability_event_refs must identify this run or one of its phase_refs.
+      explanation:
+        zh: 失败运行仍可记录已经独立完成的事实，但不得伪造失败后产生的结果；诊断事件必须绑定该运行或其实际阶段。
+        en: A failed run may retain independently completed facts but must not fabricate results after failure; diagnostic events must bind this run or its actual phases.
+        ja: 失敗実行は独立して完了した事実を保持できますが、失敗後の結果を捏造してはいけず、診断イベントはこの実行または実際のフェーズに結び付く必要があります。
 examples:
-  - id: IngestionRun-example-positive-manual-20260716
-    kind: positive
+  - id: ingestion-run-positive
+
     labels:
-      zh: 摄入运行正例
-      en: "Positive case: Ingestion run"
-      ja: 取込run正例
-    scenario_id: null
+      zh: 已完成的策略目录摄入运行
+      en: Completed policy-directory ingestion run
+      ja: 完了した方針ディレクトリ取込み実行
+
     descriptions:
-      zh: ingest-run-17 在 policy@4 下选择 loader-pdf-v3，实际读取 file-policy-v7@b7，依次编排 normalize-17 与 dedup-17，并记录最终 Document 和 Decision 引用。
-      en: ingest-run-17 selects loader-pdf-v3 under policy@4, actually reads file-policy-v7@b7, orders normalize-17 and dedup-17, and records final Document and Decision references.
-      ja: ingest-run-17 は policy@4 下で loader を選び resource を読み normalize-17、dedup-17 を順序化し最終 outputs を記録します。
+      zh: LlamaIndex SimpleDirectoryReader + VectorStoreIndex.from_documents；KnowledgeGraphIndex；LangChain PyPDFLoader Document(page_content, metadata)。
+      en: LlamaIndex SimpleDirectoryReader + VectorStoreIndex.from_documents; KnowledgeGraphIndex; LangChain PyPDFLoader Document(page_content, metadata).
+      ja: LlamaIndex SimpleDirectoryReader + VectorStoreIndex.from_documents。KnowledgeGraphIndex。LangChain PyPDFLoader Document。
     field_values:
-      ingestion_run_id: ingest-run-17
-      policy_version: ingest-policy@4
-      started_at: 2026-07-16T10:00:00Z
-      activity_id: ingest-run-17
+      activity_id: ingest-policy-directory-42
+      ingestion_run_id: ingest-policy-directory-42
+      policy_ref: ingestion-policy-42-v3
+      input_collection_ref: collection-policy-directory-42
+      input_resource_refs:
+        - dir-policy-2026-07
+      run_manifest_digest: sha256:ingest-manifest-policy-directory-42-v1
+      loader_refs:
+        - loader-pdf:3.2.1
+      phase_refs:
+        - normalize-policy-42-02
+        - deduplicate-policy-42-03
+      output_document_refs:
+        - document-policy-42-v1
+      decision_refs:
+        - decision-policy-42-v1
+      started_at: "2026-07-18T08:58:59Z"
+      ended_at: "2026-07-18T08:59:31Z"
       status: completed
     related_node_ids:
       - IngestionRun
-    related_relation_ids: []
-    expected_result:
-      zh: 将该端到端执行表示为 IngestionRun，并用 run_id 连接策略、加载器、资源、阶段和结果。
-      en: Represent the end-to-end execution as IngestionRun and use its run ID to connect policy, loader, resource, phases, and results.
-      ja: 当該 end-to-end execution を IngestionRun とし run ID で policy、loader、resource、phases、results を接続します。
-    why_valid_or_invalid:
-      zh: 运行拥有完整时间边界和跨阶段协调责任，覆盖从实际读取到规范化与去重决定的接入闭环。
-      en: The run owns complete temporal boundaries and cross-phase coordination, covering the ingestion loop from actual reading through normalization and deduplication decision.
-      ja: run は complete temporal boundary と cross-phase coordination を持ち reading から normalization・dedup decision までを覆います。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - IngestionActivity
+      - IngestionPolicy
+      - IngestibleCollection
+      - DocumentLoader
+      - IngestibleResource
+      - IngestionPhase
+    related_relation_ids:
+      - IngestionRun-is_a-IngestionActivity
+      - IngestionRun-governed_by-IngestionPolicy
+      - IngestionRun-uses-IngestibleCollection
+      - IngestionRun-uses-DocumentLoader
+      - IngestionRun-reads-IngestibleResource
+      - IngestionPhase-part-of-IngestionRun
+
     source_claims:
-      - claim-ingestion-run-005
-  - id: IngestionRun-example-boundary-manual-20260716
-    kind: boundary
+      - claim-ingestion-run-policy
+      - claim-ingestion-run-input
+      - claim-ingestion-run-loader
+      - claim-ingestion-run-phase
+  - id: ingestion-run-counterexample
+
     labels:
-      zh: 摄入运行边界例
-      en: "Boundary case: Ingestion run"
-      ja: 取込run境界例
-    scenario_id: null
+      zh: 单个规范化活动不是完整摄入运行
+      en: Single normalization activity is not complete ingestion run
+      ja: 一つの正規化活動は完全な取込み実行ではない
+
     descriptions:
-      zh: normalize-17 只处理 info-17 并生成 document-policy-v7，不选择来源加载器、不管理 dedup-17，也没有端到端完成状态。
-      en: normalize-17 only processes info-17 and generates document-policy-v7; it selects no source loader, manages no dedup-17, and has no end-to-end completion state.
-      ja: normalize-17 は info-17 から document を作るだけで source loader 選択、dedup 管理、end-to-end state を持ちません。
-    field_values: {}
+      zh: 反例：DocumentLoader 输出无 DocumentMetadata source/page 就进入 EmbeddingRun，丢失 ChunkProvenance。
+      en: Counterexample: DocumentLoader output enters EmbeddingRun without DocumentMetadata source/page, losing ChunkProvenance.
+      ja: 反例：DocumentLoader 出力が DocumentMetadata source/page なしで EmbeddingRun へ。
+    field_values:
+      activity_id: normalize-policy-42-02
+      phase_id: normalize-policy-42-02
+      input_information_refs:
+        - info-policy-42
+      output_document_refs:
+        - document-policy-42-v1
+      policy_ref: absent
+      input_collection_ref: absent
+      loader_refs: []
+      status: completed
     related_node_ids:
       - IngestionRun
-    related_relation_ids: []
-    expected_result:
-      zh: 把 normalize-17 保持为 NormalizationActivity，而不是 IngestionRun。
-      en: Keep normalize-17 as NormalizationActivity rather than IngestionRun.
-      ja: normalize-17 は NormalizationActivity とし IngestionRun にしません。
-    why_valid_or_invalid:
-      zh: 单一阶段缺少跨阶段的读取、策略执行和最终交接责任，不能因为属于该运行就继承完整运行身份。
-      en: A single phase lacks cross-phase reading, policy execution, and final-handoff responsibility and does not inherit complete-run identity merely from membership.
-      ja: single phase は cross-phase reading、policy execution、handoff responsibility を欠き membership だけで complete-run identity を継承しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - NormalizationActivity
+      - IngestionPhase
+    related_relation_ids:
+      - IngestionRun-is_a-IngestionActivity
+      - NormalizationActivity-is_a-IngestionPhase
+      - IngestionPhase-part-of-IngestionRun
+
     source_claims:
-      - claim-ingestion-run-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-ingestion-run-specialization
+  - id: ingestion-run-boundary
+
+    labels:
+      zh: 正在运行且尚无终态交接的摄入运行
+      en: Running ingestion run with no terminal handoff yet
+      ja: 終端引渡しがまだない実行中の取込み実行
+
+    descriptions:
+      zh: IngestionRun 产出 Document vs ChunkingRun 分割；GraphStore node/edge vs TextCorpus 资源类型边界。
+      en: IngestionRun produces Document vs ChunkingRun splits; GraphStore node/edge vs TextCorpus resource type boundary.
+      ja: IngestionRun Document 生成 vs ChunkingRun 分割。GraphStore vs TextCorpus 境界。
+    field_values:
+      ingestion_run_id: ingest-contract-51
+      policy_ref: ingestion-policy-contract-51-v2
+      input_collection_ref: collection-contract-51
+      run_manifest_digest: sha256:ingest-manifest-contract-51-v1
+      loader_refs:
+        - loader-json:2.0.0
+      phase_refs:
+        - normalize-contract-51-02
+      started_at: "2026-07-18T10:00:00Z"
+      status: running
+    related_node_ids:
+      - IngestionRun
+      - IngestionPolicy
+      - IngestibleCollection
+      - DocumentLoader
+      - IngestionPhase
+    related_relation_ids:
+      - IngestionRun-is_a-IngestionActivity
+      - IngestionRun-governed_by-IngestionPolicy
+      - IngestionRun-uses-IngestibleCollection
+      - IngestionRun-uses-DocumentLoader
+      - IngestionPhase-part-of-IngestionRun
+
+    source_claims:
+      - claim-ingestion-run-input
+      - claim-ingestion-run-temporal
+  - id: ingestion-run-instance
+
+    labels:
+      zh: 因解析超时失败的档案摄入运行
+      en: "Instance: archive ingestion run failed by parse timeout"
+      ja: "事例: 解析タイムアウトで失敗したアーカイブ取込み実行"
+
+    descriptions:
+      zh: LlamaIndex PDFReader load_data → Document list metadata file_name/page_label → downstream RAPTOR chunking。
+      en: LlamaIndex PDFReader load_data → Document list metadata file_name/page_label → downstream RAPTOR chunking.
+      ja: LlamaIndex PDFReader→Document list metadata→downstream RAPTOR chunking。
+    field_values:
+      activity_id: ingest-archive-07
+      ingestion_run_id: ingest-archive-07
+      policy_ref: ingestion-policy-archive-07-v1
+      input_collection_ref: collection-archive-07
+      input_resource_refs:
+        - file-archive-07
+      run_manifest_digest: sha256:ingest-manifest-archive-07-v1
+      loader_refs:
+        - loader-pdf:3.2.1
+      phase_refs:
+        - normalize-archive-07-02
+      output_document_refs: []
+      decision_refs: []
+      observability_event_refs:
+        - observability-ingest-archive-07-timeout
+      started_at: "2026-07-18T11:00:00Z"
+      ended_at: "2026-07-18T11:00:32Z"
+      status: failed
+    related_node_ids:
+      - IngestionRun
+      - IngestibleResource
+      - IngestionPhase
+      - ObservabilityEvent
+    related_relation_ids:
+      - IngestionRun-is_a-IngestionActivity
+      - IngestionRun-reads-IngestibleResource
+      - IngestionPhase-part-of-IngestionRun
+      - IngestionRun-may_emit-ObservabilityEvent
+
+    source_claims:
+      - claim-ingestion-run-temporal
+      - claim-ingestion-run-observability
 parent_relation:
   id: IngestionRun-is_a-IngestionActivity
   predicate: is_a
-  direction: target-to-source
+  target: concept:IngestionActivity
+  endpoint_order: child-to-parent
+  direction: source-to-target
   relation_kind: hierarchy
   labels:
-    zh: 是一种
-    en: is a
-    ja: の一種である
+    zh: 是摄入活动的端到端运行特化
+    en: is an end-to-end run specialization of ingestion activity
+    ja: 取込み活動のエンドツーエンド実行特化である
   definitions:
-    zh: IngestionRun 是 IngestionActivity 的严格子类；种差为：端到端协调来源读取、加载器选择、有序阶段与结果交接。
-    en: "IngestionRun is a strict subtype of IngestionActivity; its reviewed differentia is: it coordinates source reading, loader selection, ordered phases, and result handoff end to end."
-    ja: IngestionRun は IngestionActivity の厳密なsubtypeで、審査済み種差は「source read・loader選択・順序phase・result handoffをend-to-end調整します。」です。
-  cardinality: null
-  cardinality_not_applicable_reason:
-    zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
-    en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
-    ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
+    zh: IngestionRun 是在固定政策和输入边界内协调读取、加载器选择、有序阶段和终态交接的 IngestionActivity。
+    en: IngestionRun is an IngestionActivity that coordinates reading, loader selection, ordered phases, and terminal handoff within fixed policy and input boundary.
+    ja: IngestionRun は固定方針と入力境界内で読取り、ローダー選択、順序付きフェーズ、終端引渡しを調整するIngestionActivityです。
+  cardinality:
+    source:
+      min: 0
+      max: null
+    target:
+      min: 1
+      max: 1
+  cardinality_not_applicable_reason: null
   inverse_reading:
-    predicate: part_of
+    predicate: has_ingestion_run_specialization
     labels:
-      zh: 反向读取
-      en: inverse reading
-      ja: 逆方向読取
+      zh: 具有摄入运行特化
+      en: has ingestion run specialization
+      ja: 取込み実行特化を持つ
   conditions:
-    - id: IngestionRun-is_a-IngestionActivity-condition-manual-001
+    - id: ingestion-run-is-a-ingestion-activity-condition
       severity: error
       expression_language: plain
-      expression: "Assert only when the object first satisfies IngestionActivity and also satisfies the differentia: it coordinates source reading, loader selection, ordered phases, and result handoff end to end."
-      explanations:
-        zh: 仅当对象首先满足 IngestionActivity 定义且满足种差“端到端协调来源读取、加载器选择、有序阶段与结果交接。”时成立。
-        en: "Assert only when the object first satisfies IngestionActivity and also satisfies the differentia: it coordinates source reading, loader selection, ordered phases, and result handoff end to end."
-        ja: 対象がまず IngestionActivity を満たし、さらに種差「source read・loader選択・順序phase・result handoffをend-to-end調整します。」を満たす時だけ成立します。
+      expression: Assert the specialization only when an object satisfies IngestionActivity identity and additionally has fixed policy and input collection, run manifest, actual loader, ordered actual phases, and terminal handoff or terminal failure record.
+      explanation:
+        zh: 除 IngestionActivity 身份外，完整运行还需要固定政策和输入、清单、实际加载器、发生过的阶段以及终态交接或失败记录；单个阶段或加载器不具备这些种差。
+        en: Beyond IngestionActivity identity, a complete run needs fixed policy and input, manifest, actual loader, occurred phases, and terminal handoff or failure record; one phase or loader lacks these differentiae.
+        ja: IngestionActivity同一性に加え、完全実行には固定方針と入力、マニフェスト、実際のローダー、発生したフェーズ、終端引渡しまたは失敗記録が必要で、一つのフェーズまたはローダーはこれらの種差を欠きます。
       source_claims:
-        - claim-ingestion-run-007
-  temporal_scope: timeless
-  boundary_context: null
+        - claim-ingestion-run-specialization
+  temporal_scope: valid-time
+  boundary_context: A run is scoped to one execution identity and frozen input manifest; policy reuse or retry does not merge run histories.
   constraints: []
-  examples:
-    - id: IngestionRun-is_a-IngestionActivity-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 是一种正例
-        en: "Positive case: is a"
-        ja: の一種である正例
-      scenario_id: null
-      descriptions:
-        zh: ingest-run-17 具有完整 start/end、policy@4、实际读取资源、loader 调用、两个有序阶段和最终输出状态，覆盖接入的端到端执行。
-        en: ingest-run-17 has complete start and end times, policy@4, an actually read resource, a loader invocation, two ordered phases, and final output state, covering end-to-end ingestion execution.
-        ja: ingest-run-17 は complete start/end、policy、read resource、loader call、ordered phases、final state を持ちます。
-      field_values: {}
-      related_node_ids:
-        - IngestionRun
-        - IngestionActivity
-      related_relation_ids:
-        - IngestionRun-is_a-IngestionActivity
-      expected_result:
-        zh: 确认 ingest-run-17 是 IngestionActivity 的 IngestionRun 特化。
-        en: Confirm ingest-run-17 as an IngestionRun specialization of IngestionActivity.
-        ja: ingest-run-17 を IngestionActivity の IngestionRun specialization とします。
-      why_valid_or_invalid:
-        zh: 它满足活动的发生、时间和输入输出条件，并以跨阶段协调及完整运行状态形成种差。
-        en: It satisfies occurrence, temporal, input, and output conditions of Activity and adds cross-phase coordination and complete-run state as differentia.
-        ja: Activity occurrence・time・input/output 条件を満たし cross-phase coordination・complete-run state を differentia とします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-ingestion-run-007
-    - id: IngestionRun-is_a-IngestionActivity-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 是一种边界例
-        en: "Boundary case: is a"
-        ja: の一種である境界例
-      scenario_id: null
-      descriptions:
-        zh: normalize-17 有局部时间和输出，但只承担一种变换，不读取外部资源、不选择 loader，也不管理 dedup-17。
-        en: normalize-17 has local time and output but performs one transformation, reads no external resource, selects no loader, and does not manage dedup-17.
-        ja: normalize-17 は local time・output を持つが一 transformation だけで external read、loader selection、dedup management がありません。
-      field_values: {}
-      related_node_ids:
-        - IngestionRun
-        - IngestionActivity
-      related_relation_ids:
-        - IngestionRun-is_a-IngestionActivity
-      expected_result:
-        zh: 不要通过该子类边把单个 NormalizationActivity 归为完整 IngestionRun。
-        en: Do not use this subtype edge to classify one NormalizationActivity as a complete IngestionRun.
-        ja: この subtype edge で一 NormalizationActivity を complete IngestionRun に分類しません。
-      why_valid_or_invalid:
-        zh: 局部活动满足上位 Activity 不代表满足完整运行种差；端到端范围与协调责任不可缺失。
-        en: A local activity can satisfy the Activity parent without satisfying the complete-run differentia; end-to-end scope and coordination responsibility are required.
-        ja: local activity が Activity parent を満たしても complete-run differentia の end-to-end scope・coordination が必要です。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-ingestion-run-007
+  examples: []
   source_claims:
-    - claim-ingestion-run-007
-  distinct_fact_rationale: null
+    - claim-ingestion-run-specialization
+  distinct_fact_rationale: This hierarchy captures complete workflow execution while inputs, loaders, phases, Documents, decisions, and diagnostics remain separately identifiable facts.
   layout_role: primary-backbone
-  review_status: accepted
-  endpoint_order: child-to-parent
 relations:
+  - id: IngestionRun-uses-DocumentLoader
+    predicate: uses
+    target: concept:DocumentLoader
+    endpoint_order: source-to-target
+    direction: source-to-target
+    relation_kind: causal
+    labels:
+      zh: 使用文档加载器
+      en: uses document loader
+      ja: document loader を使用する
+    definitions:
+      zh: IngestionRun 使用一个已记录实现版本的 DocumentLoader 来读取与其契约兼容的来源载荷；加载器不是该运行的组成部分。
+      en: An IngestionRun uses a DocumentLoader at a recorded implementation version to read source payloads compatible with its contract; the loader is not a structural part of the run.
+      ja: IngestionRun はその contract と compatible な source payload を読むため、記録された implementation version の DocumentLoader を使用し、loader は run の structural part ではない。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 一个运行可调用零个或多个加载器版本，具体调用由运行清单和调用证据确定。
+      en: One run may invoke zero or more loader versions; manifest and invocation evidence determine the concrete calls.
+      ja: 一つの run は zero 又は複数の loader version を invoke でき、manifest と invocation evidence が具体的な call を決める。
+    inverse_reading:
+      predicate: is_used_by_ingestion_run
+      labels:
+        zh: 被摄入运行使用
+        en: is used by ingestion run
+        ja: ingestion run に使用される
+    conditions:
+      - id: ingestion-run-uses-loader-condition
+        severity: error
+        expression_language: plain
+        expression: Assert only when loader_refs includes the loader ID and implementation version, invocation evidence records its entrypoint, and source kind and media type satisfy the loader contract.
+        explanation:
+          zh: 运行引用、调用证据和输入兼容性必须同时存在；仅安装、可发现或政策允许不能证明实际使用。
+          en: Run reference, invocation evidence, and input compatibility must all exist; installation, discoverability, or policy permission alone does not prove use.
+          ja: run reference、invocation evidence、input compatibility がすべて必要で、installation、discoverability、policy permission だけでは use を証明しない。
+        source_claims: [claim-ingestion-run-loader]
+    temporal_scope: valid-time
+    boundary_context: Use is scoped to one run invocation and loader version and does not claim every compatible run invokes the loader.
+    constraints: []
+    examples: []
+    source_claims: [claim-ingestion-run-loader]
+    distinct_fact_rationale: This records a runtime capability invocation, not containment of the loader in the run.
+    layout_role: cross-link
+  - id: IngestionRun-uses-IngestibleCollection
+    predicate: uses
+    target: concept:IngestibleCollection
+    endpoint_order: source-to-target
+    direction: source-to-target
+    relation_kind: causal
+    labels:
+      zh: 使用可摄入集合
+      en: uses ingestible collection
+      ja: ingestible collection を使用する
+    definitions:
+      zh: IngestionRun 使用一个成员清单和版本摘要已冻结的 IngestibleCollection 作为实际读取边界；该集合独立于运行存在。
+      en: An IngestionRun uses an IngestibleCollection with frozen member manifest and version digest as its actual read boundary; the collection exists independently of the run.
+      ja: IngestionRun は frozen member manifest と version digest を持つ IngestibleCollection を実際の read boundary として使用し、collection は run から独立して存在する。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 一个运行通常使用一个输入集合，但合并或重试工作流可有多个可审计集合引用。
+      en: A run commonly uses one input collection, while merge or retry workflows may retain multiple auditable collection references.
+      ja: 一つの run は通常一つの input collection を使用するが、merge 又は retry workflow は複数の audit 可能な collection reference を保持できる。
+    inverse_reading:
+      predicate: is_used_by_ingestion_run
+      labels:
+        zh: 被摄入运行使用
+        en: is used by ingestion run
+        ja: ingestion run に使用される
+    conditions:
+      - id: ingestion-run-uses-collection-condition
+        severity: error
+        expression_language: plain
+        expression: Assert only when input_collection_ref identifies the collection, run_manifest_digest binds its member_manifest_digest, selection_time precedes run start, and at least one manifest member is attempted for reading.
+        explanation:
+          zh: 运行引用、清单摘要、选择时间和实际成员读取共同证明使用；动态查询或共同目录不能替代冻结输入事实。
+          en: Run reference, manifest digest, selection time, and actual member read jointly prove use; a dynamic query or shared directory cannot substitute for frozen input.
+          ja: run reference、manifest digest、selection time、実際の member read が共同で use を証明し、dynamic query 又は shared directory は frozen input の代わりにならない。
+        source_claims: [claim-ingestion-run-input]
+    temporal_scope: valid-time
+    boundary_context: Use is scoped to one frozen collection version and does not imply that all later versions or discoverable resources were consumed.
+    constraints: []
+    examples: []
+    source_claims: [claim-ingestion-run-input]
+    distinct_fact_rationale: This records an activity-to-collection input fact, not a whole-part relationship.
+    layout_role: cross-link
   - id: IngestionRun-governed_by-IngestionPolicy
     predicate: governed_by
+    target: concept:IngestionPolicy
+    endpoint_order: source-to-target
     direction: source-to-target
     relation_kind: governance
     labels:
       zh: 受摄入政策治理
-      en: governed by ingestion policy
-      ja: 取込policyに統治される
+      en: is governed by ingestion policy
+      ja: 取込み方針に統治される
     definitions:
-      zh: IngestionRun —governed_by→ IngestionPolicy 表示运行在开始时固定并遵守该政策版本的来源、加载器、阶段与失败约束。
-      en: IngestionRun —governed_by→ IngestionPolicy means that the run fixes and follows that policy version's source, loader, phase, and failure constraints at start.
-      ja: IngestionRun —governed_by→ IngestionPolicy はrun開始時にそのpolicy版のsource・loader・phase・failure制約を固定遵守することを表します。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
-      en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
-      ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
+      zh: IngestionRun 受 IngestionPolicy 治理，表示运行在开始时冻结该政策版本并使实际读取、加载器、阶段与失败处理符合其约束。
+      en: IngestionRun is governed by IngestionPolicy when it freezes that policy version at start and makes actual reading, loader, phases, and failure handling conform to its constraints.
+      ja: IngestionRun がIngestionPolicyに統治されるとは、開始時にその方針版を固定し、実際の読取り、ローダー、フェーズ、失敗処理をその制約に適合させることです。
+    cardinality:
+      source:
+        min: 1
+        max: 1
+      target:
+        min: 0
+        max: null
+    cardinality_not_applicable_reason: null
     inverse_reading:
-      predicate: inverse_governed_by
+      predicate: governs_ingestion_run
       labels:
-        zh: 反向读取
-        en: inverse reading
-        ja: 逆方向読取
+        zh: 治理摄入运行
+        en: governs ingestion run
+        ja: 取込み実行を統治する
     conditions:
-      - id: IngestionRun-governed_by-IngestionPolicy-condition-manual-001
+      - id: ingestion-run-governed-by-policy-condition
         severity: error
         expression_language: plain
-        expression: Assert only when run.policy_version matches the policy's composite identity and execution did not exceed its scope.
-        explanations:
-          zh: 仅当 run.policy_version 与目标复合政策身份一致且执行记录未越权时成立。
-          en: Assert only when run.policy_version matches the policy's composite identity and execution did not exceed its scope.
-          ja: run.policy_versionがpolicy複合同一性と一致しexecutionがscopeを越えない時だけ成立します。
+        expression: Assert only when policy_ref identifies the target policy version, the run manifest is frozen under it, and actual resource, loader, phase, and failure handling evidence stays within policy constraints.
+        explanation:
+          zh: 政策引用、冻结清单和实际执行证据必须一致；仅写入政策名称、但绕过其允许来源或失败处理约束时不得声称有效治理。
+          en: Policy reference, frozen manifest, and actual execution evidence must agree; naming a policy while bypassing its allowed-source or failure-handling constraints is not effective governance.
+          ja: 方針参照、固定マニフェスト、実際の実行証拠が一致する必要があり、方針名を書いて許可ソースまたは失敗処理制約を迂回しても有効な統治ではありません。
         source_claims:
-          - claim-ingestion-run-008
-    temporal_scope: timeless
-    boundary_context: null
+          - claim-ingestion-run-policy
+    temporal_scope: valid-time
+    boundary_context: Governance is scoped to the frozen policy version and one run execution, not to every later run that shares a policy name.
     constraints: []
-    examples:
-      - id: IngestionRun-governed_by-IngestionPolicy-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 受摄入政策治理正例
-          en: "Positive case: governed by ingestion policy"
-          ja: 取込policyに統治される正例
-        scenario_id: null
-        descriptions:
-          zh: ingest-run-17 的 policy_ref 固定 ingest-policy@4，运行清单显示所读来源、loader、文件大小、规范化 profile 与去重键均满足该版本约束。
-          en: ingest-run-17 fixes ingest-policy@4 in policy_ref, and its manifest shows that sources, loader, file size, normalization profile, and deduplication key all satisfy that version's constraints.
-          ja: ingest-run-17 policy_ref が ingest-policy@4 を固定し sources、loader、size、profiles が constraints を満たします。
-        field_values: {}
-        related_node_ids:
-          - IngestionRun
-          - IngestionPolicy
-        related_relation_ids:
-          - IngestionRun-governed_by-IngestionPolicy
-        expected_result:
-          zh: 建立 ingest-run-17 governed_by ingest-policy@4，并保留确切 policy version。
-          en: Assert ingest-run-17 governed_by ingest-policy@4 and retain the exact policy version.
-          ja: ingest-run-17 governed_by ingest-policy@4 を exact version 付きで確立します。
-        why_valid_or_invalid:
-          zh: 运行声明、实际执行证据和策略适用范围一致，因此该规范确实约束了本次运行。
-          en: The run declaration, actual execution evidence, and policy applicability agree, so this specification genuinely governed the run.
-          ja: run declaration、actual execution evidence、policy applicability が一致し governance を証明します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-ingestion-run-008
-      - id: IngestionRun-governed_by-IngestionPolicy-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 受摄入政策治理边界例
-          en: "Boundary case: governed by ingestion policy"
-          ja: 取込policyに統治される境界例
-        scenario_id: null
-        descriptions:
-          zh: ingest-run-18 虽填写 policy_ref=@4，却读取 policy@4 明确禁止的 executable.exe，并绕过要求的 malware filter。
-          en: ingest-run-18 names policy@4 but reads prohibited executable.exe and bypasses the required malware filter.
-          ja: ingest-run-18 は policy@4 を記載するが prohibited executable を読み required filter を bypass します。
-        field_values: {}
-        related_node_ids:
-          - IngestionRun
-          - IngestionPolicy
-        related_relation_ids:
-          - IngestionRun-governed_by-IngestionPolicy
-        expected_result:
-          zh: 不得仅凭 policy_ref 声称 ingest-run-18 受 policy@4 有效治理。
-          en: Do not claim effective governance of ingest-run-18 by policy@4 from policy_ref alone.
-          ja: policy_ref だけで ingest-run-18 の effective governance を主張しません。
-        why_valid_or_invalid:
-          zh: 引用规范与实际遵循规范是不同事实；有效治理边要求适用条件和执行约束同时满足。
-          en: Referencing a specification and complying with it are different facts; an effective governance edge requires both applicability and execution constraints to hold.
-          ja: specification reference と compliance は別事実で effective governance は applicability・execution constraints の成立を要します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-ingestion-run-008
+    examples: []
     source_claims:
-      - claim-ingestion-run-008
-    distinct_fact_rationale: null
+      - claim-ingestion-run-policy
+    distinct_fact_rationale: This relation records normative control separately from factual resource reads, loader invocation, and phase execution.
     layout_role: cross-link
-    review_status: accepted
-    target: concept:IngestionPolicy
-  - id: IngestionRun-has_phase-DeduplicationActivity
-    predicate: has_phase
-    direction: source-to-target
-    relation_kind: composition
-    labels:
-      zh: 具有去重阶段
-      en: has deduplication phase
-      ja: deduplication phaseを持つ
-    definitions:
-      zh: IngestionRun —has_phase→ DeduplicationActivity 表示去重阶段属于该运行并在其顺序计划中执行。
-      en: IngestionRun —has_phase→ DeduplicationActivity means that the deduplication phase belongs to this run and executes in its ordered plan.
-      ja: IngestionRun —has_phase→ DeduplicationActivity はdeduplication phaseがこのrunに属しordered plan内で実行されることを表します。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
-      en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
-      ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
-    inverse_reading:
-      predicate: inverse_has_phase
-      labels:
-        zh: 反向读取
-        en: inverse reading
-        ja: 逆方向読取
-    conditions:
-      - id: IngestionRun-has_phase-DeduplicationActivity-condition-manual-001
-        severity: error
-        expression_language: plain
-        expression: Assert only when phase.ingestion_run_id matches and sequence follows normalization.
-        explanations:
-          zh: 仅当 phase.ingestion_run_id 匹配且 sequence 位于规范化之后时成立。
-          en: Assert only when phase.ingestion_run_id matches and sequence follows normalization.
-          ja: phase.ingestion_run_idが一致しsequenceがnormalization後の時だけ成立します。
-        source_claims:
-          - claim-ingestion-run-009
-    temporal_scope: timeless
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: IngestionRun-has_phase-DeduplicationActivity-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 具有去重阶段正例
-          en: "Positive case: has deduplication phase"
-          ja: deduplication phaseを持つ正例
-        scenario_id: null
-        descriptions:
-          zh: dedup-17 的 run_id=ingest-run-17、phase_id=deduplicate、sequence=2，且 ingest-run-17 的 phase manifest 在 normalize-17 后列出它。
-          en: dedup-17 has run ID ingest-run-17, phase ID deduplicate, and sequence 2, and ingest-run-17's phase manifest lists it after normalize-17.
-          ja: dedup-17 の run ID、phase ID、sequence 2 が一致し run phase manifest が normalize 後に列挙します。
-        field_values: {}
-        related_node_ids:
-          - IngestionRun
-          - DeduplicationActivity
-        related_relation_ids:
-          - IngestionRun-has_phase-DeduplicationActivity
-        expected_result:
-          zh: 建立 ingest-run-17 has_phase dedup-17，并保留 sequence=2 与运行成员身份。
-          en: Assert ingest-run-17 has_phase dedup-17 while retaining sequence 2 and run membership.
-          ja: ingest-run-17 has_phase dedup-17 を sequence=2・run membership 付きで確立します。
-        why_valid_or_invalid:
-          zh: 运行清单和阶段内部 run_id 双向一致，且局部时间位于运行边界内，证明组成关系。
-          en: The run manifest and phase-internal run ID agree in both directions, and local time lies within run boundaries, proving composition.
-          ja: run manifest と phase internal run ID が一致し local time も run boundary 内で composition を証明します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-ingestion-run-009
-      - id: IngestionRun-has_phase-DeduplicationActivity-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 具有去重阶段边界例
-          en: "Boundary case: has deduplication phase"
-          ja: deduplication phaseを持つ境界例
-        scenario_id: null
-        descriptions:
-          zh: offline-dedup-9 处理同一 document-policy-v7，但 run_id=maintenance-9，未出现在 ingest-run-17 清单中且发生在该运行结束后。
-          en: offline-dedup-9 processes the same document-policy-v7 but has run ID maintenance-9, is absent from ingest-run-17's manifest, and occurs after that run ended.
-          ja: offline-dedup-9 は同じ document を処理するが run ID が別で manifest 外・run 終了後です。
-        field_values: {}
-        related_node_ids:
-          - IngestionRun
-          - DeduplicationActivity
-        related_relation_ids:
-          - IngestionRun-has_phase-DeduplicationActivity
-        expected_result:
-          zh: 不要因共享输入把 offline-dedup-9 连接为 ingest-run-17 的阶段。
-          en: Do not connect offline-dedup-9 as a phase of ingest-run-17 from shared input.
-          ja: shared input だけで offline-dedup-9 を ingest-run-17 phase として接続しません。
-        why_valid_or_invalid:
-          zh: 组成关系由运行归属和时间范围决定，而不是由处理相同文档或活动类型相同决定。
-          en: Composition is determined by run membership and temporal scope, not by processing the same Document or sharing an activity type.
-          ja: composition は run membership・temporal scope で決まり same document/type では決まりません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-ingestion-run-009
-    source_claims:
-      - claim-ingestion-run-009
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:DeduplicationActivity
-  - id: IngestionRun-has_phase-NormalizationActivity
-    predicate: has_phase
-    direction: source-to-target
-    relation_kind: composition
-    labels:
-      zh: 具有规范化阶段
-      en: has normalization phase
-      ja: normalization phaseを持つ
-    definitions:
-      zh: IngestionRun —has_phase→ NormalizationActivity 表示该阶段的 run_id 与运行相同且位于其有序阶段计划。
-      en: IngestionRun —has_phase→ NormalizationActivity means that the phase has the same run ID and occurs in the run's ordered phase plan.
-      ja: IngestionRun —has_phase→ NormalizationActivity はphaseのrun IDがrunと同じでrunのordered phase plan内にあることを表します。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
-      en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
-      ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
-    inverse_reading:
-      predicate: inverse_has_phase
-      labels:
-        zh: 反向读取
-        en: inverse reading
-        ja: 逆方向読取
-    conditions:
-      - id: IngestionRun-has_phase-NormalizationActivity-condition-manual-001
-        severity: error
-        expression_language: plain
-        expression: Assert only when phase.ingestion_run_id matches and sequence is unique within the run plan.
-        explanations:
-          zh: 仅当 phase.ingestion_run_id 匹配且 sequence 在运行计划内唯一时成立。
-          en: Assert only when phase.ingestion_run_id matches and sequence is unique within the run plan.
-          ja: phase.ingestion_run_idが一致しsequenceがrun plan内で一意の時だけ成立します。
-        source_claims:
-          - claim-ingestion-run-010
-    temporal_scope: timeless
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: IngestionRun-has_phase-NormalizationActivity-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 具有规范化阶段正例
-          en: "Positive case: has normalization phase"
-          ja: normalization phaseを持つ正例
-        scenario_id: null
-        descriptions:
-          zh: normalize-17 的 run_id=ingest-run-17、phase_id=normalize、sequence=1，运行清单将其输入输出和局部时间列为第一处理阶段。
-          en: normalize-17 has run ID ingest-run-17, phase ID normalize, and sequence 1, and the run manifest lists its inputs, outputs, and local time as the first processing phase.
-          ja: normalize-17 の run ID、phase ID、sequence 1 と run manifest の inputs/outputs/local time が一致します。
-        field_values: {}
-        related_node_ids:
-          - IngestionRun
-          - NormalizationActivity
-        related_relation_ids:
-          - IngestionRun-has_phase-NormalizationActivity
-        expected_result:
-          zh: 建立 ingest-run-17 has_phase normalize-17，并保留 sequence=1 的顺序证据。
-          en: Assert ingest-run-17 has_phase normalize-17 and retain the sequence-1 ordering evidence.
-          ja: ingest-run-17 has_phase normalize-17 を sequence=1 evidence 付きで確立します。
-        why_valid_or_invalid:
-          zh: 阶段自述、运行清单与时间边界全部一致，证明 normalize-17 是该运行的组成步骤。
-          en: The phase declaration, run manifest, and temporal boundaries all agree, proving normalize-17 is a component step of this run.
-          ja: phase declaration、run manifest、temporal boundaries が一致し component step を証明します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-ingestion-run-010
-      - id: IngestionRun-has_phase-NormalizationActivity-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 具有规范化阶段边界例
-          en: "Boundary case: has normalization phase"
-          ja: normalization phaseを持つ境界例
-        scenario_id: null
-        descriptions:
-          zh: normalize-18 具有相同 profile 和 phase_id，但 run_id=ingest-run-18，输出 document-18，未列入 ingest-run-17 清单。
-          en: normalize-18 has the same profile and phase ID but run ID ingest-run-18, outputs document-18, and is absent from ingest-run-17's manifest.
-          ja: normalize-18 は同じ profile・phase ID でも run ID、output が別で ingest-run-17 manifest 外です。
-        field_values: {}
-        related_node_ids:
-          - IngestionRun
-          - NormalizationActivity
-        related_relation_ids:
-          - IngestionRun-has_phase-NormalizationActivity
-        expected_result:
-          zh: 不得把 normalize-18 连接为 ingest-run-17 的规范化阶段。
-          en: Do not connect normalize-18 as the normalization phase of ingest-run-17.
-          ja: normalize-18 を ingest-run-17 normalization phase として接続しません。
-        why_valid_or_invalid:
-          zh: 阶段类型可在多个运行中复用；只有 run_id、清单和时间共同匹配才能建立组成关系。
-          en: A phase type is reusable across runs; composition requires joint agreement of run ID, manifest, and time.
-          ja: phase type は run 横断で再利用され composition には run ID・manifest・time の一致が必要です。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-ingestion-run-010
-    source_claims:
-      - claim-ingestion-run-010
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:NormalizationActivity
-  - id: IngestionRun-may_emit-ErrorEvent
-    predicate: may_emit
-    direction: source-to-target
-    relation_kind: causal
-    labels:
-      zh: 可能发出错误事件
-      en: may emit error event
-      ja: error eventを発行し得る
-    definitions:
-      zh: IngestionRun —may_emit→ ErrorEvent 表示运行检测到不可恢复或需报告的失败时可生成错误事件。
-      en: IngestionRun —may_emit→ ErrorEvent means that the run may generate an error event when it detects a reportable or unrecoverable failure.
-      ja: IngestionRun —may_emit→ ErrorEvent はrunがreportable/unrecoverable failureを検出した時error eventを生成し得ることを表します。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
-      en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
-      ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
-    inverse_reading:
-      predicate: inverse_may_emit
-      labels:
-        zh: 反向读取
-        en: inverse reading
-        ja: 逆方向読取
-    conditions:
-      - id: IngestionRun-may_emit-ErrorEvent-condition-manual-001
-        severity: error
-        expression_language: plain
-        expression: Assert only when the error event's run ID, phase, time, and error code identify this run's failure.
-        explanations:
-          zh: 仅当错误事件的 run_id、阶段、时间与错误码均指向该运行失败时成立。
-          en: Assert only when the error event's run ID, phase, time, and error code identify this run's failure.
-          ja: error eventのrun ID・phase・時刻・error codeがこのrun failureを識別する時だけ成立します。
-        source_claims:
-          - claim-ingestion-run-011
-    temporal_scope: timeless
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: IngestionRun-may_emit-ErrorEvent-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 可能发出错误事件正例
-          en: "Positive case: may emit error event"
-          ja: error eventを発行し得る正例
-        scenario_id: null
-        descriptions:
-          zh: error-17 的 source_run_id=ingest-run-17、source_phase_id=normalize-17、发生时间位于运行区间内，错误代码 PARSE_TIMEOUT 与该阶段失败日志一致。
-          en: error-17 has source run ID ingest-run-17 and source phase ID normalize-17, occurs within the run interval, and its PARSE_TIMEOUT code matches that phase's failure log.
-          ja: error-17 の source run/phase ID、occurrence time、PARSE_TIMEOUT code が run failure log と一致します。
-        field_values: {}
-        related_node_ids:
-          - IngestionRun
-          - ErrorEvent
-        related_relation_ids:
-          - IngestionRun-may_emit-ErrorEvent
-        expected_result:
-          zh: 建立 ingest-run-17 may_emit error-17，并保留产生错误的具体阶段。
-          en: Assert ingest-run-17 may_emit error-17 while retaining the exact phase that raised it.
-          ja: ingest-run-17 may_emit error-17 を exact source phase 付きで確立します。
-        why_valid_or_invalid:
-          zh: 错误内部来源、阶段日志与运行时间三者一致，证明该事件由本运行路径发出。
-          en: The error's internal source, phase log, and run time all agree, proving emission from this run path.
-          ja: error internal source、phase log、run time が一致し emission を証明します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-ingestion-run-011
-      - id: IngestionRun-may_emit-ErrorEvent-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 可能发出错误事件边界例
-          en: "Boundary case: may emit error event"
-          ja: error eventを発行し得る境界例
-        scenario_id: null
-        descriptions:
-          zh: error-18 也使用 PARSE_TIMEOUT 代码，但 source_run_id=ingest-run-18，发生在另一租户且不在 ingest-run-17 时间范围。
-          en: error-18 also uses PARSE_TIMEOUT but has source run ID ingest-run-18, occurs in another tenant, and lies outside ingest-run-17's interval.
-          ja: error-18 は同じ code でも source run が別、tenant が別、time interval 外です。
-        field_values: {}
-        related_node_ids:
-          - IngestionRun
-          - ErrorEvent
-        related_relation_ids:
-          - IngestionRun-may_emit-ErrorEvent
-        expected_result:
-          zh: 不得因错误代码相同把 error-18 连接到 ingest-run-17。
-          en: Do not link error-18 to ingest-run-17 merely because the error code matches.
-          ja: same error code だけで error-18 を ingest-run-17 に接続しません。
-        why_valid_or_invalid:
-          zh: 错误代码是可复用分类值，不是事件来源；运行 ID、阶段 ID 和时间才确定发出关系。
-          en: An error code is a reusable classification value rather than event provenance; run ID, phase ID, and time determine emission.
-          ja: error code は reusable classification value で provenance ではなく run/phase ID・time が emission を決めます。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-ingestion-run-011
-    source_claims:
-      - claim-ingestion-run-011
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:ErrorEvent
   - id: IngestionRun-reads-IngestibleResource
     predicate: reads
+    target: concept:IngestibleResource
+    endpoint_order: source-to-target
     direction: source-to-target
     relation_kind: information
     labels:
       zh: 读取来源资源
       en: reads source resource
-      ja: source resourceをreadする
+      ja: ソース資源を読む
     definitions:
-      zh: IngestionRun —reads→ IngestibleResource 表示运行通过加载器访问输入清单点名的 resource_id、定位符和 version_ref，并以 content_digest 核对实际读取内容。
-      en: IngestionRun —reads→ IngestibleResource states that the run uses a loader to access the resource_id, locator, and version_ref named by its input manifest and verifies the bytes actually read against content_digest.
-      ja: IngestionRun —reads→ IngestibleResource は run が loader で input manifest の resource_id・locator・version_ref へアクセスし、実際に読んだ内容を content_digest と照合することを表します。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
-      en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
-      ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
+      zh: IngestionRun 读取 IngestibleResource，表示运行清单与加载器 I/O 共同证明该资源的确切版本和内容摘要被实际访问。
+      en: IngestionRun reads IngestibleResource when run manifest and loader I/O jointly prove that exact resource version and content digest were actually accessed.
+      ja: IngestionRun がIngestibleResourceを読むとは、実行マニフェストとローダーI/Oが共同で、その正確な資源版と内容ダイジェストが実際にアクセスされたと証明することです。
+    cardinality:
+      source:
+        min: 1
+        max: null
+      target:
+        min: 0
+        max: null
+    cardinality_not_applicable_reason: null
     inverse_reading:
-      predicate: inverse_reads
+      predicate: is_read_by_ingestion_run
       labels:
-        zh: 反向读取
-        en: inverse reading
-        ja: 逆方向読取
+        zh: 被摄入运行读取
+        en: is read by ingestion run
+        ja: 取込み実行に読まれる
     conditions:
-      - id: IngestionRun-reads-IngestibleResource-condition-manual-001
+      - id: ingestion-run-reads-resource-condition
         severity: error
         expression_language: plain
-        expression: Assert only when the run input manifest fixes resource_id, canonical locator, and version_ref, and the observed content verifies against content_digest.
-        explanations:
-          zh: 仅当运行输入清单固定 resource_id、规范定位符与 version_ref，且实际读取内容通过 content_digest 校验时成立。
-          en: Assert only when the run input manifest fixes resource_id, canonical locator, and version_ref and the observed content verifies against content_digest.
-          ja: run input manifest が resource_id・canonical locator・version_ref を固定し、実読内容が content_digest で検証できる時だけ成立します。
+        expression: Assert only when run manifest fixes resource identity, canonical locator, version reference, and expected content digest, and loader I/O records actual open or read verified against that digest.
+        explanation:
+          zh: 发现、列出、计划或共享目录不足以表示读取；必须有清单固定和实际 I/O 与摘要核验的双重证据。
+          en: Discovery, listing, planning, or shared directory is not reading; both manifest pinning and actual I/O with digest verification are required.
+          ja: 発見、列挙、計画、共有ディレクトリは読取りではなく、マニフェスト固定とダイジェスト検証付き実際I/Oの両方が必要です。
         source_claims:
-          - claim-ingestion-run-012
-          - claim-ingestion-run-013
-    temporal_scope: timeless
-    boundary_context: null
+          - claim-ingestion-run-read
+          - claim-ingestion-run-digest
+    temporal_scope: valid-time
+    boundary_context: Read fact is scoped to one resource version and the run interval; it does not claim all resources in the collection or later versions were read.
     constraints: []
-    examples:
-      - id: IngestionRun-reads-IngestibleResource-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 读取来源资源正例
-          en: "Positive case: reads source resource"
-          ja: source resourceをreadする正例
-        scenario_id: null
-        descriptions:
-          zh: ingest-run-17 的 loader trace 记录对 file-policy-v7@b7 的 open/download，读取字节数与 b7 校验通过，input manifest 也固定同一 URI 与版本。
-          en: ingest-run-17's loader trace records opening and downloading file-policy-v7@b7, validates bytes read against b7, and fixes the same URI and version in the input manifest.
-          ja: ingest-run-17 loader trace が file-policy-v7@b7 open/download、bytes read、digest validation を記録し input manifest と一致します。
-        field_values: {}
-        related_node_ids:
-          - IngestionRun
-          - IngestibleResource
-        related_relation_ids:
-          - IngestionRun-reads-IngestibleResource
-        expected_result:
-          zh: 建立 ingest-run-17 reads file-policy-v7，并把读取事实限定到对象版本 b7。
-          en: Assert ingest-run-17 reads file-policy-v7 and scope the read fact to object version b7.
-          ja: ingest-run-17 reads file-policy-v7 を object version b7 に限定して確立します。
-        why_valid_or_invalid:
-          zh: 运行清单与实际 I/O 追踪同时证明该确切资源版本被打开并读取，而非仅被发现。
-          en: Both the run manifest and actual I/O trace prove that this exact resource version was opened and read rather than merely discovered.
-          ja: run manifest と actual I/O trace が exact resource version の open/read を証明します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-ingestion-run-014
-      - id: IngestionRun-reads-IngestibleResource-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 读取来源资源边界例
-          en: "Boundary case: reads source resource"
-          ja: source resourceをreadする境界例
-        scenario_id: null
-        descriptions:
-          zh: file-18 出现在同一目录的 index 列表中，但 post-index filter 排除了它，loader trace 没有 open 或读取字节记录。
-          en: file-18 appears in the same directory index but is removed by the post-index filter, and the loader trace has no open or byte-read record for it.
-          ja: file-18 は directory index にあるが filter で除外され loader trace に open/byte-read がありません。
-        field_values: {}
-        related_node_ids:
-          - IngestionRun
-          - IngestibleResource
-        related_relation_ids:
-          - IngestionRun-reads-IngestibleResource
-        expected_result:
-          zh: 不要把可发现但未打开的 file-18 连接为 ingest-run-17 的已读资源。
-          en: Do not connect discoverable but unopened file-18 as a resource read by ingest-run-17.
-          ja: discoverable but unopened file-18 を ingest-run-17 read resource として接続しません。
-        why_valid_or_invalid:
-          zh: 索引或目录共现只表示候选资源；reads 要求实际访问与版本校验证据。
-          en: Index or directory co-occurrence identifies a candidate resource; reads requires actual access and version-validation evidence.
-          ja: index/directory co-occurrence は candidate を示すだけで reads には actual access・version validation が必要です。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-ingestion-run-014
+    examples: []
     source_claims:
-      - claim-ingestion-run-014
-    distinct_fact_rationale: null
+      - claim-ingestion-run-read
+      - claim-ingestion-run-digest
+    distinct_fact_rationale: This relation records actual input access separately from collection membership, loader availability, and generated Document provenance.
     layout_role: cross-link
-    review_status: accepted
-    target: concept:IngestibleResource
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-ingestion-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 Anthropic Contextual Retrieval、LangChain text splitters/document loaders、LlamaIndex node parsers/ingestion pipeline、Unstructured 解析模式与 ETL 去重策略逐项人工语义核验通过。
-    en: Manually verified against Anthropic Contextual Retrieval, LangChain text splitters and document loaders, LlamaIndex node parsers and ingestion pipeline, Unstructured parsing patterns, and ETL deduplication strategies.
-    ja: Anthropic Contextual Retrieval、LangChain text splitters/document loaders、LlamaIndex node parsers/ingestion pipeline、Unstructured 解析パターン、ETL 重複排除戦略に照らし手動意味審査を完了しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+  - id: IngestionRun-may_emit-ObservabilityEvent
+    predicate: may_emit
+    target: concept:ObservabilityEvent
+    endpoint_order: source-to-target
+    direction: source-to-target
+    relation_kind: causal
+    labels:
+      zh: 可发出可观测性事件
+      en: may emit observability event
+      ja: 可観測性イベントを発行し得る
+    definitions:
+      zh: IngestionRun 可发出 ObservabilityEvent，表示该运行或其阶段产生了具有命名事件、受影响主体、结果代码、诊断证据和发生时间的独立诊断事实。
+      en: IngestionRun may emit ObservabilityEvent when the run or one of its phases produces a separate diagnostic fact with named event, affected subject, result code, diagnostic evidence, and occurrence time.
+      ja: IngestionRun がObservabilityEventを発行し得るとは、実行またはそのフェーズが、命名イベント、影響対象、結果コード、診断証拠、発生時刻を持つ独立診断事実を生成することです。
+    cardinality:
+      source:
+        min: 0
+        max: null
+      target:
+        min: 0
+        max: null
+    cardinality_not_applicable_reason: null
+    inverse_reading:
+      predicate: is_emitted_by_ingestion_run
+      labels:
+        zh: 由摄入运行发出
+        en: is emitted by ingestion run
+        ja: 取込み実行により発行される
+    conditions:
+      - id: ingestion-run-may-emit-observability-event-condition
+        severity: error
+        expression_language: plain
+        expression: Assert only when event subject_ref identifies the run or a listed phase, source_run_ref equals ingestion_run_id, result_code and diagnostic_evidence_ref are present, and occurrence time lies in the run interval.
+        explanation:
+          zh: 相同事件名或错误代码不构成来源；受影响主体、运行回指、诊断证据和时间必须共同绑定该事件到本次运行。
+          en: Matching event name or error code does not establish provenance; affected subject, run back-link, diagnostic evidence, and time must jointly bind the event to this run.
+          ja: 一致するイベント名やエラーコードは来歴を確立せず、影響対象、実行逆参照、診断証拠、時刻が共同でイベントをこの実行へ結び付ける必要があります。
+        source_claims:
+          - claim-ingestion-run-observability
+    temporal_scope: valid-time
+    boundary_context: This relation identifies a custom diagnostic fact and does not infer an OpenTelemetry signal type or turn a diagnostic event into the run outcome.
+    constraints: []
+    examples: []
+    source_claims:
+      - claim-ingestion-run-observability
+    distinct_fact_rationale: This relation preserves diagnostic provenance separately from activity failure state and from downstream retry activity.
+    layout_role: cross-link
+sources:
+  - id: langchain-document-loaders
+    title: LangChain document loader integrations
+    url: https://docs.langchain.com/oss/python/integrations/document_loaders/index
+    type: official-doc
+    source_type: official-doc
+    relevance: Documents loader interfaces for reading diverse sources into Document values.
+  - id: nodejs-crypto
+    title: Node.js Crypto API
+    url: https://nodejs.org/api/crypto.html
+    type: official-doc
+    source_type: official-doc
+    relevance: Documents createHash for generating run-manifest and source-content digests.
+  - id: nist-fips-180-4
+    title: FIPS 180-4 Secure Hash Standard
+    url: https://csrc.nist.gov/pubs/fips/180-4/upd1/final
+    type: standard
+    source_type: standard
+    relevance: Specifies secure-hash algorithms that produce message digests for detecting changed messages.
+  - id: w3c-prov-o
+    title: W3C PROV-O
+    url: https://www.w3.org/TR/prov-o/
+    type: standard
+    source_type: standard
+    relevance: Defines time-bounded activities that use entities, generate entities, and participate in provenance chains.
 source_claims:
-  - id: claim-ingestion-run-001
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured defines the complete ingest flow and its ordered steps; Moonweave assigns one identity to the coordinating run.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
+  - id: claim-ingestion-run-loader
+    source: langchain-document-loaders
+    supports: LangChain documents loaders that read varied source systems into Document values. Moonweave records only loader versions actually invoked in a run, not every loader merely installed or policy-permitted.
+    locator: LangChain document loader integrations overview and BaseLoader interface
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-ingestion-run-002
-    source: eng-fw-unstructured-ingestion
-    supports: IngestionRun.ingestion_run_id records the complete ingestion-run identity; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
+  - id: claim-ingestion-run-digest
+    source: nist-fips-180-4
+    supports: FIPS 180-4 specifies secure-hash algorithms that generate message digests for detecting message changes. Moonweave uses algorithm-tagged run-manifest and source-content digests to freeze execution input evidence.
+    locator: FIPS 180-4 abstract on message digests and change detection
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-ingestion-run-003
-    source: eng-fw-unstructured-ingestion
-    supports: IngestionRun.policy_version records reproducible governance context; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
+  - id: claim-ingestion-run-identity
+    source: w3c-prov-o
+    supports: PROV-O distinguishes independently identifiable activities from entities they use or generate. Moonweave identifies a complete ingestion execution separately from resources, loaders, phases, Documents, decisions, and diagnostic events.
+    locator: PROV-O section 3.1 Activity and Entity
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-ingestion-run-004
-    source: eng-fw-unstructured-ingestion
-    supports: IngestionRun.started_at records run temporal identity; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
+  - id: claim-ingestion-run-temporal
+    source: w3c-prov-o
+    supports: PROV-O states that activities start and end at particular points in time. Moonweave records a run start and terminal end independently from individual phase, resource, or Document times.
+    locator: PROV-O section 3.1 on activity start and end times
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-ingestion-run-005
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured describes one ingest workflow coordinating an ordered sequence of source-to-destination steps.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
+  - id: claim-ingestion-run-input
+    source: w3c-prov-o
+    supports: PROV-O states that activities can use entities during their lifetime. Moonweave treats an input collection and its frozen manifest as actual run input rather than inferring use from resource discovery or metadata mention.
+    locator: PROV-O section 3.1 on prov used and Entity Activity relations
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-ingestion-run-006
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured lists partition and other steps as phases within the overall ingest flow.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
+  - id: claim-ingestion-run-parent-contract
+    source: w3c-prov-o
+    supports: PROV-O distinguishes an activity's identity from entities it uses. Moonweave retains IngestionActivity's activity ID and concrete versioned source-resource references on an IngestionRun while separately identifying the run's collection, policy, and local phases.
+    locator: PROV-O section 3.1 on Activity, Entity, and prov:used
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-ingestion-run-007
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured defines one end-to-end ingest flow containing ordered steps.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
+  - id: claim-ingestion-run-read
+    source: langchain-document-loaders
+    supports: Loader integrations distinguish access to source content from merely listing a source. Moonweave requires loader I/O evidence and version-pinned manifest evidence before asserting that a run reads a resource.
+    locator: LangChain document loader integrations overview and BaseLoader interface
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-ingestion-run-008
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured exposes configurable step behavior and source/destination boundaries that a policy governs.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
+  - id: claim-ingestion-run-generation
+    source: w3c-prov-o
+    supports: PROV-O states that activities can generate separate entities. Moonweave hands off completed Documents and independent deduplication decisions while retaining activity status separately from those output facts.
+    locator: PROV-O section 3.1 on prov wasGeneratedBy and generated entities
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-ingestion-run-009
-    source: eng-fw-llamaindex-ingestion-code
-    supports: LlamaIndex executes duplicate/upsert handling within an ingestion pipeline run.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-ingestion-run-010
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured defines ordered transformation steps within one ingest flow.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-ingestion-run-011
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured's multi-step ingest flow exposes step failures; Moonweave requires explicit run and phase binding.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-ingestion-run-012
-    source: eng-fw-langchain-document-loaders
-    supports: LangChain loaders read configured source locations and return Documents. Moonweave records the concrete run-to-resource access rather than treating the reusable loader class as the source instance.
-    locator: Document loader integrations > Interface > BaseLoader load() and lazy_load() source-to-Document behavior
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-ingestion-run-013
-    source: eng-proto-rfc9530-digest-fields
-    supports: RFC 9530 defines Content-Digest as a digest over content. Moonweave uses content_digest to verify that the bytes read by the run correspond to the resource version fixed in the input manifest.
-    locator: RFC 9530 > Section 2.1 Content-Digest; Section 4 Integrity Considerations
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-ingestion-run-014
-    source: eng-fw-langchain-document-loaders
-    supports: LangChain loaders read configured source locations and return Documents.
-    locator: Document loader integrations > Interface > BaseLoader load() and lazy_load() source-to-Document behavior
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
+  - id: claim-ingestion-run-phase
+    source: w3c-prov-o
+    supports: PROV-O supports provenance chains among activities and entities but does not prescribe local phase order. Moonweave models actual ingestion phases as ordered members of one run as a local orchestration inference.
+    locator: PROV-O Activity relations and provenance chains
+    evidence_kind: ontology-design-inference
+    confidence: medium
+  - id: claim-ingestion-run-policy
+    source: w3c-prov-o
+    supports: PROV-O represents provenance participants but does not prescribe ingestion policies. Moonweave models a fixed policy as a separate governing constraint only when manifest and actual execution evidence conform to it.
+    locator: PROV-O Entity Activity provenance and activity constraints
+    evidence_kind: ontology-design-inference
+    confidence: medium
+  - id: claim-ingestion-run-specialization
+    source: w3c-prov-o
+    supports: Modeling a policy- and input-bounded end-to-end workflow as an IngestionRun specialization of IngestionActivity is a Moonweave taxonomy inference grounded in PROV-O's activity and entity distinction.
+    locator: PROV-O Entity Activity usage and generation
+    evidence_kind: ontology-design-inference
+    confidence: medium
+  - id: claim-ingestion-run-observability
+    source: w3c-prov-o
+    supports: PROV-O distinguishes activities from independent provenance entities. Moonweave associates a diagnostic ObservabilityEvent with a run only when subject, run reference, diagnostic evidence, result code, and occurrence time bind it to that run.
+    locator: PROV-O Entity Activity usage and generation
+    evidence_kind: ontology-design-inference
+    confidence: medium

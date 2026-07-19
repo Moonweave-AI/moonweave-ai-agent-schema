@@ -1,0 +1,508 @@
+{
+  "memory-lifecycle": {
+    "positive": {
+      "zh": "Redis SET session:u-42 EX 86400 配合 maxmemory-policy volatile-ttl 管理会话记忆 TTL；Mem0 client.add(\"Prefers metric units\", user_id=\"u-42\") 写入向量库；DynamoDB expires_at 字段触发 TTL 自动删除过期 item。",
+      "en": "Redis SET session:u-42 EX 86400 with maxmemory-policy volatile-ttl manages session memory TTL; Mem0 client.add(\"Prefers metric units\", user_id=\"u-42\") writes to vector store; DynamoDB expires_at triggers TTL auto-deletion of expired items.",
+      "ja": "Redis SET session:u-42 EX 86400 と volatile-ttl が session memory TTL を管理。Mem0 client.add が vector store へ write。DynamoDB expires_at が期限切れ item を自動削除。"
+    },
+    "counterexample": {
+      "zh": "反例：LangGraph checkpointer 线程状态未设 retention policy 就 bulk 复制到 Pinecone，无 MemoryRetentionPolicy、无 Redis EX、无 DynamoDB TTL，无法审计生命周期阶段。",
+      "en": "Counterexample: bulk copying LangGraph checkpointer thread state to Pinecone without retention policy, MemoryRetentionPolicy, Redis EX, or DynamoDB TTL—no auditable lifecycle stages.",
+      "ja": "反例：LangGraph checkpointer thread state を retention policy なしで Pinecone へ bulk copy。MemoryRetentionPolicy/Redis EX/DynamoDB TTL なし。"
+    },
+    "boundary": {
+      "zh": "LangGraph InMemorySaver checkpoint thread-401 恢复图状态属于 thread-scoped 运行时；Mem0 search(query, user_id=\"alice\") 跨 session Store 检索属于长期记忆域，二者 lifecycle 边界不同。",
+      "en": "LangGraph InMemorySaver checkpoint thread-401 restores thread-scoped graph state; Mem0 search(query, user_id=\"alice\") cross-session Store retrieval is long-term memory—different lifecycle domains.",
+      "ja": "LangGraph checkpoint thread-401 は thread-scoped runtime。Mem0 search は cross-session Store long-term memory。lifecycle domain が異なる。"
+    },
+    "instance": {
+      "zh": "MemGPT/Letta archival_memory_insert 写入长期层；Mem0 client.update(memory_id=\"ea925981\", data={\"text\":\" prefers TypeScript\"}) 修订 record-391-v1；Cassandra tombstone 在 compaction 前阻止 stale replica 复活。",
+      "en": "MemGPT/Letta archival_memory_insert writes long-term layer; Mem0 client.update(memory_id=\"ea925981\") revises record-391-v1; Cassandra tombstone prevents stale replica revival before compaction.",
+      "ja": "MemGPT archival_memory_insert が long-term layer へ write。Mem0 client.update が record-391-v1 を改訂。Cassandra tombstone が compaction 前に stale replica 復活を防止。"
+    }
+  },
+  "MemoryOperation": {
+    "positive": {
+      "zh": "mem-op-revise-512 通过 Mem0 client.update(memory_id=\"rec-512\", data={\"timezone\":\"America/New_York\"}) 创建 record-512-v2 后继版本，保留 PROV 修订谱系与 predecessor_record_ref。",
+      "en": "mem-op-revise-512 creates successor record-512-v2 via Mem0 client.update(memory_id=\"rec-512\", data={\"timezone\":\"America/New_York\"}), preserving PROV revision lineage and predecessor_record_ref.",
+      "ja": "mem-op-revise-512 が Mem0 client.update で record-512-v2 後継を作成。PROV 改訂系譜と predecessor_record_ref を保持。"
+    },
+    "counterexample": {
+      "zh": "反例：把 LangGraph checkpointer 的 thread state dict 直接登记为 MemoryOperation，缺少 operation_id、started_at、actor_ref 与可审计操作结果。",
+      "en": "Counterexample: registering LangGraph checkpointer thread state dict as MemoryOperation without operation_id, started_at, actor_ref, or auditable operation result.",
+      "ja": "反例：LangGraph checkpointer thread state dict を operation_id/started_at/actor_ref なしで MemoryOperation 登録。"
+    },
+    "boundary": {
+      "zh": "MemoryRetentionPolicy 文档化 Redis EX 3600 与 DynamoDB TTL，但 planned mem-op-expire-900 尚未 started_at，属于计划操作而非已执行 MemoryOperation。",
+      "en": "MemoryRetentionPolicy documents Redis EX 3600 and DynamoDB TTL, but planned mem-op-expire-900 has no started_at—planned action, not executed MemoryOperation.",
+      "ja": "MemoryRetentionPolicy が Redis EX 3600 を文書化するが planned mem-op-expire-900 は started_at なし—未実行計画。"
+    },
+    "instance": {
+      "zh": "mem-op-dispose-801 status=failed 仍产生 MemoryOperationResult 与 MemoryAuditEvent，记录 Redis volatile-ttl 驱逐失败原因与 partial_diagnostic_ref。",
+      "en": "mem-op-dispose-801 status=failed still produces MemoryOperationResult and MemoryAuditEvent recording Redis volatile-ttl eviction failure and partial_diagnostic_ref.",
+      "ja": "mem-op-dispose-801 status=failed が MemoryOperationResult/MemoryAuditEvent を生成。Redis volatile-ttl evict 失敗を記録。"
+    }
+  },
+  "MemoryAdmissionOperation": {
+    "positive": {
+      "zh": "Mem0 client.add(messages=[{\"role\":\"user\",\"content\":\"I prefer dark mode\"}], user_id=\"alice\") 经 LLM 事实提取后 admission_decision=accept；LangGraph store.put namespace (\"users\",\"alice\",\"prefs\") 提交 version-1 记录。",
+      "en": "Mem0 client.add(messages=[{\"role\":\"user\",\"content\":\"I prefer dark mode\"}], user_id=\"alice\") passes LLM fact extraction with admission_decision=accept; LangGraph store.put namespace (\"users\",\"alice\",\"prefs\") commits version-1 record.",
+      "ja": "Mem0 client.add が LLM 事実抽出後 admission_decision=accept。LangGraph store.put が version-1 record を commit。"
+    },
+    "counterexample": {
+      "zh": "反例：Mem0 client.update(memory_id=\"ea925981\") 修订既有记录属于 MemoryUpdate 修订操作，不是 admission 候选裁决。",
+      "en": "Counterexample: Mem0 client.update(memory_id=\"ea925981\") revising existing record is MemoryUpdate revision, not admission candidate verdict.",
+      "ja": "反例：Mem0 client.update による既存 record 改訂は MemoryUpdate であり admission 判定ではない。"
+    },
+    "boundary": {
+      "zh": "UI 显示 candidate-item-312 的 preview_record_ref 未 committed_at；LangGraph store.put 未执行，accept 裁决 alone 不构成 MemoryAdmissionOperation 完成。",
+      "en": "UI preview_record_ref for candidate-item-312 has no committed_at; LangGraph store.put not executed—accept verdict alone does not complete MemoryAdmissionOperation.",
+      "ja": "preview_record_ref に committed_at なし。LangGraph store.put 未実行—accept だけでは MemoryAdmissionOperation 完了にならない。"
+    },
+    "instance": {
+      "zh": "mem-op-discard-401 admission_decision=discard、decision_reason_code=duplicate_of_existing，Mem0 检测到 namespace (\"users\",\"u-123\",\"prefs\")/language 已有 record-401-v1 而拒绝重复写入。",
+      "en": "mem-op-discard-401 admission_decision=discard, decision_reason_code=duplicate_of_existing—Mem0 detects existing record-401-v1 at namespace (\"users\",\"u-123\",\"prefs\")/language and rejects duplicate write.",
+      "ja": "mem-op-discard-401 admission_decision=discard。Mem0 が既存 record-401-v1 を検出し duplicate write を拒否。"
+    }
+  },
+  "MemoryWrite": {
+    "positive": {
+      "zh": "Mem0 client.add(\"Likes Indian food\", user_id=\"alice\") 经 LLM 提取事实→向量化→Qdrant/ChromaDB 存储→Neo4j 实体关系；LangGraph store.put((\"users\",\"u-123\",\"preferences\"), \"preferred_language\", {\"lang\":\"en\"}) 创建无前驱的 version-1 record-310-v1。",
+      "en": "Mem0 client.add(\"Likes Indian food\", user_id=\"alice\") flows LLM fact extraction→vectorize→Qdrant/ChromaDB→Neo4j relations; LangGraph store.put((\"users\",\"u-123\",\"preferences\"), \"preferred_language\", {\"lang\":\"en\"}) creates predecessor-free version-1 record-310-v1.",
+      "ja": "Mem0 client.add が LLM 抽出→vectorize→Qdrant/ChromaDB→Neo4j。LangGraph store.put が version-1 record-310-v1 を作成。"
+    },
+    "counterexample": {
+      "zh": "反例：mem-op-update-310 输出 output_record_version=2、predecessor_record_ref=record-310-v1，属于 Mem0 client.update 后继版本修订，不是无前驱的 MemoryWrite。",
+      "en": "Counterexample: mem-op-update-310 outputs output_record_version=2 with predecessor_record_ref=record-310-v1—Mem0 client.update successor revision, not predecessor-free MemoryWrite.",
+      "ja": "反例：output_record_version=2 と predecessor ありは Mem0 client.update 改訂であり MemoryWrite ではない。"
+    },
+    "boundary": {
+      "zh": "mem-op-write-preview-312 status=failed、committed_at=absent；LangGraph store 预览 record-preview-312 仅 UI 可见，未产生持久 output_record_ref，不构成 MemoryWrite 提交。",
+      "en": "mem-op-write-preview-312 status=failed, committed_at=absent; LangGraph store preview record-preview-312 is UI-only with no persistent output_record_ref—not a MemoryWrite commit.",
+      "ja": "mem-op-write-preview-312 status=failed、committed_at なし。preview のみで MemoryWrite commit ではない。"
+    },
+    "instance": {
+      "zh": "feedback-91 要求使用公制单位触发 mem-op-write-391；Mem0 client.add 写入 namespace (\"users\",\"u-123\",\"preferences\")/measurement_system，decision_reason_code=user_authorized，trigger_feedback_refs 含 feedback-91。",
+      "en": "feedback-91 requesting metric units triggers mem-op-write-391; Mem0 client.add writes namespace (\"users\",\"u-123\",\"preferences\")/measurement_system with decision_reason_code=user_authorized and trigger_feedback_refs=[feedback-91].",
+      "ja": "feedback-91 が mem-op-write-391 をトリガー。Mem0 client.add が measurement_system を write。trigger_feedback_refs に feedback-91。"
+    }
+  },
+  "MemoryDiscard": {
+    "positive": {
+      "zh": "Mem0 检测到 user_id=\"alice\" 已有相同 fact 的 memory_id=ea925981；admission_decision=discard、decision_reason_code=duplicate_of_existing，candidate-item-402 未调用 store.put 或 client.add 持久化。",
+      "en": "Mem0 detects existing memory_id=ea925981 for same fact on user_id=\"alice\"; admission_decision=discard, decision_reason_code=duplicate_of_existing—candidate-item-402 never calls store.put or client.add.",
+      "ja": "Mem0 が duplicate を検出し admission_decision=discard。candidate-item-402 は store.put/client.add 未実行。"
+    },
+    "counterexample": {
+      "zh": "反例：Mem0 client.delete(memory_id=\"ea925981\") 使既有 record 失效属于 MemoryDelete 处置操作，不是 admission discard 裁决。",
+      "en": "Counterexample: Mem0 client.delete(memory_id=\"ea925981\") invalidating existing record is MemoryDelete disposition, not admission discard verdict.",
+      "ja": "反例：Mem0 client.delete は MemoryDelete であり admission discard ではない。"
+    },
+    "boundary": {
+      "zh": "recommendation-discard-403 只是 UI 建议未执行；无 decision_at、无 actor_ref、无 audit_event_ref，不能登记为已执行的 MemoryDiscard。",
+      "en": "recommendation-discard-403 is UI-only recommendation without decision_at, actor_ref, or audit_event_ref—not an executed MemoryDiscard.",
+      "ja": "recommendation-discard-403 は UI 提案のみ。decision_at/actor_ref なし—実行済み MemoryDiscard ではない。"
+    },
+    "instance": {
+      "zh": "mem-op-discard-404 policy_ref=admission-policy@v4 评估 candidate-item-404 超出 scope；Open Policy Agent rego 返回 deny，decision_reason_code=policy_denied，无 MemoryRecord 生成。",
+      "en": "mem-op-discard-404 policy_ref=admission-policy@v4 evaluates candidate-item-404 out of scope; Open Policy Agent rego returns deny, decision_reason_code=policy_denied, no MemoryRecord generated.",
+      "ja": "mem-op-discard-404 で OPA rego が deny。decision_reason_code=policy_denied。MemoryRecord 未生成。"
+    }
+  },
+  "MemoryAssessmentOperation": {
+    "positive": {
+      "zh": "mem-op-assess-501 read-only 调用 Mem0 client.search(\"timezone preference\", user_id=\"u-501\") 检索 record-501-v1，检测到与 CRM 源冲突并登记 warning_code=source_mismatch，不修改记录。",
+      "en": "mem-op-assess-501 read-only calls Mem0 client.search(\"timezone preference\", user_id=\"u-501\") retrieving record-501-v1, detects CRM source mismatch and registers warning_code=source_mismatch without modifying record.",
+      "ja": "mem-op-assess-501 が Mem0 client.search で record-501-v1 を read-only 評価。source_mismatch warning を登録し改変しない。"
+    },
+    "counterexample": {
+      "zh": "反例：Mem0 client.update(memory_id=\"rec-501\") 写入新版本属于 MemoryUpdate 修订，不是 read-only MemoryAssessmentOperation。",
+      "en": "Counterexample: Mem0 client.update(memory_id=\"rec-501\") writing new version is MemoryUpdate revision, not read-only MemoryAssessmentOperation.",
+      "ja": "反例：Mem0 client.update は MemoryUpdate であり read-only assessment ではない。"
+    },
+    "boundary": {
+      "zh": "Grafana 仪表盘 relevance_score=0.82 无 operation_id、无 target_record_refs、无 assessment_kind；属于观测显示，不是 MemoryAssessmentOperation。",
+      "en": "Grafana dashboard relevance_score=0.82 has no operation_id, target_record_refs, or assessment_kind—observability display, not MemoryAssessmentOperation.",
+      "ja": "Grafana relevance_score=0.82 は operation_id なし—MemoryAssessmentOperation ではない。"
+    },
+    "instance": {
+      "zh": "mem-op-validate-3001 检测 conflict-3001：record-3001-a-v2 断言 timezone=UTC，record-3001-b-v4 断言 timezone=America/New_York，登记 MemoryConflict 但未选择解决策略。",
+      "en": "mem-op-validate-3001 detects conflict-3001: record-3001-a-v2 asserts timezone=UTC vs record-3001-b-v4 asserts America/New_York—registers MemoryConflict without resolution strategy.",
+      "ja": "mem-op-validate-3001 が conflict-3001 を検出。UTC vs America/New_York の MemoryConflict を登録。"
+    }
+  },
+  "MemoryValidation": {
+    "positive": {
+      "zh": "mem-op-validate-601 对 record-601-v1 执行 schema 校验：Mem0 metadata.user_id=\"alice\" 与 namespace (\"users\",\"alice\") 一致，content_digest 匹配 committed output，validation_result=valid_for_reuse。",
+      "en": "mem-op-validate-601 schema-validates record-601-v1: Mem0 metadata.user_id=\"alice\" matches namespace (\"users\",\"alice\"), content_digest matches committed output, validation_result=valid_for_reuse.",
+      "ja": "mem-op-validate-601 が record-601-v1 を schema 検証。Mem0 metadata.user_id と namespace 一致。validation_result=valid_for_reuse。"
+    },
+    "counterexample": {
+      "zh": "反例：mem-op-conflict-resolve-3001 选择 retain_one 并形成 conflict-resolution-decision 属于 MemoryConflictResolution，不是仅检测的 MemoryValidation。",
+      "en": "Counterexample: mem-op-conflict-resolve-3001 selecting retain_one and forming conflict-resolution-decision is MemoryConflictResolution, not detection-only MemoryValidation.",
+      "ja": "反例：retain_one 選択と resolution decision は MemoryConflictResolution であり MemoryValidation ではない。"
+    },
+    "boundary": {
+      "zh": "Pinecone match score=0.91 是检索相似度，无 validation_kind、无 criterion_ref；不能把 VectorIndex 分数当作 MemoryValidation 结果。",
+      "en": "Pinecone match score=0.91 is retrieval similarity without validation_kind or criterion_ref—VectorIndex score is not MemoryValidation result.",
+      "ja": "Pinecone match score=0.91 は retrieval 類似度。validation_kind なし—MemoryValidation 結果ではない。"
+    },
+    "instance": {
+      "zh": "mem-op-validate-3001 登记 conflict-3001：两条 record 对同一 record_key=timezone 给出互斥值，validation_output_ref=conflict-3001，未执行 merge 或 delete。",
+      "en": "mem-op-validate-3001 registers conflict-3001: two records give incompatible values for record_key=timezone, validation_output_ref=conflict-3001, no merge or delete executed.",
+      "ja": "mem-op-validate-3001 が conflict-3001 を登録。timezone record_key で互斥値。merge/delete 未実行。"
+    }
+  },
+  "MemoryConflict": {
+    "positive": {
+      "zh": "conflict-3001 绑定 record-3001-a-v2（timezone=UTC，source=calendar_sync）与 record-3001-b-v4（timezone=America/New_York，source=user_explicit）；Mem0 检索两条记忆对同一 record_key 给出互斥断言。",
+      "en": "conflict-3001 binds record-3001-a-v2 (timezone=UTC, source=calendar_sync) vs record-3001-b-v4 (timezone=America/New_York, source=user_explicit)—Mem0 retrieves two memories with incompatible assertions on same record_key.",
+      "ja": "conflict-3001 が UTC vs America/New_York の二 record を結合。Mem0 が同一 record_key で互斥 assertion を検出。"
+    },
+    "counterexample": {
+      "zh": "反例：record-3002-a-v1 与 record-3002-b-v1 字段互补（language=en + locale=en-US）无互斥断言，属于 MemoryMerge 输入而非 MemoryConflict。",
+      "en": "Counterexample: record-3002-a-v1 and record-3002-b-v1 have complementary fields (language=en + locale=en-US) with no incompatible assertion—MemoryMerge input, not MemoryConflict.",
+      "ja": "反例：補完フィールドのみは MemoryMerge 入力であり MemoryConflict ではない。"
+    },
+    "boundary": {
+      "zh": "conflict-3003 两源权威与 consent_scope 均 inconclusive；MemoryValidation 登记冲突但 mark_ambiguous 决定属于 MemoryConflictResolutionDecision，不是 MemoryConflict 本身。",
+      "en": "conflict-3003 has inconclusive source authority and consent_scope; MemoryValidation registers conflict but mark_ambiguous decision belongs to MemoryConflictResolutionDecision, not MemoryConflict itself.",
+      "ja": "conflict-3003 は authority inconclusive。mark_ambiguous は MemoryConflictResolutionDecision 側。"
+    },
+    "instance": {
+      "zh": "conflict-3004 涉及 payment_method=card vs payment_method=invoice 互斥；policy_ref=data-retention@v2 的 consent_scope 排除 calendar_sync 源，影响 conflict_severity=high。",
+      "en": "conflict-3004 involves payment_method=card vs payment_method=invoice; policy_ref=data-retention@v2 consent_scope excludes calendar_sync source, affecting conflict_severity=high.",
+      "ja": "conflict-3004 が payment_method 互斥。consent_scope が calendar_sync を exclude。"
+    }
+  },
+  "MemoryAuditEvent": {
+    "positive": {
+      "zh": "audit-write-310 记录 mem-op-write-310 committed_at=2026-07-18T17:00:00.143Z、output_record_ref=record-310-v1、output_content_digest=sha256:0bf7...；W3C PROV-O 审计链绑定 operation 与生成实体。",
+      "en": "audit-write-310 records mem-op-write-310 committed_at=2026-07-18T17:00:00.143Z, output_record_ref=record-310-v1, output_content_digest=sha256:0bf7...—W3C PROV-O audit chain binds operation to generated entity.",
+      "ja": "audit-write-310 が mem-op-write-310 の commit を PROV-O 監査 chain で記録。"
+    },
+    "counterexample": {
+      "zh": "反例：MemoryOperationResult summary 字段 alone 无 event_kind、无 audit_timestamp、无 actor_ref，不能代替 MemoryAuditEvent 合规审计记录。",
+      "en": "Counterexample: MemoryOperationResult summary alone without event_kind, audit_timestamp, or actor_ref cannot substitute MemoryAuditEvent compliance audit record.",
+      "ja": "反例：MemoryOperationResult summary のみでは MemoryAuditEvent 代替にならない。"
+    },
+    "boundary": {
+      "zh": "DEBUG log line \"store.put succeeded\" 无 structured event_kind、无 operation_id 引用；属于应用日志，不是 MemoryAuditEvent。",
+      "en": "DEBUG log line \"store.put succeeded\" lacks structured event_kind and operation_id reference—application log, not MemoryAuditEvent.",
+      "ja": "DEBUG log \"store.put succeeded\" は event_kind なし—MemoryAuditEvent ではない。"
+    },
+    "instance": {
+      "zh": "audit-discard-401 记录 mem-op-discard-401 decision_at、decision_reason_code=duplicate_of_existing、candidate_item_ref=candidate-item-401，证明 discard 裁决可审计且无 MemoryRecord 生成。",
+      "en": "audit-discard-401 records mem-op-discard-401 decision_at, decision_reason_code=duplicate_of_existing, candidate_item_ref=candidate-item-401—proves auditable discard verdict with no MemoryRecord generation.",
+      "ja": "audit-discard-401 が discard 判定を監査可能に記録。MemoryRecord 未生成。"
+    }
+  },
+  "MemoryDispositionOperation": {
+    "positive": {
+      "zh": "mem-op-expire-2602 按 MemoryRetentionPolicy expires_after_days=90 将 record-2602-v1 标记 retention_ineligible；DynamoDB TTL expires_at 到期后触发后台 MemoryDelete。",
+      "en": "mem-op-expire-2602 marks record-2602-v1 retention_ineligible per MemoryRetentionPolicy expires_after_days=90; DynamoDB TTL expires_at triggers background MemoryDelete.",
+      "ja": "mem-op-expire-2602 が retention_ineligible を印付け。DynamoDB TTL が background MemoryDelete をトリガー。"
+    },
+    "counterexample": {
+      "zh": "反例：Mem0 client.update(memory_id=\"rec-2602\") 创建 record-2602-v2 属于 MemoryUpdate 修订谱系，不是 MemoryDispositionOperation 处置。",
+      "en": "Counterexample: Mem0 client.update(memory_id=\"rec-2602\") creating record-2602-v2 is MemoryUpdate revision lineage, not MemoryDispositionOperation disposition.",
+      "ja": "反例：Mem0 client.update による v2 作成は MemoryUpdate であり disposition ではない。"
+    },
+    "boundary": {
+      "zh": "cron job 计划 03:00 执行 Redis SCAN+UNLINK 清理 expired keys 尚未 started_at；属于 scheduled cleanup 计划，不是已执行 MemoryDispositionOperation。",
+      "en": "Cron job scheduled 03:00 Redis SCAN+UNLINK cleanup of expired keys has no started_at—scheduled cleanup plan, not executed MemoryDispositionOperation.",
+      "ja": "03:00 cron Redis SCAN+UNLINK 計画は started_at なし—未実行 disposition。"
+    },
+    "instance": {
+      "zh": "mem-op-evict-801 Redis maxmemory-policy allkeys-lru 在 used_memory>maxmemory 时移出 cache tier 的 record-801-v1 副本；durable MemoryStore 副本仍有效。",
+      "en": "mem-op-evict-801 Redis maxmemory-policy allkeys-lru evicts cache-tier copy of record-801-v1 when used_memory>maxmemory; durable MemoryStore copy remains valid.",
+      "ja": "mem-op-evict-801 が Redis allkeys-lru で cache copy を evict。durable copy は有効。"
+    }
+  },
+  "MemoryDecay": {
+    "positive": {
+      "zh": "Mem0 检索排序对 90 天未访问 memory_id=\"rec-decay-1\" 应用 decay_score=0.31（base=1.0, half_life_days=30）；低于 retrieval_threshold=0.4 后不再默认返回，但未 delete。",
+      "en": "Mem0 retrieval ranking applies decay_score=0.31 (base=1.0, half_life_days=30) to memory_id=\"rec-decay-1\" after 90 days inactive; below retrieval_threshold=0.4 it is not returned by default but not deleted.",
+      "ja": "Mem0 が 90 日 inactive の memory に decay_score=0.31 を適用。threshold 未満で default 返却なし、delete なし。"
+    },
+    "counterexample": {
+      "zh": "反例：Redis maxmemory-policy allkeys-lru 物理驱逐 key 属于 MemoryEviction，不是仅降低 relevance 的 MemoryDecay。",
+      "en": "Counterexample: Redis maxmemory-policy allkeys-lru physically evicting key is MemoryEviction, not relevance-reducing MemoryDecay.",
+      "ja": "反例：Redis allkeys-lru 物理 evict は MemoryEviction であり MemoryDecay ではない。"
+    },
+    "boundary": {
+      "zh": "UI 显示 decay_score=0.31 无 operation_id、无 decay_policy_ref；仪表盘数值不能登记为 MemoryDecay 活动。",
+      "en": "UI displaying decay_score=0.31 without operation_id or decay_policy_ref—dashboard number cannot be registered as MemoryDecay activity.",
+      "ja": "UI decay_score 表示のみ—operation_id なし—MemoryDecay 活動ではない。"
+    },
+    "instance": {
+      "zh": "mem-op-decay-901 decay_policy_ref=exponential-half-life@v1 对 record-901-v1 last_accessed_at=2026-04-01 计算 time_decay_factor=0.28，写入 decay_audit_ref 供检索过滤。",
+      "en": "mem-op-decay-901 decay_policy_ref=exponential-half-life@v1 computes time_decay_factor=0.28 for record-901-v1 last_accessed_at=2026-04-01, writes decay_audit_ref for retrieval filtering.",
+      "ja": "mem-op-decay-901 が time_decay_factor=0.28 を計算。decay_audit_ref を retrieval filter 用に write。"
+    }
+  },
+  "MemoryOperationResult": {
+    "positive": {
+      "zh": "result-write-310 status=succeeded 列出 output_record_refs=[record-310-v1]、committed_at=2026-07-18T17:00:00.143Z，与 mem-op-write-310 LangGraph store.put 提交证据一致。",
+      "en": "result-write-310 status=succeeded lists output_record_refs=[record-310-v1], committed_at=2026-07-18T17:00:00.143Z, matching mem-op-write-310 LangGraph store.put commit evidence.",
+      "ja": "result-write-310 が output_record_refs と committed_at を列挙。mem-op-write-310 store.put と一致。"
+    },
+    "counterexample": {
+      "zh": "反例：MemoryOperation activity 的 started_at/actor_ref 无 result_status、无 output_record_refs，不能把操作活动本身当作 MemoryOperationResult。",
+      "en": "Counterexample: MemoryOperation activity started_at/actor_ref without result_status or output_record_refs—activity itself is not MemoryOperationResult.",
+      "ja": "反例：activity の started_at のみでは MemoryOperationResult にならない。"
+    },
+    "boundary": {
+      "zh": "mem-op-write-312 status=running、progress_pct=0.6 无 committed_at、无 final output_record_refs；进行中进度不是完成 MemoryOperationResult。",
+      "en": "mem-op-write-312 status=running, progress_pct=0.6 without committed_at or final output_record_refs—in-progress state is not completed MemoryOperationResult.",
+      "ja": "mem-op-write-312 status=running は completed MemoryOperationResult ではない。"
+    },
+    "instance": {
+      "zh": "result-dispose-801 status=partially_succeeded 含 succeeded_target_refs=[record-801-cache] 与 failed_target_refs=[record-801-durable]，partial_diagnostic_ref 记录 Redis UNLINK 部分失败。",
+      "en": "result-dispose-801 status=partially_succeeded includes succeeded_target_refs=[record-801-cache] and failed_target_refs=[record-801-durable], partial_diagnostic_ref records partial Redis UNLINK failure.",
+      "ja": "result-dispose-801 status=partially_succeeded。Redis UNLINK 部分失敗を partial_diagnostic_ref に記録。"
+    }
+  },
+  "MemoryResolutionOperation": {
+    "positive": {
+      "zh": "mem-op-conflict-resolve-3001 消费 conflict-3001，比较 Mem0 源 metadata.authoritative_source，选择 retain_one 保留 record-3001-b-v4，形成 conflict-resolution-decision-3001。",
+      "en": "mem-op-conflict-resolve-3001 consumes conflict-3001, compares Mem0 source metadata.authoritative_source, selects retain_one keeping record-3001-b-v4, forms conflict-resolution-decision-3001.",
+      "ja": "mem-op-conflict-resolve-3001 が conflict-3001 を消費。authoritative_source 比較で retain_one。"
+    },
+    "counterexample": {
+      "zh": "反例：mem-op-validate-3001 仅检测登记 conflict-3001 无 resolution_strategy、无 decision_ref，属于 MemoryValidation 不是 MemoryResolutionOperation。",
+      "en": "Counterexample: mem-op-validate-3001 only detects conflict-3001 without resolution_strategy or decision_ref—MemoryValidation, not MemoryResolutionOperation.",
+      "ja": "反例：conflict 検出のみは MemoryValidation であり resolution ではない。"
+    },
+    "boundary": {
+      "zh": "mem-op-merge-3002 合并互补字段无 conflict_ref；普通 MemoryMerge 无互斥断言，不属于 MemoryConflictResolution 子类。",
+      "en": "mem-op-merge-3002 merges complementary fields without conflict_ref—ordinary MemoryMerge without incompatible assertions is not MemoryConflictResolution subtype.",
+      "ja": "mem-op-merge-3002 は conflict_ref なし merge—MemoryConflictResolution ではない。"
+    },
+    "instance": {
+      "zh": "mem-op-conflict-resolve-3003 对 conflict-3003 选择 mark_ambiguous；两 record consent_scope 均无法决定胜者，decision_ref=conflict-resolution-decision-3003，未自动 rewrite 任何 record。",
+      "en": "mem-op-conflict-resolve-3003 selects mark_ambiguous for conflict-3003; neither record consent_scope determines winner, decision_ref=conflict-resolution-decision-3003, no automatic record rewrite.",
+      "ja": "mem-op-conflict-resolve-3003 が mark_ambiguous を選択。decision_ref=conflict-resolution-decision-3003。"
+    }
+  },
+  "MemoryConflictResolutionDecision": {
+    "positive": {
+      "zh": "conflict-resolution-decision-3001 resolution_strategy=retain_one、selected_record_ref=record-3001-b-v4、evidence_digest=sha256:abc...；Mem0 metadata.source=user_explicit 权威高于 calendar_sync。",
+      "en": "conflict-resolution-decision-3001 resolution_strategy=retain_one, selected_record_ref=record-3001-b-v4, evidence_digest=sha256:abc...—Mem0 metadata.source=user_explicit authority over calendar_sync.",
+      "ja": "conflict-resolution-decision-3001 が retain_one を選択。user_explicit 権威が calendar_sync より高い。"
+    },
+    "counterexample": {
+      "zh": "反例：mem-op-conflict-resolve-3001 执行 reconcile 并创建 record-3005-reconciled-v1 属于 resolution 活动执行，不是独立的 MemoryConflictResolutionDecision 裁决工件。",
+      "en": "Counterexample: mem-op-conflict-resolve-3001 executing reconcile and creating record-3005-reconciled-v1 is resolution activity execution, not independent MemoryConflictResolutionDecision artifact.",
+      "ja": "反例：reconcile 実行と record 作成は activity であり decision artifact 単体ではない。"
+    },
+    "boundary": {
+      "zh": "conflict-resolution-decision-3001 针对 conflict-3001；conflict-3004 同批次出现但未被 mem-op-conflict-resolve-3001 引用，不能共享同一 decision。",
+      "en": "conflict-resolution-decision-3001 targets conflict-3001; conflict-3004 in same batch but not referenced by mem-op-conflict-resolve-3001 cannot share same decision.",
+      "ja": "decision-3001 は conflict-3001 専用。conflict-3004 は別 decision。"
+    },
+    "instance": {
+      "zh": "conflict-resolution-decision-3003 resolution_strategy=mark_ambiguous、ambiguous_reason=insufficient_authority；两源 metadata.authoritative_source 与 consent_scope 均 inconclusive，保留双 record 待人工审查。",
+      "en": "conflict-resolution-decision-3003 resolution_strategy=mark_ambiguous, ambiguous_reason=insufficient_authority—both sources metadata.authoritative_source and consent_scope inconclusive, both records retained for human review.",
+      "ja": "decision-3003 が mark_ambiguous。authority/consent  inconclusive で両 record 保留。"
+    }
+  },
+  "MemoryRevisionOperation": {
+    "positive": {
+      "zh": "mem-op-revise-512 读取 record-512-v1（timezone=UTC），Mem0 client.update(memory_id=\"rec-512\", data={\"timezone\":\"America/New_York\"}) 产生 record-512-v2，predecessor_record_ref=record-512-v1。",
+      "en": "mem-op-revise-512 reads record-512-v1 (timezone=UTC), Mem0 client.update(memory_id=\"rec-512\", data={\"timezone\":\"America/New_York\"}) produces record-512-v2 with predecessor_record_ref=record-512-v1.",
+      "ja": "mem-op-revise-512 が Mem0 client.update で record-512-v2 を生成。predecessor=record-512-v1。"
+    },
+    "counterexample": {
+      "zh": "反例：LangGraph store.put 覆盖同名 key 而不递增 output_record_version 属于 in-place overwrite，违反 MemoryRevisionOperation 版本谱系约束。",
+      "en": "Counterexample: LangGraph store.put overwriting same key without incrementing output_record_version is in-place overwrite, violating MemoryRevisionOperation version lineage constraint.",
+      "ja": "反例：version 増加なし store.put 上書きは in-place overwrite で revision 制約違反。"
+    },
+    "boundary": {
+      "zh": "mem-op-validate-601 只读校验 record-601-v1 无 output_record_ref、无 successor 写入；validation-only 不是 MemoryRevisionOperation。",
+      "en": "mem-op-validate-601 read-only validates record-601-v1 without output_record_ref or successor write—validation-only is not MemoryRevisionOperation.",
+      "ja": "mem-op-validate-601 は validation-only で revision ではない。"
+    },
+    "instance": {
+      "zh": "mem-op-synthesize-701 MemorySynthesisOperation 子类：Generative Agents 式 reflection 从 record-701-a/b 合成 record-701-reflection-v1，保留 input_manifest_digest 与 synthesis_kind=reflection。",
+      "en": "mem-op-synthesize-701 MemorySynthesisOperation subtype: Generative Agents-style reflection synthesizes record-701-reflection-v1 from record-701-a/b, retaining input_manifest_digest and synthesis_kind=reflection.",
+      "ja": "mem-op-synthesize-701 が Generative Agents 式 reflection で record-701-reflection-v1 を合成。"
+    }
+  },
+  "MemorySynthesisOperation": {
+    "positive": {
+      "zh": "mem-op-consolidate-801 跨 session 合并 Mem0 search(user_id=\"alice\") 返回的三条 language preference 为 record-801-consolidated-v1；synthesis_kind=consolidation，input_record_refs 含三条前驱。",
+      "en": "mem-op-consolidate-801 cross-session merges three language preferences from Mem0 search(user_id=\"alice\") into record-801-consolidated-v1; synthesis_kind=consolidation, input_record_refs lists three predecessors.",
+      "ja": "mem-op-consolidate-801 が Mem0 search 結果 3 件を consolidation で record-801-consolidated-v1 に統合。"
+    },
+    "counterexample": {
+      "zh": "反例：Mem0 client.update 单条 memory_id 修订属于 MemoryUpdate，不是多输入 synthesize 的 MemorySynthesisOperation。",
+      "en": "Counterexample: Mem0 client.update single memory_id revision is MemoryUpdate, not multi-input MemorySynthesisOperation synthesize.",
+      "ja": "反例：単一 Mem0 client.update は MemoryUpdate であり synthesis ではない。"
+    },
+    "boundary": {
+      "zh": "Pinecone index compact 操作优化向量索引存储，无 input_record_refs、无 synthesis_kind；属于 index compaction 不是 MemoryCompaction 记忆压缩。",
+      "en": "Pinecone index compact optimizes vector index storage without input_record_refs or synthesis_kind—index compaction, not MemoryCompaction memory compression.",
+      "ja": "Pinecone index compact は index 最適化であり MemoryCompaction ではない。"
+    },
+    "instance": {
+      "zh": "mem-op-reflect-901 Generative Agents memory stream：从 record-901-event-a/b 生成 reflection record-901-reflection-v1，LLM prompt 提取 higher-level insight，synthesis_kind=reflection。",
+      "en": "mem-op-reflect-901 Generative Agents memory stream: generates reflection record-901-reflection-v1 from record-901-event-a/b via LLM prompt extracting higher-level insight, synthesis_kind=reflection.",
+      "ja": "mem-op-reflect-901 が Generative Agents memory stream で reflection record を生成。"
+    }
+  },
+  "MemoryCompaction": {
+    "positive": {
+      "zh": "mem-op-compact-1001 将 record-1001-v1..v8 会话历史压缩为 record-1001-summary-v1；保留 ChunkProvenance 与 input_manifest_digest，LLM summarization 后 token 数从 4200 降至 680。",
+      "en": "mem-op-compact-1001 compresses record-1001-v1..v8 session history into record-1001-summary-v1; preserves ChunkProvenance and input_manifest_digest, LLM summarization reduces tokens from 4200 to 680.",
+      "ja": "mem-op-compact-1001 が v1..v8 を summary-v1 に圧縮。token 4200→680。Provenance 保持。"
+    },
+    "counterexample": {
+      "zh": "反例：压缩时丢弃 retention_policy_ref 与 consent_scope 约束属于 lost-constraint compaction，违反 MemoryCompaction provenance-preserving 约束。",
+      "en": "Counterexample: compaction dropping retention_policy_ref and consent_scope constraints is lost-constraint compaction, violating MemoryCompaction provenance-preserving constraint.",
+      "ja": "反例：retention_policy_ref 丢弃は lost-constraint compaction。"
+    },
+    "boundary": {
+      "zh": "Weaviate index.optimize() 重建 HNSW 图无 MemoryRecord 输入；向量索引维护不是 MemoryCompaction 语义压缩。",
+      "en": "Weaviate index.optimize() rebuilds HNSW graph without MemoryRecord input—vector index maintenance is not MemoryCompaction semantic compression.",
+      "ja": "Weaviate index.optimize() は vector index メンテナンスであり MemoryCompaction ではない。"
+    },
+    "instance": {
+      "zh": "mem-op-compact-1002 对 thread_id=t-1002 的 12 条 checkpoint message 生成 record-1002-context-v1；LangGraph trim_messages 前先持久化 compaction 摘要供跨 thread 检索。",
+      "en": "mem-op-compact-1002 compacts 12 checkpoint messages for thread_id=t-1002 into record-1002-context-v1; persists compaction summary before LangGraph trim_messages for cross-thread retrieval.",
+      "ja": "mem-op-compact-1002 が 12 checkpoint message を record-1002-context-v1 に圧縮。"
+    }
+  },
+  "MemoryConsolidation": {
+    "positive": {
+      "zh": "Mem0 跨 session 合并 user_id=\"alice\" 的三条 \"prefers TypeScript\" 记忆为 memory_id=consolidated-1；mem-op-consolidate-1101 synthesis_kind=consolidation，dedupe_key=preference.language。",
+      "en": "Mem0 cross-session merges three \"prefers TypeScript\" memories for user_id=\"alice\" into memory_id=consolidated-1; mem-op-consolidate-1101 synthesis_kind=consolidation, dedupe_key=preference.language.",
+      "ja": "Mem0 が alice の TypeScript preference 3 件を consolidated-1 に統合。"
+    },
+    "counterexample": {
+      "zh": "反例：合并同一 event_id=evt-42 的两条实时 transcript 属于 same-event merge，不是跨 session factual pattern 的 MemoryConsolidation。",
+      "en": "Counterexample: merging two real-time transcripts for same event_id=evt-42 is same-event merge, not cross-session factual pattern MemoryConsolidation.",
+      "ja": "反例：同一 event_id merge は cross-session consolidation ではない。"
+    },
+    "boundary": {
+      "zh": "MemoryCompaction 生成单 thread 摘要不提取跨 session pattern；compaction 输出不是 consolidation 的 cross-session 合并结果。",
+      "en": "MemoryCompaction generates single-thread summary without cross-session pattern extraction—compaction output is not consolidation cross-session merge result.",
+      "ja": "MemoryCompaction は single-thread summary であり consolidation 結果ではない。"
+    },
+    "instance": {
+      "zh": "mem-op-consolidate-1102 从 Mem0 graph 遍历 (alice)-[:PREFERS]->(metric_units) 与 (alice)-[:PREFERS]->(celsius) 合并为 record-1102-preference-v1，scope=user:alice。",
+      "en": "mem-op-consolidate-1102 merges Mem0 graph traversals (alice)-[:PREFERS]->(metric_units) and (alice)-[:PREFERS]->(celsius) into record-1102-preference-v1, scope=user:alice.",
+      "ja": "mem-op-consolidate-1102 が Mem0 graph traversal 結果を record-1102-preference-v1 に統合。"
+    }
+  },
+  "MemoryMerge": {
+    "positive": {
+      "zh": "mem-op-merge-1201 合并 record-1201-a-v1（meeting_date=2026-07-10）与 record-1201-b-v1（attendees=[alice,bob]）为 record-1201-merged-v1；字段互补无 conflict_ref。",
+      "en": "mem-op-merge-1201 merges record-1201-a-v1 (meeting_date=2026-07-10) and record-1201-b-v1 (attendees=[alice,bob]) into record-1201-merged-v1; complementary fields, no conflict_ref.",
+      "ja": "mem-op-merge-1201 が meeting_date と attendees を互补 merge。"
+    },
+    "counterexample": {
+      "zh": "反例：LLM 将两条记忆 generalize 为 \"user likes meetings\" 丢失 record-1201-a-v1 的具体日期属于 over-generalization merge，违反 MemoryMerge 保留字段级证据。",
+      "en": "Counterexample: LLM generalizing two memories to \"user likes meetings\" losing record-1201-a-v1 specific date is over-generalization merge, violating MemoryMerge field-level evidence preservation.",
+      "ja": "反例：over-generalization merge は具体日付を失い MemoryMerge 制約違反。"
+    },
+    "boundary": {
+      "zh": "mem-op-conflict-resolve-3001 处理 conflict-3001 互斥 timezone 值；有 conflict_ref 的 retain_one 属于 MemoryConflictResolution 不是普通 MemoryMerge。",
+      "en": "mem-op-conflict-resolve-3001 handles conflict-3001 incompatible timezone values; retain_one with conflict_ref is MemoryConflictResolution, not ordinary MemoryMerge.",
+      "ja": "conflict_ref 付き retain_one は MemoryConflictResolution であり普通 merge ではない。"
+    },
+    "instance": {
+      "zh": "mem-op-merge-1202 dedupe Mem0 search 返回的两条 \"User email is alice@example.com\" 为 record-1202-dedup-v1；content_digest 匹配，merge_strategy=deduplicate_identical_facts。",
+      "en": "mem-op-merge-1202 deduplicates two Mem0 search results \"User email is alice@example.com\" into record-1202-dedup-v1; content_digest matches, merge_strategy=deduplicate_identical_facts.",
+      "ja": "mem-op-merge-1202 が同一 email fact を dedupe merge。"
+    }
+  },
+  "MemoryReflection": {
+    "positive": {
+      "zh": "Generative Agents (Park et al.) memory stream：mem-op-reflect-1301 从 record-1301-failed-login-a/b 生成 reflection \"User struggles with 2FA on mobile\"；MemGPT core_memory_append 写入 persona block。",
+      "en": "Generative Agents (Park et al.) memory stream: mem-op-reflect-1301 generates reflection \"User struggles with 2FA on mobile\" from record-1301-failed-login-a/b; MemGPT core_memory_append writes persona block.",
+      "ja": "Generative Agents memory stream。mem-op-reflect-1301 が 2FA struggle reflection を生成。MemGPT core_memory_append。"
+    },
+    "counterexample": {
+      "zh": "反例：将单条 event record 的 title 字段复制为 \"summary\" 无 LLM synthesis、无 higher-level insight 属于 event-summary，不是 MemoryReflection。",
+      "en": "Counterexample: copying single event record title as \"summary\" without LLM synthesis or higher-level insight is event-summary, not MemoryReflection.",
+      "ja": "反例：title コピーだけは event-summary であり MemoryReflection ではない。"
+    },
+    "boundary": {
+      "zh": "LLM chain-of-thought 中间 reasoning token 未持久化为 MemoryRecord；private reasoning 不是 scoped retry lesson 的 MemoryReflection 输出。",
+      "en": "LLM chain-of-thought intermediate reasoning tokens not persisted as MemoryRecord—private reasoning is not scoped retry lesson MemoryReflection output.",
+      "ja": "CoT reasoning token 未 persist は MemoryReflection 出力ではない。"
+    },
+    "instance": {
+      "zh": "HumanFeedback feedback-1301 纠正 \"prefer email not SMS\" 触发 mem-op-reflect-1302；从 record-1302-channel-a 生成 reflection record-1302-lesson-v1，scope=support-preferences。",
+      "en": "HumanFeedback feedback-1301 correcting \"prefer email not SMS\" triggers mem-op-reflect-1302; generates reflection record-1302-lesson-v1 from record-1302-channel-a, scope=support-preferences.",
+      "ja": "HumanFeedback feedback-1301 が mem-op-reflect-1302 をトリガー。reflection record-1302-lesson-v1 を生成。"
+    }
+  },
+  "MemoryUpdate": {
+    "positive": {
+      "zh": "Mem0 client.update(memory_id=\"ea925981\", data={\"text\":\" prefers TypeScript over JavaScript\"}) 创建 record-512-v2；predecessor_record_ref=record-512-v1，output_record_version=2，保留 PROV 修订谱系。",
+      "en": "Mem0 client.update(memory_id=\"ea925981\", data={\"text\":\" prefers TypeScript over JavaScript\"}) creates record-512-v2; predecessor_record_ref=record-512-v1, output_record_version=2, preserving PROV revision lineage.",
+      "ja": "Mem0 client.update が record-512-v2 を作成。predecessor=record-512-v1、version=2。"
+    },
+    "counterexample": {
+      "zh": "反例：LangGraph store.put 直接覆盖 (\"users\",\"u-123\",\"prefs\")/language 而不创建 record-310-v2 后继版本属于 in-place overwrite，不是 MemoryUpdate。",
+      "en": "Counterexample: LangGraph store.put directly overwriting (\"users\",\"u-123\",\"prefs\")/language without creating record-310-v2 successor is in-place overwrite, not MemoryUpdate.",
+      "ja": "反例：version なし store.put 上書きは MemoryUpdate ではない。"
+    },
+    "boundary": {
+      "zh": "mem-op-merge-1201 同时消费 record-1201-a-v1 与 record-1201-b-v1 生成 merged 输出；多输入 merge 不是单前驱 MemoryUpdate。",
+      "en": "mem-op-merge-1201 consumes record-1201-a-v1 and record-1201-b-v1 producing merged output—multi-input merge is not single-predecessor MemoryUpdate.",
+      "ja": "multi-input merge は single-predecessor MemoryUpdate ではない。"
+    },
+    "instance": {
+      "zh": "mem-op-update-391 Mem0 client.update 修订 measurement_system preference：record-391-v1→record-391-v2，trigger_feedback_refs=[feedback-91]，content_digest 从 sha256:34ea... 变为 sha256:8f2a...。",
+      "en": "mem-op-update-391 Mem0 client.update revises measurement_system preference: record-391-v1→record-391-v2, trigger_feedback_refs=[feedback-91], content_digest changes from sha256:34ea... to sha256:8f2a...",
+      "ja": "mem-op-update-391 が measurement_system を v1→v2 に改訂。feedback-91 トリガー。"
+    }
+  },
+  "MemoryRetentionPolicy": {
+    "positive": {
+      "zh": "MemoryRetentionPolicy retention-policy@v4 声明 Redis SET key EX 86400、DynamoDB attribute expires_at Unix epoch、Mem0 infer=false 时 max_age_days=365；三存储统一 TTL 语义。",
+      "en": "MemoryRetentionPolicy retention-policy@v4 declares Redis SET key EX 86400, DynamoDB attribute expires_at Unix epoch, Mem0 infer=false max_age_days=365—unified TTL semantics across stores.",
+      "ja": "retention-policy@v4 が Redis EX 86400、DynamoDB expires_at、Mem0 max_age_days=365 を宣言。"
+    },
+    "counterexample": {
+      "zh": "反例：应用代码 hardcode TTL=3600 无 policy_id、无 version、无 scope 绑定，不能代替可审计 MemoryRetentionPolicy。",
+      "en": "Counterexample: application hardcoding TTL=3600 without policy_id, version, or scope binding cannot substitute auditable MemoryRetentionPolicy.",
+      "ja": "反例：hardcode TTL=3600 は policy_id/version なし—MemoryRetentionPolicy 代替不可。"
+    },
+    "boundary": {
+      "zh": "LangGraph checkpointer thread TTL 由 checkpointer config 管理；thread-scoped checkpoint retention 不自动等同于 Mem0 cross-session MemoryRetentionPolicy。",
+      "en": "LangGraph checkpointer thread TTL managed by checkpointer config—thread-scoped checkpoint retention does not automatically equal Mem0 cross-session MemoryRetentionPolicy.",
+      "ja": "LangGraph checkpoint TTL と Mem0 cross-session retention policy は別 domain。"
+    },
+    "instance": {
+      "zh": "retention-policy-session@v2 scope=session:u-42 绑定 Redis volatile-ttl + maxmemory-policy volatile-ttl；record-2602-v1 policy_ref 指向该版本，expires_at=2026-10-18T00:00:00Z。",
+      "en": "retention-policy-session@v2 scope=session:u-42 binds Redis volatile-ttl + maxmemory-policy volatile-ttl; record-2602-v1 policy_ref points to this version, expires_at=2026-10-18T00:00:00Z.",
+      "ja": "retention-policy-session@v2 が session:u-42 に Redis volatile-ttl を绑定。"
+    }
+  },
+  "MemoryTombstone": {
+    "positive": {
+      "zh": "Cassandra DELETE 写入 tombstone marker；Mem0 client.delete(memory_id=\"rec-2601\") 产生 tombstone-2601，仅含 record-2601-v1 最小 identity、erasure-request-2601、invalidated_at，不含正文或 embedding。",
+      "en": "Cassandra DELETE writes tombstone marker; Mem0 client.delete(memory_id=\"rec-2601\") produces tombstone-2601 with only record-2601-v1 minimal identity, erasure-request-2601, invalidated_at—no body or embeddings.",
+      "ja": "Cassandra DELETE tombstone。Mem0 client.delete が tombstone-2601 を生成。本文/embedding なし。"
+    },
+    "counterexample": {
+      "zh": "反例：tombstone-copy-2601 保留 record-2601-v1 原始正文和 embedding 仅改 type=tombstone，违反 content-minimized tombstone 约束。",
+      "en": "Counterexample: tombstone-copy-2601 retaining record-2601-v1 original body and embeddings with only type=tombstone violates content-minimized tombstone constraint.",
+      "ja": "反例：本文保持 tombstone は content-minimized 制約違反。"
+    },
+    "boundary": {
+      "zh": "Redis DEL key 物理删除无 tombstone marker；与 Cassandra gc_grace_seconds 内 tombstone 阻止 stale replica 复活的语义不同。",
+      "en": "Redis DEL key physical deletion has no tombstone marker—different from Cassandra gc_grace_seconds tombstone preventing stale replica revival.",
+      "ja": "Redis DEL は tombstone marker なし—Cassandra tombstone 语义と異なる。"
+    },
+    "instance": {
+      "zh": "tombstone-2603 关联 mem-op-delete-2603、ticket-invalid-2603 质量调查；invalidated_at=2026-07-18T22:00:00.107Z 后 Mem0 search 与 LangGraph store.get 均不返回 record-2603-v3 正文。",
+      "en": "tombstone-2603 linked to mem-op-delete-2603, ticket-invalid-2603 quality investigation; after invalidated_at=2026-07-18T22:00:00.107Z Mem0 search and LangGraph store.get return no record-2603-v3 body.",
+      "ja": "tombstone-2603 が delete-2603 に链接。invalidated_at 後 Mem0/search/store.get は正文を返さない。"
+    }
+  }
+}

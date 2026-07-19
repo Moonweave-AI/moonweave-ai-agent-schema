@@ -1,0 +1,331 @@
+schema: moonweave.ai/ontology-node/v1
+id: info-content-parts
+kind: module
+status: accepted
+labels:
+  zh: 内容片段
+  en: Content Parts
+  ja: コンテンツパート
+semantics:
+  short_definition:
+    zh: 在消息中独立携带文本、文件、数据或媒体的一段带类型内容。
+    en: A typed unit of text, file, data, or media carried independently in a message.
+    ja: メッセージ内でテキスト、ファイル、データ、またはメディアを独立して運ぶ型付きの内容単位。
+  definition:
+    zh: >-
+      内容片段模块规定 Moonweave 如何描述消息或工件内部的可组合内容单元，并保留其目标协议的
+      实际载荷形状。它以 A2A 的 Part 为主要互操作边界，同时记录 MCP 的 TextContent、ImageContent、
+      AudioContent 与 EmbeddedResource，以及 OpenAI Responses API 的 input_text、input_image、
+      input_file 和音频输入。它不是声称这些协议共用同一 JSON 对象；本模块只规定何时必须保留
+      类型、媒体类型和目标协议，具体线路格式仍由相应协议决定。
+    en: >-
+      The Content Parts module describes composable content units inside a message or artifact while
+      preserving the real payload shape of the target protocol. Its primary interoperability boundary
+      is the A2A Part, with explicit reference to MCP TextContent, ImageContent, AudioContent, and
+      EmbeddedResource, and to OpenAI Responses API input_text, input_image, input_file, and audio
+      input. It does not assert that these protocols share one JSON object; it only requires that kind,
+      media type, and target protocol remain explicit while the owning protocol defines the wire shape.
+    ja: >-
+      コンテンツパートモジュールは、メッセージまたは成果物の内部にある合成可能な内容単位を記述し、
+      対象プロトコル固有の実際のペイロード形状を保持します。主な相互運用境界は A2A Part であり、
+      MCP の TextContent、ImageContent、AudioContent、EmbeddedResource、および OpenAI Responses API
+      の input_text、input_image、input_file、音声入力を明示的に参照します。これらが同一の JSON
+      オブジェクトであるとは主張せず、種別、メディア型、対象プロトコルを明示することだけを求め、
+      ワイヤ形式は各プロトコルに委ねます。
+  why_needed:
+    zh: >-
+      “content” 只有一个字符串时，系统无法分辨一段文字、待解析的 PDF、图像 URL 和 JSON 数据，
+      也无法安全地序列化到正确的 API。把内容按片段保存能让调用方在发送前选择正确的编码与模型能力，
+      同时避免把 A2A、MCP 和 OpenAI 的不同字段名误当成同一个标准。
+    en: >-
+      A single untyped content string cannot distinguish prose, a PDF to parse, an image URL, and JSON
+      data, or serialize them safely to the correct API. Keeping typed parts lets a caller select the
+      right encoding and model capability before sending, without mistaking the different A2A, MCP, and
+      OpenAI field names for one standard.
+    ja: >-
+      型のない一つの content 文字列では、文章、解析対象の PDF、画像 URL、JSON データを区別できず、
+      正しい API に安全に直列化することもできません。型付きパートを保持すると、送信前に適切な
+      エンコーディングとモデル能力を選択でき、A2A、MCP、OpenAI の異なるフィールド名を同一標準と
+      取り違えずに済みます。
+  includes:
+    - zh: A2A Message 或 Artifact 中满足“一种载荷分支”的 Part。
+      en: An A2A Message or Artifact Part that satisfies one payload branch.
+      ja: 一つのペイロード分岐を満たす A2A Message または Artifact の Part。
+    - zh: MCP PromptMessage 中的 TextContent、ImageContent、AudioContent 或 EmbeddedResource。
+      en: TextContent, ImageContent, AudioContent, or EmbeddedResource in an MCP PromptMessage.
+      ja: MCP PromptMessage 内の TextContent、ImageContent、AudioContent、または EmbeddedResource。
+    - zh: OpenAI 请求中的 input_text、input_image、input_file 或文档化的音频输入项。
+      en: An input_text, input_image, input_file, or documented audio input item in an OpenAI request.
+      ja: OpenAI リクエスト内の input_text、input_image、input_file、または文書化された音声入力項目。
+  excludes:
+    - zh: Message、Artifact 或 PromptMessage 本身；它们是片段的容器，不是片段。
+      en: A Message, Artifact, or PromptMessage itself; these are containers of parts, not parts.
+      ja: Message、Artifact、PromptMessage 自体。これらはパートの容器であり、パートではありません。
+    - zh: 代码高亮、表格渲染或播放器控件等 UI 表示对象。
+      en: A UI presentation object such as syntax highlighting, a table renderer, or a media player.
+      ja: シンタックスハイライト、表レンダラー、メディアプレーヤーなどの UI 表示オブジェクト。
+    - zh: 向量嵌入、OCR 结果或转写结果；它们是处理后的派生数据，而不是原始内容片段。
+      en: An embedding, OCR result, or transcription; these are derived processing results, not source parts.
+      ja: 埋め込み、OCR 結果、文字起こし結果。これらは派生した処理結果であり、元の内容パートではありません。
+engineering:
+  explanation:
+    zh: >-
+      工程实现先标明目标协议，再按该协议的真实联合类型编码，而不是把内部对象直接透传。A2A 1.0 的
+      Part 必须恰好含 text、raw、url、data 之一，可带 mediaType 和 filename；MCP prompts 的
+      PromptMessage.content 是一种内容类型；OpenAI Responses 请求把输入项放在 message 的 content
+      数组中。适配代码应在边界处执行这种投影，并在无法表示时返回明确错误。
+    en: >-
+      An implementation identifies the target protocol first and then encodes its real union type instead
+      of passing an internal object through. An A2A 1.0 Part must contain exactly one of text, raw, url,
+      or data and can carry mediaType and filename; an MCP prompt PromptMessage.content has one content
+      type; an OpenAI Responses request places input items in a message content array. Boundary code makes
+      that projection and returns an explicit error when a part cannot be represented.
+    ja: >-
+      実装はまず対象プロトコルを識別し、内部オブジェクトをそのまま通すのではなく、実際の union 型に
+      符号化します。A2A 1.0 の Part は text、raw、url、data のいずれか一つだけを含み、mediaType と
+      filename を持てます。MCP prompt の PromptMessage.content は一種類の内容型であり、OpenAI
+      Responses リクエストはメッセージの content 配列に入力項目を置きます。境界コードはこの投影を
+      実施し、表現できないパートには明示的なエラーを返します。
+  typical_input:
+    - description: An A2A 1.0 Message with one Part using text and one Part using a URL file payload.
+      format: |
+        {
+          "messageId": "msg-42",
+          "role": "ROLE_USER",
+          "parts": [
+            {"text": "Summarize this report."},
+            {"url": "https://example.com/doc.pdf", "filename": "report.pdf", "mediaType": "application/pdf"}
+          ]
+        }
+      source_claims: [claim-content-parts-a2a]
+    - description: OpenAI Responses API multimodal input items.
+      format: |
+        {
+          "model": "gpt-5.6",
+          "input": [{"role": "user", "content": [
+            {"type": "input_text", "text": "Describe this chart."},
+            {"type": "input_image", "image_url": "https://api.nga.gov/iiif/a2e6da57-3cd1-4235-b20e-95dcaefed6c8/full/!800,800/0/default.jpg"}
+          ]}]
+        }
+      source_claims: [claim-content-parts-openai-image]
+  typical_output:
+    - description: Target-specific A2A Part projection retaining the selected branch.
+      format: |
+        {"text": "Summary request", "mediaType": "text/plain"}
+      source_claims: [claim-content-parts-a2a]
+    - description: Target-specific MCP prompt content projection.
+      format: |
+        {"role": "user", "content": {"type": "text", "text": "Summary request"}}
+      source_claims: [claim-content-parts-mcp]
+  reference_implementations:
+    - name: A2A Protocol Part
+      url: https://a2a-protocol.org/latest/specification/
+      description: Defines the Part one-of payload fields, mediaType, filename, and use in Message and Artifact.
+    - name: Model Context Protocol Prompts
+      url: https://modelcontextprotocol.io/specification/2025-11-25/server/prompts
+      description: Defines PromptMessage and its Text, Image, Audio, and Embedded Resource content types.
+    - name: OpenAI Responses API image input
+      url: https://developers.openai.com/api/docs/guides/images-vision
+      description: Shows input_text and input_image items in a Responses API message content array.
+    - name: OpenAI API file inputs
+      url: https://developers.openai.com/api/docs/guides/file-inputs
+      description: Documents input_file shapes using file URL, file ID, or file data.
+structure:
+  identity_keys: [part_kind, target_protocol]
+  fields:
+    - id: part_kind
+      labels: {zh: 片段种类, en: part kind, ja: パート種別}
+      definitions:
+        zh: 指示该片段是文本、文件、数据、图像或音频的规范化分类标签。
+        en: A normalized classification label indicating text, file, data, image, or audio.
+        ja: テキスト、ファイル、データ、画像、音声のいずれかを示す正規化された分類ラベル。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+    - id: target_protocol
+      labels: {zh: 目标协议, en: target protocol, ja: 対象プロトコル}
+      definitions:
+        zh: 决定此片段实际序列化规则的协议或本地规范化表示标识。
+        en: The protocol or local normalized representation that determines the actual serialization rule.
+        ja: 実際の直列化規則を決めるプロトコル、またはローカル正規化表現の識別子。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+    - id: media_type
+      labels: {zh: 媒体类型, en: media type, ja: メディア型}
+      definitions:
+        zh: 可选 MIME 类型，用于说明文件、媒体或数据载荷的解释方式。
+        en: An optional MIME type describing how a file, media, or data payload is interpreted.
+        ja: ファイル、メディア、またはデータペイロードの解釈を示す任意の MIME 型。
+      datatype: string
+      required: false
+      cardinality: {min: 0, max: 1}
+    - id: payload
+      labels: {zh: 协议载荷, en: protocol payload, ja: プロトコルペイロード}
+      definitions:
+        zh: 按 target_protocol 的真实字段形状保存的文本、URL、字节或 JSON 数据。
+        en: Text, URL, bytes, or JSON data stored in the real field shape of target_protocol.
+        ja: target_protocol の実際のフィールド形状で保存されるテキスト、URL、バイト、または JSON データ。
+      datatype: object
+      required: true
+      cardinality: {min: 1, max: 1}
+  constraints:
+    - id: content-part-target-is-explicit
+      expression: target_protocol != "" AND part_kind != ""
+      explanation:
+        zh: 每个片段必须声明其目标协议和种类，才能选择正确的序列化器。
+        en: Every part must state its target protocol and kind so the correct serializer can be selected.
+        ja: 正しいシリアライザーを選べるよう、各パートは対象プロトコルと種別を明示しなければならない。
+    - id: a2a-part-has-one-payload-branch
+      expression: target_protocol != "a2a-1.0" OR exactly_one(payload.text, payload.raw, payload.url, payload.data)
+      explanation:
+        zh: A2A 1.0 投影必须只使用 text、raw、url、data 中的一个载荷分支。
+        en: An A2A 1.0 projection must use exactly one of the text, raw, url, or data payload branches.
+        ja: A2A 1.0 への投影は text、raw、url、data のペイロード分岐をちょうど一つだけ使用しなければならない。
+    - id: content-part-does-not-invent-a-common-wire-shape
+      expression: target_protocol = "local-normalized" OR payload conforms_to target_protocol
+      explanation:
+        zh: 本模块可保存本地规范化描述，但发送前必须投影到一个已声明协议的真实接口形状。
+        en: The module may store a local normalized description, but it must be projected to a declared protocol's real interface before sending.
+        ja: このモジュールはローカル正規化記述を保存できますが、送信前に宣言済みプロトコルの実際のインターフェースへ投影しなければなりません。
+  required_relations: []
+examples:
+  - id: info-content-parts-a2a-text-and-file-payload-branches
+    labels:
+      zh: A2A 文本与文件负载分支
+      en: A2A text and file payload branches
+      ja: A2A のテキストとファイルのペイロード分岐
+
+    descriptions: {zh: "Attention Is All You Need (Vaswani et al., 2017) self-attention Q/K/V scaled dot-product; context window is transformer sequence foundation; info-content-parts maps ContentPart/token boundaries.", en: "Attention Is All You Need (Vaswani et al., 2017) self-attention Q/K/V; context window is transformer sequence foundation; info-content-parts maps ContentPart/token boundaries.", ja: "Attention self-attention Q/K/V; info-content-parts context/token boundary."}
+    field_values:
+      target_protocol: a2a-1.0
+      parts:
+        - text: Summarize the report.
+          mediaType: text/plain
+        - url: https://example.com/doc.pdf
+          filename: doc.pdf
+          mediaType: application/pdf
+      source_doc: A2A Protocol v1.0 — Part text and File with URL examples
+    related_relation_ids: []
+    source_claims: [claim-content-parts-a2a]
+  - id: info-content-parts-mixed-protocol-without-target
+    labels:
+      zh: 未声明 target_protocol 的混放
+      en: Mixed payloads without target_protocol
+      ja: target_protocol 未宣言の混在
+    descriptions: {zh: "Attention Is All You Need (Vaswani et al., 2017) self-attention Q/K/V scaled dot-product; context window is transformer sequence foundation; info-content-parts maps ContentPart/token boundaries.", en: "Attention Is All You Need (Vaswani et al., 2017) self-attention Q/K/V; context window is transformer sequence foundation; info-content-parts maps ContentPart/token boundaries.", ja: "Attention self-attention Q/K/V; info-content-parts context/token boundary."}
+    field_values:
+      target_protocol: ""
+      payload: {any: mixed}
+    related_relation_ids: []
+    source_claims: [claim-content-parts-design]
+  - id: info-content-parts-local-normalized-image
+    labels:
+      zh: 本地规范化图像 Part
+      en: Local normalized image Part
+      ja: ローカル正規化画像 Part
+    descriptions: {zh: "Attention Is All You Need (Vaswani et al., 2017) self-attention Q/K/V scaled dot-product; context window is transformer sequence foundation; info-content-parts maps ContentPart/token boundaries.", en: "Attention Is All You Need (Vaswani et al., 2017) self-attention Q/K/V; context window is transformer sequence foundation; info-content-parts maps ContentPart/token boundaries.", ja: "Attention self-attention Q/K/V; info-content-parts context/token boundary."}
+    field_values:
+      part_kind: image
+      target_protocol: local-normalized
+      payload: {uri: "https://api.nga.gov/iiif/a2e6da57-3cd1-4235-b20e-95dcaefed6c8/full/!800,800/0/default.jpg", media_type: image/png}
+    related_relation_ids: []
+    source_claims: [claim-content-parts-openai-image]
+  - id: info-content-parts-openai-multimodal-input
+    labels:
+      zh: OpenAI 多模态 input 数组
+      en: OpenAI multimodal input array
+      ja: OpenAI マルチモーダル input 配列
+    descriptions: {zh: "Attention Is All You Need (Vaswani et al., 2017) self-attention Q/K/V scaled dot-product; context window is transformer sequence foundation; info-content-parts maps ContentPart/token boundaries.", en: "Attention Is All You Need (Vaswani et al., 2017) self-attention Q/K/V; context window is transformer sequence foundation; info-content-parts maps ContentPart/token boundaries.", ja: "Attention self-attention Q/K/V; info-content-parts context/token boundary."}
+    field_values:
+      target_protocol: openai-responses
+      content:
+        - type: input_text
+          text: "what's in this image?"
+        - type: input_image
+          image_url: https://api.nga.gov/iiif/a2e6da57-3cd1-4235-b20e-95dcaefed6c8/full/!800,800/0/default.jpg
+      source_doc: OpenAI Images and vision guide — Responses API content array
+    related_relation_ids: []
+    source_claims: [claim-content-parts-openai-image]
+parent_relation: null
+relations: []
+sources:
+  - id: a2a-part
+    title: A2A Protocol Specification
+    publisher: A2A Project
+    url: https://a2a-protocol.org/latest/specification/
+    version: 1.0
+    accessed_on: 2026-07-18
+    source_type: standard
+    relevance: Defines Message.parts, Artifact.parts, and the exact one-of fields of Part.
+  - id: mcp-prompts-content
+    title: Model Context Protocol Prompts Specification
+    publisher: Model Context Protocol
+    url: https://modelcontextprotocol.io/specification/2025-11-25/server/prompts
+    version: 2025-11-25
+    accessed_on: 2026-07-18
+    source_type: standard
+    relevance: Defines PromptMessage and its Text, Image, Audio, and Embedded Resource content forms.
+  - id: openai-responses-images
+    title: OpenAI API Images and vision guide
+    publisher: OpenAI
+    url: https://developers.openai.com/api/docs/guides/images-vision
+    version: Documentation accessed 2026-07-18
+    accessed_on: 2026-07-18
+    source_type: official-doc
+    relevance: Documents input_text and input_image in a Responses API message content array.
+  - id: openai-responses-files
+    title: OpenAI API File inputs guide
+    publisher: OpenAI
+    url: https://developers.openai.com/api/docs/guides/file-inputs
+    version: Documentation accessed 2026-07-18
+    accessed_on: 2026-07-18
+    source_type: official-doc
+    relevance: Documents input_file with file URL, file ID, and file data shapes.
+  - id: openai-audio-input
+    title: OpenAI API Audio and speech guide
+    publisher: OpenAI
+    url: https://developers.openai.com/api/docs/guides/audio
+    version: Documentation accessed 2026-07-18
+    accessed_on: 2026-07-18
+    source_type: official-doc
+    relevance: Documents an input_audio item with encoded data and format in a Chat Completions request.
+source_claims:
+  - id: claim-content-parts-a2a
+    source: a2a-part
+    supports: A2A defines Part as a message or artifact content unit with exactly one of text, raw, url, or data, plus optional mediaType and filename.
+    locator: A2A specification section 4.1.4 Message, section 4.1.6 Part, and section 4.1.7 Artifact
+    evidence_kind: normative
+    confidence: high
+  - id: claim-content-parts-mcp
+    source: mcp-prompts-content
+    supports: MCP defines PromptMessage content and the Text Content, Image Content, Audio Content, and Embedded Resources data types.
+    locator: MCP Prompts specification sections PromptMessage and Data Types
+    evidence_kind: normative
+    confidence: high
+  - id: claim-content-parts-openai-image
+    source: openai-responses-images
+    supports: OpenAI documents input_text and input_image items together in a Responses API message content array.
+    locator: Images and vision guide section Analyze images
+    evidence_kind: official
+    confidence: high
+  - id: claim-content-parts-openai-file
+    source: openai-responses-files
+    supports: OpenAI documents input_file request shapes including file_url, file_id, and file_data.
+    locator: File inputs guide sections How it works and File URLs
+    evidence_kind: official
+    confidence: high
+  - id: claim-content-parts-openai-audio
+    source: openai-audio-input
+    supports: OpenAI documents input_audio with base64 data and an audio format inside message content for the audio model API.
+    locator: Audio and speech guide section audio input example
+    evidence_kind: official
+    confidence: high
+  - id: claim-content-parts-design
+    source: a2a-part
+    supports: Treating Content Parts as a local normalized boundary while preserving the target protocol is a Moonweave design inference; A2A, MCP, and OpenAI do not define one shared wire object.
+    locator: A2A Part section 4.1.6, MCP Prompts Data Types, and OpenAI API request examples
+    evidence_kind: design-inference
+    confidence: medium
+
+

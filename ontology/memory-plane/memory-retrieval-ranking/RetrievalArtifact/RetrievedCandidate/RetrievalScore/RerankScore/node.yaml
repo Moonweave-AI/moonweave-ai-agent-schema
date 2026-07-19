@@ -3,325 +3,424 @@ id: RerankScore
 kind: concept
 status: accepted
 labels:
-  zh: 重排分数
+  zh: 重排序评分
   en: Rerank score
-  ja: 再順位付けscore
+  ja: 再ランキングスコア
 semantics:
   short_definition:
-    zh: 由声明版本的重排模型在二阶段检索中为候选重新产生的检索分数。
-    en: A retrieval score reassigned to a candidate by a declared reranker-model version in second-stage retrieval.
-    ja: second-stage retrievalで指定reranker-model versionがcandidateに再付与するretrieval scoreです。
+    zh: 由重排序器为一个已检索候选项生成的方法限定相关性评分。
+    en: A method-scoped relevance score emitted by a reranker for one retrieved candidate.
+    ja: reranker が一つの取得済み候補に生成する method 範囲の relevance score。
   definition:
-    zh: RerankScore 是 RetrievalScore 的严格子类，由 RerankActivity 的声明模型对查询与候选字段联合评估后产生；它保留 model_version 和数值，但不等同于初始相似度、RRF 累积分或最终 rank_position。
-    en: RerankScore is the strict RetrievalScore subtype produced when a RerankActivity's declared model jointly evaluates the query and candidate fields. It preserves model_version and value but is not initial similarity, accumulated RRF value, or final rank_position.
-    ja: RerankScore はRerankActivity指定modelがquery/candidate fieldをjointly評価して生成するstrict RetrievalScore subtypeです。model_version/valueを保持しますがinitial similarity・RRF aggregate・final rank_positionではありません。
+    zh: >-
+      RerankScore 是 RetrievalScore 的子类型，记录重排序模型在给定查询与候选项对上产生的数值、模型版本、量表和运行来源。
+      它不等同于初始词法或向量分数，不是最终名次，也不表示候选项已被选入模型上下文或用于生成答案。
+    en: >-
+      A RerankScore is a subtype of RetrievalScore that retains its retrieval_score_id, generic score value, method, scale,
+      and scoring-run provenance while recording the reranker value, model version, and query-candidate pair that produced it.
+      It is neither an initial lexical or vector score nor a final rank, and it does not mean the candidate was selected into
+      model context or used to generate an answer.
+    ja: >-
+      RerankScore は RetrievalScore の下位型であり、reranking model が一つの query-candidate pair に生成した値、model version、
+      scale、run provenance を記録する。初期 lexical score や vector score、最終 rank ではなく、candidate が model context に選ばれたことや
+      answer の生成に使われたことも表さない。
   why_needed:
-    zh: 使二阶段模型分数可以解释、复算并与初始检索信号区分。
-    en: Makes second-stage model scores explainable and reproducible while distinguishing them from first-stage retrieval signals.
-    ja: second-stage model scoreを説明・再計算可能にしfirst-stage retrieval signalと区別します。
+    zh: 重排序通常比初检更精细且成本更高；独立记录可追踪其模型来源并避免覆盖初始评分。
+    en: Reranking is usually more precise and more expensive than first-pass retrieval; a separate record preserves model provenance without overwriting initial scores.
+    ja: reranking は通常 first-pass retrieval より精密で高コストである。別 record により model provenance を保ち初期 score を上書きしない。
   includes:
-    - zh: 纳入交叉编码器或专用 reranker 对候选产生的二阶段相关性数值。
-      en: Includes second-stage relevance values produced by cross-encoders or dedicated rerankers.
-      ja: cross-encoder/dedicated rerankerがcandidateに生成するsecond-stage relevance valueを含みます。
+    - zh: 候选引用、查询引用、重排序值、模型版本、量表和运行来源。
+      en: Candidate reference query reference rerank value model version scale and run provenance.
+      ja: candidate 参照 query 参照 rerank 値 model version scale run provenance。
   excludes:
-    - zh: 排除向量相似度、词汇分数、融合排名贡献和最终排名字段。
-      en: Excludes vector similarity, lexical scores, fusion-rank contributions, and the final rank field.
-      ja: vector similarity・lexical score・fusion-rank contribution・final rank fieldを除外します。
-  semantic_kind: quality
-  aliases: []
+    - zh: BM25 原始分数、向量距离、最终排名、上下文包成员资格、答案和持久化写入。
+      en: BM25 raw score vector distance final rank context-package membership answer and persistence write.
+      ja: BM25 raw score vector distance 最終 rank context-package membership answer persistence write。
+  semantic_kind: entity
+  aliases: [cross-encoder score, reranked relevance, 重排得分]
+engineering:
+  explanation:
+    zh: 重排序活动将查询和有限候选列表传给交叉编码器或重排序 API，并为每个候选项输出单独相关性值。
+    en: A reranking activity sends a query and bounded candidate list to a cross-encoder or rerank API and emits a separate relevance value for each candidate. The record keeps the generic RetrievalScore fields alongside reranker-specific fields so an API response is not mistaken for a final ranking decision.
+    ja: reranking activity は query と制限された candidate list を cross-encoder または rerank API に送り各 candidate に別の relevance 値を出力する。
+  typical_input:
+    - description: Query and candidate documents sent to a reranker.
+      format: |
+        {
+          "query_ref": "query-support-42",
+          "candidate_refs": ["candidate-support-42", "candidate-support-51"],
+          "reranker_model": "rerank-v3.5",
+          "score_method": "rerank",
+          "rerank_run_ref": "rerank-run-support-42"
+        }
+  typical_output:
+    - description: One immutable rerank score for a candidate.
+      format: |
+        {
+          "retrieval_score_id": "score-rerank-support-42",
+          "rerank_score_id": "rerank-score-support-42",
+          "candidate_ref": "candidate-support-42",
+          "query_ref": "query-support-42",
+          "score_value": 0.98,
+          "score_method": "rerank",
+          "rerank_value": 0.98,
+          "reranker_model": "rerank-v3.5",
+          "score_scale": "cohere-relevance-score",
+          "scoring_run_ref": "rerank-run-support-42",
+          "rerank_run_ref": "rerank-run-support-42"
+        }
+  reference_implementations:
+    - name: Cohere Rerank
+      url: https://docs.cohere.com/docs/reranking
+      description: Documents reranking documents for a query and returning relevance scores.
+    - name: SentenceTransformers CrossEncoder
+      url: https://www.sbert.net/docs/cross_encoder/usage/usage.html
+      description: Documents scoring query-document pairs with CrossEncoder models.
 structure:
-  identity_keys:
-    - score_id
+  identity_keys: [retrieval_score_id, rerank_score_id]
   fields:
-    - id: score_id
+    - id: retrieval_score_id
       labels:
-        zh: 分数标识
-        en: score ID
-        ja: score ID
+        zh: 检索评分标识
+        en: retrieval score ID
+        ja: retrieval score ID
+      definitions:
+        zh: 保留 RetrievalScore 父类的稳定标识，使重排序评分可作为同一候选项的通用检索评分记录被审计。
+        en: Retains the stable RetrievalScore parent identifier so this rerank value can be audited as a general retrieval-score record for its candidate.
+        ja: この rerank 値を candidate の一般的な retrieval-score record として監査できるよう RetrievalScore 親の安定識別子を保持する。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 继承并标识一次重排评分记录。
-        en: Inherited identifier for one rerank-score record.
-        ja: 一rerank-score recordを継承識別します。
+      cardinality: {min: 1, max: 1}
       allowed_values: []
-      pattern: null
-      example_value: rerank-score-430
-      source_claims:
-        - claim-rerank-score-002
-    - id: model_version
+      pattern: '^score-[A-Za-z0-9._-]+$'
+      example_value: score-rerank-support-42
+      source_claims: [claim-rerank-score-output]
+    - id: rerank_score_id
       labels:
-        zh: 重排模型版本
-        en: reranker model version
-        ja: reranker model version
+        zh: 重排序评分标识
+        en: rerank score ID
+        ja: rerank score ID
+      definitions:
+        zh: 在候选项与重排序运行范围内稳定标识一条重排序评分记录。
+        en: Stably identifies one rerank score record in a candidate and rerank-run scope.
+        ja: candidate と rerank-run の範囲内で一つの rerank score record を安定して識別する。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 记录产生该数值的确切重排模型版本。
-        en: Exact reranker model version that produced the value.
-        ja: valueを生成したexact reranker model versionです。
+      cardinality: {min: 1, max: 1}
       allowed_values: []
-      pattern: null
-      example_value: bge-reranker-v3
-      source_claims:
-        - claim-rerank-score-003
-    - id: numeric_value
+      pattern: '^rerank-score-[A-Za-z0-9._-]+$'
+      example_value: rerank-score-support-42
+      source_claims: [claim-rerank-score-output]
+    - id: candidate_ref
       labels:
-        zh: 重排分数值
-        en: rerank score value
-        ja: rerank score値
-      datatype: number
-      required: true
-      cardinality:
-        min: 1
-        max: 1
+        zh: 候选引用
+        en: candidate reference
+        ja: candidate 参照
       definitions:
-        zh: 保存该模型输出的候选相关性数值。
-        en: Candidate relevance value emitted by the reranker model.
-        ja: reranker modelが出力したcandidate relevance valueです。
+        zh: 指向被重排序器评估的 RetrievedCandidate，而不是原始索引或最终结果集合。
+        en: Points to the RetrievedCandidate evaluated by the reranker rather than raw index or final result set.
+        ja: raw index や最終 result set ではなく reranker が評価した RetrievedCandidate を指す。
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: 1}
       allowed_values: []
       pattern: null
-      example_value: 0.82
-      source_claims:
-        - claim-rerank-score-004
-  constraints: []
-  required_relation_constraints: []
+      example_value: candidate-support-42
+      source_claims: [claim-rerank-score-output]
+    - id: query_ref
+      labels:
+        zh: 查询引用
+        en: query reference
+        ja: query 参照
+      definitions:
+        zh: 指向用于比较候选项的 RetrievalQuery，不复制查询正文。
+        en: Points to the RetrievalQuery used to compare the candidate without copying its text.
+        ja: 本文を複製せず candidate の比較に用いる RetrievalQuery を指す。
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: null
+      example_value: query-support-42
+      source_claims: [claim-rerank-score-output]
+    - id: rerank_value
+      labels:
+        zh: 重排序数值
+        en: rerank value
+        ja: rerank 値
+      definitions:
+        zh: 由声明的重排序模型为该查询候选对产生的数值，不是全局排名。
+        en: Numeric value produced by the declared reranker for this query-candidate pair and not a global rank.
+        ja: 宣言された reranker がこの query-candidate pair に生成する数値であり global rank ではない。
+      datatype: decimal
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: null
+      example_value: 0.98
+      source_claims: [claim-rerank-score-output]
+    - id: score_value
+      labels:
+        zh: 父类评分数值
+        en: parent score value
+        ja: 親 score 値
+      definitions:
+        zh: 保留 RetrievalScore 所要求的通用数值；在此子类型中它必须与 rerank_value 相等。
+        en: Retains the generic numeric value required by RetrievalScore; in this subtype it must equal rerank_value.
+        ja: RetrievalScore が要求する汎用数値を保持し、この subtype では rerank_value と等しくなければならない。
+      datatype: decimal
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: null
+      example_value: 0.98
+      source_claims: [claim-rerank-score-output]
+    - id: reranker_model
+      labels:
+        zh: 重排序模型
+        en: reranker model
+        ja: reranker model
+      definitions:
+        zh: 标识产生评分的模型或版本，避免把不同模型的数值视为同一证据。
+        en: Identifies the model or version that produced the value so scores from different models are not assumed equivalent.
+        ja: 値を生成した model または version を識別し異なる model の score を同等と仮定しない。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: null
+      example_value: rerank-v3.5
+      source_claims: [claim-rerank-score-model]
+    - id: score_scale
+      labels:
+        zh: 评分量表
+        en: score scale
+        ja: score scale
+      definitions:
+        zh: 声明重排序数值的解释范围，不能从数值本身推断跨模型可比性。
+        en: Declares interpretation of the rerank value; cross-model comparability cannot be inferred from a number alone.
+        ja: rerank 値の解釈を宣言し数値だけから cross-model comparability を推論しない。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: null
+      example_value: cohere-relevance-score
+      source_claims: [claim-rerank-score-model]
+    - id: score_method
+      labels:
+        zh: 父类评分方法
+        en: parent score method
+        ja: 親 score method
+      definitions:
+        zh: 保留 RetrievalScore 的方法分类；重排序子类型的值固定为 rerank，而不是最终排序策略。
+        en: Retains the RetrievalScore method family; the rerank subtype fixes it to rerank rather than a final ranking policy.
+        ja: RetrievalScore の method family を保持し、rerank subtype では最終 ranking policy ではなく rerank に固定する。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: [rerank]
+      pattern: null
+      example_value: rerank
+      source_claims: [claim-rerank-score-output]
+    - id: rerank_run_ref
+      labels:
+        zh: 重排序运行引用
+        en: rerank run reference
+        ja: rerank run 参照
+      definitions:
+        zh: 指向产生评分的 RerankActivity 或运行记录，不表示候选项已被采用。
+        en: Points to the RerankActivity or run that produced the score and does not assert candidate adoption.
+        ja: score を生成した RerankActivity または run を指し candidate が採用されたことを主張しない。
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: null
+      example_value: rerank-run-support-42
+      source_claims: [claim-rerank-score-provenance]
+    - id: scoring_run_ref
+      labels:
+        zh: 父类评分运行引用
+        en: parent scoring run reference
+        ja: 親 scoring run 参照
+      definitions:
+        zh: 保留 RetrievalScore 的计算来源；在此子类型中它必须与 rerank_run_ref 指向同一重排序运行。
+        en: Retains RetrievalScore computation provenance; in this subtype it must point to the same reranking run as rerank_run_ref.
+        ja: RetrievalScore の computation provenance を保持し、この subtype では rerank_run_ref と同じ reranking run を指さなければならない。
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: null
+      example_value: rerank-run-support-42
+      source_claims: [claim-rerank-score-provenance]
+  constraints:
+    - id: rerank-score-query-candidate-model
+      severity: error
+      expression_language: plain
+      expression: retrieval_score_id, candidate_ref, query_ref, rerank_value, score_value, score_method, reranker_model, score_scale, rerank_run_ref, and scoring_run_ref are required. Values from different model versions or scales must not be merged without a declared fusion activity.
+      explanation:
+        zh: 重排序评分需要绑定输入对、模型和运行来源；跨模型融合必须另行记录，不能静默覆盖。
+        en: A rerank score binds its input pair model and run provenance; cross-model fusion must be separately recorded and cannot silently overwrite it.
+        ja: rerank score は input pair model run provenance を結び、cross-model fusion は別に記録し無言で上書きしない。
+      source_claims: [claim-rerank-score-model, claim-rerank-score-provenance]
+    - id: rerank-score-parent-contract
+      severity: error
+      expression_language: plain
+      expression: score_value equals rerank_value; score_method is rerank; and scoring_run_ref equals rerank_run_ref. The generic RetrievalScore fields must not be populated from a different candidate or scoring run.
+      explanation:
+        zh: 父类字段是同一重排序事实的可审计接口，不是可独立替换的第二份评分。
+        en: The parent fields are an auditable interface for the same reranking fact, not a second score that can be substituted independently.
+        ja: 親 field は同じ reranking fact の監査可能な interface であり、独立に置換できる第二の score ではない。
+      source_claims: [claim-rerank-score-output, claim-rerank-score-provenance]
+    - id: rerank-score-not-final-selection
+      severity: error
+      expression_language: plain
+      expression: RerankScore must not contain final rank, top-k selection, context-package membership, answer content, or storage-write outcome.
+      explanation:
+        zh: 重排序数值是排序决策的输入证据，不是决策或下游消费本身。
+        en: A rerank value is input evidence for a ranking decision and not the decision or downstream consumption itself.
+        ja: rerank 値は ranking decision の入力 evidence であり decision や downstream consumption 自体ではない。
+      source_claims: [claim-rerank-score-provenance]
+  required_relations: []
 examples:
-  - id: RerankScore-example-positive-manual-001
-    kind: positive
+  - id: rerank-score-positive-cohere
+
     labels:
-      zh: 重排分数正例
-      en: "Positive case: Rerank score"
-      ja: 再順位付けscore正例
-    scenario_id: null
+      zh: Cohere 候选重排序评分
+      en: Cohere rerank score for a candidate
+      ja: candidate の Cohere rerank score
+
     descriptions:
-      zh: rerank-score-430 记录 bge-reranker-v3 为 candidate-424 产生的 0.82。
-      en: rerank-score-430 records value 0.82 produced for candidate-424 by bge-reranker-v3.
-      ja: rerank-score-430 はbge-reranker-v3がcandidate-424に生成した0.82を記録します。
-    field_values:
-      score_id: rerank-score-430
-      model_version: bge-reranker-v3
-      numeric_value: 0.82
-      scoring_stage: rerank
-    related_node_ids:
-      - RerankScore
-    related_relation_ids: []
-    expected_result:
-      zh: 归类为 RerankScore。
-      en: Classify the object as RerankScore.
-      ja: RerankScore として分類します。
-    why_valid_or_invalid:
-      zh: 分数明确来自二阶段声明模型，可与初始检索分数区分。
-      en: The score explicitly comes from a declared second-stage model and is distinguishable from initial retrieval scores.
-      ja: 指定second-stage model由来でinitial retrieval scoreと区別できます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-rerank-score-005
-  - id: RerankScore-example-boundary-manual-001
-    kind: boundary
+      zh: Lewis RAG p(y|x)=Σ_z p(z|x)·p(y|x,z)；HyDE 假设文档 embedding；RAPTOR 树检索；Self-RAG [Retrieve] adaptive；Generative Agents score=α·recency+β·importance+γ·relevance。
+      en: Lewis RAG p(y|x)=Σ_z p(z|x)·p(y|x,z); HyDE hypothetical doc embedding; RAPTOR tree retrieval; Self-RAG [Retrieve] adaptive; Generative Agents score=α·recency+β·importance+γ·relevance.
+      ja: Lewis RAG p(y|x,z)。HyDE 仮説 doc embedding。RAPTOR tree retrieval。Self-RAG [Retrieve]。Generative Agents score 公式。
+    field_values: {retrieval_score_id: score-rerank-support-42, rerank_score_id: rerank-score-support-42, candidate_ref: candidate-support-42, query_ref: query-support-42, rerank_value: 0.98, score_value: 0.98, reranker_model: rerank-v3.5, score_method: rerank, score_scale: cohere-relevance-score, rerank_run_ref: rerank-run-support-42, scoring_run_ref: rerank-run-support-42}
+    related_node_ids: [RerankScore, RetrievalScore, RerankActivity]
+    related_relation_ids: [RerankScore-is_a-RetrievalScore]
+
+    source_claims: [claim-rerank-score-output]
+  - id: rerank-score-counterexample-rank
+
     labels:
-      zh: 重排分数边界例
-      en: "Boundary case: Rerank score"
-      ja: 再順位付けscore境界例
-    scenario_id: null
+      zh: 没有评分证据的名次
+      en: Rank without score evidence
+      ja: score evidence のない rank
+
     descriptions:
-      zh: rrf-contribution-430 仅由候选在两个列表中的 rank 代入公式得到。
-      en: rrf-contribution-430 is computed only from the candidate's ranks in two lists.
-      ja: rrf-contribution-430 は二list内rankだけを式へ代入して得ます。
-    field_values: {}
-    related_node_ids:
-      - RerankScore
-    related_relation_ids: []
-    expected_result:
-      zh: 不得归类为 RerankScore。
-      en: Do not classify the object as RerankScore.
-      ja: RerankScore として分類しません。
-    why_valid_or_invalid:
-      zh: 它是排名融合贡献，不是模型产生的 RerankScore。
-      en: It is a rank-fusion contribution, not a model-produced RerankScore.
-      ja: rank-fusion contributionでmodel由来RerankScoreではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-rerank-score-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      zh: 反例：RetrievalResult 候选无 TopKSelection/token budget 直接全量进 ContextPackage。
+      en: Counterexample: RetrievalResult candidates enter ContextPackage without TopKSelection/token budget.
+      ja: 反例：RetrievalResult candidate が TopKSelection/token budget なしで ContextPackage 全量進入。
+    field_values: {candidate_ref: candidate-support-42, final_rank: 2, ranking_result_ref: result-support-42}
+    related_node_ids: [RerankScore, TopKSelection, RetrievalResult]
+    related_relation_ids: [RerankScore-is_a-RetrievalScore]
+
+    source_claims: [claim-rerank-score-model]
+  - id: rerank-score-boundary-initial-similarity
+
+    labels:
+      zh: 初检相似度与重排序评分
+      en: Initial similarity versus rerank score
+      ja: 初期 similarity と rerank score
+
+    descriptions:
+      zh: IndexBuildRun 离线索引 vs RetrievalRun 在线查询；RAG-Sequence vs RAG-Token 变体边界。
+      en: IndexBuildRun offline index vs RetrievalRun online query; RAG-Sequence vs RAG-Token variant boundary.
+      ja: IndexBuildRun offline vs RetrievalRun online。RAG-Sequence vs RAG-Token 境界。
+    field_values: {retrieval_score_id: score-rerank-support-42-crossencoder, rerank_score_id: rerank-score-support-42-crossencoder, candidate_ref: candidate-support-42, query_ref: query-support-42, rerank_value: 0.94, score_value: 0.94, reranker_model: cross-encoder-ms-marco, score_method: rerank, score_scale: cross-encoder-logit, rerank_run_ref: rerank-run-support-42, scoring_run_ref: rerank-run-support-42}
+    related_node_ids: [RerankScore, SimilarityScore, RetrievalScore]
+    related_relation_ids: [RerankScore-is_a-RetrievalScore]
+
+    source_claims: [claim-rerank-score-output, claim-rerank-score-provenance]
+  - id: rerank-score-instance-crossencoder
+
+    labels:
+      zh: CrossEncoder 评分实例
+      en: CrossEncoder scoring instance
+      ja: CrossEncoder scoring の事例
+
+    descriptions:
+      zh: pgvector ORDER BY embedding <=> query LIMIT 20；Anthropic Contextual Retrieval top-20 + rerank → top-5 context。
+      en: pgvector ORDER BY embedding <=> query LIMIT 20; Anthropic Contextual Retrieval top-20 + rerank → top-5 context.
+      ja: pgvector <=> LIMIT 20。Anthropic Contextual Retrieval top-20+rerank→top-5 context。
+    field_values: {retrieval_score_id: score-rerank-crossencoder-17, rerank_score_id: rerank-score-crossencoder-17, candidate_ref: candidate-support-17, query_ref: query-support-17, rerank_value: 7.13, score_value: 7.13, reranker_model: cross-encoder-ms-marco, score_method: rerank, score_scale: cross-encoder-logit, rerank_run_ref: rerank-run-crossencoder-17, scoring_run_ref: rerank-run-crossencoder-17}
+    related_node_ids: [RerankScore, RerankActivity, RetrievedCandidate]
+    related_relation_ids: [RerankScore-is_a-RetrievalScore]
+    source_claims: [claim-rerank-score-output]
 parent_relation:
   id: RerankScore-is_a-RetrievalScore
   predicate: is_a
-  direction: target-to-source
+  target: concept:RetrievalScore
+  endpoint_order: child-to-parent
+  direction: source-to-target
   relation_kind: hierarchy
   labels:
-    zh: 是一种RetrievalScore
-    en: is a RetrievalScore
-    ja: RetrievalScoreの一種
+    zh: 是检索评分的重排序子类
+    en: is a rerank subtype of retrieval score
+    ja: RetrievalScore の rerank 下位型である
   definitions:
-    zh: RerankScore —is_a→ RetrievalScore 成立，因为其数值由声明版本的 reranker 对查询与候选字段联合评估后产生。
-    en: RerankScore —is_a→ RetrievalScore holds because its value is produced by a declared reranker version jointly evaluating query and candidate fields.
-    ja: RerankScore —is_a→ RetrievalScore はvalueが指定reranker versionによるquery/candidate field joint evaluationから生成されるため成立します。
-  cardinality: null
-  cardinality_not_applicable_reason:
-    zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
-    en: The relation is decided per auditable fact; no universal runtime cardinality is imposed at ontology level.
-    ja: このrelationはaudit可能fact単位で判定しontology層で一律runtime cardinalityを課しません。
+    zh: RerankScore 是具有重排序模型、查询候选对和运行来源差异的 RetrievalScore。
+    en: RerankScore is RetrievalScore with the differentia of reranker model query-candidate pair and rerank-run provenance.
+    ja: RerankScore は reranker model query-candidate pair rerank-run provenance を差異とする RetrievalScore である。
+  cardinality: {source: {min: 0, max: null}, target: {min: 1, max: 1}}
+  cardinality_not_applicable_reason: null
   inverse_reading:
-    predicate: part_of
+    predicate: has_rerank_score_subtype
     labels:
-      zh: 反向读取
-      en: inverse is_a
-      ja: 逆方向読取
+      zh: 具有重排序评分子类
+      en: has rerank-score subtype
+      ja: rerank-score 下位型を持つ
   conditions:
-    - id: RerankScore-is_a-RetrievalScore-condition-manual-001
+    - id: rerank-score-subtype-condition
       severity: error
       expression_language: plain
-      expression: "Assert only when the instance satisfies the complete RetrievalScore definition and the child differentia: its value is produced by a declared reranker version jointly evaluating query and candidate fields."
-      explanations:
-        zh: 仅当实例既满足 RetrievalScore 的完整定义，又满足子类种差“其数值由声明版本的 reranker 对查询与候选字段联合评估后产生。”时建立该边。
-        en: "Assert only when the instance satisfies the complete RetrievalScore definition and the child differentia: its value is produced by a declared reranker version jointly evaluating query and candidate fields."
-        ja: instanceがRetrievalScore完全定義とchild differentia「valueが指定reranker versionによるquery/candidate field joint evaluationから生成される」を共に満たす時だけassertします。
-      source_claims:
-        - claim-rerank-score-007
-  temporal_scope: timeless
-  boundary_context: null
+      expression: Assert this subtype only when a reranking model evaluates a query-candidate pair and records model version scale and run provenance.
+      explanation:
+        zh: 子类型差异在于重排序模型对查询候选对的具体评分来源。
+        en: The subtype differentia is scoring provenance from a reranking model over a query-candidate pair.
+        ja: subtype の differentia は reranking model が query-candidate pair に与える scoring provenance である。
+      source_claims: [claim-rerank-score-model]
+  temporal_scope: valid-time
+  boundary_context: A rank derived after reranking is a separate ranking result and does not change this score subtype.
   constraints: []
-  examples:
-    - id: RerankScore-is_a-RetrievalScore-example-positive-manual-001
-      kind: positive
-      labels:
-        zh: 是一种RetrievalScore正例
-        en: "Positive case: is a RetrievalScore"
-        ja: RetrievalScoreの一種正例
-      scenario_id: null
-      descriptions:
-        zh: rerank-score-430 记录 bge-reranker-v3=0.82。
-        en: rerank-score-430 records bge-reranker-v3=0.82.
-        ja: rerank-score-430がbge-reranker-v3=0.82を記録します。
-      field_values: {}
-      related_node_ids:
-        - RerankScore
-        - RetrievalScore
-      related_relation_ids:
-        - RerankScore-is_a-RetrievalScore
-      expected_result:
-        zh: 建立该有向事实，并保留条件与证据。
-        en: Assert the directed fact with its condition and evidence retained.
-        ja: condition/evidenceを保持してdirected factをassertします。
-      why_valid_or_invalid:
-        zh: 实例满足端点定义、方向和该关系的显式成立条件。
-        en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-        ja: endpoint定義・direction・明示assertion conditionを満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-rerank-score-007
-    - id: RerankScore-is_a-RetrievalScore-example-boundary-manual-001
-      kind: boundary
-      labels:
-        zh: 是一种RetrievalScore边界例
-        en: "Boundary case: is a RetrievalScore"
-        ja: RetrievalScoreの一種境界例
-      scenario_id: null
-      descriptions:
-        zh: RRF contribution 只依赖排名位置，不属于 RerankScore。
-        en: An RRF contribution depends only on rank positions and is not RerankScore.
-        ja: RRF contributionはrank positionだけに依存しRerankScoreではありません。
-      field_values: {}
-      related_node_ids:
-        - RerankScore
-        - RetrievalScore
-      related_relation_ids:
-        - RerankScore-is_a-RetrievalScore
-      expected_result:
-        zh: 验证器不得建立该有向关系事实。
-        en: Do not assert the directed fact.
-        ja: directed factをassertしません。
-      why_valid_or_invalid:
-        zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-        en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-        ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-rerank-score-007
-  source_claims:
-    - claim-rerank-score-007
-  distinct_fact_rationale: null
+  examples: []
+  source_claims: [claim-rerank-score-output]
+  distinct_fact_rationale: This relation classifies rerank-score semantics and does not express the ranking decision or model consumption.
   layout_role: primary-backbone
-  review_status: pending
-  endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: cohere-rerank
+    title: Cohere Rerank
+    source_type: official-documentation
+    url: https://docs.cohere.com/docs/reranking
+    relevance: Documents reranking documents for a query and returning relevance scores.
+  - id: sentence-transformers-crossencoder
+    title: SentenceTransformers CrossEncoder usage
+    source_type: official-documentation
+    url: https://www.sbert.net/docs/cross_encoder/usage/usage.html
+    relevance: Documents predicting scores for query-document pairs with CrossEncoder models.
+  - id: w3c-prov-o
+    title: W3C PROV-O
+    source_type: standard
+    url: https://www.w3.org/TR/prov-o/
+    relevance: Defines entities separately from the activities that generate them.
 source_claims:
-  - id: claim-rerank-score-001
-    source: eng-vector-pinecone-reranking
-    supports: Pinecone documents reranking initial results with a selected model and returns model-assigned relevance scores; Moonweave records model version with each RerankScore.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
+  - id: claim-rerank-score-output
+    source: cohere-rerank
+    supports: Cohere Rerank ranks documents against a query and returns relevance scores. Moonweave records each returned value as a RerankScore tied to its candidate and query.
+    locator: "Reranking: query documents and relevance scores"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-rerank-score-002
-    source: eng-vector-pinecone-reranking
-    supports: "Pinecone documents reranking initial results with a selected model and returns model-assigned relevance scores; Moonweave records model version with each RerankScore. Moonweave records RerankScore.score_id as the stated auditable datum: Inherited identifier for one rerank-score record."
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
+  - id: claim-rerank-score-model
+    source: sentence-transformers-crossencoder
+    supports: CrossEncoder models score sentence pairs. Moonweave records the reranker model and scale because different models need not produce comparable numeric values.
+    locator: "CrossEncoder usage: predict sentence-pair scores"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-rerank-score-003
-    source: eng-vector-pinecone-reranking
-    supports: "Pinecone documents reranking initial results with a selected model and returns model-assigned relevance scores; Moonweave records model version with each RerankScore. Moonweave records RerankScore.model_version as the stated auditable datum: Exact reranker model version that produced the value."
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
+  - id: claim-rerank-score-provenance
+    source: w3c-prov-o
+    supports: PROV-O distinguishes an entity from the activity that generated it. Moonweave keeps rerank score data distinct from the reranking activity and later selection.
+    locator: "PROV-O: Entity Activity and wasGeneratedBy"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-rerank-score-004
-    source: eng-vector-pinecone-reranking
-    supports: "Pinecone documents reranking initial results with a selected model and returns model-assigned relevance scores; Moonweave records model version with each RerankScore. Moonweave records RerankScore.numeric_value as the stated auditable datum: Candidate relevance value emitted by the reranker model."
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-rerank-score-005
-    source: eng-vector-pinecone-reranking
-    supports: Pinecone documents reranking initial results with a selected model and returns model-assigned relevance scores; Moonweave records model version with each RerankScore. Pinecone reranking returns rescored results from a named reranking model.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-rerank-score-006
-    source: eng-vector-pinecone-reranking
-    supports: Pinecone documents reranking initial results with a selected model and returns model-assigned relevance scores; Moonweave records model version with each RerankScore. RRF uses rank positions, whereas reranking uses a model to rescore documents.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-rerank-score-007
-    source: eng-vector-pinecone-reranking
-    supports: The official documentation supports the operational distinction used in this child differentia; Moonweave's RerankScore-to-RetrievalScore subclass placement is an explicit ontology design decision.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
