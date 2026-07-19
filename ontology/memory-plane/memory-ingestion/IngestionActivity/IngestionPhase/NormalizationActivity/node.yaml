@@ -5,811 +5,545 @@ status: accepted
 labels:
   zh: 规范化活动
   en: Normalization activity
-  ja: 正規化アクティビティ
+  ja: 正規化activity
 semantics:
   short_definition:
-    zh: 在摄入运行中将已读取信息转换为规范文档的有界活动。
-    en: A bounded ingestion activity that turns read information into canonical Documents.
-    ja: 読み取った情報を正規のDocumentへ変換する、取込み実行内の有界な活動です。
+    zh: 把来源信息转换为规范 Document 的摄入阶段。
+    en: An ingestion phase transforming source information into canonical Document values.
+    ja: source informationをcanonical Documentへ変換する取込phaseです。
   definition:
-    zh: >-
-      NormalizationActivity 是 IngestionPhase 的特化：它在一个确定的摄入运行中读取版本固定的
-      IngestibleInformation，按声明的解析、清洗和字符规范化配置形成独立的 Document 引用。它以活动、
-      输入信息和输出文档为不同事实记录，不是来源下载、去重判定、持久化写入、向量索引或查询检索。
-    en: >-
-      A NormalizationActivity is an IngestionPhase specialization that reads version-pinned IngestibleInformation in one
-      identified ingestion run and, under a declared parsing, cleaning, and character-normalization profile, forms
-      separate Document references. It records activity, input information, and output Documents as different facts; it
-      is not source download, a deduplication decision, persistence write, vector indexing, or query retrieval.
-    ja: >-
-      NormalizationActivity は、識別された一つの取込み実行で版固定の IngestibleInformation を読み、宣言された
-      解析、清掃、文字正規化プロファイルに従って独立した Document 参照を形成する IngestionPhase の特化です。
-      活動、入力情報、出力Documentを別々の事実として記録し、ソース取得、重複判定、永続書込み、ベクトル索引、
-      または問合せ検索ではありません。
+    zh: NormalizationActivity 是消费 IngestibleInformation、应用确定解析/清洗配置并产生 Document 的 IngestionPhase；它不负责去重判定或持久写入。
+    en: NormalizationActivity is an IngestionPhase consuming IngestibleInformation, applying a fixed parsing/cleaning profile, and producing Document values; it does not decide duplicates or perform persistence writes.
+    ja: NormalizationActivity は IngestibleInformation を消費し固定parse/clean profileを適用して Document を生成する IngestionPhase で、duplicate判断や永続writeは担いません。
   why_needed:
-    zh: 将内容表示的可重放转换与来源读取、去重判断和写入副作用分离，使文档出处和失败原因可审计。
-    en: Separates replayable content transformation from source reading, duplicate judgment, and write side effects so document provenance and failures remain auditable.
-    ja: 再生可能な内容変換をソース読取り、重複判定、書込み副作用から分離し、Documentの来歴と失敗理由を監査可能にします。
+    zh: 把内容规范化与去重及存储生命周期分开。
+    en: Separates content normalization from deduplication and storage lifecycle.
+    ja: content normalizationをdeduplication・storage lifecycleから分離します。
   includes:
-    - zh: 读取已取得的信息负载，应用固定解析和清洗规则，并生成具有输入出处的规范文档引用。
-      en: Reading acquired information payloads, applying fixed parsing and cleaning rules, and generating canonical Document references with input provenance.
-      ja: 取得済み情報のペイロード読取り、固定された解析・清掃規則の適用、入力来歴を持つ正規Document参照の生成を含みます。
+    - zh: 纳入解析、格式统一、字符集处理与结构规范化。
+      en: Includes parsing, format unification, charset handling, and structural normalization.
+      ja: parse・format統一・charset処理・構造normalizationを含みます。
   excludes:
-    - zh: 只定位或下载来源资源、只比较文档身份并作去重决定、写入记忆存储、建立向量索引或为用户问题执行相似度搜索。
-      en: Merely locating or downloading a source resource, only comparing document identity for a deduplication decision, writing memory storage, building a vector index, or searching similarity for a user question.
-      ja: ソース資源の位置特定または取得だけ、重複判定のためのDocument同一性比較だけ、記憶ストアへの書込み、ベクトル索引作成、利用者質問への類似検索を除きます。
+    - zh: 排除来源下载、DeduplicationActivity 与 MemoryWrite。
+      en: Excludes source download, DeduplicationActivity, and MemoryWrite.
+      ja: source download・DeduplicationActivity・MemoryWriteを除外します。
   semantic_kind: activity
-  aliases:
-    - document normalization phase
-    - canonicalization activity
-engineering:
-  explanation:
-    zh: >-
-      实现会把输入清单及其摘要作为冻结的读取边界，选择一个版本化的解析和清洗 profile，再将每个成功产物作为
-      独立 Document 引用交给后续去重阶段。运行中的活动可没有结束时间和产物；失败活动保留输入和时间边界，
-      但不把半成品误称为文档。
-    en: >-
-      An implementation freezes a read boundary with an input manifest and its digest, selects a versioned parsing and
-      cleaning profile, then hands each successful output onward as a separate Document reference. A running activity can
-      have neither end time nor output, while a failed activity retains its input and time bounds without calling a partial
-      result a Document.
-    ja: >-
-      実装は入力マニフェストとそのダイジェストで読取り境界を固定し、版付きの解析・清掃プロファイルを選び、成功した
-      各出力を独立したDocument参照として後続の重複排除段階へ渡します。実行中の活動には終了時刻も出力もなくてよく、
-      失敗した活動は入力と時間境界を保持しますが、部分結果をDocumentとは呼びません。
-  typical_input:
-    - description: Version-pinned normalization request
-      format: |
-        {
-          "activity_id": "normalize-policy-42-02",
-          "phase_id": "normalize-policy-42-02",
-          "ingestion_run_ref": "ingest-policy-directory-42",
-          "sequence_number": 2,
-          "phase_kind": "normalize",
-          "input_resource_refs": ["dir-policy-2026-07"],
-          "normalization_profile": "unicode-nfc-clean-v1",
-          "input_information_refs": ["info-policy-42"],
-          "input_manifest_digest": "sha256:input-manifest-policy-42-v1",
-          "started_at": "2026-07-18T08:59:10Z",
-          "status": "running"
-        }
-      source_claims:
-        - claim-normalization-activity-parent-usage
-        - claim-normalization-activity-usage
-  typical_output:
-    - description: Completed canonical document handoff
-      format: |
-        {
-          "activity_id": "normalize-policy-42-02",
-          "phase_id": "normalize-policy-42-02",
-          "ingestion_run_ref": "ingest-policy-directory-42",
-          "phase_kind": "normalize",
-          "input_resource_refs": ["dir-policy-2026-07"],
-          "input_information_refs": ["info-policy-42"],
-          "input_manifest_digest": "sha256:input-manifest-policy-42-v1",
-          "output_document_refs": ["document-policy-42-v1"],
-          "ended_at": "2026-07-18T08:59:24Z",
-          "status": "completed"
-        }
-      source_claims:
-        - claim-normalization-activity-parent-usage
-        - claim-normalization-activity-generation
-  reference_implementations:
-    - name: LangChain document loaders
-      url: https://docs.langchain.com/oss/python/integrations/document_loaders/index
-      description: Documents a standard loader interface for reading varied sources into Document values.
-    - name: Unicode Standard Annex 15
-      url: https://www.unicode.org/reports/tr15/
-      description: Specifies Unicode normalization forms for stable binary representations of equivalent text.
-    - name: W3C PROV-O
-      url: https://www.w3.org/TR/prov-o/
-      description: Defines activities that use entities, generate entities, and have time bounds.
+  aliases: []
 structure:
   identity_keys:
-    - activity_id
-    - ingestion_run_ref
+    - phase_id
   fields:
-    - id: activity_id
-      labels:
-        zh: 活动标识
-        en: activity ID
-        ja: 活動ID
-      definitions:
-        zh: 稳定标识实际发生的规范化过程，不是输入信息、输出文档或后续去重决定。
-        en: Stably identifies the normalization process that occurred, rather than its input information, output Document, or later deduplication decision.
-        ja: 入力情報、出力Document、後続の重複判定ではなく、実際に発生した正規化過程を安定して識別します。
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      allowed_values: []
-      pattern: null
-      example_value: normalize-policy-42-02
-      source_claims:
-        - claim-normalization-activity-identity
     - id: phase_id
       labels:
         zh: 阶段标识
         en: phase ID
-        ja: フェーズID
-      definitions:
-        zh: 在所属摄入运行内标识该局部规范化步骤，可与活动标识相同但不等同于整个运行。
-        en: Identifies this local normalization step inside its owning ingestion run and may equal the activity ID without equaling the complete run.
-        ja: 所属する取込み実行内の局所的な正規化手順を識別し、活動IDと同じでも実行全体と同一にはなりません。
+        ja: phase ID
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
+      definitions:
+        zh: 稳定标识规范化阶段。
+        en: Stable identifier for the normalization phase.
+        ja: normalization phaseの安定識別子です。
       allowed_values: []
       pattern: null
-      example_value: normalize-policy-42-02
+      example_value: normalize-17
       source_claims:
-        - claim-normalization-activity-phase
-    - id: ingestion_run_ref
-      labels:
-        zh: 所属摄入运行引用
-        en: owning ingestion-run reference
-        ja: 所属取込み実行参照
-      definitions:
-        zh: 引用编排此活动并拥有端到端结果的 IngestionRun，而不是输入来源或输出存储。
-        en: References the IngestionRun that orchestrates this activity and owns the end-to-end outcome, rather than an input source or output store.
-        ja: 入力ソースや出力ストアではなく、この活動を編成して端から端までの結果を所有する IngestionRun を参照します。
-      datatype: reference
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      allowed_values: []
-      pattern: null
-      example_value: ingest-policy-directory-42
-      source_claims:
-        - claim-normalization-activity-phase
-    - id: sequence_number
-      labels:
-        zh: 阶段顺序号
-        en: phase sequence number
-        ja: フェーズ順序番号
-      definitions:
-        zh: 记录该规范化步骤在所属运行内的正整数顺序，不是重试次数、字符数量或全局序列。
-        en: Records the positive integer order of this normalization step in its owning run, not a retry count, character count, or global sequence.
-        ja: 所属する実行内でこの正規化手順の正整数順序を記録し、再試行回数、文字数、全域連番ではありません。
-      datatype: integer
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      allowed_values: []
-      pattern: null
-      example_value: 2
-      source_claims:
-        - claim-normalization-activity-phase
-    - id: phase_kind
-      labels:
-        zh: 父阶段职责类型
-        en: parent phase responsibility kind
-        ja: 親フェーズ責務種別
-      definitions:
-        zh: 保留 IngestionPhase 的职责字段；此活动必须明确为 normalize，不能以 normalization_profile 的实现版本代替职责类型。
-        en: Retains IngestionPhase's responsibility field; this activity must explicitly be normalize rather than using a normalization_profile implementation version as its phase kind.
-        ja: IngestionPhase の責務 field を保持し、この activity は normalization_profile の実装版を phase kind とせず明示的に normalize でなければなりません。
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      allowed_values:
-        - normalize
-      pattern: null
-      example_value: normalize
-      source_claims:
-        - claim-normalization-activity-phase
-    - id: input_resource_refs
-      labels:
-        zh: 父活动输入资源引用
-        en: parent-activity input resource references
-        ja: 親活動入力リソース参照
-      definitions:
-        zh: 保留拥有该规范化阶段的摄入活动实际读取的版本化来源资源，区别于本活动读取的 input_information_refs。
-        en: Retains versioned source resources actually read by the ingestion activity owning this normalization phase, distinct from input_information_refs read by this activity.
-        ja: この normalization phase を所有する ingestion activity が実際に読んだ versioned source resource を保持し、この activity が読む input_information_refs と区別します。
-      datatype: array
-      required: true
-      cardinality:
-        min: 1
-        max: null
-      allowed_values: []
-      pattern: null
-      example_value:
-        - dir-policy-2026-07
-      source_claims:
-        - claim-normalization-activity-parent-usage
+        - claim-normalization-activity-002
     - id: normalization_profile
       labels:
         zh: 规范化配置
         en: normalization profile
-        ja: 正規化プロファイル
-      definitions:
-        zh: 固定该活动采用的解析、清洗和字符规范化规则版本，而不是来源格式名称或任意脚本。
-        en: Fixes the versioned parsing, cleaning, and character-normalization rules used by the activity, rather than merely naming a source format or arbitrary script.
-        ja: 単なるソース形式名や任意スクリプトではなく、活動が使う版付きの解析、清掃、文字正規化規則を固定します。
+        ja: normalization profile
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      allowed_values:
-        - unicode-nfc-clean-v1
-        - pdf-text-extraction-v3
-        - html-text-clean-v2
-      pattern: null
-      example_value: unicode-nfc-clean-v1
-      source_claims:
-        - claim-normalization-activity-unicode
-        - claim-normalization-activity-loader
-    - id: input_information_refs
-      labels:
-        zh: 输入信息引用
-        en: input information references
-        ja: 入力情報参照
       definitions:
-        zh: 引用该活动实际读取的 IngestibleInformation 版本，而不是仅在元数据中出现的相关来源。
-        en: References IngestibleInformation versions actually read by the activity, rather than sources merely mentioned in metadata.
-        ja: メタデータに記載されただけのソースではなく、活動が実際に読んだ IngestibleInformation の版を参照します。
-      datatype: array
-      required: true
-      cardinality:
-        min: 1
-        max: null
+        zh: 固定解析、清洗与编码规则。
+        en: Fixes parsing, cleaning, and encoding rules.
+        ja: parse・clean・encoding規則を固定します。
       allowed_values: []
       pattern: null
-      example_value:
-        - info-policy-42
+      example_value: pdf-partition-v3
       source_claims:
-        - claim-normalization-activity-usage
-    - id: input_manifest_digest
+        - claim-normalization-activity-003
+    - id: input_digest
       labels:
-        zh: 输入清单摘要
-        en: input manifest digest
-        ja: 入力マニフェストダイジェスト
-      definitions:
-        zh: 记录列出所有实际输入信息标识和内容摘要的清单摘要，以冻结此次活动的读取边界。
-        en: Records a digest of the manifest listing every actual input information ID and content digest, freezing this activity's read boundary.
-        ja: 実際の入力情報IDと内容ダイジェストを列挙するマニフェストのダイジェストを記録し、この活動の読取り境界を固定します。
+        zh: 输入摘要
+        en: input digest
+        ja: 入力digest
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
+      definitions:
+        zh: 固定阶段消费的信息版本。
+        en: Fixes the information version consumed by the phase.
+        ja: phaseが消費したinformation版を固定します。
       allowed_values: []
       pattern: null
-      example_value: sha256:input-manifest-policy-42-v1
+      example_value: sha256:file17
       source_claims:
-        - claim-normalization-activity-digest
-    - id: output_document_refs
-      labels:
-        zh: 输出文档引用
-        en: output document references
-        ja: 出力Document参照
-      definitions:
-        zh: 可选地引用本活动成功形成的独立 Document，不把未完成缓冲区或失败诊断当作输出文档。
-        en: Optionally references separate Documents successfully formed by this activity, not incomplete buffers or failure diagnostics.
-        ja: この活動が成功して形成した独立Documentを任意に参照し、未完了バッファや失敗診断を出力Documentとは扱いません。
-      datatype: array
-      required: false
-      cardinality:
-        min: 0
-        max: null
-      allowed_values: []
-      pattern: null
-      example_value:
-        - document-policy-42-v1
-      source_claims:
-        - claim-normalization-activity-generation
-    - id: started_at
-      labels:
-        zh: 开始时间
-        en: started at
-        ja: 開始時刻
-      definitions:
-        zh: 记录开始读取输入并应用规范化 profile 的时间点，独立于来源资源创建时间。
-        en: Records when input reading and profile application began, independently of the source resource's creation time.
-        ja: ソース資源の作成時刻とは独立に、入力読取りとプロファイル適用を開始した時点を記録します。
-      datatype: date-time
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      allowed_values: []
-      pattern: null
-      example_value: "2026-07-18T08:59:10Z"
-      source_claims:
-        - claim-normalization-activity-temporal
-    - id: ended_at
-      labels:
-        zh: 结束时间
-        en: ended at
-        ja: 終了時刻
-      definitions:
-        zh: 可选地记录活动完成、失败或取消的时刻；运行中的活动不得声称有结束时间。
-        en: Optionally records when the activity completed, failed, or was cancelled; a running activity must not claim an end time.
-        ja: 活動が完了、失敗、取消された時点を任意に記録し、実行中の活動は終了時刻を主張してはいけません。
-      datatype: date-time
-      required: false
-      cardinality:
-        min: 0
-        max: 1
-      allowed_values: []
-      pattern: null
-      example_value: "2026-07-18T08:59:24Z"
-      source_claims:
-        - claim-normalization-activity-temporal
-    - id: status
-      labels:
-        zh: 活动状态
-        en: activity status
-        ja: 活動状態
-      definitions:
-        zh: 声明规范化过程的运行状态，不使用去重的保留、更新或跳过结果作为活动状态。
-        en: Declares the run state of normalization without using a deduplication keep, update, or skip result as activity status.
-        ja: 重複排除のkeep、update、skip結果を活動状態に使わず、正規化の実行状態を宣言します。
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      allowed_values:
-        - running
-        - completed
-        - failed
-        - cancelled
-      pattern: null
-      example_value: completed
-      source_claims:
-        - claim-normalization-activity-temporal
-  constraints:
-    - id: normalization-activity-required-inputs
-      expression: activity_id, phase_id, ingestion_run_ref, sequence_number, phase_kind, input_resource_refs, normalization_profile, input_information_refs, input_manifest_digest, started_at, and status are required; sequence_number must be a positive integer.
-      explanation:
-        zh: 这些字段共同固定实际活动、所属运行、局部顺序、输入边界和可重放的转换配置；缺少任一项时不能审计该过程。
-        en: These fields jointly pin the actual activity, owning run, local order, input boundary, and replayable transformation profile; omitting one makes the process unauditable.
-        ja: これらの項目は実際の活動、所属実行、局所順序、入力境界、再生可能な変換プロファイルを共同で固定し、欠けると過程を監査できません。
-    - id: normalization-activity-terminal-output
-      expression: When status is completed, ended_at and at least one output_document_refs value are required; when status is running, ended_at and output_document_refs must be absent.
-      explanation:
-        zh: 完成活动必须同时记录完成边界和可交接文档；运行中活动不能把未完成缓冲区提前声明为产物。
-        en: A completed activity must record both a terminal boundary and handoffable Documents, while a running activity cannot declare unfinished buffers as outputs.
-        ja: 完了した活動は終了境界と引渡し可能なDocumentの両方を記録し、実行中の活動は未完了バッファを出力として宣言できません。
-    - id: normalization-activity-failed-output
-      expression: When status is failed or cancelled, ended_at is required and output_document_refs must be empty or absent unless each referenced Document has an independently recorded successful generating activity.
-      explanation:
-        zh: 失败或取消仍是有时间边界的活动事实，但不得将未完成内容归因于该失败活动的生成。
-        en: A failed or cancelled run remains a time-bounded activity fact, but must not attribute unfinished content generation to that failed activity.
-        ja: 失敗または取消も時間境界を持つ活動事実ですが、未完了内容の生成をその失敗活動に帰属させてはいけません。
+        - claim-normalization-activity-004
+  constraints: []
+  required_relation_constraints: []
 examples:
-  - id: normalization-activity-positive
-
+  - id: NormalizationActivity-example-positive-manual-20260716
+    kind: positive
     labels:
-      zh: 已完成的策略文档规范化
-      en: Completed policy-document normalization
-      ja: 完了した方針Documentの正規化
-
+      zh: 规范化活动正例
+      en: "Positive case: Normalization activity"
+      ja: 正規化activity正例
+    scenario_id: null
     descriptions:
-      zh: LlamaIndex SimpleDirectoryReader + VectorStoreIndex.from_documents；KnowledgeGraphIndex；LangChain PyPDFLoader Document(page_content, metadata)。
-      en: LlamaIndex SimpleDirectoryReader + VectorStoreIndex.from_documents; KnowledgeGraphIndex; LangChain PyPDFLoader Document(page_content, metadata).
-      ja: LlamaIndex SimpleDirectoryReader + VectorStoreIndex.from_documents。KnowledgeGraphIndex。LangChain PyPDFLoader Document。
+      zh: normalize-17 是 ingest-run-17 的 sequence=1 阶段；它按 pdf-partition-v3 解码、去除页眉、统一 Unicode，并从 info-17 生成 content digest=c7 的 document-policy-v7。
+      en: normalize-17 is sequence 1 of ingest-run-17; under pdf-partition-v3 it decodes text, removes headers, normalizes Unicode, and generates document-policy-v7 with content digest c7 from info-17.
+      ja: normalize-17 は run の sequence=1 で decode、header removal、Unicode normalization を行い info-17 から digest c7 の document を生成します。
     field_values:
-      activity_id: normalize-policy-42-02
-      phase_id: normalize-policy-42-02
-      ingestion_run_ref: ingest-policy-directory-42
-      sequence_number: 2
-      phase_kind: normalize
-      input_resource_refs:
-        - dir-policy-2026-07
-      normalization_profile: unicode-nfc-clean-v1
-      input_information_refs:
-        - info-policy-42
-      input_manifest_digest: sha256:input-manifest-policy-42-v1
-      output_document_refs:
-        - document-policy-42-v1
-      started_at: "2026-07-18T08:59:10Z"
-      ended_at: "2026-07-18T08:59:24Z"
+      phase_id: normalize-17
+      normalization_profile: pdf-partition-v3
+      input_digest: sha256:file17
+      ingestion_run_id: ingest-run-17
+      sequence: 1
+      activity_id: normalize-17
+      started_at: 2026-07-16T10:01:00Z
       status: completed
     related_node_ids:
       - NormalizationActivity
-      - IngestionPhase
-      - IngestibleInformation
-      - Document
-      - DeduplicationActivity
-    related_relation_ids:
-      - NormalizationActivity-is_a-IngestionPhase
-      - NormalizationActivity-uses-IngestibleInformation
-      - NormalizationActivity-produces-Document
-      - NormalizationActivity-precedes-DeduplicationActivity
-
+    related_relation_ids: []
+    expected_result:
+      zh: 将 normalize-17 表示为 NormalizationActivity，并记录输入摘要、变换 profile 与新文档摘要。
+      en: Represent normalize-17 as NormalizationActivity and record input digest, transformation profile, and new document digest.
+      ja: normalize-17 を NormalizationActivity とし input digest、transformation profile、new document digest を記録します。
+    why_valid_or_invalid:
+      zh: 阶段实际改变内容表示并形成规范 Document，且所有变化可由 profile 和输入输出摘要重放验证。
+      en: The phase actually changes content representation and forms a normalized Document, with changes reproducible from the profile and input and output digests.
+      ja: phase は content representation を変更し normalized Document を形成し profile・digests で再現検証できます。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-normalization-activity-loader
-      - claim-normalization-activity-unicode
-      - claim-normalization-activity-generation
-  - id: normalization-activity-counterexample
-
+      - claim-normalization-activity-005
+  - id: NormalizationActivity-example-boundary-manual-20260716
+    kind: boundary
     labels:
-      zh: 去重决定不是规范化活动
-      en: A deduplication decision is not normalization activity
-      ja: 重複排除決定は正規化活動ではない
-
+      zh: 规范化活动边界例
+      en: "Boundary case: Normalization activity"
+      ja: 正規化activity境界例
+    scenario_id: null
     descriptions:
-      zh: 反例：DocumentLoader 输出无 DocumentMetadata source/page 就进入 EmbeddingRun，丢失 ChunkProvenance。
-      en: Counterexample: DocumentLoader output enters EmbeddingRun without DocumentMetadata source/page, losing ChunkProvenance.
-      ja: 反例：DocumentLoader 出力が DocumentMetadata source/page なしで EmbeddingRun へ。
-    field_values:
-      decision_id: decision-policy-42-v1
-      outcome: update
-      candidate_document_ref: document-policy-42-v1
-      activity_id: absent
-      normalization_profile: absent
-      input_information_refs: []
+      zh: dedup-17 不改变 document-policy-v7 的正文；它只比较 c7 与 docstore 哈希并记录 keep/skip/update 判断。
+      en: dedup-17 does not change document-policy-v7's content; it only compares c7 with a docstore hash and records a keep, skip, or update judgment.
+      ja: dedup-17 は document content を変更せず c7 と docstore hash を比較し judgment を記録するだけです。
+    field_values: {}
     related_node_ids:
       - NormalizationActivity
-      - DeduplicationDecision
-      - DeduplicationActivity
-    related_relation_ids:
-      - DeduplicationDecision-was-generated-by-DeduplicationActivity
-
+    related_relation_ids: []
+    expected_result:
+      zh: 把 dedup-17 保持为 DeduplicationActivity，不归为 NormalizationActivity。
+      en: Keep dedup-17 as DeduplicationActivity and exclude it from NormalizationActivity.
+      ja: dedup-17 は DeduplicationActivity とし NormalizationActivity から除外します。
+    why_valid_or_invalid:
+      zh: 规范化改变内容形态，去重只判断身份与版本处置；两阶段的输入输出和成功条件不同。
+      en: Normalization changes content form, whereas deduplication decides identity and version disposition; their inputs, outputs, and success criteria differ.
+      ja: normalization は content form を変更し deduplication は identity・version disposition を判断するため inputs/outputs が異なります。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-normalization-activity-identity
-      - claim-normalization-activity-boundary
-  - id: normalization-activity-boundary
-
-    labels:
-      zh: 正在运行且尚无产物的规范化
-      en: Running normalization with no output yet
-      ja: まだ出力のない実行中の正規化
-
-    descriptions:
-      zh: IngestionRun 产出 Document vs ChunkingRun 分割；GraphStore node/edge vs TextCorpus 资源类型边界。
-      en: IngestionRun produces Document vs ChunkingRun splits; GraphStore node/edge vs TextCorpus resource type boundary.
-      ja: IngestionRun Document 生成 vs ChunkingRun 分割。GraphStore vs TextCorpus 境界。
-    field_values:
-      activity_id: normalize-contract-51-02
-      phase_id: normalize-contract-51-02
-      ingestion_run_ref: ingest-contract-51
-      sequence_number: 2
-      normalization_profile: pdf-text-extraction-v3
-      input_information_refs:
-        - info-contract-51
-      input_manifest_digest: sha256:input-manifest-contract-51-v1
-      started_at: "2026-07-18T10:00:08Z"
-      status: running
-    related_node_ids:
-      - NormalizationActivity
-      - IngestibleInformation
-      - IngestionPhase
-    related_relation_ids:
-      - NormalizationActivity-is_a-IngestionPhase
-      - NormalizationActivity-uses-IngestibleInformation
-
-    source_claims:
-      - claim-normalization-activity-usage
-      - claim-normalization-activity-temporal
-  - id: normalization-activity-instance
-
-    labels:
-      zh: 因无效字符流失败的规范化
-      en: "Instance: normalization failed on invalid character stream"
-      ja: "事例: 無効な文字列で失敗した正規化"
-
-    descriptions:
-      zh: LlamaIndex PDFReader load_data → Document list metadata file_name/page_label → downstream RAPTOR chunking。
-      en: LlamaIndex PDFReader load_data → Document list metadata file_name/page_label → downstream RAPTOR chunking.
-      ja: LlamaIndex PDFReader→Document list metadata→downstream RAPTOR chunking。
-    field_values:
-      activity_id: normalize-legacy-archive-07
-      phase_id: normalize-legacy-archive-07
-      ingestion_run_ref: ingest-legacy-archive-07
-      sequence_number: 2
-      phase_kind: normalize
-      input_resource_refs:
-        - file-legacy-archive-07
-      normalization_profile: unicode-nfc-clean-v1
-      input_information_refs:
-        - info-legacy-archive-07
-      input_manifest_digest: sha256:input-manifest-legacy-archive-07-v1
-      started_at: "2026-07-18T11:01:02Z"
-      ended_at: "2026-07-18T11:01:04Z"
-      status: failed
-    related_node_ids:
-      - NormalizationActivity
-      - IngestibleInformation
-      - IngestionPhase
-    related_relation_ids:
-      - NormalizationActivity-is_a-IngestionPhase
-      - NormalizationActivity-uses-IngestibleInformation
-
-    source_claims:
-      - claim-normalization-activity-temporal
-      - claim-normalization-activity-unicode
+      - claim-normalization-activity-006
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation: []
 parent_relation:
   id: NormalizationActivity-is_a-IngestionPhase
   predicate: is_a
-  target: concept:IngestionPhase
-  endpoint_order: child-to-parent
-  direction: source-to-target
+  direction: target-to-source
   relation_kind: hierarchy
   labels:
-    zh: 是摄入阶段的规范化特化
-    en: is a normalization specialization of ingestion phase
-    ja: 取込みフェーズの正規化特化である
+    zh: 是一种
+    en: is a
+    ja: の一種である
   definitions:
-    zh: NormalizationActivity 是在一个摄入运行中固定输入信息清单和规范化 profile，并形成独立 Document 的 IngestionPhase。
-    en: NormalizationActivity is an IngestionPhase that fixes an input-information manifest and normalization profile in one ingestion run and forms separate Documents.
-    ja: NormalizationActivity は、一つの取込み実行で入力情報マニフェストと正規化プロファイルを固定し、独立したDocumentを形成する IngestionPhase です。
-  cardinality:
-    source:
-      min: 0
-      max: null
-    target:
-      min: 1
-      max: 1
-  cardinality_not_applicable_reason: null
+    zh: NormalizationActivity 是 IngestionPhase 的严格子类；种差为：消费 IngestibleInformation 并按确定解析/清洗配置产生 Document。
+    en: "NormalizationActivity is a strict subtype of IngestionPhase; its reviewed differentia is: it consumes IngestibleInformation and produces Document under a fixed parsing or cleaning profile."
+    ja: NormalizationActivity は IngestionPhase の厳密なsubtypeで、審査済み種差は「IngestibleInformation を消費し固定parse/clean profileで Documentを生成します。」です。
+  cardinality: null
+  cardinality_not_applicable_reason:
+    zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
+    en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
+    ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
   inverse_reading:
-    predicate: has_normalization_specialization
+    predicate: part_of
     labels:
-      zh: 具有规范化特化
-      en: has normalization specialization
-      ja: 正規化特化を持つ
+      zh: 反向读取
+      en: inverse reading
+      ja: 逆方向読取
   conditions:
-    - id: normalization-activity-is-a-phase-condition
+    - id: NormalizationActivity-is_a-IngestionPhase-condition-manual-001
       severity: error
       expression_language: plain
-      expression: Assert the specialization only when an object satisfies IngestionPhase identity and additionally has version-pinned input information, a declared normalization profile, and separate Document output when completed.
-      explanation:
-        zh: 在满足 IngestionPhase 身份之外，还必须具有版本固定的输入信息、声明的规范化配置，并在完成时形成独立文档；下载、去重判断或写入不满足这些过程种差。
-        en: Beyond IngestionPhase identity, the object must have version-pinned input information, a declared normalization profile, and a separate Document when completed; downloading, duplicate judgment, or writing lacks these process differentiae.
-        ja: IngestionPhase の同一性に加え、版固定の入力情報、宣言された正規化プロファイル、完了時の独立Documentが必要で、取得、重複判定、書込みはこれらの過程上の種差を満たしません。
+      expression: "Assert only when the object first satisfies IngestionPhase and also satisfies the differentia: it consumes IngestibleInformation and produces Document under a fixed parsing or cleaning profile."
+      explanations:
+        zh: 仅当对象首先满足 IngestionPhase 定义且满足种差“消费 IngestibleInformation 并按确定解析/清洗配置产生 Document。”时成立。
+        en: "Assert only when the object first satisfies IngestionPhase and also satisfies the differentia: it consumes IngestibleInformation and produces Document under a fixed parsing or cleaning profile."
+        ja: 対象がまず IngestionPhase を満たし、さらに種差「IngestibleInformation を消費し固定parse/clean profileで Documentを生成します。」を満たす時だけ成立します。
       source_claims:
-        - claim-normalization-activity-specialization
-  temporal_scope: valid-time
-  boundary_context: The specialization is scoped to one owning ingestion run; input information and generated Documents stay distinct from the activity itself.
+        - claim-normalization-activity-007
+  temporal_scope: timeless
+  boundary_context: null
   constraints: []
-  examples: []
-  source_claims:
-    - claim-normalization-activity-specialization
-  distinct_fact_rationale: This hierarchy records a content-transformation process while its inputs and outputs remain separate information facts.
-  layout_role: primary-backbone
-relations:
-  - id: NormalizationActivity-uses-IngestibleInformation
-    predicate: uses
-    target: concept:IngestibleInformation
-    endpoint_order: source-to-target
-    direction: source-to-target
-    relation_kind: causal
-    labels:
-      zh: 使用可摄入信息
-      en: uses ingestible information
-      ja: ingestible information を使用する
-    definitions:
-      zh: NormalizationActivity 使用已从来源读取并固定到输入清单中的 IngestibleInformation，不把该信息作为活动本身的组成部分。
-      en: A NormalizationActivity uses IngestibleInformation that was read from a source and pinned in its input manifest; it does not make that information a structural part of the activity.
-      ja: NormalizationActivity は source から read され input manifest に固定された IngestibleInformation を使用し、その information を activity の structural part にはしない。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 一个规范化活动可使用零个或多个信息版本，具体数量由冻结输入清单决定。
-      en: One normalization activity may use zero or more information versions; its frozen input manifest determines the count.
-      ja: 一つの normalization activity は zero 又は複数の information version を使用でき、frozen input manifest が数を決める。
-    inverse_reading:
-      predicate: is_used_by_normalization
+  examples:
+    - id: NormalizationActivity-is_a-IngestionPhase-example-positive-manual-20260716
+      kind: positive
       labels:
-        zh: 被规范化活动使用
-        en: is used by normalization activity
-        ja: normalization activity に使用される
-    conditions:
-      - id: normalization-activity-uses-information-condition
-        severity: error
-        expression_language: plain
-        expression: Assert only when input_information_refs and input_manifest_digest include the information ID and digest and the activity actually reads the payload. Shared source, media type, or metadata alone is insufficient.
-        explanation:
-          zh: 输入引用、冻结清单和实际负载读取必须共同证明使用关系。
-          en: Input reference, frozen manifest, and actual payload read must jointly establish use.
-          ja: input reference、frozen manifest、実際の payload read が共同で use を確立しなければならない。
-        source_claims: [claim-normalization-activity-usage]
-    temporal_scope: valid-time
-    boundary_context: Use is scoped to one activity execution and information version and does not turn a source or related metadata into input by association.
-    constraints: []
-    examples: []
-    source_claims: [claim-normalization-activity-usage]
-    distinct_fact_rationale: This records input provenance separately from the activity, source resource, and generated Document.
-    layout_role: cross-link
+        zh: 是一种正例
+        en: "Positive case: is a"
+        ja: の一種である正例
+      scenario_id: null
+      descriptions:
+        zh: normalize-17 具有 ingest-run-17 内唯一 phase_id 与 sequence=1，并执行解码、清理和 Unicode 规范化，从 info-17 形成新的 Document。
+        en: normalize-17 has a run-unique phase ID and sequence 1 inside ingest-run-17 and performs decoding, cleaning, and Unicode normalization to form a new Document from info-17.
+        ja: normalize-17 は run-unique phase ID、sequence 1 を持ち decode、clean、Unicode normalize で new Document を形成します。
+      field_values: {}
+      related_node_ids:
+        - NormalizationActivity
+        - IngestionPhase
+      related_relation_ids:
+        - NormalizationActivity-is_a-IngestionPhase
+      expected_result:
+        zh: 确认 normalize-17 同时属于 NormalizationActivity、IngestionPhase 与 IngestionActivity。
+        en: Confirm normalize-17 as NormalizationActivity, IngestionPhase, and IngestionActivity.
+        ja: normalize-17 を NormalizationActivity、IngestionPhase、IngestionActivity に所属させます。
+      why_valid_or_invalid:
+        zh: 它先满足局部阶段的运行归属、时间和输入输出条件，再以改变内容形式为规范 Document 构成种差。
+        en: It first satisfies run membership, time, input, and output conditions of a local phase and adds transformation into normalized Document form as differentia.
+        ja: local phase parent 条件を満たし normalized Document への content transformation を differentia とします。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-normalization-activity-007
+    - id: NormalizationActivity-is_a-IngestionPhase-example-boundary-manual-20260716
+      kind: boundary
+      labels:
+        zh: 是一种边界例
+        en: "Boundary case: is a"
+        ja: の一種である境界例
+      scenario_id: null
+      descriptions:
+        zh: dedup-17 也是 IngestionPhase，但只比较 document_id 与哈希并生成处置决定，不改变正文表示。
+        en: dedup-17 is also an IngestionPhase but only compares document identity and hash and generates a disposition decision without changing content representation.
+        ja: dedup-17 も IngestionPhase だが document identity/hash 比較だけで content representation を変更しません。
+      field_values: {}
+      related_node_ids:
+        - NormalizationActivity
+        - IngestionPhase
+      related_relation_ids:
+        - NormalizationActivity-is_a-IngestionPhase
+      expected_result:
+        zh: 不要通过该子类边把 dedup-17 归为 NormalizationActivity。
+        en: Do not use this subtype edge to classify dedup-17 as NormalizationActivity.
+        ja: この subtype edge で dedup-17 を NormalizationActivity に分類しません。
+      why_valid_or_invalid:
+        zh: 共享阶段上位类不代表专门行为相同；规范化与去重有不同的变换、输出和完成条件。
+        en: Sharing the phase parent does not make specialized behavior equal; normalization and deduplication have different transformations, outputs, and completion conditions.
+        ja: phase parent 共通でも specialized behavior は異なり normalization と dedup は outputs・completion が違います。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-normalization-activity-007
+  source_claims:
+    - claim-normalization-activity-007
+  distinct_fact_rationale: null
+  layout_role: primary-backbone
+  review_status: accepted
+  endpoint_order: child-to-parent
+relations:
   - id: NormalizationActivity-precedes-DeduplicationActivity
     predicate: precedes
-    target: concept:DeduplicationActivity
-    endpoint_order: source-to-target
     direction: source-to-target
     relation_kind: temporal
     labels:
-      zh: 先于去重活动
-      en: precedes deduplication activity
-      ja: 重複排除活動に先行する
+      zh: 先于去重
+      en: precedes deduplication
+      ja: deduplicationに先行する
     definitions:
-      zh: 在同一摄入运行中，已完成的 NormalizationActivity 的输出文档可作为 DeduplicationActivity 的候选输入，且其结束时间不晚于后者开始时间。
-      en: Within one ingestion run, a completed NormalizationActivity precedes DeduplicationActivity when its output Document is eligible candidate input and its end time is no later than the latter's start time.
-      ja: 同一取込み実行内で、完了したNormalizationActivityの出力Documentが DeduplicationActivity の候補入力となり、終了時刻が後者の開始時刻以前なら先行します。
-    cardinality:
-      source:
-        min: 0
-        max: null
-      target:
-        min: 0
-        max: null
-    cardinality_not_applicable_reason: null
+      zh: NormalizationActivity —precedes→ DeduplicationActivity 表示同一 IngestionRun 中规范化完成时间早于去重开始且其输出可作为去重输入。
+      en: NormalizationActivity —precedes→ DeduplicationActivity means that within the same IngestionRun normalization completes before deduplication starts and its output is eligible as deduplication input.
+      ja: NormalizationActivity —precedes→ DeduplicationActivity は同一 IngestionRun 内でnormalization完了がdeduplication開始より前で出力がdedup入力可能なことを表します。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
+      en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
+      ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
     inverse_reading:
-      predicate: follows_normalization
+      predicate: inverse_precedes
       labels:
-        zh: 在规范化之后
-        en: follows normalization
-        ja: 正規化に続く
+        zh: 反向读取
+        en: inverse reading
+        ja: 逆方向読取
     conditions:
-      - id: normalization-activity-precedes-deduplication-condition
+      - id: NormalizationActivity-precedes-DeduplicationActivity-condition-manual-001
         severity: error
         expression_language: plain
-        expression: Assert only when both activities reference the same ingestion_run_ref, the normalization status is completed, its ended_at is no later than deduplication started_at, and a normalization output Document is an actual deduplication input.
-        explanation:
-          zh: 同一运行、已完成规范化、可比较的时间顺序和真实的输出到输入交接共同证明流程先后；墙上时间早于而不共享运行或文档输入不足以建立关系。
-          en: Shared run, completed normalization, comparable time order, and actual output-to-input handoff jointly prove workflow order; earlier wall-clock time without shared run or Document input is insufficient.
-          ja: 同じ実行、完了した正規化、比較可能な時間順、実際の出力から入力への引渡しがワークフロー順序を共同で証明し、実行共有やDocument入力のない単なる時刻順だけでは不十分です。
+        expression: Assert only when both phases share run ID and normalization completion is no later than deduplication start.
+        explanations:
+          zh: 仅当两阶段 run_id 相同且 normalization.completed_at <= dedup.started_at 时成立。
+          en: Assert only when both phases share run ID and normalization completion is no later than deduplication start.
+          ja: 両phaseのrun IDが同じでnormalization完了がdeduplication開始以前の時だけ成立します。
         source_claims:
-          - claim-normalization-activity-precedes
+          - claim-normalization-activity-008
     temporal_scope: valid-time
-    boundary_context: Ordering is local to the shared ingestion run and does not order unrelated runs by wall-clock time alone.
+    boundary_context: null
     constraints: []
-    examples: []
+    examples:
+      - id: NormalizationActivity-precedes-DeduplicationActivity-example-positive-manual-20260716
+        kind: positive
+        labels:
+          zh: 先于去重正例
+          en: "Positive case: precedes deduplication"
+          ja: deduplicationに先行する正例
+        scenario_id: null
+        descriptions:
+          zh: 在 ingest-run-17 内，normalize-17 的 end=10:02 早于 dedup-17 的 start=10:02:01，phase sequence 分别为 1 和 2，且 dedup 输入是其输出 Document。
+          en: Within ingest-run-17, normalize-17 ends at 10:02 before dedup-17 starts at 10:02:01, their sequences are 1 and 2, and deduplication consumes the normalization output Document.
+          ja: ingest-run-17 内で normalize end が dedup start より前、sequence 1/2、dedup input が normalization output です。
+        field_values: {}
+        related_node_ids:
+          - NormalizationActivity
+          - DeduplicationActivity
+        related_relation_ids:
+          - NormalizationActivity-precedes-DeduplicationActivity
+        expected_result:
+          zh: 建立 normalize-17 precedes dedup-17，并限定到 ingest-run-17 的工作流范围。
+          en: Assert normalize-17 precedes dedup-17 and scope the ordering to ingest-run-17's workflow.
+          ja: normalize-17 precedes dedup-17 を ingest-run-17 workflow scope に限定して確立します。
+        why_valid_or_invalid:
+          zh: 同一运行、时间顺序、阶段序号和输出到输入依赖共同证明有意义的流程先后。
+          en: Shared run, temporal order, phase sequence, and output-to-input dependency jointly prove meaningful workflow precedence.
+          ja: same run、temporal order、phase sequence、output-input dependency が workflow precedence を証明します。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-normalization-activity-008
+      - id: NormalizationActivity-precedes-DeduplicationActivity-example-boundary-manual-20260716
+        kind: boundary
+        labels:
+          zh: 先于去重边界例
+          en: "Boundary case: precedes deduplication"
+          ja: deduplicationに先行する境界例
+        scenario_id: null
+        descriptions:
+          zh: normalize-18 在 09:00 完成，dedup-17 在 10:02 开始，但 normalize-18 属于 ingest-run-18，二者没有输出输入依赖。
+          en: normalize-18 completes at 09:00 before dedup-17 starts at 10:02, but it belongs to ingest-run-18 and there is no output-to-input dependency between them.
+          ja: normalize-18 は時間上先でも別 run で output-input dependency がありません。
+        field_values: {}
+        related_node_ids:
+          - NormalizationActivity
+          - DeduplicationActivity
+        related_relation_ids:
+          - NormalizationActivity-precedes-DeduplicationActivity
+        expected_result:
+          zh: 不得仅按墙上时间建立 normalize-18 precedes dedup-17。
+          en: Do not assert normalize-18 precedes dedup-17 from wall-clock order alone.
+          ja: wall-clock order だけで normalize-18 precedes dedup-17 を確立しません。
+        why_valid_or_invalid:
+          zh: 时间早于只形成一般事件顺序；该关系还要求同一工作流范围和阶段依赖。
+          en: Earlier wall-clock time provides only general event ordering; this relation additionally requires shared workflow scope and phase dependency.
+          ja: earlier time は general event order だけで shared workflow scope・phase dependency が必要です。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-normalization-activity-008
     source_claims:
-      - claim-normalization-activity-precedes
-    distinct_fact_rationale: This records a local workflow handoff, not a claim that all normalization globally precedes all deduplication.
+      - claim-normalization-activity-008
+    distinct_fact_rationale: null
     layout_role: cross-link
+    review_status: accepted
+    target: concept:DeduplicationActivity
   - id: NormalizationActivity-produces-Document
     predicate: produces
-    target: concept:Document
-    endpoint_order: source-to-target
     direction: source-to-target
     relation_kind: causal
     labels:
-      zh: 产生规范文档
-      en: produces canonical document
-      ja: 正規Documentを生成する
+      zh: 产生文档
+      en: produces document
+      ja: documentを生成する
     definitions:
-      zh: NormalizationActivity 产生 Document，表示该活动在完成时按其固定输入清单和 profile 首次形成该独立文档版本。
-      en: NormalizationActivity produces a Document when completion first forms that separate Document version from its fixed input manifest and profile.
-      ja: NormalizationActivity が Document を生成するとは、固定された入力マニフェストとプロファイルから、その独立Document版を完了時に初めて形成することです。
-    cardinality:
-      source:
-        min: 0
-        max: null
-      target:
-        min: 0
-        max: null
-    cardinality_not_applicable_reason: null
+      zh: NormalizationActivity —produces→ Document 表示阶段完成时新形成一个规范 Document 版本。
+      en: NormalizationActivity —produces→ Document means that phase completion newly forms one canonical Document version.
+      ja: NormalizationActivity —produces→ Document はphase完了時に一canonical Document版を新規形成することを表します。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
+      en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
+      ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
     inverse_reading:
-      predicate: is_generated_by_normalization
+      predicate: inverse_produces
       labels:
-        zh: 由规范化生成
-        en: is generated by normalization
-        ja: 正規化により生成される
+        zh: 反向读取
+        en: inverse reading
+        ja: 逆方向読取
     conditions:
-      - id: normalization-activity-produces-document-condition
+      - id: NormalizationActivity-produces-Document-condition-manual-001
         severity: error
         expression_language: plain
-        expression: Assert only when status is completed, the Document is listed in output_document_refs, and its generating activity, input-manifest digest, and normalization profile bind back to this activity.
-        explanation:
-          zh: 完成状态、活动输出引用及文档内部对生成活动、输入摘要和 profile 的回指必须一致；读取、验证或失败的半成品不是生成。
-          en: Completed status, the activity output reference, and the Document back-links for generating activity, input digest, and profile must agree; reading, validation, or a failed partial result is not generation.
-          ja: 完了状態、活動の出力参照、生成活動・入力ダイジェスト・プロファイルに対するDocumentの逆参照が一致する必要があり、読取り、検証、失敗した部分結果は生成ではありません。
+        expression: Assert only when the Document's generating phase, input digest, and normalization profile all bind to the activity.
+        explanations:
+          zh: 仅当 Document.generating_phase_id、输入摘要与 normalization_profile 均绑定该活动时成立。
+          en: Assert only when the Document's generating phase, input digest, and normalization profile all bind to the activity.
+          ja: Documentのgenerating phase・入力digest・normalization profileがactivityへ結び付く時だけ成立します。
         source_claims:
-          - claim-normalization-activity-generation
-    temporal_scope: valid-time
-    boundary_context: The relation creates no claim about later storage, indexing, deduplication, or user-facing retrieval of the Document.
+          - claim-normalization-activity-009
+    temporal_scope: timeless
+    boundary_context: null
     constraints: []
-    examples: []
+    examples:
+      - id: NormalizationActivity-produces-Document-example-positive-manual-20260716
+        kind: positive
+        labels:
+          zh: 产生文档正例
+          en: "Positive case: produces document"
+          ja: documentを生成する正例
+        scenario_id: null
+        descriptions:
+          zh: normalize-17 的 output manifest 新列出 document-policy-v7@c7，Document 的 generating_phase_id 回指 normalize-17，且 c7 可由 info-17 与 profile 重放得到。
+          en: normalize-17's output manifest newly lists document-policy-v7@c7, the Document's generating phase ID points back to normalize-17, and c7 can be reproduced from info-17 and the profile.
+          ja: normalize-17 output manifest が document@c7 を新規列挙し generating phase ID が戻り c7 を replay できます。
+        field_values: {}
+        related_node_ids:
+          - NormalizationActivity
+          - Document
+        related_relation_ids:
+          - NormalizationActivity-produces-Document
+        expected_result:
+          zh: 建立 normalize-17 produces document-policy-v7，并保留输入、profile 与输出摘要。
+          en: Assert normalize-17 produces document-policy-v7 while retaining input, profile, and output digest.
+          ja: normalize-17 produces document-policy-v7 を input、profile、output digest 付きで確立します。
+        why_valid_or_invalid:
+          zh: 输出清单、文档内部生成者和可重放内容摘要三者一致，证明新文档版本由该活动形成。
+          en: Output manifest, the Document's internal generator, and reproducible content digest all agree, proving creation of the new Document version by this activity.
+          ja: output manifest、internal generator、reproducible digest が一致し new Document version generation を証明します。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-normalization-activity-009
+      - id: NormalizationActivity-produces-Document-example-boundary-manual-20260716
+        kind: boundary
+        labels:
+          zh: 产生文档边界例
+          en: "Boundary case: produces document"
+          ja: documentを生成する境界例
+        scenario_id: null
+        descriptions:
+          zh: validate-17 只读取已存在的 document-policy-v6、检查 schema 后返回 valid=true；它没有新 document_id、摘要或 output manifest 项。
+          en: validate-17 only reads existing document-policy-v6, checks its schema, and returns valid true; it has no new Document ID, digest, or output-manifest entry.
+          ja: validate-17 は existing document-v6 を検証するだけで new Document ID、digest、output entry がありません。
+        field_values: {}
+        related_node_ids:
+          - NormalizationActivity
+          - Document
+        related_relation_ids:
+          - NormalizationActivity-produces-Document
+        expected_result:
+          zh: 不要建立 validate-17 produces document-policy-v6；验证不是生成。
+          en: Do not assert validate-17 produces document-policy-v6; validation is not generation.
+          ja: validate-17 produces document-policy-v6 を確立せず validation と generation を区別します。
+        why_valid_or_invalid:
+          zh: 读取或确认既有文档不会产生新身份；produces 要求输出首次由该活动形成并回指生成者。
+          en: Reading or confirming an existing Document creates no new identity; produces requires an output first formed by the activity and linked back to its generator.
+          ja: existing Document read/validation は new identity を作らず produces は first formation・generator backlink を要します。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-normalization-activity-009
     source_claims:
-      - claim-normalization-activity-generation
-    distinct_fact_rationale: This records document formation separately from the activity execution, its input use, and later downstream effects.
+      - claim-normalization-activity-009
+    distinct_fact_rationale: null
     layout_role: cross-link
-sources:
-  - id: langchain-document-loaders
-    title: LangChain document loader integrations
-    url: https://docs.langchain.com/oss/python/integrations/document_loaders/index
-    type: official-doc
-    source_type: official-doc
-    relevance: Documents a common loader interface for reading diverse external sources into Document values.
-  - id: unicode-uax15
-    title: Unicode Standard Annex 15 Unicode Normalization Forms
-    url: https://www.unicode.org/reports/tr15/
-    type: standard
-    source_type: standard
-    relevance: Specifies normalization forms that give equivalent Unicode strings a unique binary representation after normalization.
-  - id: nist-fips-180-4
-    title: FIPS 180-4 Secure Hash Standard
-    url: https://csrc.nist.gov/pubs/fips/180-4/upd1/final
-    type: standard
-    source_type: standard
-    relevance: Specifies hash algorithms that produce message digests useful for detecting changed messages.
-  - id: w3c-prov-o
-    title: W3C PROV-O
-    url: https://www.w3.org/TR/prov-o/
-    type: standard
-    source_type: standard
-    relevance: Defines activities with start and end times that use entities and generate separate entities.
+    review_status: accepted
+    target: concept:Document
+review:
+  status: accepted
+  method: manual-semantic
+  reviewer: manual-memory-ingestion-verification
+  reviewed_on: 2026-07-17
+  note:
+    zh: 已对照 Anthropic Contextual Retrieval、LangChain text splitters/document loaders、LlamaIndex node parsers/ingestion pipeline、Unstructured 解析模式与 ETL 去重策略逐项人工语义核验通过。
+    en: Manually verified against Anthropic Contextual Retrieval, LangChain text splitters and document loaders, LlamaIndex node parsers and ingestion pipeline, Unstructured parsing patterns, and ETL deduplication strategies.
+    ja: Anthropic Contextual Retrieval、LangChain text splitters/document loaders、LlamaIndex node parsers/ingestion pipeline、Unstructured 解析パターン、ETL 重複排除戦略に照らし手動意味審査を完了しました。
+  sections:
+    semantics: accepted
+    hierarchy: accepted
+    relations: accepted
+    structure: accepted
+    examples: accepted
+    source_claims: accepted
 source_claims:
-  - id: claim-normalization-activity-loader
-    source: langchain-document-loaders
-    supports: LangChain documents a standard BaseLoader interface with load and lazy_load methods that read varied sources into Document values. Moonweave models source-specific parsing as a declared normalization profile and keeps resulting Documents separate from the loading activity.
-    locator: LangChain document loader integrations overview and BaseLoader interface
-    evidence_kind: ontology-design-inference
+  - id: claim-normalization-activity-001
+    source: eng-fw-unstructured-ingestion
+    supports: Unstructured documents partitioning and ordered downstream steps; Moonweave bounds normalization at canonical Document production.
+    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-normalization-activity-unicode
-    source: unicode-uax15
-    supports: Unicode Standard Annex 15 specifies normalization forms under which equivalent strings obtain a unique binary representation. Moonweave records a versioned Unicode normalization profile rather than treating transformed text as format-neutral.
-    locator: UAX 15 introduction and normalization-form definitions
-    evidence_kind: ontology-design-inference
+    review_status: accepted
+  - id: claim-normalization-activity-002
+    source: eng-fw-unstructured-ingestion
+    supports: NormalizationActivity.phase_id records the separately auditable normalization phase; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
+    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-normalization-activity-digest
-    source: nist-fips-180-4
-    supports: FIPS 180-4 specifies hash algorithms that produce message digests for detecting message changes. Moonweave stores an algorithm-tagged digest of the input manifest to pin the information versions read by one activity.
-    locator: FIPS 180-4 abstract on message digests and change detection
-    evidence_kind: ontology-design-inference
+    review_status: accepted
+  - id: claim-normalization-activity-003
+    source: eng-fw-unstructured-ingestion
+    supports: NormalizationActivity.normalization_profile records reproducible normalization behavior; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
+    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-normalization-activity-identity
-    source: w3c-prov-o
-    supports: PROV-O distinguishes activities from entities they use or generate. Moonweave identifies normalization execution separately from input information, output Documents, and later deduplication decisions.
-    locator: PROV-O section 3.1 Activity and Entity
-    evidence_kind: ontology-design-inference
+    review_status: accepted
+  - id: claim-normalization-activity-004
+    source: eng-fw-unstructured-ingestion
+    supports: NormalizationActivity.input_digest records exact normalization input; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
+    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-normalization-activity-temporal
-    source: w3c-prov-o
-    supports: PROV-O states that activities start and end at particular points in time. Moonweave records start and terminal end independently from input content, Document identity, and activity status.
-    locator: PROV-O section 3.1 on activity start and end times
-    evidence_kind: ontology-design-inference
+    review_status: accepted
+  - id: claim-normalization-activity-005
+    source: eng-fw-unstructured-ingestion
+    supports: Unstructured's partition step parses downloaded content into structured elements before later chunk/embed/upload steps.
+    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-normalization-activity-usage
-    source: w3c-prov-o
-    supports: PROV-O states that activities can use entities during their lifetime. Moonweave records actual input-information references and a manifest digest rather than inferring use from a source mention in metadata.
-    locator: PROV-O section 3.1 on prov used and Entity Activity relations
-    evidence_kind: ontology-design-inference
+    review_status: accepted
+  - id: claim-normalization-activity-006
+    source: eng-fw-unstructured-ingestion
+    supports: LlamaIndex performs duplicate/upsert handling separately from transformations.
+    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-normalization-activity-parent-usage
-    source: w3c-prov-o
-    supports: PROV-O permits an activity to use source entities and derived entities as distinct facts. Moonweave retains the owning ingestion activity's versioned source-resource references on a normalization phase while separately recording the information representations that phase transforms.
-    locator: PROV-O section 3.1 on prov:used and Entity Activity relations
-    evidence_kind: ontology-design-inference
+    review_status: accepted
+  - id: claim-normalization-activity-007
+    source: eng-fw-unstructured-ingestion
+    supports: Unstructured's partition step parses source content into structured elements before later steps.
+    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-normalization-activity-generation
-    source: w3c-prov-o
-    supports: PROV-O states that activities can generate entities. Moonweave treats a completed normalized Document as a separate generated information entity and does not call an unfinished failed buffer a Document.
-    locator: PROV-O section 3.1 on prov wasGeneratedBy and generated entities
-    evidence_kind: ontology-design-inference
+    review_status: accepted
+  - id: claim-normalization-activity-008
+    source: eng-fw-llamaindex-ingestion-code
+    supports: LlamaIndex's ingestion pipeline applies transformations before duplicate/upsert handling over produced nodes.
+    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-normalization-activity-phase
-    source: w3c-prov-o
-    supports: PROV-O supports provenance chains among activities and entities but does not prescribe ingestion-step ordinals. Moonweave models normalization as an ordered phase in one owning ingestion run as a local orchestration inference.
-    locator: PROV-O Activity relations and provenance chains
-    evidence_kind: ontology-design-inference
-    confidence: medium
-  - id: claim-normalization-activity-specialization
-    source: w3c-prov-o
-    supports: Modeling a version-pinned information transformation as a NormalizationActivity specialization of IngestionPhase is a Moonweave taxonomy inference grounded in PROV-O's activity and entity distinction.
-    locator: PROV-O Entity Activity usage and generation
-    evidence_kind: ontology-design-inference
-    confidence: medium
-  - id: claim-normalization-activity-precedes
-    source: w3c-prov-o
-    supports: PROV-O provides activity time bounds and entity usage and generation facts. Moonweave infers a local normalization-before-deduplication handoff only when shared-run, temporal, and output-to-input evidence agree.
-    locator: PROV-O Activity timing plus Entity Activity usage and generation
-    evidence_kind: ontology-design-inference
-    confidence: medium
-  - id: claim-normalization-activity-boundary
-    source: langchain-document-loaders
-    supports: Loader integrations distinguish reading source content into Document values from later storage and retrieval integrations. Moonweave keeps source acquisition, normalization, deduplication, persistence, and query retrieval as separate node identities.
-    locator: LangChain document loader integrations overview
-    evidence_kind: ontology-design-inference
-    confidence: medium
+    review_status: accepted
+  - id: claim-normalization-activity-009
+    source: eng-fw-unstructured-ingestion
+    supports: Unstructured's partition step transforms source content into structured elements; PROV-O separates generation from use.
+    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted

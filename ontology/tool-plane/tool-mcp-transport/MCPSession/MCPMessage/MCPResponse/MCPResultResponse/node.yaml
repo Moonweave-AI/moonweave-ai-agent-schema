@@ -1,305 +1,412 @@
 schema: moonweave.ai/ontology-node/v1
 id: MCPResultResponse
 kind: concept
+status: review
 labels:
-  zh: MCP 成功响应
-  en: MCP success response
-  ja: MCP成功レスポンス
+  zh: MCP 结果响应
+  en: MCP result response
+  ja: MCP 結果応答
 semantics:
   short_definition:
-    zh: 含有 result、没有 error 的 MCP JSON-RPC 响应。
-    en: An MCP JSON-RPC response that contains result and no error.
-    ja: resultを含みerrorを含まないMCP JSON-RPCレスポンス。
+    zh: 以请求 id 返回 result 且不带 error 的 MCP 响应。
+    en: An MCP response carrying result and no error under the request ID.
+    ja: request ID で result を返し error を持たない MCP response。
   definition:
-    zh: >
-      MCP 成功响应是对一个 MCP 请求的 JSON-RPC response object，其中相同 id 与请求相关联，`result`
-      成员承载该方法的成功输出，而 `error` 成员不存在。result 的具体形状取决于方法，例如 tools/list
-      的 tools、resources/read 的 contents 或 prompts/get 的 messages。
-    en: >
-      An MCP success response is a JSON-RPC response object to one MCP request in which the
-      same id correlates to the request, the `result` member carries the method's successful
-      output, and `error` is absent. The concrete result shape depends on method, such as
-      tools for tools/list, contents for resources/read, or messages for prompts/get.
-    ja: >
-      MCP成功レスポンスは一つのMCPリクエストへのJSON-RPC response objectであり、同じidでリクエストに
-      対応付けられ、`result` がmethodの成功出力を運び、`error` は存在しない。具体的なresult形状は
-      methodにより異なり、tools/listならtools、resources/readならcontents、prompts/getならmessagesである。
+    zh: MCP 结果响应是 MCPResponse 的严格下位类型，继承 MCPResponse 的 message_record_id 作为线路响应记录身份。request_id 是继承的请求关联字段，必须回显对应请求的值；必需的 result 与 response_member=result 构成种差且不得同时出现 error。JSON-RPC 层成功不排除内部 CallToolResult 以 isError=true 报告工具级失败。
+    en: An MCP result response is a strict MCPResponse subtype and inherits the message_record_id wire-response identity from MCPResponse. The inherited request_id is a correlation field and must repeat the corresponding request value; required result together with response_member=result supplies the differentia, and error cannot coexist. JSON-RPC-level success does not prevent an inner CallToolResult from reporting tool-level failure with isError=true.
+    ja: MCP result response は MCPResponse の厳密な下位型で、MCPResponse から wire response record の identity である message_record_id を継承します。継承した request_id は request 相関 field で対応値を必ず反映し、必須 result と response_member=result が種差となり error は共存しません。inner CallToolResult は isError=true を返せます。
   why_needed:
-    zh: >
-      成功响应将协议层成功与业务内容分开：例如 ToolResult 的 `isError: true` 仍可能位于 JSON-RPC
-      result 中，因为服务器成功执行并返回了一个工具层错误表示。调用方必须先识别 JSON-RPC success，
-      再解释特定方法的 result 语义。
-    en: >
-      A success response separates protocol-level success from business content. For example,
-      a ToolResult with `isError: true` can still appear in JSON-RPC result because the server
-      successfully returned a tool-level error representation. Callers identify JSON-RPC success
-      first, then interpret method-specific result semantics.
-    ja: >
-      成功レスポンスはプロトコル層の成功をビジネス内容から分離する。たとえば `isError: true` のToolResultも、
-      サーバーがtool層error表現を正常に返したためJSON-RPC resultに現れ得る。呼び出し側はまずJSON-RPC
-      成功を識別し、次にmethod固有のresult意味を解釈する。
+    zh: 独立子型防止把工具业务失败误升级为 JSON-RPC error，并支持精确关联成功结果载荷。
+    en: A distinct subtype prevents tool-level failure from being promoted to JSON-RPC error and supports precise correlation of successful result payloads.
+    ja: 独立 subtype により tool-level failure を JSON-RPC error へ誤昇格せず successful result payload を正確に相関します。
   includes:
-    - zh: 与请求相同的 JSON-RPC id。
-      en: The same JSON-RPC id as the request.
-      ja: リクエストと同じJSON-RPC id。
-    - zh: 恰好一个 `result` 成员。
-      en: Exactly one `result` member.
-      ja: ちょうど一つの `result` メンバー。
-    - zh: 由相应 MCP 方法定义的成功数据。
-      en: Success data defined by the corresponding MCP method.
-      ja: 対応するMCP methodが定義する成功データ。
+    - zh: 纳入具有同一请求 id、result 且没有 error 的协议响应。
+      en: Includes protocol responses with the correlated request ID, result, and no error.
+      ja: correlated request ID・result を持ち error 無しの protocol response を含みます。
   excludes:
-    - zh: 具有 JSON-RPC `error` 成员的失败响应。
-      en: A failure response with a JSON-RPC `error` member.
-      ja: JSON-RPC `error` メンバーを持つ失敗レスポンス。
-    - zh: 无论内容看似成功与否，任何没有 id 的通知。
-      en: Any id-less notification regardless of whether its content looks successful.
-      ja: 内容が成功に見えるかどうかに関係なく、idを持たない通知。
+    - zh: 排除 error response、HTTP 成功状态和 CallToolResult 本身。
+      en: Excludes error responses, HTTP success statuses, and CallToolResult itself.
+      ja: error response・HTTP success status・CallToolResult 自体を除外します。
   semantic_kind: information
-  aliases:
-    - language: en
-      value: JSON-RPC result response
-      alias_kind: synonym
-engineering:
-  explanation:
-    zh: >
-      在完成一个已验证且授权的请求后，服务器构造 `{jsonrpc:"2.0",id,result}`。它必须不添加
-      JSON-RPC error；调用方按 id 移除 pending request，然后按 method 解码 result。对 tools/call，
-      JSON-RPC result 表示协议响应成功，而 ToolResult.isError 仍是工具方法结果的一部分。
-    en: >
-      After completing a validated and authorized request, the server constructs
-      `{jsonrpc:"2.0",id,result}` and does not add JSON-RPC error. The caller removes the
-      pending request by id and decodes result by method. For tools/call, JSON-RPC result means
-      protocol response success, while ToolResult.isError remains part of the tool method result.
-    ja: >
-      検証・認可済みリクエストの完了後、サーバーは `{jsonrpc:"2.0",id,result}` を構成しJSON-RPC errorを
-      追加しない。呼び出し側はidで保留リクエストを除去しmethodによりresultをデコードする。tools/callでは
-      JSON-RPC resultはプロトコルレスポンス成功を示し、ToolResult.isErrorはtool method結果の一部である。
-  typical_input:
-    - description: A successfully processed tools/list request.
-      format: |
-        {
-          "jsonrpc": "2.0",
-          "id": 4,
-          "method": "tools/list",
-          "params": {}
-        }
-      source_claims: [mcp-result-response-json-rpc]
-  typical_output:
-    - description: The successful same-id tools/list result response.
-      format: |
-        {
-          "jsonrpc": "2.0",
-          "id": 4,
-          "result": {
-            "tools": [
-              {"name": "get_weather", "inputSchema": {"type": "object"}}
-            ]
-          }
-        }
-      source_claims: [mcp-result-response-json-rpc]
-  reference_implementations:
-    - name: JSON-RPC 2.0 specification
-      url: https://www.jsonrpc.org/specification
-      description: Defines result response shape and mutual exclusion with error.
-    - name: MCP tools specification
-      url: https://modelcontextprotocol.io/specification/2025-11-25/server/tools
-      description: Illustrates method-specific ToolResult semantics inside successful JSON-RPC result.
+  aliases: []
 structure:
-  identity_keys: ["id"]
+  identity_keys: []
   fields:
-    - id: jsonrpc
-      labels: {zh: "JSON-RPC 版本", en: "JSON-RPC version", ja: "JSON-RPC バージョン"}
-      definitions:
-        zh: "MCP 响应包络中的原生 jsonrpc 成员，值必须为 \"2.0\"。"
-        en: "The native jsonrpc member of the MCP response envelope; it must be \"2.0\"."
-        ja: "MCP 応答エンベロープのネイティブな jsonrpc メンバーで、値は \"2.0\" でなければならない。"
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      pattern: null
-      example_value: "2.0"
-      allowed_values: ["2.0"]
-      source_claims: [mcp-result-response-json-rpc]
-    - id: id
-      labels: {zh: "JSON-RPC 标识", en: "JSON-RPC id", ja: "JSON-RPC id"}
-      definitions:
-        zh: "与所响应请求相同的原生 JSON-RPC id。"
-        en: "The native JSON-RPC id equal to the request being answered."
-        ja: "応答対象の要求と同じネイティブな JSON-RPC id。"
-      datatype: string-or-number-or-null
-      required: true
-      cardinality: {min: 1, max: 1}
-      pattern: null
-      example_value: 4
-      allowed_values: []
-      source_claims: [mcp-result-response-json-rpc, mcp-result-response-session]
     - id: result
-      labels: {zh: "成功结果", en: "Success result", ja: "成功結果"}
-      definitions:
-        zh: "成功响应中的原生 result 成员；它不能与 error 同时出现。"
-        en: "The native result member of a successful response; it cannot coexist with error."
-        ja: "成功応答のネイティブな result メンバー。error と共存できない。"
-      datatype: json
+      labels:
+        zh: 结果对象
+        en: result object
+        ja: result object
+      datatype: object
       required: true
-      cardinality: {min: 1, max: 1}
-      pattern: null
-      example_value: {"contents":[]}
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 映射 JSON-RPC 成功响应的必需 result 成员；具体 MCP 方法决定其中的属性合同，且同一响应不得同时带 error。
+        en: Maps the required result member of a successful JSON-RPC response; the concrete MCP method determines its property contract, and the same response cannot also carry error.
+        ja: successful JSON-RPC response の required result member に対応し、具体 MCP method が property contract を決め、同一 response は error を同時に保持できません。
       allowed_values: []
-      source_claims: [mcp-result-response-json-rpc]
+      pattern: null
+      example_value:
+        tools: []
+      source_claims:
+        - claim-mcp-result-response-002
+    - id: elicitation_action
+      labels:
+        zh: 征询结果动作
+        en: elicitation result action
+        ja: elicitation 結果 action
+      datatype: string
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      definitions:
+        zh: 当该结果响应回答 `elicitation/create` 时，记录用户或客户端选择的 `accept`、`decline` 或 `cancel`；其他 MCP 结果响应不使用该字段。
+        en: When this result response answers elicitation/create, records the client or user choice accept, decline, or cancel; other MCP result responses do not use this field.
+        ja: この result response が `elicitation/create` に応答する場合、client/user の選択 accept・decline・cancel を記録し、他の MCP result response では使用しません。
+      allowed_values:
+        - id: MCPElicitationActionAccept
+          value: accept
+          labels:
+            zh: 接受并提交输入
+            en: accept and submit input
+            ja: 入力を accept して submit
+          definitions:
+            zh: 用户接受请求，并在结果 content 中提交所请求的输入。
+            en: The user accepts the request and submits the requested input in the result content.
+            ja: user が request を accept し、result content に requested input を submit します。
+          status: accepted
+          source_claims:
+            - claim-mcp-result-response-003
+        - id: MCPElicitationActionDecline
+          value: decline
+          labels:
+            zh: 拒绝请求
+            en: decline request
+            ja: request を decline
+          definitions:
+            zh: 用户明确拒绝提供请求的输入。
+            en: The user explicitly declines to provide the requested input.
+            ja: user が requested input の提供を明示的に decline します。
+          status: accepted
+          source_claims:
+            - claim-mcp-result-response-004
+        - id: MCPElicitationActionCancel
+          value: cancel
+          labels:
+            zh: 取消交互
+            en: cancel interaction
+            ja: interaction を cancel
+          definitions:
+            zh: 用户在不接受也不明确拒绝请求内容的情况下取消交互。
+            en: The user cancels the interaction without accepting or explicitly declining the requested content.
+            ja: user が requested content を accept/decline せず interaction を cancel します。
+          status: accepted
+          source_claims:
+            - claim-mcp-result-response-005
+      pattern: null
+      example_value: accept
+      source_claims:
+        - claim-mcp-result-response-006
+    - id: elicitation_content
+      labels:
+        zh: 征询响应内容
+        en: elicitation response content
+        ja: elicitation 応答 content
+      datatype: object
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      definitions:
+        zh: "仅当该响应是表单模式 `elicitation/create` 的 `action: accept` 结果时，保存与请求 `requestedSchema` 匹配的字符串、数字、布尔值或字符串数组属性；`decline`、`cancel` 及 URL 模式结果省略该字段。"
+        en: "Only for an action: accept result of a form-mode elicitation/create, carries properties matching requestedSchema whose values are strings, numbers, booleans, or string arrays; decline, cancel, and URL-mode results omit the field."
+        ja: "form-mode `elicitation/create` の `action: accept` result に限り、requestedSchema に適合する string・number・boolean・string array value の property を保持し、decline・cancel・URL-mode result では省略します。"
+      allowed_values: []
+      pattern: null
+      example_value:
+        confirmation: true
+        display_name: Moonweave operator
+      source_claims:
+        - claim-mcp-result-response-007
   constraints:
-    - id: result-response-omits-error
+    - id: mcp-result-response-correlation-and-member
       severity: error
       expression_language: plain
-      expression: A success response contains result and omits JSON-RPC error.
-      explanation:
-        zh: 成功响应包含 result 并省略 JSON-RPC error。
-        en: A success response contains result and omits JSON-RPC error.
-        ja: 成功レスポンスはresultを含みJSON-RPC errorを省略する。
-      source_claims: [mcp-result-response-json-rpc]
-    - id: result-response-result-is-method-specific
-      severity: error
-      expression_language: plain
-      expression: The result value is decoded against the method of the correlated request rather than treated as one universal payload schema.
-      explanation:
-        zh: result 值应按关联请求的方法解码，不能当作一种通用 payload schema。
-        en: The result value is decoded against the method of the correlated request rather than treated as one universal payload schema.
-        ja: result値は一つの普遍的payload schemaとしてではなく、相関リクエストのmethodに対してデコードされる。
-      source_claims: [mcp-result-response-json-rpc]
-  required_relations: []
+      expression: request_id MUST be present and equal the answered MCPRequest.request_id, response_member MUST equal result, and error MUST be absent.
+      explanations:
+        zh: 结果响应必须以继承的 request_id 字段回显原请求关联值，response_member 必须为 result，且不得同时带 error。
+        en: A result response must repeat the original request correlation in inherited request_id, set response_member to result, and omit error.
+        ja: result response は継承 request_id に元 request の相関値を反映し、response_member=result として error を持ちません。
+      source_claims:
+        - claim-mcp-result-response-008
+  required_relation_constraints: []
 examples:
-  - id: mcp-result-response-positive-tools-list
-
-    labels: {zh: 工具列表成功结果, en: Successful tool list result, ja: 成功したtoolリストresult}
-
+  - id: MCPResultResponse-example-positive-001
+    kind: positive
+    labels:
+      zh: MCP 结果响应正例
+      en: Positive MCP result response case
+      ja: MCP 結果応答の正例
+    scenario_id: null
     descriptions:
-      zh: "MCP JSON-RPC tools/call {\"method\":\"tools/call\",\"params\":{\"name\":\"read_file\",\"arguments\":{\"path\":\"/tmp/test.txt\"}}}；同时 Anthropic MCP connector 与 LangChain MCP adapter 提供等价工具调用路径。"
-      en: "MCP JSON-RPC tools/call {\"method\":\"tools/call\",\"params\":{\"name\":\"read_file\",\"arguments\":{\"path\":\"/tmp/test.txt\"}}}; Anthropic MCP connector and LangChain MCP adapter provide equivalent tool-call paths."
-      ja: MCP JSON-RPC tools/call。Anthropic MCP connector と LangChain MCP adapter が同等 tool-call 経路を提供。
-    field_values: {"jsonrpc":"2.0","id":4,"result":{"tools":[{"name":"get_weather"}]}}
-    related_node_ids: [MCPResultResponse, MCPResponse]
-    related_relation_ids: [MCPResultResponse-is_a-MCPResponse]
-
-    source_claims: [mcp-result-response-json-rpc]
-  - id: mcp-result-response-counterexample-error-member
-
-    labels: {zh: 误标为成功的错误响应, en: Error response mislabeled as success, ja: 成功と誤分類されたerrorレスポンス}
-
+      zh: tools/list 请求 id=41 后，服务器以 id=41 返回 `result:{tools:[...]}`。
+      en: After tools/list request id=41, the server returns id=41 with result containing tools.
+      ja: tools/list request id=41 後 server が同 id と tools result を返します。
+    field_values:
+      message_record_id: mcp-message:tools-list-result:41
+      session_id: mcp-session-s-42
+      jsonrpc: "2.0"
+      message_kind: result-response
+      response_member: result
+      request_id: 41
+      result:
+        tools:
+          - name: read_file
+            inputSchema:
+              type: object
+              properties:
+                path:
+                  type: string
+              required:
+                - path
+    related_node_ids:
+      - MCPResultResponse
+    related_relation_ids: []
+    expected_result:
+      zh: 归为 MCPResultResponse，并与请求 41 关联。
+      en: Classify MCPResultResponse and correlate it with request 41.
+      ja: MCPResultResponse として request 41 に対応させます。
+    why_valid_or_invalid:
+      zh: 同一 id 与 result/error 互斥条件都满足。
+      en: The same-ID and result/error exclusivity conditions are both satisfied.
+      ja: same-ID と result/error exclusivity を満たします。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-mcp-result-response-001
+  - id: MCPResultResponse-example-boundary-001
+    kind: boundary
+    labels:
+      zh: MCP 结果响应边界例
+      en: Boundary MCP result response case
+      ja: MCP 結果応答の境界例
+    scenario_id: null
     descriptions:
-      zh: 反例：initialize 前 tools/call；混合 MCP JSON-RPC id 与 Anthropic tool_use_id；arguments 违反 inputSchema required 字段。
-      en: Counterexample: tools/call before initialize; mixing MCP JSON-RPC id with Anthropic tool_use_id; arguments violate inputSchema required fields.
-      ja: 反例：initialize 前 tools/call。MCP JSON-RPC id と Anthropic tool_use_id 混同。inputSchema required 違反。
-    field_values: {"jsonrpc":"2.0","id":4}
-    related_node_ids: [MCPResultResponse, MCPErrorResponse]
-    related_relation_ids: [MCPResultResponse-is_a-MCPResponse]
-
-    source_claims: [mcp-result-response-json-rpc]
-  - id: mcp-result-response-boundary-tool-is-error
-
-    labels: {zh: JSON-RPC 成功与工具层错误的边界, en: Boundary between JSON-RPC success and tool-level error, ja: JSON-RPC成功とtool層errorの境界}
-
-    descriptions:
-      zh: MCP wire JSON-RPC 封包 vs ReAct 文本 Action vs Anthropic tool_use 的结构化载荷边界；MCP 是传输层非唯一工具范式。
-      en: Boundary among MCP wire JSON-RPC envelope, ReAct text Action, Anthropic tool_use structured payload; MCP is transport layer not sole tool paradigm.
-      ja: MCP wire JSON-RPC envelope、ReAct テキスト Action、Anthropic tool_use structured payload の境界。MCP は transport 層であり唯一の tool パラダイムではない。
-    field_values: {"jsonrpc":"2.0","id":2,"result":{"content":[],"isError":true}}
-    related_node_ids: [MCPResultResponse, MCPToolCallRequest]
-    related_relation_ids: [MCPResultResponse-is_a-MCPResponse]
-
-    source_claims: [mcp-result-response-json-rpc, mcp-tools-result]
-  - id: mcp-result-response-instance-tools-list-4
-
-    labels: {zh: tools/list 成功响应实例, en: tools/list success response instance, ja: tools/list成功レスポンスインスタンス}
-
-    descriptions:
-      zh: MCP Inspector 调试 server-filesystem：initialize→tools/list→tools/call read_file path=/README.md 返回 content text block。
-      en: MCP Inspector debugging server-filesystem: initialize→tools/list→tools/call read_file path=/README.md returns content text block.
-      ja: MCP Inspector が server-filesystem をデバッグ：initialize→tools/list→tools/call read_file。
-    field_values: {"jsonrpc":"2.0","id":4,"result":{"tools":[{"name":"get_weather"}]}}
-    related_node_ids: [MCPResultResponse, MCPResponse]
-    related_relation_ids: [MCPResultResponse-is_a-MCPResponse]
-
-    source_claims: [mcp-result-response-json-rpc]
+      zh: tools/call 的外层 result 含 `isError:true`。
+      en: A tools/call outer result contains isError=true.
+      ja: tools/call outer result が isError=true を含みます。
+    field_values: {}
+    related_node_ids:
+      - MCPResultResponse
+    related_relation_ids: []
+    expected_result:
+      zh: 外层仍归 MCPResultResponse；内层形成工具失败信息。
+      en: Keep the outer message as MCPResultResponse; model the inner value as tool failure information.
+      ja: outer message は MCPResultResponse のまま、inner value を tool failure 情報とします。
+    why_valid_or_invalid:
+      zh: CallToolResult.isError 不改变 JSON-RPC result 分支。
+      en: CallToolResult.isError does not change the JSON-RPC result branch.
+      ja: CallToolResult.isError は JSON-RPC result branch を変更しません。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-mcp-result-response-001
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation:
+  - sibling_concept_id: MCPErrorResponse
+    shared_parent_concept_id: MCPResponse
+    differentia:
+      zh: MCPResultResponse 与 MCPErrorResponse 同属 MCPResponse；MCPResultResponse 只带 result 并表示 JSON-RPC 成功；MCPErrorResponse 只带 error 且必须包含错误 code 与 message。
+      en: MCPResultResponse and MCPErrorResponse share MCPResponse; MCPResultResponse carries only result and records JSON-RPC success, whereas MCPErrorResponse carries only error with a required code and message.
+      ja: MCPResultResponse と MCPErrorResponse は MCPResponse を共有し、MCPResultResponse は result のみで JSON-RPC success、MCPErrorResponse は required code/message を持つ error のみです。
+    source_claims:
+      - claim-mcp-result-response-009
 parent_relation:
   id: MCPResultResponse-is_a-MCPResponse
   predicate: is_a
-  target: concept:MCPResponse
-  endpoint_order: child-to-parent
-  direction: source-to-target
+  direction: target-to-source
   relation_kind: hierarchy
-  labels: {zh: 是成功响应, en: is a success response, ja: 成功レスポンスである}
-  definition:
-    zh: MCPResultResponse 是具有 result、没有 JSON-RPC error 的 MCPResponse。
-    en: An MCPResultResponse is an MCPResponse with result and no JSON-RPC error.
-    ja: MCPResultResponseはresultを持ちJSON-RPC errorを持たないMCPResponseである。
-  cardinality:
-    source: {min: 0, max: null}
-    target: {min: 1, max: 1}
-  cardinality_not_applicable_reason: null
+  labels:
+    zh: MCPResultResponse是一种MCPResponse
+    en: MCPResultResponse is a MCPResponse
+    ja: MCPResultResponseがMCPResponseを一種である
+  definitions:
+    zh: MCPResultResponse 是 MCPResponse 的严格子型；其必要身份差异是：MCP 结果响应是一种 MCP 响应（MCPResponse），以与请求相同的 RequestId 返回必需的 `result` 对象且不含 `error`；它表示 JSON-RPC 层成功完成，但内部 CallToolResult 仍可用 `isError=true` 报告工具级失败。
+    en: "MCPResultResponse is a strict subtype of MCPResponse; its necessary identity differentia is: An MCP result response is an MCPResponse that uses the request's RequestId, contains the required result object, and contains no error. It records JSON-RPC-level success even when an inner CallToolResult reports a tool-level failure with isError=true."
+    ja: MCPResultResponse は MCPResponse の strict subtype であり、必要な identity differentia は次の通りです：MCP result response は MCPResponse の一種で request と同じ RequestId、必須 result object、error 無しを満たします。JSON-RPC success を表しますが inner CallToolResult は isError=true で tool-level failure を報告できます。
+  cardinality: null
+  cardinality_not_applicable_reason:
+    zh: 该边记录满足协议前提的可查询事实；规范没有为所有实现规定一项统一本体基数。
+    en: The edge records a queryable fact when its protocol preconditions hold; the specification does not impose one ontology cardinality across all implementations.
+    ja: protocol prerequisite 成立時の照会可能 fact を記録し、specification は全 implementation に単一 ontology cardinality を課しません。
   inverse_reading:
-    predicate: has_success_response
-    labels: {zh: 具有成功响应, en: has success response, ja: 成功レスポンスを持つ}
+    predicate: part_of
+    labels:
+      zh: MCPResponse反向关联MCPResultResponse
+      en: MCPResponse is the inverse target of MCPResultResponse
+      ja: MCPResponseからMCPResultResponseへの逆読解
   conditions: []
-  temporal_scope: session
-  boundary_context: 不包括 error response，也不把 method result 内的 isError 当作 JSON-RPC error。
-  constraints:
-    - id: result-response-discriminator
-      severity: error
-      expression_language: plain
-      expression: An MCPResultResponse has result and no JSON-RPC error member.
-      explanation:
-        zh: MCPResultResponse 有 result 且没有 JSON-RPC error 成员。
-        en: An MCPResultResponse has result and no JSON-RPC error member.
-        ja: MCPResultResponseはresultを持ちJSON-RPC errorメンバーを持たない。
-      source_claims: [mcp-result-response-json-rpc]
-  examples: []
-  source_claims: [moonweave-mcp-result-response-taxonomy]
+  temporal_scope: timeless
+  boundary_context: null
+  constraints: []
+  examples:
+    - id: MCPResultResponse-is_a-MCPResponse-example-positive-001
+      kind: positive
+      labels:
+        zh: MCPResultResponse-is_a-MCPResponse 正例
+        en: Positive case for MCPResultResponse-is_a-MCPResponse
+        ja: MCPResultResponse-is_a-MCPResponse の正例
+      scenario_id: null
+      descriptions:
+        zh: tools/list 请求 id=41 后，服务器以 id=41 返回 `result:{tools:[...]}`。
+        en: After tools/list request id=41, the server returns id=41 with result containing tools.
+        ja: tools/list request id=41 後 server が同 id と tools result を返します。
+      field_values: {}
+      related_node_ids:
+        - MCPResultResponse
+        - MCPResponse
+      related_relation_ids:
+        - MCPResultResponse-is_a-MCPResponse
+      expected_result:
+        zh: 建立 MCPResultResponse-is_a-MCPResponse，并保留所述协议方向与条件。
+        en: Assert MCPResultResponse-is_a-MCPResponse with the stated protocol direction and conditions.
+        ja: MCPResultResponse-is_a-MCPResponse を stated protocol direction/condition 付きで確立します。
+      why_valid_or_invalid:
+        zh: 仅当对象满足 MCPResultResponse 的全部身份条件时，才能沿 is_a 归入 MCPResponse。
+        en: Assert the subtype edge only when the object satisfies every identity condition of MCPResultResponse.
+        ja: object が MCPResultResponse の全 identity condition を満たす時だけ is_a edge を確立します。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-mcp-result-response-010
+    - id: MCPResultResponse-is_a-MCPResponse-example-boundary-001
+      kind: boundary
+      labels:
+        zh: MCPResultResponse-is_a-MCPResponse 边界例
+        en: Boundary case for MCPResultResponse-is_a-MCPResponse
+        ja: MCPResultResponse-is_a-MCPResponse の境界例
+      scenario_id: null
+      descriptions:
+        zh: tools/call 的外层 result 含 `isError:true`。
+        en: A tools/call outer result contains isError=true.
+        ja: tools/call outer result が isError=true を含みます。
+      field_values: {}
+      related_node_ids:
+        - MCPResultResponse
+        - MCPResponse
+      related_relation_ids:
+        - MCPResultResponse-is_a-MCPResponse
+      expected_result:
+        zh: 不得建立 MCPResultResponse-is_a-MCPResponse；保留实际出现的较宽或相邻事实。
+        en: Do not assert MCPResultResponse-is_a-MCPResponse; retain the broader or adjacent fact actually present.
+        ja: MCPResultResponse-is_a-MCPResponse を確立せず、実際の broader/adjacent fact を保持します。
+      why_valid_or_invalid:
+        zh: MCPResultResponse 的边界例缺少该子型所需的 method、方向、载荷或状态，不能凭共享词汇归入该子型。
+        en: The MCPResultResponse boundary case lacks the method, direction, payload, or state required by the subtype and cannot be classified through shared vocabulary.
+        ja: MCPResultResponse boundary case は subtype に必要な method・direction・payload・state を欠き、shared vocabulary だけで分類できません。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-mcp-result-response-010
+  source_claims:
+    - claim-mcp-result-response-010
   distinct_fact_rationale:
-    zh: 此子类由 JSON-RPC result/error 区分，而非 result payload 的应用语义。
-    en: This subtype is distinguished by JSON-RPC result/error, not application semantics of the result payload.
-    ja: この下位型はresult payloadのアプリケーション意味ではなくJSON-RPC result/errorで区別される。
+    zh: MCPResultResponse-is_a-MCPResponse 只在其方法、方向、载荷或类型条件成立时记录；它不等于端点共现、反向捷径或词形相似。
+    en: MCPResultResponse-is_a-MCPResponse records only the reviewed method, direction, payload, or subtype condition; it is not endpoint co-occurrence, a redundant inverse shortcut, or lexical similarity.
+    ja: MCPResultResponse-is_a-MCPResponse は reviewed method・direction・payload・subtype condition のみを記録し、endpoint 共起・redundant inverse shortcut・lexical similarity ではありません。
+  layout_role: primary-backbone
+  review_status: accepted
+  endpoint_order: child-to-parent
 relations: []
-sources:
-  - id: json-rpc-2-0
-    title: JSON-RPC 2.0 Specification
-    url: https://www.jsonrpc.org/specification
-    source_type: official-specification
-    locator: "Response object"
-    relevance: Defines successful result response shape and exclusion of error.
-  - id: mcp-tools-2025-11-25
-    title: Model Context Protocol Specification — Tools
-    url: https://modelcontextprotocol.io/specification/2025-11-25/server/tools
-    source_type: official-specification
-    locator: "Calling Tools; Tool Result"
-    relevance: Defines tool result content and isError inside a successful JSON-RPC result.
-  - id: mcp-lifecycle-2025-11-25
-    title: Model Context Protocol Specification — Lifecycle
-    url: https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
-    source_type: official-specification
-    locator: "Operation; Timeouts"
-    relevance: Defines request operations and response waiting within an MCP session, including timeout expectations.
+review:
+  status: accepted
+  method: manual-mcp-spec-verification
+  reviewer: manual-mcp-spec-verification
+  reviewed_on: 2026-07-17
+  note:
+    zh: 已对照 MCP 2025-11-25 规范（生命周期、传输、授权、能力协商、JSON-RPC 消息、资源订阅）完成人工语义核验。
+    en: Manually verified against MCP 2025-11-25 (lifecycle, transports, authorization, capability negotiation, JSON-RPC messages, resource subscriptions).
+    ja: MCP 2025-11-25 仕様（ライフサイクル、トランスポート、認可、能力協議、JSON-RPC メッセージ、リソース購読）に照らして手動意味審査を完了しました。
+  sections:
+    semantics: accepted
+    hierarchy: accepted
+    relations: accepted
+    structure: accepted
+    examples: accepted
+    source_claims: accepted
 source_claims:
-  - id: mcp-result-response-json-rpc
-    source: json-rpc-2-0
-    supports: A JSON-RPC success response uses request id and result while error is absent.
-    locator: "Response object"
-    evidence_kind: normative
-    confidence: high
-  - id: moonweave-mcp-result-response-taxonomy
-    source: json-rpc-2-0
-    supports: "Moonweave classifies a successful JSON-RPC response used by MCP as an MCPResponse for navigation; this subclass edge is a taxonomy design inference."
-    locator: "5 Response Object"
+  - id: claim-mcp-result-response-001
+    source: eng-proto-mcp-2025-spec
+    supports: MCP 2025-11-25 defines the base protocol as JSON-RPC request, result-response, error-response, and notification records; it also fixes request-ID uniqueness within a session and separates lifecycle, capability negotiation, transport, authorization, server features, and client features.
+    locator: MCP 2025-11-25 > Base Protocol > Overview > Messages and Lifecycle
     evidence_kind: design-inference
     confidence: high
-  - id: mcp-result-response-session
-    source: mcp-lifecycle-2025-11-25
-    supports: An MCP request operation and its response wait occur within a stateful session and are bounded by timeout expectations.
-    locator: "Operation; Timeouts"
+    review_status: accepted
+  - id: claim-mcp-result-response-002
+    source: eng-proto-mcp-2025-spec
+    supports: MCP result responses follow JSON-RPC 2.0 and contain a result member mutually exclusive with error.
+    locator: MCP 2025-11-25 > Base Protocol > Messages > Responses
     evidence_kind: normative
     confidence: high
-  - id: mcp-tools-result
-    source: mcp-tools-2025-11-25
-    supports: A ToolResult includes content and isError and is returned as the result of tools/call.
-    locator: "Calling Tools; Tool Result"
+    review_status: accepted
+  - id: claim-mcp-result-response-003
+    source: eng-proto-mcp-2025-spec
+    supports: MCP defines accept as the elicitation result action used when requested input is submitted.
+    locator: MCP 2025-11-25 > Client Features > Elicitation > ElicitResult > action
+    evidence_kind: official
+    confidence: high
+    review_status: accepted
+  - id: claim-mcp-result-response-004
+    source: eng-proto-mcp-2025-spec
+    supports: MCP defines decline as an elicitation result action distinct from accepting or cancelling.
+    locator: MCP 2025-11-25 > Client Features > Elicitation > ElicitResult > action
+    evidence_kind: official
+    confidence: high
+    review_status: accepted
+  - id: claim-mcp-result-response-005
+    source: eng-proto-mcp-2025-spec
+    supports: MCP defines cancel as a separate elicitation result action.
+    locator: MCP 2025-11-25 > Client Features > Elicitation > ElicitResult > action
+    evidence_kind: official
+    confidence: high
+    review_status: accepted
+  - id: claim-mcp-result-response-006
+    source: eng-proto-mcp-elicitation
+    supports: MCP 2025-11-25 ElicitResult requires an action of accept, decline, or cancel and defines content separately as an optional field.
+    locator: MCP 2025-11-25 > Client Features > Elicitation > ElicitResult
     evidence_kind: normative
     confidence: high
+    review_status: accepted
+  - id: claim-mcp-result-response-007
+    source: eng-proto-mcp-elicitation
+    supports: MCP 2025-11-25 defines ElicitResult.content as an optional property map that is returned only for accepted form elicitation and must conform to the requested schema.
+    locator: MCP 2025-11-25 > Client Features > Elicitation > ElicitResult and Form Elicitation
+    evidence_kind: normative
+    confidence: high
+    review_status: accepted
+  - id: claim-mcp-result-response-008
+    source: eng-proto-mcp-2025-spec
+    supports: MCP result responses repeat the corresponding request ID, require result, and exclude the error member.
+    locator: MCP 2025-11-25 > Base Protocol > Overview > Result Responses
+    evidence_kind: normative
+    confidence: high
+    review_status: accepted
+  - id: claim-mcp-result-response-009
+    source: eng-proto-mcp-2025-spec
+    supports: "Sibling evidence scope: MCPResultResponse and MCPErrorResponse are compared only under MCPResponse. MCP 2025-11-25 defines the base protocol as JSON-RPC request, result-response, error-response, and notification records; it also fixes request-ID uniqueness within a session and separates lifecycle, capability negotiation, transport, authorization, server features, and client features."
+    locator: MCP 2025-11-25 > Base Protocol > Overview > Messages and Lifecycle
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-mcp-result-response-010
+    source: eng-proto-mcp-2025-spec
+    supports: "MCP 2025-11-25 defines the base protocol as JSON-RPC request, result-response, error-response, and notification records; it also fixes request-ID uniqueness within a session and separates lifecycle, capability negotiation, transport, authorization, server features, and client features. For this reviewed edge, the operational reading is: MCPResultResponse is a strict subtype of MCPResponse; its necessary identity differentia is: An MCP result response is an MCPResponse that uses the request's RequestId, contains the required result object, and contains no error. It records JSON-RPC-level success even when an inner CallToolResult reports a tool-level failure with isError=true."
+    locator: MCP 2025-11-25 > Base Protocol > Overview > Messages and Lifecycle
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted

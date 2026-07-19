@@ -1,287 +1,1028 @@
 schema: moonweave.ai/ontology-node/v1
 id: ToolCallAttempt
 kind: concept
+status: accepted
 labels:
   zh: 工具调用尝试
-  en: Tool-call attempt
+  en: Tool Call Attempt
   ja: ツール呼び出し試行
 semantics:
   short_definition:
-    zh: 专门派发一个工具调用的 InvocationAttempt 子类。
-    en: An InvocationAttempt subtype specifically dispatching one tool call.
-    ja: 一つのツール呼び出しを配信する InvocationAttempt の下位型。
+    zh: 工具调用尝试是某次 ToolCall 交给具体工具执行器的一次独立执行。
+    en: A Tool Call Attempt is one independent execution of a ToolCall by a concrete tool executor.
+    ja: ツール呼び出し試行は一 ToolCall を具体 tool executor が実行する一回の独立実行です。
   definition:
-    zh: >-
-      ToolCallAttempt 是目标为 ToolCall 的本地 InvocationAttempt。它记录本地尝试和用于发送调用的适配器表面；它不是 MCP tools/call 请求、OpenAI function_call item 或 Responses mcp_call item，这些原生记录可从底层尝试引用。它是实际子类，因为每个 ToolCallAttempt 都是目标为工具调用的 InvocationAttempt。
-    en: >
-      A ToolCallAttempt is a local InvocationAttempt whose target is a ToolCall. It records the local
-      attempt and the adapter surface used to send the call. It is not the MCP tools/call request, the
-      OpenAI function_call item, or a Responses mcp_call item; those native records can be referenced
-      from the underlying attempt. It is a true subtype because every ToolCallAttempt remains an
-      InvocationAttempt with the additional invariant that its target is a tool call.
-    ja: >-
-      ToolCallAttempt は対象が ToolCall であるローカル InvocationAttempt である。ローカル attempt と呼び出し送信に使う adapter surface を記録する。MCP tools/call 要求、OpenAI function_call item、Responses mcp_call item そのものではなく、これらのネイティブ記録は基礎 attempt から参照できる。各 ToolCallAttempt は tool call を対象とする InvocationAttempt なので真の subtype である。
+    zh: 工具调用尝试是一种 InvocationAttempt，沿用 RunAttempt 的 activity_id、尝试序号与时间状态，并以执行一个确定 ToolCall 的执行器为种差；每次重试都是新的工具调用尝试，并通过 retries 指向先前尝试。授权、沙箱和幂等信息描述本次执行环境，但 ToolResult、ToolError 与 RunOutcome 仍保持独立身份。
+    en: A Tool Call Attempt is an InvocationAttempt that retains the inherited RunAttempt activity_id, attempt number, and temporal state. Its differentia is execution of one definite ToolCall by one executor. Every retry is a new Tool Call Attempt linked to the prior attempt by retries. Authorization, sandbox, and idempotency data describe this execution context while ToolResult, ToolError, and RunOutcome retain separate identities.
+    ja: ツール呼び出し試行は InvocationAttempt の一種で、RunAttempt の activity_id・attempt number・temporal state を継承し、一つの definite ToolCall を実行する executor を種差とします。retry ごとに新 Tool Call Attempt を作り retries で prior attempt を指します。authorization・sandbox・idempotency data は execution context を記述し ToolResult・ToolError・RunOutcome は separate identity を保持します。
   why_needed:
-    zh: >-
-      工具调用通常需要表面特定的派发、校验和重试证据。将此尝试类型与 ToolCall 区分，防止把计划或已发出的调用混同为主机的单次投递尝试。
-    en: >
-      Tool calls often need surface-specific dispatch, validation, and retry evidence. Distinguishing
-      this attempt type from ToolCall prevents a planned or emitted call from being confused with the
-      host's individual delivery attempt.
-    ja: >-
-      ツール呼び出しにはしばしば表面固有の配信、検証、再試行証拠が必要である。この attempt type を ToolCall と区別することで、予定または発行済みの call をホストの個別 delivery attempt と混同しない。
+    zh: 工具专用尝试承载每次执行的超时、授权、沙箱和工具错误，又不会把这些运行事实写回 ToolCall 或稳定定义。
+    en: The tool-specific attempt carries per-execution timeout, authorization, sandbox, and tool-error facts without writing them back into ToolCall or the stable definition.
+    ja: tool-specific attempt が per-execution timeout・authorization・sandbox・tool-error fact を持ち ToolCall/stable definition へ書戻しません。
   includes:
-    - {zh: 对尝试和工具调用的本地引用, en: Local references to the attempt and tool call, ja: 試行とツール呼び出しへのローカル参照}
-    - {zh: 本地适配器表面和派发状态, en: Local adapter surface and dispatch state, ja: ローカルアダプター表面と配信状態}
+    - zh: 纳入已经启动并关联一个 ToolCall、执行器与尝试序号的实际工具执行。
+      en: Includes actual tool executions that have started and reference one ToolCall, executor, and attempt number.
+      ja: 開始済みで一 ToolCall・executor・attempt number を参照する actual tool execution を含みます。
   excludes:
-    - {zh: 工具调用的原生请求字段或工具结果, en: Native request fields of the tool call or the tool result, ja: ツール呼び出しのネイティブ要求項目またはツール結果}
+    - zh: 排除 ToolCall 本身、重试策略、等待批准的请求、ToolResult 和通用 RunOutcome。
+      en: Excludes the ToolCall itself, retry policy, approval-pending request, ToolResult, and generic RunOutcome.
+      ja: ToolCall 自体・retry policy・approval-pending request・ToolResult・generic RunOutcome を除きます。
   semantic_kind: activity
-  aliases:
-    - {language: en, value: tool dispatch attempt, alias_kind: synonym}
-engineering:
-  explanation:
-    zh: >-
-      适配器校验本地 ToolCall 投影并创建其协议原生交换。MCP 派发创建带 name 和可选 arguments 的 tools/call，Responses 函数派发处理 function_call item 并返回 function_call_output，远程 MCP 派发通过 mcp_call output item 观察；该记录只记录围绕交换的主机尝试。
-    en: >
-      The adapter validates the local ToolCall projection and creates its protocol-native exchange.
-      MCP dispatch creates tools/call with name and optional arguments; Responses function dispatch
-      handles a function_call item and returns function_call_output; remote MCP dispatch is observed
-      through an mcp_call output item. This record only records the host attempt around that exchange.
-    ja: >-
-      adapter はローカル ToolCall projection を検証して protocol-native exchange を作る。MCP 配信は name と任意 arguments を持つ tools/call を作り、Responses function 配信は function_call item を扱って function_call_output を返し、remote MCP 配信は mcp_call output item を通じて観測される。この記録は exchange 周辺の host attempt だけを記録する。
-  typical_input:
-    - description: First local attempt to send an MCP tool call.
-      format: '{"local_tool_call_attempt_id":"tool-attempt-1","local_tool_call_ref":"tool-call-42","local_adapter_surface":"mcp_tools_call","local_dispatch_state":"sent"}'
-      source_claims: [moonweave-tool-call-attempt]
-  typical_output:
-    - description: Native wire evidence remains referenced rather than copied into local fields.
-      format: '{"local_tool_call_attempt_id":"tool-attempt-1","local_native_exchange_ref":"mcp-session-42#id-2"}'
-      source_claims: [moonweave-tool-call-attempt]
-  reference_implementations:
-    - name: MCP Tools specification
-      url: https://modelcontextprotocol.io/specification/2025-11-25/server/tools
-      description: Defines native tools/call request and error boundaries.
-    - name: OpenAI Function Calling guide
-      url: https://developers.openai.com/api/docs/guides/function-calling
-      description: Defines function_call and function_call_output flow.
+  aliases: []
 structure:
-  identity_keys: [local_tool_call_attempt_id]
+  identity_keys: []
   fields:
-    - id: local_tool_call_attempt_id
-      labels: {zh: 工具调用尝试标识, en: Tool-call attempt ID, ja: ツール呼び出し試行 ID}
-      definitions: {zh: 主机分配给该工具派发尝试的标识, en: The host-assigned identifier for this tool-dispatch attempt, ja: このツール配信試行に対するホスト割当て識別子}
+    - id: tool_call_ref
+      labels:
+        zh: 工具调用引用
+        en: tool-call reference
+        ja: tool call 参照
       datatype: string
       required: true
-      cardinality: {min: 1, max: 1}
-      pattern: null
-      example_value: tool-attempt-1
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 指向跨所有重试保持不变的 ToolCall。
+        en: References the ToolCall that remains stable across retries.
+        ja: retry 間で不変の ToolCall を参照します。
       allowed_values: []
-      source_claims: [moonweave-tool-call-attempt]
-    - id: local_tool_call_ref
-      labels: {zh: 工具调用引用, en: Tool-call reference, ja: ツール呼び出し参照}
-      definitions: {zh: 被该尝试派发的本地 ToolCall 引用, en: The local ToolCall reference dispatched by this attempt, ja: この試行が配信するローカル ToolCall 参照}
+      pattern: null
+      example_value: call_weather_0042
+      source_claims:
+        - claim-tool-call-attempt-005
+        - claim-tool-call-attempt-006
+        - claim-tool-call-attempt-007
+        - claim-tool-call-attempt-008
+    - id: executor_ref
+      labels:
+        zh: 工具执行器引用
+        en: tool-executor reference
+        ja: tool executor 参照
       datatype: string
       required: true
-      cardinality: {min: 1, max: 1}
-      pattern: null
-      example_value: tool-call-42
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 标识实际承接这次工具执行的执行器或服务端。
+        en: Identifies the executor or server performing this tool execution.
+        ja: tool execution を行う executor/server を識別します。
       allowed_values: []
-      source_claims: [moonweave-tool-call-attempt]
-    - id: local_adapter_surface
-      labels: {zh: 本地适配器表面, en: Local adapter surface, ja: ローカルアダプター表面}
-      definitions: {zh: 主机派发该调用所用的来源适配器分类, en: The source-adapter classification the host uses to dispatch this call, ja: この呼び出しの配信にホストが使うソースアダプター分類}
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
       pattern: null
-      example_value: mcp_tools_call
-      allowed_values: [mcp_tools_call, openai_responses_function, openai_responses_remote_mcp]
-      source_claims: [moonweave-tool-call-attempt]
-    - id: local_dispatch_state
-      labels: {zh: 本地派发状态, en: Local dispatch state, ja: ローカル配信状態}
-      definitions: {zh: 主机对本次发送动作的局部状态，不表示远端执行成功, en: The host state of this send action and not proof of remote execution success, ja: この送信動作に対するホスト状態でありリモート実行成功の証明ではない}
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      pattern: null
-      example_value: sent
-      allowed_values: [prepared, sent, blocked, failed]
-      source_claims: [moonweave-tool-call-attempt]
-    - id: local_native_exchange_ref
-      labels: {zh: 原生交换引用, en: Native exchange reference, ja: ネイティブ交換参照}
-      definitions: {zh: 对该尝试创建或观察到的原生协议记录引用, en: A reference to the native protocol record created or observed for this attempt, ja: この試行で作成または観測したネイティブプロトコル記録への参照}
+      example_value: executor:mcp-weather-prod
+      source_claims:
+        - claim-tool-call-attempt-009
+        - claim-tool-call-attempt-010
+        - claim-tool-call-attempt-011
+        - claim-tool-call-attempt-012
+    - id: authorization_ref
+      labels:
+        zh: 授权引用
+        en: authorization reference
+        ja: 認可参照
       datatype: string
       required: false
-      cardinality: {min: 0, max: 1}
-      pattern: null
-      example_value: mcp-session-42#id-2
+      cardinality:
+        min: 0
+        max: 1
+      definitions:
+        zh: 引用本次尝试实际依据的授权或审批记录。
+        en: References the authorization or approval actually governing this attempt.
+        ja: この attempt を統制した authorization/approval record を参照します。
       allowed_values: []
-      source_claims: [moonweave-tool-call-attempt]
-    - id: local_attempt_id
-      labels: {zh: 本地尝试标识, en: Local attempt ID, ja: ローカル試行 ID}
-      definitions: {zh: 主机分配给一次执行尝试的标识, en: A host-assigned identifier for one execution attempt, ja: 一回の実行試行に対するホスト割当て識別子}
+      pattern: null
+      example_value: approval:weather-read
+      source_claims:
+        - claim-tool-call-attempt-013
+        - claim-tool-call-attempt-014
+        - claim-tool-call-attempt-015
+        - claim-tool-call-attempt-016
+    - id: sandbox_ref
+      labels:
+        zh: 沙箱引用
+        en: sandbox reference
+        ja: sandbox 参照
       datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      pattern: null
-      example_value: attempt-42-1
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      definitions:
+        zh: 引用隔离本次执行的沙箱配置。
+        en: References the sandbox configuration isolating this execution.
+        ja: execution を隔離する sandbox configuration を参照します。
       allowed_values: []
-      source_claims: [moonweave-tool-call-attempt]
-    - id: local_invocation_ref
-      labels: {zh: 调用引用, en: Invocation reference, ja: 呼び出し参照}
-      definitions: {zh: 包含该尝试的本地调用, en: The local invocation that contains this attempt, ja: この試行を含むローカル呼び出し}
+      pattern: null
+      example_value: sandbox:network-readonly
+      source_claims:
+        - claim-tool-call-attempt-017
+        - claim-tool-call-attempt-018
+        - claim-tool-call-attempt-019
+        - claim-tool-call-attempt-020
+    - id: idempotency_key
+      labels:
+        zh: 幂等键
+        en: idempotency key
+        ja: idempotency key
       datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      pattern: null
-      example_value: inv-42
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      definitions:
+        zh: 记录本次尝试实际使用的幂等键，使传输重放可与产生新外部效果的再次执行区分。
+        en: Records the idempotency key actually used by this attempt so transport replay can be distinguished from a re-execution that may create a new external effect.
+        ja: この attempt が実際に用いた idempotency key を記録し、transport replay と新 external effect を生み得る再実行を区別します。
       allowed_values: []
-      source_claims: [moonweave-tool-call-attempt]
-    - id: attempt_index
-      labels: {zh: 尝试序号, en: Attempt index, ja: 試行番号}
-      definitions: {zh: 同一调用中的从一开始的尝试序号, en: One-based ordinal of the attempt within the same invocation, ja: 同じ呼び出し内で一から始まる試行順序}
-      datatype: integer
-      required: true
-      cardinality: {min: 1, max: 1}
       pattern: null
-      example_value: 1
-      allowed_values: []
-      source_claims: [moonweave-tool-call-attempt]
-    - id: local_outcome
-      labels: {zh: 本地尝试结果, en: Local attempt outcome, ja: ローカル試行結果}
-      definitions: {zh: 主机对尝试状态的本地判断，不取代协议错误或远程任务状态, en: "A host's local disposition of the attempt, not a replacement for protocol error or remote task state", ja: ホストによるローカル試行の判断でありプロトコルエラーやリモートタスク状態の置換ではない}
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      pattern: null
-      example_value: running
-      allowed_values: [running, succeeded, failed, timed_out, cancelled]
-      source_claims: [moonweave-tool-call-attempt]
-  constraints:
-    - id: tool-call-attempt-references-tool-call
-      severity: error
-      expression_language: plain
-      expression: "local_tool_call_ref identifies a ToolCall planned in the same local invocation context as this local_tool_call_attempt_id."
-      explanation: {zh: "local_tool_call_ref 标识与该同一记录子类型处于同一本地调用上下文的 ToolCall。", en: "The ToolCall reference is correlated with this same-record specialization's local invocation context.", ja: "local_tool_call_ref は、この同一レコードの下位型と同じローカル呼び出し文脈の ToolCall を識別する。"}
-      source_claims: [moonweave-tool-call-attempt]
-    - id: tool-call-attempt-sent-is-not-success
-      severity: error
-      expression_language: plain
-      expression: local_dispatch_state sent proves only host dispatch; success or failure is established by a correlated result or diagnostic.
-      explanation:
-        zh: local_dispatch_state 为 sent 仅证明主机派发；成功或失败须由关联结果或诊断确定。
-        en: local_dispatch_state sent proves only host dispatch; success or failure is established by a correlated result or diagnostic.
-        ja: local_dispatch_state sent はホスト配信のみを示し、成功または失敗は相関結果または診断で確定する。
-      source_claims: [mcp-tools-call-boundary, moonweave-tool-call-attempt]
-    - id: tool-call-attempt-id-same-record-parent-identity
-      severity: error
-      expression_language: plain
-      expression: "local_tool_call_attempt_id = local_attempt_id; both identify the same local InvocationAttempt record and inherited parent fields belong to that one record."
-      explanation: {zh: "local_tool_call_attempt_id 与 local_attempt_id 标识同一条本地 InvocationAttempt 记录，继承的父字段属于该同一记录。", en: "The child and parent IDs are equal representations of one local record, not a link to a second parent record.", ja: "local_tool_call_attempt_id と local_attempt_id は同じローカル InvocationAttempt レコードを識別し、継承した親フィールドはその一つのレコードに属する。"}
-      source_claims: [moonweave-tool-call-attempt]
-  required_relations: []
+      example_value: weather-0042
+      source_claims:
+        - claim-tool-call-attempt-021
+  constraints: []
+  required_relation_constraints: []
 examples:
-  - id: tool-call-attempt-positive-mcp-send
-
-    labels: {zh: MCP 工具派发, en: MCP tool dispatch, ja: MCP ツール配信}
-
+  - id: ToolCallAttempt-example-positive-manual-001
+    kind: positive
+    labels:
+      zh: 工具调用尝试正例
+      en: Tool Call Attempt positive case
+      ja: ツール呼び出し試行正例
+    scenario_id: null
     descriptions:
-      zh: "ReAct (Yao 2023) Action: Search[entity]/Lookup[term]/Finish[answer]；Anthropic content:[{type:\"tool_use\",id:\"toolu_01\",name:\"get_weather\",input:{location:\"Paris\"}}]；Vercel AI SDK generateText({tools:{weather:tool({execute:async({city})=>...)}})。"
-      en: "ReAct (Yao 2023) Action: Search[entity]/Lookup[term]/Finish[answer]; Anthropic content:[{type:\"tool_use\",id:\"toolu_01\",name:\"get_weather\",input:{location:\"Paris\"}}]; Vercel AI SDK generateText({tools:{weather:tool({execute:async({city})=>...)}})."
-      ja: "ReAct (Yao 2023) Action: Search[entity]/Lookup[term]/Finish[answer]。Anthropic tool_use。Vercel AI SDK generateText({tools:{weather:tool({execute:async({city})=>...)}})。"
-    field_values: {local_tool_call_attempt_id: tool-attempt-1, local_tool_call_ref: tool-call-42, local_adapter_surface: mcp_tools_call, local_dispatch_state: sent, local_native_exchange_ref: mcp-session-42#id-2}
-    related_node_ids: [ToolCallAttempt, InvocationAttempt, ToolCall]
-    related_relation_ids: [ToolCallAttempt-is_a-InvocationAttempt]
-
-    source_claims: [mcp-tools-call-boundary, moonweave-tool-call-attempt]
-  - id: tool-call-attempt-counterexample-result-as-send
-
-    labels: {zh: 把结果当作派发, en: Result treated as dispatch, ja: 結果を配信として扱う}
-
+      zh: tool-attempt-0042-1 超时后保留失败记录；tool-attempt-0042-2 在同一 call_id 下使用新 attempt_id 并成功返回。
+      en: After tool-attempt-0042-1 times out, its failure record is preserved; tool-attempt-0042-2 uses a new attempt_id under the same call_id and succeeds.
+      ja: tool-attempt-0042-1 timeout 後 failure record を保持し tool-attempt-0042-2 が同一 call_id 下で新 attempt_id を使い成功します。
+    field_values:
+      activity_id: tool-attempt-0042-2
+      execution_kind: attempt
+      work_ref: invocation-weather-0042
+      invocation_ref: invocation-weather-0042
+      tool_call_ref: invocation-weather-0042
+      attempt_number: 2
+      executor_ref: executor:mcp-weather-prod
+      started_at: 2026-07-16T01:30:02Z
+      ended_at: 2026-07-16T01:30:03Z
+      lifecycle_state: succeeded
+      authorization_ref: approval:weather-read
+      sandbox_ref: sandbox:network-readonly
+      idempotency_key: weather-0042
+    related_node_ids:
+      - ToolCallAttempt
+      - InvocationAttempt
+      - ToolCall
+      - ToolResult
+    related_relation_ids:
+      - ToolCallAttempt-is_a-InvocationAttempt
+      - ToolCall-has_attempt-ToolCallAttempt
+      - ToolCallAttempt-retries-ToolCallAttempt
+      - ToolCallAttempt-produces_result-ToolResult
+    expected_result:
+      zh: 建立 ToolCallAttempt，并保留它与相邻规范、尝试或结果的独立身份。
+      en: Create ToolCallAttempt while preserving its identity from adjacent specifications, attempts, or results.
+      ja: ToolCallAttempt を作成し adjacent specification・attempt・result との separate identity を保持します。
+    why_valid_or_invalid:
+      zh: 纳入已经启动并关联一个 ToolCall、执行器与尝试序号的实际工具执行。
+      en: Includes actual tool executions that have started and reference one ToolCall, executor, and attempt number.
+      ja: 開始済みで一 ToolCall・executor・attempt number を参照する actual tool execution を含みます。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+    source_claims:
+      - claim-tool-call-attempt-022
+      - claim-tool-call-attempt-023
+      - claim-tool-call-attempt-024
+      - claim-tool-call-attempt-025
+  - id: ToolCallAttempt-example-boundary-manual-001
+    kind: boundary
+    labels:
+      zh: 工具调用尝试边界例
+      en: Tool Call Attempt boundary case
+      ja: ツール呼び出し試行境界例
+    scenario_id: null
     descriptions:
-      zh: 反例：ReAct Action 无对应 Observation 就继续推理；Anthropic tool_use 缺少配对 tool_result(tool_use_id)；Vercel AI SDK execute 抛错未捕获。
-      en: Counterexample: ReAct continues reasoning without Observation for Action; Anthropic tool_use missing paired tool_result(tool_use_id); Vercel AI SDK execute error uncaught.
-      ja: 反例：ReAct Action に Observation なしで reasoning 継続。Anthropic tool_use に tool_result ペア欠落。Vercel AI SDK execute エラー未捕捉。
-    field_values: {local_tool_call_attempt_id: tool-attempt-bad, local_tool_call_ref: tool-call-42, local_adapter_surface: mcp_tools_call, local_dispatch_state: "Current weather: 72 F"}
-    related_node_ids: [ToolCallAttempt, ToolResult]
-    related_relation_ids: [ToolCallAttempt-is_a-InvocationAttempt]
-
-    source_claims: [mcp-tools-call-boundary, moonweave-tool-call-attempt]
-  - id: tool-call-attempt-boundary-responses-item
-
-    labels: {zh: 本地尝试与 Responses item 边界, en: Local attempt versus Responses-item boundary, ja: ローカル試行と Responses item の境界}
-
-    descriptions:
-      zh: ReAct 文本 Action 标记 vs Anthropic structured tool_use vs Vercel AI SDK Zod schema tool 的 wire 契约边界；本地 Invocation 活动非原生封包。
-      en: Wire contract boundary among ReAct text Action markers, Anthropic structured tool_use, Vercel AI SDK Zod schema tools; local Invocation activity is not native envelope.
-      ja: ReAct テキスト Action marker、Anthropic structured tool_use、Vercel AI SDK Zod schema tool の wire 契約境界。ローカル Invocation 活動はネイティブ envelope ではない。
-    field_values: {local_tool_call_attempt_id: tool-attempt-fc, local_tool_call_ref: tool-call-fc, local_adapter_surface: openai_responses_function, local_dispatch_state: sent, local_native_exchange_ref: "responses:call_123"}
-    related_node_ids: [ToolCallAttempt, ToolCall, InvocationAttempt]
-    related_relation_ids: [ToolCallAttempt-is_a-InvocationAttempt]
-
-    source_claims: [openai-function-call-items, moonweave-tool-call-attempt]
-  - id: tool-call-attempt-instance-remote-mcp-blocked
-
-    labels: {zh: 远程 MCP 被阻止实例, en: Remote-MCP blocked instance, ja: リモート MCP ブロック済みインスタンス}
-
-    descriptions:
-      zh: ReAct HotpotQA 实例：Thought→Action: Search[Arthur's Magazine]→Observation→Action: Lookup[Arthur's Magazine]→Finish[1850]；Anthropic tool_use_id=toolu_01A09q90qw90 配对 tool_result。
-      en: ReAct HotpotQA instance: Thought→Action: Search[Arthur's Magazine]→Observation→Action: Lookup→Finish[1850]; Anthropic tool_use_id=toolu_01A09q90qw90 paired with tool_result.
-      ja: ReAct HotpotQA 実例：Thought→Action: Search→Observation→Lookup→Finish[1850]。Anthropic tool_use_id=toolu_01A09q90qw90 が tool_result とペア。
-    field_values: {local_tool_call_attempt_id: tool-attempt-mcp, local_tool_call_ref: tool-call-mcp, local_adapter_surface: openai_responses_remote_mcp, local_dispatch_state: blocked}
-    related_node_ids: [ToolCallAttempt, ToolCall]
-    related_relation_ids: [ToolCallAttempt-is_a-InvocationAttempt]
-
-    source_claims: [moonweave-tool-call-attempt]
+      zh: 批准界面展示一条待执行工具调用，但执行器尚未启动，也没有 started_at；此时只有请求与批准状态。
+      en: An approval UI shows a pending tool call, but no executor has started and started_at is absent; only request and approval state exist.
+      ja: approval UI に pending tool call が表示されても executor 未開始で started_at がなく request/approval state のみです。
+    field_values:
+      attempt_id: tool-attempt-0042-2
+    related_node_ids:
+      - ToolCallAttempt
+      - InvocationAttempt
+    related_relation_ids:
+      - ToolCallAttempt-is_a-InvocationAttempt
+    expected_result:
+      zh: 不建立 ToolCallAttempt；按边界例所示保留在更准确的概念中。
+      en: Do not create ToolCallAttempt; keep the record in the more accurate concept identified by the boundary.
+      ja: ToolCallAttempt を作らず boundary が示す accurate concept に保持します。
+    why_valid_or_invalid:
+      zh: 排除 ToolCall 本身、重试策略、等待批准的请求、ToolResult 和通用 RunOutcome。
+      en: Excludes the ToolCall itself, retry policy, approval-pending request, ToolResult, and generic RunOutcome.
+      ja: ToolCall 自体・retry policy・approval-pending request・ToolResult・generic RunOutcome を除きます。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+    source_claims:
+      - claim-tool-call-attempt-026
+      - claim-tool-call-attempt-027
+      - claim-tool-call-attempt-028
+      - claim-tool-call-attempt-029
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation: []
 parent_relation:
   id: ToolCallAttempt-is_a-InvocationAttempt
   predicate: is_a
-  target: concept:InvocationAttempt
-  endpoint_order: child-to-parent
-  direction: source-to-target
+  direction: target-to-source
   relation_kind: hierarchy
-  labels: {zh: 是调用尝试的一种, en: is an invocation-attempt subtype, ja: 呼び出し試行の下位型である}
-  definition: {zh: 每个 ToolCallAttempt 都是目标为 ToolCall 的 InvocationAttempt, en: Every ToolCallAttempt is an InvocationAttempt targeted at a ToolCall, ja: すべての ToolCallAttempt は ToolCall を対象とする InvocationAttempt である}
-  cardinality: {source: {min: 0, max: null}, target: {min: 1, max: 1}}
-  cardinality_not_applicable_reason: null
-  inverse_reading: {predicate: has_tool_call_attempt_subtype, labels: {zh: 具有工具调用尝试子类, en: has tool-call-attempt subtype, ja: ツール呼び出し試行下位型を持つ}}
+  labels:
+    zh: 属于
+    en: is a
+    ja: 一種である
+  definitions:
+    zh: ToolCallAttempt 继承 InvocationAttempt 的单次执行身份，并把所执行对象限定为 ToolCall。
+    en: ToolCallAttempt inherits InvocationAttempt's single-execution identity and restricts the executed object to a ToolCall.
+    ja: ToolCallAttempt は InvocationAttempt の single-execution identity を継承し executed object を ToolCall に限定します。
+  cardinality: null
+  cardinality_not_applicable_reason:
+    zh: 分类继承不使用实例关系基数。
+    en: Taxonomic inheritance does not use instance-relation cardinality.
+    ja: 分類継承には instance relation cardinality を使いません。
+  inverse_reading:
+    predicate: part_of
+    labels:
+      zh: 反向：是一种
+      en: has subtype
+      ja: 逆方向：の一種である
   conditions: []
-  temporal_scope: execution
-  boundary_context: This subtype specializes the attempt target; it does not assert a result, error, or provider-native message shape.
+  temporal_scope: timeless
+  boundary_context: null
   constraints: []
-  examples: []
-  source_claims: [moonweave-tool-call-attempt]
-  distinct_fact_rationale: Every ToolCallAttempt retains InvocationAttempt semantics and adds the ToolCall target invariant. It uses one same-record identity in which local_tool_call_attempt_id identifies the same local InvocationAttempt record, so a second InvocationAttempt reference field is not permitted.
-relations: []
-sources:
-  - id: mcp-tools-2025-11-25
-    title: Model Context Protocol Specification - Tools
-    url: https://modelcontextprotocol.io/specification/2025-11-25/server/tools
-    source_type: official-specification
-    locator: "Calling Tools; Error Handling"
-    relevance: Defines tools/call and distinct result/error outcomes.
-  - id: openai-responses-function-calling
-    title: OpenAI API - Function Calling
-    url: https://developers.openai.com/api/docs/guides/function-calling
-    source_type: official-documentation
-    locator: "Handling function calls; Execute function calls and append results"
-    relevance: Defines function_call and function_call_output items.
+  examples:
+    - id: ToolCallAttempt-is_a-InvocationAttempt-example-positive-manual-001
+      kind: positive
+      labels:
+        zh: ToolCallAttempt-is_a-InvocationAttempt 正例
+        en: ToolCallAttempt-is_a-InvocationAttempt positive case
+        ja: ToolCallAttempt-is_a-InvocationAttempt 正例
+      scenario_id: null
+      descriptions:
+        zh: tool-attempt-0042-1 超时后保留失败记录；tool-attempt-0042-2 在同一 call_id 下使用新 attempt_id 并成功返回。
+        en: After tool-attempt-0042-1 times out, its failure record is preserved; tool-attempt-0042-2 uses a new attempt_id under the same call_id and succeeds.
+        ja: tool-attempt-0042-1 timeout 後 failure record を保持し tool-attempt-0042-2 が同一 call_id 下で新 attempt_id を使い成功します。
+      field_values: {}
+      related_node_ids:
+        - ToolCallAttempt
+        - InvocationAttempt
+      related_relation_ids:
+        - ToolCallAttempt-is_a-InvocationAttempt
+      expected_result:
+        zh: 建立 ToolCallAttempt —is_a→ InvocationAttempt，并保持规范方向。
+        en: Assert ToolCallAttempt —is_a→ InvocationAttempt in the reviewed direction.
+        ja: ToolCallAttempt —is_a→ InvocationAttempt を reviewed direction で成立させます。
+      why_valid_or_invalid:
+        zh: 正例同时满足两个端点身份和该谓词的成立条件。
+        en: The positive case satisfies both endpoint identities and the predicate's conditions.
+        ja: positive case は両 endpoint identity と predicate condition を満たします。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+      source_claims:
+        - claim-tool-call-attempt-030
+    - id: ToolCallAttempt-is_a-InvocationAttempt-example-boundary-manual-001
+      kind: boundary
+      labels:
+        zh: ToolCallAttempt-is_a-InvocationAttempt 边界例
+        en: ToolCallAttempt-is_a-InvocationAttempt boundary case
+        ja: ToolCallAttempt-is_a-InvocationAttempt 境界例
+      scenario_id: null
+      descriptions:
+        zh: 批准界面展示一条待执行工具调用，但执行器尚未启动，也没有 started_at；此时只有请求与批准状态。
+        en: An approval UI shows a pending tool call, but no executor has started and started_at is absent; only request and approval state exist.
+        ja: approval UI に pending tool call が表示されても executor 未開始で started_at がなく request/approval state のみです。
+      field_values: {}
+      related_node_ids:
+        - ToolCallAttempt
+        - InvocationAttempt
+      related_relation_ids:
+        - ToolCallAttempt-is_a-InvocationAttempt
+      expected_result:
+        zh: 不建立该边；边界例缺少 is_a 所要求的事实。
+        en: Do not assert the edge because the boundary case lacks the fact required by is_a.
+        ja: boundary case は is_a required fact がなく edge を成立させません。
+      why_valid_or_invalid:
+        zh: 端点共现、类型相近或时间相邻都不足以推断该关系。
+        en: Endpoint co-occurrence, similar types, or temporal proximity alone cannot infer this relation.
+        ja: endpoint co-occurrence・similar type・temporal proximity だけでは relation を推論できません。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+      source_claims:
+        - claim-tool-call-attempt-031
+  source_claims:
+    - claim-tool-call-attempt-032
+  distinct_fact_rationale: null
+  layout_role: primary-backbone
+  review_status: accepted
+  endpoint_order: child-to-parent
+relations:
+  - id: ToolCallAttempt-produces_result-ToolResult
+    predicate: produces_result
+    direction: source-to-target
+    relation_kind: causal
+    labels:
+      zh: 产生结果
+      en: produces result
+      ja: 結果を生成する
+    definitions:
+      zh: ToolCallAttempt 在返回时通过 produces_result 产生与同一 call_id 和 attempt_id 关联的 ToolResult，包括 is_error=true 的工具执行失败。
+      en: ToolCallAttempt produces_result a ToolResult correlated with the same call_id and attempt_id, including tool-execution failures returned with is_error=true.
+      ja: ToolCallAttempt が same call_id/attempt_id の ToolResult を produces_result し is_error=true tool-execution failure も含みます。
+    cardinality:
+      source:
+        min: 1
+        max: 1
+      target:
+        min: 0
+        max: 1
+    cardinality_not_applicable_reason: null
+    inverse_reading:
+      predicate: produced_by_attempt
+      labels:
+        zh: 反向：produces result
+        en: produced by attempt
+        ja: 逆方向：produces result
+    conditions: []
+    temporal_scope: valid-time
+    boundary_context: null
+    constraints: []
+    examples:
+      - id: ToolCallAttempt-produces_result-ToolResult-example-positive-manual-001
+        kind: positive
+        labels:
+          zh: ToolCallAttempt-produces_result-ToolResult 正例
+          en: ToolCallAttempt-produces_result-ToolResult positive case
+          ja: ToolCallAttempt-produces_result-ToolResult 正例
+        scenario_id: null
+        descriptions:
+          zh: 第二次天气尝试返回结构化温度 ToolResult。
+          en: The second weather attempt returns a structured-temperature ToolResult.
+          ja: second weather attempt が structured-temperature ToolResult を返します。
+        field_values: {}
+        related_node_ids:
+          - ToolCallAttempt
+          - ToolResult
+        related_relation_ids:
+          - ToolCallAttempt-produces_result-ToolResult
+        expected_result:
+          zh: 建立 ToolCallAttempt —produces_result→ ToolResult，并保持规范方向。
+          en: Assert ToolCallAttempt —produces_result→ ToolResult in the reviewed direction.
+          ja: ToolCallAttempt —produces_result→ ToolResult を reviewed direction で成立させます。
+        why_valid_or_invalid:
+          zh: 正例同时满足两个端点身份和该谓词的成立条件。
+          en: The positive case satisfies both endpoint identities and the predicate's conditions.
+          ja: positive case は両 endpoint identity と predicate condition を満たします。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+        source_claims:
+          - claim-tool-call-attempt-033
+      - id: ToolCallAttempt-produces_result-ToolResult-example-boundary-manual-001
+        kind: boundary
+        labels:
+          zh: ToolCallAttempt-produces_result-ToolResult 边界例
+          en: ToolCallAttempt-produces_result-ToolResult boundary case
+          ja: ToolCallAttempt-produces_result-ToolResult 境界例
+        scenario_id: null
+        descriptions:
+          zh: 未知工具名导致协议 Invalid params 且没有执行尝试时，不得创建由 ToolCallAttempt 产生的结果。
+          en: An unknown tool name causing protocol Invalid params before execution has no ToolCallAttempt-produced result.
+          ja: unknown tool name が execution 前 protocol Invalid params の場合 ToolCallAttempt-produced result はありません。
+        field_values: {}
+        related_node_ids:
+          - ToolCallAttempt
+          - ToolResult
+        related_relation_ids:
+          - ToolCallAttempt-produces_result-ToolResult
+        expected_result:
+          zh: 不建立该边；边界例缺少 produces_result 所要求的事实。
+          en: Do not assert the edge because the boundary case lacks the fact required by produces_result.
+          ja: boundary case は produces_result required fact がなく edge を成立させません。
+        why_valid_or_invalid:
+          zh: 端点共现、类型相近或时间相邻都不足以推断该关系。
+          en: Endpoint co-occurrence, similar types, or temporal proximity alone cannot infer this relation.
+          ja: endpoint co-occurrence・similar type・temporal proximity だけでは relation を推論できません。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+        source_claims:
+          - claim-tool-call-attempt-034
+    source_claims:
+      - claim-tool-call-attempt-035
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: accepted
+    target: concept:ToolResult
+  - id: ToolCallAttempt-emits_diagnostic-ToolError
+    predicate: emits_diagnostic
+    direction: source-to-target
+    relation_kind: causal
+    labels:
+      zh: 发出诊断
+      en: emits diagnostic
+      ja: 診断を発行する
+    definitions:
+      zh: 失败的 ToolCallAttempt 通过 emits_diagnostic 产生解释该尝试失败原因的 ToolError；诊断不替代返回 ToolResult。
+      en: A failed ToolCallAttempt emits_diagnostic a ToolError explaining the failure; the diagnostic does not replace the returned ToolResult.
+      ja: failed ToolCallAttempt が failure reason の ToolError を emits_diagnostic し diagnostic は returned ToolResult を置換しません。
+    cardinality:
+      source:
+        min: 0
+        max: null
+      target:
+        min: 0
+        max: 1
+    cardinality_not_applicable_reason: null
+    inverse_reading:
+      predicate: emitted_by
+      labels:
+        zh: 由……发出
+        en: emitted by
+        ja: …により発行される
+    conditions: []
+    temporal_scope: valid-time
+    boundary_context: null
+    constraints: []
+    examples:
+      - id: ToolCallAttempt-emits_diagnostic-ToolError-example-positive-manual-001
+        kind: positive
+        labels:
+          zh: ToolCallAttempt-emits_diagnostic-ToolError 正例
+          en: ToolCallAttempt-emits_diagnostic-ToolError positive case
+          ja: ToolCallAttempt-emits_diagnostic-ToolError 正例
+        scenario_id: null
+        descriptions:
+          zh: CITY_NOT_FOUND 尝试同时返回 is_error ToolResult 并发出不可重试 ToolError。
+          en: A CITY_NOT_FOUND attempt returns an is_error ToolResult and emits a non-retryable ToolError.
+          ja: CITY_NOT_FOUND attempt が is_error ToolResult と non-retryable ToolError を出します。
+        field_values: {}
+        related_node_ids:
+          - ToolCallAttempt
+          - ToolError
+        related_relation_ids:
+          - ToolCallAttempt-emits_diagnostic-ToolError
+        expected_result:
+          zh: 建立 ToolCallAttempt —emits_diagnostic→ ToolError，并保持规范方向。
+          en: Assert ToolCallAttempt —emits_diagnostic→ ToolError in the reviewed direction.
+          ja: ToolCallAttempt —emits_diagnostic→ ToolError を reviewed direction で成立させます。
+        why_valid_or_invalid:
+          zh: 正例同时满足两个端点身份和该谓词的成立条件。
+          en: The positive case satisfies both endpoint identities and the predicate's conditions.
+          ja: positive case は両 endpoint identity と predicate condition を満たします。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+        source_claims:
+          - claim-tool-call-attempt-036
+      - id: ToolCallAttempt-emits_diagnostic-ToolError-example-boundary-manual-001
+        kind: boundary
+        labels:
+          zh: ToolCallAttempt-emits_diagnostic-ToolError 边界例
+          en: ToolCallAttempt-emits_diagnostic-ToolError boundary case
+          ja: ToolCallAttempt-emits_diagnostic-ToolError 境界例
+        scenario_id: null
+        descriptions:
+          zh: 成功尝试没有错误诊断，普通结果文本不能强制建立 ToolError。
+          en: A successful attempt has no error diagnostic, and ordinary result text cannot force a ToolError.
+          ja: successful attempt には error diagnostic がなく ordinary result text から ToolError を作りません。
+        field_values: {}
+        related_node_ids:
+          - ToolCallAttempt
+          - ToolError
+        related_relation_ids:
+          - ToolCallAttempt-emits_diagnostic-ToolError
+        expected_result:
+          zh: 不建立该边；边界例缺少 emits_diagnostic 所要求的事实。
+          en: Do not assert the edge because the boundary case lacks the fact required by emits_diagnostic.
+          ja: boundary case は emits_diagnostic required fact がなく edge を成立させません。
+        why_valid_or_invalid:
+          zh: 端点共现、类型相近或时间相邻都不足以推断该关系。
+          en: Endpoint co-occurrence, similar types, or temporal proximity alone cannot infer this relation.
+          ja: endpoint co-occurrence・similar type・temporal proximity だけでは relation を推論できません。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+        source_claims:
+          - claim-tool-call-attempt-037
+    source_claims:
+      - claim-tool-call-attempt-038
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: accepted
+    target: concept:ToolError
+  - id: ToolCallAttempt-retries-ToolCallAttempt
+    predicate: retries
+    direction: source-to-target
+    relation_kind: causal
+    labels:
+      zh: 重试
+      en: retries
+      ja: 再試行する
+    definitions:
+      zh: 后续 ToolCallAttempt 通过 retries 指向同一 ToolCall 中被重试的先前尝试；源尝试必须有更大 attempt_number 和新的 attempt_id。
+      en: A later ToolCallAttempt retries a prior attempt of the same ToolCall; the source has a greater attempt_number and a new attempt_id.
+      ja: later ToolCallAttempt が same ToolCall の prior attempt を retries し source は greater attempt_number/new attempt_id を持ちます。
+    cardinality:
+      source:
+        min: 0
+        max: null
+      target:
+        min: 0
+        max: null
+    cardinality_not_applicable_reason: null
+    inverse_reading:
+      predicate: inverse_retries
+      labels:
+        zh: 反向：重试
+        en: "inverse: retries"
+        ja: 逆：再試行する
+    conditions: []
+    temporal_scope: valid-time
+    boundary_context: null
+    constraints: []
+    examples:
+      - id: ToolCallAttempt-retries-ToolCallAttempt-example-positive-manual-001
+        kind: positive
+        labels:
+          zh: ToolCallAttempt-retries-ToolCallAttempt 正例
+          en: ToolCallAttempt-retries-ToolCallAttempt positive case
+          ja: ToolCallAttempt-retries-ToolCallAttempt 正例
+        scenario_id: null
+        descriptions:
+          zh: tool-attempt-0042-2 指向超时的 tool-attempt-0042-1，并复用受支持的幂等键。
+          en: tool-attempt-0042-2 retries timed-out tool-attempt-0042-1 while reusing the supported idempotency key.
+          ja: tool-attempt-0042-2 が timeout tool-attempt-0042-1 を retries し supported idempotency key を再利用します。
+        field_values: {}
+        related_node_ids:
+          - ToolCallAttempt
+        related_relation_ids:
+          - ToolCallAttempt-retries-ToolCallAttempt
+        expected_result:
+          zh: 建立 ToolCallAttempt —retries→ ToolCallAttempt，并保持规范方向。
+          en: Assert ToolCallAttempt —retries→ ToolCallAttempt in the reviewed direction.
+          ja: ToolCallAttempt —retries→ ToolCallAttempt を reviewed direction で成立させます。
+        why_valid_or_invalid:
+          zh: 正例同时满足两个端点身份和该谓词的成立条件。
+          en: The positive case satisfies both endpoint identities and the predicate's conditions.
+          ja: positive case は両 endpoint identity と predicate condition を満たします。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+        source_claims:
+          - claim-tool-call-attempt-039
+      - id: ToolCallAttempt-retries-ToolCallAttempt-example-boundary-manual-001
+        kind: boundary
+        labels:
+          zh: ToolCallAttempt-retries-ToolCallAttempt 边界例
+          en: ToolCallAttempt-retries-ToolCallAttempt boundary case
+          ja: ToolCallAttempt-retries-ToolCallAttempt 境界例
+        scenario_id: null
+        descriptions:
+          zh: 同一 attempt_id 状态从 running 变为 failed 是状态更新，不是重试边。
+          en: A status change from running to failed on the same attempt_id is not a retry edge.
+          ja: same attempt_id の running→failed status change は retry edge ではありません。
+        field_values: {}
+        related_node_ids:
+          - ToolCallAttempt
+        related_relation_ids:
+          - ToolCallAttempt-retries-ToolCallAttempt
+        expected_result:
+          zh: 不建立该边；边界例缺少 retries 所要求的事实。
+          en: Do not assert the edge because the boundary case lacks the fact required by retries.
+          ja: boundary case は retries required fact がなく edge を成立させません。
+        why_valid_or_invalid:
+          zh: 端点共现、类型相近或时间相邻都不足以推断该关系。
+          en: Endpoint co-occurrence, similar types, or temporal proximity alone cannot infer this relation.
+          ja: endpoint co-occurrence・similar type・temporal proximity だけでは relation を推論できません。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+        source_claims:
+          - claim-tool-call-attempt-040
+    source_claims:
+      - claim-tool-call-attempt-041
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: accepted
+    target: concept:ToolCallAttempt
+  - id: ToolCallAttempt-may_cause-ToolSideEffect
+    predicate: may_cause
+    direction: source-to-target
+    relation_kind: causal
+    labels:
+      zh: 可能导致
+      en: may cause
+      ja: 引き起こし得る
+    definitions:
+      zh: ToolCallAttempt 通过 may_cause 连接实际可归因于该尝试的 ToolSideEffect；关系只在有外部变化证据时成立，不从效果声明自动推断。
+      en: ToolCallAttempt may_cause links an evidenced ToolSideEffect attributable to the attempt; the edge exists only with external-change evidence and is not inferred from a declaration.
+      ja: ToolCallAttempt が evidenced ToolSideEffect に may_cause で結び external-change evidence がある場合のみ成立し declaration から自動推論しません。
+    cardinality:
+      source:
+        min: 0
+        max: null
+      target:
+        min: 0
+        max: null
+    cardinality_not_applicable_reason: null
+    inverse_reading:
+      predicate: is_target_of_may_cause
+      labels:
+        zh: 反向：may cause
+        en: is target of may cause
+        ja: 逆方向：may cause
+    conditions: []
+    temporal_scope: valid-time
+    boundary_context: null
+    constraints: []
+    examples:
+      - id: ToolCallAttempt-may_cause-ToolSideEffect-example-positive-manual-001
+        kind: positive
+        labels:
+          zh: ToolCallAttempt-may_cause-ToolSideEffect 正例
+          en: ToolCallAttempt-may_cause-ToolSideEffect positive case
+          ja: ToolCallAttempt-may_cause-ToolSideEffect 正例
+        scenario_id: null
+        descriptions:
+          zh: 获批工单尝试导致外部系统创建 INC-778。
+          en: An approved ticket attempt causes external system creation of INC-778.
+          ja: approved ticket attempt が external system に INC-778 を作成させます。
+        field_values: {}
+        related_node_ids:
+          - ToolCallAttempt
+          - ToolSideEffect
+        related_relation_ids:
+          - ToolCallAttempt-may_cause-ToolSideEffect
+        expected_result:
+          zh: 建立 ToolCallAttempt —may_cause→ ToolSideEffect，并保持规范方向。
+          en: Assert ToolCallAttempt —may_cause→ ToolSideEffect in the reviewed direction.
+          ja: ToolCallAttempt —may_cause→ ToolSideEffect を reviewed direction で成立させます。
+        why_valid_or_invalid:
+          zh: 正例同时满足两个端点身份和该谓词的成立条件。
+          en: The positive case satisfies both endpoint identities and the predicate's conditions.
+          ja: positive case は両 endpoint identity と predicate condition を満たします。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+        source_claims:
+          - claim-tool-call-attempt-042
+      - id: ToolCallAttempt-may_cause-ToolSideEffect-example-boundary-manual-001
+        kind: boundary
+        labels:
+          zh: ToolCallAttempt-may_cause-ToolSideEffect 边界例
+          en: ToolCallAttempt-may_cause-ToolSideEffect boundary case
+          ja: ToolCallAttempt-may_cause-ToolSideEffect 境界例
+        scenario_id: null
+        descriptions:
+          zh: 只读天气尝试返回数据但不改变外部状态，没有 ToolSideEffect。
+          en: A read-only weather attempt returns data without changing external state and has no ToolSideEffect.
+          ja: read-only weather attempt は data を返して external state unchanged で ToolSideEffect はありません。
+        field_values: {}
+        related_node_ids:
+          - ToolCallAttempt
+          - ToolSideEffect
+        related_relation_ids:
+          - ToolCallAttempt-may_cause-ToolSideEffect
+        expected_result:
+          zh: 不建立该边；边界例缺少 may_cause 所要求的事实。
+          en: Do not assert the edge because the boundary case lacks the fact required by may_cause.
+          ja: boundary case は may_cause required fact がなく edge を成立させません。
+        why_valid_or_invalid:
+          zh: 端点共现、类型相近或时间相邻都不足以推断该关系。
+          en: Endpoint co-occurrence, similar types, or temporal proximity alone cannot infer this relation.
+          ja: endpoint co-occurrence・similar type・temporal proximity だけでは relation を推論できません。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+        source_claims:
+          - claim-tool-call-attempt-043
+    source_claims:
+      - claim-tool-call-attempt-044
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: accepted
+    target: concept:ToolSideEffect
+review:
+  status: accepted
+  method: manual-semantic
+  reviewer: manual-tool-spec-verification
+  reviewed_on: 2026-07-17
+  note:
+    zh: 已对照 MCP 2025-11-25、OpenAI function calling、Anthropic tool use 与 OpenAI Agents SDK 逐项核验概念定义、字段、关系与层级位置。
+    en: Verified concept definitions, fields, relations, and hierarchy placement against MCP 2025-11-25, OpenAI function calling, Anthropic tool use, and the OpenAI Agents SDK.
+    ja: MCP 2025-11-25、OpenAI function calling、Anthropic tool use、OpenAI Agents SDK に照らし概念定義・フィールド・関係・階層位置を個別検証しました。
+  sections:
+    semantics: accepted
+    hierarchy: accepted
+    relations: accepted
+    structure: accepted
+    examples: accepted
+    source_claims: accepted
 source_claims:
-  - id: mcp-tools-call-boundary
-    source: mcp-tools-2025-11-25
-    supports: MCP tools/call is a request and ToolResult or JSON-RPC error is a separate response outcome.
-    locator: "Calling Tools; Error Handling"
-    evidence_kind: normative
-    confidence: high
-  - id: openai-function-call-items
-    source: openai-responses-function-calling
-    supports: A Responses function_call item includes call_id, name, and JSON-encoded arguments and is followed by a function_call_output input item.
-    locator: "Handling function calls; Execute function calls and append results"
-    evidence_kind: normative
-    confidence: high
-  - id: moonweave-tool-call-attempt
-    source: mcp-tools-2025-11-25
-    supports: Moonweave ToolCallAttempt is a local InvocationAttempt subtype that records host dispatch around source-specific native exchanges.
-    locator: "Calling Tools"
+  - id: claim-tool-call-attempt-001
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. Moonweave uses this primary evidence to delimit ToolCallAttempt as activity with the reviewed boundary stated in its definition.
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-002
+    source: eng-fw-openai-agents-tools
+    supports: OpenAI Agents SDK distinguishes ordinary function-tool calls from agents-as-tools and states that the manager retains control when an agent is exposed as a tool. Moonweave uses this primary evidence to delimit ToolCallAttempt as activity with the reviewed boundary stated in its definition.
+    locator: Tools > Function tools; Agents as tools; Handling errors in function tools
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-003
+    source: eng-std-opentelemetry-spec
+    supports: OpenTelemetry models each execution occurrence as a span with timestamps, attributes, events, and status rather than as a reusable specification. Moonweave uses this primary evidence to delimit ToolCallAttempt as activity with the reviewed boundary stated in its definition.
+    locator: Specification > Traces > Span creation, attributes, events and status
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-004
+    source: eng-api-stripe-idempotency
+    supports: Stripe documents that retrying a mutation with the same idempotency key replays the first saved response instead of repeating the external effect. Moonweave uses this primary evidence to delimit ToolCallAttempt as activity with the reviewed boundary stated in its definition.
+    locator: API Reference > Idempotent requests > replaying a request with the same key
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-005
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: "MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. Moonweave stores ToolCallAttempt.tool_call_ref because this field specifically records: References the ToolCall that remains stable across retries."
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-006
+    source: eng-fw-openai-agents-tools
+    supports: "OpenAI Agents SDK distinguishes ordinary function-tool calls from agents-as-tools and states that the manager retains control when an agent is exposed as a tool. Moonweave stores ToolCallAttempt.tool_call_ref because this field specifically records: References the ToolCall that remains stable across retries."
+    locator: Tools > Function tools; Agents as tools; Handling errors in function tools
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-007
+    source: eng-std-opentelemetry-spec
+    supports: "OpenTelemetry models each execution occurrence as a span with timestamps, attributes, events, and status rather than as a reusable specification. Moonweave stores ToolCallAttempt.tool_call_ref because this field specifically records: References the ToolCall that remains stable across retries."
+    locator: Specification > Traces > Span creation, attributes, events and status
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-008
+    source: eng-api-stripe-idempotency
+    supports: "Stripe documents that retrying a mutation with the same idempotency key replays the first saved response instead of repeating the external effect. Moonweave stores ToolCallAttempt.tool_call_ref because this field specifically records: References the ToolCall that remains stable across retries."
+    locator: API Reference > Idempotent requests > replaying a request with the same key
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-009
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: "MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. Moonweave stores ToolCallAttempt.executor_ref because this field specifically records: Identifies the executor or server performing this tool execution."
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-010
+    source: eng-fw-openai-agents-tools
+    supports: "OpenAI Agents SDK distinguishes ordinary function-tool calls from agents-as-tools and states that the manager retains control when an agent is exposed as a tool. Moonweave stores ToolCallAttempt.executor_ref because this field specifically records: Identifies the executor or server performing this tool execution."
+    locator: Tools > Function tools; Agents as tools; Handling errors in function tools
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-011
+    source: eng-std-opentelemetry-spec
+    supports: "OpenTelemetry models each execution occurrence as a span with timestamps, attributes, events, and status rather than as a reusable specification. Moonweave stores ToolCallAttempt.executor_ref because this field specifically records: Identifies the executor or server performing this tool execution."
+    locator: Specification > Traces > Span creation, attributes, events and status
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-012
+    source: eng-api-stripe-idempotency
+    supports: "Stripe documents that retrying a mutation with the same idempotency key replays the first saved response instead of repeating the external effect. Moonweave stores ToolCallAttempt.executor_ref because this field specifically records: Identifies the executor or server performing this tool execution."
+    locator: API Reference > Idempotent requests > replaying a request with the same key
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-013
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: "MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. Moonweave stores ToolCallAttempt.authorization_ref because this field specifically records: References the authorization or approval actually governing this attempt."
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-014
+    source: eng-fw-openai-agents-tools
+    supports: "OpenAI Agents SDK distinguishes ordinary function-tool calls from agents-as-tools and states that the manager retains control when an agent is exposed as a tool. Moonweave stores ToolCallAttempt.authorization_ref because this field specifically records: References the authorization or approval actually governing this attempt."
+    locator: Tools > Function tools; Agents as tools; Handling errors in function tools
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-015
+    source: eng-std-opentelemetry-spec
+    supports: "OpenTelemetry models each execution occurrence as a span with timestamps, attributes, events, and status rather than as a reusable specification. Moonweave stores ToolCallAttempt.authorization_ref because this field specifically records: References the authorization or approval actually governing this attempt."
+    locator: Specification > Traces > Span creation, attributes, events and status
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-016
+    source: eng-api-stripe-idempotency
+    supports: "Stripe documents that retrying a mutation with the same idempotency key replays the first saved response instead of repeating the external effect. Moonweave stores ToolCallAttempt.authorization_ref because this field specifically records: References the authorization or approval actually governing this attempt."
+    locator: API Reference > Idempotent requests > replaying a request with the same key
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-017
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: "MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. Moonweave stores ToolCallAttempt.sandbox_ref because this field specifically records: References the sandbox configuration isolating this execution."
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-018
+    source: eng-fw-openai-agents-tools
+    supports: "OpenAI Agents SDK distinguishes ordinary function-tool calls from agents-as-tools and states that the manager retains control when an agent is exposed as a tool. Moonweave stores ToolCallAttempt.sandbox_ref because this field specifically records: References the sandbox configuration isolating this execution."
+    locator: Tools > Function tools; Agents as tools; Handling errors in function tools
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-019
+    source: eng-std-opentelemetry-spec
+    supports: "OpenTelemetry models each execution occurrence as a span with timestamps, attributes, events, and status rather than as a reusable specification. Moonweave stores ToolCallAttempt.sandbox_ref because this field specifically records: References the sandbox configuration isolating this execution."
+    locator: Specification > Traces > Span creation, attributes, events and status
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-020
+    source: eng-api-stripe-idempotency
+    supports: "Stripe documents that retrying a mutation with the same idempotency key replays the first saved response instead of repeating the external effect. Moonweave stores ToolCallAttempt.sandbox_ref because this field specifically records: References the sandbox configuration isolating this execution."
+    locator: API Reference > Idempotent requests > replaying a request with the same key
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-021
+    source: eng-api-stripe-idempotency
+    supports: Stripe documents that retrying a mutation with the same idempotency key replays the saved response instead of repeating the external effect; Moonweave records the key at attempt granularity for that distinction.
+    locator: API Reference > Idempotent requests > replaying a request with the same key
     evidence_kind: design-inference
     confidence: high
+    review_status: accepted
+  - id: claim-tool-call-attempt-022
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. The ToolCallAttempt positive case applies that documented distinction to the concrete occurrence described here.
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-023
+    source: eng-fw-openai-agents-tools
+    supports: OpenAI Agents SDK distinguishes ordinary function-tool calls from agents-as-tools and states that the manager retains control when an agent is exposed as a tool. The ToolCallAttempt positive case applies that documented distinction to the concrete occurrence described here.
+    locator: Tools > Function tools; Agents as tools; Handling errors in function tools
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-024
+    source: eng-std-opentelemetry-spec
+    supports: OpenTelemetry models each execution occurrence as a span with timestamps, attributes, events, and status rather than as a reusable specification. The ToolCallAttempt positive case applies that documented distinction to the concrete occurrence described here.
+    locator: Specification > Traces > Span creation, attributes, events and status
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-025
+    source: eng-api-stripe-idempotency
+    supports: Stripe documents that retrying a mutation with the same idempotency key replays the first saved response instead of repeating the external effect. The ToolCallAttempt positive case applies that documented distinction to the concrete occurrence described here.
+    locator: API Reference > Idempotent requests > replaying a request with the same key
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-026
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. The ToolCallAttempt boundary case applies that documented distinction to the concrete occurrence described here.
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-027
+    source: eng-fw-openai-agents-tools
+    supports: OpenAI Agents SDK distinguishes ordinary function-tool calls from agents-as-tools and states that the manager retains control when an agent is exposed as a tool. The ToolCallAttempt boundary case applies that documented distinction to the concrete occurrence described here.
+    locator: Tools > Function tools; Agents as tools; Handling errors in function tools
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-028
+    source: eng-std-opentelemetry-spec
+    supports: OpenTelemetry models each execution occurrence as a span with timestamps, attributes, events, and status rather than as a reusable specification. The ToolCallAttempt boundary case applies that documented distinction to the concrete occurrence described here.
+    locator: Specification > Traces > Span creation, attributes, events and status
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-029
+    source: eng-api-stripe-idempotency
+    supports: Stripe documents that retrying a mutation with the same idempotency key replays the first saved response instead of repeating the external effect. The ToolCallAttempt boundary case applies that documented distinction to the concrete occurrence described here.
+    locator: API Reference > Idempotent requests > replaying a request with the same key
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-030
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. The ToolCallAttempt-is_a-InvocationAttempt positive case applies the documented distinction to the concrete endpoints and direction described here.
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-031
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. The ToolCallAttempt-is_a-InvocationAttempt boundary case applies the documented distinction to the concrete endpoints and direction described here.
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-032
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. Moonweave uses that primary evidence to justify ToolCallAttempt —is_a→ InvocationAttempt with the reviewed direction and boundary.
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-033
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. The ToolCallAttempt-produces_result-ToolResult positive case applies the documented distinction to the concrete endpoints and direction described here.
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-034
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. The ToolCallAttempt-produces_result-ToolResult boundary case applies the documented distinction to the concrete endpoints and direction described here.
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-035
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. Moonweave uses that primary evidence to justify ToolCallAttempt —produces_result→ ToolResult with the reviewed direction and boundary.
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-036
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. The ToolCallAttempt-emits_diagnostic-ToolError positive case applies the documented distinction to the concrete endpoints and direction described here.
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-037
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. The ToolCallAttempt-emits_diagnostic-ToolError boundary case applies the documented distinction to the concrete endpoints and direction described here.
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-038
+    source: eng-proto-mcp-tools-2025-06-18
+    supports: MCP separates a tools/call request from its Tool Result, requires a result for tool execution errors, and reserves protocol errors for malformed or unknown requests. Moonweave uses that primary evidence to justify ToolCallAttempt —emits_diagnostic→ ToolError with the reviewed direction and boundary.
+    locator: Server Features > Tools > Calling Tools; Tool Result; Error Handling
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-039
+    source: eng-api-stripe-idempotency
+    supports: Stripe documents that retrying a mutation with the same idempotency key replays the first saved response instead of repeating the external effect. The ToolCallAttempt-retries-ToolCallAttempt positive case applies the documented distinction to the concrete endpoints and direction described here.
+    locator: API Reference > Idempotent requests > replaying a request with the same key
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-040
+    source: eng-api-stripe-idempotency
+    supports: Stripe documents that retrying a mutation with the same idempotency key replays the first saved response instead of repeating the external effect. The ToolCallAttempt-retries-ToolCallAttempt boundary case applies the documented distinction to the concrete endpoints and direction described here.
+    locator: API Reference > Idempotent requests > replaying a request with the same key
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-041
+    source: eng-api-stripe-idempotency
+    supports: Stripe documents that retrying a mutation with the same idempotency key replays the first saved response instead of repeating the external effect. Moonweave uses that primary evidence to justify ToolCallAttempt —retries→ ToolCallAttempt with the reviewed direction and boundary.
+    locator: API Reference > Idempotent requests > replaying a request with the same key
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-042
+    source: eng-fw-openai-hitl
+    supports: OpenAI HITL records a pending tool call, a per-call approval or rejection, and later resumption of the original run. The ToolCallAttempt-may_cause-ToolSideEffect positive case applies the documented distinction to the concrete endpoints and direction described here.
+    locator: Human-in-the-loop > Tool approval requests; approve, reject and resume
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-043
+    source: eng-fw-openai-hitl
+    supports: OpenAI HITL records a pending tool call, a per-call approval or rejection, and later resumption of the original run. The ToolCallAttempt-may_cause-ToolSideEffect boundary case applies the documented distinction to the concrete endpoints and direction described here.
+    locator: Human-in-the-loop > Tool approval requests; approve, reject and resume
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-tool-call-attempt-044
+    source: eng-fw-openai-hitl
+    supports: OpenAI HITL records a pending tool call, a per-call approval or rejection, and later resumption of the original run. Moonweave uses that primary evidence to justify ToolCallAttempt —may_cause→ ToolSideEffect with the reviewed direction and boundary.
+    locator: Human-in-the-loop > Tool approval requests; approve, reject and resume
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted

@@ -8,326 +8,460 @@ labels:
   ja: 検索要求
 semantics:
   short_definition:
-    zh: 在检索执行前固定查询、范围、可选过滤条件和候选数量上限的请求产物。
-    en: A pre-execution artifact that fixes a query, scope, optional filters, and candidate limit.
-    ja: 検索実行前に query・scope・任意 filter・candidate 上限を固定する request artifact。
+    zh: 在执行前固定查询、过滤条件、目标索引版本和结果上限的请求产物。
+    en: A request artifact that fixes the query, filters, target index version, and result limit before execution.
+    ja: 実行前にquery・filter・target index version・result limitを固定するrequest artifactです。
   definition:
-    zh: >
-      RetrievalRequest 是一次可审计的检索意图记录：它引用一个 RetrievalQuery，声明要搜索的存储范围或索引，
-      并可声明过滤条件和返回候选上限。它在 RetrievalRun 开始前存在，不能包含已经返回的候选、分数或完成状态；
-      因而它既不是 RetrievalQuery 本身，也不是 RetrievalResult、MemoryStore 或消息历史。
-    en: >
-      A RetrievalRequest is an auditable record of retrieval intent: it references one RetrievalQuery,
-      declares the store scope or index to search, and may declare filters and a return limit. It exists
-      before a RetrievalRun starts and cannot contain returned candidates, scores, or completion state.
-      It is therefore neither the query itself nor a RetrievalResult, MemoryStore, or message history.
-    ja: >
-      RetrievalRequest は RetrievalQuery を参照し、検索する store scope または index、任意の filter と return limit を
-      宣言する監査可能な retrieval intent record です。RetrievalRun 開始前に存在し、戻った candidate・score・完了状態を
-      含めません。query 自体、RetrievalResult、MemoryStore、message history ではありません。
+    zh: RetrievalRequest 是一个可持久引用的检索意图记录，由 RetrievalQuery 与可选 RetrievalFilter 组成，并明确目标 IndexVersion 与请求上限；它不是执行运行，也不表示已经产生候选或结果。
+    en: RetrievalRequest is a persistently referencable record of retrieval intent, composed of a RetrievalQuery and optional RetrievalFilter and declaring a target IndexVersion and requested limit. It is neither an execution run nor evidence that candidates or results already exist.
+    ja: RetrievalRequest はpersistentに参照できるretrieval intent recordでRetrievalQueryと任意RetrievalFilterから成りtarget IndexVersionとlimitを宣言します。execution runでもcandidate/result生成済み証拠でもありません。
   why_needed:
-    zh: 请求身份使检索输入可重放、可授权和可观察，并将请求配置与执行产生的结果清楚分开。
-    en: A request identity makes retrieval inputs replayable, authorizable, and observable while separating configuration from execution output.
-    ja: request identity は retrieval input を replayable・authorizable・observable にし、設定を execution output から分離します。
+    zh: 在运行前固定可重放输入，并把请求身份与运行身份分开。
+    en: Fixes replayable inputs before execution and separates request identity from run identity.
+    ja: 実行前に再生可能inputを固定しrequest identityとrun identityを分離します。
   includes:
-    - zh: 查询引用、命名空间或索引范围、可选元数据过滤条件、检索方法标识和正整数候选上限。
-      en: A query reference, namespace or index scope, optional metadata filters, retrieval-method identifier, and a positive candidate limit.
-      ja: query reference、namespace または index scope、任意 metadata filter、retrieval method ID、正の candidate limit。
+    - zh: 纳入具有 request_id、目标索引版本、查询和约束条件的已提交检索意图。
+      en: Includes submitted retrieval intent with request_id, target index version, query, and constraints.
+      ja: request_id・target index version・query・constraintを持つsubmitted retrieval intentを含みます。
   excludes:
-    - zh: 单独的查询文本、正在执行的 RetrievalRun、已返回的 RetrievedCandidate 或 RetrievalResult，以及写入或持久化记忆的操作。
-      en: A query string alone, an executing RetrievalRun, returned RetrievedCandidate or RetrievalResult artifacts, and memory-write operations.
-      ja: query string 単体、実行中 RetrievalRun、返却済み RetrievedCandidate・RetrievalResult、memory write operation。
+    - zh: 排除自然语言问题本身、正在执行的 RetrievalRun、返回结果和索引配置。
+      en: Excludes the natural-language question alone, executing RetrievalRun, returned results, and index configuration.
+      ja: 自然言語question単体・実行中RetrievalRun・returned result・index configurationを除外します。
   semantic_kind: information
-  aliases: [search request, retrieval plan, 检索计划]
-engineering:
-  explanation:
-    zh: >
-      请求是检索运行的输入合同。例如 LangGraph Store 搜索将 namespace、query 和 limit 传给 search；
-      search 返回的项目属于运行输出，不能回写到请求对象中。
-    en: >
-      The request is an input contract for a retrieval run. For example, a LangGraph Store search passes
-      namespace, query, and limit to search; returned items are run output and must not be written into the request.
-    ja: >
-      request は retrieval run の入力契約である。LangGraph Store search では namespace、query、limit を渡し、
-      返された item は run の出力として扱い、request 自体へ書き戻さない。
-  typical_input:
-    - description: Retrieval request handed to a memory-store retrieval run
-      format: |
-        {
-          "request_id": "memory-request-042",
-          "query_id": "query-042",
-          "namespace": ["user_123", "memories"],
-          "candidate_limit": 5,
-          "filter_expression": {"kind": "preference"}
-        }
-  typical_output:
-    - description: Immutable request artifact persisted before a namespace-scoped store search is executed.
-      format: |
-        {
-          "request_id": "memory-request-042",
-          "query_id": "query-042",
-          "namespace": ["user_123", "memories"],
-          "candidate_limit": 5,
-          "filter_expression": {"kind": "preference"},
-          "retrieval_artifact_id": "retrieval-request-memory-042",
-          "artifact_kind": "request",
-          "retrieval_scope_id": "scope-user-123-memories"
-        }
-        # This is the pre-execution request record; the StoreItem[] response belongs to RetrievalResult/CandidateSet.
-  reference_implementations:
-    - name: LangGraph Store search
-      url: https://docs.langchain.com/oss/python/langgraph/add-memory
-      description: Official example of namespace-scoped search with query and limit.
+  aliases: []
 structure:
-  identity_keys: [request_id]
+  identity_keys:
+    - request_id
   fields:
     - id: request_id
-      labels: {zh: 请求标识, en: request ID, ja: request ID}
+      labels:
+        zh: 请求标识
+        en: request ID
+        ja: request ID
       datatype: string
       required: true
-      cardinality: {min: 1, max: 1}
+      cardinality:
+        min: 1
+        max: 1
       definitions:
-        zh: 稳定标识一次已提交但尚未执行的检索意图。
-        en: Stably identifies one submitted, pre-execution retrieval intent.
-        ja: 一つの submitted かつ pre-execution retrieval intent を安定識別します。
+        zh: 稳定标识一次检索意图记录。
+        en: Stable identifier for one retrieval-intent record.
+        ja: 一つのretrieval-intent recordを安定識別します。
       allowed_values: []
       pattern: null
-      example_value: memory-request-042
-      source_claims: [claim-retrieval-request-contract]
-    - id: query_id
-      labels: {zh: 查询引用, en: query reference, ja: query reference}
+      example_value: retrieval-request-419
+      source_claims:
+        - claim-retrieval-request-002
+    - id: index_version_id
+      labels:
+        zh: 目标索引版本
+        en: target index version ID
+        ja: target index version ID
       datatype: string
       required: true
-      cardinality: {min: 1, max: 1}
+      cardinality:
+        min: 1
+        max: 1
       definitions:
-        zh: 指向该请求要解释或编码的 RetrievalQuery；不复制候选结果。
-        en: Points to the RetrievalQuery the request will interpret or encode; it does not copy candidate results.
-        ja: request が解釈または encode する RetrievalQuery を指し、candidate result を複写しません。
+        zh: 声明请求希望查询的不可替代索引版本。
+        en: Declares the non-substitutable index version the request intends to query.
+        ja: requestがqueryする置換不能index versionを宣言します。
       allowed_values: []
       pattern: null
-      example_value: query-042
-      source_claims: [claim-retrieval-request-contract]
-    - id: namespace
-      labels: {zh: 检索范围, en: retrieval namespace, ja: retrieval namespace}
-      datatype: json
-      required: true
-      cardinality: {min: 1, max: 1}
-      definitions:
-        zh: 限定搜索到一个逻辑存储范围或等效索引作用域，避免把所有用户或集合混在一起查询。
-        en: Limits search to one logical store namespace or equivalent index scope instead of querying mixed users or collections.
-        ja: 混在った user や collection を検索せず、一つの logical store namespace または同等の index scope に検索を制限します。
-      allowed_values: []
-      pattern: null
-      example_value: '["user_123", "memories"]'
-      source_claims: [claim-retrieval-request-store-search]
-    - id: candidate_limit
-      labels: {zh: 候选上限, en: candidate limit, ja: candidate limit}
+      example_value: index-v19
+      source_claims:
+        - claim-retrieval-request-003
+    - id: requested_limit
+      labels:
+        zh: 请求结果上限
+        en: requested result limit
+        ja: 要求result上限
       datatype: integer
       required: true
-      cardinality: {min: 1, max: 1}
+      cardinality:
+        min: 1
+        max: 1
       definitions:
-        zh: 请求检索运行最多产生的候选数量；它不是已产生候选的计数。
-        en: Maximum number of candidates the retrieval run is asked to produce; it is not a count of candidates already produced.
-        ja: retrieval run に要求する最大 candidate 数であり、既に生成済み candidate の count ではありません。
+        zh: 声明请求希望返回的最大候选或结果数量。
+        en: Maximum number of candidates or results requested.
+        ja: 要求するcandidate/resultの最大数です。
       allowed_values: []
       pattern: null
-      example_value: 5
-      source_claims: [claim-retrieval-request-store-search]
-    - id: filter_expression
-      labels: {zh: 过滤表达式, en: filter expression, ja: filter expression}
-      datatype: json
-      required: false
-      cardinality: {min: 0, max: 1}
-      definitions:
-        zh: 可选的结构化条件，用于在检索前或检索中缩小范围；它不是查询文本的语义表示。
-        en: Optional structured condition that narrows scope before or during retrieval; it is not the semantic representation of query text.
-        ja: 検索前または中に scope を絞る任意 structured condition であり、query text の semantic representation ではありません。
-      allowed_values: []
-      pattern: null
-      example_value: '{"kind":"preference"}'
-      source_claims: [claim-retrieval-request-contract]
-    - id: retrieval_artifact_id
-      labels:
-        zh: 检索工件标识
-        en: retrieval artifact ID
-        ja: retrieval artifact ID
-      definitions:
-        zh: 稳定标识同一预执行检索请求作为 I/O 工件，不复用为活动、索引或模型响应标识。
-        en: Stably identifies the same pre-execution retrieval request as an I/O artifact and is not reused as an activity, index, or model-response ID.
-        ja: 同じ pre-execution retrieval request を I/O artifact として安定識別し、activity、index、model-response ID として再利用しない。
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: []
-      pattern: '^(?:retrieval-request|retrieval-result|candidate|retrieval-trace)-[A-Za-z0-9._-]+$'
-      example_value: retrieval-request-042
-      source_claims: [claim-retrieval-request-subtype]
-    - id: artifact_kind
-      labels:
-        zh: 工件种类
-        en: artifact kind
-        ja: artifact kind
-      definitions:
-        zh: 将本记录声明为 request 工件，而不以种类掩盖活动状态、评分方法或后续结果。
-        en: Declares this record to be a request artifact and does not use kind to conceal activity state, scoring method, or a later result.
-        ja: この record を request artifact として宣言し、kind で activity state、scoring method、後続 result を隠さない。
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: [request, result, candidate, trace]
-      pattern: null
-      example_value: request
-      source_claims: [claim-retrieval-request-subtype]
-    - id: retrieval_scope_id
-      labels:
-        zh: 检索范围标识
-        en: retrieval scope ID
-        ja: retrieval scope ID
-      definitions:
-        zh: 标识本请求限定的可检索范围，不等同于 namespace 的完整配置或权限授权。
-        en: Identifies the retrievable scope bounded by this request and is not the complete namespace configuration or an authorization grant.
-        ja: この request が限定する retrievable scope を識別し、完全な namespace configuration や authorization grant ではない。
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: []
-      pattern: '^scope-[A-Za-z0-9._-]+$'
-      example_value: scope-memory-042
-      source_claims: [claim-retrieval-request-store-search]
-  constraints:
-    - id: retrieval-request-inherits-retrieval-artifact-fields
-      severity: error
-      expression_language: plain
-      expression: RetrievalRequest is one RetrievalArtifact record. retrieval_artifact_id and request_id must resolve to the same submitted intent; artifact_kind must be request; retrieval_scope_id must identify the scope configured by namespace; and query_id, filters, and candidate_limit remain pre-execution request facts rather than a second parent artifact.
-      explanation:
-        zh: 检索请求是检索工件的真实特化；请求标识和 namespace 细化同一 I/O 对象，不能通过独立父工件回避通用种类和范围字段。
-        en: A retrieval request is a real retrieval-artifact specialization; its request ID and namespace refine one I/O object and cannot avoid generic kind and scope fields through an independent parent artifact.
-        ja: RetrievalRequest は真の RetrievalArtifact 特殊化であり、request ID と namespace は一つの I/O object を細化する。独立した親 artifact で一般 kind と scope field を回避してはならない。
-      source_claims: [claim-retrieval-request-subtype, claim-retrieval-request-contract]
-    - id: retrieval-request-preexecution-boundary
-      severity: error
-      expression_language: plain
-      expression: A RetrievalRequest must reference a query, a finite scope, and a positive candidate_limit; it must not carry returned candidate IDs, scores, or a completed_at value.
-      explanation:
-        zh: 请求只能记录执行前输入；候选、分数和完成状态属于 RetrievalRun 或 RetrievalResult，不能伪装成请求字段。
-        en: A request records pre-execution inputs only; candidates, scores, and completion state belong to RetrievalRun or RetrievalResult and cannot be disguised as request fields.
-        ja: request は pre-execution input だけを記録し、candidate・score・完了状態は RetrievalRun または RetrievalResult に属します。
-      source_claims: [claim-retrieval-request-contract]
-    - id: retrieval-request-limit-positive
-      severity: error
-      expression_language: plain
-      expression: candidate_limit must be an integer greater than zero and applies only to the declared namespace or index scope.
-      explanation:
-        zh: 结果上限必须是正整数并在已声明范围内解释，避免无界或跨范围检索请求。
-        en: The result limit must be a positive integer interpreted within the declared scope, avoiding unbounded or cross-scope retrieval requests.
-        ja: result limit は宣言 scope 内で解釈される正整数であり、無制限または cross-scope request を避けます。
-      source_claims: [claim-retrieval-request-store-search]
-  required_relations: []
+      example_value: 12
+      source_claims:
+        - claim-retrieval-request-004
+  constraints: []
+  required_relation_constraints: []
 examples:
-  - id: retrieval-request-positive-example
-
-    labels: {zh: 用户偏好检索请求, en: User-preference retrieval request, ja: User-preference retrieval request}
-
+  - id: RetrievalRequest-example-positive-manual-001
+    kind: positive
+    labels:
+      zh: 检索请求正例
+      en: "Positive case: Retrieval request"
+      ja: 検索要求正例
+    scenario_id: null
     descriptions:
-      zh: Lewis et al. 2020 RAG：p(y|x)=Σ_z p(z|x)·p(y|x,z) 检索 z 增强生成；HyDE 先 LLM 生成假设文档再 embedding 检索；MemGPT archival_memory_search(query, page=0)。
-      en: Lewis et al. 2020 RAG: p(y|x)=Σ_z p(z|x)·p(y|x,z) retrieves z to augment generation; HyDE generates hypothetical doc then embeds for retrieval; MemGPT archival_memory_search(query, page=0).
-      ja: Lewis RAG p(y|x,z)。HyDE 仮説 doc embedding。MemGPT archival_memory_search(page=0)。
-    field_values: {request_id: memory-request-042, query_id: query-042, namespace: '["user_123", "memories"]', candidate_limit: 5, filter_expression: '{"kind":"preference"}', retrieval_artifact_id: retrieval-request-memory-042, artifact_kind: request, retrieval_scope_id: scope-user-123-memories}
-    related_node_ids: [RetrievalRequest, RetrievalQuery, RetrievalFilter]
+      zh: request-419 固定 query-419、filter-419、index-v19 与 12 条结果上限。
+      en: request-419 fixes query-419, filter-419, index-v19, and a 12-result limit.
+      ja: request-419 はquery-419・filter-419・index-v19・result limit 12を固定します。
+    field_values:
+      request_id: retrieval-request-419
+      index_version_id: index-v19
+      requested_limit: 12
+      artifact_id: retrieval-request-419
+      created_at: 2026-07-16T11:59:00Z
+    related_node_ids:
+      - RetrievalRequest
     related_relation_ids: []
-
-    source_claims: [claim-retrieval-request-store-search]
-  - id: retrieval-request-boundary-example
-
-    labels: {zh: 执行中的检索运行, en: Executing retrieval run, ja: Executing retrieval run}
-
+    expected_result:
+      zh: 归类为 RetrievalRequest。
+      en: Classify the object as RetrievalRequest.
+      ja: RetrievalRequest として分類します。
+    why_valid_or_invalid:
+      zh: 执行前输入边界完整且具有独立请求身份。
+      en: The pre-execution input boundary is complete and has an independent request identity.
+      ja: 実行前input boundaryが完全で独立request identityを持ちます。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-retrieval-request-005
+  - id: RetrievalRequest-example-boundary-manual-001
+    kind: boundary
+    labels:
+      zh: 检索请求边界例
+      en: "Boundary case: Retrieval request"
+      ja: 検索要求境界例
+    scenario_id: null
     descriptions:
-      zh: Self-RAG [Retrieve] token 自适应决定是否发起检索 vs 无条件 RetrievalRequest；RAG-Sequence vs RAG-Token 变体影响请求粒度。
-      en: Self-RAG [Retrieve] token adaptively decides retrieval vs unconditional RetrievalRequest; RAG-Sequence vs RAG-Token variants affect request granularity.
-      ja: Self-RAG [Retrieve] adaptive vs 無条件 RetrievalRequest。RAG-Sequence vs RAG-Token。
-    field_values: {request_id: memory-request-042}
-    related_node_ids: [RetrievalRequest, RetrievalRun, RetrievedCandidate]
+      zh: run-419 已开始读取 index-v19 并产生候选。
+      en: run-419 has started reading index-v19 and producing candidates.
+      ja: run-419 はindex-v19を読みcandidate生成を開始しています。
+    field_values: {}
+    related_node_ids:
+      - RetrievalRequest
     related_relation_ids: []
-
-    source_claims: [claim-retrieval-request-output-boundary]
-  - id: retrieval-request-counterexample-example
-
-    labels: {zh: 把搜索结果写回请求, en: Writing search results into the request, ja: Writing search results into the request}
-
-    descriptions:
-      zh: 反例：RetrievalRequest 携带 returned candidate IDs 或 similarity scores，违反 pre-execution 请求边界。
-      en: Counterexample: RetrievalRequest carries returned candidate IDs or similarity scores, violating pre-execution request boundary.
-      ja: 反例：RetrievalRequest が candidate ID/score を含み pre-execution 境界違反。
-    field_values: {request_id: mixed-request-9, query_id: query-9, namespace: '["user_123", "memories"]', candidate_limit: 5}
-    related_node_ids: [RetrievalRequest, RetrievalRun, RetrievalResult]
-    related_relation_ids: []
-
-    source_claims: [claim-retrieval-request-output-boundary]
-  - id: retrieval-request-instance-example
-
-    labels: {zh: 实例：支持记忆检索请求, en: "Instance: support-memory retrieval request", ja: "Instance: support-memory retrieval request"}
-
-    descriptions:
-      zh: HyDE: query→LLM hypothetical passage→embed(hypothesis)→nearest neighbor search；ChromaDB collection.query(query_texts=[q], n_results=20)。
-      en: HyDE: query→LLM hypothetical passage→embed(hypothesis)→nearest neighbor; ChromaDB collection.query(n_results=20).
-      ja: HyDE query→仮説 passage→embed→nearest neighbor。ChromaDB query n_results=20。
-    field_values: {request_id: support-memory-request-20260718-01, query_id: support-query-20260718-01, namespace: '["u-123", "memories"]', candidate_limit: 3, retrieval_artifact_id: retrieval-request-support-20260718-01, artifact_kind: request, retrieval_scope_id: scope-u-123-memories}
-    related_node_ids: [RetrievalRequest, RetrievalQuery, MemoryNamespace]
-    related_relation_ids: []
-
-    source_claims: [claim-retrieval-request-store-search]
+    expected_result:
+      zh: 不得归类为 RetrievalRequest。
+      en: Do not classify the object as RetrievalRequest.
+      ja: RetrievalRequest として分類しません。
+    why_valid_or_invalid:
+      zh: 它是履行请求的活动，不是 RetrievalRequest 本身。
+      en: It is the activity fulfilling the request, not the RetrievalRequest itself.
+      ja: requestを履行するactivityでRetrievalRequest自体ではありません。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-retrieval-request-006
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation:
+  - sibling_concept_id: RetrievalResult
+    shared_parent_concept_id: RetrievalArtifact
+    differentia:
+      zh: 已审查兄弟区分：父节点 RetrievalArtifact：RetrievalRequest（semantic kind=information，骨架 RetrievalRequest-is_a-RetrievalArtifact）；RetrievalResult（semantic kind=information，骨架 RetrievalResult-is_a-RetrievalArtifact）。双端条件：RetrievalRequest 条件：“在执行前固定查询、过滤条件、目标索引版本和结果上限的请求产物”；RetrievalResult 条件：“一次检索运行完成后封装候选集合、最终保留候选和完成状态的结果产物”。任一条件成立不推出另一端。
+      en: "Reviewed sibling distinction: parent RetrievalArtifact: RetrievalRequest (semantic kind=information, backbone RetrievalRequest-is_a-RetrievalArtifact); RetrievalResult (semantic kind=information, backbone RetrievalResult-is_a-RetrievalArtifact). Endpoint conditions: RetrievalRequest condition: “A request artifact that fixes the query, filters, target index version, and result limit before execution”; RetrievalResult condition: “A result artifact that packages the candidate set, retained candidates, and completion state after one retrieval run”. Either condition leaves the other unproven."
+      ja: 審査済み兄弟区別：親 RetrievalArtifact：RetrievalRequest（semantic kind=information、バックボーン RetrievalRequest-is_a-RetrievalArtifact）；RetrievalResult（semantic kind=information、バックボーン RetrievalResult-is_a-RetrievalArtifact）。両端条件：RetrievalRequest の条件：「実行前にquery・filter・target index version・result limitを固定するrequest artifactです」；RetrievalResult の条件：「一retrieval run完了後にcandidate set・retained candidate・completion stateをまとめるresult artifactです」。一方の成立は他方を証明しません。
+    source_claims:
+      - claim-retrieval-request-007
+  - sibling_concept_id: RetrievedCandidate
+    shared_parent_concept_id: RetrievalArtifact
+    differentia:
+      zh: 端点特定对照：父节点 RetrievalArtifact：RetrievalRequest（semantic kind=information，骨架 RetrievalRequest-is_a-RetrievalArtifact）；RetrievedCandidate（semantic kind=information，骨架 RetrievedCandidate-is_a-RetrievalArtifact）。双端条件：RetrievalRequest 条件：“在执行前固定查询、过滤条件、目标索引版本和结果上限的请求产物”；RetrievedCandidate 条件：“在一个候选集合中引用实际内容对象并记录阶段排名与分数的候选产物”。条件不得互借；各自成立后方可归类。
+      en: "Endpoint-specific contrast: parent RetrievalArtifact: RetrievalRequest (semantic kind=information, backbone RetrievalRequest-is_a-RetrievalArtifact); RetrievedCandidate (semantic kind=information, backbone RetrievedCandidate-is_a-RetrievalArtifact). Endpoint conditions: RetrievalRequest condition: “A request artifact that fixes the query, filters, target index version, and result limit before execution”; RetrievedCandidate condition: “A candidate artifact that refers to an actual content object and records stage rank and scores within a candidate set”. Conditions cannot be borrowed; classify each endpoint only from its own evidence."
+      ja: 端点別対照：親 RetrievalArtifact：RetrievalRequest（semantic kind=information、バックボーン RetrievalRequest-is_a-RetrievalArtifact）；RetrievedCandidate（semantic kind=information、バックボーン RetrievedCandidate-is_a-RetrievalArtifact）。両端条件：RetrievalRequest の条件：「実行前にquery・filter・target index version・result limitを固定するrequest artifactです」；RetrievedCandidate の条件：「candidate set内でactual content objectを参照しstage rankとscoreを記録するcandidate artifactです」。条件を流用せず、各端を固有の証拠で分類します。
+    source_claims:
+      - claim-retrieval-request-008
 parent_relation:
   id: RetrievalRequest-is_a-RetrievalArtifact
   predicate: is_a
-  target: concept:RetrievalArtifact
-  endpoint_order: child-to-parent
-  direction: source-to-target
+  direction: target-to-source
   relation_kind: hierarchy
-  labels: {zh: 是检索产物的请求子类, en: is a request subtype of retrieval artifact, ja: request としての RetrievalArtifact 下位型である}
+  labels:
+    zh: 是一种RetrievalArtifact
+    en: is a RetrievalArtifact
+    ja: RetrievalArtifactの一種
   definitions:
-    zh: RetrievalRequest 是记录检索执行前输入合同的 RetrievalArtifact。
-    en: RetrievalRequest is the RetrievalArtifact that records a retrieval run's pre-execution input contract.
-    ja: RetrievalRequest は retrieval run の pre-execution input contract を記録する RetrievalArtifact です。
-  cardinality: {source: {min: 0, max: null}, target: {min: 1, max: 1}}
-  cardinality_not_applicable_reason: null
-  inverse_reading: {predicate: has_retrieval_request_subtype, labels: {zh: 具有检索请求子类, en: has retrieval-request subtype, ja: retrieval-request 下位型を持つ}}
-  conditions: []
+    zh: RetrievalRequest —is_a→ RetrievalArtifact 成立，因为它是在执行前固定查询、过滤条件、目标索引版本和结果上限的持久请求记录。
+    en: RetrievalRequest —is_a→ RetrievalArtifact holds because it is the persistent pre-execution record fixing query, filter, target index version, and result limit.
+    ja: RetrievalRequest —is_a→ RetrievalArtifact は実行前にquery・filter・target index version・result limitを固定するpersistent request recordであるため成立します。
+  cardinality: null
+  cardinality_not_applicable_reason:
+    zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
+    en: The relation is decided per auditable fact; no universal runtime cardinality is imposed at ontology level.
+    ja: このrelationはaudit可能fact単位で判定しontology層で一律runtime cardinalityを課しません。
+  inverse_reading:
+    predicate: part_of
+    labels:
+      zh: 反向读取
+      en: inverse is_a
+      ja: 逆方向読取
+  conditions:
+    - id: RetrievalRequest-is_a-RetrievalArtifact-condition-manual-001
+      severity: error
+      expression_language: plain
+      expression: "Assert only when the instance satisfies the complete RetrievalArtifact definition and the child differentia: it is the persistent pre-execution record fixing query, filter, target index version, and result limit."
+      explanations:
+        zh: 仅当实例既满足 RetrievalArtifact 的完整定义，又满足子类种差“它是在执行前固定查询、过滤条件、目标索引版本和结果上限的持久请求记录。”时建立该边。
+        en: "Assert only when the instance satisfies the complete RetrievalArtifact definition and the child differentia: it is the persistent pre-execution record fixing query, filter, target index version, and result limit."
+        ja: instanceがRetrievalArtifact完全定義とchild differentia「実行前にquery・filter・target index version・result limitを固定するpersistent request recordである」を共に満たす時だけassertします。
+      source_claims:
+        - claim-retrieval-request-009
   temporal_scope: timeless
-  boundary_context: A result-bearing execution record is not a request subtype.
+  boundary_context: null
   constraints: []
-  examples: []
-  source_claims: [claim-retrieval-request-subtype]
-  distinct_fact_rationale: A pre-execution input record is a retrieval artifact, but differs from a result artifact because it contains no candidate outcome.
+  examples:
+    - id: RetrievalRequest-is_a-RetrievalArtifact-example-positive-manual-001
+      kind: positive
+      labels:
+        zh: 是一种RetrievalArtifact正例
+        en: "Positive case: is a RetrievalArtifact"
+        ja: RetrievalArtifactの一種正例
+      scenario_id: null
+      descriptions:
+        zh: request-419 固定本次检索输入但尚未执行。
+        en: request-419 fixes retrieval inputs before execution.
+        ja: request-419が実行前retrieval inputを固定します。
+      field_values: {}
+      related_node_ids:
+        - RetrievalRequest
+        - RetrievalArtifact
+      related_relation_ids:
+        - RetrievalRequest-is_a-RetrievalArtifact
+      expected_result:
+        zh: 建立该有向事实，并保留条件与证据。
+        en: Assert the directed fact with its condition and evidence retained.
+        ja: condition/evidenceを保持してdirected factをassertします。
+      why_valid_or_invalid:
+        zh: 实例满足端点定义、方向和该关系的显式成立条件。
+        en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
+        ja: endpoint定義・direction・明示assertion conditionを満たします。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-retrieval-request-009
+    - id: RetrievalRequest-is_a-RetrievalArtifact-example-boundary-manual-001
+      kind: boundary
+      labels:
+        zh: 是一种RetrievalArtifact边界例
+        en: "Boundary case: is a RetrievalArtifact"
+        ja: RetrievalArtifactの一種境界例
+      scenario_id: null
+      descriptions:
+        zh: run-411 已经开始执行并具有活动时间边界。
+        en: run-411 has started execution and has an activity boundary.
+        ja: run-411は実行開始済みでactivity boundaryがあります。
+      field_values: {}
+      related_node_ids:
+        - RetrievalRequest
+        - RetrievalArtifact
+      related_relation_ids:
+        - RetrievalRequest-is_a-RetrievalArtifact
+      expected_result:
+        zh: 验证器不得建立该有向关系事实。
+        en: Do not assert the directed fact.
+        ja: directed factをassertしません。
+      why_valid_or_invalid:
+        zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
+        en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
+        ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-retrieval-request-009
+  source_claims:
+    - claim-retrieval-request-009
+  distinct_fact_rationale: null
   layout_role: primary-backbone
-relations: []
-sources:
-  - id: langgraph-add-memory
-    title: LangGraph Memory
-    url: https://docs.langchain.com/oss/python/langgraph/add-memory
-    source_type: official-documentation
-    relevance: Documents namespace-scoped Store search with query and limit, and distinguishes search from writing with put or aput.
+  review_status: pending
+  endpoint_order: child-to-parent
+relations:
+  - id: RetrievalRequest-targets-IndexVersion
+    predicate: targets
+    direction: source-to-target
+    relation_kind: information
+    labels:
+      zh: targets IndexVersion
+      en: targets IndexVersion
+      ja: IndexVersionをtargets
+    definitions:
+      zh: RetrievalRequest —targets→ IndexVersion 表示请求在执行前声明希望查询的不可替代索引版本。
+      en: RetrievalRequest —targets→ IndexVersion states that the request declares the non-substitutable index version it intends to query before execution.
+      ja: RetrievalRequest —targets→ IndexVersion はrequestが実行前にquery予定の置換不能index versionを宣言します。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
+      en: The relation is decided per auditable fact; no universal runtime cardinality is imposed at ontology level.
+      ja: このrelationはaudit可能fact単位で判定しontology層で一律runtime cardinalityを課しません。
+    inverse_reading:
+      predicate: inverse_targets
+      labels:
+        zh: 反向读取
+        en: inverse targets
+        ja: 逆方向読取
+    conditions:
+      - id: RetrievalRequest-targets-IndexVersion-condition-manual-001
+        severity: error
+        expression_language: plain
+        expression: Assert only when request.index_version_id explicitly equals this IndexVersion identifier.
+        explanations:
+          zh: 仅当 request.index_version_id 明确等于该 IndexVersion 的标识时建立该边。
+          en: Assert only when request.index_version_id explicitly equals this IndexVersion identifier.
+          ja: request.index_version_idがこのIndexVersion IDと明示一致する時だけassertします。
+        source_claims:
+          - claim-retrieval-request-010
+    temporal_scope: valid-time
+    boundary_context: null
+    constraints: []
+    examples:
+      - id: RetrievalRequest-targets-IndexVersion-example-positive-manual-001
+        kind: positive
+        labels:
+          zh: targets IndexVersion正例
+          en: "Positive case: targets IndexVersion"
+          ja: IndexVersionをtargets正例
+        scenario_id: null
+        descriptions:
+          zh: request-419 targets index-v19。
+          en: request-419 targets index-v19.
+          ja: request-419がindex-v19をtargetにします。
+        field_values: {}
+        related_node_ids:
+          - RetrievalRequest
+          - IndexVersion
+        related_relation_ids:
+          - RetrievalRequest-targets-IndexVersion
+        expected_result:
+          zh: 建立该有向事实，并保留条件与证据。
+          en: Assert the directed fact with its condition and evidence retained.
+          ja: condition/evidenceを保持してdirected factをassertします。
+        why_valid_or_invalid:
+          zh: 实例满足端点定义、方向和该关系的显式成立条件。
+          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
+          ja: endpoint定義・direction・明示assertion conditionを満たします。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-retrieval-request-010
+      - id: RetrievalRequest-targets-IndexVersion-example-boundary-manual-001
+        kind: boundary
+        labels:
+          zh: targets IndexVersion边界例
+          en: "Boundary case: targets IndexVersion"
+          ja: IndexVersionをtargets境界例
+        scenario_id: null
+        descriptions:
+          zh: 仅因 index-v19 是最新版本不能建立目标边。
+          en: Being the latest version alone does not make index-v19 the request target.
+          ja: index-v19がlatestだけではrequest targetになりません。
+        field_values: {}
+        related_node_ids:
+          - RetrievalRequest
+          - IndexVersion
+        related_relation_ids:
+          - RetrievalRequest-targets-IndexVersion
+        expected_result:
+          zh: 验证器不得建立该有向关系事实。
+          en: Do not assert the directed fact.
+          ja: directed factをassertしません。
+        why_valid_or_invalid:
+          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
+          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
+          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-retrieval-request-010
+    source_claims:
+      - claim-retrieval-request-010
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: accepted
+    target: concept:IndexVersion
+review:
+  status: accepted
+  method: manual-semantic
+  reviewer: manual-memory-retrieval-verification
+  reviewed_on: 2026-07-17
+  note:
+    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
+    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
+    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
+  sections:
+    semantics: accepted
+    hierarchy: accepted
+    relations: accepted
+    structure: accepted
+    examples: accepted
+    source_claims: accepted
 source_claims:
-  - id: claim-retrieval-request-store-search
-    source: langgraph-add-memory
-    supports: LangGraph Store search accepts a namespace, query, and limit and returns matching store items, providing the operational input boundary for a retrieval request.
-    locator: "Memory guide: Long-term memory with semantic search; store.search(namespace, query, limit)"
-    evidence_kind: official-documentation
+  - id: claim-retrieval-request-001
+    source: eng-fw-langchain-retrieval
+    supports: LangChain defines a retriever as accepting a string query and returning Documents; Moonweave packages the query, target version, constraints, and limit into a stable request record.
+    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-retrieval-request-contract
-    source: langgraph-add-memory
-    supports: Separating a persisted query/scope/limit input contract from the later search invocation and its returned items is a Moonweave modeling decision grounded in the documented Store search API.
-    locator: "Memory guide: Access the store inside nodes"
-    evidence_kind: ontology-design-inference
+    review_status: accepted
+  - id: claim-retrieval-request-002
+    source: eng-fw-langchain-retrieval
+    supports: "LangChain defines a retriever as accepting a string query and returning Documents; Moonweave packages the query, target version, constraints, and limit into a stable request record. Moonweave records RetrievalRequest.request_id as the stated auditable datum: Stable identifier for one retrieval-intent record."
+    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-retrieval-request-output-boundary
-    source: langgraph-add-memory
-    supports: The documented search call returns items after it receives namespace, query, and limit; treating those items and run completion as request fields would collapse input and output stages.
-    locator: "Memory guide: Long-term memory with semantic search"
-    evidence_kind: ontology-design-inference
+    review_status: accepted
+  - id: claim-retrieval-request-003
+    source: eng-fw-langchain-retrieval
+    supports: "LangChain defines a retriever as accepting a string query and returning Documents; Moonweave packages the query, target version, constraints, and limit into a stable request record. Moonweave records RetrievalRequest.index_version_id as the stated auditable datum: Declares the non-substitutable index version the request intends to query."
+    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-retrieval-request-subtype
-    source: langgraph-add-memory
-    supports: A pre-execution artifact that fixes Store-search inputs is modeled by Moonweave as a request subtype of RetrievalArtifact; this is an ontology taxonomy inference, not an API type name.
-    locator: "Memory guide: Access the store inside nodes"
-    evidence_kind: ontology-design-inference
-    confidence: medium
+    review_status: accepted
+  - id: claim-retrieval-request-004
+    source: eng-fw-langchain-retrieval
+    supports: "LangChain defines a retriever as accepting a string query and returning Documents; Moonweave packages the query, target version, constraints, and limit into a stable request record. Moonweave records RetrievalRequest.requested_limit as the stated auditable datum: Maximum number of candidates or results requested."
+    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-retrieval-request-005
+    source: eng-fw-langchain-retrieval
+    supports: LangChain defines a retriever as accepting a string query and returning Documents; Moonweave packages the query, target version, constraints, and limit into a stable request record. The retriever interface accepts a query and retrieval configuration before returning documents.
+    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-retrieval-request-006
+    source: eng-fw-langchain-retrieval
+    supports: LangChain defines a retriever as accepting a string query and returning Documents; Moonweave packages the query, target version, constraints, and limit into a stable request record. LangChain distinguishes the input supplied to a retriever from the retriever invocation.
+    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-retrieval-request-007
+    source: eng-fw-langchain-retrieval
+    supports: LangChain's retriever interface accepts an unstructured query and returns documents, separating retrieval input from retrieval output. Moonweave makes that boundary auditable by modeling RetrievalRequest as the fixed query, filters, and target version, and RetrievalResult as the resulting candidate package; their fields and sibling placement are Moonweave-specific.
+    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-retrieval-request-008
+    source: eng-fw-langchain-retrieval
+    supports: LangChain describes retrieval as taking a query and returning relevant documents through a retriever. Moonweave distinguishes the RetrievalRequest that fixes the input conditions from each RetrievedCandidate that identifies returned content and its retrieval evidence; this object-level split is a Moonweave ontology inference.
+    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-retrieval-request-009
+    source: eng-fw-langchain-retrieval
+    supports: The official documentation supports the operational distinction used in this child differentia; Moonweave's RetrievalRequest-to-RetrievalArtifact subclass placement is an explicit ontology design decision.
+    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-retrieval-request-010
+    source: eng-fw-langchain-retrieval
+    supports: The cited official documentation supports the endpoint roles and direction of this retrieval fact; the exact relation identifier and ownership boundary are Moonweave design decisions.
+    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted

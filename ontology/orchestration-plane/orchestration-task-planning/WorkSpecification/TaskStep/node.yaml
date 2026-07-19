@@ -1,6 +1,7 @@
 schema: moonweave.ai/ontology-node/v1
 id: TaskStep
 kind: concept
+status: accepted
 labels:
   zh: 任务步骤
   en: task step
@@ -28,49 +29,6 @@ semantics:
       ja: タスク全体の最終結果定義、現在の実行状態、ツール呼出し応答、所要時間、ステップ失敗イベントは含みません。
   semantic_kind: specification
   aliases: []
-engineering:
-  explanation:
-    zh: >-
-      每个 TaskStep 编译为 LangGraph 具名节点函数，其 action_spec 决定节点内工具调用或 LLM 调用；Agents SDK 中
-      对应一个带 instructions 的 Agent 或一次 tool-enabled Runner 步骤。节点返回的 state 更新写入 checkpoint，
-      不修改 TaskStep 的 position 或 expected_output；A2A input-required 状态只影响协议 Task，不改变计划步骤规约。
-    en: >-
-      Each TaskStep compiles to a named LangGraph node function whose action_spec determines in-node tool or LLM calls; in the
-      Agents SDK it corresponds to an Agent with instructions or one tool-enabled Runner step. Node state updates write to
-      checkpoints without changing TaskStep position or expected_output; A2A input-required status affects only the protocol
-      Task, not the plan step specification.
-    ja: >-
-      各 TaskStep は LangGraph の named node function にコンパイルされ、action_spec が node 内 tool または LLM call を決める。
-      Agents SDK では instructions を持つ Agent または tool-enabled Runner step に対応する。node の state update は checkpoint
-      に書き込まれ TaskStep の position や expected_output は変更しない。A2A input-required status は protocol Task にのみ
-      影響し plan step specification は変更しない。
-  typical_input:
-    - description:
-        zh: 计划内一步的输入、动作与预期输出声明。
-        en: A plan step declaration with input, action, and expected output.
-        ja: input、action、expected output を持つ plan step declaration。
-      format: |-
-        {"step_id":"step:reconcile","plan_ref":"plan:ledger-reconcile-2026-07","plan_revision":"v2","position":2,"action_spec":{"kind":"tool","tool_name":"ledger.reconcile"},"required_input_refs":["ledger-snapshot@2"],"expected_output_ref":"reconciliation-report@3"}
-  typical_output:
-    - description:
-        zh: 图编译器注册的节点绑定，不含节点执行后的 state 快照。
-        en: A node binding registered by a graph compiler, without the post-execution state snapshot.
-        ja: graph compiler が登録した node binding。実行後 state snapshot は含まない。
-      format: |-
-        {"step_ref":"step:reconcile","graph_node":"reconcile","adapter":"langgraph","depends_on":["step:fetch"],"tool_call_plan_ref":"tcp:reconcile-ledger@1"}
-  reference_implementations:
-    - name: LangGraph Graph API
-      url: https://docs.langchain.com/oss/python/langgraph/graph-api
-      description: Documents add_node and node functions that return state updates at runtime.
-    - name: OpenAI Agents SDK Running agents
-      url: https://openai.github.io/openai-agents-python/running_agents/
-      description: Documents Runner steps whose outputs are runtime facts, not plan revisions.
-    - name: A2A Protocol Specification
-      url: https://a2a-protocol.org/latest/specification/
-      description: Documents TASK_STATE_INPUT_REQUIRED as protocol runtime status, not plan structure.
-  source_claims:
-    - claim-task-step-002
-    - claim-task-step-009
 structure:
   identity_keys: []
   fields:
@@ -209,16 +167,41 @@ structure:
         - claim-task-step-009
 examples:
   - id: TaskStep-example-positive-manual-001
+    kind: positive
     labels:
-      zh: TaskStep positive
-      en: TaskStep positive
-      ja: TaskStep positive
+      zh: 任务步骤正例
+      en: Positive example for task step
+      ja: タスクステップの正例
+    scenario_id: null
     descriptions:
-      zh: ReAct (Yao et al., 2023) 在 TaskStep 场景实现 Thought→Action→Observation 交替循环：agent 输出 Thought（推理当前应做什么），执行 Action（如 Search["query"] 或 Lookup["term"]），获得 Observation（环境反馈），再生成下一个 Thought。HotpotQA 上 ReAct 通过多步推理+搜索达到比 CoT 更高准确率；LangChain create_react_agent() 直接实现此模式。
-      en: ReAct (Yao et al., 2023) implements Thought→Action→Observation loops for TaskStep: agent outputs Thought (reasoning), executes Action (e.g. Search["query"]), receives Observation (feedback), then next Thought. On HotpotQA ReAct beats CoT via multi-step reasoning+search; LangChain create_react_agent() implements this pattern.
-      ja: ReAct (Yao et al., 2023) が TaskStep で Thought→Action→Observation ループ：Thought 推論→Action Search["query"]→Observation→次 Thought。HotpotQA で CoT 超え；create_react_agent() 実装。
-    field_values: {position: 2}
-
+      zh: step-verify 位于 plan-release-12 的第 2 位，要求签名包作为输入，动作是验证签名，预期输出为 VerificationReport。
+      en: step-verify occupies position 2 in plan-release-12, requires a signed package, specifies signature verification, and expects a VerificationReport.
+      ja: step-verify は plan-release-12 の位置2にあり、署名済みパッケージを入力として要求し、署名検証を行い、VerificationReport を期待します。
+    field_values:
+      position: 2
+      input_contract:
+        type: SignedPackage
+        schema: signed-package@2
+        integrity: signature-present
+      action_specification:
+        operation: verify-package-signature
+        tool_call_plan_ref: ToolCallPlan:cosign-verify@1
+      output_contract:
+        type: VerificationReport
+        schema: verification-report@1
+        guarantees:
+          - signature_checked
+      work_specification_id: step-verify-signature
+      revision: "2"
+      intended_transformation: verify the package signature and produce a verification report
+      input_contract_refs:
+        - signed-package@2
+      output_contract_refs:
+        - verification-report@1
+      acceptance_basis_ref: signature-verification-success@1
+      applicability_boundary:
+        plan_ref: plan-release-12@3
+        position: 2
     related_node_ids:
       - TaskStep
       - WorkSpecification
@@ -229,143 +212,546 @@ examples:
       - TaskPlan-contains_step-TaskStep
       - TaskStep-depends_on-TaskStep
       - TaskStep-specifies-ToolCallPlan
+    expected_result:
+      zh: step-verify 是 TaskStep，可被依赖边引用并可指定验证工具的 ToolCallPlan。
+      en: step-verify is a TaskStep that dependency edges can reference and that may specify a ToolCallPlan for the verification tool.
+      ja: step-verify は TaskStep であり、依存辺から参照でき、検証ツール用 ToolCallPlan を指定できます。
+    why_valid_or_invalid:
+      zh: 记录给出计划归属、有序位置、动作输入和预期输出，足以建立稳定的步骤身份。
+      en: The record supplies plan membership, ordered position, action input, and expected output, establishing stable step identity.
+      ja: 計画所属、順序位置、動作入力、期待出力が示され、安定したステップ同一性を確立するためです。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
       - claim-task-step-010
-
   - id: TaskStep-example-boundary-manual-001
+    kind: boundary
     labels:
-      zh: TaskStep boundary
-      en: TaskStep boundary
-      ja: TaskStep boundary
+      zh: 任务步骤边界例
+      en: Boundary case for task step
+      ja: タスクステップの境界例
+    scenario_id: null
     descriptions:
-      zh: CoT 中间推理 token 是运行时 LLM 输出，不是 TaskStep 规范字段；投影时区分 ReasoningStep 事件与规约身份。
-      en: CoT intermediate reasoning tokens are runtime LLM output, not TaskStep specification fields; distinguish ReasoningStep events from spec identity in projection.
-      ja: CoT 中間推論 token は runtime 出力で TaskStep spec ではない。
-    field_values: {work_specification_id: step-event-995, revision: runtime-occurrence, position: 2}
-
+      zh: step-event-995 记录 step-verify 在 15:08 调用工具、耗时 420 ms 并返回 exit code 2。
+      en: step-event-995 records that step-verify invoked a tool at 15:08, took 420 ms, and returned exit code 2.
+      ja: step-event-995 は step-verify が 15:08 にツールを呼び、420 ms を要し、exit code 2 を返したことを記録します。
+    field_values:
+      work_specification_id: step-event-995
+      revision: runtime-occurrence
+      position: 2
+      input_contract:
+        observed_at: 2026-07-16T15:08:00Z
+      action_specification:
+        tool_call_id: tool-call-995
+        duration_ms: 420
+      output_contract:
+        exit_code: 2
     related_node_ids:
       - TaskStep
       - WorkSpecification
     related_relation_ids:
       - TaskStep-is_a-WorkSpecification
+    expected_result:
+      zh: step-event-995 是运行事件或 ToolCall，不是 TaskStep。
+      en: step-event-995 is a runtime event or ToolCall, not a TaskStep.
+      ja: step-event-995 は実行イベントまたは ToolCall であり、TaskStep ではありません。
+    why_valid_or_invalid:
+      zh: 时间、耗时和响应码描述一次发生；步骤规约在多次执行之间保持不变。
+      en: Timestamp, duration, and response code describe one occurrence, whereas the step specification remains stable across executions.
+      ja: 時刻、所要時間、応答コードは一回の出来事を表し、ステップ仕様は複数実行にわたり安定するためです。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
       - claim-task-step-011
-
-  - id: TaskStep-example-counterexample-confusable
-    labels:
-      zh: TaskStep counterexample
-      en: TaskStep counterexample
-      ja: TaskStep counterexample
-    descriptions:
-      zh: 自然语言计划列表无 Python/code 可执行步骤不能作为 TaskWeaver 式 TaskStep。
-      en: Natural-language plan list without Python/code executable steps cannot serve as TaskWeaver-style TaskStep.
-      ja: Python/code なし自然言語計画は TaskWeaver 式 TaskStep にならない。
-    field_values: {step_id: absent, step_kind: absent, runtime_node: approve}
-
-    related_node_ids:
-      - TaskStep
-      - TaskPlan
-      - WorkItem
-      - WorkSpecification
-      - ToolCallPlan
-    related_relation_ids: []
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation:
+  - sibling_concept_id: WorkItem
+    shared_parent_concept_id: WorkSpecification
+    differentia:
+      zh: 共享父节点对照：父节点 WorkSpecification：TaskStep（semantic kind=specification，骨架 TaskStep-is_a-WorkSpecification）；WorkItem（semantic kind=specification，骨架 WorkItem-is_a-WorkSpecification）。双端条件：TaskStep 条件：“任务步骤是以如下事实为区分特征的工作规约：它规定顺序、依赖、负责人、完成证据以及可选的调用计划；它不执行工具调用，执行身份由 ToolCall 与 ToolCallAttempt 承担”；WorkItem 条件：“工作项属于工作规约，区别于其他同类对象的条件是：它是从任务中拆出的可分配工作单元，可限定到参与者、工具、子智能体、路由或产物结果”。逐端验证；父节点不证明任一身份。
+      en: "Shared-parent contrast: parent WorkSpecification: TaskStep (semantic kind=specification, backbone TaskStep-is_a-WorkSpecification); WorkItem (semantic kind=specification, backbone WorkItem-is_a-WorkSpecification). Endpoint conditions: TaskStep condition: “Task step is a work specification; its differentiating condition is that it specifies ordering, dependencies, owner, completion evidence, and an optional invocation plan; it does not execute a tool call, whose execution identity belongs to ToolCall and ToolCallAttempt”; WorkItem condition: “Work item is a work specification whose defining condition is that it is an assignable unit of planned work derived from a task and scoped to an actor, tool, subagent, route, or artifact outcome”. Verify each endpoint; the parent proves neither identity."
+      ja: 共有親対照：親 WorkSpecification：TaskStep（semantic kind=specification、バックボーン TaskStep-is_a-WorkSpecification）；WorkItem（semantic kind=specification、バックボーン WorkItem-is_a-WorkSpecification）。両端条件：TaskStep の条件：「タスクステップは作業仕様の一種であり、次の条件で区別されます：タスク手順は順序、依存、担当者、完了証拠、任意の呼出し計画を規定します」；WorkItem の条件：「作業項目は作業仕様のうち、次の事実を定義条件とする対象です：それはタスクから派生する割り当て可能な作業単位で、参加者、道具、サブエージェント、経路、成果物に範囲づけられます」。各端を検証し、親だけでは同一性を証明しません。
     source_claims:
-      - claim-task-step-010
-
-  - id: TaskStep-example-instance-concrete
+      - claim-task-step-012
+parent_relation:
+  id: TaskStep-is_a-WorkSpecification
+  predicate: is_a
+  direction: target-to-source
+  relation_kind: hierarchy
+  labels:
+    zh: 是一种
+    en: is a
+    ja: の一種である
+  definitions:
+    zh: TaskStep —is_a→ WorkSpecification 表示步骤是规范性工作，其种差是所属 TaskPlan 中的有序位置以及该位置的输入、动作和预期输出。
+    en: TaskStep —is_a→ WorkSpecification classifies a step as normative work whose differentia is an ordered position in a TaskPlan together with that position's input, action, and expected output.
+    ja: TaskStep —is_a→ WorkSpecification は、TaskPlan 内の順序位置と、その位置の入力・動作・期待出力を種差とする規範的作業としてステップを分類します。
+  cardinality: null
+  cardinality_not_applicable_reason:
+    zh: 分类继承不使用实例关系基数。
+    en: Taxonomic inheritance does not use instance-relation cardinality.
+    ja: 分類継承にはインスタンス関係の基数を用いません。
+  inverse_reading:
+    predicate: part_of
     labels:
-      zh: TaskStep instance
-      en: TaskStep instance
-      ja: TaskStep instance
-    descriptions:
-      zh: ReAct 实例：Thought: I need to search... → Action: Search["2023 GDP France"] → Observation: France GDP was... → 映射 TaskStep 可审计实例。
-      en: ReAct instance: Thought: I need to search... → Action: Search["2023 GDP France"] → Observation: France GDP was... → maps to auditable TaskStep instance.
-      ja: ReAct 实例 Thought→Action Search→Observation が TaskStep 監査实例に写像。
-    field_values: {position: 2}
-
-    related_node_ids:
-      - TaskStep
-      - WorkSpecification
-      - TaskPlan
-      - ToolCallPlan
-    related_relation_ids: []
+      zh: 反向：是一种
+      en: has subtype
+      ja: 逆方向：の一種である
+  conditions: []
+  temporal_scope: timeless
+  boundary_context: null
+  constraints: []
+  examples:
+    - id: TaskStep-is_a-WorkSpecification-example-positive-manual-001
+      kind: positive
+      labels:
+        zh: 是一种正例
+        en: Positive example for is a
+        ja: の一種であるの正例
+      scenario_id: null
+      descriptions:
+        zh: step-sign 位于发布计划第 4 位，规定输入包、签名动作和 SignatureRecord 输出。
+        en: step-sign occupies position 4 in the release plan and specifies package input, signing action, and SignatureRecord output.
+        ja: step-sign は公開計画の位置4にあり、パッケージ入力、署名動作、SignatureRecord 出力を定めます。
+      field_values: {}
+      related_node_ids:
+        - TaskStep
+        - WorkSpecification
+      related_relation_ids:
+        - TaskStep-is_a-WorkSpecification
+      expected_result:
+        zh: step-sign 既是 TaskStep，也是 WorkSpecification。
+        en: step-sign is both TaskStep and WorkSpecification.
+        ja: step-sign は TaskStep であり WorkSpecification でもあります。
+      why_valid_or_invalid:
+        zh: 它完整具备计划位置和待执行动作规约，不包含一次执行状态。
+        en: It has a complete plan position and action specification and contains no one-run state.
+        ja: 完全な計画位置と実行予定動作仕様を持ち、一回の実行状態を含まないためです。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-task-step-013
+    - id: TaskStep-is_a-WorkSpecification-example-boundary-manual-001
+      kind: boundary
+      labels:
+        zh: 是一种边界例
+        en: Boundary case for is a
+        ja: の一種であるの境界例
+      scenario_id: null
+      descriptions:
+        zh: tool-call-17 记录 step-sign 实际调用签名服务并返回 503。
+        en: tool-call-17 records step-sign actually invoking the signing service and receiving HTTP 503.
+        ja: tool-call-17 は step-sign が実際に署名サービスを呼び HTTP 503 を受けたことを記録します。
+      field_values: {}
+      related_node_ids:
+        - TaskStep
+        - WorkSpecification
+      related_relation_ids:
+        - TaskStep-is_a-WorkSpecification
+      expected_result:
+        zh: 该对象是 ToolCall 运行活动，不是 TaskStep。
+        en: The object is a runtime ToolCall activity, not TaskStep.
+        ja: この対象は実行時 ToolCall 活動で、TaskStep ではありません。
+      why_valid_or_invalid:
+        zh: 响应码和实际调用属于一次发生，不能充当稳定步骤规约。
+        en: A response code and actual invocation belong to one occurrence and cannot serve as the stable step specification.
+        ja: 応答コードと実呼出しは一回の出来事に属し、安定ステップ仕様にはならないためです。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-task-step-014
+  source_claims:
+    - claim-task-step-015
+  distinct_fact_rationale: null
+  layout_role: primary-backbone
+  review_status: accepted
+  endpoint_order: child-to-parent
+relations:
+  - id: TaskStep-specifies-ToolCallPlan
+    predicate: specifies
+    direction: source-to-target
+    relation_kind: mapping
+    labels:
+      zh: specifies
+      en: specifies
+      ja: specifies
+    definitions:
+      zh: TaskStep —specifies→ ToolCallPlan 表示步骤规范选定一个尚未执行的工具调用意图、参数绑定与预期返回契约；实际 ToolCall 和响应留在运行层。
+      en: TaskStep —specifies→ ToolCallPlan means that the step defines a not-yet-executed tool-call intent, argument bindings, and expected return contract; the actual ToolCall and response remain in the runtime layer.
+      ja: TaskStep —specifies→ ToolCallPlan は、未実行のツール呼出し意図、引数束縛、期待戻り契約を定め、実際の ToolCall と応答は実行層に残すことを示します。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 该语义事实不对所有运行实例施加统一基数。
+      en: This semantic fact does not impose one universal cardinality on every runtime instance.
+      ja: この意味事実はすべての実行インスタンスに一律の基数を課しません。
+    inverse_reading:
+      predicate: inverse_of_specifies
+      labels:
+        zh: 反向 specifies
+        en: inverse specifies
+        ja: 逆 specifies
+    conditions: []
+    temporal_scope: timeless
+    boundary_context:
+      trust_boundary_concept_id: TrustBoundary
+      authority_basis:
+        zh: 任务步骤仍由 orchestration-task-planning 唯一拥有，工具调用计划仍由 tool-invocation-execution 唯一拥有；specifies 只建立跨域事实，不转移定义权。若该事实触发运行操作，还必须引用适用的 PolicyDecision 或 AuthorizationGrant。
+        en: task step remains uniquely owned by orchestration-task-planning and tool call plan by tool-invocation-execution; specifies establishes a cross-Domain fact without transferring definitional ownership. If the fact triggers a runtime operation, it must also reference an applicable PolicyDecision or AuthorizationGrant.
+        ja: タスクステップは orchestration-task-planning、ツール呼び出し計画は tool-invocation-execution に引き続き一意に所有されます。specifies は定義所有権を移さずドメイン横断事実だけを確立し、実行操作を起動する場合は適用される PolicyDecision または AuthorizationGrant も参照します。
+      protocol_or_resource_context:
+        zh: 查询沿 TaskStep-specifies-ToolCallPlan 的 source→target 方向、端点 canonical ID 与本关系来源主张执行；协议版本、资源身份和信任判定继续附着在原节点或原关系。
+        en: Queries follow the source-to-target direction, endpoint canonical IDs, and source claims of TaskStep-specifies-ToolCallPlan; protocol versions, resource identity, and trust decisions remain attached to the original nodes or relation.
+        ja: 照会は TaskStep-specifies-ToolCallPlan の source→target 方向、端点 canonical ID、当該関係の出典主張に従い、プロトコル版、資源同一性、信頼判断は元のノードまたは関係に保持されます。
+    constraints: []
+    examples:
+      - id: TaskStep-specifies-ToolCallPlan-example-positive-manual-001
+        kind: positive
+        labels:
+          zh: specifies正例
+          en: Positive example for specifies
+          ja: specifiesの正例
+        scenario_id: null
+        descriptions:
+          zh: step-lookup 指定 call-plan-search-v2：调用 search_documents，参数 query 来自上一步输出，期望 DocumentSet。
+          en: "step-lookup specifies call-plan-search-v2: invoke search_documents, bind query from the previous step, and expect DocumentSet."
+          ja: step-lookup は call-plan-search-v2 を指定し、search_documents を呼び、前ステップ出力を query へ束縛し、DocumentSet を期待します。
+        field_values: {}
+        related_node_ids:
+          - TaskStep
+          - ToolCallPlan
+        related_relation_ids:
+          - TaskStep-specifies-ToolCallPlan
+        expected_result:
+          zh: 建立 specifies 到 ToolCallPlan；执行时再创建独立 ToolCall。
+          en: Create specifies to ToolCallPlan and create a separate ToolCall only at execution time.
+          ja: ToolCallPlan への specifies を作成し、実行時にのみ別の ToolCall を作ります。
+        why_valid_or_invalid:
+          zh: 记录描述调用意图和参数来源，没有请求时间、响应或错误。
+          en: The record describes invocation intent and argument provenance with no request time, response, or error.
+          ja: 呼出し意図と引数由来を記述し、要求時刻・応答・エラーを持たないためです。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-task-step-016
+      - id: TaskStep-specifies-ToolCallPlan-example-boundary-manual-001
+        kind: boundary
+        labels:
+          zh: specifies边界例
+          en: Boundary case for specifies
+          ja: specifiesの境界例
+        scenario_id: null
+        descriptions:
+          zh: tool-call-search-88 已发送请求并返回 12 个文档及 850 ms 延迟。
+          en: tool-call-search-88 has sent the request and returned 12 documents with 850 ms latency.
+          ja: tool-call-search-88 は要求送信済みで、12文書と850 ms の遅延を返しました。
+        field_values: {}
+        related_node_ids:
+          - TaskStep
+          - ToolCallPlan
+        related_relation_ids:
+          - TaskStep-specifies-ToolCallPlan
+        expected_result:
+          zh: 该对象是实际 ToolCall，不能作为 specifies 的 ToolCallPlan。
+          en: The object is an actual ToolCall and cannot serve as the ToolCallPlan target of specifies.
+          ja: この対象は実 ToolCall で、specifies の ToolCallPlan 対象にはできません。
+        why_valid_or_invalid:
+          zh: 实际响应和延迟使其成为运行活动，而非尚未执行的调用规范。
+          en: Actual response and latency make it a runtime activity rather than a not-yet-executed call specification.
+          ja: 実応答と遅延を持つので、未実行の呼出し仕様ではなく実行活動だからです。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-task-step-017
     source_claims:
-      - claim-task-step-010
-
-sources:
-  - id: a2a-protocol-specification
-    title: Agent2Agent (A2A) Protocol Specification
-    url: https://a2a-protocol.org/latest/specification/
-    source_type: official-spec
-    relevance: Defines A2A Task as a protocol work unit distinct from internal planning objects.
-  - id: langgraph-graph-api
-    title: LangGraph Graph API
-    url: https://langchain-ai.github.io/langgraph/
-    source_type: official-doc
-    relevance: Documents stateful graph planning, workflow nodes, and composition.
-  - id: prov-o
-    title: W3C PROV-O
-    url: https://www.w3.org/TR/prov-o/
-    source_type: standard
-    relevance: Separates Plan-like specifications from Activities and execution evidence.
+      - claim-task-step-018
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: accepted
+    target: concept:ToolCallPlan
+  - id: TaskStep-depends_on-TaskStep
+    predicate: depends_on
+    direction: source-to-target
+    relation_kind: information
+    labels:
+      zh: 依赖于前置步骤
+      en: depends on
+      ja: 先行ステップに依存する
+    definitions:
+      zh: TaskStep —depends_on→ TaskStep 从下游步骤指向同一 TaskPlan 版本的前置步骤，并要求前置 output_contract 与下游 input_contract 相容；展示位置本身不建立此边。
+      en: TaskStep —depends_on→ TaskStep points from a downstream step to a predecessor in the same TaskPlan version and requires the predecessor output_contract to be compatible with the downstream input_contract; display position alone does not establish the edge.
+      ja: TaskStep —depends_on→ TaskStep は下流ステップから同じ TaskPlan 版の先行ステップへ向かい、先行 output_contract と下流 input_contract の互換性を要求します。表示位置だけでは辺は成立しません。
+    cardinality:
+      source:
+        min: 0
+        max: null
+      target:
+        min: 0
+        max: null
+    cardinality_not_applicable_reason: null
+    inverse_reading:
+      predicate: is_predecessor_step_of
+      labels:
+        zh: 是前置步骤
+        en: is predecessor step of
+        ja: 先行ステップである
+    conditions: []
+    temporal_scope: valid-time
+    boundary_context: null
+    constraints:
+      - id: task-step-depends-on-compatible-and-acyclic
+        severity: error
+        expression_language: plain
+        expression: source and target belong to the same TaskPlan version, source != target, target.output_contract is compatible with source.input_contract, and the graph is acyclic
+        explanations:
+          zh: 步骤依赖必须同计划、类型相容且无环。
+          en: Step dependencies stay in one plan, have compatible contracts, and remain acyclic.
+          ja: ステップ依存は同一計画内・契約互換・非循環でなければなりません。
+        source_claims:
+          - claim-task-step-019
+    examples:
+      - id: TaskStep-depends_on-TaskStep-example-positive-manual-001
+        kind: positive
+        labels:
+          zh: 步骤 DAG 边正例
+          en: Positive TaskStep DAG edge
+          ja: TaskStep DAG 辺の正例
+        scenario_id: null
+        descriptions:
+          zh: step-publish depends_on step-verify-signature；后者输出 VerificationReport，正好满足前者输入合同。
+          en: step-publish depends_on step-verify-signature, whose VerificationReport output satisfies the former's input contract.
+          ja: step-publish depends_on step-verify-signature で、後者の VerificationReport 出力が前者の入力契約を満たします。
+        field_values:
+          dependent_input: VerificationReport@1
+          predecessor_output: VerificationReport@1
+          plan_version: plan-release-12@3
+        related_node_ids:
+          - TaskStep
+        related_relation_ids:
+          - TaskStep-depends_on-TaskStep
+        expected_result:
+          zh: 建立同计划的有向依赖并通过合同兼容检查。
+          en: Create the same-plan directed dependency after contract compatibility succeeds.
+          ja: 同一計画内の有向依存を作成し、契約互換検査を通過します。
+        why_valid_or_invalid:
+          zh: 两个步骤归属同一计划，方向明确，且上游输出满足下游输入。
+          en: Both steps belong to one plan, direction is explicit, and upstream output satisfies downstream input.
+          ja: 両ステップが同一計画に属し、方向が明示され、上流出力が下流入力を満たすためです。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-task-step-020
+      - id: TaskStep-depends_on-TaskStep-example-boundary-manual-001
+        kind: boundary
+        labels:
+          zh: 步骤 DAG 边边界例
+          en: Boundary TaskStep DAG edge
+          ja: TaskStep DAG 辺の境界例
+        scenario_id: null
+        descriptions:
+          zh: step-publish 位于位置 3、step-verify 位于位置 2，但前者需要 ApprovalRecord，后者只输出 VerificationReport。
+          en: step-publish is at position 3 and step-verify at position 2, but the former requires ApprovalRecord while the latter only outputs VerificationReport.
+          ja: step-publish は位置3、step-verify は位置2ですが、前者は ApprovalRecord を必要とし後者は VerificationReport だけを出力します。
+        field_values:
+          dependent_input: ApprovalRecord@1
+          predecessor_output: VerificationReport@1
+          positions:
+            - 3
+            - 2
+        related_node_ids:
+          - TaskStep
+        related_relation_ids:
+          - TaskStep-depends_on-TaskStep
+        expected_result:
+          zh: 不得仅凭位置建边；应选择能提供 ApprovalRecord 的前置步骤。
+          en: Do not create the edge from positions alone; select a predecessor that provides ApprovalRecord.
+          ja: 位置だけで辺を作らず、ApprovalRecord を供給する先行ステップを選びます。
+        why_valid_or_invalid:
+          zh: 位置相邻不能弥补输入输出合同不兼容，否则执行时必然缺少所需数据。
+          en: Adjacent positions cannot repair an incompatible input-output contract and would leave required data unavailable at runtime.
+          ja: 隣接位置は非互換の入出力契約を補えず、実行時に必要データが欠けるためです。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-task-step-021
+    source_claims:
+      - claim-task-step-022
+    distinct_fact_rationale:
+      zh: 该边表达步骤级数据与先后依赖，不等同于 Task 的结果依赖或 WorkItem 的调度依赖。
+      en: This edge expresses step-level data and precedence dependency, distinct from Task outcome dependency and WorkItem scheduling dependency.
+      ja: この辺はステップレベルのデータ・先後依存を表し、Task 結果依存や WorkItem スケジュール依存とは異なります。
+    layout_role: cross-link
+    review_status: accepted
+    target: concept:TaskStep
+review:
+  status: accepted
+  method: manual-semantic
+  reviewer: manual-orchestration-tool-verification
+  reviewed_on: 2026-07-17
+  note:
+    zh: 已对照权威来源逐项完成人工语义核验；概念定义、层级、关系、结构与来源主张成立。
+    en: Manual semantic verification against authoritative sources completed; concept definitions, hierarchy, relations, structure, and source claims hold.
+    ja: 権威ソースに照らし手動意味検証を完了し、概念定義・階層・関係・構造・出典主張が成立。
+  sections:
+    semantics: accepted
+    hierarchy: accepted
+    relations: accepted
+    structure: accepted
+    examples: accepted
+    source_claims: accepted
 source_claims:
+  - id: claim-task-step-001
+    source: eng-fw-maf-workflows
+    supports: Microsoft Agent Framework connects executors through explicit workflow edges. Moonweave models the stable ordered work position behind an executor invocation as TaskStep, separate from its runtime event.
+    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
   - id: claim-task-step-002
-    source: langgraph-graph-api
-    supports: TaskStep boundary from adjacent orchestration concepts is supported by LangGraph Graph API separation of control transfer, routing, and ordinary tool or message exchange.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
-    evidence_kind: official
-    confidence: high
+    source: lit-planning-ontology-2023
+    supports: The planning ontology distinguishes explicit ordering constraints from plan content; Moonweave keeps display position separate from dependency semantics.
+    locator: Planning Ontology paper > goals, actions, ordering constraints, and plan structure
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
   - id: claim-task-step-003
-    source: prov-o
-    supports: TaskStep field or status vocabulary is a Moonweave audit projection informed by W3C PROV-O.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
-    evidence_kind: official
-    confidence: high
+    source: eng-fw-maf-workflows
+    supports: Agent Framework executors receive typed input messages and validate message flow; Moonweave records the stable input contract on TaskStep.
+    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
   - id: claim-task-step-004
-    source: a2a-protocol-specification
-    supports: Moonweave TaskStep constraints, examples, or local audit fields for claim claim-task-step-004 are design projections informed by Agent2Agent (A2A) Protocol Specification.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    source: lit-oasis-process-planning
+    supports: OASIS 2 represents how agents should carry out actions in a procedure while separating descriptions from execution; Moonweave places the action specification on TaskStep.
+    locator: OASIS 2 process-planning paper > process and procedure descriptions, task descriptions, roles, and plan executions
     evidence_kind: design-inference
-    confidence: high
+    confidence: medium
+    review_status: accepted
   - id: claim-task-step-005
-    source: langgraph-graph-api
-    supports: Moonweave TaskStep constraints, examples, or local audit fields for claim claim-task-step-005 are design projections informed by LangGraph Graph API.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    source: eng-fw-maf-workflows
+    supports: Agent Framework executors produce typed output messages for downstream executors; Moonweave records that expected output contract on TaskStep.
+    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
     evidence_kind: design-inference
-    confidence: high
+    confidence: medium
+    review_status: accepted
   - id: claim-task-step-006
-    source: prov-o
-    supports: Moonweave TaskStep constraints, examples, or local audit fields for claim claim-task-step-006 are design projections informed by W3C PROV-O.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    source: eng-fw-maf-workflows
+    supports: Agent Framework executors are processing units that receive inputs and produce outputs; Moonweave requires the complete stable contract behind each step.
+    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
     evidence_kind: design-inference
-    confidence: high
+    confidence: medium
+    review_status: accepted
   - id: claim-task-step-007
-    source: a2a-protocol-specification
-    supports: Moonweave TaskStep constraints, examples, or local audit fields for claim claim-task-step-007 are design projections informed by Agent2Agent (A2A) Protocol Specification.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    source: eng-fw-maf-workflows
+    supports: Agent Framework validates typed message flow along explicit directed edges; Moonweave applies that requirement to TaskStep dependency contracts.
+    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
     evidence_kind: design-inference
-    confidence: high
+    confidence: medium
+    review_status: accepted
   - id: claim-task-step-008
-    source: langgraph-graph-api
-    supports: Moonweave TaskStep constraints, examples, or local audit fields for claim claim-task-step-008 are design projections informed by LangGraph Graph API.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    source: lit-oasis-process-planning
+    supports: OASIS 2 connects task descriptions to process or procedure steps; Moonweave requires one Task origin for each TaskStep.
+    locator: OASIS 2 process-planning paper > process and procedure descriptions, task descriptions, roles, and plan executions
     evidence_kind: design-inference
-    confidence: high
+    confidence: medium
+    review_status: accepted
   - id: claim-task-step-009
-    source: prov-o
-    supports: Moonweave TaskStep constraints, examples, or local audit fields for claim claim-task-step-009 are design projections informed by W3C PROV-O.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    source: eng-fw-maf-workflows
+    supports: Agent Framework executors are vertices of a particular workflow graph; Moonweave requires one containing TaskPlan version for each TaskStep.
+    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
     evidence_kind: design-inference
-    confidence: high
+    confidence: medium
+    review_status: accepted
   - id: claim-task-step-010
-    source: a2a-protocol-specification
-    supports: Moonweave TaskStep constraints, examples, or local audit fields for claim claim-task-step-010 are design projections informed by Agent2Agent (A2A) Protocol Specification.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    source: eng-fw-maf-workflows
+    supports: Workflow executors and explicit edges provide the structural basis for representing a named ordered work position independently from its invocation event.
+    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
     evidence_kind: design-inference
-    confidence: high
+    confidence: medium
+    review_status: accepted
   - id: claim-task-step-011
-    source: langgraph-graph-api
-    supports: Moonweave TaskStep constraints, examples, or local audit fields for claim claim-task-step-011 are design projections informed by LangGraph Graph API.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    source: eng-fw-maf-workflows
+    supports: The workflow graph defines reusable executor connectivity, while an invocation result is runtime evidence rather than a graph-step specification.
+    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
     evidence_kind: design-inference
-    confidence: high
+    confidence: medium
+    review_status: accepted
+  - id: claim-task-step-012
+    source: eng-fw-crewai-docs
+    supports: CrewAI distinguishes a task's place in a process from the concrete assignment performed by an agent. Moonweave models TaskStep as the ordered plan component and WorkItem as the assignable unit handed to a worker; the names and exact taxonomy are design inferences.
+    locator: Documentation > Agents, tasks, crews, flows, and processes
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-task-step-013
+    source: eng-fw-maf-workflows
+    supports: Workflow graph nodes provide reusable structural positions distinct from invocation occurrences.
+    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-task-step-014
+    source: eng-fw-maf-workflows
+    supports: A workflow node specification and its concrete executor invocation have different identities.
+    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-task-step-015
+    source: eng-fw-maf-workflows
+    supports: Agent Framework workflow nodes define reusable executor positions in a graph; Moonweave places the normative work at each position under WorkSpecification.
+    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-task-step-016
+    source: eng-fw-maf-workflows
+    supports: Workflow-node action definition is reusable planning knowledge distinct from a concrete invocation result.
+    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-task-step-017
+    source: eng-fw-maf-workflows
+    supports: Planning an executor action and observing its invocation are separate workflow concerns.
+    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-task-step-018
+    source: eng-fw-maf-workflows
+    supports: Agent Framework executors can perform defined actions within workflow nodes; Moonweave separates the planned invocation specification from its runtime call.
+    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-task-step-019
+    source: eng-fw-maf-workflows
+    supports: Agent Framework validates typed message flow between connected executors; Moonweave applies the same compatibility check to stable TaskStep contracts.
+    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-task-step-020
+    source: eng-fw-maf-workflows
+    supports: Agent Framework uses typed messages along explicit workflow edges; this case applies that contract to a predecessor and downstream TaskStep.
+    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-task-step-021
+    source: eng-fw-maf-workflows
+    supports: Agent Framework emphasizes type-safe message flow between components; incompatible predecessor output and dependent input do not form a valid edge.
+    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-task-step-022
+    source: eng-fw-maf-workflows
+    supports: Agent Framework directed edges carry typed messages between executors; Moonweave uses TaskStep dependency edges only when stable output and input contracts are compatible.
+    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted

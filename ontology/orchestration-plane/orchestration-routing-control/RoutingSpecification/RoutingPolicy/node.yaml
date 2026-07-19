@@ -1,6 +1,7 @@
 schema: moonweave.ai/ontology-node/v1
 id: RoutingPolicy
 kind: concept
+status: accepted
 labels:
   zh: 路由策略
   en: routing policy
@@ -28,47 +29,6 @@ semantics:
       ja: policy outcome・candidate worker・GateOutcome・network access policy。
   semantic_kind: specification
   aliases: []
-engineering:
-  explanation:
-    zh: >-
-      RoutingPolicy 在 RoutingDecision 求值时合并 Route、RetryPolicy 与 RoutingCondition：LangGraph 路由函数
-      读取 policy_ref 决定候选目标排序与冲突消解；OPA 用 default 与 partial set 规则表达同语义。Policy
-      revision 不变；一次 decision 输出 selected_target 与 applied_policy_ref。
-    en: >-
-      RoutingPolicy merges Route, RetryPolicy, and RoutingCondition during RoutingDecision evaluation: LangGraph routing
-      functions read policy_ref to order candidate targets and resolve conflicts; OPA expresses the same with default and
-      partial set rules. Policy revision stays immutable; one decision outputs selected_target and applied_policy_ref.
-    ja: >-
-      RoutingPolicy は RoutingDecision evaluation 時に Route、RetryPolicy、RoutingCondition を merge する。LangGraph routing
-      function は policy_ref を読み candidate target の order と conflict resolution を決める。OPA は default と partial set
-      rule で同语义を表す。policy revision は immutable。one decision は selected_target と applied_policy_ref を出力する。
-  typical_input:
-    - description:
-        zh: 绑定多条 Route 与 Condition 的路由策略规约。
-        en: A routing policy specification binding multiple Routes and Conditions.
-        ja: 複数 Route と Condition を bind する routing policy specification。
-      format: |-
-        {"policy_id":"policy:release-branch@2","routing_spec_ref":"rs:release-routing@3","route_refs":["route:sign-to-approve","route:sign-to-review"],"condition_refs":["cond:risk-high@1"],"conflict_resolution":"highest_precedence"}
-  typical_output:
-    - description:
-        zh: RoutingDecision 求值时应用的政策引用与候选目标排序。
-        en: Applied policy reference and candidate target ordering during RoutingDecision evaluation.
-        ja: RoutingDecision evaluation 時の applied policy reference と candidate target ordering。
-      format: |-
-        {"applied_policy_ref":"policy:release-branch@2","candidates":[{"target_ref":"target:node:review","precedence":10},{"target_ref":"target:node:approve","precedence":5}],"routing_decision_id":"rd-886"}
-  reference_implementations:
-    - name: LangGraph conditional edges
-      url: https://docs.langchain.com/oss/python/langgraph/graph-api
-      description: Documents routing functions that apply policy-ordered target selection.
-    - name: Open Policy Agent
-      url: https://www.openpolicyagent.org/docs/latest/policy-language/
-      description: Documents default and conflict rules for policy-driven routing decisions.
-    - name: LangGraph Command
-      url: https://docs.langchain.com/oss/python/langgraph/graph-api
-      description: Documents goto results after policy evaluation selects a target.
-  source_claims:
-    - claim-routing-policy-001
-    - claim-routing-policy-003
 structure:
   identity_keys: []
   fields:
@@ -247,178 +207,427 @@ structure:
   constraints: []
   required_relation_constraints: []
 examples:
-  - id: policy-semantic-router-multi-route
+  - id: RoutingPolicy-example-positive-manual-20260716
+    kind: positive
     labels:
-      zh: RoutingPolicy positive
-      en: RoutingPolicy positive
-      ja: RoutingPolicy positive
+      zh: 客服意图路由策略
+      en: Support-intent routing policy
+      ja: support intent routing policy
+    scenario_id: null
     descriptions:
-      zh: MRKL Systems (Karpas et al., 2022) 将 LLM 作为 RoutingPolicy 路由器分派到专家模块：router LLM 解析 query → dispatch 到 calculator/wiki/search 等 neuro-symbolic 模块 → 汇总模块输出；模块化架构解耦推理与外部知识。
-      en: MRKL Systems (Karpas et al., 2022) uses LLM as RoutingPolicy router dispatching to expert modules: router parses query → dispatch to calculator/wiki/search neuro-symbolic modules → aggregate outputs; modular architecture decouples reasoning from external knowledge.
-      ja: MRKL (Karpas et al., 2022) LLM router が RoutingPolicy から calculator/wiki/search 等 expert module へ dispatch。
-    field_values: {routing_specification_id: policy-intent-routing, version: 2, default_route_ref: route-general-fallback}
-
+      zh: policy-support-routing@7 要求 request-state-snapshot 与 intent-classifier-result，且分类置信度至少为 0.8；它求值 billing、technical 与 high-risk 条件，从三条候选路径中选择，同分时优先人工，完全无匹配时也转 route-human-review。
+      en: policy-support-routing@7 requires request-state-snapshot and intent-classifier-result with classifier confidence of at least 0.8, evaluates billing, technical, and high-risk conditions over three candidate routes, prefers human review on a tie, and uses route-human-review when none matches.
+      ja: policy-support-routing@7 は request-state-snapshot と intent-classifier-result、および 0.8 以上の分類信頼度を要求し、billing・technical・high-risk 条件を三つの候補経路に対して評価します。同順位と完全不一致はいずれも route-human-review を選びます。
+    field_values:
+      routing_specification_id: policy-support-routing
+      version: "7"
+      eligible_target_types:
+        - worker
+        - human-review
+      valid_from: 2026-07-16T00:00:00Z
+      condition_refs:
+        - condition-billing-intent
+        - condition-technical-intent
+        - condition-high-risk
+      candidate_route_refs:
+        - route-billing
+        - route-technical
+        - route-human-review
+      precedence_rule:
+        ordered_route_refs:
+          - route-human-review
+          - route-billing
+          - route-technical
+        tie_breaker: first-listed
+      no_match_behavior: select-fallback-route
+      fallback_route_ref: route-human-review
+      evidence_requirements:
+        required_evidence_refs:
+          - request-state-snapshot
+          - intent-classifier-result
+        minimum_classifier_confidence: 0.8
+        require_frozen_input: true
     related_node_ids:
       - RoutingPolicy
       - BranchCondition
       - Route
-    related_relation_ids: []
+    related_relation_ids:
+      - RoutingPolicy-has_condition-BranchCondition
+    expected_result:
+      zh: 建立可由多次决定应用的 RoutingPolicy。
+      en: Create a RoutingPolicy reusable by multiple decisions.
+      ja: multiple decision が reuse する RoutingPolicy を作成します。
+    why_valid_or_invalid:
+      zh: 条件、候选路径、确定性优先规则、无匹配结果、后备路径与证据要求全部显式绑定，因此同一版本可以被重放和审计。
+      en: Conditions, candidate routes, deterministic precedence, no-match outcome, fallback route, and evidence requirements are all explicit, so the same revision can be replayed and audited.
+      ja: 条件、候補経路、決定的な優先順位、不一致時の結果、後備経路、証拠要件がすべて明示され、同じ版を再現して監査できます。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
       - claim-routing-policy-001
-
-  - id: policy-langgraph-supervisor-routing
+      - claim-routing-policy-002
+  - id: RoutingPolicy-example-boundary-manual-20260716
+    kind: boundary
     labels:
-      zh: RoutingPolicy positive
-      en: RoutingPolicy positive
-      ja: RoutingPolicy positive
+      zh: 某次选择理由
+      en: One selection rationale
+      ja: one selection rationale
+    scenario_id: routing-review-routingpolicy-boundary
     descriptions:
-      zh: LiteLLM 映射 RoutingPolicy LLM 路由：completion(model="gpt-4", messages=[...]) 统一接口；Router(model_list=[...], routing_strategy="least-busy") 负载均衡；ModelRouting 在多 provider 间选择 endpoint。
-      en: LiteLLM maps RoutingPolicy LLM routing: completion(model="gpt-4", messages) unified interface; Router(model_list, routing_strategy="least-busy") load balancing; ModelRouting selects endpoints across providers.
-      ja: LiteLLM RoutingPolicy: completion(model="gpt-4")+Router(routing_strategy="least-busy") ModelRouting。
-    field_values: {routing_specification_id: policy-supervisor-v1, evaluation_order: precedence-desc}
-
+      zh: 记录写着“因为账单意图选择 billing-worker-2”，仅适用于 decision-884，没有版本化候选集合。
+      en: A record says “selected billing-worker-2 because of billing intent,” applies only to decision-884, and has no versioned candidate set.
+      ja: record は billing intent により billing-worker-2 selected と述べ decision-884 のみで versioned candidate set がありません。
+    field_values: {}
     related_node_ids:
+      - RoutingDecision
       - RoutingPolicy
-      - BranchCondition
     related_relation_ids: []
+    expected_result:
+      zh: 作为 RoutingDecision.rationale 保存。
+      en: Store it as RoutingDecision rationale.
+      ja: RoutingDecision rationale として保存します。
+    why_valid_or_invalid:
+      zh: 一次选择理由不足以建立可复用策略的独立身份与版本边界。
+      en: One rationale is not a reusable policy identity.
+      ja: one rationale は reusable policy identity ではありません。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-routing-policy-003
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation:
+  - sibling_concept_id: RetryPolicy
+    shared_parent_concept_id: RoutingSpecification
+    differentia:
+      zh: RoutingPolicy 在一般候选目标之间选路；RetryPolicy 仅在失败后治理再次尝试或耗尽转向。
+      en: RoutingPolicy selects among general candidate targets; RetryPolicy governs another attempt or exhaustion routing only after failure.
+      ja: RoutingPolicy は general target selection、RetryPolicy は failure 後 retry/exhaustion routing を govern します。
     source_claims:
       - claim-routing-policy-001
-
-  - id: policy-openai-triage-handoffs
+      - claim-routing-policy-016
+parent_relation:
+  id: RoutingPolicy-is_a-RoutingSpecification
+  predicate: is_a
+  direction: target-to-source
+  relation_kind: hierarchy
+  labels:
+    zh: 是一种
+    en: is a
+    ja: の一種である
+  definitions:
+    zh: RoutingPolicy 是一种 RoutingSpecification；其种差是组合候选路径、分支条件、优先级和无匹配处理。
+    en: A RoutingPolicy is a RoutingSpecification distinguished by combining candidate paths, branch conditions, precedence, and no-match handling.
+    ja: RoutingPolicy は candidate path・branch condition・precedence・no-match handling を組み合わせる RoutingSpecification subtype です。
+  cardinality: null
+  cardinality_not_applicable_reason:
+    zh: 该关系表达类型级语义，不在此规定实例基数。
+    en: This relation expresses type-level semantics; instance cardinality is not fixed here.
+    ja: type-level semantics を表すため instance cardinality はここで固定しません。
+  inverse_reading:
+    predicate: part_of
     labels:
-      zh: RoutingPolicy positive
-      en: RoutingPolicy positive
-      ja: RoutingPolicy positive
-    descriptions:
-      zh: Tree of Thoughts (Yao et al., 2023) 对 RoutingPolicy 使用 BFS/DFS 思维树：tree.generate_thoughts(state, k=5) 生成候选 → tree.evaluate(thoughts) 评估 → tree.select(evaluated, method="greedy") 选最优分支；Game of 24 任务上 ToT 显著优于 CoT。
-      en: Tree of Thoughts (Yao et al., 2023) applies BFS/DFS thought trees to RoutingPolicy: tree.generate_thoughts(state, k=5) → tree.evaluate(thoughts) → tree.select(evaluated, method="greedy"); ToT beats CoT on Game of 24.
-      ja: ToT (Yao et al., 2023) RoutingPolicy で generate_thoughts(k=5)→evaluate→select(greedy)；Game of 24 で CoT 超え。
-    field_values: {routing_specification_id: policy-triage-handoff, fallback_target_ref: general_agent}
-
-    related_node_ids:
-      - RoutingPolicy
-      - RoutingTarget
-    related_relation_ids: []
-    source_claims:
-      - claim-routing-policy-001
-
-  - id: policy-crewai-process-routing
+      zh: 有子类
+      en: has subtype
+      ja: subtype を持つ
+  conditions: []
+  temporal_scope: timeless
+  boundary_context: null
+  constraints: []
+  examples:
+    - id: RoutingPolicy-is_a-RoutingSpecification-example-positive-manual-20260716
+      kind: positive
+      labels:
+        zh: 客服意图路由策略
+        en: Support-intent routing policy
+        ja: support intent routing policy
+      scenario_id: routing-relation-routingpolicy-is_a-routingspecification-positive
+      descriptions:
+        zh: policy-support@7 组合三类条件、候选 worker 与人工后备。
+        en: policy-support@7 combines three condition classes, candidate workers, and a human fallback.
+        ja: policy-support@7 は three conditions・candidate worker・human fallback を組み合わせます。
+      field_values: {}
+      related_node_ids:
+        - RoutingPolicy
+        - RoutingSpecification
+      related_relation_ids:
+        - RoutingPolicy-is_a-RoutingSpecification
+      expected_result:
+        zh: 归入 RoutingSpecification。
+        en: Classify under RoutingSpecification.
+        ja: RoutingSpecification 下に分類します。
+      why_valid_or_invalid:
+        zh: 该对象具有候选集合、条件和版本，是可复用的选择规则规范。
+        en: It is a versioned reusable selection rule.
+        ja: versioned reusable selection rule です。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-routing-policy-001
+        - claim-routing-policy-002
+        - claim-routing-policy-003
+    - id: RoutingPolicy-is_a-RoutingSpecification-example-boundary-manual-20260716
+      kind: boundary
+      labels:
+        zh: 一次选择理由不是策略
+        en: One selection rationale is not a policy
+        ja: one rationale は policy ではない
+      scenario_id: routing-relation-routingpolicy-is_a-routingspecification-boundary
+      descriptions:
+        zh: decision-884.rationale 只解释一次账单分流，没有候选集合或版本。
+        en: decision-884.rationale explains one billing selection and has no candidate set or version.
+        ja: decision-884.rationale は one selection のみで candidate set/version がありません。
+      field_values: {}
+      related_node_ids:
+        - RoutingPolicy
+        - RoutingSpecification
+      related_relation_ids:
+        - RoutingPolicy-is_a-RoutingSpecification
+      expected_result:
+        zh: 该文本只应保存为 RoutingDecision 的一次性 rationale 字段。
+        en: Keep it as a decision field.
+        ja: decision field として保持します。
+      why_valid_or_invalid:
+        zh: 一次决定理由没有候选集合与版本，不能满足策略规范身份。
+        en: One rationale does not satisfy specification identity.
+        ja: one rationale は specification identity を満たしません。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-routing-policy-001
+        - claim-routing-policy-002
+        - claim-routing-policy-003
+  source_claims:
+    - claim-routing-policy-001
+    - claim-routing-policy-002
+    - claim-routing-policy-003
+  distinct_fact_rationale: null
+  layout_role: primary-backbone
+  review_status: accepted
+  endpoint_order: child-to-parent
+relations:
+  - id: RoutingPolicy-has_condition-BranchCondition
+    predicate: has_condition
+    direction: source-to-target
+    relation_kind: governance
     labels:
-      zh: RoutingPolicy positive
-      en: RoutingPolicy positive
-      ja: RoutingPolicy positive
-    descriptions:
-      zh: ReAct (Yao et al., 2023) 在 RoutingPolicy 场景实现 Thought→Action→Observation 交替循环：agent 输出 Thought（推理当前应做什么），执行 Action（如 Search["query"] 或 Lookup["term"]），获得 Observation（环境反馈），再生成下一个 Thought。HotpotQA 上 ReAct 通过多步推理+搜索达到比 CoT 更高准确率；LangChain create_react_agent() 直接实现此模式。
-      en: ReAct (Yao et al., 2023) implements Thought→Action→Observation loops for RoutingPolicy: agent outputs Thought (reasoning), executes Action (e.g. Search["query"]), receives Observation (feedback), then next Thought. On HotpotQA ReAct beats CoT via multi-step reasoning+search; LangChain create_react_agent() implements this pattern.
-      ja: ReAct (Yao et al., 2023) が RoutingPolicy で Thought→Action→Observation ループ：Thought 推論→Action Search["query"]→Observation→次 Thought。HotpotQA で CoT 超え；create_react_agent() 実装。
-    field_values: {routing_specification_id: policy-crew-sequential, evaluation_order: fixed-list}
-
-    related_node_ids:
-      - RoutingPolicy
-      - Route
-    related_relation_ids: []
+      zh: 包含条件
+      en: has condition
+      ja: 条件を持つ
+    definitions:
+      zh: RoutingPolicy 组合并版本锁定一个 BranchCondition，用它定义候选路径的适用结果与优先级；条件仍保持独立身份。
+      en: A RoutingPolicy composes and version-locks a BranchCondition that defines candidate-path applicability and precedence while the condition retains independent identity.
+      ja: RoutingPolicy は BranchCondition revision を compose/lock し candidate path applicability/precedence を定義し condition identity を保持します。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 该关系表达类型级语义，不在此规定实例基数。
+      en: This relation expresses type-level semantics; instance cardinality is not fixed here.
+      ja: type-level semantics を表すため instance cardinality はここで固定しません。
+    inverse_reading:
+      predicate: condition_of
+      labels:
+        zh: 是其条件
+        en: is condition of
+        ja: の条件である
+    conditions: []
+    temporal_scope: timeless
+    boundary_context: null
+    constraints: []
+    examples:
+      - id: RoutingPolicy-has_condition-BranchCondition-example-positive-manual-20260716
+        kind: positive
+        labels:
+          zh: 客服策略包含账单分支条件
+          en: Support policy has billing branch condition
+          ja: support policy has billing branch condition
+        scenario_id: routing-relation-routingpolicy-has_condition-branchcondition-positive
+        descriptions:
+          zh: policy-support@7 包含 branch-billing@3 并规定优先级 20。
+          en: policy-support@7 includes branch-billing@3 at precedence 20.
+          ja: policy-support@7 は branch-billing@3 precedence=20 を含みます。
+        field_values: {}
+        related_node_ids:
+          - RoutingPolicy
+          - BranchCondition
+        related_relation_ids:
+          - RoutingPolicy-has_condition-BranchCondition
+        expected_result:
+          zh: 连接策略版本与条件版本。
+          en: Link the policy revision to the condition revision.
+          ja: policy revision と condition revision を接続します。
+        why_valid_or_invalid:
+          zh: 策略清单显式锁定该分支条件版本及其冲突优先级。
+          en: The policy manifest explicitly references that condition revision.
+          ja: policy manifest は condition revision を explicit reference します。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-routing-policy-001
+          - claim-routing-policy-002
+      - id: RoutingPolicy-has_condition-BranchCondition-example-boundary-manual-20260716
+        kind: boundary
+        labels:
+          zh: 门控条件不自动成为分支条件
+          en: Gate condition does not become branch condition
+          ja: gate condition は branch condition にならない
+        scenario_id: routing-relation-routingpolicy-has_condition-branchcondition-boundary
+        descriptions:
+          zh: policy@7 同时引用 gate-quality 作为前置门，但它不映射候选 Route。
+          en: policy@7 also references gate-quality as a prerequisite gate, but it maps no candidate Route.
+          ja: policy@7 は gate-quality を prerequisite として参照しますが candidate Route を mapping しません。
+        field_values: {}
+        related_node_ids:
+          - RoutingPolicy
+          - BranchCondition
+        related_relation_ids:
+          - RoutingPolicy-has_condition-BranchCondition
+        expected_result:
+          zh: 不得用本关系连接 GateCondition。
+          en: Do not use this relation for GateCondition.
+          ja: この relation を GateCondition に使用しません。
+        why_valid_or_invalid:
+          zh: 对象没有候选路径映射与优先级，因此缺少分支条件的必要种差。
+          en: The branch-mapping differentia is absent.
+          ja: branch-mapping differentia がありません。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-routing-policy-001
+          - claim-routing-policy-002
     source_claims:
       - claim-routing-policy-001
-
-sources:
-  - id: langgraph-graph-api
-    title: LangGraph Graph API
-    url: https://langchain-ai.github.io/langgraph/reference/graphs/
-    source_type: official-doc
-    relevance: Defines conditional edges, Command routing, nodes, END, and graph control flow.
-  - id: opa-policy-language
-    title: Open Policy Agent - Policy Language
-    url: https://www.openpolicyagent.org/docs/latest/
-    source_type: official-doc
-    relevance: Defines declarative policy evaluation for gate and routing decisions over structured input.
+      - claim-routing-policy-002
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: accepted
+    target: concept:BranchCondition
+review:
+  status: accepted
+  method: manual-semantic
+  reviewer: manual-orchestration-tool-verification
+  reviewed_on: 2026-07-17
+  note:
+    zh: 已对照权威来源逐项完成人工语义核验；概念定义、层级、关系、结构与来源主张成立。
+    en: Manual semantic verification against authoritative sources completed; concept definitions, hierarchy, relations, structure, and source claims hold.
+    ja: 権威ソースに照らし手動意味検証を完了し、概念定義・階層・関係・構造・出典主張が成立。
+  sections:
+    semantics: accepted
+    hierarchy: accepted
+    relations: accepted
+    structure: accepted
+    examples: accepted
+    source_claims: accepted
 source_claims:
   - id: claim-routing-policy-001
-    source: langgraph-graph-api
-    supports: RoutingPolicy core identity and classification criteria align with LangGraph Graph API definitions for orchestration control structures.
-    locator: Conditional edges; Command routing; policy evaluation
-    evidence_kind: normative
+    source: eng-fw-langgraph-graph-api
+    supports: LangGraph's Graph API distinguishes workflow state, executable nodes, static edges, conditional routing functions, termination targets, and Command values that combine state updates with a selected destination. Moonweave uses this to separate reusable routing specifications and targets from one RoutingDecision occurrence.
+    locator: LangGraph Graph API documentation, Graphs, Edges, Conditional edges, and Command sections
+    evidence_kind: design-inference
     confidence: high
+    review_status: accepted
   - id: claim-routing-policy-002
-    source: opa-policy-language
-    supports: RoutingPolicy boundary from adjacent orchestration concepts is supported by Open Policy Agent - Policy Language separation of control transfer, routing, and ordinary tool or message exchange.
-    locator: Conditional edges; Command routing; policy evaluation
-    evidence_kind: official
+    source: eng-fw-autogen-agentchat
+    supports: AutoGen SelectorGroupChat selects a next participant from described candidates using current conversation context and stops when an explicit termination condition is satisfied. Moonweave uses this as evidence for typed routing targets, selection decisions, and separately evaluated stop conditions.
+    locator: AutoGen AgentChat documentation, Selector Group Chat workflow and Termination Conditions
+    evidence_kind: design-inference
     confidence: high
+    review_status: accepted
   - id: claim-routing-policy-003
-    source: langgraph-graph-api
-    supports: RoutingPolicy field or status vocabulary is a Moonweave audit projection informed by LangGraph Graph API.
-    locator: Conditional edges; Command routing; policy evaluation
+    source: eng-ont-prov-o
+    supports: W3C PROV-O distinguishes plans and other Entities from time-bounded Activities that use or generate Entities. Moonweave therefore treats routing policy and conditions as reusable specifications, RoutingDecision as an occurrence, and GateOutcome as information produced by gate evaluation.
+    locator: W3C PROV-O Recommendation Sections 3.1 and 3.2, Entity, Activity, generation, and Plan
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-routing-policy-004
+    source: eng-fw-langgraph-graph-api
+    supports: The official LangGraph Graph API defines conditional edges through a routing function evaluated after a source node and maps its result to next nodes. Moonweave reifies the reusable predicates evaluated by that function as condition references.
+    locator: LangGraph Graph API > Graphs > Edges > Conditional edges
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-routing-policy-005
+    source: eng-fw-autogen-agentchat
+    supports: The official AutoGen SelectorGroupChat documentation defines candidate_func to narrow the potential agents for each selection and rejects an empty candidate list. Moonweave records the admissible Route set before any one selection occurs.
+    locator: AutoGen Selector Group Chat > Custom Candidate Function
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-routing-policy-006
+    source: eng-fw-langgraph-graph-api
+    supports: LangGraph conditional routing returns one or more destination node names and may map routing outputs to those names. Moonweave binds the permitted destinations through candidate Route references.
+    locator: LangGraph Graph API > Graphs > Edges > Conditional edges and routing output map
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-routing-policy-007
+    source: eng-fw-autogen-agentchat
+    supports: The official AutoGen SelectorGroupChat documentation permits a custom selector function for complex selection logic and state-based transitions. Moonweave requires the winner order and tie resolution to be declared so the same evidence yields a reproducible choice.
+    locator: AutoGen Selector Group Chat > Custom Selector Function
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-routing-policy-008
+    source: eng-fw-autogen-agentchat
+    supports: AutoGen documents that a custom selector may return None to fall back to the default selection mechanism. Moonweave makes the fallback explicit and binds it to a reviewed candidate Route.
+    locator: AutoGen Selector Group Chat > Custom Selector Function > None fallback
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-routing-policy-009
+    source: eng-fw-langgraph-graph-api
+    supports: The official LangGraph Graph API states that conditional edges may optionally route to one or more edges or terminate. This controlled value preserves the explicit termination outcome.
+    locator: LangGraph Graph API > Graphs > Edges > Conditional edges > optional termination
     evidence_kind: official
     confidence: high
-  - id: claim-routing-policy-004
-    source: opa-policy-language
-    supports: Moonweave RoutingPolicy constraints, examples, or local audit fields for claim claim-routing-policy-004 are design projections informed by Open Policy Agent - Policy Language.
-    locator: Conditional edges; Command routing; policy evaluation
-    evidence_kind: design-inference
-    confidence: high
-  - id: claim-routing-policy-005
-    source: langgraph-graph-api
-    supports: Moonweave RoutingPolicy constraints, examples, or local audit fields for claim claim-routing-policy-005 are design projections informed by LangGraph Graph API.
-    locator: Conditional edges; Command routing; policy evaluation
-    evidence_kind: design-inference
-    confidence: high
-  - id: claim-routing-policy-006
-    source: opa-policy-language
-    supports: Moonweave RoutingPolicy constraints, examples, or local audit fields for claim claim-routing-policy-006 are design projections informed by Open Policy Agent - Policy Language.
-    locator: Conditional edges; Command routing; policy evaluation
-    evidence_kind: design-inference
-    confidence: high
-  - id: claim-routing-policy-007
-    source: langgraph-graph-api
-    supports: Moonweave RoutingPolicy constraints, examples, or local audit fields for claim claim-routing-policy-007 are design projections informed by LangGraph Graph API.
-    locator: Conditional edges; Command routing; policy evaluation
-    evidence_kind: design-inference
-    confidence: high
-  - id: claim-routing-policy-008
-    source: opa-policy-language
-    supports: Moonweave RoutingPolicy constraints, examples, or local audit fields for claim claim-routing-policy-008 are design projections informed by Open Policy Agent - Policy Language.
-    locator: Conditional edges; Command routing; policy evaluation
-    evidence_kind: design-inference
-    confidence: high
-  - id: claim-routing-policy-009
-    source: langgraph-graph-api
-    supports: Moonweave RoutingPolicy constraints, examples, or local audit fields for claim claim-routing-policy-009 are design projections informed by LangGraph Graph API.
-    locator: Conditional edges; Command routing; policy evaluation
-    evidence_kind: design-inference
-    confidence: high
+    review_status: accepted
   - id: claim-routing-policy-010
-    source: opa-policy-language
-    supports: Moonweave RoutingPolicy constraints, examples, or local audit fields for claim claim-routing-policy-010 are design projections informed by Open Policy Agent - Policy Language.
-    locator: Conditional edges; Command routing; policy evaluation
+    source: eng-fw-autogen-agentchat
+    supports: The official AutoGen SelectorGroupChat documentation states that candidate_func returning None or an empty list raises ValueError. Moonweave generalizes that fail-fast outcome as a routing error code.
+    locator: AutoGen Selector Group Chat > Custom Candidate Function > empty candidate error
     evidence_kind: design-inference
     confidence: high
+    review_status: accepted
   - id: claim-routing-policy-011
-    source: langgraph-graph-api
-    supports: Moonweave RoutingPolicy constraints, examples, or local audit fields for claim claim-routing-policy-011 are design projections informed by LangGraph Graph API.
-    locator: Conditional edges; Command routing; policy evaluation
+    source: eng-fw-langgraph-graph-api
+    supports: LangGraph conditional edges may route to one or more nodes or terminate, establishing that no-match behavior cannot remain implicit in a reusable routing policy.
+    locator: LangGraph Graph API > Graphs > Edges > Conditional edges
     evidence_kind: design-inference
     confidence: high
+    review_status: accepted
   - id: claim-routing-policy-012
-    source: opa-policy-language
-    supports: Moonweave RoutingPolicy constraints, examples, or local audit fields for claim claim-routing-policy-012 are design projections informed by Open Policy Agent - Policy Language.
-    locator: Conditional edges; Command routing; policy evaluation
+    source: eng-fw-autogen-agentchat
+    supports: AutoGen distinguishes selector fallback from an invalid empty candidate result. Moonweave turns fallback, termination, and error into reviewed mutually exclusive policy outcomes.
+    locator: AutoGen Selector Group Chat > Custom Selector Function and Custom Candidate Function
     evidence_kind: design-inference
     confidence: high
+    review_status: accepted
   - id: claim-routing-policy-013
-    source: langgraph-graph-api
-    supports: Moonweave RoutingPolicy constraints, examples, or local audit fields for claim claim-routing-policy-013 are design projections informed by LangGraph Graph API.
-    locator: Conditional edges; Command routing; policy evaluation
+    source: eng-fw-langgraph-graph-api
+    supports: The official LangGraph Graph API permits a routing result to be mapped to the exact name of the next node. Moonweave records the exact reviewed fallback Route rather than merely saying that fallback exists.
+    locator: LangGraph Graph API > Graphs > Edges > Conditional edges > path map
     evidence_kind: design-inference
     confidence: high
+    review_status: accepted
   - id: claim-routing-policy-014
-    source: opa-policy-language
-    supports: Moonweave RoutingPolicy constraints, examples, or local audit fields for claim claim-routing-policy-014 are design projections informed by Open Policy Agent - Policy Language.
-    locator: Conditional edges; Command routing; policy evaluation
+    source: eng-fw-langgraph-graph-api
+    supports: The official LangGraph Graph API states that a routing function receives the current graph state and returns the next destination. Moonweave requires the exact state snapshot and classifier evidence used by that function to be named for replay.
+    locator: LangGraph Graph API > Graphs > Edges > Conditional edges > routing function state input
     evidence_kind: design-inference
     confidence: high
+    review_status: accepted
   - id: claim-routing-policy-015
-    source: langgraph-graph-api
-    supports: Moonweave RoutingPolicy constraints, examples, or local audit fields for claim claim-routing-policy-015 are design projections informed by LangGraph Graph API.
-    locator: Conditional edges; Command routing; policy evaluation
+    source: eng-fw-autogen-agentchat
+    supports: AutoGen SelectorGroupChat exposes candidate roles and conversation history to the selector and supports state-based custom selection. Moonweave records those selection inputs as explicit evidence requirements.
+    locator: AutoGen Selector Group Chat > Selector Prompt and Custom Selector Function
     evidence_kind: design-inference
     confidence: high
+    review_status: accepted
+  - id: claim-routing-policy-016
+    source: eng-fw-langgraph-fault-tolerance
+    supports: LangGraph fault-tolerance documentation defines retry policy parameters such as maximum attempts, backoff, jitter, retryable errors, timeouts, exhaustion, and subsequent error handling. Moonweave uses these as fields of RetryPolicy while keeping each retry decision and attempt as separate occurrences.
+    locator: LangGraph Fault tolerance documentation, Retries, Parameters, Timeouts, and Error handling sections
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted

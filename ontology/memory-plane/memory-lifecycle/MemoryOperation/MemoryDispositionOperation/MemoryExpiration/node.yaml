@@ -8,716 +8,278 @@ labels:
   ja: 記憶期限切れ
 semantics:
   short_definition:
-    zh: 根据适用保留规则达到明确到期条件时，使既有记忆记录失去正常检索或复用资格的处置操作。
-    en: A disposition operation that makes an existing memory record ineligible for normal retrieval or reuse when an applicable retention rule reaches an explicit expiry condition.
-    ja: 適用される保持規則が明示的な期限切れ条件に達したとき、既存記憶レコードを通常検索または再利用に不適格にする処分操作です。
+    zh: 记录达到时间、同意或作用域期限并改变保留资格的处置操作。
+    en: A disposition operation marking that a record has reached a time, consent, or scope deadline and changing retention eligibility.
+    ja: recordがtime・consent・scope deadlineへ達しretention eligibilityを変えるdisposition operationです。
   definition:
-    zh: MemoryExpiration 是一种已执行的 MemoryDispositionOperation。它对既有 MemoryRecord 应用特定版本的 MemoryRetentionPolicy，验证 TTL、保留截止、同意期限或作用域结束已经达到，并记录策略、目标、到期时间、资格效果和证据。该操作使记录不再参与正常记忆检索或复用，但不声称记录已被物理清除、全局失效或产生墓碑；若需要实际无效化或删除，必须由独立的 MemoryDelete 记录。容量导致的活动层移除是 MemoryEviction，检索强度下降是 MemoryDecay，未执行的将来计划不是到期操作。
-    en: MemoryExpiration is an executed MemoryDispositionOperation. It applies a specific version of MemoryRetentionPolicy to an existing MemoryRecord, verifies that a TTL, retention deadline, consent deadline, or scope end has been reached, and records policy, target, expiry time, eligibility effect, and evidence. The operation removes the record from normal memory retrieval or reuse but does not claim that the record was physically cleared, globally invalidated, or tombstoned; actual invalidation or deletion must be recorded by a separate MemoryDelete. Capacity-driven active-tier removal is MemoryEviction, retrieval-strength reduction is MemoryDecay, and an unexecuted future plan is not expiration.
-    ja: MemoryExpiration は実行済みの MemoryDispositionOperation です。既存 MemoryRecord に特定バージョンの MemoryRetentionPolicy を適用し、TTL、保持期限、同意期限、またはスコープ終了に達したことを検証して、ポリシー、対象、期限時刻、資格効果、証跡を記録します。この操作はレコードを通常の記憶検索または再利用から除外しますが、物理消去、全体失効、墓標生成を主張しません。実際の失効または削除は別の MemoryDelete で記録しなければなりません。容量起因のアクティブ層除去は MemoryEviction、検索強度低下は MemoryDecay、未実行の将来計画は到期ではありません。
+    zh: MemoryExpiration 依据 MemoryRetentionPolicy 的 expiry 条件把 MemoryRecord 标为已到期或待清理；到期事实可以先于物理删除，只有后续删除活动才保证产生墓碑。
+    en: MemoryExpiration applies an expiry condition from MemoryRetentionPolicy and marks a MemoryRecord expired or pending cleanup. Expiration may precede physical deletion; only a later delete activity guarantees a tombstone.
+    ja: MemoryExpiration はMemoryRetentionPolicyのexpiry conditionでMemoryRecordをexpired/cleanup pendingにします。expirationはphysical deleteより前でありtombstone保証は後続delete activityだけです。
   why_needed:
-    zh: 到期资格、异步清理和删除完成具有不同的时间与证据边界；将它们合并会让系统过早声称内容已删除，或在删除前继续把不应使用的记忆提供给正常检索。
-    en: Expiry eligibility, asynchronous cleanup, and completed deletion have different time and evidence boundaries; collapsing them can make a system claim deletion too early or keep serving memory that should no longer be used before deletion occurs.
-    ja: 期限切れ適格性、非同期清掃、完了削除は時刻と証跡の境界が異なります。それらを統合すると、削除を早期に主張したり、削除前に使用すべきでない記憶を通常検索で提供し続けたりします。
+    zh: 把时间资格变化与异步物理删除拆开。
+    en: Separates time-based eligibility change from asynchronous physical deletion.
+    ja: time-based eligibility changeをasynchronous physical deleteから分けます。
   includes:
-    - zh: 已执行的 TTL 到达、保留截止到达、同意期限到达或会话与作用域结束后，对既有记录施加的正常检索不合格标记。
-      en: Executed normal-retrieval-ineligibility marking of an existing record after TTL arrival, retention-deadline arrival, consent-deadline arrival, or session and scope end.
-      ja: TTL 到達、保持期限到達、同意期限到達、またはセッションとスコープ終了後に、既存レコードへ実行済みで適用する通常検索不適格の印付けを含みます。
+    - zh: 纳入 TTL、保留截止时间、同意到期和会话作用域结束。
+      en: Includes TTL, retention deadlines, consent expiry, and session-scope end.
+      ja: TTL・retention deadline・consent expiry・session-scope endを含みます。
   excludes:
-    - zh: 因容量移出缓存或索引层、基于用户或法律授权使记录失效、仅降低检索权重、仅创建或修改保留策略、在将来到期但尚未发生效果的计划，以及以“到期”掩盖完成删除。
-      en: Removing a cache or index copy because of capacity, invalidating a record under user or legal authorization, lowering retrieval weight only, creating or changing a retention policy only, a plan whose future expiry has not produced an effect, and masking completed deletion as "expiry".
-      ja: 容量によるキャッシュまたはインデックスコピー除去、利用者または法的許可によるレコード失効、検索重みだけの低下、保持ポリシーの作成または変更だけ、将来期限がまだ効果を生じていない計画、完了削除を「期限切れ」として隠すことを除外します。
+    - zh: 排除容量驱逐、显式遗忘请求和仅随时间降低权重。
+      en: Excludes capacity eviction, explicit forget requests, and merely reducing weight over time.
+      ja: capacity eviction・explicit forget request・timeによるweight低下のみを除外します。
   semantic_kind: activity
   aliases: []
-engineering:
-  explanation:
-    zh: 将到期实现为策略版本和记录快照绑定的已执行资格转换：验证目标范围和截止条件，在实际发生时间把正常检索资格改为不合格，并保留证据摘要。清理或介质删除可以随后执行，但必须作为单独的删除事实记录；不能从策略配置、TTL 字段或后台任务排程本身推断本次到期已经发生。
-    en: "Implement expiration as an executed eligibility transition bound to a policy version and record snapshot: verify target scope and deadline condition, set normal-retrieval eligibility to ineligible at the actual occurrence time, and retain an evidence digest. Cleanup or media deletion can occur later but must be recorded as a separate deletion fact; do not infer that expiration happened merely from policy configuration, a TTL field, or a scheduled background task."
-    ja: 到期はポリシーバージョンとレコードスナップショットに結び付けた実行済み資格遷移として実装します。対象スコープと期限条件を検証し、実際の発生時刻に通常検索資格を不適格へ変更し、証跡ダイジェストを保持します。清掃または媒体削除は後で起き得ますが、別の削除事実として記録しなければなりません。ポリシー設定、TTL フィールド、予定されたバックグラウンドタスクだけから到期が起きたと推論してはいけません。
-  typical_input:
-    - description: An existing target repeated in the parent disposition collection, an applicable versioned retention policy, an expiry condition and deadline, executor identity, and actual execution start.
-      format: "{operation_id, operation_kind:'disposition', target_record_ref, target_record_refs:[target_record_ref], disposition_kind:'expiration', disposition_basis:'retention_policy', retention_policy_ref, expiry_basis, expiry_deadline, actor_ref, started_at}"
-  typical_output:
-    - description: An applied normal-retrieval-ineligibility fact with aligned disposition effect, expiry time, cleanup state, evidence digest, result, and audit event.
-      format: "{operation_id, status:'succeeded', eligibility_effect:'retention_ineligible', disposition_effect:'retention_ineligible', expired_at, disposed_at:expired_at, expiration_evidence_digest, disposition_evidence_digest:expiration_evidence_digest, cleanup_state, result_ref?, audit_event_ref?}"
-  reference_implementations:
-    - name: Amazon DynamoDB time to live
-      url: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/TTL.html
-      description: Documents per-item expiration timestamps and asynchronous deletion of expired items.
-    - name: Redis EXPIRE command
-      url: https://redis.io/docs/latest/commands/expire/
-      description: Documents time-to-live configuration and expiry behavior for keys.
-    - name: W3C PROV-O
-      url: https://www.w3.org/TR/prov-o/
-      description: Distinguishes executed activities, entities, agents, time, and provenance facts.
-  source_claims:
-    - claim-memory-expiration-activity
-    - claim-memory-expiration-policy
-    - claim-memory-expiration-boundary
 structure:
   identity_keys:
-    - operation_id
+    - expiration_operation_id
   fields:
-    - id: operation_id
+    - id: expiration_operation_id
       labels:
-        zh: 操作标识
-        en: operation ID
-        ja: 操作 ID
+        zh: 到期操作标识
+        en: expiration operation ID
+        ja: expiration operation ID
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
       definitions:
-        zh: 复用父类 MemoryOperation 的稳定标识，以关联一次到期的目标、策略、资格效果、证据、结果和审计事实。
-        en: Reuses the stable MemoryOperation identity to join one expiration's target, policy, eligibility effect, evidence, result, and audit facts.
-        ja: 親 MemoryOperation の安定識別子を再利用し、一つの到期の対象、ポリシー、資格効果、証跡、結果、監査事実を結びます。
+        zh: 标识一次到期资格判定活动。
+        en: Identifies one expiry-eligibility determination activity.
+        ja: 一expiry-eligibility determination activityを識別します。
       allowed_values: []
-      pattern: '^mem-op-[a-z0-9][a-z0-9-]*$'
-      example_value: mem-op-expire-2801
+      pattern: null
+      example_value: expire-1506
       source_claims:
-        - claim-memory-expiration-identity
-    - id: operation_kind
-      labels:
-        zh: 操作类别
-        en: operation kind
-        ja: 操作種別
-      datatype: string
-      required: true
-      cardinality: { min: 1, max: 1 }
-      definitions:
-        zh: 继承并固定为 disposition，表示政策条件已实际造成既有记录的资格变化，而不是仅配置 TTL 或排期清理。
-        en: Inherited and fixed to disposition, showing that a policy condition actually changed an existing record's eligibility rather than merely configuring a TTL or scheduling cleanup.
-        ja: 継承して disposition に固定する。方針条件が既存レコードの資格を実際に変えたことを示し、TTL の設定または清掃の予定ではない。
-      allowed_values: [disposition]
-      pattern: null
-      example_value: disposition
-      source_claims: [claim-memory-expiration-activity]
-    - id: status
-      labels:
-        zh: 运行状态
-        en: runtime status
-        ja: 実行状態
-      datatype: string
-      required: true
-      cardinality: { min: 1, max: 1 }
-      definitions:
-        zh: 继承的到期工作单元状态；只有成功的执行加上实际资格效果，才能和未来到期计划区分。
-        en: The inherited expiration-work-unit status; only a successful execution plus an applied eligibility effect distinguishes it from a future expiry plan.
-        ja: 期限切れ作業単位の状態を継承する。成功した実行と適用済みの資格効果が揃って初めて、将来の期限切れ計画と区別できる。
-      allowed_values: [running, succeeded, failed, partially_succeeded, rejected, cancelled]
-      pattern: null
-      example_value: succeeded
-      source_claims: [claim-memory-expiration-activity]
-    - id: started_at
-      labels:
-        zh: 开始时间
-        en: started at
-        ja: 開始時刻
-      datatype: date-time
-      required: true
-      cardinality: { min: 1, max: 1 }
-      definitions:
-        zh: 继承的实际到期检查与资格变更开始时间，不得用策略发布时间、TTL 字段写入时间或任务排程时间代替。
-        en: The inherited actual start of expiry checking and eligibility change; policy publication, TTL-field write, and task-scheduling time cannot substitute.
-        ja: 期限切れ検査と資格変更の実行開始時刻を継承する。方針公開、TTL フィールド書込み、タスク予定時刻で代用してはならない。
-      allowed_values: []
-      pattern: null
-      example_value: "2026-07-18T23:00:00Z"
-      source_claims: [claim-memory-expiration-activity]
-    - id: actor_ref
-      labels:
-        zh: 执行主体引用
-        en: executor reference
-        ja: 実行主体参照
-      datatype: string
-      required: true
-      cardinality: { min: 1, max: 1 }
-      definitions:
-        zh: 继承的到期执行者；策略作者、数据主体或清理队列消费者不是该资格转移的执行者，除非审计证据如此绑定。
-        en: The inherited expiration executor; a policy author, data subject, or cleanup-queue consumer is not this eligibility transition's executor unless audit evidence binds it so.
-        ja: 期限切れの実行者を継承する。方針作成者、データ主体、清掃キュー消費者は、監査証拠で結び付けられない限り、この資格遷移の実行者ではない。
-      allowed_values: []
-      pattern: "^[A-Za-z0-9][A-Za-z0-9._:@/-]*$"
-      example_value: retention-enforcer-1
-      source_claims: [claim-memory-expiration-activity]
-    - id: target_record_refs
-      labels:
-        zh: 目标记录引用集合
-        en: target record references
-        ja: 対象レコード参照集合
-      datatype: string
-      required: true
-      cardinality: { min: 1, max: null }
-      definitions:
-        zh: 继承的处置目标集合；单记录到期将 target_record_ref 作为唯一已满足策略到期条件的既有记录，不能将同租户记录或未来清理输出列入其中。
-        en: The inherited disposition-target collection. A single-record expiration places target_record_ref in it as the sole existing record that met the policy's expiry condition; same-tenant records or future cleanup outputs do not belong in it.
-        ja: 処置対象集合を継承する。単一レコードの期限切れでは、方針の期限条件を満たした唯一の既存レコードとして target_record_ref を含める。同一テナントのレコードや将来の清掃出力を含めてはならない。
-      allowed_values: []
-      pattern: "^record-[A-Za-z0-9._-]+$"
-      example_value: [record-2801-v1]
-      source_claims: [claim-memory-expiration-target]
-    - id: disposition_kind
-      labels:
-        zh: 处置种类
-        en: disposition kind
-        ja: 処置種別
-      datatype: string
-      required: true
-      cardinality: { min: 1, max: 1 }
-      definitions:
-        zh: 将继承处置种类收窄为 expiration，明确该操作只改变正常检索资格，不是删除或活动层驱逐。
-        en: Narrows the inherited disposition kind to expiration, making this an operation on normal-retrieval eligibility rather than deletion or active-tier eviction.
-        ja: 継承した処置種別を expiration に限定する。これは通常検索の資格に対する操作であり、削除またはアクティブ層の追い出しではない。
-      allowed_values: [expiration]
-      pattern: null
-      example_value: expiration
-      source_claims: [claim-memory-expiration-boundary]
-    - id: disposition_basis
-      labels:
-        zh: 处置依据类别
-        en: disposition basis
-        ja: 処置根拠種別
-      datatype: string
-      required: true
-      cardinality: { min: 1, max: 1 }
-      definitions:
-        zh: 固定为 retention_policy；细分 expiry_basis 必须由 retention_policy_ref 的适用版本定义。
-        en: Fixed to retention_policy; the granular expiry_basis must be defined by the applicable retention_policy_ref version.
-        ja: retention_policy に固定する。細分化した expiry_basis は、適用される retention_policy_ref のバージョンで定義されなければならない。
-      allowed_values: [retention_policy]
-      pattern: null
-      example_value: retention_policy
-      source_claims: [claim-memory-expiration-policy]
-    - id: disposition_effect
-      labels:
-        zh: 处置效果
-        en: disposition effect
-        ja: 処置効果
-      datatype: string
-      required: true
-      cardinality: { min: 1, max: 1 }
-      definitions:
-        zh: 固定为 retention_ineligible，表示正常记忆检索或复用被阻止；它不表示物理清除、全局失效或墓碑产生。
-        en: Fixed to retention_ineligible, meaning normal memory retrieval or reuse is blocked; it does not represent physical clearing, global invalidation, or tombstone creation.
-        ja: retention_ineligible に固定する。通常の記憶検索または再利用が遮断されたことを示し、物理消去、全体無効化、墓標生成を表さない。
-      allowed_values: [retention_ineligible]
-      pattern: null
-      example_value: retention_ineligible
-      source_claims: [claim-memory-expiration-effect]
-    - id: disposition_evidence_digest
-      labels:
-        zh: 处置证据摘要
-        en: disposition evidence digest
-        ja: 処置証拠ダイジェスト
-      datatype: string
-      required: true
-      cardinality: { min: 1, max: 1 }
-      definitions:
-        zh: 继承的处置证据摘要；到期中必须等于 expiration_evidence_digest，绑定目标快照、策略版本、期限条件、资格效果与实际发生时间。
-        en: The inherited disposition-evidence digest. For expiration it must equal expiration_evidence_digest and bind target snapshot, policy version, expiry condition, eligibility effect, and actual occurrence time.
-        ja: 処置証拠ダイジェストを継承する。期限切れでは expiration_evidence_digest と同一でなければならず、対象スナップショット、方針バージョン、期限条件、資格効果、実際の発生時刻を結び付ける。
-      allowed_values: []
-      pattern: "^sha256:[a-f0-9]{64}$"
-      example_value: sha256:93d5a6c19abe60f9544187e655c3ed1a8d01f9a58a3d96812d550dc8b47dac8e
-      source_claims: [claim-memory-expiration-evidence]
-    - id: disposed_at
-      labels:
-        zh: 处置生效时间
-        en: disposed at
-        ja: 処置発生時刻
-      datatype: date-time
-      required: true
-      cardinality: { min: 1, max: 1 }
-      definitions:
-        zh: 继承的处置生效时间；到期中必须等于 expired_at，记录资格效果实际生效的时刻，而不是日后清理完成的时刻。
-        en: The inherited disposition-effective time. For expiration it must equal expired_at, the time eligibility actually changed rather than a later cleanup-completion time.
-        ja: 処置の有効時刻を継承する。期限切れでは expired_at と一致し、後日の清掃完了時刻ではなく資格が実際に変わった時刻を記録する。
-      allowed_values: []
-      pattern: null
-      example_value: "2026-07-18T23:00:00.042Z"
-      source_claims: [claim-memory-expiration-effect]
-    - id: target_record_ref
-      labels:
-        zh: 目标记录引用
-        en: target record reference
-        ja: 対象レコード参照
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 引用实际达到到期条件并被标记不合格的既有 MemoryRecord；相同租户、相同策略名称或共享追踪不能替代精确目标身份。
-        en: References the existing MemoryRecord that actually reached an expiry condition and is marked ineligible; the same tenant, policy name, or shared trace cannot substitute for exact target identity.
-        ja: 実際に期限切れ条件に達して不適格と印付けられる既存 MemoryRecord を参照します。同じテナント、ポリシー名、共有トレースでは正確な対象識別を代替できません。
-      allowed_values: []
-      pattern: '^record-[A-Za-z0-9._-]+$'
-      example_value: record-2801-v1
-      source_claims:
-        - claim-memory-expiration-target
-    - id: retention_policy_ref
-      labels:
-        zh: 保留策略版本引用
-        en: retention policy version reference
-        ja: 保持ポリシーバージョン参照
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 指向本次到期实际使用的具体 MemoryRetentionPolicy 版本，必须包含足以区分版本、范围和期限规则的稳定身份。
-        en: Points to the specific MemoryRetentionPolicy version actually used for this expiration and must carry stable identity sufficient to distinguish version, scope, and deadline rule.
-        ja: この到期で実際に使われた特定の MemoryRetentionPolicy バージョンを指し、バージョン、スコープ、期限規則を区別するのに十分な安定識別を持たなければなりません。
-      allowed_values: []
-      pattern: '^retention-policy-[A-Za-z0-9._-]+@v[0-9]+$'
-      example_value: retention-policy-tenant-a-30d@v3
-      source_claims:
-        - claim-memory-expiration-policy
-    - id: expiry_basis
-      labels:
-        zh: 到期依据
-        en: expiry basis
-        ja: 期限切れ根拠
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 指出策略中实际达到的到期条件，而不是将容量压力、手工删除或权重变化混写为到期。
-        en: States the expiry condition actually reached in the policy rather than writing capacity pressure, manual deletion, or weight change as expiration.
-        ja: 容量圧力、手動削除、重み変更を到期として書くのではなく、ポリシー内で実際に達した期限切れ条件を示します。
-      allowed_values:
-        - ttl_elapsed
-        - retention_deadline
-        - consent_deadline
-        - scope_end
-      pattern: null
-      example_value: retention_deadline
-      source_claims:
-        - claim-memory-expiration-policy
-    - id: expiry_deadline
-      labels:
-        zh: 到期截止时间
-        en: expiry deadline
-        ja: 期限切れ締切時刻
-      datatype: date-time
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 记录由适用策略和目标快照计算出的到期阈值时间，不能以任务排程或日志摄取时间代替。
-        en: Records the expiry threshold time calculated from applicable policy and target snapshot and cannot be substituted by job scheduling or log-ingestion time.
-        ja: 適用ポリシーと対象スナップショットから計算された期限切れしきい値時刻を記録し、ジョブ予定またはログ取込み時刻では代替できません。
-      allowed_values: []
-      pattern: null
-      example_value: "2026-07-18T22:59:59Z"
-      source_claims:
-        - claim-memory-expiration-policy
-    - id: eligibility_effect
-      labels:
-        zh: 资格效果
-        en: eligibility effect
-        ja: 資格効果
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 记录本次到期实际施加的效果，即目标记录不再可用于正常记忆检索或复用；它不是删除完成、墓碑生成或物理清除的替代名称。
-        en: "Records the effect actually applied by this expiration: the target record is no longer eligible for normal memory retrieval or reuse; it is not a substitute name for completed deletion, tombstone production, or physical clearance."
-        ja: この到期で実際に適用された効果、すなわち対象レコードが通常の記憶検索または再利用に不適格になったことを記録します。完了削除、墓標生成、物理消去の代替名称ではありません。
-      allowed_values:
-        - retention_ineligible
-      pattern: null
-      example_value: retention_ineligible
-      source_claims:
-        - claim-memory-expiration-effect
+        - claim-memory-expiration-002
     - id: expired_at
       labels:
-        zh: 到期发生时间
+        zh: 到期时间
         en: expired at
-        ja: 期限切れ発生時刻
+        ja: 期限到達時刻
       datatype: date-time
       required: true
       cardinality:
         min: 1
         max: 1
       definitions:
-        zh: 记录资格效果实际生效的事件时间，必须不早于 expiry_deadline；它不是未来计划时间，也不是后续删除完成时间。
-        en: Records the event time at which eligibility effect actually takes hold and must not precede expiry_deadline; it is neither a future plan time nor later deletion-completion time.
-        ja: 資格効果が実際に有効になったイベント時刻を記録し、expiry_deadline より前にはなりません。将来計画時刻でも後続削除完了時刻でもありません。
+        zh: 记录记录满足到期条件的事件时间。
+        en: Records the event time at which the record met its expiry condition.
+        ja: recordがexpiry conditionを満たしたevent timeを記録します。
       allowed_values: []
       pattern: null
-      example_value: "2026-07-18T23:00:00.042Z"
+      example_value: 2026-07-16T00:00:00Z
       source_claims:
-        - claim-memory-expiration-effect
-    - id: cleanup_state
-      labels:
-        zh: 清理状态
-        en: cleanup state
-        ja: 清掃状態
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 记录到期后清理在本操作结束时的状态，明确区分尚未开始或已排队的清理与后续独立删除完成事实。
-        en: Records cleanup status at the end of this expiration operation, explicitly distinguishing not-started or queued cleanup from a later independent deletion-completion fact.
-        ja: この到期操作終了時の清掃状態を記録し、未開始またはキュー済み清掃を、後続の独立した削除完了事実から明確に区別します。
-      allowed_values:
-        - not_started
-        - queued
-        - not_required
-      pattern: null
-      example_value: queued
-      source_claims:
-        - claim-memory-expiration-boundary
-    - id: expiration_evidence_digest
-      labels:
-        zh: 到期证据摘要
-        en: expiration evidence digest
-        ja: 期限切れ証跡ダイジェスト
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 固定目标版本、策略版本、适用范围、到期条件、截止时间、资格效果和执行输出摘要，使以后可以重放这次资格转换。
-        en: Fixes a digest of target version, policy version, applicable scope, expiry condition, deadline, eligibility effect, and execution output so this eligibility transition can later be replayed.
-        ja: 対象バージョン、ポリシーバージョン、適用スコープ、期限条件、締切時刻、資格効果、実行出力のダイジェストを固定し、この資格遷移を後から再実行できるようにします。
-      allowed_values: []
-      pattern: '^sha256:[a-f0-9]{64}$'
-      example_value: sha256:93d5a6c19abe60f9544187e655c3ed1a8d01f9a58a3d96812d550dc8b47dac8e
-      source_claims:
-        - claim-memory-expiration-evidence
-  constraints:
-    - id: MemoryExpiration-parent-disposition-contract
-      expression: "operation_kind = disposition, disposition_kind = expiration, disposition_basis = retention_policy, disposition_effect = retention_ineligible, target_record_refs contains exactly target_record_ref, disposition_evidence_digest = expiration_evidence_digest, and disposed_at = expired_at."
-      explanation:
-        zh: 到期是父类处置契约的资格变化分支：它保留活动、目标、依据、效果、证据和发生时间的全部事实，但不得将这些事实改写为删除或缓存驱逐。
-        en: "Expiration is the eligibility-change branch of the parent disposition contract: it preserves activity, target, basis, effect, evidence, and occurrence facts but must not recast them as deletion or cache eviction."
-        ja: 期限切れは親の処置契約における資格変更の分岐である。活動、対象、根拠、効果、証拠、発生の全事実を保持するが、それらを削除やキャッシュ追い出しに書き換えてはならない。
-      source_claims:
-        - claim-memory-expiration-activity
-        - claim-memory-expiration-policy
-        - claim-memory-expiration-effect
-        - claim-memory-expiration-evidence
-    - id: MemoryExpiration-policy-target-scope-match
-      expression: "retention_policy_ref identifies a version whose scope applies to target_record_ref, expiry_basis is a condition defined by that version, and expiry_deadline is calculated from the target snapshot and that condition."
-      explanation:
-        zh: 仅有同名策略或同一租户不足以证明治理；错误版本、作用域或时间锚点会错误改变到期结论。
-        en: Merely sharing a policy name or tenant does not prove governance; wrong version, scope, or time anchor changes the expiration conclusion incorrectly.
-        ja: ポリシー名またはテナントを共有するだけでは統治を証明できません。誤ったバージョン、スコープ、時間アンカーは到期結論を誤って変えます。
-      source_claims:
-        - claim-memory-expiration-policy
-        - claim-memory-expiration-target
-    - id: MemoryExpiration-time-and-effect-consistency
-      expression: "expired_at is on or after expiry_deadline and started_at, eligibility_effect=retention_ineligible, normal memory retrieval excludes target_record_ref after expired_at, and a terminal parent operation has ended_at on or after expired_at."
-      explanation:
-        zh: 到期需要一个已经生效的资格效果，而不是一个即将到来的截止时间；同时它不能早于规则条件或操作开始。
-        en: Expiration needs an eligibility effect that has already taken hold rather than an approaching deadline, and it cannot predate the rule condition or operation start.
-        ja: 到期には近づく締切ではなく、すでに有効になった資格効果が必要です。また規則条件または操作開始より前にはなれません。
-      source_claims:
-        - claim-memory-expiration-effect
-        - claim-memory-expiration-activity
-    - id: MemoryExpiration-cleanup-delete-boundary
-      expression: "cleanup_state may be not_started, queued, or not_required, but this node does not assert a deletion tombstone, global invalidation, or verified media sanitization; any such fact requires a separate MemoryDelete operation and evidence."
-      explanation:
-        zh: 到期和删除可以处于同一工作流，但它们是不同的可审计断言。把等待清理误称为完成删除会破坏时序和合规证据。
-        en: Expiration and deletion can occur in one workflow, but they are different auditable assertions. Calling queued cleanup completed deletion corrupts timing and compliance evidence.
-        ja: 到期と削除は一つのワークフローに存在し得ますが、異なる監査可能な主張です。キュー済み清掃を完了削除と呼ぶと、時系列とコンプライアンス証跡を壊します。
-      source_claims:
-        - claim-memory-expiration-boundary
-    - id: MemoryExpiration-non-eviction-non-decay-boundary
-      expression: "Capacity pressure, active-tier residency removal, or a strength change alone cannot establish expiration; there must be an applicable policy deadline and applied retention_ineligible effect."
-      explanation:
-        zh: 缓存驱逐和检索衰减可能恰好接近某个 TTL，但没有策略期限与资格效果时仍不是到期。
-        en: Cache eviction and retrieval decay can happen near a TTL, but without policy deadline and applied eligibility effect they are still not expiration.
-        ja: キャッシュ追い出しと検索減衰は TTL 付近で起き得ますが、ポリシー期限と適用済み資格効果がなければ到期ではありません。
-      source_claims:
-        - claim-memory-expiration-boundary
+        - claim-memory-expiration-003
+  constraints: []
   required_relation_constraints: []
 examples:
-  - id: MemoryExpiration-example-positive-retention-deadline
-
+  - id: MemoryExpiration-example-positive-manual-001
+    kind: positive
     labels:
-      zh: 保留截止到期
-      en: Retention-deadline expiration
-      ja: 保持期限による到期
-
+      zh: 记忆到期正例
+      en: "Positive case: Memory expiration"
+      ja: 記憶期限切れ正例
+    scenario_id: null
     descriptions:
-      zh: Generative Agents Memory Stream + Reflection；MemGPT core_memory_append/archival_memory_insert；Redis SET EX TTL + FT.SEARCH vector eviction。
-      en: Generative Agents Memory Stream + Reflection; MemGPT core_memory_append/archival_memory_insert; Redis SET EX TTL + FT.SEARCH vector eviction.
-      ja: Generative Agents Memory Stream + Reflection。MemGPT core_memory_append/archival_memory_insert。Redis SET EX TTL + vector eviction。
+      zh: memory-op-expiration-001 在 2026-07-16T00:00:00Z 依据 retention-30d 把 record-1506 标记为不再满足正常检索资格，等待异步清理。
+      en: memory-op-expiration-001 applies retention-30d at 2026-07-16T00:00:00Z and marks record-1506 ineligible for normal retrieval while it awaits asynchronous cleanup.
+      ja: memory-op-expiration-001 は 2026-07-16T00:00:00Z に retention-30d を適用し、record-1506 を通常検索の対象外として非同期清掃待ちにします。
     field_values:
-      operation_id: mem-op-expire-2801
-      operation_kind: disposition
-      status: succeeded
-      started_at: "2026-07-18T23:00:00Z"
-      ended_at: "2026-07-18T23:00:00.074Z"
-      actor_ref: retention-worker-1
-      target_record_ref: record-2801-v1
-      target_record_refs:
-        - record-2801-v1
-      disposition_kind: expiration
-      disposition_basis: retention_policy
-      disposition_effect: retention_ineligible
-      retention_policy_ref: retention-policy-tenant-a-30d@v3
-      expiry_basis: retention_deadline
-      expiry_deadline: "2026-07-18T22:59:59Z"
-      eligibility_effect: retention_ineligible
-      expired_at: "2026-07-18T23:00:00.042Z"
-      cleanup_state: queued
-      expiration_evidence_digest: sha256:93d5a6c19abe60f9544187e655c3ed1a8d01f9a58a3d96812d550dc8b47dac8e
-      disposition_evidence_digest: sha256:93d5a6c19abe60f9544187e655c3ed1a8d01f9a58a3d96812d550dc8b47dac8e
-      disposed_at: "2026-07-18T23:00:00.042Z"
-      normal_memory_retrieval_returns_target: false
+      expiration_operation_id: memory-op-expiration-001
+      expired_at: 2026-07-16T00:00:00Z
+      operation_id: memory-op-expiration-001
+      reason: the retention window for this record has elapsed
+      disposition_operation_id: memory-op-expiration-001
+      target_record_id: record-1506
+      started_at: 2026-07-16T00:00:00Z
+    related_node_ids:
+      - MemoryExpiration
+      - MemoryDispositionOperation
+    related_relation_ids:
+      - MemoryExpiration-is_a-MemoryDispositionOperation
+    expected_result:
+      zh: 归类为 MemoryExpiration，但不得同时推断已物理删除。
+      en: Classify as MemoryExpiration but do not infer that physical deletion has already occurred.
+      ja: MemoryExpirationに分類しますがphysical delete済みとは推論しません。
+    why_valid_or_invalid:
+      zh: 到期资格成立，删除完成事件尚未发生。
+      en: Expiry eligibility holds while the deletion-completion event has not occurred.
+      ja: expiry eligibilityは成立しdelete completion eventは未発生です。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-memory-expiration-001
+  - id: MemoryExpiration-example-instance-manual-20260716
+    kind: instance
+    labels:
+      zh: 保留期限到期实例
+      en: Retention-window expiration instance
+      ja: 保持期限満了インスタンス
+    scenario_id: MemoryExpiration:instance:memory-op-expiration-001
+    descriptions:
+      zh: memory-op-expiration-001 在 2026-07-16T00:00:00Z 依据 retention-30d 把 record-1506 标记为不再满足正常检索资格，等待异步清理。
+      en: memory-op-expiration-001 applies retention-30d at 2026-07-16T00:00:00Z and marks record-1506 ineligible for normal retrieval while it awaits asynchronous cleanup.
+      ja: memory-op-expiration-001 は 2026-07-16T00:00:00Z に retention-30d を適用し、record-1506 を通常検索の対象外として非同期清掃待ちにします。
+    field_values:
+      expiration_operation_id: memory-op-expiration-001
+      expired_at: 2026-07-16T00:00:00Z
+      operation_id: memory-op-expiration-001
+      reason: the retention window for this record has elapsed
     related_node_ids:
       - MemoryExpiration
       - MemoryDispositionOperation
       - MemoryRecord
       - MemoryRetentionPolicy
-      - MemoryOperationResult
-      - MemoryAuditEvent
     related_relation_ids:
       - MemoryExpiration-is_a-MemoryDispositionOperation
       - MemoryExpiration-marks_ineligible-MemoryRecord
       - MemoryExpiration-governed_by-MemoryRetentionPolicy
-      - MemoryOperation-acts_on-MemoryRecord
-      - MemoryOperation-has_result-MemoryOperationResult
-      - MemoryOperation-has_audit_event-MemoryAuditEvent
-
+    expected_result:
+      zh: 返回到期活动、记录和适用策略；不得据此声称已经发生物理删除或墓碑生成。
+      en: Return the expiration activity, record, and policy without claiming that physical deletion or tombstone production already occurred.
+      ja: 期限満了活動、記録、方針を返し、物理削除や墓標生成が済んだとは主張しません。
+    why_valid_or_invalid:
+      zh: 时间策略使记录失去检索资格，但清理尚未执行，因此是 Expiration 而不是 Delete。
+      en: A time policy removes retrieval eligibility before cleanup executes, so this is Expiration rather than Delete.
+      ja: 時間方針で検索資格を失うが清掃は未実行のため、Delete ではなく Expiration です。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
     source_claims:
-      - claim-memory-expiration-policy
-      - claim-memory-expiration-effect
-      - claim-memory-expiration-boundary
-  - id: MemoryExpiration-example-counterexample-eviction
-
+      - claim-memory-expiration-001
+  - id: MemoryExpiration-example-boundary-manual-001
+    kind: boundary
     labels:
-      zh: 容量驱逐不是到期
-      en: Capacity eviction is not expiration
-      ja: 容量追い出しは到期ではない
-
+      zh: 记忆到期边界例
+      en: "Boundary case: Memory expiration"
+      ja: 記憶期限切れ境界例
+    scenario_id: null
     descriptions:
-      zh: 反例：ephemeral tool output 无 MemoryRetentionPolicy/Redis EX TTL 就永久 MemoryWrite。
-      en: Counterexample: ephemeral tool output MemoryWrite permanently without MemoryRetentionPolicy/Redis EX TTL.
-      ja: 反例：ephemeral tool output が MemoryRetentionPolicy/Redis EX TTL なしで永久 MemoryWrite。
-    field_values:
-      operation_id: mem-op-evict-2801
-      operation_kind: disposition
-      target_record_ref: record-2801-v1
-      active_tier_ref: tier-retrieval-cache-east
-      disposition_kind: eviction
-      disposition_basis: capacity_pressure
-      disposition_effect: active_tier_removed
-      expiry_deadline: "2026-07-28T23:00:00Z"
-      expired_at: absent
-      eligibility_effect: absent
+      zh: expire-1507 因缓存容量不足提前移除未到期记录。
+      en: expire-1507 removes an unexpired record early because cache capacity is exhausted.
+      ja: expire-1507 はcache capacity不足で未expired recordを早期除去します。
+    field_values: {}
     related_node_ids:
       - MemoryExpiration
-      - MemoryEviction
-      - MemoryRecord
-    related_relation_ids:
-      - MemoryExpiration-is_a-MemoryDispositionOperation
-      - MemoryEviction-is_a-MemoryDispositionOperation
-      - MemoryEviction-evicts-MemoryRecord
-
+    related_relation_ids: []
+    expected_result:
+      zh: 不得归类为 MemoryExpiration；应归 MemoryEviction。
+      en: Do not classify as MemoryExpiration; classify as MemoryEviction.
+      ja: MemoryExpirationでなくMemoryEvictionに分類します。
+    why_valid_or_invalid:
+      zh: 没有满足时间或保留期限，触发器是容量。
+      en: No time or retention deadline was met; capacity is the trigger.
+      ja: time/retention deadline未成立でtriggerはcapacityです。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-memory-expiration-boundary
-  - id: MemoryExpiration-example-boundary-future-policy
-
-    labels:
-      zh: 未来到期计划不是已执行到期
-      en: Future expiry plan is not executed expiration
-      ja: 将来到期計画は実行済み到期ではない
-
-    descriptions:
-      zh: MemGPT main_context vs archival vs recall 生命周期阶段；Generative Agents importance 累计 vs MemoryDecay recency 衰减。
-      en: MemGPT main_context vs archival vs recall lifecycle stages; Generative Agents importance accumulation vs MemoryDecay recency decay.
-      ja: MemGPT main/recall/archival lifecycle 段階。Generative Agents importance 累計 vs MemoryDecay recency 減衰。
-    field_values:
-      schedule_id: retention-job-2802
-      target_record_ref: record-2802-v1
-      retention_policy_ref: retention-policy-tenant-a-30d@v3
-      planned_expiry_deadline: "2026-07-25T23:00:00Z"
-      operation_id: absent
-      eligibility_effect: absent
-      expired_at: absent
-      expiration_evidence_digest: absent
-    related_node_ids:
-      - MemoryExpiration
-      - MemoryRetentionPolicy
-      - MemoryRecord
-    related_relation_ids:
-      - MemoryExpiration-is_a-MemoryDispositionOperation
-
-    source_claims:
-      - claim-memory-expiration-activity
-  - id: MemoryExpiration-example-instance-consent-deadline
-
-    labels:
-      zh: 同意期限到期实例
-      en: Consent-deadline expiration instance
-      ja: 同意期限到期インスタンス
-
-    descriptions:
-      zh: MemGPT core_memory_replace(key="human", old="Bob", new="Alice")；Generative Agents reflection importance threshold=150 触发。
-      en: MemGPT core_memory_replace(key="human", old="Bob", new="Alice"); Generative Agents reflection importance threshold=150 triggers.
-      ja: MemGPT core_memory_replace。Generative Agents reflection importance threshold=150 トリガー。
-    field_values:
-      operation_id: mem-op-expire-2803
-      operation_kind: disposition
-      status: succeeded
-      started_at: "2026-07-18T23:10:00Z"
-      ended_at: "2026-07-18T23:10:00.064Z"
-      actor_ref: consent-retention-worker-1
-      target_record_ref: record-2803-v4
-      target_record_refs:
-        - record-2803-v4
-      disposition_kind: expiration
-      disposition_basis: retention_policy
-      disposition_effect: retention_ineligible
-      retention_policy_ref: retention-policy-consent-90d@v2
-      expiry_basis: consent_deadline
-      expiry_deadline: "2026-07-18T23:09:59Z"
-      eligibility_effect: retention_ineligible
-      expired_at: "2026-07-18T23:10:00.040Z"
-      cleanup_state: not_started
-      expiration_evidence_digest: sha256:dd68f2c808cfff61e5178ad86be268ba6a2db3ef4f018a9ec39c57be551d3a29
-      disposition_evidence_digest: sha256:dd68f2c808cfff61e5178ad86be268ba6a2db3ef4f018a9ec39c57be551d3a29
-      disposed_at: "2026-07-18T23:10:00.040Z"
-      normal_memory_retrieval_returns_target: false
-      tombstone_ref: absent
-    related_node_ids:
-      - MemoryExpiration
-      - MemoryDispositionOperation
-      - MemoryRecord
-      - MemoryRetentionPolicy
-      - MemoryOperationResult
-    related_relation_ids:
-      - MemoryExpiration-is_a-MemoryDispositionOperation
-      - MemoryExpiration-marks_ineligible-MemoryRecord
-      - MemoryExpiration-governed_by-MemoryRetentionPolicy
-      - MemoryOperation-acts_on-MemoryRecord
-      - MemoryOperation-has_result-MemoryOperationResult
-
-    source_claims:
-      - claim-memory-expiration-policy
-      - claim-memory-expiration-effect
-      - claim-memory-expiration-boundary
+      - claim-memory-expiration-001
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation: []
 parent_relation:
   id: MemoryExpiration-is_a-MemoryDispositionOperation
   predicate: is_a
-  direction: source-to-target
+  direction: target-to-source
   relation_kind: hierarchy
   labels:
     zh: 是一种记忆处置操作
     en: is a memory disposition operation
-    ja: 記憶処分操作の一種である
+    ja: 記憶処分操作の一種
   definitions:
-    zh: MemoryExpiration —is_a→ MemoryDispositionOperation 表示一次已执行活动依据适用保留规则使既有记录失去正常检索资格，而没有宣称删除完成。
-    en: MemoryExpiration —is_a→ MemoryDispositionOperation means one executed activity makes an existing record ineligible for normal retrieval under an applicable retention rule without claiming completed deletion.
-    ja: MemoryExpiration —is_a→ MemoryDispositionOperation は、一つの実行済み活動が適用保持規則により既存レコードを通常検索に不適格にし、完了削除を主張しないことを表します。
+    zh: MemoryExpiration —is_a→ MemoryDispositionOperation 表示：记录满足 MemoryRetentionPolicy 的时间、同意或作用域到期条件，物理删除可稍后发生。
+    en: MemoryExpiration —is_a→ MemoryDispositionOperation holds because the record meets a time, consent, or scope expiry condition in MemoryRetentionPolicy while physical deletion may happen later
+    ja: MemoryExpiration —is_a→ MemoryDispositionOperation は、recordがMemoryRetentionPolicyのtime・consent・scope expiry conditionを満たしphysical deleteが後で起こり得るため成立します。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 分类关系表达类型成员资格，不限制一次到期活动可处理的目标记录批次数。
-    en: The classification relation expresses type membership and does not limit how many target-record batches one expiration activity may handle.
-    ja: 分類関係は型メンバーシップを表し、一つの到期活動が処理できる対象レコードバッチ数を制限しません。
+    zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
+    en: The relation is decided per auditable fact; no uniform runtime cardinality is imposed at ontology level.
+    ja: このrelationはaudit可能fact単位で判定しontology層で全runtime instanceへ一律cardinalityを課しません。
   inverse_reading:
-    predicate: has_expiration_subtype
+    predicate: part_of
     labels:
-      zh: 具有到期子类
-      en: has expiration subtype
-      ja: 到期サブタイプを持つ
+      zh: 反向读取
+      en: inverse is a memory disposition operation
+      ja: 逆方向読取
   conditions:
-    - id: MemoryExpiration-is_a-MemoryDispositionOperation-child-differentia
+    - id: MemoryExpiration-is_a-MemoryDispositionOperation-condition-manual-001
       severity: error
       expression_language: plain
-      expression: "Assert only when an executed disposition applies a versioned retention policy to an existing record, reaches its defined expiry condition, and changes normal retrieval eligibility to retention_ineligible without asserting deletion completion."
-      explanation:
-        zh: 处置父类身份不足以证明到期；必须有适用策略、已达到条件、实际资格效果，以及不提前声称删除完成的边界。
-        en: Disposition-parent identity alone does not prove expiration; applicable policy, reached condition, actual eligibility effect, and a boundary against premature deletion claims are all required.
-        ja: 処分親の識別だけでは到期を証明できません。適用ポリシー、到達済み条件、実際の資格効果、早すぎる削除完了主張への境界のすべてが必要です。
+      expression: Assert only when the instance satisfies the child differentia—the record meets a time, consent, or scope expiry condition in MemoryRetentionPolicy while physical deletion may happen later—and already meets the activity definition of MemoryDispositionOperation.
+      explanations:
+        zh: 仅当实例满足子类种差“记录满足 MemoryRetentionPolicy 的时间、同意或作用域到期条件，物理删除可稍后发生。”且已满足 MemoryDispositionOperation 的活动定义时建立该边。
+        en: Assert only when the instance satisfies the child differentia—the record meets a time, consent, or scope expiry condition in MemoryRetentionPolicy while physical deletion may happen later—and already meets the activity definition of MemoryDispositionOperation.
+        ja: instanceがchild differentia「recordがMemoryRetentionPolicyのtime・consent・scope expiry conditionを満たしphysical deleteが後で起こり得るため成立します。」を満たし、かつ MemoryDispositionOperation のactivity定義を満たす時だけassertします。
       source_claims:
-        - claim-memory-expiration-policy
-        - claim-memory-expiration-effect
-        - claim-memory-expiration-boundary
+        - claim-memory-expiration-001
   temporal_scope: timeless
   boundary_context: null
   constraints: []
   examples:
-    - id: MemoryExpiration-is_a-MemoryDispositionOperation-example-positive
-
+    - id: MemoryExpiration-is_a-MemoryDispositionOperation-example-positive-manual-20260716
+      kind: positive
       labels:
-        zh: 已应用保留到期属于处置
-        en: Applied retention expiry is disposition
-        ja: 適用済み保持期限切れは処分である
-
+        zh: 是一种记忆处置操作正例
+        en: "Positive case: is a memory disposition operation"
+        ja: 記憶処分操作の一種正例
+      scenario_id: MemoryExpiration-is_a-MemoryDispositionOperation:positive:20260716
       descriptions:
-        zh: mem-op-expire-2801 按 retention-policy-tenant-a-30d@v3 使 record-2801-v1 失去正常检索资格，并仅排队清理。
-        en: Under retention-policy-tenant-a-30d@v3, mem-op-expire-2801 makes record-2801-v1 ineligible for normal retrieval and only queues cleanup.
-        ja: retention-policy-tenant-a-30d@v3 に従い、mem-op-expire-2801 は record-2801-v1 を通常検索に不適格にし、清掃をキューに入れるだけです。
-      field_values:
-        operation_id: mem-op-expire-2801
-        target_record_ref: record-2801-v1
-        retention_policy_ref: retention-policy-tenant-a-30d@v3
-        expiry_basis: retention_deadline
-        eligibility_effect: retention_ineligible
-        expired_at: "2026-07-18T23:00:00.042Z"
-        cleanup_state: queued
+        zh: expire-1506 在 retention-policy-4@v3 的 30 天期限到达时，把 record-1506 标为 expired 并排入异步清理队列。
+        en: expire-1506 marks record-1506 expired when retention-policy-4@v3 reaches its 30-day deadline and queues it for asynchronous cleanup.
+        ja: expire-1506 は retention-policy-4@v3 の 30-day deadline 到達時に record-1506 を expired とし async cleanup queue に入れます。
+      field_values: {}
       related_node_ids:
         - MemoryExpiration
         - MemoryDispositionOperation
       related_relation_ids:
         - MemoryExpiration-is_a-MemoryDispositionOperation
-
+      expected_result:
+        zh: 将 expire-1506 归为 MemoryExpiration，立即停止常规检索资格，同时明确物理删除仍可能延迟。
+        en: Classify expire-1506 as MemoryExpiration, stop normal retrieval eligibility immediately, and state that physical deletion may still be delayed.
+        ja: expire-1506 を MemoryExpiration に分類し normal retrieval eligibility を直ちに止め、physical deletion は遅延可能と明記します。
+      why_valid_or_invalid:
+        zh: 记录满足具体时间策略并进入到期状态，DynamoDB TTL 也明确到期与后台删除可分离，符合 expiration 种差。
+        en: The record meets a versioned time policy and enters an expiry state; DynamoDB TTL likewise separates expiry from later background deletion.
+        ja: record は versioned time policy を満たし expiry state に入り、DynamoDB TTL も expiry と後続 background deletion を分離します。
+      synthetic: false
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-memory-expiration-policy
-        - claim-memory-expiration-effect
-        - claim-memory-expiration-boundary
-    - id: MemoryExpiration-is_a-MemoryDispositionOperation-example-boundary-plan
-
+        - claim-memory-expiration-001
+    - id: MemoryExpiration-is_a-MemoryDispositionOperation-example-boundary-manual-20260716
+      kind: boundary
       labels:
-        zh: 未来到期计划不是处置子类
-        en: Future expiry plan is not the disposition subtype
-        ja: 将来到期計画は処分サブタイプではない
-
+        zh: 是一种记忆处置操作边界例
+        en: "Boundary case: is a memory disposition operation"
+        ja: 記憶処分操作の一種境界例
+      scenario_id: MemoryExpiration-is_a-MemoryDispositionOperation:boundary:20260716
       descriptions:
-        zh: retention-job-2802 只排程未来检查 record-2802-v1 的到期条件，尚未改变任何资格。
-        en: retention-job-2802 only schedules a future check of record-2802-v1's expiry condition and has changed no eligibility.
-        ja: retention-job-2802 は record-2802-v1 の期限切れ条件の将来確認を予定するだけで、資格を何も変更していません。
-      field_values:
-        schedule_id: retention-job-2802
-        target_record_ref: record-2802-v1
-        planned_expiry_deadline: "2026-07-25T23:00:00Z"
-        eligibility_effect: absent
-        expired_at: absent
-        operation_id: absent
+        zh: evict-1506 在 record-1506 尚余十天 TTL 时因 cache-east 内存压力移除驻留副本，持久记录仍处于 active。
+        en: evict-1506 removes the cache-east copy for memory pressure while record-1506 still has ten TTL days remaining and remains active durably.
+        ja: evict-1506 は record-1506 の TTL が十日残る時に memory pressure で cache-east copy を除去し durable record は active のままです。
+      field_values: {}
       related_node_ids:
         - MemoryExpiration
         - MemoryDispositionOperation
       related_relation_ids:
         - MemoryExpiration-is_a-MemoryDispositionOperation
-
+      expected_result:
+        zh: 拒绝 MemoryExpiration 分类；把该活动建模为 MemoryEviction，并保持原 TTL 不变。
+        en: Reject MemoryExpiration membership; model the activity as MemoryEviction and leave the original TTL unchanged.
+        ja: MemoryExpiration 所属を拒否し activity を MemoryEviction として original TTL を変更しません。
+      why_valid_or_invalid:
+        zh: 容量压力不是保留策略的到期条件；在期限未满足时声称 expiration 会错误终止正常检索资格。
+        en: Capacity pressure is not a retention-policy expiry condition; asserting expiration before the deadline would wrongly terminate normal retrieval eligibility.
+        ja: capacity pressure は retention-policy expiry condition ではなく deadline 前の expiration 主張は normal retrieval eligibility を誤って終了します。
+      synthetic: false
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-memory-expiration-activity
+        - claim-memory-expiration-001
   source_claims:
-    - claim-memory-expiration-activity
-    - claim-memory-expiration-policy
-    - claim-memory-expiration-effect
-    - claim-memory-expiration-boundary
-  distinct_fact_rationale:
-    zh: 此主干关系只表达已应用保留规则的资格处置属于 MemoryDispositionOperation；目标、策略版本、期限、资格效果、清理状态、删除、结果和审计由字段或独立关系表达。
-    en: This backbone relation only expresses that applied retention-rule eligibility disposition belongs to MemoryDispositionOperation; target, policy version, deadline, eligibility effect, cleanup state, deletion, result, and audit use fields or separate relations.
-    ja: この主幹関係は、適用済み保持規則の資格処分が MemoryDispositionOperation に属することだけを表します。対象、ポリシーバージョン、期限、資格効果、清掃状態、削除、結果、監査はフィールドまたは別関係で表します。
+    - claim-memory-expiration-001
+  distinct_fact_rationale: null
   layout_role: primary-backbone
+  review_status: accepted
   endpoint_order: child-to-parent
 relations:
   - id: MemoryExpiration-marks_ineligible-MemoryRecord
@@ -725,107 +287,102 @@ relations:
     direction: source-to-target
     relation_kind: temporal
     labels:
-      zh: 标记记忆记录不再合格
-      en: marks memory record ineligible
-      ja: 記憶レコードを不適格に印付ける
+      zh: 标记记录到期不再合格
+      en: marks record expired and ineligible
+      ja: recordをexpired/ineligibleにする
     definitions:
-      zh: MemoryExpiration —marks_ineligible→ MemoryRecord 表示一次已执行到期使目标记录不再有资格用于正常记忆检索或复用，而没有建立删除完成事实。
-      en: MemoryExpiration —marks_ineligible→ MemoryRecord means one executed expiration makes the target record no longer eligible for normal memory retrieval or reuse without establishing completed deletion fact.
-      ja: MemoryExpiration —marks_ineligible→ MemoryRecord は、一つの実行済み到期が対象レコードを通常の記憶検索または再利用に不適格にし、完了削除事実を確立しないことを表します。
+      zh: MemoryExpiration —marks_ineligible→ MemoryRecord 表示记录满足到期条件后不再合格用于正常检索或复用，即使物理删除仍在等待。
+      en: MemoryExpiration —marks_ineligible→ MemoryRecord means the record is no longer eligible for normal retrieval or reuse after meeting expiry conditions even while physical deletion is pending.
+      ja: MemoryExpiration —marks_ineligible→ MemoryRecord はexpiry condition成立後physical delete待ちでもnormal retrieval/reuse不適格になることを表します。
     cardinality: null
     cardinality_not_applicable_reason:
-      zh: 该关系表达每个到期事实对具体目标资格的效果，不对所有实现设定固定运行时基数。
-      en: This relation expresses each expiration fact's effect on a concrete target's eligibility and imposes no fixed runtime cardinality across implementations.
-      ja: この関係は各到期事実の具体対象資格への効果を表し、実装全体に固定ランタイム基数を課しません。
+      zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
+      en: The relation is decided per auditable fact; no uniform runtime cardinality is imposed at ontology level.
+      ja: このrelationはaudit可能fact単位で判定しontology層で全runtime instanceへ一律cardinalityを課しません。
     inverse_reading:
-      predicate: is_marked_ineligible_by_expiration
+      predicate: inverse_marks_ineligible
       labels:
-        zh: 被到期标记为不合格
-        en: is marked ineligible by expiration
-        ja: 到期により不適格と印付けられる
+        zh: 反向读取
+        en: inverse marks record expired and ineligible
+        ja: 逆方向読取
     conditions:
-      - id: MemoryExpiration-marks_ineligible-MemoryRecord-target-policy-and-effect
+      - id: MemoryExpiration-marks_ineligible-MemoryRecord-condition-manual-001
         severity: error
         expression_language: plain
-        expression: "Assert only when the relation target matches target_record_ref, retention_policy_ref applies, expired_at is on or after expiry_deadline, eligibility_effect=retention_ineligible, normal retrieval excludes the target, and expiration_evidence_digest covers the fact."
-        explanation:
-          zh: 不合格关系必须有目标、适用规则、实际时间、资格效果和证据支持；不能由缓存未命中、低权重或未来 TTL 单独推断。
-          en: The ineligibility relation needs target, applicable rule, actual time, eligibility effect, and evidence; it cannot be inferred from a cache miss, low weight, or future TTL alone.
-          ja: 不適格関係には対象、適用規則、実際の時刻、資格効果、証跡が必要です。キャッシュミス、低重み、将来 TTL だけから推論できません。
+        expression: Assert only when current_time reaches policy expiry_at, target_record_id matches, and the result records eligibility=expired.
+        explanations:
+          zh: 仅当 current_time 达到 policy expiry_at，目标 record_id 匹配且结果记录 eligibility=expired 时成立。
+          en: Assert only when current_time reaches policy expiry_at, target_record_id matches, and the result records eligibility=expired.
+          ja: current_timeがpolicy expiry_atへ達しtarget_record_id一致かつresultがeligibility=expiredを記録する時だけassertします。
         source_claims:
-          - claim-memory-expiration-policy
-          - claim-memory-expiration-effect
-          - claim-memory-expiration-evidence
+          - claim-memory-expiration-001
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
-      - id: MemoryExpiration-marks_ineligible-MemoryRecord-example-positive
-
+      - id: MemoryExpiration-marks_ineligible-MemoryRecord-example-positive-manual-20260716
+        kind: positive
         labels:
-          zh: 到期标记具体记录不合格
-          en: Expiration marks concrete record ineligible
-          ja: 到期が具体レコードを不適格に印付ける
-
+          zh: 标记记录到期不再合格正例
+          en: "Positive case: marks record expired and ineligible"
+          ja: recordをexpired/ineligibleにする正例
+        scenario_id: MemoryExpiration-marks_ineligible-MemoryRecord:positive:20260716
         descriptions:
-          zh: mem-op-expire-2801 在适用策略截止后标记 record-2801-v1 为 retention_ineligible，正常记忆检索不再返回该记录。
-          en: After the applicable policy deadline, mem-op-expire-2801 marks record-2801-v1 retention_ineligible and normal memory retrieval no longer returns it.
-          ja: 適用ポリシー期限後、mem-op-expire-2801 は record-2801-v1 を retention_ineligible と印付け、通常の記憶検索は返さなくなります。
-        field_values:
-          operation_id: mem-op-expire-2801
-          target_record_ref: record-2801-v1
-          retention_policy_ref: retention-policy-tenant-a-30d@v3
-          expiry_deadline: "2026-07-18T22:59:59Z"
-          expired_at: "2026-07-18T23:00:00.042Z"
-          eligibility_effect: retention_ineligible
-          normal_memory_retrieval_returns_target: false
+          zh: record-1506 在 expiry_at 到达后由 expire-1506 改为 retrieval_eligible=false；后台 TTL 删除可能稍后发生。
+          en: At expiry_at, expire-1506 changes record-1506 to retrieval_eligible=false while TTL background deletion may occur later.
+          ja: expiry_at 到達時 expire-1506 は record-1506 を retrieval_eligible=false にし TTL background deletion は後で起こり得ます。
+        field_values: {}
         related_node_ids:
           - MemoryExpiration
           - MemoryRecord
         related_relation_ids:
           - MemoryExpiration-marks_ineligible-MemoryRecord
-
+        expected_result:
+          zh: 建立 expire-1506 marks_ineligible record-1506，并立即从正常召回候选中排除，但不伪造删除完成。
+          en: Assert expire-1506 marks_ineligible record-1506 and exclude it from normal recall immediately without fabricating completed deletion.
+          ja: expire-1506 marks_ineligible record-1506 を確立し normal recall から即時除外しますが completed deletion は作りません。
+        why_valid_or_invalid:
+          zh: 时间条件、目标和资格状态一致；DynamoDB TTL 明确允许到期项目在后台删除前短暂保留。
+          en: Time condition, target, and eligibility state agree, and DynamoDB TTL explicitly allows expired items to remain pending background deletion.
+          ja: time condition・target・eligibility state が一致し DynamoDB TTL は expired item の background deletion pending を許します。
+        synthetic: false
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-memory-expiration-policy
-          - claim-memory-expiration-effect
-      - id: MemoryExpiration-marks_ineligible-MemoryRecord-example-boundary-eviction
-
+          - claim-memory-expiration-001
+      - id: MemoryExpiration-marks_ineligible-MemoryRecord-example-boundary-manual-20260716
+        kind: boundary
         labels:
-          zh: 缓存驱逐不标记不合格
-          en: Cache eviction does not mark ineligible
-          ja: キャッシュ追い出しは不適格に印付けない
-
+          zh: 标记记录到期不再合格边界例
+          en: "Boundary case: marks record expired and ineligible"
+          ja: recordをexpired/ineligibleにする境界例
+        scenario_id: MemoryExpiration-marks_ineligible-MemoryRecord:boundary:20260716
         descriptions:
-          zh: mem-op-evict-2801 只从活动层移除 record-2801-v1 副本，保留其正常检索资格和未到期的截止时间。
-          en: mem-op-evict-2801 only removes the active-tier copy of record-2801-v1 and preserves its normal retrieval eligibility and not-yet-reached deadline.
-          ja: mem-op-evict-2801 は record-2801-v1 のアクティブ層コピーだけを除去し、通常検索資格と未到達の期限を保持します。
-        field_values:
-          operation_id: mem-op-evict-2801
-          target_record_ref: record-2801-v1
-          disposition_kind: eviction
-          active_tier_residency_after: false
-          eligibility_effect: absent
-          expired_at: absent
+          zh: record-1507 尚未到 expiry_at，只因低 LFU 频率被缓存驱逐；持久层检索仍应返回它。
+          en: record-1507 has not reached expiry_at and is evicted only for low LFU frequency; durable retrieval must still return it.
+          ja: record-1507 は expiry_at 前で low LFU により cache eviction されただけで durable retrieval は返す必要があります。
+        field_values: {}
         related_node_ids:
           - MemoryExpiration
-          - MemoryEviction
           - MemoryRecord
         related_relation_ids:
           - MemoryExpiration-marks_ineligible-MemoryRecord
-          - MemoryEviction-evicts-MemoryRecord
-
+        expected_result:
+          zh: 拒绝 expire-1506 marks_ineligible record-1507；只记录其缓存驻留变化，不改变正常检索资格。
+          en: Reject marking record-1507 ineligible; record only its cache-residency change and preserve normal retrieval eligibility.
+          ja: record-1507 marks_ineligible を拒否し cache residency change のみ記録して normal retrieval eligibility を保持します。
+        why_valid_or_invalid:
+          zh: 容量驱逐不满足时间、同意或作用域到期条件，把它当 expiration 会在有效期内隐藏合法记忆。
+          en: Capacity eviction satisfies no time, consent, or scope expiry condition; treating it as expiration would hide valid memory prematurely.
+          ja: capacity eviction は time・consent・scope expiry condition を満たさず expiration 化は valid memory を早期非表示にします。
+        synthetic: false
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-memory-expiration-boundary
+          - claim-memory-expiration-001
     source_claims:
-      - claim-memory-expiration-policy
-      - claim-memory-expiration-effect
-      - claim-memory-expiration-evidence
-    distinct_fact_rationale:
-      zh: 此关系表达到期对具体记录正常检索资格的效果，不表达处置类型成员资格、策略本身、删除、物理清除、结果或审计事件。
-      en: This relation expresses expiration's effect on a concrete record's normal-retrieval eligibility; it does not express disposition type membership, the policy itself, deletion, physical clearance, result, or audit event.
-      ja: この関係は到期が具体レコードの通常検索資格に与える効果を表し、処分型所属、ポリシー自体、削除、物理消去、結果、監査イベントを表しません。
+      - claim-memory-expiration-001
+    distinct_fact_rationale: null
     layout_role: cross-link
-    endpoint_order: source-to-target
+    review_status: accepted
     target: concept:MemoryRecord
   - id: MemoryExpiration-governed_by-MemoryRetentionPolicy
     predicate: governed_by
@@ -834,160 +391,136 @@ relations:
     labels:
       zh: 受记忆保留策略治理
       en: is governed by memory retention policy
-      ja: 記憶保持ポリシーにより統治される
+      ja: memory retention policyにより統治される
     definitions:
-      zh: MemoryExpiration —governed_by→ MemoryRetentionPolicy 表示一次到期使用某一特定策略版本来确定目标范围、到期条件和资格效果。
-      en: MemoryExpiration —governed_by→ MemoryRetentionPolicy means one expiration uses a specific policy version to determine target scope, expiry condition, and eligibility effect.
-      ja: MemoryExpiration —governed_by→ MemoryRetentionPolicy は、一つの到期が特定ポリシーバージョンを用いて対象スコープ、期限条件、資格効果を決定することを表します。
+      zh: MemoryExpiration —governed_by→ MemoryRetentionPolicy 表示到期时间、作用域、宽限期及清理行为由特定保留策略版本给出。
+      en: MemoryExpiration —governed_by→ MemoryRetentionPolicy means expiry time, scope, grace period, and cleanup behavior are supplied by a specific retention-policy version.
+      ja: MemoryExpiration —governed_by→ MemoryRetentionPolicy はexpiry time・scope・grace period・cleanup behaviorが特定retention-policy版で与えられることを表します。
     cardinality: null
     cardinality_not_applicable_reason:
-      zh: 该关系表达每次到期与适用策略版本的治理事实，不对所有实现设定固定运行时基数。
-      en: This relation expresses the governance fact between each expiration and its applicable policy version and imposes no fixed runtime cardinality across implementations.
-      ja: この関係は各到期と適用ポリシーバージョン間の統治事実を表し、実装全体に固定ランタイム基数を課しません。
+      zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
+      en: The relation is decided per auditable fact; no uniform runtime cardinality is imposed at ontology level.
+      ja: このrelationはaudit可能fact単位で判定しontology層で全runtime instanceへ一律cardinalityを課しません。
     inverse_reading:
-      predicate: governs_expiration
+      predicate: inverse_governed_by
       labels:
-        zh: 治理到期操作
-        en: governs expiration operation
-        ja: 到期操作を統治する
+        zh: 反向读取
+        en: inverse is governed by memory retention policy
+        ja: 逆方向読取
     conditions:
-      - id: MemoryExpiration-governed_by-MemoryRetentionPolicy-version-and-scope-match
+      - id: MemoryExpiration-governed_by-MemoryRetentionPolicy-condition-manual-001
         severity: error
         expression_language: plain
-        expression: "Assert only when the relation target matches retention_policy_ref, the policy version applies to target_record_ref at expiry_deadline, expiry_basis is defined by it, and expiration_evidence_digest covers the application."
-        explanation:
-          zh: 策略名称、旧版本或相邻租户不能替代精确策略版本与范围匹配；治理关系必须反映实际使用的规则。
-          en: Policy name, an old version, or a neighboring tenant cannot substitute for exact policy version and scope match; the governance relation must reflect the rule actually used.
-          ja: ポリシー名、旧バージョン、隣接テナントでは正確なポリシーバージョンとスコープ一致を代替できません。統治関係は実際に使われた規則を反映しなければなりません。
+        expression: Assert only when expiration policy ID and version match the target, the policy applies to the record scope, and its expiry condition was actually used.
+        explanations:
+          zh: 仅当 expiration.policy_id/version 与目标策略一致，策略适用于目标记录 scope，且 expiry 条件实际被使用时成立。
+          en: Assert only when expiration policy ID and version match the target, the policy applies to the record scope, and its expiry condition was actually used.
+          ja: expiration policy ID/versionがtargetと一致しpolicyがrecord scopeへ適用されexpiry conditionが実際に使われた時だけassertします。
         source_claims:
-          - claim-memory-expiration-policy
-          - claim-memory-expiration-evidence
+          - claim-memory-expiration-001
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
-      - id: MemoryExpiration-governed_by-MemoryRetentionPolicy-example-positive
-
+      - id: MemoryExpiration-governed_by-MemoryRetentionPolicy-example-positive-manual-20260716
+        kind: positive
         labels:
-          zh: 特定策略版本治理到期
-          en: Specific policy version governs expiration
-          ja: 特定ポリシーバージョンが到期を統治する
-
+          zh: 受记忆保留策略治理正例
+          en: "Positive case: is governed by memory retention policy"
+          ja: memory retention policyにより統治される正例
+        scenario_id: MemoryExpiration-governed_by-MemoryRetentionPolicy:positive:20260716
         descriptions:
-          zh: mem-op-expire-2801 使用 retention-policy-tenant-a-30d@v3 对 tenant-a 的 record-2801-v1 计算截止并标记不合格。
-          en: mem-op-expire-2801 uses retention-policy-tenant-a-30d@v3 to calculate the deadline for tenant-a record-2801-v1 and mark it ineligible.
-          ja: mem-op-expire-2801 は retention-policy-tenant-a-30d@v3 を用いて tenant-a の record-2801-v1 の期限を計算し不適格と印付けます。
-        field_values:
-          operation_id: mem-op-expire-2801
-          target_record_ref: record-2801-v1
-          retention_policy_ref: retention-policy-tenant-a-30d@v3
-          expiry_basis: retention_deadline
-          expiry_deadline: "2026-07-18T22:59:59Z"
+          zh: expire-1506 引用 retention-policy-4@v3；该版本对 tenant-a 的 episodic-memory 规定 30 天 TTL、24 小时宽限和后台删除。
+          en: expire-1506 cites retention-policy-4@v3, which gives tenant-a episodic memory a 30-day TTL, 24-hour grace period, and background deletion.
+          ja: expire-1506 は retention-policy-4@v3 を参照し tenant-a episodic memory に 30-day TTL・24-hour grace・background deletion を規定します。
+        field_values: {}
         related_node_ids:
           - MemoryExpiration
           - MemoryRetentionPolicy
         related_relation_ids:
           - MemoryExpiration-governed_by-MemoryRetentionPolicy
-
+        expected_result:
+          zh: 建立 expire-1506 governed_by retention-policy-4@v3，并从该精确版本计算 expiry_at 与清理行为。
+          en: Assert expire-1506 governed_by retention-policy-4@v3 and derive expiry_at and cleanup behavior from that exact version.
+          ja: expire-1506 governed_by retention-policy-4@v3 を確立し exact version から expiry_at/cleanup behavior を導出します。
+        why_valid_or_invalid:
+          zh: 策略身份、版本、租户、记忆类型和生效区间都匹配目标记录，因而确实决定本次到期。
+          en: Policy identity, version, tenant, memory type, and effective interval all match the target, so the policy determines this expiry.
+          ja: policy identity・version・tenant・memory type・effective interval が target と一致し expiry を決定します。
+        synthetic: false
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-memory-expiration-policy
-          - claim-memory-expiration-evidence
-      - id: MemoryExpiration-governed_by-MemoryRetentionPolicy-example-boundary-wrong-version
-
+          - claim-memory-expiration-001
+      - id: MemoryExpiration-governed_by-MemoryRetentionPolicy-example-boundary-manual-20260716
+        kind: boundary
         labels:
-          zh: 不适用的策略版本不治理到期
-          en: Inapplicable policy version does not govern expiration
-          ja: 適用不能なポリシーバージョンは到期を統治しない
-
+          zh: 受记忆保留策略治理边界例
+          en: "Boundary case: is governed by memory retention policy"
+          ja: memory retention policyにより統治される境界例
+        scenario_id: MemoryExpiration-governed_by-MemoryRetentionPolicy:boundary:20260716
         descriptions:
-          zh: retention-policy-tenant-a-90d@v2 名称相近但版本过期且期限为九十天，不是 record-2801-v1 实际使用的三十天规则。
-          en: retention-policy-tenant-a-90d@v2 has a similar name but is an older 90-day rule, not the 30-day rule actually used for record-2801-v1.
-          ja: retention-policy-tenant-a-90d@v2 は類似名ですが古い 90 日規則であり、record-2801-v1 に実際に使われた 30 日規則ではありません。
-        field_values:
-          operation_id: mem-op-expire-2801
-          target_record_ref: record-2801-v1
-          candidate_policy_ref: retention-policy-tenant-a-90d@v2
-          actual_policy_ref: retention-policy-tenant-a-30d@v3
-          candidate_expiry_deadline: "2026-09-16T23:00:00Z"
+          zh: retention-policy-4@v2 同名但仅适用于 tenant-b，且其 TTL 为 90 天；record-1506 未引用该版本。
+          en: retention-policy-4@v2 has the same name but applies only to tenant-b with a 90-day TTL, and record-1506 does not reference it.
+          ja: retention-policy-4@v2 は同名でも tenant-b のみ、TTL 90-day で record-1506 は参照しません。
+        field_values: {}
         related_node_ids:
           - MemoryExpiration
           - MemoryRetentionPolicy
         related_relation_ids:
           - MemoryExpiration-governed_by-MemoryRetentionPolicy
-
+        expected_result:
+          zh: 拒绝用 v2 治理 expire-1506；继续使用适用的 v3，避免把到期时间错误延后三倍。
+          en: Reject v2 as governor of expire-1506 and keep applicable v3 to avoid incorrectly tripling the retention period.
+          ja: v2 governance を拒否し applicable v3 を使い retention period の誤三倍化を防ぎます。
+        why_valid_or_invalid:
+          zh: 策略名称不足以证明治理，错误版本或租户会改变 TTL 和合法保留范围，必须按完整身份匹配。
+          en: Policy name alone does not prove governance; wrong version or tenant changes TTL and lawful retention, so full identity must match.
+          ja: policy name だけでは governance を証明せず wrong version/tenant は TTL/lawful retention を変えるため full identity match が必要です。
+        synthetic: false
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-memory-expiration-policy
+          - claim-memory-expiration-001
     source_claims:
-      - claim-memory-expiration-policy
-      - claim-memory-expiration-evidence
-    distinct_fact_rationale:
-      zh: 此关系表达实际到期所使用的具体保留策略版本，不表达策略定义本身、目标资格效果、删除、物理清除、结果或审计事件。
-      en: This relation expresses the concrete retention-policy version used by an actual expiration; it does not express policy definition itself, target eligibility effect, deletion, physical clearance, result, or audit event.
-      ja: この関係は実際の到期で使われた具体的保持ポリシーバージョンを表し、ポリシー定義自体、対象資格効果、削除、物理消去、結果、監査イベントを表しません。
+      - claim-memory-expiration-001
+    distinct_fact_rationale: null
     layout_role: cross-link
-    endpoint_order: source-to-target
+    review_status: accepted
     target: concept:MemoryRetentionPolicy
-sources:
-  - id: dynamodb-ttl
-    title: Using time to live in DynamoDB
-    source_type: official-doc
-    url: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/TTL.html
-    relevance: Documents per-item expiration timestamps, items pending asynchronous TTL deletion, and the need to filter expired items from use before cleanup completes.
-  - id: redis-expire
-    title: Redis EXPIRE command
-    source_type: official-doc
-    url: https://redis.io/docs/latest/commands/expire/
-    relevance: Documents time-to-live configuration, deadline behavior, and expiry-related key lifecycle semantics.
-  - id: w3c-prov-o
-    title: "W3C PROV-O: The PROV Ontology"
-    source_type: standard
-    url: https://www.w3.org/TR/prov-o/
-    relevance: Defines activities, entities, agents, time, and provenance associations as distinct facts.
-  - id: nist-fips-180-4
-    title: FIPS 180-4 Secure Hash Standard
-    source_type: standard
-    url: https://csrc.nist.gov/pubs/fips/180/4/final
-    relevance: Specifies SHA-256 message digests used to bind auditable expiration evidence.
+review:
+  status: accepted
+  method: manual-semantic
+  reviewer: manual-memory-lifecycle-verification
+  reviewed_on: 2026-07-17
+  note:
+    zh: 该节点仅完成了从现行候选数据到唯一 YAML 树的无损转录；尚未逐项完成人工语义核验，不得据此宣称已审定。
+    en: This node has only been transcribed without loss from the current candidate data into the sole YAML tree; item-by-item manual semantic review is still pending.
+    ja: このノードは現行候補データから唯一の YAML ツリーへ欠落なく転記した段階であり、項目別の手動意味審査は未完了です。
+  sections:
+    semantics: pending
+    hierarchy: pending
+    relations: pending
+    structure: pending
+    examples: pending
+    source_claims: []
 source_claims:
-  - id: claim-memory-expiration-activity
-    source: w3c-prov-o
-    supports: PROV-O distinguishes an executed Activity from entities and provenance facts around it. Moonweave records expiration as an executed operation with target, policy, actor, time, result, and audit evidence rather than a policy setting or future schedule.
-    locator: "PROV-O sections 3.1 Activity, 3.2 Entity, and 3.4 Agent"
-    evidence_kind: ontology-design-inference
+  - id: claim-memory-expiration-001
+    source: eng-db-dynamodb-ttl
+    supports: DynamoDB TTL assigns a per-item expiry timestamp and distinguishes becoming expired from later service deletion.
+    locator: Using time to live (TTL) > expired items pending deletion and TTL stream records
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-memory-expiration-identity
-    source: w3c-prov-o
-    supports: PROV-O permits activities and related provenance facts to have stable identities. Moonweave uses one operation ID to join an expiration's target, policy, eligibility effect, evidence, result, and audit facts.
-    locator: "PROV-O Activity and Entity identifier model"
-    evidence_kind: ontology-design-inference
+    review_status: accepted
+  - id: claim-memory-expiration-002
+    source: eng-db-dynamodb-ttl
+    supports: MemoryExpiration.expiration_operation_id records the stated operational datum so the concept instance can be identified or audited without changing the source model's own vocabulary.
+    locator: Using time to live (TTL) > expired items pending deletion and TTL stream records
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-memory-expiration-target
-    source: w3c-prov-o
-    supports: PROV-O distinguishes specific entities acted upon by an activity from nearby or later-generated entities. Moonweave identifies the exact existing memory record that reaches a retention condition.
-    locator: "PROV-O sections on prov:used and prov:wasGeneratedBy"
-    evidence_kind: ontology-design-inference
+    review_status: accepted
+  - id: claim-memory-expiration-003
+    source: eng-db-dynamodb-ttl
+    supports: MemoryExpiration.expired_at records the stated operational datum so the concept instance can be identified or audited without changing the source model's own vocabulary.
+    locator: Using time to live (TTL) > expired items pending deletion and TTL stream records
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-memory-expiration-policy
-    source: dynamodb-ttl
-    supports: DynamoDB TTL uses a configured expiration attribute for each item and determines eligibility from that time. Moonweave applies a concrete versioned retention rule and records its deadline and basis for a specific target rather than inferring expiry from capacity or a policy name.
-    locator: "DynamoDB TTL overview and expiration timestamp requirements"
-    evidence_kind: ontology-design-inference
-    confidence: high
-  - id: claim-memory-expiration-effect
-    source: dynamodb-ttl
-    supports: DynamoDB documents expired items pending deletion and recommends filtering them from read and write operations. Moonweave marks a record retention_ineligible for normal memory retrieval once the expiry condition is applied.
-    locator: "DynamoDB TTL expired items and filtering expired items from operations"
-    evidence_kind: ontology-design-inference
-    confidence: high
-  - id: claim-memory-expiration-evidence
-    source: nist-fips-180-4
-    supports: FIPS 180-4 specifies fixed-size secure message digests. Moonweave stores a SHA-256 digest over target version, policy version, scope, deadline, eligibility effect, and execution output to bind expiration evidence.
-    locator: "FIPS 180-4 abstract and SHA-256 specification"
-    evidence_kind: ontology-design-inference
-    confidence: high
-  - id: claim-memory-expiration-boundary
-    source: dynamodb-ttl
-    supports: DynamoDB states that expired items can remain pending asynchronous deletion and can be filtered from operations before deletion. Moonweave keeps applied expiry eligibility distinct from later deletion, tombstone production, media sanitization, cache eviction, decay, and future scheduling.
-    locator: "DynamoDB TTL overview and Working with expired items and time to live"
-    evidence_kind: ontology-design-inference
-    confidence: high
+    review_status: accepted

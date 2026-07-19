@@ -2,179 +2,223 @@ schema: moonweave.ai/ontology-node/v1
 id: RetryActivity
 kind: concept
 status: accepted
-labels: {zh: 重试活动, en: Retry activity, ja: 再試行 Activity}
+labels:
+  zh: 重试活动
+  en: Retry activity
+  ja: 再試行活動
 semantics:
-  short_definition: {zh: 在重试条件成立时评估尝试结果并启动后续尝试的控制 Activity。, en: A control Activity that evaluates an attempt outcome and initiates a later attempt when retry conditions hold., ja: 再試行条件が満たされるときに試行結果を評価し、後続試行を開始する制御 Activity。}
-  definition: {zh: RetryActivity 是 Execution 内有时间边界的决定或控制发生。它消费失败或可重试 RunAttempt 的证据，应用重试策略和预算约束，并可以创建后续 RunAttempt。它不是失败尝试、新尝试或静态重试策略 Entity。, en: "A RetryActivity is a time-bounded decision or control occurrence inside an Execution. It consumes evidence from a failed or retryable RunAttempt, applies retry policy and budget constraints, and may create a later RunAttempt. It is not the failed attempt, the new attempt, or a static retry policy Entity.", ja: RetryActivity は Execution 内の時間境界を持つ判断または制御の発生である。失敗または再試行可能な RunAttempt の証拠を消費し、再試行ポリシーと予算制約を適用して、後続 RunAttempt を作成し得る。失敗試行、新規試行、静的な再試行ポリシー Entity ではない。}
-  why_needed: {zh: 将决定实体化可以区分有意恢复行为和意外重复工作，并使退避、策略、耗尽和人工干预可审计。, en: "Reifying the decision distinguishes intentional recovery behavior from accidental duplicate work and makes backoff, policy, exhaustion, and human intervention auditable.", ja: 判断を実体化することで、意図的な復旧動作と偶発的な重複作業を区別し、バックオフ、ポリシー、枯渇、人間介入を監査可能にする。}
+  short_definition:
+    zh: 在一次 Execution 内落实“重试”决定并创建后续 RunAttempt 的调度活动。
+    en: A scheduling activity within an Execution that implements a retry decision and creates a successor RunAttempt.
+    ja: 一 Execution 内で retry decision を実装し successor RunAttempt を作る scheduling activity。
+  definition:
+    zh: >-
+      RetryActivity 将一个已经选择 retry 的 RoutingDecision 落实为调度与创建动作，并把直接失败的
+      RunAttempt 连接到新建后续 RunAttempt。RetryPolicy 的资格、次数与退避求值属于
+      RoutingDecision；本活动只在后续尝试确实建立时存在。将该动作实体化是 Moonweave 的建模选择。
+    en: >-
+      A RetryActivity implements a RoutingDecision whose selected outcome is retry, schedules the
+      transition, and connects the directly failed RunAttempt to the newly created successor. Retry
+      eligibility, attempt limits, and backoff evaluation belong to the RoutingDecision that applies
+      RetryPolicy. This activity exists only when a successor is actually created. Reifying that
+      action is a Moonweave modeling choice.
+    ja: >-
+      RetryActivity は失敗した RunAttempt、評価された RetryPolicy、新規 successor RunAttempt を
+      監査可能な occurrence として結びます。framework は retry count・backoff・rerun を公開しますが、
+      control decision を独立 activity とするのは Moonweave の modeling choice です。
+  why_needed:
+    zh: 若只看尝试序号，无法证明为何重试、采用哪版策略、实际等待多久以及是否创建了新身份。
+    en: Attempt ordinals alone cannot prove why retry happened, which policy governed it, the actual delay, or whether a new identity was created.
+    ja: attempt ordinal だけでは retry 理由・適用 policy・実 delay・新 identity 作成を証明できません。
   includes:
-    - {zh: 重试资格评估、退避调度、预算检查、重试决定以及后续尝试的创建。, en: "Retry eligibility evaluation, backoff scheduling, budget checks, retry decision, and creation of a subsequent attempt.", ja: 再試行適格性評価、バックオフスケジューリング、予算チェック、再試行判断、後続試行の作成。}
-    - {zh: 指向源尝试、产生的尝试、适用策略和决定原因的链接。, en: "Links to the source attempt, produced attempt, applicable policy, and decision reason.", ja: ソース試行、生成試行、適用ポリシー、判断理由へのリンク。}
+    - zh: 已有 retry 路由决定并实际创建后续尝试的调度发生。
+      en: A scheduling occurrence that implements an existing retry routing decision and actually creates a successor attempt.
+      ja: 既存 retry routing decision を実装し successor attempt を実際に作る scheduling occurrence。
   excludes:
-    - {zh: 一个失败 RunAttempt、一个成功替代 RunAttempt 或 RetryPolicy 配置。, en: "A failed RunAttempt, a successful replacement RunAttempt, or a RetryPolicy configuration.", ja: 失敗した RunAttempt、成功した代替 RunAttempt、RetryPolicy 構成。}
-    - {zh: 一个从检查点恢复而不重试同一工作的通用状态恢复活动。, en: A generic state restoration activity that resumes from a checkpoint without retrying the same work., ja: 同じ作業を再試行せずにチェックポイントから再開する一般的な状態復元 Activity。}
+    - zh: 同一 RunAttempt 的恢复、继续或重放。
+      en: Resumption, continuation, or replay of the same RunAttempt.
+      ja: 同一 RunAttempt の resume・continue・replay。
+    - zh: 没有失败证据和策略判定的手动再次运行。
+      en: A manual rerun without failure evidence and a policy decision.
+      ja: failure evidence と policy decision のない manual rerun。
+    - zh: 判定为不符合重试条件或重试已耗尽、因而没有创建后续尝试的路由决定。
+      en: A routing decision that selects not-eligible or exhausted and therefore creates no successor.
+      ja: not-eligible または exhausted を選び successor を作らない routing decision。
   semantic_kind: activity
-  aliases: [retry decision, retry controller action]
-engineering:
-  explanation: {zh: 一次尝试结束后，控制器检查结果分类、重试次数、退避、预算和取消状态。它记录 retry_activity_id 和决定，必要时等待，然后创建新的尝试记录或记录耗尽。, en: "After an attempt ends, the controller checks outcome classification, retry count, backoff, budget, and cancellation state. It records retry_activity_id and decision, waits if necessary, then creates a fresh attempt record or records exhaustion.", ja: 試行終了後、コントローラーは結果分類、再試行回数、バックオフ、予算、取消状態を確認する。retry_activity_id と判断を記録し、必要なら待機して、新しい試行記録を作成するか枯渇を記録する。}
-  typical_input:
-    - description: {zh: 重试决定输入, en: Retry decision input, ja: 再試行判断入力}
-      format: |-
-        {"retry_activity_id":"retry-4","failed_attempt_id":"attempt-1","error_kind":"timeout","attempt_number":1,"max_attempts":3,"backoff_ms":500}
-  typical_output:
-    - description: {zh: 重试决定输出, en: Retry decision output, ja: 再試行判断出力}
-      format: |-
-        {"retry_activity_id":"retry-4","decision":"retry","next_attempt_id":"attempt-2","scheduled_at":"2026-07-18T09:01:00Z"}
-  reference_implementations:
-    - {name: LangGraph fault tolerance, url: https://docs.langchain.com/oss/python/langgraph/fault-tolerance, description: "Retry policies, backoff, and recovery behavior."}
+  aliases: []
+applicability: [core]
 structure:
   identity_keys: [retry_activity_id]
   fields:
     - id: retry_activity_id
-      labels: {zh: 重试活动 ID, en: Retry activity ID, ja: 再試行 Activity ID}
-      definitions: {zh: 一次重试决定发生的稳定标识符。, en: Stable identifier for one retry decision occurrence., ja: 1つの再試行判断発生に対する安定した識別子。}
+      labels: {zh: 重试活动标识, en: Retry activity ID, ja: 再試行活動ID}
+      definitions: {zh: 唯一标识一次重试控制发生。, en: Uniquely identifies one retry-control occurrence., ja: 一つの retry-control occurrence を一意に識別します。}
       datatype: string
       required: true
       cardinality: {min: 1, max: 1}
-      pattern: '^[a-z][a-z0-9-]{2,127}$'
-      example_value: retry-4
-      source_claims: [claim-retry-activity]
-    - id: decision
-      labels: {zh: 重试决定, en: Retry decision, ja: 再試行判断}
-      definitions: {zh: 评估是否应创建后续尝试的结果。, en: Result of evaluating whether a later attempt should be created., ja: 後続試行を作成すべきかを評価した結果。}
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: [retry, stop, escalate]
-      example_value: retry
-      source_claims: [claim-retry-activity]
-    - id: backoff_ms
-      labels: {zh: 退避毫秒数, en: Backoff milliseconds, ja: バックオフミリ秒}
-      definitions: {zh: 当决定为重试时，下次尝试前的计划等待时间。, en: Scheduled wait before the next attempt when decision is retry., ja: 判断が retry のとき、次の試行前に予定される待機時間。}
+      pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$'
+      example_value: retry-build-42-2
+      allowed_values: []
+      source_claims: [claim-retry-activity-reification]
+    - id: scheduled_delay_ms
+      labels: {zh: 已调度延迟毫秒, en: Scheduled delay in milliseconds, ja: schedule 済み遅延ミリ秒}
+      definitions: {zh: 策略计算后实际安排的等待时长，不是策略中的默认值。, en: Delay actually scheduled after policy evaluation, not merely the policy default., ja: policy 評価後に実際に schedule された待ち時間で default 値ではありません。}
       datatype: integer
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: 2000
+      allowed_values: []
+      source_claims: [claim-retry-activity-policy]
+    - id: started_at
+      labels: {zh: 判定开始时间, en: Decision started at, ja: 判定開始時刻}
+      definitions: {zh: 开始评估失败和重试策略的时间。, en: Time evaluation of the failure and retry policy began., ja: failure と retry policy の評価を始めた時刻。}
+      datatype: date-time
       required: false
       cardinality: {min: 0, max: 1}
-      example_value: 500
-      source_claims: [claim-retry-activity]
+      pattern: null
+      example_value: '2026-07-17T05:01:05Z'
+      allowed_values: []
+      source_claims: [claim-retry-activity-reification]
+    - id: ended_at
+      labels: {zh: 判定结束时间, en: Decision ended at, ja: 判定終了時刻}
+      definitions: {zh: 后续尝试建立完成的时间。, en: Time creation of the successor attempt completed., ja: successor attempt の作成完了時刻。}
+      datatype: date-time
+      required: false
+      cardinality: {min: 0, max: 1}
+      pattern: null
+      example_value: '2026-07-17T05:01:07Z'
+      allowed_values: []
+      source_claims: [claim-retry-activity-reification]
   constraints:
-    - id: retry-activity-source-outcome
+    - id: retry-activity-delay-nonnegative
       severity: error
-      language: plain
-      expression: A retry decision of retry requires a source attempt with a retryable terminal outcome and remaining budget.
-      explanation: {zh: 控制器不得从一个活跃或成功的尝试创建重复尝试。, en: A controller must not create duplicate attempts from an active or successful attempt., ja: コントローラーはアクティブまたは成功した試行から重複試行を作成してはならない。}
-      source_claims: [claim-retry-activity]
-  required_relations: [RetryActivity-part_of-Execution, RetryActivity-responds_to-RunAttempt]
+      expression_language: plain
+      expression: scheduled_delay_ms >= 0
+      explanations: {zh: 调度延迟不能为负。, en: Scheduled delay cannot be negative., ja: scheduled delay は負にできません。}
+      source_claims: [claim-retry-activity-policy]
+  required_relations: []
 examples:
-  - id: retry-activity-positive
-    labels: {zh: "OpenAI submit_tool_outputs 重试", en: "OpenAI submit_tool_outputs retry", ja: "OpenAI submit_tool_outputs 再試行"}
-    descriptions: {zh: "W3C PROV-O prov:Agent wasAssociatedWith prov:Activity; Activity used/generated Entity; RetryActivity maps actor/execution/artifact provenance graph.", en: "W3C PROV-O prov:Agent wasAssociatedWith Activity; Activity used/generated Entity; RetryActivity maps actor/execution/artifact provenance graph.", ja: "PROV-O Agent-Activity-Entity; RetryActivity provenance graph."}
-    field_values: {retry_activity_id: retry-4, decision: retry, backoff_ms: 500}
-    related_node_ids: [RetryActivity, RunAttempt, RuntimeBudget]
-    related_relation_ids: [RetryActivity-responds_to-RunAttempt, RetryActivity-creates-RunAttempt]
-    source_claims: [claim-retry-activity]
-  - id: retry-activity-counterexample
-    labels: {zh: "LangGraph RetryPolicy 内部循环", en: "LangGraph RetryPolicy internal loop", ja: "LangGraph RetryPolicy 内部ループ"}
-    descriptions: {zh: "Mock bypassing Helicone gateway cannot serve as Helicone-style RetryActivity.", en: "Mock bypassing Helicone gateway cannot serve as Helicone-style RetryActivity.", ja: "Gateway bypass rejects Helicone-style RetryActivity."}
-    field_values: {retry_activity_id: retry-4, decision: retry}
-    related_node_ids: [RunAttempt]
-    related_relation_ids: []
-    source_claims: [claim-retry-activity]
-  - id: retry-activity-boundary
-    labels: {zh: "Temporal signal 与 RetryActivity 边界", en: "Temporal signal versus RetryActivity", ja: "Temporal signal と RetryActivity 境界"}
-    descriptions: {zh: "Span.add_event produces TraceEvent on Span; Metrics are not Execution; RetryActivity preserves boundaries.", en: "Span.add_event produces TraceEvent on Span; Metrics are not Execution; RetryActivity preserves boundaries.", ja: "OTel Event on Span; Metrics not Execution."}
-    field_values: {retry_activity_id: retry-4}
-    related_node_ids: [RetryActivity, RestoreActivity]
-    related_relation_ids: []
-    source_claims: [claim-retry-activity]
-  - id: retry-activity-instance-retry-4
-    labels: {zh: "CrewAI kickoff 失败后重跑", en: "CrewAI kickoff retry after failure", ja: "CrewAI kickoff 失敗後再実行"}
-    descriptions: {zh: "LangSmith instance: run_id=0192a3b4 parent_run_id=0192a3b3 run_type=llm->RetryActivity.", en: "LangSmith instance: run_id parent_run_id run_type=llm->RetryActivity.", ja: "LangSmith instance maps to RetryActivity."}
-    field_values: {retry_activity_id: retry-4, decision: retry, backoff_ms: 500}
-    related_node_ids: [RetryActivity, RunAttempt, RuntimeBudget, Execution]
-    related_relation_ids: [RetryActivity-responds_to-RunAttempt, RetryActivity-creates-RunAttempt]
-    source_claims: [claim-retry-activity]
+  - id: retry-activity-example-timeout
+    kind: positive
+    labels: {zh: 超时后的策略重试, en: Policy retry after timeout, ja: timeout 後の policy retry}
+    scenario_id: null
+    descriptions: {zh: attempt-build-42-1 超时，策略允许第二次尝试并安排 2000ms 退避，随后创建 attempt-build-42-2。, en: attempt-build-42-1 times out, policy allows a second attempt with 2000 ms backoff, and attempt-build-42-2 is created., ja: attempt-build-42-1 が timeout し policy が 2000ms backoff の第二 attempt を許可し attempt-build-42-2 を作成します。}
+    field_values: {retry_activity_id: retry-build-42-2, scheduled_delay_ms: 2000}
+    related_node_ids: [RetryActivity, RunAttempt, RetryPolicy, Execution]
+    related_relation_ids: [RetryActivity-part_of-Execution, RetryActivity-implements-RoutingDecision, RetryActivity-responds_to-RunAttempt, RetryActivity-creates-RunAttempt]
+    expected_result: {zh: 失败、策略判定和新尝试形成可审计链。, en: Failure, policy decision, and successor form an auditable chain., ja: failure・policy decision・successor が監査可能な chain を形成します。}
+    why_valid_or_invalid: {zh: 有直接失败、策略版本和新身份的证据。, en: Direct evidence identifies the failure, policy, and new identity., ja: failure・policy・新 identity の直接 evidence があります。}
+    synthetic: true
+    source_claims: [claim-retry-activity-policy, claim-retry-activity-reification]
 parent_relation:
   id: RetryActivity-part_of-Execution
   predicate: part_of
   target: concept:Execution
   endpoint_order: child-to-parent
-  direction: source-to-target
+  direction: target-to-source
   relation_kind: composition
-  labels: {zh: 是执行内的重试控制活动, en: is a retry control activity within execution, ja: 実行内の再試行制御 Activity である}
-  definitions: {zh: 每个 RetryActivity 都是一个 Execution 的组合控制 Activity。, en: Every RetryActivity is a compositional control Activity of one Execution., ja: すべての RetryActivity は1つの Execution のコンポジション制御 Activity である。}
-  cardinality: {source: {min: 1, max: 1}, target: {min: 0, max: null}}
+  labels: {zh: 是执行的重试控制组成, en: is retry control within execution, ja: execution 内の retry control である}
+  definitions: {zh: RetryActivity 只在一个具体 Execution 的尝试谱系中成立。, en: A RetryActivity exists only within one concrete Execution's attempt lineage., ja: RetryActivity は一つの Execution の attempt lineage 内でのみ成立します。}
+  cardinality: {source: {min: 0, max: null}, target: {min: 1, max: 1}}
   cardinality_not_applicable_reason: null
-  inverse_reading: {predicate: has_retry_activity, labels: {zh: 具有重试活动, en: has retry activity, ja: 再試行 Activity を持つ}}
-  conditions:
-    - id: retry-activity-parent-condition
-      severity: error
-      expression: RetryActivity execution_id must match its parent Execution identifier.
-      explanations: {zh: 重试控制不能静默跨越逻辑执行边界。, en: Retry control cannot silently cross a logical execution boundary., ja: 再試行制御は論理 Execution 境界を黙って越えてはならない。}
-      source_claims: [claim-retry-activity]
-  temporal_scope: valid-time
+  inverse_reading: {predicate: has_retry_activity, labels: {zh: 包含重试活动, en: has retry activity, ja: retry activity を含む}}
+  conditions: []
+  temporal_scope: timeless
   boundary_context: null
   constraints: []
   examples: []
-  source_claims: [claim-retry-activity]
+  source_claims: [claim-retry-activity-reification]
+  distinct_fact_rationale: {zh: 重试控制是 Execution 的内部活动，不是 Execution 的类型。, en: Retry control is an internal activity, not a type of Execution., ja: retry control は内部 activity で Execution の type ではありません。}
+  layout_role: primary-backbone
+  review_status: accepted
 relations:
   - id: RetryActivity-responds_to-RunAttempt
     predicate: responds_to
+    target: concept:RunAttempt
     direction: source-to-target
-    relation_kind: provenance
-    labels: {zh: 响应运行尝试, en: responds to run attempt, ja: 実行試行に応答する}
-    definitions: {zh: 当 RetryActivity 的决定评估该尝试的终止结果或失败证据时，它响应 RunAttempt。, en: RetryActivity responds to RunAttempt when its decision evaluates that attempt's terminal outcome or failure evidence., ja: RetryActivity の判断がその試行の終端結果または失敗証拠を評価するとき、RunAttempt に応答する。}
-    cardinality: {source: {min: 1, max: 1}, target: {min: 0, max: null}}
+    relation_kind: causal
+    labels: {zh: 响应失败尝试, en: responds to failed attempt, ja: failed attempt に応答する}
+    definitions: {zh: 指向触发本次策略评估的直接失败尝试。, en: Points to the directly failed attempt that triggered this policy evaluation., ja: この policy 評価を引き起こした直接 failed attempt を指します。}
+    cardinality: {source: {min: 0, max: null}, target: {min: 1, max: 1}}
     cardinality_not_applicable_reason: null
-    inverse_reading: {predicate: has_retry_response, labels: {zh: 具有重试响应, en: has retry response, ja: 再試行応答を持つ}}
-    conditions:
-      - id: retry-responds-to-condition
-        severity: error
-        expression: Target attempt must have ended before the retry decision and share execution_id.
-        explanations: {zh: 重试不能响应一个活跃或无关的尝试。, en: A retry cannot respond to an active or unrelated attempt., ja: 再試行はアクティブまたは無関係な試行に応答できない。}
-        source_claims: [claim-retry-activity]
+    inverse_reading: {predicate: triggers_retry_activity, labels: {zh: 触发重试活动, en: triggers retry activity, ja: retry activity を起動する}}
+    conditions: []
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples: []
-    source_claims: [claim-retry-activity]
-    target: concept:RunAttempt
+    source_claims: [claim-retry-activity-policy]
+    distinct_fact_rationale: {zh: 明确的触发失败不能由相邻时间推断。, en: The triggering failure cannot be inferred from timing alone., ja: trigger failure は時刻だけで推定できません。}
+    layout_role: cross-link
+    review_status: accepted
   - id: RetryActivity-creates-RunAttempt
     predicate: creates
+    target: concept:RunAttempt
     direction: source-to-target
-    relation_kind: provenance
-    labels: {zh: 创建后续运行尝试, en: creates subsequent run attempt, ja: 後続実行試行を作成する}
-    definitions: {zh: 当重试决定在同一执行中调度并开始一次新尝试时，RetryActivity 创建 RunAttempt。, en: RetryActivity creates RunAttempt when a retry decision schedules and starts a new attempt in the same execution., ja: 再試行判断が同じ実行内で新しい試行をスケジュールして開始するとき、RetryActivity は RunAttempt を作成する。}
-    cardinality: {source: {min: 0, max: 1}, target: {min: 0, max: 1}}
+    relation_kind: causal
+    labels: {zh: 创建后续尝试, en: creates successor attempt, ja: successor attempt を作る}
+    definitions: {zh: 指向由本活动新建且身份不同的 RunAttempt；没有后续尝试就不建立 RetryActivity。, en: Points to the newly created RunAttempt with a distinct identity; without a successor there is no RetryActivity., ja: この activity が作った新 identity の RunAttempt を指し、successor がなければ RetryActivity は成立しません。}
+    cardinality: {source: {min: 0, max: null}, target: {min: 0, max: 1}}
     cardinality_not_applicable_reason: null
-    inverse_reading: {predicate: is_created_by_retry, labels: {zh: 由重试活动创建, en: is created by retry activity, ja: 再試行 Activity により作成される}}
-    conditions:
-      - id: retry-creates-attempt-condition
-        severity: error
-        expression: Assert only if decision is retry and target attempt starts after the retry activity with the next ordinal.
-        explanations: {zh: 停止或升级决定不能创建重试尝试。, en: A stop or escalate decision cannot create a retry attempt., ja: stop または escalate の判断は再試行を作成できない。}
-        source_claims: [claim-retry-activity]
+    inverse_reading: {predicate: created_by_retry_activity, labels: {zh: 由重试活动创建, en: created by retry activity, ja: retry activity により作成される}}
+    conditions: []
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples: []
-    source_claims: [claim-retry-activity]
-    target: concept:RunAttempt
-sources:
-  - id: langgraph-fault-tolerance
-    title: LangGraph fault tolerance
-    url: https://docs.langchain.com/oss/python/langgraph/fault-tolerance
-    source_type: official-doc
-    relevance: Documents retries, backoff, and fault-tolerance controls for graph execution.
-  - id: prov-o-core
-    title: "PROV-O: The PROV Ontology"
-    url: https://www.w3.org/TR/prov-o/
-    source_type: standard
-    relevance: Supports modeling the decision and created work as separate time-bounded Activities.
+    source_claims: [claim-retry-activity-policy, claim-retry-activity-reification]
+    distinct_fact_rationale: {zh: 新尝试必须有新身份，不能原地修改旧尝试。, en: A successor requires a new identity and must not mutate the prior attempt., ja: successor は新 identity が必要で旧 attempt を in-place mutation しません。}
+    layout_role: cross-link
+    review_status: accepted
+  - id: RetryActivity-implements-RoutingDecision
+    predicate: implements
+    target: concept:RoutingDecision
+    direction: source-to-target
+    relation_kind: mapping
+    labels: {zh: 落实重试路由决定, en: implements retry routing decision, ja: retry routing decision を実装する}
+    definitions: {zh: 指向已应用 RetryPolicy 并明确选择 retry 的 RoutingDecision；本活动不重复策略求值。, en: Points to the RoutingDecision that applied RetryPolicy and explicitly selected retry; this activity does not repeat policy evaluation., ja: RetryPolicy を適用し retry を選んだ RoutingDecision を指し、この activity は policy 評価を重複しません。}
+    cardinality: {source: {min: 0, max: null}, target: {min: 1, max: 1}}
+    cardinality_not_applicable_reason: null
+    inverse_reading: {predicate: implemented_by_retry_activity, labels: {zh: 由重试活动落实, en: implemented by retry activity, ja: retry activity により実装される}}
+    conditions: []
+    temporal_scope: valid-time
+    boundary_context: null
+    constraints: []
+    examples: []
+    source_claims: [claim-retry-activity-policy, claim-retry-activity-reification]
+    distinct_fact_rationale: {zh: RoutingDecision 记录选择，RetryActivity 记录选择后的实际调度与创建。, en: RoutingDecision records the choice; RetryActivity records the resulting scheduling and creation., ja: RoutingDecision は選択、RetryActivity は後続 scheduling と creation を記録します。}
+    layout_role: cross-link
+    review_status: accepted
+review:
+  status: accepted
+  method: manual-semantic
+  reviewer: manual-runtime-verification
+  reviewed_on: 2026-07-17
+  note:
+    zh: 已对照 PROV-O Activity、OpenAI Agents runner 与 LangGraph RetryPolicy 逐项核验，Execution/RunAttempt 语义成立。
+    en: Verified against PROV-O Activity, OpenAI Agents runner, and LangGraph RetryPolicy. Execution and RunAttempt semantics hold.
+    ja: PROV-O Activity、OpenAI Agents runner、LangGraph RetryPolicy に照らし Execution/RunAttempt semantics を確認しました。
+  sections:
+    semantics: accepted
+    hierarchy: accepted
+    relations: accepted
+    structure: accepted
+    examples: accepted
+    source_claims: accepted
 source_claims:
-  - id: claim-retry-activity
-    source: langgraph-fault-tolerance
-    supports: LangGraph documents retry policies and retry behavior; this ontology reifies the observed retry control decision as a distinct activity for auditability.
-    locator: Fault tolerance and retry policy sections
-    evidence_kind: official-doc
-    confidence: medium
+  - id: claim-retry-activity-policy
+    source: eng-fw-langgraph-fault-tolerance
+    supports: LangGraph RetryPolicy defines retryable exceptions, maximum attempts including the first, delay, backoff, jitter, per-attempt timeout, and behavior after exhaustion.
+    locator: Fault tolerance > RetryPolicy; Handling errors after retries are exhausted
+    evidence_kind: official
+    confidence: high
+    review_status: accepted
+  - id: claim-retry-activity-reification
+    source: eng-fw-langgraph-fault-tolerance
+    supports: LangGraph exposes successive attempts and retry metadata but does not define a standalone retry-activity object; Moonweave reifies the policy decision to preserve provenance.
+    locator: Fault tolerance > Accessing retry metadata during execution
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
 
