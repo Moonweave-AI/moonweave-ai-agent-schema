@@ -1,34 +1,63 @@
 schema: moonweave.ai/ontology-node/v1
 id: ControlOwnership
 kind: concept
-status: accepted
 labels:
   en: control ownership
   zh: 控制归属
   ja: 制御帰属
 semantics:
   short_definition:
-    zh: 控制责任归属是对谁可决定工作流下一步的可审计记录。
-    en: Control ownership is an auditable record of who may decide the next workflow step.
-    ja: 制御責任の帰属は、次のワークフローステップを決定できる者の監査可能な記録です。
+    zh: 记录谁可在特定范围内路由、继续、暂停或 handoff 工作流下一步。
+    en: Records who may route, continue, pause, or hand off the next workflow step within a scope.
+    ja: 指定範囲内で次のワークフロー手順をルーティング・続行・一時停止・handoff できる者を記録します。
   definition:
-    zh: 控制责任归属是一种协同责任记录，其种差是：它在特定时点和范围内标明哪个有效角色绑定可路由、继续、暂停或 handoff 工作流；它不等同于最终答案责任。
-    en: Control ownership is a CoordinationOwnershipRecord distinguished by naming the active role binding authorized, at a stated time and scope, to decide the next workflow step by routing, continuing, pausing, or handing off the workflow; it is not final-answer accountability.
-    ja: 制御責任の帰属は調整責任記録の一種であり、指定時刻と範囲でワークフローをルーティング、続行、一時停止、ハンドオフできる有効な役割バインディングを示します。最終回答責任とは異なります。
+    zh: ControlOwnership 是 CoordinationOwnershipRecord 的特化，responsibility_type=control，并附加 control_action_scope 与 decision_boundary。OpenAI handoff 转移 active agent 时 ControlOwnership 随接收方移动；LangGraph supervisor 在 worker 返回后仍保留 ControlOwnership；CrewAI manager_llm 在 hierarchical 模式中控制 task 分配。它不是最终答案责任（AnswerOwnership），也不赋予 WorkerRole 全局路由权。
+    en: ControlOwnership specializes CoordinationOwnershipRecord with responsibility_type=control plus control_action_scope and decision_boundary. OpenAI handoffs move ControlOwnership to the recipient; LangGraph supervisors retain ControlOwnership after worker returns; CrewAI manager_llm controls task assignment in hierarchical mode. It is not AnswerOwnership and does not grant WorkerRole global routing authority.
+    ja: ControlOwnership は responsibility_type=control と control_action_scope・decision_boundary を持つ特化です。OpenAI handoff で移転し、LangGraph supervisor は worker 返却後も保持、CrewAI manager_llm は hierarchical で task 割当を制御します。AnswerOwnership でも WorkerRole の全体ルーティング権でもありません。
   why_needed:
-    zh: 管理者调用子智能体与把控制权 handoff 给另一个智能体具有不同后果；显式控制责任可防止两个参与者同时推进同一流程。
-    en: A manager calling a subagent and handing control to another agent have different consequences; explicit control ownership prevents two participants from advancing the same workflow concurrently.
-    ja: 管理者によるサブエージェント呼び出しと別エージェントへの制御移転は結果が異なるため、制御責任を明示して二者が同じフローを同時に進めることを防ぎます。
+    zh: manager 调用子智能体与 handoff 给另一智能体后果不同；显式控制责任防止两个参与者同时推进同一流程。
+    en: Manager subagent calls and handoffs have different consequences; explicit control ownership prevents two participants advancing the same workflow concurrently.
+    ja: manager の subagent 呼び出しと handoff は結果が異なるため、制御責任を明示して同時進行を防ぎます。
   includes:
     - zh: 对下一步路由、继续、暂停、重试或 handoff 的有效决策权限。
       en: Effective authority to route, continue, pause, retry, or hand off the next step.
-      ja: 次のステップをルーティング、続行、一時停止、再試行、ハンドオフする有効な権限。
+      ja: 次手のルーティング・続行・一時停止・再試行・handoff 権限。
   excludes:
-    - zh: 只对最终答复负责但无权选择下一步的 AnswerOwnership，以及单纯执行已分配步骤的 WorkerRole。
-      en: AnswerOwnership without authority over the next step, and a WorkerRole merely executing an assigned step.
-      ja: 次の手順を選ぶ権限のない AnswerOwnership、および割り当て済み手順を実行するだけの WorkerRole。
+    - zh: 只对最终答复负责的 AnswerOwnership，以及仅执行已分配步骤的 WorkerRole。
+      en: AnswerOwnership without next-step authority, and WorkerRole executing assigned steps only.
+      ja: 次手権限のない AnswerOwnership、割当手順のみ実行する WorkerRole。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: LangGraph conditional_edges 的 route 函数返回值决定下一节点，但 ControlOwnership 归属 supervisor 而非 worker。OpenAI agents-as-tools 调用不转移 ControlOwnership；handoff 必须终止旧记录并创建新记录。CrewAI Process 控制 task 顺序时也应对齐 ControlOwnership 区间。
+    en: LangGraph route functions choose the next node, but ControlOwnership stays with the supervisor, not the worker. OpenAI agents-as-tools calls do not transfer ControlOwnership; handoffs must end the old record and create a new one. CrewAI Process task ordering should align ControlOwnership intervals similarly.
+    ja: LangGraph route 関数は次ノードを選びますが ControlOwnership は supervisor に残ります。OpenAI agents-as-tools は ControlOwnership を移しません。handoff では旧記録を終了し新記録を作成します。
+  typical_input:
+    - description: OpenAI handoff changing active agent.
+      format: |
+        handoff(to_agent=refund_specialist)
+      source_claims: [claim-co-openai]
+    - description: LangGraph supervisor routing after worker return.
+      format: |
+        builder.add_conditional_edges("supervisor", route_fn, {...})
+      source_claims: [claim-co-langgraph]
+  typical_output:
+    - description: ControlOwnership interval with permitted actions.
+      format: |
+        {
+          "responsibility_type": "control",
+          "control_action_scope": ["route", "pause", "handoff"],
+          "scope_ref": "travel-session-9#next-step"
+        }
+      source_claims: [claim-co-design]
+  reference_implementations:
+    - name: OpenAI Agents SDK
+      url: https://openai.github.io/openai-agents-python/
+      description: Handoff versus manager-as-tools control retention.
+    - name: LangGraph
+      url: https://langchain-ai.github.io/langgraph/
+      description: Supervisor conditional routing after worker nodes.
 structure:
   identity_keys: []
   fields:
@@ -43,9 +72,9 @@ structure:
         min: 1
         max: null
       definitions:
-        zh: 列出持有者在给定范围内可执行的路由、继续、暂停、重试、升级或移交动作。
-        en: Lists routing, continue, pause, retry, escalation, or handoff actions the holder may perform within the stated scope.
-        ja: 指定範囲で保持者が行える routing・continue・pause・retry・escalation・handoff 動作を列挙します。
+        zh: 列出持有者可执行的路由、继续、暂停、重试、升级或 handoff 动作。
+        en: Lists routing, continue, pause, retry, escalation, or handoff actions the holder may perform.
+        ja: routing・continue・pause・retry・escalation・handoff 動作を列挙します。
       allowed_values:
         - id: ControlActionRoute
           value: route
@@ -57,9 +86,7 @@ structure:
             zh: 从可用目标中选择下一条执行路径。
             en: Select the next execution path from eligible targets.
             ja: 適格な対象から次の実行経路を選択します。
-          status: accepted
-          source_claims:
-            - claim-control-ownership-002
+          source_claims: [claim-co-langgraph]
         - id: ControlActionContinue
           value: continue
           labels:
@@ -68,11 +95,9 @@ structure:
             ja: 続行
           definitions:
             zh: 允许当前控制流进入已确定的下一步。
-            en: Allow the current control flow to proceed to its determined next step.
-            ja: 現在の制御フローを決定済みの次手へ進めます。
-          status: accepted
-          source_claims:
-            - claim-control-ownership-003
+            en: Allow control flow to proceed to the determined next step.
+            ja: 制御フローを次手へ進めます。
+          source_claims: [claim-co-openai]
         - id: ControlActionPause
           value: pause
           labels:
@@ -83,9 +108,7 @@ structure:
             zh: 在保留可恢复状态的同时暂停后续执行。
             en: Pause further execution while retaining resumable state.
             ja: 再開可能な状態を保持して後続実行を一時停止します。
-          status: accepted
-          source_claims:
-            - claim-control-ownership-004
+          source_claims: [claim-co-langgraph]
         - id: ControlActionRetry
           value: retry
           labels:
@@ -93,12 +116,10 @@ structure:
             en: retry
             ja: 再試行
           definitions:
-            zh: 依据适用的失败与次数边界重新安排一次尝试。
-            en: Schedule another attempt under the applicable failure and attempt bounds.
-            ja: 適用される失敗条件と回数境界に従って再試行を予定します。
-          status: accepted
-          source_claims:
-            - claim-control-ownership-005
+            zh: 依据失败与次数边界重新安排一次尝试。
+            en: Schedule another attempt under failure and attempt bounds.
+            ja: 失敗条件と回数境界に従い再試行を予定します。
+          source_claims: [claim-co-design]
         - id: ControlActionEscalate
           value: escalate
           labels:
@@ -106,12 +127,10 @@ structure:
             en: escalate
             ja: 上位移管
           definitions:
-            zh: 把决定权或处理责任移交给更高权限或专门责任方。
-            en: Refer decision authority or handling responsibility to a higher-authority or specialist party.
-            ja: 判断権限または処理責任を上位権限・専門責任主体へ移します。
-          status: accepted
-          source_claims:
-            - claim-control-ownership-006
+            zh: 把决定权移交给更高权限或专门责任方。
+            en: Refer decision authority to a higher-authority or specialist party.
+            ja: 判断権限を上位または専門責任主体へ移します。
+          source_claims: [claim-co-design]
         - id: ControlActionHandoff
           value: handoff
           labels:
@@ -120,18 +139,11 @@ structure:
             ja: 制御引継ぎ
           definitions:
             zh: 把当前会话或任务的主动控制权转移给另一智能体。
-            en: Transfer active control of the current conversation or task to another agent.
-            ja: 現在の会話またはタスクの能動制御を別エージェントへ移します。
-          status: accepted
-          source_claims:
-            - claim-control-ownership-007
-      pattern: null
-      example_value:
-        - route
-        - pause
-        - handoff
-      source_claims:
-        - claim-control-ownership-008
+            en: Transfer active control of the conversation or task to another agent.
+            ja: 会話またはタスクの能動制御を別エージェントへ移します。
+          source_claims: [claim-co-openai]
+      example_value: [route, pause, handoff]
+      source_claims: [claim-co-design]
     - id: decision_boundary
       labels:
         zh: 决定边界
@@ -143,101 +155,69 @@ structure:
         min: 1
         max: 1
       definitions:
-        zh: 规定每类控制动作的适用条件、禁止条件和必须升级到其他角色的边界。
-        en: Specifies applicability, prohibition, and mandatory-escalation boundaries for each permitted control action.
-        ja: 各許可制御動作の適用条件・禁止条件・他役割への必須エスカレーション境界を規定します。
-      allowed_values: []
-      pattern: null
+        zh: 规定每类控制动作的适用条件、禁止条件和必须升级边界。
+        en: Applicability, prohibition, and mandatory-escalation boundaries for control actions.
+        ja: 各制御動作の適用条件・禁止条件・必須エスカレーション境界を規定します。
       example_value:
         may_route_when: confidence>=0.8
         must_escalate_when: policy_override_required
-      source_claims:
-        - claim-control-ownership-009
+      source_claims: [claim-co-openai]
   constraints: []
   required_relation_constraints: []
 examples:
-  - id: ControlOwnership-manual-positive-20260715
-    kind: positive
+  - id: ControlOwnership-openai-tools
     labels:
-      zh: 控制归属正例
-      en: Positive case for control ownership
-      ja: 制御帰属の正例
-    scenario_id: null
+      zh: OpenAI tools 调用保留控制
+      en: OpenAI tool call retains control
+      ja: OpenAI tool 呼び出しで制御保持
     descriptions:
-      zh: 旅行协调器调用航班专家作为工具；专家返回候选航班后不能自行呼叫酒店专家，下一步仍由协调器决定。
-      en: A travel coordinator calls a flight specialist as a tool; after returning candidate flights, the specialist cannot invoke the hotel specialist on its own, and the coordinator still chooses the next step.
-      ja: 旅行調整役が航空券専門家をツールとして呼び出し、候補便が返っても専門家は独自にホテル専門家を呼べず、次の手順は調整役が決めます。
+      zh: 旅行协调器调用航班专家作为 tool；专家返回后不能自行呼叫酒店专家，ControlOwnership 仍在协调器。
+      en: A travel coordinator calls a flight specialist as a tool; after return the specialist cannot invoke the hotel specialist; ControlOwnership stays with the coordinator.
+      ja: 旅行調整役が航空券専門家を tool として呼び、返却後も ControlOwnership は調整役に残ります。
+    example_source:
+      product: OpenAI Agents SDK
+      url: https://openai.github.io/openai-agents-python/
+      version: agents as tools
     field_values:
-      ownership_record_id: ownership-travel-next-step-9
-      revision: "2"
-      responsibility_type: control
-      scope_ref: travel-session-9#next-step
-      effective_at: 2026-07-15T09:20:00Z
-      control_action_scope:
-        - route
-        - pause
-        - handoff
-      decision_boundary:
-        may_route_when: specialist result is complete
-        must_escalate_when: policy override is required
-    related_node_ids:
-      - ControlOwnership
-      - CoordinationOwnershipRecord
-    related_relation_ids:
-      - ControlOwnership-is_a-CoordinationOwnershipRecord
-    expected_result:
-      zh: 控制责任保留在旅行协调器的角色绑定上。
-      en: ControlOwnership remains with the travel coordinator's role binding.
-      ja: ControlOwnership は旅行調整役の役割バインディングに残ります。
-    why_valid_or_invalid:
-      zh: 子调用只返回结果，没有转移路由或继续工作流的权限。
-      en: The subcall returns a result without transferring authority to route or continue the workflow.
-      ja: サブ呼び出しは結果を返すだけで、ルーティングや続行の権限を移転しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-control-ownership-010
-  - id: ControlOwnership-manual-boundary-20260715
-    kind: boundary
+      control_action_scope: [route, pause, handoff]
+    related_node_ids: [ControlOwnership, Orchestrator]
+    related_relation_ids: []
+    source_claims: [claim-co-openai]
+  - id: ControlOwnership-langgraph-supervisor
     labels:
-      zh: 控制归属边界例
-      en: Boundary case for control ownership
-      ja: 制御帰属の境界例
-    scenario_id: null
+      zh: LangGraph supervisor 保留控制
+      en: LangGraph supervisor retains control
+      ja: LangGraph supervisor が制御を保持
     descriptions:
-      zh: 分诊智能体执行 handoff 后，专科智能体成为活跃智能体并决定后续工具调用；分诊智能体不再选择下一步。
-      en: After a triage agent performs a handoff, the specialist becomes the active agent and decides subsequent tool calls; the triage agent no longer selects the next step.
-      ja: トリアージエージェントのハンドオフ後、専門エージェントがアクティブとなって後続ツール呼び出しを決め、トリアージ側は次の手順を選びません。
+      zh: centralized supervisor 调用 research_worker 并接收结果；下一步路由仍由 supervisor 的 ControlOwnership 决定。
+      en: A centralized supervisor calls research_worker and receives its result; next-step routing remains under supervisor ControlOwnership.
+      ja: centralized supervisor が research_worker を呼び結果を受け取り、次手ルーティングは supervisor の ControlOwnership 下にあります。
+    example_source:
+      product: LangGraph
+      url: https://langchain-ai.github.io/langgraph/
+      version: centralized supervisor
+    field_values:
+      scope_ref: research-session-4#next-step
+    related_node_ids: [ControlOwnership, Orchestrator, WorkerRole]
+    related_relation_ids: []
+    source_claims: [claim-co-langgraph]
+  - id: ControlOwnership-boundary-handoff
+    labels:
+      zh: handoff 转移控制
+      en: Handoff transfers control
+      ja: handoff で制御移転
+    descriptions:
+      zh: 分诊 handoff 后专科决定后续工具调用；旧 ControlOwnership 必须终止并为接收方创建新记录。
+      en: After triage handoff the specialist decides subsequent tool calls; the former ControlOwnership must end and a new record is created for the recipient.
+      ja: トリアージ handoff 後、専門側が後続 tool 呼び出しを決め、旧 ControlOwnership は終了し受信側に新記録を作成します。
+    example_source:
+      product: OpenAI Agents SDK
+      url: https://openai.github.io/openai-agents-python/
+      version: handoffs
     field_values: {}
-    related_node_ids:
-      - ControlOwnership
-      - CoordinationOwnershipRecord
-    related_relation_ids:
-      - ControlOwnership-is_a-CoordinationOwnershipRecord
-    expected_result:
-      zh: 旧控制责任记录终止，并为接收方建立新的 ControlOwnership。
-      en: End the former control record and create a new ControlOwnership for the recipient.
-      ja: 旧制御記録を終了し、受信側に新しい ControlOwnership を作成します。
-    why_valid_or_invalid:
-      zh: handoff 转移活跃控制者，若仍把控制权留给发起者会产生相互矛盾的下一步。
-      en: A handoff transfers the active controller; retaining control at the sender would authorize contradictory next steps.
-      ja: ハンドオフはアクティブな制御者を移すため、送信側にも制御を残すと矛盾する次の手順が許可されます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-control-ownership-011
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: AnswerOwnership
-    shared_parent_concept_id: CoordinationOwnershipRecord
-    differentia:
-      zh: 端点特定对照：父节点 CoordinationOwnershipRecord：ControlOwnership（semantic kind=information，骨架 ControlOwnership-is_a-CoordinationOwnershipRecord）；AnswerOwnership（semantic kind=information，骨架 AnswerOwnership-is_a-CoordinationOwnershipRecord）。双端条件：ControlOwnership 条件：“控制归属是一种协调归属记录；其区分条件是：它记录当前由哪个参与者控制下一步工作流，包括管理者保留控制或通过交接转移控制”；AnswerOwnership 条件：“答案归属是以如下事实为区分特征的协调归属记录：它记录在委派、交接、审查或综合之后，哪个协同参与者对最终答复或产物负责”。条件不得互借；各自成立后方可归类。
-      en: "Endpoint-specific contrast: parent CoordinationOwnershipRecord: ControlOwnership (semantic kind=information, backbone ControlOwnership-is_a-CoordinationOwnershipRecord); AnswerOwnership (semantic kind=information, backbone AnswerOwnership-is_a-CoordinationOwnershipRecord). Endpoint conditions: ControlOwnership condition: “As a coordination ownership record, Control ownership is distinguished by the fact that it records which actor currently controls the next workflow step, including whether control is retained by a manager or transferred through handoff”; AnswerOwnership condition: “Answer ownership is a coordination ownership record; its differentiating condition is that it records which coordinating actor is accountable for the final response or artifact after delegation, handoff, review, or synthesis”. Conditions cannot be borrowed; classify each endpoint only from its own evidence."
-      ja: 端点別対照：親 CoordinationOwnershipRecord：ControlOwnership（semantic kind=information、バックボーン ControlOwnership-is_a-CoordinationOwnershipRecord）；AnswerOwnership（semantic kind=information、バックボーン AnswerOwnership-is_a-CoordinationOwnershipRecord）。両端条件：ControlOwnership の条件：「調整帰属記録に属する制御帰属は、次の事実を種差とします：それは、次のワークフロー手順を現在どの参加者が制御するかを記録し、管理者が保持する場合と引き継ぎで移転する場合を区別します」；AnswerOwnership の条件：「回答帰属は調整帰属記録の一種であり、次の条件で区別されます：それは、委任、引き継ぎ、レビュー、統合の後で、どの協調参加者が最終回答または成果物に責任を持つかを記録します」。条件を流用せず、各端を固有の証拠で分類します。
-    source_claims:
-      - claim-control-ownership-012
+    related_node_ids: [ControlOwnership, AnswerOwnership]
+    related_relation_ids: []
+    source_claims: [claim-co-openai]
 parent_relation:
   id: ControlOwnership-is_a-CoordinationOwnershipRecord
   predicate: is_a
@@ -248,9 +228,9 @@ parent_relation:
     en: is a
     ja: の一種である
   definitions:
-    zh: 控制责任归属是协同责任记录的一种，区分条件是它专门记录在有效范围内决定工作流下一步的主体。
-    en: ControlOwnership is a kind of CoordinationOwnershipRecord distinguished by recording who may decide the next workflow step within an effective scope.
-    ja: ControlOwnership は CoordinationOwnershipRecord の一種であり、有効範囲内で次のワークフローステップを決定できる者を記録します。
+    zh: ControlOwnership 专门记录决定工作流下一步的主体。
+    en: ControlOwnership records who may decide the next workflow step.
+    ja: ControlOwnership は次のワークフロー手順を決定できる者を記録します。
   cardinality: null
   cardinality_not_applicable_reason:
     zh: 分类继承不使用实例关系基数。
@@ -266,184 +246,43 @@ parent_relation:
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: ControlOwnership-is_a-CoordinationOwnershipRecord-manual-positive-20260715
-      kind: positive
-      labels:
-        zh: 是一种正例
-        en: Positive case for is a
-        ja: の一種であるの正例
-      scenario_id: null
-      descriptions:
-        zh: control-17 指向旅行协调器的有效角色绑定，并授权其在 session-4 中选择继续调用或结束。
-        en: control-17 points to the travel coordinator's active role binding and authorizes it to choose another call or finish session-4.
-        ja: control-17 は旅行調整役の有効な役割バインディングを指し、session-4 で追加呼び出しか終了かを選ぶ権限を与えます。
-      field_values: {}
-      related_node_ids:
-        - ControlOwnership
-        - CoordinationOwnershipRecord
-      related_relation_ids:
-        - ControlOwnership-is_a-CoordinationOwnershipRecord
-      expected_result:
-        zh: control-17 同时属于 ControlOwnership 与 CoordinationOwnershipRecord。
-        en: control-17 is both ControlOwnership and a CoordinationOwnershipRecord.
-        ja: control-17 は ControlOwnership であり CoordinationOwnershipRecord でもあります。
-      why_valid_or_invalid:
-        zh: 它继承责任记录的持有者、范围与时间信息，并以下一步控制权作为种差。
-        en: It inherits holder, scope, and time information and adds next-step authority as its differentia.
-        ja: 保持者、範囲、時間情報を継承し、次ステップ権限を種差として加えます。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-control-ownership-013
-    - id: ControlOwnership-is_a-CoordinationOwnershipRecord-manual-boundary-20260715
-      kind: boundary
-      labels:
-        zh: 是一种边界例
-        en: Boundary case for is a
-        ja: の一種であるの境界例
-      scenario_id: null
-      descriptions:
-        zh: answer-3 指定编辑负责最终报告，但所有后续路由必须由独立工作流控制器批准。
-        en: answer-3 makes an editor accountable for the final report, while every subsequent route requires approval from a separate workflow controller.
-        ja: answer-3 は編集者を最終報告の責任者としますが、後続ルートは別のワークフロー制御者の承認が必要です。
-      field_values: {}
-      related_node_ids:
-        - ControlOwnership
-        - CoordinationOwnershipRecord
-      related_relation_ids:
-        - ControlOwnership-is_a-CoordinationOwnershipRecord
-      expected_result:
-        zh: answer-3 是一般责任记录和 AnswerOwnership，但不是 ControlOwnership。
-        en: answer-3 is a general ownership record and AnswerOwnership, but not ControlOwnership.
-        ja: answer-3 は一般責任記録かつ AnswerOwnership ですが ControlOwnership ではありません。
-      why_valid_or_invalid:
-        zh: 最终输出问责并未赋予选择下一步的权限，两种责任不能互推。
-        en: Final-output accountability does not grant authority over the next step, so the two ownership types are not mutually inferable.
-        ja: 最終出力責任は次ステップ権限を付与せず、両責任を相互推論できません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-control-ownership-014
-  source_claims:
-    - claim-control-ownership-001
-  distinct_fact_rationale: null
+  examples: []
+  source_claims: [claim-co-design]
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-orchestration-tool-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照权威来源逐项完成人工语义核验；概念定义、层级、关系、结构与来源主张成立。
-    en: Manual semantic verification against authoritative sources completed; concept definitions, hierarchy, relations, structure, and source claims hold.
-    ja: 権威ソースに照らし手動意味検証を完了し、概念定義・階層・関係・構造・出典主張が成立。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: openai-agents
+    title: OpenAI Agents SDK
+    url: https://openai.github.io/openai-agents-python/
+    source_type: official-doc
+    relevance: Handoff control transfer versus manager retention.
+  - id: langgraph
+    title: LangGraph
+    url: https://langchain-ai.github.io/langgraph/
+    source_type: official-doc
+    relevance: Supervisor routing after worker nodes.
+  - id: moonweave-design
+    title: Moonweave orchestration design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Control versus answer ownership separation.
 source_claims:
-  - id: claim-control-ownership-001
-    source: eng-fw-openai-orchestration
-    supports: OpenAI contrasts manager-owned agent-as-tool calls with handoffs that transfer the active agent. Moonweave represents the authority to choose the next step as ControlOwnership, separately from accountability for the final answer.
-    locator: Agents SDK > Orchestrating multiple agents > Manager pattern (agents as tools) and handoffs
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-control-ownership-002
-    source: eng-fw-openai-orchestration
-    supports: Orchestration determines which agent runs next, grounding the route control action.
-    locator: Agent orchestration > Introduction > Which agents run and what happens next
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-control-ownership-003
-    source: eng-fw-openai-orchestration
-    supports: The orchestration controller decides what happens next, including continuing the current flow.
-    locator: Agent orchestration > Introduction > What happens next
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-control-ownership-004
-    source: eng-fw-openai-orchestration
-    supports: Control of the next step includes withholding progression until required evidence or authority is available.
-    locator: Agent orchestration > Introduction > What happens next
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-control-ownership-005
-    source: eng-fw-openai-orchestration
-    supports: Orchestration decides subsequent execution behavior; Moonweave makes retry a bounded control action rather than an implicit loop.
-    locator: Agent orchestration > Introduction > What happens next
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-control-ownership-006
-    source: eng-fw-openai-orchestration
-    supports: Manager and specialist roles have distinct authority, motivating explicit escalation when the current holder cannot decide.
-    locator: Agent orchestration > Core SDK patterns > Pattern comparison table
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-control-ownership-007
-    source: eng-fw-openai-orchestration
-    supports: OpenAI handoffs transfer conversation control to the selected specialist, directly grounding the handoff control action.
-    locator: Agent orchestration > Core SDK patterns > Handoffs > Conversation control
+  - id: claim-co-openai
+    source: openai-agents
+    supports: OpenAI handoffs transfer active control while manager-as-tools retains orchestration control.
+    locator: Agents as tools versus Handoffs
     evidence_kind: official
     confidence: high
-    review_status: accepted
-  - id: claim-control-ownership-008
-    source: eng-fw-openai-orchestration
-    supports: OpenAI defines orchestration by which agents run, in what order, and who decides what happens next, grounding an explicit set of control actions.
-    locator: Agent orchestration > Introduction > Which agents run and what happens next
+  - id: claim-co-langgraph
+    source: langgraph
+    supports: LangGraph centralized supervisor retains routing control after subagent returns.
+    locator: Multi-agent > Subagents
+    evidence_kind: official
+    confidence: high
+  - id: claim-co-design
+    source: moonweave-design
+    supports: Moonweave specializes CoordinationOwnershipRecord for next-step authority as ControlOwnership.
+    locator: ControlOwnership concept boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-control-ownership-009
-    source: eng-fw-openai-orchestration
-    supports: OpenAI contrasts deterministic code orchestration with model-decided routing and recommends shared guardrails, supporting explicit decision boundaries.
-    locator: Agent orchestration > Orchestrating via LLM and Orchestrating via code
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-control-ownership-010
-    source: eng-fw-openai-orchestration
-    supports: The manager-pattern documentation keeps orchestration decisions with the manager when agents are exposed as tools; this case therefore retains next-step control at the coordinator.
-    locator: Agents SDK > Orchestrating multiple agents > Manager pattern (agents as tools) and handoffs
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-control-ownership-011
-    source: eng-fw-openai-orchestration
-    supports: OpenAI defines a handoff as transferring control to the recipient agent; this boundary requires the control-ownership interval to move with that transfer.
-    locator: Agents SDK > Orchestrating multiple agents > Manager pattern (agents as tools) and handoffs
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-control-ownership-012
-    source: eng-fw-crewai-docs
-    supports: CrewAI assigns workflow control to a process while agents carry task roles and produce outcomes. Moonweave uses that distinction to define ControlOwnership as authority over coordination decisions rather than accountability for the answer represented by AnswerOwnership; the sibling boundary is a reviewed design inference.
-    locator: Documentation > Agents, tasks, crews, flows, and processes
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-control-ownership-013
-    source: eng-fw-openai-orchestration
-    supports: Manager-as-tools documentation keeps workflow control with the manager, providing the operational basis for specializing a scoped ownership record as ControlOwnership.
-    locator: Agents SDK > Orchestrating multiple agents > Manager pattern (agents as tools) and handoffs
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-control-ownership-014
-    source: eng-fw-openai-orchestration
-    supports: The manager/handoff distinction separates control transfer from final-answer responsibility; this record lacks the next-step authority required for ControlOwnership.
-    locator: Agents SDK > Orchestrating multiple agents > Manager pattern (agents as tools) and handoffs
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted

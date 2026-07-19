@@ -1,20 +1,19 @@
 schema: moonweave.ai/ontology-node/v1
 id: MCPStdioTransport
 kind: concept
-status: review
 labels:
   zh: MCP 标准输入输出传输
   en: MCP stdio transport
   ja: MCP stdio トランスポート
 semantics:
   short_definition:
-    zh: 以子进程 stdin/stdout 按换行分帧 MCP 消息的标准传输。
-    en: The standard transport framing MCP messages by newlines over subprocess stdin and stdout.
-    ja: subprocess stdin/stdout 上で newline framing する standard MCP transport。
+    zh: 客户端启动子进程并通过 stdin/stdout 换行分帧交换 MCP JSON-RPC 消息的传输绑定。
+    en: Transport binding where the client launches a subprocess and exchanges newline-framed MCP JSON-RPC over stdin/stdout.
+    ja: client が subprocess を起動し stdin/stdout newline framing で MCP JSON-RPC を交換する transport binding。
   definition:
-    zh: MCP 标准输入输出传输是 MCPTransport 的严格下位类型，继承 MCPTransport 的 transport_spec_id 配置身份；server_process_id 只是承载该配置的一次服务器进程绑定。客户端启动子进程并写 stdin、读 stdout，每条 UTF-8 JSON-RPC 消息以换行分隔且内部不得含换行；stderr 仅用于可选日志。
-    en: MCP stdio transport is a strict MCPTransport subtype and inherits the transport_spec_id configuration identity from MCPTransport; server_process_id is only the server-process binding that realizes that configuration. The client launches the subprocess, writes stdin, and reads stdout. Each UTF-8 JSON-RPC message is newline-delimited with no embedded newline, while stderr is optional logging.
-    ja: MCP stdio transport は MCPTransport の厳密な下位型で、MCPTransport から configuration identity の transport_spec_id を継承し、server_process_id はその構成を実現する server process binding にすぎません。client は subprocess を起動して stdin/stdout を使い、UTF-8 JSON-RPC message は newline-delimited です。
+    zh: MCP 标准输入输出传输是 MCPTransport 的严格子类型，继承 transport_spec_id 配置身份；server_process_id 只是承载该配置的一次进程绑定。客户端写 stdin、读 stdout，每条 UTF-8 JSON-RPC 消息以换行分隔且消息体不得含换行；stderr 仅用于可选日志而非协议错误通道。普通 shell 流、Streamable HTTP 端点或无 MCP JSON-RPC 消息的编译器输出都不构成 MCPStdioTransport。
+    en: MCP stdio transport is a strict MCPTransport subtype inheriting transport_spec_id configuration identity; server_process_id is only the process binding realizing that configuration. The client writes stdin and reads stdout with newline-delimited UTF-8 JSON-RPC messages that contain no embedded newlines; stderr is optional logging, not a protocol error channel. Ordinary shell streams, Streamable HTTP endpoints, or compiler output without MCP JSON-RPC messages do not constitute MCPStdioTransport.
+    ja: MCP stdio transport は MCPTransport strict subtype で transport_spec_id configuration identity を継承し server_process_id は process binding のみ。client は stdin write/stdout read で embedded newline なし UTF-8 JSON-RPC newline framing。stderr は optional log。ordinary shell stream/Streamable HTTP endpoint/MCP JSON-RPC なし compiler output は MCPStdioTransport ではありません。
   why_needed:
     zh: 独立子型使换行分帧、stdout 纯净性与进程关闭顺序可验证，而不把这些规则施加到 HTTP。
     en: The subtype makes newline framing, stdout purity, and subprocess shutdown order testable without applying them to HTTP.
@@ -29,6 +28,28 @@ semantics:
       ja: ordinary shell stream・stderr log・Streamable HTTP・legacy SSE endpoint を除外します。
   semantic_kind: specification
   aliases: []
+engineering:
+  explanation:
+    zh: MCP 2025-11-25 stdio 传输规定 client 启动 server subprocess，JSON-RPC 消息以换行分隔，message body 不得包含 embedded newline，stderr 仅日志。典型线路形如两行 initialize/result 与一行 notifications/initialized。LangChain MCP adapter 与 Anthropic MCP connector 在本地开发场景常用 stdio 绑定连接 IDE 宿主与工具服务器。
+    en: MCP 2025-11-25 stdio transport requires the client to launch the server subprocess, delimit JSON-RPC messages by newline without embedded newlines, and restrict stderr to logging. Typical wire traffic is initialize/result lines plus notifications/initialized. LangChain MCP adapters and Anthropic MCP connectors commonly use stdio bindings to connect IDE hosts and tool servers in local development.
+    ja: MCP 2025-11-25 stdio transport は client が server subprocess を起動し JSON-RPC を newline 区切り（embedded newline 禁止）、stderr は log のみ。典型 wire は initialize/result 行と notifications/initialized。LangChain MCP adapter/Anthropic MCP connector は local dev で stdio binding を常用。
+  typical_input:
+    - description: stdio newline-delimited initialize line on stdin.
+      format: |
+        {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{}}}
+      source_claims: [claim-mcp-stdio-transport-spec]
+  typical_output:
+    - description: Moonweave-local stdio transport binding record.
+      format: |
+        {"transport_kind":"stdio","frame_delimiter":"newline","server_process_id":"mcp-stdio-proc-91"}
+      source_claims: [claim-mcp-stdio-transport-design]
+  reference_implementations:
+    - name: MCP Transports
+      url: https://modelcontextprotocol.io/specification/2025-11-25/basic/transports
+      description: stdio newline framing rules.
+    - name: LangChain MCP
+      url: https://python.langchain.com/docs/integrations/tools/mcp/
+      description: Local stdio MCP server connections.
 structure:
   identity_keys: []
   fields:
@@ -59,11 +80,11 @@ structure:
             ja: 一 line に一 complete message。
           status: accepted
           source_claims:
-            - claim-mcp-stdio-transport-002
+            - claim-mcp-stdio-transport-spec
       pattern: null
       example_value: newline
       source_claims:
-        - claim-mcp-stdio-transport-002
+        - claim-mcp-stdio-transport-spec
     - id: server_process_id
       labels:
         zh: 服务器进程标识
@@ -82,7 +103,7 @@ structure:
       pattern: null
       example_value: mcp-stdio-proc-91
       source_claims:
-        - claim-mcp-stdio-transport-003
+        - claim-mcp-stdio-transport-design
   constraints: []
   required_relation_constraints: []
 examples:
@@ -116,8 +137,11 @@ examples:
       ja: launch・direction・newline framing・stdout/stderr constraint が一致します。
     synthetic: true
     verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    example_source:
+      product: MCP Transports
+      url: https://modelcontextprotocol.io/specification/2025-11-25/basic/transports
     source_claims:
-      - claim-mcp-stdio-transport-003
+      - claim-mcp-stdio-transport-spec
   - id: MCPStdioTransport-example-boundary-001
     kind: boundary
     labels:
@@ -143,20 +167,11 @@ examples:
       ja: standard stream は media にすぎず MCP message/endpoint role が protocol transport を決めます。
     synthetic: true
     verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    example_source:
+      product: Moonweave MCP transport design
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-mcp-stdio-transport-003
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: MCPStreamableHTTPTransport
-    shared_parent_concept_id: MCPTransport
-    differentia:
-      zh: MCPStdioTransport 与 MCPStreamableHTTPTransport 同属 MCPTransport；MCPStdioTransport 使用子进程 stdin/stdout 换行分帧；MCPStreamableHTTPTransport 使用单一 HTTP 端点、POST/GET 与可选 SSE，并适用 Origin 与 HTTP 授权控制。
-      en: MCPStdioTransport and MCPStreamableHTTPTransport share MCPTransport; MCPStdioTransport uses newline framing over subprocess stdin/stdout, whereas MCPStreamableHTTPTransport uses one HTTP endpoint with POST/GET and optional SSE plus Origin and HTTP authorization controls.
-      ja: MCPStdioTransport と MCPStreamableHTTPTransport は MCPTransport を共有し、MCPStdioTransport は subprocess stdin/stdout の newline framing、MCPStreamableHTTPTransport は single HTTP endpoint・POST/GET・optional SSE と Origin/HTTP authorization control を使います。
-    source_claims:
-      - claim-mcp-stdio-transport-004
+      - claim-mcp-stdio-transport-design
 parent_relation:
   id: MCPStdioTransport-is_a-MCPTransport
   predicate: is_a
@@ -254,55 +269,43 @@ parent_relation:
   review_status: accepted
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-mcp-spec-verification
-  reviewer: manual-mcp-spec-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 MCP 2025-11-25 规范（生命周期、传输、授权、能力协商、JSON-RPC 消息、资源订阅）完成人工语义核验。
-    en: Manually verified against MCP 2025-11-25 (lifecycle, transports, authorization, capability negotiation, JSON-RPC messages, resource subscriptions).
-    ja: MCP 2025-11-25 仕様（ライフサイクル、トランスポート、認可、能力協議、JSON-RPC メッセージ、リソース購読）に照らして手動意味審査を完了しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-mcp-stdio-transport
+    title: MCP Transports Specification
+    publisher: Model Context Protocol
+    url: https://modelcontextprotocol.io/specification/2025-11-25/basic/transports
+    version: checked 2026-07-19
+    accessed_on: 2026-07-19
+    source_type: official-spec
+    authority: A
+    status: fetched
+    why_it_matters: stdio newline-delimited JSON-RPC framing and stderr logging rules.
+  - id: src-mcp-stdio-design
+    title: Moonweave MCPStdioTransport concept boundary design
+    publisher: Moonweave
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    version: checked 2026-07-19
+    accessed_on: 2026-07-19
+    source_type: design-inference
+    authority: B
+    status: fetched
+    why_it_matters: Distinguishes MCP stdio transport from ordinary shell streams.
 source_claims:
-  - id: claim-mcp-stdio-transport-001
-    source: eng-proto-mcp-transports-2025
-    supports: "The MCP 2025-11-25 transport specification defines exactly two standard bindings: newline-delimited stdio and Streamable HTTP with one MCP endpoint, POST/GET, and optional SSE streaming; custom transports are extension points and legacy HTTP+SSE is only a backwards-compatibility path."
-    locator: MCP 2025-11-25 > Base Protocol > Transports > stdio, Streamable HTTP, and Backwards Compatibility
-    evidence_kind: normative
+  - id: claim-mcp-stdio-transport-spec
+    source: src-mcp-stdio-transport
+    supports: MCP stdio transport uses newline-delimited JSON-RPC messages and forbids embedded newlines; stderr is for logging only.
+    locator: Transports > stdio
+    evidence_kind: primary-spec
     confidence: high
-    review_status: accepted
-  - id: claim-mcp-stdio-transport-002
-    source: eng-proto-mcp-transports-2025
-    supports: The stdio transport uses newline-delimited JSON-RPC messages and forbids embedded newlines in a message.
-    locator: MCP 2025-11-25 > Transports > stdio
-    evidence_kind: normative
-    confidence: high
-    review_status: accepted
-  - id: claim-mcp-stdio-transport-003
-    source: eng-proto-mcp-transports-2025
-    supports: "The MCP 2025-11-25 transport specification defines exactly two standard bindings: newline-delimited stdio and Streamable HTTP with one MCP endpoint, POST/GET, and optional SSE streaming; custom transports are extension points and legacy HTTP+SSE is only a backwards-compatibility path."
-    locator: MCP 2025-11-25 > Base Protocol > Transports > stdio, Streamable HTTP, and Backwards Compatibility
+  - id: claim-mcp-stdio-transport-design
+    source: src-mcp-stdio-design
+    supports: Moonweave requires conforming MCP JSON-RPC messages and client-launched subprocess binding to classify MCPStdioTransport.
+    locator: MCPStdioTransport concept boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-mcp-stdio-transport-004
-    source: eng-proto-mcp-transports-2025
-    supports: "Sibling evidence scope: MCPStdioTransport and MCPStreamableHTTPTransport are compared only under MCPTransport. The MCP 2025-11-25 transport specification defines exactly two standard bindings: newline-delimited stdio and Streamable HTTP with one MCP endpoint, POST/GET, and optional SSE streaming; custom transports are extension points and legacy HTTP+SSE is only a backwards-compatibility path."
-    locator: MCP 2025-11-25 > Base Protocol > Transports > stdio, Streamable HTTP, and Backwards Compatibility
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
   - id: claim-mcp-stdio-transport-005
-    source: eng-proto-mcp-transports-2025
-    supports: "The MCP 2025-11-25 transport specification defines exactly two standard bindings: newline-delimited stdio and Streamable HTTP with one MCP endpoint, POST/GET, and optional SSE streaming; custom transports are extension points and legacy HTTP+SSE is only a backwards-compatibility path. For this reviewed edge, the operational reading is: MCPStdioTransport is a strict subtype of MCPTransport; its necessary identity differentia is: MCP stdio transport is an MCPTransport where the client launches a server subprocess, writes its stdin, and reads its stdout. Each UTF-8 JSON-RPC message is newline-delimited and contains no embedded newline; stderr is optional logging, not a protocol-error channel."
-    locator: MCP 2025-11-25 > Base Protocol > Transports > stdio, Streamable HTTP, and Backwards Compatibility
+    source: src-mcp-stdio-transport
+    supports: MCPStdioTransport is a strict MCPTransport subtype with newline framing over subprocess stdin/stdout.
+    locator: Transports > stdio
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted

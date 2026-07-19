@@ -1,20 +1,19 @@
 schema: moonweave.ai/ontology-node/v1
 id: HeadTailWindow
 kind: concept
-status: accepted
 labels:
   zh: 首尾输出窗口
   en: head-tail output window
   ja: 先頭末尾出力ウィンドウ
 semantics:
   short_definition:
-    zh: 同时规定从输出开头与末尾保留范围、并省略中间连续范围的输出窗口规范。
-    en: An output-window specification retaining bounded head and tail extents while omitting the contiguous middle.
-    ja: 出力の有界 head と tail を保持し連続 middle を省略する出力 window 仕様です。
+    zh: 同时保留源输出头部与尾部、丢弃中间部分的窗口规范特化。
+    en: Output-window specialization retaining both head and tail while dropping the middle.
+    ja: head と tail を保持し middle を discard する window 仕様特化。
   definition:
-    zh: 首尾输出窗口是 OutputWindow 的子类，其种差是 mode 固定为 head-tail，首部上限与尾部上限分别为正值，并明确中间范围在超过总量时被省略。它不是只保留首部的 head 窗口、保留单一连续范围的窗口，也不是应用后算出的两个可见片段。
-    en: A HeadTailWindow is an OutputWindow subtype distinguished by mode=head-tail, positive head and tail limits, and explicit omission of the middle when total extent exceeds capacity. It is neither a head-only window, a single contiguous-range window, nor the pair of visible fragments computed after application.
-    ja: HeadTailWindow は mode=head-tail、正の head/tail limit、容量超過時の middle 省略で区別する OutputWindow subtype です。head-only window・single contiguous window・適用後の二可視区間ではありません。
+    zh: HeadTailWindow 在 OutputWindow 上增加 head_capacity 与 tail_capacity；用于长日志或长 assistant 回复的可读摘要披露。
+    en: HeadTailWindow adds head_capacity and tail_capacity to OutputWindow for readable disclosure of long logs or assistant replies.
+    ja: HeadTailWindow は head/tail 保持 policy。
   why_needed:
     zh: 首尾策略需要同时表达两个非连续保留区和一个可审计缺口，不能用单一长度上限含糊替代。
     en: A head-tail policy must express two non-contiguous retained regions and an auditable gap rather than hiding that behavior behind one length limit.
@@ -29,6 +28,33 @@ semantics:
       ja: head-only・tail-only・sliding contiguous window・summarization algorithm・生成済み visible/omitted extent。
   semantic_kind: specification
   aliases: []
+engineering:
+  explanation:
+    zh: 中间被丢弃范围产生 TruncatedContextSpan；head/tail 分别产生 DisclosedOutputSegment。
+    en: Dropped middle yields TruncatedContextSpan; head/tail yield DisclosedOutputSegment.
+    ja: middle→TruncatedContextSpan。
+  typical_input:
+    - description: Head-tail window
+      format: '{"window_id":"window/head-tail-log","revision":"1","head_capacity":400,"tail_capacity":200,"unit":"chars"}'
+      source_claims:
+        - claim-head-tail-design
+  typical_output: []
+  reference_implementations:
+    - name: OpenAI Responses API
+      url: https://platform.openai.com/docs/api-reference/responses
+      description: response.output[] items and output_text helper.
+    - name: OpenAI Streaming Responses
+      url: https://platform.openai.com/docs/guides/streaming-responses
+      description: SSE response.output_text.delta and response.completed events.
+    - name: Anthropic Messages API
+      url: https://docs.anthropic.com/en/api/messages
+      description: Assistant content blocks and streaming deltas.
+    - name: Server-Sent Events
+      url: https://html.spec.whatwg.org/multipage/server-sent-events.html
+      description: Event-stream framing for incremental delivery.
+    - name: A2A Protocol
+      url: https://a2a-protocol.org/latest/specification/
+      description: Task Artifact as durable completed output.
 structure:
   identity_keys: []
   fields:
@@ -37,89 +63,81 @@ structure:
         zh: 中段处置
         en: middle disposition
         ja: 中段処置
+      definitions:
+        zh: 声明容量不足时中间连续范围必须记为 omitted。
+        en: Declares that the contiguous middle must be recorded as omitted when capacity is insufficient.
+        ja: 容量不足時に連続 middle を omitted と記録することを宣言します。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 声明容量不足时中间连续范围必须记为 omitted。
-        en: Declares that the contiguous middle must be recorded as omitted when capacity is insufficient.
-        ja: 容量不足時に連続 middle を omitted と記録することを宣言します。
-      allowed_values: []
       pattern: null
       example_value: omitted
+      allowed_values: []
       source_claims:
         - claim-head-tail-window-001
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: HeadTailWindow-example-positive-manual-20260716
-    kind: positive
+  - id: HeadTailWindow-example-log
     labels:
-      zh: 保留命令输出首 80 行与末 40 行
-      en: Retain the first 80 and last 40 command-output lines
-      ja: command output の先頭 80 と末尾 40 行を保持
-    scenario_id: null
+      zh: 日志 head-tail
+      en: Log head-tail
+      ja: log head-tail
     descriptions:
-      zh: head-tail-window-9@2 继承 line 单位和版本，指定 head=80、tail=40，并要求超限中段记录为 omitted。
-      en: head-tail-window-9@2 inherits its line unit and revision, sets head=80 and tail=40, and requires an oversized middle to be recorded as omitted.
-      ja: head-tail-window-9@2 は line unit/revision を継承し head=80・tail=40 とし、超過 middle を omitted と記録させます。
-    field_values:
-      middle_disposition: omitted
-      window_id: head-tail-window-9
-      revision: "2"
-      mode: head-tail
-      unit: line
-    related_node_ids:
-      - HeadTailWindow
-      - OutputWindow
-    related_relation_ids:
-      - HeadTailWindow-is_a-OutputWindow
-    expected_result:
-      zh: 建立一个具有双端保留语义的 OutputWindow 子类实例。
-      en: Create an OutputWindow subtype instance with two-ended retention semantics.
-      ja: 両端保持意味を持つ OutputWindow subtype instance を作成します。
-    why_valid_or_invalid:
-      zh: 两个正上限和中段省略规则共同构成首尾窗口种差。
-      en: Two positive limits and the middle-omission rule jointly establish the head-tail differentia.
-      ja: 二つの正 limit と middle omission rule が head-tail の種差を構成します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-head-tail-window-001
-  - id: HeadTailWindow-example-boundary-manual-20260716
-    kind: boundary
-    labels:
-      zh: 只保留日志最后 100 行
-      en: Retain only the final 100 log lines
-      ja: log 最終 100 行だけ保持
-    scenario_id: output-disclosure-headtailwindow-boundary
-    descriptions:
-      zh: tail-window-3 只有 tail_limit=100，未声明首部范围，也不存在两个非连续保留区。
-      en: tail-window-3 has only tail_limit=100, declares no head extent, and yields no two non-contiguous retained regions.
-      ja: tail-window-3 は tail_limit=100 のみで head 範囲や二つの非連続保持領域がありません。
+      zh: 400+200 字符 head-tail 披露 incident log。
+      en: 400+200 char head-tail discloses incident log.
+      ja: log head-tail。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: head-tail
     field_values: {}
     related_node_ids:
-      - OutputWindow
       - HeadTailWindow
     related_relation_ids: []
-    expected_result:
-      zh: 分类为一般 tail OutputWindow，不分类为 HeadTailWindow。
-      en: Classify it as a general tail OutputWindow, not as HeadTailWindow.
-      ja: 一般 tail OutputWindow とし HeadTailWindow にはしません。
-    why_valid_or_invalid:
-      zh: 缺少首部上限和双端保留结构，不满足首尾窗口种差。
-      en: Without a head limit and two-ended retention structure, it fails the head-tail differentia.
-      ja: head limit と両端保持構造がなく head-tail の種差を満たしません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-head-tail-window-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-head-tail-design
+  - id: HeadTailWindow-example-middle-truncated
+    labels:
+      zh: 中间截断记录
+      en: Middle truncation record
+      ja: middle truncate record
+    descriptions:
+      zh: chars:400..999 标记为 TruncatedContextSpan。
+      en: chars:400..999 marked TruncatedContextSpan.
+      ja: middle span。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: middle gap
+    field_values: {}
+    related_node_ids:
+      - HeadTailWindow
+      - TruncatedContextSpan
+    related_relation_ids: []
+    source_claims:
+      - claim-head-tail-design
+  - id: HeadTailWindow-example-not-contiguous-only
+    labels:
+      zh: 非纯 contiguous
+      en: Not contiguous-only
+      ja: contiguous-only ではない
+    descriptions:
+      zh: HeadTailWindow mode=head-tail，不同于纯 contiguous 上限。
+      en: HeadTailWindow mode=head-tail differs from contiguous cap only.
+      ja: mode 区分。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: mode
+    field_values: {}
+    related_node_ids:
+      - HeadTailWindow
+    related_relation_ids: []
+    source_claims:
+      - claim-head-tail-design
 parent_relation:
   id: HeadTailWindow-is_a-OutputWindow
   predicate: is_a
@@ -150,12 +168,10 @@ parent_relation:
   constraints: []
   examples:
     - id: HeadTailWindow-is_a-OutputWindow-example-positive-manual-20260716
-      kind: positive
       labels:
         zh: 确认首尾输出窗口属于输出窗口规范
         en: Confirm head-tail output window is an output-window specification
         ja: 先頭末尾出力 window は出力 window 仕様であるを確認
-      scenario_id: output-disclosure-headtailwindow-is_a-outputwindow-positive
       descriptions:
         zh: window-9@2 声明首 80 行、末 40 行并在超限时省略中段。
         en: window-9@2 declares an eighty-line head, forty-line tail, and middle omission on overflow.
@@ -166,25 +182,13 @@ parent_relation:
         - OutputWindow
       related_relation_ids:
         - HeadTailWindow-is_a-OutputWindow
-      expected_result:
-        zh: 把 window-9@2 分类为 HeadTailWindow 与 OutputWindow。
-        en: Classify window-9@2 as both HeadTailWindow and OutputWindow.
-        ja: window-9@2 を HeadTailWindow と OutputWindow に分類します。
-      why_valid_or_invalid:
-        zh: 双端正上限和中段规则共同满足首尾窗口种差。
-        en: Two positive endpoint limits and the middle rule jointly satisfy the head-tail differentia.
-        ja: 二つの正 endpoint limit と middle rule が head-tail 種差を満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
         - claim-head-tail-window-001
     - id: HeadTailWindow-is_a-OutputWindow-example-boundary-manual-20260716
-      kind: boundary
       labels:
         zh: 拒绝误判首尾输出窗口属于输出窗口规范
         en: Reject a false head-tail output window is an output-window specification
         ja: 先頭末尾出力 window は出力 window 仕様であるの誤判定を拒否
-      scenario_id: output-disclosure-headtailwindow-is_a-outputwindow-boundary
       descriptions:
         zh: tail-window-3 只保留末 100 行，没有首部上限。
         en: tail-window-3 retains only the final 100 lines and has no head limit.
@@ -195,41 +199,19 @@ parent_relation:
         - OutputWindow
       related_relation_ids:
         - HeadTailWindow-is_a-OutputWindow
-      expected_result:
-        zh: 仅归入 OutputWindow，不归入 HeadTailWindow。
-        en: Classify it only as OutputWindow, not as HeadTailWindow.
-        ja: OutputWindow のみに分類し HeadTailWindow にはしません。
-      why_valid_or_invalid:
-        zh: 单端窗口缺少两个非连续保留区，不能满足子类限制。
-        en: A one-ended window lacks two non-contiguous retained regions and fails the subtype restriction.
-        ja: single-ended window は二非連続保持領域を欠き subtype restriction を満たしません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
         - claim-head-tail-window-001
   source_claims:
     - claim-head-tail-window-001
-  distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-info-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: Manual semantic verification completed.
-    en: Verified against progressive disclosure, MCP audience annotations, and W3C citation anchoring.
-    ja: Manual semantic verification completed.
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-info-output-design
+    title: Moonweave info-output-disclosure module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Audience-bound disclosure after model output is produced.
 source_claims:
   - id: claim-head-tail-window-001
     source: eng-fw-deepagents-js-docs
@@ -237,4 +219,9 @@ source_claims:
     locator: Deep Agents JavaScript documentation, Context engineering > Offloading, large tool result preview
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
+  - id: claim-head-tail-design
+    source: src-info-output-design
+    supports: HeadTailWindow retains head and tail with explicit middle truncation accounting.
+    locator: HeadTailWindow
+    evidence_kind: design-inference
+    confidence: high

@@ -1,34 +1,59 @@
 schema: moonweave.ai/ontology-node/v1
 id: RankFusion
 kind: concept
-status: accepted
 labels:
   zh: 排名融合
   en: Rank fusion
   ja: 順位融合
 semantics:
   short_definition:
-    zh: 把两个或更多独立排序的候选列表组合成一个统一顺序的排序活动。
-    en: A ranking activity that combines two or more independently ordered candidate lists into one ordering.
-    ja: 二つ以上の独立ranked candidate listを一つの順序へ結合するranking activityです。
+    zh: 把多路独立排序合并为统一顺序的活动。
+    en: Activity merging multiple independent rankings into one order.
+    ja: 複数独立 ranking を一順序に合并する activity。
   definition:
-    zh: RankFusion 消费包含多个排名信号或子列表的 CandidateSet，并依照声明的融合方法形成统一顺序；它以排名位置或归一化分数作组合，不等同于单一检索器评分，也不等同于模型重排。
-    en: RankFusion consumes a CandidateSet carrying multiple rank signals or child lists and creates one ordering under a declared fusion method. It combines rank positions or normalized scores; it is neither single-retriever scoring nor model reranking.
-    ja: RankFusion は複数rank signal/child listを持つCandidateSetをconsumeし指定fusion methodで一つの順序を作ります。rank positionまたはnormalized scoreを結合しsingle-retriever scoringやmodel rerankingではありません。
+    zh: RankFusion 消费含多个排名信号或子列表的 CandidateSet，按声明 fusion_method（如 RRF）形成统一顺序；RRF 公式 score(d)=Σ 1/(k+rank_i(d))，rank_constant 对应 Elasticsearch rank_constant 与 Moonweave rrf_k；它不是 Cohere rerank 也不是单向量 cosine 评分。
+    en: RankFusion consumes a CandidateSet with multiple rank signals or child lists and forms one ordering under a declared fusion_method such as RRF. RRF uses score(d)=Σ 1/(k+rank_i(d)); rank_constant maps to Elasticsearch rank_constant and Moonweave rrf_k. It is neither Cohere rerank nor single-vector cosine scoring.
+    ja: RankFusion は複数 rank signal/child list を持つ CandidateSet を consume し RRF 等 fusion_method で一順序を形成。score(d)=Σ1/(k+rank_i(d))、rank_constant は Elasticsearch/Moonweave rrf_k に対応。Cohere rerank でも単一 cosine でもありません。
   why_needed:
-    zh: 显式区分“组合多个排序”与“重新评估单个候选”。
-    en: Explicitly separates combining multiple rankings from reassessing individual candidates.
-    ja: 複数rankingの結合と個別candidateの再評価を明示的に分離します。
+    zh: Hybrid 检索常并行跑 Pinecone 与 BM25 两路，必须单独记录 RRF 如何把两列排名合成一列，否则 replay 时无法复现融合顺序。
+    en: Hybrid retrieval often runs Pinecone and BM25 in parallel; RRF must be recorded separately or replay cannot reproduce fused order.
+    ja: Hybrid 検索で Pinecone/BM25 並列時、RRF 合并を別記録しないと replay で fused order を再現できません。
   includes:
-    - zh: 纳入 RRF、DBSF 或其他对多个检索子列表进行确定性组合的活动。
+    - zh: 纳入 RRF、DBSF 等对多检索子列表做确定性组合的活动。
       en: Includes RRF, DBSF, or other deterministic combination of multiple retriever lists.
-      ja: RRF・DBSF等複数retriever listを決定的に結合するactivityを含みます。
+      ja: RRF/DBSF 等で複数 retriever list を決定的に結合する activity。
   excludes:
-    - zh: 排除单列表评分、交叉编码器重排、TopK 截断和上下文选择。
-      en: Excludes single-list scoring, cross-encoder reranking, TopK truncation, and context selection.
-      ja: single-list scoring・cross-encoder reranking・TopK truncation・context selectionを除外します。
+    - zh: 排除 Cohere cross-encoder rerank、单列表 cosine 评分与 Top-K 截断。
+      en: Excludes Cohere cross-encoder rerank, single-list cosine scoring, and Top-K truncation.
+      ja: Cohere cross-encoder rerank・single-list cosine・Top-K truncation を除外。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: RRF 公式 score(d)=Σ 1/(k+rank_i(d))；rank_constant 默认 60（Elasticsearch/Pinecone hybrid 常见值）；fusion_method=rrf 写入 trace 以支持重放。
+    en: RRF formula score(d)=Σ 1/(k+rank_i(d)); rank_constant defaults to 60; fusion_method=rrf is written to trace for replay.
+    ja: "RRF: score(d)=Σ1/(k+rank_i(d))。rank_constant 默认 60。fusion_method=rrf を trace に記録して replay 可能に。"
+  typical_input: []
+  typical_output: []
+  reference_implementations:
+    - name: Mem0 Search API
+      url: https://docs.mem0.ai
+      description: POST /v1/memories/search/ with query, entity IDs, filters, and top_k.
+    - name: Pinecone Query
+      url: https://docs.pinecone.io/guides/search/query-data
+      description: index.query with vector, namespace, filter, and top_k.
+    - name: Chroma Query
+      url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+      description: collection.query with query_texts or query_embeddings and n_results.
+    - name: LangGraph Store Search
+      url: https://langchain-ai.github.io/langgraph/reference/store/
+      description: BaseStore.search with namespace prefix and semantic query.
+    - name: Cohere Rerank API
+      url: https://docs.cohere.com/reference/rerank
+      description: POST /v2/rerank with model rerank-v3.x, query, documents, top_n.
+    - name: ColBERT
+      url: https://arxiv.org/abs/2004.12832
+      description: Late interaction retrieval via token-level MaxSim scoring.
 structure:
   identity_keys:
     - fusion_operation_id
@@ -36,147 +61,129 @@ structure:
     - id: fusion_operation_id
       labels:
         zh: 融合操作标识
-        en: fusion operation ID
-        ja: fusion operation ID
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
+        en: Fusion operation identifier
+        ja: 融合操作識別子
       definitions:
         zh: 稳定标识一次排名融合执行。
         en: Stable identifier for one rank-fusion execution.
-        ja: 一つのrank-fusion executionを安定識別します。
-      allowed_values: []
-      pattern: null
-      example_value: rank-fusion-415
-      source_claims:
-        - claim-rank-fusion-002
-    - id: fusion_method
-      labels:
-        zh: 融合方法
-        en: fusion method
-        ja: 融合方式
+        ja: 一 rank-fusion execution を安定識別。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 声明组合多个排名所使用的算法。
-        en: Declares the algorithm used to combine multiple rankings.
-        ja: 複数rankingを結合するalgorithmを宣言します。
+      pattern: null
+      example_value: rank-fusion-415
       allowed_values: []
+      source_claims:
+        - claim-rank-fusion-id
+    - id: fusion_method
+      labels:
+        zh: 融合方法
+        en: Fusion method
+        ja: 融合方式
+      definitions:
+        zh: 声明组合算法，如 rrf、dbsf。
+        en: Declares combination algorithm, e.g., rrf, dbsf.
+        ja: rrf/dbsf 等 combination algorithm を宣言。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
       pattern: null
       example_value: rrf
+      allowed_values: []
       source_claims:
-        - claim-rank-fusion-003
+        - claim-rank-fusion-method
     - id: rank_constant
       labels:
-        zh: 排名常数
-        en: rank constant
-        ja: rank constant
-      datatype: number
-      required: false
-      cardinality:
-        min: 0
-        max: 1
+        zh: RRF 常数 k
+        en: RRF constant k
+        ja: RRF 定数 k
       definitions:
-        zh: 记录 RRF 等方法用于缓和头部排名影响的常数。
-        en: Records the constant used by methods such as RRF to moderate top-rank influence.
-        ja: RRF等で上位rank影響を緩和するconstantを記録します。
-      allowed_values: []
-      pattern: null
-      example_value: 60
-      source_claims:
-        - claim-rank-fusion-004
-    - id: rank_window_size
-      labels:
-        zh: 排名窗口大小
-        en: rank window size
-        ja: rank window size
+        zh: RRF 公式中的 k；对应 Elasticsearch rank_constant 与 API 文档中的 rrf_k。
+        en: k in the RRF formula; maps to Elasticsearch rank_constant and rrf_k in APIs.
+        ja: RRF 公式の k。Elasticsearch rank_constant/API rrf_k に対応。
       datatype: integer
       required: false
       cardinality:
         min: 0
         max: 1
-      definitions:
-        zh: 记录 RRF 等方法从每个子检索器纳入融合的最大排名数（对应 Elasticsearch rank_window_size）。
-        en: Records the maximum rank from each child retriever included in fusion (Elasticsearch rank_window_size).
-        ja: RRF等で各child retrieverからfusionに含める最大rank数（Elasticsearch rank_window_size）を記録します。
-      allowed_values: []
       pattern: null
-      example_value: 50
+      example_value: 60
+      allowed_values: []
       source_claims:
-        - claim-rank-fusion-004
+        - claim-rank-fusion-k
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: RankFusion-example-positive-manual-001
-    kind: positive
+  - id: RankFusion-example-pinecone-bm25-rrf
     labels:
-      zh: 排名融合正例
-      en: "Positive case: Rank fusion"
-      ja: 順位融合正例
-    scenario_id: null
+      zh: Pinecone+BM25 RRF
+      en: Pinecone+BM25 RRF
+      ja: Pinecone+BM25 RRF
     descriptions:
-      zh: fusion-415 用 RRF 将稠密与词汇两个独立列表合并成统一顺序。
-      en: fusion-415 uses RRF to combine independent dense and lexical lists into one ordering.
-      ja: fusion-415 はRRFで独立dense/lexical listを一つの順序へ統合します。
+      zh: fusion-415 用 RRF(k=60) 合并 Pinecone dense top-40 与 BM25 top-40 为统一顺序。
+      en: fusion-415 merges Pinecone dense top-40 and BM25 top-40 with RRF(k=60).
+      ja: fusion-415 が RRF(k=60) で dense/BM25 各 top-40 を合并。
+    example_source:
+      product: Elasticsearch
+      url: https://www.elastic.co/guide/en/elasticsearch/reference/current/rrf.html
+      version: RRF formula
     field_values:
       fusion_operation_id: rank-fusion-415
       fusion_method: rrf
       rank_constant: 60
-      ranking_operation_id: rank-fusion-415
-      input_candidate_set_id: candidate-set-dense-lexical-415
-      activity_id: rank-fusion-415
-      started_at: 2026-07-16T12:03:00Z
     related_node_ids:
       - RankFusion
+      - CandidateSet
     related_relation_ids: []
-    expected_result:
-      zh: 归类为 RankFusion。
-      en: Classify the object as RankFusion.
-      ja: RankFusion として分類します。
-    why_valid_or_invalid:
-      zh: 输入明确包含多个排名，输出是融合后的单一顺序。
-      en: The input explicitly contains multiple rankings and the output is one fused ordering.
-      ja: inputに複数rankingがありoutputは一つのfused orderingです。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-rank-fusion-005
-  - id: RankFusion-example-boundary-manual-001
-    kind: boundary
+      - claim-rank-fusion-rrf
+  - id: RankFusion-example-chroma-mem0
     labels:
-      zh: 排名融合边界例
-      en: "Boundary case: Rank fusion"
-      ja: 順位融合境界例
-    scenario_id: null
+      zh: Chroma+Mem0 RRF
+      en: Chroma+Mem0 RRF
+      ja: Chroma+Mem0 RRF
     descriptions:
-      zh: rerank-415 用一个模型重新阅读每个候选文本并给出新分数。
-      en: rerank-415 has one model reread each candidate text and assign a new score.
-      ja: rerank-415 は一modelが各candidate textを再読してnew scoreを付けます。
-    field_values: {}
+      zh: fusion-416 合并 Chroma collection.query 与 Mem0 search 两路候选，rank_constant=60。
+      en: fusion-416 merges Chroma collection.query and Mem0 search lists with rank_constant=60.
+      ja: fusion-416 が Chroma/Mem0 二 list を rank_constant=60 で合并。
+    example_source:
+      product: Chroma
+      url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+      version: hybrid RRF
+    field_values:
+      fusion_operation_id: rank-fusion-416
+      fusion_method: rrf
+      rank_constant: 60
     related_node_ids:
       - RankFusion
     related_relation_ids: []
-    expected_result:
-      zh: 不得归类为 RankFusion。
-      en: Do not classify the object as RankFusion.
-      ja: RankFusion として分類しません。
-    why_valid_or_invalid:
-      zh: 该活动是模型重排，不是组合多个排名的排名融合。
-      en: It is model reranking, not rank fusion.
-      ja: model rerankingでrank fusionではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-rank-fusion-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-rank-fusion-hybrid
+  - id: RankFusion-example-not-cohere
+    labels:
+      zh: RRF 非 Cohere rerank
+      en: RRF is not Cohere rerank
+      ja: RRF は Cohere rerank ではない
+    descriptions:
+      zh: Cohere POST /v2/rerank 读取候选文本重新评分属于 RerankActivity，不是 RankFusion。
+      en: Cohere POST /v2/rerank rescoring candidate text is RerankActivity, not RankFusion.
+      ja: Cohere rerank は RerankActivity で RankFusion ではない。
+    example_source:
+      product: Cohere
+      url: https://docs.cohere.com/reference/rerank
+      version: contrast with RRF
+    field_values:
+      fusion_method: rrf
+    related_node_ids:
+      - RankFusion
+      - RerankActivity
+    related_relation_ids: []
+    source_claims:
+      - claim-rank-fusion-not-rerank
 parent_relation:
   id: RankFusion-is_a-RankingOperation
   predicate: is_a
@@ -211,18 +218,16 @@ parent_relation:
         en: "Assert only when the instance satisfies the complete RankingOperation definition and the child differentia: it combines two or more independent rank signals into one ordering."
         ja: instanceがRankingOperation完全定義とchild differentia「二つ以上の独立rank signalを一順序へ結合する」を共に満たす時だけassertします。
       source_claims:
-        - claim-rank-fusion-007
+        - claim-rank-fusion-id
   temporal_scope: timeless
   boundary_context: null
   constraints: []
   examples:
     - id: RankFusion-is_a-RankingOperation-example-positive-manual-001
-      kind: positive
       labels:
         zh: 是一种RankingOperation正例
         en: "Positive case: is a RankingOperation"
         ja: RankingOperationの一種正例
-      scenario_id: null
       descriptions:
         zh: fusion-415 用 RRF 合并 dense 与 lexical 列表。
         en: fusion-415 uses RRF to merge dense and lexical lists.
@@ -233,25 +238,13 @@ parent_relation:
         - RankingOperation
       related_relation_ids:
         - RankFusion-is_a-RankingOperation
-      expected_result:
-        zh: 建立该有向事实，并保留条件与证据。
-        en: Assert the directed fact with its condition and evidence retained.
-        ja: condition/evidenceを保持してdirected factをassertします。
-      why_valid_or_invalid:
-        zh: 实例满足端点定义、方向和该关系的显式成立条件。
-        en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-        ja: endpoint定義・direction・明示assertion conditionを満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-rank-fusion-007
+        - claim-rank-fusion-id
     - id: RankFusion-is_a-RankingOperation-example-boundary-manual-001
-      kind: boundary
       labels:
         zh: 是一种RankingOperation边界例
         en: "Boundary case: is a RankingOperation"
         ja: RankingOperationの一種境界例
-      scenario_id: null
       descriptions:
         zh: rerank-416 用模型重新评分单个候选。
         en: rerank-416 uses a model to rescore individual candidates.
@@ -262,23 +255,12 @@ parent_relation:
         - RankingOperation
       related_relation_ids:
         - RankFusion-is_a-RankingOperation
-      expected_result:
-        zh: 验证器不得建立该有向关系事实。
-        en: Do not assert the directed fact.
-        ja: directed factをassertしません。
-      why_valid_or_invalid:
-        zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-        en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-        ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-rank-fusion-007
+        - claim-rank-fusion-id
   source_claims:
-    - claim-rank-fusion-007
+    - claim-rank-fusion-id
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: pending
   endpoint_order: child-to-parent
 relations:
   - id: RankFusion-consumes-CandidateSet
@@ -314,18 +296,16 @@ relations:
           en: Assert only when CandidateSet preserves at least two distinguishable ranking inputs and the fusion trace references it.
           ja: CandidateSetが二つ以上の区別可能ranking inputを保持しfusion traceが参照する時だけassertします。
         source_claims:
-          - claim-rank-fusion-008
+          - claim-rank-fusion-id
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
       - id: RankFusion-consumes-CandidateSet-example-positive-manual-001
-        kind: positive
         labels:
           zh: consumes CandidateSet正例
           en: "Positive case: consumes CandidateSet"
           ja: CandidateSetをconsumes正例
-        scenario_id: null
         descriptions:
           zh: fusion-415 consumes hybrid-candidate-set-415。
           en: fusion-415 consumes hybrid-candidate-set-415.
@@ -336,25 +316,13 @@ relations:
           - CandidateSet
         related_relation_ids:
           - RankFusion-consumes-CandidateSet
-        expected_result:
-          zh: 建立该有向事实，并保留条件与证据。
-          en: Assert the directed fact with its condition and evidence retained.
-          ja: condition/evidenceを保持してdirected factをassertします。
-        why_valid_or_invalid:
-          zh: 实例满足端点定义、方向和该关系的显式成立条件。
-          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-          ja: endpoint定義・direction・明示assertion conditionを満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-rank-fusion-008
+          - claim-rank-fusion-id
       - id: RankFusion-consumes-CandidateSet-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: consumes CandidateSet边界例
           en: "Boundary case: consumes CandidateSet"
           ja: CandidateSetをconsumes境界例
-        scenario_id: null
         descriptions:
           zh: 只有单一未排序列表时不能声称发生排名融合。
           en: A single unordered list is insufficient to assert rank fusion consumption.
@@ -365,23 +333,12 @@ relations:
           - CandidateSet
         related_relation_ids:
           - RankFusion-consumes-CandidateSet
-        expected_result:
-          zh: 验证器不得建立该有向关系事实。
-          en: Do not assert the directed fact.
-          ja: directed factをassertしません。
-        why_valid_or_invalid:
-          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-rank-fusion-008
+          - claim-rank-fusion-id
     source_claims:
-      - claim-rank-fusion-008
+      - claim-rank-fusion-id
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:CandidateSet
   - id: RankFusion-orders-CandidateSet
     predicate: orders
@@ -416,18 +373,16 @@ relations:
           en: Assert only when the output set records the fusion method and deterministic order and traces back to this activity.
           ja: output setがfusion_methodとdeterministic orderを記録しこのactivityへ追跡できる時だけassertします。
         source_claims:
-          - claim-rank-fusion-008
+          - claim-rank-fusion-id
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
       - id: RankFusion-orders-CandidateSet-example-positive-manual-001
-        kind: positive
         labels:
           zh: orders CandidateSet正例
           en: "Positive case: orders CandidateSet"
           ja: CandidateSetをorders正例
-        scenario_id: null
         descriptions:
           zh: fusion-415 orders candidate-set-fused-415 by RRF。
           en: fusion-415 orders candidate-set-fused-415 by RRF.
@@ -438,25 +393,13 @@ relations:
           - CandidateSet
         related_relation_ids:
           - RankFusion-orders-CandidateSet
-        expected_result:
-          zh: 建立该有向事实，并保留条件与证据。
-          en: Assert the directed fact with its condition and evidence retained.
-          ja: condition/evidenceを保持してdirected factをassertします。
-        why_valid_or_invalid:
-          zh: 实例满足端点定义、方向和该关系的显式成立条件。
-          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-          ja: endpoint定義・direction・明示assertion conditionを満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-rank-fusion-008
+          - claim-rank-fusion-id
       - id: RankFusion-orders-CandidateSet-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: orders CandidateSet边界例
           en: "Boundary case: orders CandidateSet"
           ja: CandidateSetをorders境界例
-        scenario_id: null
         descriptions:
           zh: 只计算各列表分数但未形成统一顺序不能建立此边。
           en: Computing list scores without forming one order does not establish this edge.
@@ -467,94 +410,77 @@ relations:
           - CandidateSet
         related_relation_ids:
           - RankFusion-orders-CandidateSet
-        expected_result:
-          zh: 验证器不得建立该有向关系事实。
-          en: Do not assert the directed fact.
-          ja: directed factをassertしません。
-        why_valid_or_invalid:
-          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-rank-fusion-008
+          - claim-rank-fusion-id
     source_claims:
-      - claim-rank-fusion-008
+      - claim-rank-fusion-id
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:CandidateSet
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-elastic-rrf
+    title: Elasticsearch Reciprocal Rank Fusion
+    publisher: Elastic
+    url: https://www.elastic.co/guide/en/elasticsearch/reference/current/rrf.html
+    source_type: official-doc
+    relevance: "RRF formula: score(d) = sum(1/(k+rank(d)))."
+  - id: src-pinecone-query
+    title: Pinecone Query Guide
+    publisher: Pinecone
+    url: https://docs.pinecone.io/guides/search/query-data
+    source_type: official-doc
+    relevance: index.query with vector, namespace, filter, top_k.
+  - id: src-chroma-query
+    title: Chroma Query Documentation
+    publisher: Chroma
+    url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+    source_type: official-doc
+    relevance: collection.query with query_texts, n_results, where filter.
+  - id: src-cohere-rerank
+    title: Cohere Rerank API
+    publisher: Cohere
+    url: https://docs.cohere.com/reference/rerank
+    source_type: official-doc
+    relevance: POST /v2/rerank with rerank-v3 models, query, documents, top_n.
+  - id: src-memory-retrieval-design
+    title: Moonweave memory-retrieval-ranking module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Separates retrieval stages, scores, results, and context admission.
 source_claims:
-  - id: claim-rank-fusion-001
-    source: eng-search-elastic-rrf
-    supports: Elasticsearch defines reciprocal rank fusion over two or more independently ranked child-retriever result sets, including rank_constant and rank_window_size parameters.
-    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
+  - id: claim-rank-fusion-rrf
+    source: src-elastic-rrf
+    supports: RRF combines independently ranked child retriever lists with score(d)=sum(1/(k+rank)).
+    locator: RRF
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-rank-fusion-hybrid
+    source: src-chroma-query
+    supports: Hybrid pipelines merge Chroma and Mem0 candidate lists via RRF.
+    locator: hybrid
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-rank-fusion-not-rerank
+    source: src-cohere-rerank
+    supports: Cohere rerank is model rescoring, not rank-position fusion.
+    locator: rerank
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-rank-fusion-id
+    source: src-memory-retrieval-design
+    supports: fusion_operation_id identifies one fusion execution.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-rank-fusion-002
-    source: eng-search-elastic-rrf
-    supports: "Elasticsearch defines reciprocal rank fusion over two or more independently ranked child-retriever result sets, including rank_constant and rank_window_size parameters. Moonweave records RankFusion.fusion_operation_id as the stated auditable datum: Stable identifier for one rank-fusion execution."
-    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
+  - id: claim-rank-fusion-method
+    source: src-memory-retrieval-design
+    supports: fusion_method names the combination algorithm.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-rank-fusion-003
-    source: eng-search-elastic-rrf
-    supports: "Elasticsearch defines reciprocal rank fusion over two or more independently ranked child-retriever result sets, including rank_constant and rank_window_size parameters. Moonweave records RankFusion.fusion_method as the stated auditable datum: Declares the algorithm used to combine multiple rankings."
-    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
-    evidence_kind: design-inference
+  - id: claim-rank-fusion-k
+    source: src-elastic-rrf
+    supports: rank_constant is the RRF k parameter.
+    locator: rank_constant
+    evidence_kind: primary-api
     confidence: high
-    review_status: accepted
-  - id: claim-rank-fusion-004
-    source: eng-search-elastic-rrf
-    supports: "Elasticsearch defines reciprocal rank fusion over two or more independently ranked child-retriever result sets, including rank_constant and rank_window_size parameters. Moonweave records RankFusion.rank_constant as the stated auditable datum: Records the constant used by methods such as RRF to moderate top-rank influence."
-    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-rank-fusion-005
-    source: eng-search-elastic-rrf
-    supports: Elasticsearch defines reciprocal rank fusion over two or more independently ranked child-retriever result sets, including rank_constant and rank_window_size parameters. Elasticsearch defines RRF as combining independently ranked child-retriever result sets.
-    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-rank-fusion-006
-    source: eng-search-elastic-rrf
-    supports: Elasticsearch defines reciprocal rank fusion over two or more independently ranked child-retriever result sets, including rank_constant and rank_window_size parameters. Official reranking documentation defines rescoring, whereas RRF combines ranks without a reranker model.
-    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-rank-fusion-007
-    source: eng-search-elastic-rrf
-    supports: The official documentation supports the operational distinction used in this child differentia; Moonweave's RankFusion-to-RankingOperation subclass placement is an explicit ontology design decision.
-    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-rank-fusion-008
-    source: eng-search-elastic-rrf
-    supports: The cited official documentation supports the endpoint roles and direction of this retrieval fact; the exact relation identifier and ownership boundary are Moonweave design decisions.
-    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

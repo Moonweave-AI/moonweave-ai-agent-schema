@@ -1,217 +1,199 @@
 schema: moonweave.ai/ontology-node/v1
 id: IngestionActivity
 kind: concept
-status: accepted
 labels:
   zh: 摄入活动
   en: Ingestion activity
-  ja: 取込activity
+  ja: 取込アクティビティ
 semantics:
   short_definition:
-    zh: 把外部来源转换为可交接摄入信息的活动上位类。
-    en: The activity genus transforming external sources into handoff-ready ingestion information.
-    ja: 外部sourceをhandoff可能な取込情報へ変換するactivity上位類です。
+    zh: 把外部来源转换为可交接文档信息的可观察活动根类。
+    en: Root observable activity class transforming external sources into handoff-ready document information.
+    ja: 外部 source を handoff 可能 document information へ変換する observable activity root class。
   definition:
-    zh: IngestionActivity 是有开始/结束边界、输入、输出和策略上下文的活动上位类，覆盖完整 IngestionRun 与内部 IngestionPhase；它不是来源实体、输出文档或政策。
-    en: IngestionActivity is the activity genus with start/end boundaries, inputs, outputs, and policy context covering complete IngestionRun values and internal IngestionPhase values; it is not a source entity, output document, or policy.
-    ja: IngestionActivity は開始/終了境界・入力・出力・policy contextを持ち完全 IngestionRun と内部 IngestionPhase を包含するactivity上位類で、source entity・output document・policyではありません。
+    zh: IngestionActivity 是具有 activity_id、时间边界、输入输出与 policy 上下文的活动根类；IngestionRun 表示完整运行，IngestionPhase 表示可组合阶段（NormalizationActivity、DeduplicationActivity）。对应 LlamaIndex IngestionPipeline.run() 与 LangChain document loading pipeline 的可审计运行；不是 IngestibleResource、Document 或 IngestionPolicy。
+    en: IngestionActivity is the activity root with activity_id, temporal boundaries, inputs/outputs, and policy context; IngestionRun is a complete run and IngestionPhase covers composable stages (NormalizationActivity, DeduplicationActivity). Maps to auditable runs of LlamaIndex IngestionPipeline.run() and LangChain document loading pipelines; not IngestibleResource, Document, or IngestionPolicy.
+    ja: IngestionActivity は activity_id/時間境界/input/output/policy context を持つ activity root。IngestionRun=complete run、IngestionPhase=composable stage（NormalizationActivity/DeduplicationActivity）。LlamaIndex IngestionPipeline.run()/LangChain document loading pipeline の監査可能 run に対応。IngestibleResource/Document/IngestionPolicy ではない。
   why_needed:
-    zh: 为完整运行与运行内阶段提供共同活动根。
-    en: Provides a common activity root for complete runs and within-run phases.
-    ja: 完全runとrun内phaseに共通activity rootを提供します。
+    zh: 活动层与产物层分离后，可追踪 pipeline 各阶段而不把 LangChain Document 或 LlamaIndex TextNode 误判为活动。
+    en: Separating activity from artifact layers traces pipeline stages without misclassifying LangChain Document or LlamaIndex TextNode as activities.
+    ja: activity/artifact 層分離で pipeline 各 stage を追跡。LangChain Document/LlamaIndex TextNode を activity と誤認しない。
   includes:
     - zh: 纳入 IngestionRun、NormalizationActivity 与 DeduplicationActivity。
       en: Includes IngestionRun, NormalizationActivity, and DeduplicationActivity.
-      ja: IngestionRun・NormalizationActivity・DeduplicationActivityを含みます。
+      ja: IngestionRun・NormalizationActivity・DeduplicationActivity。
   excludes:
-    - zh: 排除 IngestibleResource、Document 与 IngestionPolicy。
-      en: Excludes IngestibleResource, Document, and IngestionPolicy.
-      ja: IngestibleResource・Document・IngestionPolicyを除外します。
+    - zh: 排除 IngestibleResource、Document、DeduplicationDecision 与 IngestionPolicy。
+      en: Excludes IngestibleResource, Document, DeduplicationDecision, and IngestionPolicy.
+      ja: IngestibleResource・Document・DeduplicationDecision・IngestionPolicy を除外。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: LlamaIndex IngestionPipeline.run(documents=...) 编排 transformations、dedup/upsert；LangChain 以 loader→transform 链构成 pipeline；Moonweave 把每次 run/phase 建模为 IngestionActivity 子类，产物 Document 与 DeduplicationDecision 另行记录。
+    en: LlamaIndex IngestionPipeline.run(documents=...) orchestrates transformations and dedup/upsert; LangChain chains loader→transform pipelines; Moonweave models each run/phase as IngestionActivity subtypes with Document and DeduplicationDecision as separate artifacts.
+    ja: LlamaIndex IngestionPipeline.run が transformations/dedup-upsert を orchestrate。LangChain は loader→transform chain。Moonweave は各 run/phase を IngestionActivity subtype、Document/DeduplicationDecision は別 artifact。
+  typical_input:
+    - description: LlamaIndex IngestionPipeline run invocation
+      format: |
+        nodes = pipeline.run(documents=loaded_documents, show_progress=True)
+      source_claims: [claim-ingestion-activity-llamaindex]
+    - description: LangChain document loading pipeline
+      format: |
+        docs = loader.load()
+        normalized = transform_chain.invoke(docs)
+      source_claims: [claim-ingestion-activity-langchain]
+  typical_output:
+    - description: Moonweave ingestion activity record
+      format: |
+        {
+          "activity_id": "ingest-run-17",
+          "started_at": "2026-07-16T10:00:00Z",
+          "activity_kind": "IngestionRun"
+        }
+      source_claims: [claim-ingestion-activity-design]
+  reference_implementations:
+    - name: LlamaIndex IngestionPipeline
+      url: https://docs.llamaindex.ai/en/stable/module_guides/indexing/ingestion_pipeline/
+      description: End-to-end ingestion with transformations and dedup.
+    - name: LangChain Document Loaders
+      url: https://python.langchain.com/docs/how_to/document_loader/
+      description: Loader-based document ingestion pipelines.
 structure:
-  identity_keys:
-    - activity_id
+  identity_keys: [activity_id]
   fields:
     - id: activity_id
-      labels:
-        zh: 活动标识
-        en: activity ID
-        ja: activity ID
+      labels: {zh: 活动标识, en: Activity identifier, ja: activity 識別子}
+      definitions:
+        zh: 稳定标识一次摄入活动或阶段运行。
+        en: Stable identifier for one ingestion activity or phase run.
+        ja: 一 ingestion activity/phase run を安定識別。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 稳定标识摄入活动。
-        en: Stable identifier for the ingestion activity.
-        ja: 取込activityの安定識別子です。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
       example_value: ingestion-activity-17
-      source_claims:
-        - claim-ingestion-activity-002
+      allowed_values: []
+      source_claims: [claim-ingestion-activity-id]
     - id: started_at
-      labels:
-        zh: 开始时间
-        en: started at
-        ja: 開始時刻
+      labels: {zh: 开始时间, en: Started at, ja: 開始時刻}
+      definitions:
+        zh: 活动可观察时间边界起点（UTC）。
+        en: Observable activity temporal boundary start (UTC).
+        ja: activity observable 時間境界起点（UTC）。
       datatype: date-time
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 记录活动时间边界起点。
-        en: Records the start of the activity's temporal boundary.
-        ja: activity時間境界の開始を記録します。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
       example_value: 2026-07-16T10:00:00Z
-      source_claims:
-        - claim-ingestion-activity-003
-    - id: status
-      labels:
-        zh: 状态
-        en: status
-        ja: 状態
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 记录运行中、完成或失败。
-        en: Records running, completed, or failed state.
-        ja: running・completed・failed状態を記録します。
       allowed_values: []
-      pattern: null
-      example_value: completed
-      source_claims:
-        - claim-ingestion-activity-004
+      source_claims: [claim-ingestion-activity-started]
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: IngestionActivity-example-positive-manual-20260716
-    kind: positive
+  - id: IngestionActivity-example-llamaindex-pipeline
     labels:
-      zh: 摄入活动正例
-      en: "Positive case: Ingestion activity"
-      ja: 取込activity正例
-    scenario_id: null
+      zh: LlamaIndex 接入流水线
+      en: LlamaIndex ingestion pipeline
+      ja: LlamaIndex 取込 pipeline
     descriptions:
-      zh: ingestion-activity-17 记录 start/end、输入资源版本、执行配置、处理步骤、输出引用和状态变化，执行期间把外部内容推进到可处理信息状态。
-      en: ingestion-activity-17 records start and end times, input-resource versions, execution configuration, processing steps, output references, and state changes while advancing external content to processable information.
-      ja: ingestion-activity-17 は start/end、input resource version、configuration、steps、outputs、state changes を記録し content を processable information へ進めます。
+      zh: IngestionPipeline.run 对 loaded_documents 应用 SentenceSplitter 与 embedding，内部含 dedup/upsert；Moonweave 建模 activity_id=ingest-run-17 完整 IngestionRun 与 normalize/dedup 两 IngestionPhase。
+      en: IngestionPipeline.run applies SentenceSplitter and embedding to loaded_documents with internal dedup/upsert; Moonweave models activity_id=ingest-run-17 as complete IngestionRun with normalize/dedup IngestionPhases.
+      ja: IngestionPipeline.run が loaded_documents に SentenceSplitter/embedding（内部 dedup/upsert）。Moonweave は activity_id=ingest-run-17 を IngestionRun、normalize/dedup を IngestionPhase として建模。
+    example_source:
+      product: LlamaIndex
+      url: https://docs.llamaindex.ai/en/stable/module_guides/indexing/ingestion_pipeline/
+      version: IngestionPipeline.run
     field_values:
-      activity_id: ingestion-activity-17
+      activity_id: ingest-run-17
       started_at: 2026-07-16T10:00:00Z
-      status: completed
-    related_node_ids:
-      - IngestionActivity
+    related_node_ids: [IngestionActivity, IngestionRun, IngestionPhase]
     related_relation_ids: []
-    expected_result:
-      zh: 将该有持续时间且改变信息状态的执行表示为 IngestionActivity。
-      en: Represent the durative execution that changes information state as IngestionActivity.
-      ja: 当該 duration と information-state change を持つ execution を IngestionActivity とします。
-    why_valid_or_invalid:
-      zh: 时间边界、输入输出、执行配置与状态转移共同证明这是发生过的活动，而不是能力或结果。
-      en: Temporal boundaries, inputs and outputs, execution configuration, and state transition jointly show an activity that occurred rather than a capability or result.
-      ja: temporal boundary、inputs/outputs、configuration、state transition が capability/result でなく occurred activity を示します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-ingestion-activity-005
-  - id: IngestionActivity-example-boundary-manual-20260716
-    kind: boundary
+    source_claims: [claim-ingestion-activity-llamaindex]
+  - id: IngestionActivity-example-langchain-loader-chain
     labels:
-      zh: 摄入活动边界例
-      en: "Boundary case: Ingestion activity"
-      ja: 取込activity境界例
-    scenario_id: null
+      zh: LangChain 加载链
+      en: LangChain loader chain
+      ja: LangChain loader chain
     descriptions:
-      zh: document-17 在活动完成后仍作为规范信息存在，只有 content digest、metadata 和 provenance，没有 start/end 或执行状态迁移。
-      en: document-17 persists as normalized information after completion and has content digest, metadata, and provenance but no start and end times or execution-state transition.
-      ja: document-17 は完了後も normalized information として存続し digest、metadata、provenance を持つが execution state transition を持ちません。
-    field_values: {}
-    related_node_ids:
-      - IngestionActivity
+      zh: PyPDFLoader.load()→transform 构成 ingest 活动链；activity_id 标识运行，返回的 Document 列表是产物而非活动本身。
+      en: PyPDFLoader.load()→transform forms an ingest activity chain; activity_id identifies the run while returned Document list is artifact, not the activity.
+      ja: PyPDFLoader.load()→transform が ingest activity chain。activity_id が run 識別、返却 Document 列表は artifact で activity 自体ではない。
+    example_source:
+      product: LangChain
+      url: https://python.langchain.com/docs/how_to/document_loader/
+      version: BaseLoader
+    field_values:
+      loader: PyPDFLoader
+      activity_id: ingest-run-18
+    related_node_ids: [IngestionActivity, DocumentLoader, Document]
     related_relation_ids: []
-    expected_result:
-      zh: 把 document-17 保持为信息产物，不把它归入 IngestionActivity。
-      en: Keep document-17 as an information product and exclude it from IngestionActivity.
-      ja: document-17 は information product とし IngestionActivity から除外します。
-    why_valid_or_invalid:
-      zh: 活动与产物的持续时间、身份键和变更规则不同；产物由活动生成并不继承活动类型。
-      en: Activity and product have different duration, identity keys, and change rules; a product generated by an activity does not inherit the activity type.
-      ja: activity と product は duration、identity key、change rule が異なり生成関係は activity type 継承を意味しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-ingestion-activity-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+    source_claims: [claim-ingestion-activity-langchain]
+  - id: IngestionActivity-example-not-document
+    labels:
+      zh: 活动非文档
+      en: Activity is not document
+      ja: activity は document ではない
+    descriptions:
+      zh: document-policy-v7 持久存在且无 started_at/ended_at；ingest-run-17 有完整时间边界与阶段轨迹——产物不得继承活动类型。
+      en: document-policy-v7 persists without started_at/ended_at; ingest-run-17 has complete temporal boundaries and phase trace—artifacts must not inherit activity type.
+      ja: document-policy-v7 は started_at/ended_at なしで存続。ingest-run-17 は完全時間境界/phase trace。artifact は activity type 継承不可。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
+    field_values: {}
+    related_node_ids: [IngestionActivity, Document]
+    related_relation_ids: []
+    source_claims: [claim-ingestion-activity-design]
 parent_relation: null
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-ingestion-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 Anthropic Contextual Retrieval、LangChain text splitters/document loaders、LlamaIndex node parsers/ingestion pipeline、Unstructured 解析模式与 ETL 去重策略逐项人工语义核验通过。
-    en: Manually verified against Anthropic Contextual Retrieval, LangChain text splitters and document loaders, LlamaIndex node parsers and ingestion pipeline, Unstructured parsing patterns, and ETL deduplication strategies.
-    ja: Anthropic Contextual Retrieval、LangChain text splitters/document loaders、LlamaIndex node parsers/ingestion pipeline、Unstructured 解析パターン、ETL 重複排除戦略に照らし手動意味審査を完了しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-llamaindex-pipeline
+    title: LlamaIndex Ingestion Pipeline
+    publisher: LlamaIndex
+    url: https://docs.llamaindex.ai/en/stable/module_guides/indexing/ingestion_pipeline/
+    source_type: official-doc
+    relevance: IngestionPipeline.run orchestration.
+  - id: src-langchain-loaders
+    title: LangChain Document Loaders
+    publisher: LangChain
+    url: https://python.langchain.com/docs/how_to/document_loader/
+    source_type: official-doc
+    relevance: Loader pipeline activity boundary.
+  - id: src-ingestion-activity-design
+    title: Moonweave ingestion activity boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Activity versus artifact separation.
 source_claims:
-  - id: claim-ingestion-activity-001
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured enumerates executable ingestion steps; PROV-O supports the activity/entity distinction used for the root.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
+  - id: claim-ingestion-activity-llamaindex
+    source: src-llamaindex-pipeline
+    supports: IngestionPipeline.run executes ordered ingestion transformations in one auditable run.
+    locator: Ingestion pipeline guide
+    evidence_kind: official
+    confidence: high
+  - id: claim-ingestion-activity-langchain
+    source: src-langchain-loaders
+    supports: LangChain loaders and transforms form executable ingestion activity chains.
+    locator: Document loaders
+    evidence_kind: official
+    confidence: high
+  - id: claim-ingestion-activity-design
+    source: src-ingestion-activity-design
+    supports: Ingestion activities are distinct from output documents and decisions.
+    locator: boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-ingestion-activity-002
-    source: eng-fw-unstructured-ingestion
-    supports: IngestionActivity.activity_id records the auditable ingestion activity identity; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
+  - id: claim-ingestion-activity-id
+    source: src-ingestion-activity-design
+    supports: activity_id identifies ingestion runs and phases.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-ingestion-activity-003
-    source: eng-fw-unstructured-ingestion
-    supports: IngestionActivity.started_at records durative activity timing; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
+  - id: claim-ingestion-activity-started
+    source: src-ingestion-activity-design
+    supports: started_at records observable activity temporal boundary.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-ingestion-activity-004
-    source: eng-fw-unstructured-ingestion
-    supports: IngestionActivity.status records observable ingestion lifecycle; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-ingestion-activity-005
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured defines ingestion as an ordered sequence of executable steps from source indexing through upload.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-ingestion-activity-006
-    source: eng-fw-unstructured-ingestion
-    supports: PROV-O separates Activity from generated Entity.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

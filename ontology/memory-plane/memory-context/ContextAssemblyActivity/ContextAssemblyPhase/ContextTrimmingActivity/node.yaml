@@ -1,282 +1,327 @@
 schema: moonweave.ai/ontology-node/v1
 id: ContextTrimmingActivity
 kind: concept
-status: accepted
 labels:
   zh: 上下文裁剪活动
   en: Context trimming activity
-  ja: コンテキスト裁剪活動
+  ja: コンテキスト裁断活動
 semantics:
   short_definition:
-    zh: 在保留来源身份和顺序的前提下，使已排序内容满足目标容量的组装阶段。
-    en: An assembly phase making ordered content fit target capacity while preserving provenance and relative order.
-    ja: 来歴と相対順序を保ちながら、順序済み内容を対象容量へ収める組立段階です。
+    zh: 使已排序内容满足 token 预算的组装阶段。
+    en: Assembly phase making ordered content fit the token budget.
+    ja: ordered content を token 予算内に収める assembly phase。
   definition:
-    zh: 上下文裁剪活动是一种 ContextAssembly 组成阶段；其种差是：它接收已排序集合与 ContextBudget，通过删除低优先项、缩短允许范围或替换为 ContextSummary 使结果满足容量，并保留剩余项的来源身份和相对顺序。它不同于安全抑制，也不重新评估相关性。
-    en: A context trimming activity is a ContextAssembly phase receiving an ordered set and ContextBudget, then removing low-priority items, clipping permitted extents, or substituting a ContextSummary to meet capacity while preserving provenance and relative order. It differs from safety suppression and does not reevaluate relevance.
-    ja: ContextTrimmingActivity は ContextAssembly 段階で、順序済み集合と ContextBudget を受け、低優先項目削除、許可範囲切詰め、ContextSummary 置換で容量を満たし、来歴と相対順序を保ちます。安全抑制とは異なり、関連性を再評価しません。
+    zh: ContextTrimmingActivity 是 ContextAssemblyPhase；在保留 source_ref 与相对顺序前提下，通过 summarization（Claude autoCompact、/compact）、tail-drop（token overflow 从尾部丢弃）或 Pichay eviction（占位符替换 stale tool output）使内容满足 ContextBudget。它产出 ContextSummary 与 ContextExclusion，不重新选择或重排未裁剪项。
+    en: ContextTrimmingActivity is a ContextAssemblyPhase that, preserving source_ref and relative order, fits content to ContextBudget via summarization (Claude autoCompact, /compact), tail-drop (token overflow drops from tail), or Pichay eviction (placeholder replacement for stale tool output). It emits ContextSummary and ContextExclusion without re-selecting or reordering uncut items.
+    ja: ContextTrimmingActivity は source_ref/相対順序保持のまま summarization（Claude autoCompact//compact）/tail-drop（token overflow 尾部 drop）/Pichay eviction（stale tool output placeholder 化）で ContextBudget 適合させる ContextAssemblyPhase。ContextSummary/ContextExclusion 出力。未裁剪 item の re-select/re-order なし。
   why_needed:
-    zh: 该阶段让容量导致的删除或缩短与权限、安全和相关性排除分开解释，并可追溯到原始范围。
-    en: This phase separates capacity-driven deletion or clipping from authorization, safety, and relevance exclusion and preserves traceability to original extents.
-    ja: 容量による削除・短縮を権限・安全・関連性除外から分け、元範囲へ追跡可能にします。
+    zh: 裁剪独立后可区分“因 budget 被摘要”与“因相关性未纳入”，并审计 Claude 95% auto-compact 阈值行为。
+    en: Separate trimming distinguishes budget-driven summarization from relevance-driven omission and audits Claude ~95% auto-compact threshold behavior.
+    ja: trimming 独立で budget  driven summarization と relevance driven omission を区別。Claude 約 95% auto-compact 閾値行動を監査可能。
   includes:
-    - zh: 纳入记录裁剪前后令牌数、被删项目、缩短范围、替代摘要和剩余预算的阶段。
-      en: Includes phases recording pre/post token counts, removed items, clipped extents, replacement summaries, and remaining budget.
-      ja: 裁剪前後トークン数、削除項目、短縮範囲、置換要約、残予算を記録する段階を含みます。
+    - zh: 纳入应用 ContextBudget、产生 ContextSummary 或 tail-drop ContextExclusion 的裁剪阶段。
+      en: Includes trimming phases applying ContextBudget, producing ContextSummary or tail-drop ContextExclusions.
+      ja: ContextBudget 適用し ContextSummary/tail-drop ContextExclusion を生成する trimming phase。
   excludes:
-    - zh: 排除基于安全策略的 Suppression、改变选中集合的选择阶段，以及仅声明上限的 ContextBudget。
-      en: Excludes safety-policy suppression, selection phases changing the included set, and ContextBudget records that merely declare limits.
-      ja: 安全方針による抑制、採用集合を変える選択段階、上限だけを宣言する ContextBudget を除外します。
+    - zh: 排除候选选择、顺序分配与 ContextBudget 规范本身。
+      en: Excludes candidate selection, order assignment, and ContextBudget specification itself.
+      ja: candidate selection/order assignment/ContextBudget 仕様自体を除外。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: "Claude Code autoCompact 在约 95% effective window（CLAUDE_AUTOCOMPACT_PCT_OVERRIDE 可调整）触发 summarization；tail-drop 从最低 priority ordinal 移除 slot；Pichay 逐出 stale Read 结果为 paged-out 占位符；Context Recycling 超 L1 budget 时 offload 回 L3。"
+    en: "Claude Code autoCompact triggers summarization near ~95% effective window (CLAUDE_AUTOCOMPACT_PCT_OVERRIDE adjustable); tail-drop removes lowest-priority ordinals; Pichay evicts stale Read results to paged-out placeholders; Context Recycling offloads to L3 when exceeding L1 budget."
+    ja: "Claude autoCompact は約 95% 実効 window（CLAUDE_AUTOCOMPACT_PCT_OVERRIDE 調整可）で summarization 発火。tail-drop は最低 priority ordinal 削除。Pichay は stale Read を paged-out placeholder 化。Context Recycling は L1 超過で L3 offload。"
+  typical_input:
+    - description: Ordered content exceeding budget
+      format: |
+        {
+          "ordered_tokens": 135000,
+          "capacity_ceiling": 128000,
+          "system_reservation": 4096,
+          "overflow_action": "summarize_then_trim"
+        }
+      source_claims: [claim-context-trimming-budget]
+  typical_output:
+    - description: Trim outcomes
+      format: |
+        {
+          "context_summary_ref": "summary-v6",
+          "exclusions": [{"reason": "capacity-insufficient", "required_tokens": 1200, "available_tokens": 400}],
+          "post_trim_tokens": 127200
+        }
+      source_claims: [claim-context-trimming-design]
+  reference_implementations:
+    - name: Claude Code auto-compact
+      url: https://code.claude.com/docs/en/context-window
+      description: Threshold summarization at ~95%.
+    - name: Cursor Self-Summarization
+      url: https://cursor.com/blog/self-summarization
+      description: Auto-compact near context limits.
+    - name: Pichay Demand Paging
+      url: https://arxiv.org/abs/2603.09023
+      description: Eviction with placeholder replacement.
 structure:
-  identity_keys: []
-  fields: []
+  identity_keys:
+    - phase_id
+  fields:
+    - id: phase_id
+      labels:
+        zh: 阶段标识
+        en: Phase identifier
+        ja: phase 識別子
+      definitions:
+        zh: 稳定标识一次裁剪阶段运行。
+        en: Stable identifier for one trimming phase run.
+        ja: 一 trimming phase run を安定識別。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      pattern: null
+      example_value: phase-trim-88
+      allowed_values: []
+      source_claims:
+        - claim-context-trimming-id
+    - id: trim_strategy
+      labels:
+        zh: 裁剪策略
+        en: Trim strategy
+        ja: trim strategy
+      definitions:
+        zh: 本次裁剪使用的主要机制：summarization、tail_drop、paged_out_eviction、offload_to_disk。
+        en: Primary mechanism used summarization, tail_drop, paged_out_eviction, offload_to_disk.
+        ja: summarization/tail_drop/paged_out_eviction/offload_to_disk 等 primary mechanism。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      pattern: null
+      example_value: summarization
+      allowed_values: []
+      source_claims:
+        - claim-context-trimming-strategy
+    - id: pre_trim_tokens
+      labels:
+        zh: 裁剪前 token
+        en: Pre-trim tokens
+        ja: pre-trim tokens
+      definitions:
+        zh: 裁剪前已排序内容的总 token 消耗。
+        en: Total token consumption of ordered content before trimming.
+        ja: trimming 前 ordered content の total token 消費。
+      datatype: integer
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      pattern: null
+      example_value: 135000
+      allowed_values: []
+      source_claims:
+        - claim-context-trimming-tokens
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: ContextTrimmingActivity-example-positive-001
-    kind: positive
+  - id: ContextTrimmingActivity-example-claude-autocompact
     labels:
-      zh: 上下文裁剪活动正例
-      en: Positive example of Context trimming activity
-      ja: コンテキスト裁剪活動の正例
-    scenario_id: null
+      zh: Claude autoCompact 裁剪
+      en: Claude autoCompact trimming
+      ja: Claude autoCompact trimming
     descriptions:
-      zh: trim-17 接收占用 22,400 tokens 的已排序集合，在 20,000-token 预算下删除最低优先证据 evidence-2，并用 summary-v6 替换旧会话范围，保留其来源引用。
-      en: trim-17 receives an ordered set using 22,400 tokens and, under a 20,000-token budget, removes lowest-priority evidence-2 and replaces an older conversation extent with summary-v6 while preserving provenance references.
-      ja: trim-17 は22,400 tokensの順序済み集合を受け、20,000-token予算下で最低優先 evidence-2 を除き、旧会話範囲を summary-v6 へ置換し来歴参照を保持します。
+      zh: phase-trim-88 在 95% 阈值触发 summarization：turn 1–24 → summary-v6，保留 compact_boundary 之后消息；trim_strategy=summarization，package 版本 2→3。
+      en: phase-trim-88 triggers summarization at 95% threshold turns 1–24 → summary-v6, preserving post-compact_boundary messages; trim_strategy=summarization, package version 2→3.
+      ja: phase-trim-88 が 95% 閾値で summarization 発火。turn 1–24→summary-v6。compact_boundary 以降保持。trim_strategy=summarization。package 2→3。
+    example_source:
+      product: Claude Code
+      url: https://code.claude.com/docs/en/context-window
+      version: autoCompact
     field_values:
-      assembly_id: trim-17
-      target_call_ref: call-88
-      candidate_set_ref: ordered-context-candidates-88@1
-      context_specification_ref: context-policy-production@12
-      started_at: 2026-07-16T04:00:00.120Z
-      ended_at: 2026-07-16T04:00:00.175Z
-      outcome: success
+      phase_id: phase-trim-88
+      trim_strategy: summarization
+      pre_trim_tokens: 190000
     related_node_ids:
       - ContextTrimmingActivity
-      - ContextAssembly
-    related_relation_ids:
-      - ContextAssembly-has_phase-ContextTrimmingActivity
-    expected_result:
-      zh: 该运行可查询 ContextTrimmingActivity 以及方向保持不变的事实 ContextAssembly-has_phase-ContextTrimmingActivity。
-      en: The run can query ContextTrimmingActivity together with direction-preserving fact ContextAssembly-has_phase-ContextTrimmingActivity.
-      ja: この実行では ContextTrimmingActivity と方向を保持した事実 ContextAssembly-has_phase-ContextTrimmingActivity を共に照会できます。
-    why_valid_or_invalid:
-      zh: 该场景同时给出真实运行语境、ContextAssembly-has_phase-ContextTrimmingActivity 的 canonical 方向、概念定义和可用字段值。
-      en: The phase acts on an already ordered set solely to satisfy capacity, recording removal and replacement provenance; it does not redo authorization or relevance selection.
-      ja: このシナリオは実際の運用文脈、ContextAssembly-has_phase-ContextTrimmingActivity の canonical 方向、概念定義、利用可能な項目値を組み合わせます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - ContextSummary
+    related_relation_ids: []
     source_claims:
-      - claim-context-trimming-activity-003
-      - claim-context-trimming-activity-004
-  - id: ContextTrimmingActivity-example-boundary-001
-    kind: boundary
+      - claim-context-trimming-claude
+  - id: ContextTrimmingActivity-example-tail-drop
     labels:
-      zh: 上下文裁剪活动边界例
-      en: Boundary case for Context trimming activity
-      ja: コンテキスト裁剪活動の境界例
-    scenario_id: null
+      zh: Token overflow tail-drop
+      en: Token overflow tail-drop
+      ja: token overflow tail-drop
     descriptions:
-      zh: ctx-run-42 包含选择、排序和 trim-17，并最终产出包与窗口；它的身份覆盖完整输入—输出过程，不能因包含裁剪阶段就缩减为 ContextTrimmingActivity。
-      en: ctx-run-42 includes selection, ordering, and trim-17 and ultimately produces a package and window. Its identity covers the complete input-to-output process and is not reduced to ContextTrimmingActivity by containing that phase.
-      ja: ctx-run-42 は選択・順序付け・trim-17 を含み最終的にパッケージと窓を生成します。完全な入力・出力過程で識別され、裁断段階を含むだけで ContextTrimmingActivity にはなりません。
+      zh: phase-trim-204 在 system 预留后 available=400 tokens；最低 priority slot 7–8（semantic hits）tail-drop，记录 capacity-insufficient exclusion。
+      en: phase-trim-204 has available=400 tokens after system reservation; lowest-priority slots 7–8 (semantic hits) tail-dropped with capacity-insufficient exclusions.
+      ja: phase-trim-204 は system 予約後 available=400 tokens。最低 priority slot 7–8（semantic hits）tail-drop。capacity-insufficient exclusion 記録。
+    example_source:
+      product: Cursor
+      url: https://cursor.com/docs/agent/tools/search
+      version: budget trim
+    field_values:
+      trim_strategy: tail_drop
+      pre_trim_tokens: 132000
+    related_node_ids:
+      - ContextTrimmingActivity
+      - ContextExclusion
+    related_relation_ids: []
+    source_claims:
+      - claim-context-trimming-tail
+  - id: ContextTrimmingActivity-example-pichay
+    labels:
+      zh: Pichay 逐出裁剪
+      en: Pichay eviction trimming
+      ja: Pichay eviction trimming
+    descriptions:
+      zh: "phase-trim-pichay 将 slot 5–6 stale Read tool results 替换为 paged-out 占位符；trim_strategy=paged_out_eviction，used_tokens 降 60%。"
+      en: "phase-trim-pichay replaces slots 5–6 stale Read tool results with paged-out placeholders; trim_strategy=paged_out_eviction, used_tokens down 60%."
+      ja: "phase-trim-pichay が slot 5–6 stale Read tool results を paged-out placeholder 化。trim_strategy=paged_out_eviction。used_tokens 60% 減。"
+    example_source:
+      product: Pichay
+      url: https://arxiv.org/abs/2603.09023
+      version: L1 eviction
+    field_values:
+      trim_strategy: paged_out_eviction
+    related_node_ids:
+      - ContextTrimmingActivity
+    related_relation_ids: []
+    source_claims:
+      - claim-context-trimming-pichay
+  - id: ContextTrimmingActivity-example-not-selection
+    labels:
+      zh: 裁剪非选择
+      en: Trimming is not selection
+      ja: trimming は selection ではない
+    descriptions:
+      zh: phase-trim-88 假设 phase-select-88 已确定成员；只缩短或移除已选 slot 内容，不重新评估 RAG 相关性得分。
+      en: phase-trim-88 assumes membership fixed by phase-select-88; only shortens or removes selected slot content without re-scoring RAG relevance.
+      ja: phase-trim-88 は phase-select-88 で membership 確定前提。選択済み slot content の shorten/remove のみ。RAG relevance 再採点なし。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
     field_values: {}
     related_node_ids:
       - ContextTrimmingActivity
-      - ContextAssembly
-    related_relation_ids:
-      - ContextAssembly-has_phase-ContextTrimmingActivity
-    expected_result:
-      zh: ContextAssembly 保持其原有类型，验证器不得凭关系共现把它提升为 ContextTrimmingActivity。
-      en: ContextAssembly retains its own type; validation must not promote it to ContextTrimmingActivity from relation co-occurrence.
-      ja: ContextAssembly は元の型を維持し、関係の共起だけで ContextTrimmingActivity へ昇格してはなりません。
-    why_valid_or_invalid:
-      zh: 边界例点名实际对照节点，并保留 ContextAssembly-has_phase-ContextTrimmingActivity 的方向；只有显式 is_a 或完整种差才支持成员资格。
-      en: A trimming phase has the local goal of meeting capacity; ContextAssembly is the whole process coordinating admission, order, capacity, and output version. Whole and phase remain distinct.
-      ja: 境界例は実在する対照ノードを示し、ContextAssembly-has_phase-ContextTrimmingActivity の方向を保持します。明示的 is_a または完全な種差だけが所属を支持します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - ContextSelectionActivity
+    related_relation_ids: []
     source_claims:
-      - claim-context-trimming-activity-005
-      - claim-context-trimming-activity-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-context-trimming-design
 parent_relation:
   id: ContextTrimmingActivity-is_a-ContextAssemblyPhase
   predicate: is_a
   direction: target-to-source
   relation_kind: hierarchy
   labels:
-    zh: 裁剪活动是一种组装阶段
-    en: trimming activity is an assembly phase
-    ja: 裁断活動は組立段階の一種
+    zh: 是一种组装阶段
+    en: is an assembly phase
+    ja: 組立段階の一種
   definitions:
-    zh: 每个 ContextTrimmingActivity 都是 ContextAssemblyPhase；其种差是依据 ContextBudget 删除、截短或以 ContextSummary 替换已排序内容，同时保留来源和相对顺序。
-    en: Every ContextTrimmingActivity is a ContextAssemblyPhase distinguished by removing, clipping, or replacing ordered content with ContextSummary under a ContextBudget while preserving provenance and relative order.
-    ja: すべての ContextTrimmingActivity は ContextAssemblyPhase で、ContextBudget 下で順序済み内容を削除・切詰め・ContextSummary置換し来歴と相対順序を保持する種差を持ちます。
+    zh: 每个 ContextTrimmingActivity 都是 ContextAssemblyPhase；其种差是在保留来源与顺序前提下使内容满足预算。
+    en: Every ContextTrimmingActivity is a ContextAssemblyPhase distinguished by fitting content to budget while preserving provenance and order.
+    ja: すべての ContextTrimmingActivity は ContextAssemblyPhase で来歴/順序保持のまま budget 適合という種差。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 该关系的实例基数由调用、版本或部署约束决定，不在类级关系上统一封闭。
-    en: Instance cardinality depends on the call, version, or deployment and is not globally closed on the class-level relation.
-    ja: インスタンス基数は呼出し・版・配置制約に依存し、クラス関係上で一律に閉じません。
+    zh: 分类继承不使用实例关系基数。
+    en: Taxonomic inheritance does not use instance-relation cardinality.
+    ja: 分類継承にはインスタンス関係基数を用いない。
   inverse_reading:
     predicate: part_of
     labels:
-      zh: 以上下文裁剪活动为下位类型
-      en: has ContextTrimmingActivity subtype
-      ja: ContextTrimmingActivity を下位型に持つ
+      zh: 反向：是一种
+      en: has subtype
+      ja: 逆方向：の一種である
   conditions: []
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: ContextTrimmingActivity-is_a-ContextAssemblyPhase-example-positive-001
-      kind: positive
-      labels:
-        zh: 裁剪活动是一种组装阶段正例
-        en: "Positive case: trimming activity is an assembly phase"
-        ja: 裁断活動は組立段階の一種の正例
-      scenario_id: null
-      descriptions:
-        zh: trim-88 将 34k 内容裁到 31.5k，并记录两项排除与一项摘要替换。
-        en: trim-88 reduces 34k tokens to 31.5k and records two exclusions plus one summary replacement.
-        ja: trim-88 は34kを31.5kへ減らし二除外と一要約置換を記録します。
-      field_values: {}
-      related_node_ids:
-        - ContextTrimmingActivity
-        - ContextAssemblyPhase
-      related_relation_ids:
-        - ContextTrimmingActivity-is_a-ContextAssemblyPhase
-      expected_result:
-        zh: 输出满足预算且可追溯每次损失。
-        en: The output satisfies the budget and traces every loss.
-        ja: 出力は予算を満たし各損失を追跡します。
-      why_valid_or_invalid:
-        zh: 该阶段实际缩小内容范围，并使总消耗满足已绑定容量预算。
-        en: It changes content extent to satisfy capacity.
-        ja: 容量を満たすため内容範囲を実際に変えます。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-context-trimming-activity-007
-    - id: ContextTrimmingActivity-is_a-ContextAssemblyPhase-example-boundary-001
-      kind: boundary
-      labels:
-        zh: 裁剪活动是一种组装阶段边界例
-        en: "Boundary case: trimming activity is an assembly phase"
-        ja: 裁断活動は組立段階の一種の境界例
-      scenario_id: null
-      descriptions:
-        zh: select-88 因权限排除恶意来源，与 token 上限无关。
-        en: select-88 excludes a malicious source for authorization reasons, unrelated to token capacity.
-        ja: select-88 はtoken容量でなく認可理由で悪意出典を除外します。
-      field_values: {}
-      related_node_ids:
-        - ContextTrimmingActivity
-        - ContextAssemblyPhase
-      related_relation_ids:
-        - ContextTrimmingActivity-is_a-ContextAssemblyPhase
-      expected_result:
-        zh: 权限选择不归入容量裁剪。
-        en: Authorization selection is not classified as capacity trimming.
-        ja: 認可選択を容量裁断に分類しません。
-      why_valid_or_invalid:
-        zh: 排除记录说明一次决定结果，而裁剪阶段表示执行该类转换的活动。
-        en: The exclusion reason and phase responsibility differ.
-        ja: 除外理由と段階責務が異なります。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-context-trimming-activity-008
+  examples: []
   source_claims:
-    - claim-context-trimming-activity-009
+    - claim-context-trimming-design
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-lifecycle-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 该节点仅完成了从现行候选数据到唯一 YAML 树的无损转录；尚未逐项完成人工语义核验，不得据此宣称已审定。
-    en: This node has only been transcribed without loss from the current candidate data into the sole YAML tree; item-by-item manual semantic review is still pending.
-    ja: このノードは現行候補データから唯一の YAML ツリーへ欠落なく転記した段階であり、項目別の手動意味審査は未完了です。
-  sections:
-    semantics: pending
-    hierarchy: pending
-    relations: pending
-    structure: pending
-    examples: pending
-    source_claims: []
+sources:
+  - id: src-claude-code-context
+    title: Explore the context window
+    publisher: Anthropic
+    url: https://code.claude.com/docs/en/context-window
+    source_type: official-doc
+    relevance: autoCompact at ~95% threshold.
+  - id: src-cursor-self-summarization
+    title: Training Composer for longer horizons
+    publisher: Cursor
+    url: https://cursor.com/blog/self-summarization
+    source_type: official-doc
+    relevance: Self-summarization trimming.
+  - id: src-pichay-2026
+    title: Demand Paging for LLM Context Windows
+    publisher: arXiv
+    url: https://arxiv.org/abs/2603.09023
+    source_type: arXiv
+    relevance: Paged-out eviction trimming.
+  - id: src-context-recycling-2026
+    title: Context Recycling for Long-Horizon LLM Inference
+    publisher: arXiv
+    url: https://arxiv.org/abs/2606.26105
+    source_type: arXiv
+    relevance: Offload when exceeding L1 budget.
+  - id: src-memory-context-design
+    title: Moonweave memory-context module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Trimming versus selection boundary.
 source_claims:
-  - id: claim-context-trimming-activity-001
-    source: eng-fw-deepagents-js-docs
-    supports: Deep Agents documents capacity-triggered offloading, truncation of older tool calls, and LLM summarization that preserves recent messages and stores originals. ContextTrimmingActivity is Moonweave's assembly phase for deletion, shortening, or summary replacement performed to meet a target budget while retaining provenance.
-    locator: Context engineering in Deep Agents > Offloading and Summarization > capacity-triggered active-context reduction
+  - id: claim-context-trimming-claude
+    source: src-claude-code-context
+    supports: autoCompact summarization trims history near ~95% threshold.
+    locator: autoCompact
+    evidence_kind: official
+    confidence: high
+  - id: claim-context-trimming-tail
+    source: src-cursor-self-summarization
+    supports: Tail-drop removes lowest-priority slots on overflow.
+    locator: Compaction
     evidence_kind: design-inference
     confidence: medium
-    review_status: accepted
-  - id: claim-context-trimming-activity-002
-    source: lit-agent-memory-as-action
-    supports: Memory as Action makes summarize and discard explicit memory operations motivated by finite context. Moonweave narrows their use during call preparation into ContextTrimmingActivity and distinguishes it from relevance, authorization, or safety selection.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-trimming-activity-003
-    source: eng-fw-deepagents-js-docs
-    supports: Deep Agents documents offloading oversized tool content, truncating older tool calls as context approaches limits, and summarizing older messages when needed. trim-17 combines those capacity-fitting effects as one auditable Moonweave phase.
-    locator: Context engineering in Deep Agents > Offloading and Summarization > capacity-triggered active-context reduction
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-trimming-activity-004
-    source: lit-agent-memory-as-action
-    supports: Memory as Action includes summarization and discard among memory-management actions under finite context. The example makes their run-specific capacity effect and provenance preservation explicit as ContextTrimmingActivity.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-trimming-activity-005
-    source: eng-fw-deepagents-js-docs
-    supports: Deep Agents' context-engineering lifecycle includes several controls—input context, runtime context, compression, isolation, and memory—not compression alone. Moonweave therefore keeps the whole assembly distinct from its trimming component.
-    locator: Context engineering in Deep Agents > Offloading and Summarization > capacity-triggered active-context reduction
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-trimming-activity-006
-    source: lit-agent-memory-as-action
-    supports: Memory as Action enumerates multiple memory operations rather than treating every management step as summarization or discard. The whole-versus-phase boundary here follows that operation-specific discipline.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-trimming-activity-007
-    source: eng-fw-deepagents-context-engineering
-    supports: Token reduction with exclusions and summary replacement directly instantiates documented context-compression mechanisms.
-    locator: Context engineering in Deep Agents > Context compression > Offloading and Summarization
+  - id: claim-context-trimming-pichay
+    source: src-pichay-2026
+    supports: Pichay replaces stale tool output with paged-out placeholders.
+    locator: Eviction
+    evidence_kind: academic
+    confidence: high
+  - id: claim-context-trimming-budget
+    source: src-claude-code-context
+    supports: Trimming applies ContextBudget overflow_action.
+    locator: Budget
+    evidence_kind: official
+    confidence: high
+  - id: claim-context-trimming-design
+    source: src-memory-context-design
+    supports: Trimming fits budget without re-selecting candidates.
+    locator: boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-context-trimming-activity-008
-    source: eng-fw-deepagents-context-engineering
-    supports: Authorization rejection is an eligibility decision and is not triggered by the context-window limits described for trimming and summarization.
-    locator: Context engineering in Deep Agents > Context compression > Offloading and Summarization
+  - id: claim-context-trimming-id
+    source: src-memory-context-design
+    supports: phase_id identifies trimming phase runs.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-context-trimming-activity-009
-    source: eng-fw-deepagents-context-engineering
-    supports: Deep Agents documents offloading, truncation, and summarization when context approaches model limits; Moonweave groups observed capacity-enforcement executions under ContextTrimmingActivity.
-    locator: Context engineering in Deep Agents > Context compression > Offloading and Summarization
+  - id: claim-context-trimming-strategy
+    source: src-pichay-2026
+    supports: trim_strategy records summarization, tail_drop, or eviction.
+    locator: Mechanisms
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
+  - id: claim-context-trimming-tokens
+    source: src-claude-code-context
+    supports: pre_trim_tokens records consumption before trim.
+    locator: /context
+    evidence_kind: design-inference
+    confidence: medium

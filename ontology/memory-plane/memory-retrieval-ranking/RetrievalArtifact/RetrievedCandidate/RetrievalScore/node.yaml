@@ -1,34 +1,56 @@
 schema: moonweave.ai/ontology-node/v1
 id: RetrievalScore
 kind: concept
-status: accepted
 labels:
   zh: 检索分数
   en: Retrieval score
   ja: 検索score
 semantics:
   short_definition:
-    zh: 由一个声明评分阶段为候选产生、其数值只在声明方法中可解释的分数产物。
-    en: A score artifact produced for a candidate by a declared stage and interpretable only under its declared method.
-    ja: 指定stageがcandidateに生成し指定method内でのみ解釈できるscore artifactです。
+    zh: 单阶段、单方法的候选分数记录。
+    en: Single-stage, single-method score record for a candidate.
+    ja: 一 stage・一 method の candidate score record。
   definition:
-    zh: RetrievalScore 是 RetrievedCandidate 的组成信息，以 score_id 标识一次阶段性评分，记录 numeric_value、scoring_stage 与方法语境；不同方法的数值不可在缺少归一化或融合规则时直接比较，它也不等同于排名位置或最终采用决定。
-    en: RetrievalScore is an information component of RetrievedCandidate. score_id identifies one stage-specific assessment and records numeric_value, scoring_stage, and method context. Values from different methods are not directly comparable without normalization or fusion rules, and a score is neither rank position nor final admission.
-    ja: RetrievalScore はRetrievedCandidateのinformation componentでscore_idがstage-specific assessmentを識別しnumeric_value・scoring_stage・method contextを記録します。異method値はnormalization/fusion ruleなしに直接比較できずrank positionやfinal admissionでもありません。
+    zh: RetrievalScore 是 RetrievedCandidate 的组成信息，记录 numeric_value、scoring_stage 与 scoring_method；LexicalScore、SimilarityScore、RerankScore 为子类。不同方法分数不可直接比较，也不等于 rank_position。
+    en: RetrievalScore is a RetrievedCandidate component recording numeric_value, scoring_stage, and scoring_method. LexicalScore, SimilarityScore, and RerankScore are subtypes. Cross-method scores are not directly comparable and do not equal rank_position.
+    ja: RetrievalScore は numeric_value/scoring_stage/scoring_method を記録。LexicalScore/SimilarityScore/RerankScore が subtype。cross-method 比較不可。rank_position でもない。
   why_needed:
-    zh: 保留分数的产生阶段和解释语境，防止把词汇、向量和重排分数误当同一量纲。
-    en: Preserves score provenance and interpretation context so lexical, vector, and rerank scores are not treated as one scale.
-    ja: score provenance/interpretation contextを保持しlexical・vector・rerank scoreを同一scale扱いしません。
+    zh: 调试 RAG 时必须知道 0.917 是 Cohere relevance_score 还是 Pinecone cosine，否则 A/B 对比无效。
+    en: RAG debugging requires knowing whether 0.917 is Cohere relevance_score or Pinecone cosine; otherwise A/B comparisons are invalid.
+    ja: 0.917 が Cohere か Pinecone かを区別しないと A/B 無効。
   includes:
-    - zh: 纳入由候选评分或重排活动实际产生并关联到一个候选的数值评估。
-      en: Includes numeric assessments actually produced for a candidate by scoring or reranking activity.
-      ja: scoring/reranking activityがcandidateに実際生成したnumeric assessmentを含みます。
+    - zh: 纳入 scoring/reranking 活动为候选产生的数值评估。
+      en: Includes numeric assessments produced for candidates by scoring/reranking activities.
+      ja: scoring/reranking activity 生成 numeric assessment。
   excludes:
-    - zh: 排除 CandidateRank、置信等级、业务重要性、索引质量指标和上下文采用分数。
-      en: Excludes CandidateRank nodes, confidence categories, business importance, index-quality metrics, and context-admission scores.
-      ja: CandidateRank node・confidence category・business importance・index-quality metric・context-admission scoreを除外します。
+    - zh: 排除 rank_position、ContextPackage 分数与索引质量指标。
+      en: Excludes rank_position, ContextPackage scores, and index-quality metrics.
+      ja: rank_position/ContextPackage score/index quality metric を除外。
   semantic_kind: quality
   aliases: []
+engineering:
+  explanation:
+    zh: numeric_value 保留原始 API 值；scoring_stage 区分 lexical/vector/rerank；子类 LexicalScore/SimilarityScore/RerankScore 声明 method。
+    en: numeric_value keeps raw API values; scoring_stage separates lexical/vector/rerank; subtypes LexicalScore/SimilarityScore/RerankScore declare method.
+    ja: numeric_value は raw API 値。subtype で method 宣言。
+  typical_input: []
+  typical_output: []
+  reference_implementations:
+    - name: Mem0 Search API
+      url: https://docs.mem0.ai
+      description: POST /v1/memories/search/
+    - name: Pinecone Query
+      url: https://docs.pinecone.io/guides/search/query-data
+      description: index.query / QueryResponse
+    - name: Chroma Query
+      url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+      description: collection.query / QueryResult
+    - name: Cohere Rerank API
+      url: https://docs.cohere.com/reference/rerank
+      description: POST /v2/rerank
+    - name: ColBERT
+      url: https://arxiv.org/abs/2004.12832
+      description: MaxSim scoring
 structure:
   identity_keys:
     - score_id
@@ -36,124 +58,145 @@ structure:
     - id: score_id
       labels:
         zh: 分数标识
-        en: score ID
-        ja: score ID
+        en: Score identifier
+        ja: score 識別子
+      definitions:
+        zh: 稳定标识一候选一阶段的分数记录。
+        en: Stable score record for one candidate at one stage.
+        ja: 一 candidate 一 stage score record。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 稳定标识一个候选在一个阶段获得的分数记录。
-        en: Stable identifier for one candidate's score record at one stage.
-        ja: 一candidateが一stageで得たscore recordを安定識別します。
-      allowed_values: []
       pattern: null
       example_value: score-427
+      allowed_values: []
       source_claims:
-        - claim-retrieval-score-002
+        - claim-retrieval-score-id
     - id: numeric_value
       labels:
         zh: 数值
-        en: numeric value
+        en: Numeric value
         ja: 数値
+      definitions:
+        zh: 评分方法输出的原始或明确归一化数值。
+        en: Raw or explicitly normalized value from scoring method.
+        ja: scoring method 出力値。
       datatype: number
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 保存评分方法输出的原始或明确归一化数值。
-        en: Raw or explicitly normalized numeric value emitted by the scoring method.
-        ja: scoring methodが出力したrawまたは明示normalized valueです。
-      allowed_values: []
       pattern: null
       example_value: 0.82
+      allowed_values: []
       source_claims:
-        - claim-retrieval-score-003
+        - claim-retrieval-score-value
     - id: scoring_stage
       labels:
         zh: 评分阶段
-        en: scoring stage
-        ja: 採点stage
+        en: Scoring stage
+        ja: 採点 stage
+      definitions:
+        zh: lexical、vector、rerank、fusion 等阶段标签。
+        en: "Stage label: lexical, vector, rerank, fusion, etc."
+        ja: lexical/vector/rerank/fusion 等。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 标识产生该分数的检索阶段。
-        en: Identifies the retrieval stage that produced the score.
-        ja: このscoreを生成したretrieval stageを識別します。
-      allowed_values: []
       pattern: null
-      example_value: post-rerank
+      example_value: vector
+      allowed_values: []
       source_claims:
-        - claim-retrieval-score-004
-  constraints: []
-  required_relation_constraints: []
+        - claim-retrieval-score-stage
+  constraints:
+    - id: heterogeneous-scores
+      severity: error
+      expression_language: plain
+      expression: Scores from different scoring_method values must not be compared without normalization rules.
+      explanation:
+        zh: BM25、cosine、rerank 量纲不同。
+        en: BM25, cosine, and rerank scales differ.
+        ja: BM25/cosine/rerank スケール不同。
+      source_claims:
+        - claim-retrieval-score-heterogeneous
+  required_relations: []
 examples:
-  - id: RetrievalScore-example-positive-manual-001
-    kind: positive
+  - id: RetrievalScore-example-multi-stage
     labels:
-      zh: 检索分数正例
-      en: "Positive case: Retrieval score"
-      ja: 検索score正例
-    scenario_id: null
+      zh: 多阶段分数共存
+      en: Multi-stage scores coexist
+      ja: 多 stage score 共存
     descriptions:
-      zh: score-427 记录 candidate-424 在 post-rerank 阶段由声明模型产生的 0.82。
-      en: score-427 records value 0.82 produced for candidate-424 by the declared post-rerank stage.
-      ja: score-427 はcandidate-424にpost-rerank stageが生成した0.82を記録します。
+      zh: candidate-424 同时有 lexical 8.73、vector 0.842、rerank 0.917 三条 RetrievalScore，scoring_stage 不同。
+      en: candidate-424 has lexical 8.73, vector 0.842, rerank 0.917 RetrievalScore records with different scoring_stage.
+      ja: candidate-424 多 stage score 共存。
+    example_source:
+      product: https://moonweave.ai/ontology/agent-system/2.0.0/
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: multi-stage
     field_values:
-      score_id: score-427
-      numeric_value: 0.82
-      scoring_stage: post-rerank
+      candidate_id: candidate-424
+      scores:
+        - stage: lexical
+          value: 8.73
+        - stage: vector
+          value: 0.842
+        - stage: rerank
+          value: 0.917
     related_node_ids:
       - RetrievalScore
+      - SimilarityScore
+      - RerankScore
     related_relation_ids: []
-    expected_result:
-      zh: 归类为 RetrievalScore。
-      en: Classify the object as RetrievalScore.
-      ja: RetrievalScore として分類します。
-    why_valid_or_invalid:
-      zh: 分数身份、候选归属、阶段和方法语境可被完整解释。
-      en: Score identity, candidate ownership, stage, and method context are all explainable.
-      ja: score identity・candidate ownership・stage・method contextを完全説明できます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-retrieval-score-005
-  - id: RetrievalScore-example-boundary-manual-001
-    kind: boundary
+      - claim-retrieval-score-multi
+  - id: RetrievalScore-example-not-rank
     labels:
-      zh: 检索分数边界例
-      en: "Boundary case: Retrieval score"
-      ja: 検索score境界例
-    scenario_id: null
+      zh: 分数非排名
+      en: Score is not rank
+      ja: score は rank ではない
     descriptions:
-      zh: rank_position=3 只表示候选在列表中的序位。
-      en: rank_position=3 only records the candidate's ordinal place in a list.
-      ja: rank_position=3 はlist内candidateのordinal positionだけを表します。
+      zh: rank_position=1 不能写入 RetrievalScore.numeric_value。
+      en: rank_position=1 must not be written as RetrievalScore.numeric_value.
+      ja: rank_position を numeric_value にしない。
+    example_source:
+      product: https://moonweave.ai/ontology/agent-system/2.0.0/
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
     field_values: {}
     related_node_ids:
       - RetrievalScore
+      - RetrievedCandidate
     related_relation_ids: []
-    expected_result:
-      zh: 不得归类为 RetrievalScore。
-      en: Do not classify the object as RetrievalScore.
-      ja: RetrievalScore として分類しません。
-    why_valid_or_invalid:
-      zh: 排名位置是 RetrievedCandidate 字段，不是 RetrievalScore。
-      en: Rank position is a RetrievedCandidate field, not RetrievalScore.
-      ja: rank positionはRetrievedCandidate fieldでRetrievalScoreではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-retrieval-score-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-retrieval-score-not-rank
+  - id: RetrievalScore-example-pinecone
+    labels:
+      zh: Pinecone score 映射
+      en: Pinecone score mapping
+      ja: Pinecone score 映射
+    descriptions:
+      zh: SimilarityScore numeric_value=0.842 来自 Pinecone ScoredVector.score。
+      en: SimilarityScore numeric_value=0.842 from Pinecone ScoredVector.score.
+      ja: Pinecone score→SimilarityScore。
+    example_source:
+      product: Pinecone
+      url: https://docs.pinecone.io/guides/search/query-data
+      version: ScoredVector.score
+    field_values:
+      score_id: similarity-score-429
+      numeric_value: 0.842
+      scoring_stage: vector
+    related_node_ids:
+      - RetrievalScore
+      - SimilarityScore
+    related_relation_ids: []
+    source_claims:
+      - claim-retrieval-score-pinecone
 parent_relation:
   id: RetrievedCandidate-has_score-RetrievalScore
   predicate: part_of
@@ -188,18 +231,16 @@ parent_relation:
         en: Assert only when the RetrievalScore is a non-substitutable information component within this RetrievedCandidate's identity boundary and activity identity is not conflated with artifact identity.
         ja: RetrievalScoreがこのRetrievedCandidate identity boundary内の置換不能information componentでactivity/artifact identityを混同しない場合だけassertします。
       source_claims:
-        - claim-retrieval-score-007
+        - claim-retrieval-score-id
   temporal_scope: valid-time
   boundary_context: null
   constraints: []
   examples:
     - id: RetrievedCandidate-has_score-RetrievalScore-example-positive-manual-001
-      kind: positive
       labels:
         zh: has_score RetrievalScore正例
         en: "Positive case: has_score RetrievalScore"
         ja: RetrievalScoreをhas_score正例
-      scenario_id: null
       descriptions:
         zh: candidate-424 拥有 rerank-score-430 并保留 post-rerank 语境。
         en: candidate-424 owns rerank-score-430 with post-rerank context.
@@ -210,25 +251,13 @@ parent_relation:
         - RetrievalScore
       related_relation_ids:
         - RetrievedCandidate-has_score-RetrievalScore
-      expected_result:
-        zh: 建立该有向事实，并保留条件与证据。
-        en: Assert the directed fact with its condition and evidence retained.
-        ja: condition/evidenceを保持してdirected factをassertします。
-      why_valid_or_invalid:
-        zh: 实例满足端点定义、方向和该关系的显式成立条件。
-        en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-        ja: endpoint定義・direction・明示assertion conditionを満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-retrieval-score-007
+        - claim-retrieval-score-id
     - id: RetrievedCandidate-has_score-RetrievalScore-example-boundary-manual-001
-      kind: boundary
       labels:
         zh: has_score RetrievalScore边界例
         en: "Boundary case: has_score RetrievalScore"
         ja: RetrievalScoreをhas_score境界例
-      scenario_id: null
       descriptions:
         zh: 相邻显示一个数值不能证明它属于该候选。
         en: Displaying a nearby number does not prove that the score belongs to the candidate.
@@ -239,88 +268,72 @@ parent_relation:
         - RetrievalScore
       related_relation_ids:
         - RetrievedCandidate-has_score-RetrievalScore
-      expected_result:
-        zh: 验证器不得建立该有向关系事实。
-        en: Do not assert the directed fact.
-        ja: directed factをassertしません。
-      why_valid_or_invalid:
-        zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-        en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-        ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-retrieval-score-007
+        - claim-retrieval-score-id
   source_claims:
-    - claim-retrieval-score-007
+    - claim-retrieval-score-id
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: pending
   endpoint_order: parent-to-child
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-pinecone-query
+    title: Pinecone Query Guide
+    publisher: Pinecone
+    url: https://docs.pinecone.io/guides/search/query-data
+    source_type: official-doc
+    relevance: QueryResponse.
+  - id: src-cohere-rerank
+    title: Cohere Rerank API
+    publisher: Cohere
+    url: https://docs.cohere.com/reference/rerank
+    source_type: official-doc
+    relevance: relevance_score.
+  - id: src-memory-retrieval-design
+    title: Moonweave design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Module boundary.
 source_claims:
-  - id: claim-retrieval-score-001
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents score-producing queries, heterogeneous score distributions, and DBSF normalization; Moonweave therefore binds each score value to a candidate, stage, and method context.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+  - id: claim-retrieval-score-multi
+    source: src-memory-retrieval-design
+    supports: Multiple stage scores coexist on one candidate.
+    locator: multi-stage
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieval-score-002
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents score-producing queries, heterogeneous score distributions, and DBSF normalization; Moonweave therefore binds each score value to a candidate, stage, and method context. Moonweave records RetrievalScore.score_id as the stated auditable datum: Stable identifier for one candidate's score record at one stage."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+  - id: claim-retrieval-score-not-rank
+    source: src-memory-retrieval-design
+    supports: Rank position is not a RetrievalScore.
+    locator: boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieval-score-003
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents score-producing queries, heterogeneous score distributions, and DBSF normalization; Moonweave therefore binds each score value to a candidate, stage, and method context. Moonweave records RetrievalScore.numeric_value as the stated auditable datum: Raw or explicitly normalized numeric value emitted by the scoring method."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+  - id: claim-retrieval-score-pinecone
+    source: src-pinecone-query
+    supports: Pinecone ScoredVector.score maps to RetrievalScore.
+    locator: score
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-retrieval-score-heterogeneous
+    source: src-memory-retrieval-design
+    supports: Cross-method scores are incomparable.
+    locator: constraint
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieval-score-004
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents score-producing queries, heterogeneous score distributions, and DBSF normalization; Moonweave therefore binds each score value to a candidate, stage, and method context. Moonweave records RetrievalScore.scoring_stage as the stated auditable datum: Identifies the retrieval stage that produced the score."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+  - id: claim-retrieval-score-id
+    source: src-memory-retrieval-design
+    supports: score_id identifies score record.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieval-score-005
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents score-producing queries, heterogeneous score distributions, and DBSF normalization; Moonweave therefore binds each score value to a candidate, stage, and method context. Qdrant warns that score distributions differ across retrieval methods and documents normalization before fusion.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+  - id: claim-retrieval-score-value
+    source: src-memory-retrieval-design
+    supports: numeric_value stores method output.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieval-score-006
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents score-producing queries, heterogeneous score distributions, and DBSF normalization; Moonweave therefore binds each score value to a candidate, stage, and method context. Rank-based fusion distinguishes rank position from underlying retrieval scores.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+  - id: claim-retrieval-score-stage
+    source: src-memory-retrieval-design
+    supports: scoring_stage tags producing stage.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieval-score-007
-    source: eng-vector-qdrant-hybrid-query
-    supports: The cited official retrieval documentation supports the component roles of these endpoints; Moonweave makes the ownership direction explicit for a non-duplicative graph.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

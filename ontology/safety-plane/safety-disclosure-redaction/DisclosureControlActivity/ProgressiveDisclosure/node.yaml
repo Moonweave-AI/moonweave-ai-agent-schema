@@ -1,137 +1,193 @@
 schema: moonweave.ai/ontology-node/v1
 id: ProgressiveDisclosure
 kind: concept
-status: accepted
 labels:
   zh: 渐进式披露
   en: progressive disclosure
   ja: 段階的開示
 semantics:
   short_definition:
-    zh: 随授权与任务需要逐阶段扩大可见信息的披露控制活动。
-    en: A disclosure-control activity that expands visible information in stages as authority and task need justify it.
-    ja: 権限とタスク必要性に応じて可視情報を段階的に拡大する開示制御活動。
+    zh: 按阶段与审批条件分步释放内容的 DisclosureControlActivity 子类。
+    en: A DisclosureControlActivity subtype releasing content in stages under approval conditions.
+    ja: 段階と承認条件で content を分步 release する DisclosureControlActivity subtype。
   definition:
-    zh: 渐进式披露是一种 DisclosureControlActivity，其种差是先释放完成当前步骤所需的最小信息，再仅在新的任务阶段、授权证据或人工决定满足条件时释放额外层级，并记录每阶段接收者与依据；它不是分页、流式传输或按 token 逐步显示。
-    en: ProgressiveDisclosure is a DisclosureControlActivity distinguished by first releasing the minimum information needed for the current step, then releasing additional layers only when a new task stage, authority evidence, or human decision satisfies conditions, recording recipient and basis for each stage; it is not pagination, streaming, or token-by-token display.
-    ja: ProgressiveDisclosure は DisclosureControlActivity の一種で、現在段階に必要な最小情報を先に公開し、新しい task stage、権限証拠、人手判断が条件を満たした時だけ追加 layer を公開し、各段階の受信者と根拠を記録します。pagination、streaming、token 表示ではありません。
+    zh: ProgressiveDisclosure 将同一 source block 按 stage 定义（summary → detail → full）与 audience 绑定，每阶段独立 DisclosureControlActivity 与 DisclosureRule 应用；经 HumanApproval 后进入下一阶段但仍可 mask credential span。它不是一次性 DisclosureFilter，也不是 DisclosureSpecification。
+    en: "ProgressiveDisclosure binds the same source block to stages (summary → detail → full) and audience, with independent DisclosureControlActivity and DisclosureRule application per stage; after HumanApproval the next stage may release more content while still masking credential spans. It is neither one-shot DisclosureFilter nor DisclosureSpecification."
+    ja: ProgressiveDisclosure は同一 source block を stage（summary→detail→full）と audience に bind し、各 stage で独立 DisclosureControlActivity/DisclosureRule apply。HumanApproval 後次 stage でより多く release 可だが credential span は mask 維持可。一回 DisclosureFilter/DisclosureSpecification ではない。
   why_needed:
-    zh: 阶段化控制可以让智能体在不提前暴露完整记录的情况下完成低权限步骤，并在权限或任务发生变化时重新判定，降低一次性过度披露与长期上下文滞留。
-    en: Staged control lets an agent complete low-authority steps without exposing a full record upfront and reevaluate when authority or task changes, reducing over-disclosure and long-lived context exposure.
-    ja: 段階制御により、完全記録を先に公開せず低権限手順を完了でき、権限・タスク変更時に再評価して過剰開示と長期文脈残留を減らせます。
+    zh: 分阶段释放让 internal-operator 先看摘要、审批后再看细节，避免一次性暴露 SSN 或 credential，且每阶段可独立审计。
+    en: Staged release lets internal-operator see summary first and detail after approval, avoiding one-shot SSN or credential exposure with per-stage audit.
+    ja: staged release により internal-operator が summary 先行閲覧、承認後 detail 閲覧となり SSN/credential 一括暴露を避け各 stage 独立監査可。
   includes:
-    - zh: 每个阶段都有明确接收者、最小字段集合、释放条件、授权依据和审计记录的分阶段披露运行。
-      en: Staged disclosure runs in which each stage has an explicit recipient, minimal field set, release condition, authority basis, and audit record.
-      ja: 各段階に明示受信者、最小項目集合、開示条件、権限根拠、監査記録を持つ段階開示実行。
+    - zh: 含 stage 定义、每阶段 audience、所需审批与仍适用的 RedactionRule。
+      en: Includes stage definitions, per-stage audience, required approvals, and still-applicable RedactionRules.
+      ja: stage 定義/各 stage audience/必要 approval/仍適用 RedactionRule を含む。
   excludes:
-    - zh: 不改变可见范围的分页、为了渲染性能的懒加载、普通 token streaming、一次性完整披露以及没有新授权判断的连续输出。
-      en: Pagination that does not change visibility, performance lazy loading, ordinary token streaming, one-shot full disclosure, and continuous output without a new authority decision.
-      ja: 可視範囲を変えない pagination、性能用 lazy load、通常 token streaming、一括完全開示、新たな権限判断のない連続出力。
+    - zh: 不包含单次 ingress filter、静态规则库或 info-output-disclosure 窗口裁剪。
+      en: Excludes one-shot ingress filter, static rule library, or info-output-disclosure window truncation.
+      ja: 一回 ingress filter/静的 rule library/info-output-disclosure window truncation は含まない。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: 集成：pd_customer stage1=summary(no SSN) → stage2=detail(mask credential) 需 HumanApproval；每 stage 产生独立 disclosure_activity_id 与 disclosure_rule_ref；不得跳过 stage 直接 full release。
+    en: "Integration: pd_customer stage1=summary(no SSN) → stage2=detail(mask credential) requires HumanApproval; each stage emits independent disclosure_activity_id and disclosure_rule_ref; must not skip stages to full release."
+    ja: 統合：pd_customer stage1=summary(no SSN)→stage2=detail(mask credential) HumanApproval 必要。各 stage 独立 disclosure_activity_id/disclosure_rule_ref。stage skip して full release 不可。
+  typical_input:
+    - description: Multi-stage disclosure plan for one source block.
+      format: |
+        progressive_disclosure_id: pd_customer
+        stages: [summary, detail]
+        stage_two_requires_approval: true
+      source_claims:
+        - claim-progressive-disclosure-design
+  typical_output:
+    - description: Stage-two activity after approval.
+      format: |
+        disclosure_activity_id: da_pd_stage2
+        stage: 2
+        credential_spans_still_masked: true
+      source_claims:
+        - claim-progressive-disclosure-design
+  reference_implementations:
+    - name: Moonweave progressive disclosure design
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      description: Staged release with per-stage DisclosureRule binding.
+    - name: Microsoft Presidio
+      url: https://microsoft.github.io/presidio/
+      description: Per-stage anonymizer application on released spans.
 structure:
-  identity_keys: []
-  fields: []
+  identity_keys:
+    - progressive_disclosure_id
+  fields:
+    - id: progressive_disclosure_id
+      labels:
+        zh: 渐进披露标识
+        en: progressive disclosure ID
+        ja: 段階的開示 ID
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 稳定标识一套分阶段披露计划。
+        en: Stably identifies one staged disclosure plan.
+        ja: 一 staged disclosure plan を安定識別。
+      allowed_values: []
+      pattern: null
+      example_value: pd_customer
+      source_claims:
+        - claim-progressive-disclosure-design
+    - id: stage_count
+      labels:
+        zh: 阶段数量
+        en: stage count
+        ja: stage 数
+      datatype: integer
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 该计划定义的披露阶段总数。
+        en: Total number of disclosure stages defined by the plan.
+        ja: 計画が定義する開示 stage 総数。
+      allowed_values: []
+      pattern: null
+      example_value: 2
+      source_claims:
+        - claim-progressive-disclosure-design
   constraints: []
   required_relation_constraints: []
 examples:
-  - id: ProgressiveDisclosure-example-positive-001
-    kind: positive
+  - id: ProgressiveDisclosure-customer-two-stage
     labels:
-      zh: 分阶段工单披露
-      en: Staged ticket disclosure
-      ja: 段階的 ticket 開示
-    scenario_id: null
+      zh: 客户两阶段披露
+      en: Customer two-stage disclosure
+      ja: 顧客 2 stage 開示
     descriptions:
-      zh: 分诊智能体先看到工单主题与严重级别；获得 on-call 批准后才看到脱敏日志；只有安全负责人批准时才可访问原始取证附件。
-      en: A triage agent first sees ticket subject and severity, gains redacted logs after on-call approval, and accesses raw forensic attachments only after security-lead approval.
-      ja: triage agent は最初に ticket subject と severity を見て、on-call 承認後に redacted logs、security lead 承認後だけ raw forensic attachments を参照します。
+      zh: internal-operator 先看 summary（无 SSN）；HumanApproval 后 stage two 释放 detail 但仍 mask credential；每阶段独立 DisclosureControlActivity。
+      en: internal-operator sees summary without SSN first; after HumanApproval stage two releases detail while still masking credentials; each stage has independent DisclosureControlActivity.
+      ja: internal-operator が summary（SSN なし）先行。HumanApproval 後 stage two detail release、credential mask 維持。各 stage 独立 DisclosureControlActivity。
+    example_source:
+      product: Moonweave design
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: progressive disclosure
     field_values:
-      disclosure_control_activity_id: disclosure-control:incident-784/staged
-      candidate_content_ref: incident-context:784
-      disclosure_boundary_ref: disclosure-boundary:incident-response/triage-to-security
-      disclosure_rule_ref: incident-progressive-disclosure-policy@4
-      authority_snapshot_ref: authority-snapshot:incident-triage@2026-07-16T10:35:00Z
-      selected_actions:
-        - release
-        - stage
-      decision_record_ref: disclosure-decision:incident-784/stage-1
-      decided_at: 2026-07-16T10:35:02Z
+      progressive_disclosure_id: pd_customer
+      stage_count: 2
+      stage_two_requires_approval: true
     related_node_ids:
       - ProgressiveDisclosure
       - DisclosureControlActivity
-    related_relation_ids:
-      - ProgressiveDisclosure-is_a-DisclosureControlActivity
-    expected_result:
-      zh: 每次扩大可见范围都产生新的授权检查与审计条目，前一阶段不会自动获得后一阶段内容。
-      en: Each visibility expansion creates a new authorization check and audit entry; an earlier stage does not automatically receive later content.
-      ja: 可視範囲拡大ごとに新しい認可検査と監査記録を作り、前段階は後段階内容を自動取得しません。
-    why_valid_or_invalid:
-      zh: 信息层级随任务与授权阶段有条件增加，而非仅改变传输顺序，满足渐进披露种差。
-      en: Information layers increase conditionally with task and authority stages rather than merely changing delivery order, satisfying progressive disclosure.
-      ja: 情報 layer が task と権限段階に応じ条件付きで増え、配送順序変更だけではないため段階開示です。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - DisclosureRule
+    related_relation_ids: []
     source_claims:
-      - claim-progressive-disclosure-002
-  - id: ProgressiveDisclosure-example-boundary-001
-    kind: boundary
+      - claim-progressive-disclosure-design
+  - id: ProgressiveDisclosure-audit-three-stage
     labels:
-      zh: 流式文本边界
-      en: Streaming-text boundary
-      ja: streaming text の境界
-    scenario_id: null
+      zh: 审计三阶段披露
+      en: Audit three-stage disclosure
+      ja: 監査 3 stage 開示
     descriptions:
-      zh: 同一份已批准公开答复按 token 流式发送，所有 token 的接收者与授权范围相同；这只是传输方式，不是 ProgressiveDisclosure。
-      en: One approved public response streams token by token with the same recipient and authority scope for every token; this is transport behavior, not ProgressiveDisclosure.
-      ja: 一つの承認済み公開応答を token 単位で送りますが、全 token の受信者と権限範囲は同じです。これは transport behavior で ProgressiveDisclosure ではありません。
-    field_values: {}
+      zh: pd_audit stage1=metadata, stage2=redacted body, stage3=full internal 仅 audit-log audience；stage3 需 dual approval。
+      en: pd_audit stage1=metadata, stage2=redacted body, stage3=full internal for audit-log audience only; stage3 requires dual approval.
+      ja: pd_audit stage1=metadata/stage2=redacted body/stage3=full internal（audit-log audience のみ）。stage3 dual approval 必要。
+    example_source:
+      product: Moonweave design
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: audit progressive disclosure
+    field_values:
+      progressive_disclosure_id: pd_audit
+      stage_count: 3
+    related_node_ids:
+      - ProgressiveDisclosure
+      - Redaction
+    related_relation_ids: []
+    source_claims:
+      - claim-progressive-disclosure-design
+  - id: ProgressiveDisclosure-skip-stage-boundary
+    labels:
+      zh: 禁止跳过阶段
+      en: Skipping stages forbidden
+      ja: stage skip 禁止
+    descriptions:
+      zh: 未获 stage1 审批不得直接 full release；跳过 stage 的 DisclosureActivity 无效。
+      en: Full release without stage1 approval is invalid; DisclosureActivity skipping stages is rejected.
+      ja: stage1 承認なし full release 無効。stage skip DisclosureActivity 拒否。
+    example_source:
+      product: Moonweave design
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: stage ordering
+    field_values:
+      authorization_chain_complete: false
     related_node_ids:
       - ProgressiveDisclosure
     related_relation_ids: []
-    expected_result:
-      zh: 记录保持普通 streaming；不创建虚假的阶段授权或披露层级。
-      en: The record remains ordinary streaming and does not create fictitious staged authority or disclosure layers.
-      ja: 通常 streaming のまま、架空の段階認可や開示 layer を作りません。
-    why_valid_or_invalid:
-      zh: 渐进披露要求可见范围与授权条件发生阶段变化；仅分片传输不满足。
-      en: Progressive disclosure requires staged changes in visible scope and authorization conditions; chunked transport alone does not qualify.
-      ja: 段階開示には可視範囲と認可条件の段階変化が必要で、分割配送だけでは不足です。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-progressive-disclosure-003
-  - id: ProgressiveDisclosure-example-instance-001
-    kind: instance
+      - claim-progressive-disclosure-design
+  - id: ProgressiveDisclosure-filter-boundary
     labels:
-      zh: 三阶段披露计划
-      en: Three-stage disclosure plan
-      ja: 三段階開示計画
-    scenario_id: null
+      zh: 单次过滤非渐进披露
+      en: One-shot filter is not progressive disclosure
+      ja: 一回 filter は progressive disclosure ではない
     descriptions:
-      zh: pd_9 保存 stages=[{role:triage,fields:[subject,severity]},{role:oncall,fields:[redacted_log]},{role:security_lead,fields:[forensic_attachment]}]，每阶段引用独立 approval_id。
-      en: pd_9 stores stages=[{role:triage,fields:[subject,severity]},{role:oncall,fields:[redacted_log]},{role:security_lead,fields:[forensic_attachment]}], each with a separate approval_id.
-      ja: pd_9 は stages=[{role:triage,fields:[subject,severity]},{role:oncall,fields:[redacted_log]},{role:security_lead,fields:[forensic_attachment]}] を保存し、各段階が別 approval_id を参照します。
-    field_values: {}
+      zh: 一次性 Anthropic output suppress 无 stage 计划；是 DisclosureFilter 不是 ProgressiveDisclosure。
+      en: One-shot Anthropic output suppress without stage plan is DisclosureFilter, not ProgressiveDisclosure.
+      ja: 一回 Anthropic output suppress で stage plan なし。DisclosureFilter で ProgressiveDisclosure ではない。
+    example_source:
+      product: Anthropic
+      url: https://docs.anthropic.com/en/api/messages
+      version: output filtering
+    field_values:
+      accepted: false
     related_node_ids:
       - ProgressiveDisclosure
+      - DisclosureFilter
     related_relation_ids: []
-    expected_result:
-      zh: 控制器只能按当前角色与批准推进一个阶段，撤销授权时停止后续释放。
-      en: The controller advances only one stage allowed by current role and approval and stops later release if authority is revoked.
-      ja: controller は現在 role と承認で許可された一段階だけ進み、権限取消時は後続開示を停止します。
-    why_valid_or_invalid:
-      zh: 实例明确定义阶段、角色、字段集合和独立授权，足以区分普通分页或流。
-      en: The instance defines stages, roles, field sets, and independent authority, distinguishing it from ordinary pagination or streaming.
-      ja: 段階、role、項目集合、独立認可を定義し、通常 pagination/streaming と区別できます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-progressive-disclosure-004
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-progressive-disclosure-design
 parent_relation:
   id: ProgressiveDisclosure-is_a-DisclosureControlActivity
   predicate: is_a
@@ -139,145 +195,48 @@ parent_relation:
   relation_kind: hierarchy
   labels:
     zh: 是一种披露控制活动
-    en: is a kind of disclosure-control activity
+    en: is a disclosure control activity
     ja: 開示制御活動の一種
   definitions:
-    zh: 每个 ProgressiveDisclosure 都是 DisclosureControlActivity，其种差是把一次潜在披露拆成有序阶段，并在每次扩展可见范围前重新验证当前目的、最小必要数据与授权；仅按字符数分块不构成渐进披露。
-    en: Every ProgressiveDisclosure is a DisclosureControlActivity, distinguished by dividing a potential disclosure into ordered stages and revalidating current purpose, minimum necessary data, and authorization before each visibility expansion; character-based chunking alone is not progressive disclosure.
-    ja: すべての ProgressiveDisclosure は DisclosureControlActivity であり、潜在的開示を順序付き段階へ分け、可視範囲を広げるたびに現在目的、必要最小データ、認可を再検証する点を種差とします。文字数による分割だけでは段階的開示になりません。
+    zh: ProgressiveDisclosure 是一种 DisclosureControlActivity，种差是分 stage 与审批条件的 staged release。
+    en: ProgressiveDisclosure is a DisclosureControlActivity distinguished by staged release with stage and approval conditions.
+    ja: ProgressiveDisclosure は stage/承認条件付き staged release を種差とする DisclosureControlActivity。
   cardinality: null
   cardinality_not_applicable_reason:
     zh: 分类继承不使用实例关系基数。
     en: Taxonomic inheritance does not use instance-relation cardinality.
     ja: 分類継承にはインスタンス関係の基数を用いません。
   inverse_reading:
-    predicate: part_of
+    predicate: has_subtype
     labels:
-      zh: 反向：具有下位类
+      zh: 有下位类型
       en: has subtype
-      ja: 逆方向：下位型を持つ
+      ja: 下位型を持つ
   conditions: []
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: ProgressiveDisclosure-is_a-DisclosureControlActivity-example-positive-001
-      kind: positive
-      labels:
-        zh: 逐级授权的病例披露
-        en: Stage-authorized case disclosure
-        ja: 段階認可された症例開示
-      scenario_id: null
-      descriptions:
-        zh: pd_14 先向支持人员显示匿名故障摘要；只有在其提交工单目的并通过医疗数据授权后，才显示下一阶段的必要病例字段。
-        en: pd_14 first shows support staff an anonymized failure summary; only after a ticket purpose is recorded and medical-data authorization succeeds does it expose the next stage's necessary case fields.
-        ja: pd_14 は support 担当へ匿名化した障害概要を先に示し、ticket 目的の記録と医療データ認可の成功後にのみ、次段階の必要な症例 field を公開します。
-      field_values: {}
-      related_node_ids:
-        - ProgressiveDisclosure
-        - DisclosureControlActivity
-      related_relation_ids:
-        - ProgressiveDisclosure-is_a-DisclosureControlActivity
-      expected_result:
-        zh: pd_14 分类为 ProgressiveDisclosure，并在每个扩展阶段留下独立授权决定。
-        en: Classify pd_14 as ProgressiveDisclosure and retain a separate authorization decision for each expansion stage.
-        ja: pd_14 を ProgressiveDisclosure に分類し、各拡張段階の認可判断を別々に保持します。
-      why_valid_or_invalid:
-        zh: 它控制的是可见范围的阶段性扩大，且每次扩大都重新验证目的、必要性和授权。
-        en: It controls staged visibility expansion and rechecks purpose, necessity, and authorization at every expansion.
-        ja: 可視範囲の段階的拡張を制御し、各拡張で目的、必要性、認可を再確認します。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-progressive-disclosure-005
-    - id: ProgressiveDisclosure-is_a-DisclosureControlActivity-example-boundary-001
-      kind: boundary
-      labels:
-        zh: 固定分页边界
-        en: Fixed-pagination boundary
-        ja: 固定 pagination の境界
-      scenario_id: null
-      descriptions:
-        zh: 一个公开手册按每页 20 条返回全部同等可见的条目，翻页不检查新目的、数据敏感性或额外权限。
-        en: A public manual returns equally visible entries twenty per page; advancing pages checks no new purpose, sensitivity, or additional authorization.
-        ja: 公開 manual は同等に可視な項目を一頁二十件で返し、page 移動時に新しい目的、機微性、追加認可を確認しません。
-      field_values: {}
-      related_node_ids:
-        - ProgressiveDisclosure
-        - DisclosureControlActivity
-      related_relation_ids:
-        - ProgressiveDisclosure-is_a-DisclosureControlActivity
-      expected_result:
-        zh: 识别为分页或分块，不分类为 ProgressiveDisclosure。
-        en: Treat it as pagination or chunking, not ProgressiveDisclosure.
-        ja: pagination または chunking とし、ProgressiveDisclosure には分類しません。
-      why_valid_or_invalid:
-        zh: 数据分批传输没有改变披露授权边界，也没有重新作出控制决定。
-        en: Batching transmission changes neither the authorization boundary nor the control decision.
-        ja: 分割転送は開示認可境界も制御判断も変えません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-progressive-disclosure-005
   source_claims:
-    - claim-progressive-disclosure-005
-  distinct_fact_rationale:
-    zh: 这是 ProgressiveDisclosure 的真实 genus 边和唯一分类父链。
-    en: This is ProgressiveDisclosure's genuine genus edge and sole taxonomy parent.
-    ja: ProgressiveDisclosure の実在 genus 辺で、唯一の分類親です。
+    - claim-progressive-disclosure-design
+  distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-safety-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: Verified against OWASP LLM02 disclosure mitigations and DLP/redaction patterns; specification vs activity and span-level SensitiveSpan targeting hold.
-    en: Verified against OWASP LLM02 disclosure mitigations and DLP/redaction patterns; specification vs activity and span-level SensitiveSpan targeting hold.
-    ja: Verified against OWASP LLM02 disclosure mitigations and DLP/redaction patterns; specification vs activity and span-level SensitiveSpan targeting hold.
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: presidio-docs
+    title: Microsoft Presidio
+    url: https://microsoft.github.io/presidio/
+    source_type: official-doc
+    relevance: Per-stage anonymizer application on released content.
+  - id: safety-disclosure-design
+    title: Moonweave safety-disclosure-redaction module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: ProgressiveDisclosure staged release with per-stage audit.
 source_claims:
-  - id: claim-progressive-disclosure-001
-    source: eng-security-mcp-nsa-2026
-    supports: NSA recommends least privilege and limiting MCP components to necessary data. Moonweave specializes DisclosureControlActivity into staged, reauthorized ProgressiveDisclosure.
-    locator: MCP Security Design Considerations > Recommendations for data validation, least privilege, logging, and monitoring
+  - id: claim-progressive-disclosure-design
+    source: safety-disclosure-design
+    supports: Moonweave models staged release as ProgressiveDisclosure subtype with independent per-stage DisclosureControlActivity and approval gates.
+    locator: ProgressiveDisclosure boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-progressive-disclosure-002
-    source: eng-security-mcp-nsa-2026
-    supports: NSA recommends least privilege and limiting exposed data to what an MCP component requires; Moonweave applies that principle through staged, reauthorized disclosure.
-    locator: MCP Security Design Considerations > Recommendations for data validation, least privilege, logging, and monitoring
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-progressive-disclosure-003
-    source: eng-security-owasp-llm02-2025
-    supports: OWASP focuses on controlling sensitive-data access and exposure, supporting the boundary from transport chunking that leaves access unchanged.
-    locator: LLM02:2025 > Prevention and Mitigation Strategies > Sanitization and Access Controls
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-progressive-disclosure-004
-    source: eng-security-mcp-nsa-2026
-    supports: NSA's least-privilege and controlled-data-access recommendations ground the staged scope; the three-stage representation is Moonweave design inference.
-    locator: MCP Security Design Considerations > Recommendations for data validation, least privilege, logging, and monitoring
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-progressive-disclosure-005
-    source: eng-security-mcp-nsa-2026
-    supports: NSA recommends least privilege and limiting MCP components to necessary data. Moonweave models staged release with renewed need and authorization checks as ProgressiveDisclosure.
-    locator: MCP Security Design Considerations > Recommendations for data validation, least privilege, logging, and monitoring
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

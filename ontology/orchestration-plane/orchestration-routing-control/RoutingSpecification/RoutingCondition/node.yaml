@@ -1,34 +1,68 @@
 schema: moonweave.ai/ontology-node/v1
 id: RoutingCondition
 kind: concept
-status: accepted
 labels:
   zh: 路由条件
   en: routing condition
-  ja: routing condition
+  ja: ルーティング条件
 semantics:
   short_definition:
     zh: 由路由决定对冻结输入状态求值的可复用布尔或枚举条件规范。
     en: A reusable Boolean or enumerated condition specification evaluated by a routing decision against frozen input state.
-    ja: frozen input state に対し routing decision が評価する reusable Boolean/enum condition specification。
+    ja: frozen input state に対し routing decision が evaluate する reusable Boolean/enum condition specification です。
   definition:
-    zh: 路由条件是 RoutingSpecification 的子类，以条件标识、表达语言、表达式、输入模式和结果类型为身份；它只声明如何判定，不读取实时状态、不自行跳转，也不终止会话。RoutingDecision 负责绑定输入、记录求值时间和结果，并据此选择 RoutingTarget。
-    en: A RoutingCondition is a RoutingSpecification identified by condition ID, expression language, expression, input schema, and result type. It declares how to judge but neither reads live state, changes control flow, nor terminates a session by itself. RoutingDecision binds input, records evaluation time and result, and selects a RoutingTarget accordingly.
-    ja: RoutingCondition は condition ID・expression language・expression・input schema・result type で識別する RoutingSpecification subtype です。判定方法のみを宣言し live state を読まず、自ら遷移・終了しません。RoutingDecision が input を bind し evaluation と target selection を記録します。
+    zh: RoutingCondition 是 RoutingSpecification 的子类，以 expression_language、expression、input_schema_ref 与 result_type 标识；它只声明如何判定，不读取实时状态、不自行跳转。LangGraph conditional_edges 的 route function 返回值（如 "billing"、"END"）是 RoutingDecision 对 RoutingCondition 求值的结果投影，不是条件规范本身。
+    en: A RoutingCondition is a RoutingSpecification identified by expression_language, expression, input_schema_ref, and result_type. It declares how to judge but neither reads live state nor changes control flow by itself. LangGraph conditional_edges route-function return values such as "billing" or "END" project RoutingDecision evaluation results, not the condition specification itself.
+    ja: RoutingCondition は expression/input schema/result type で識別する subtype です。LangGraph route function 戻り値は RoutingDecision evaluation result の投影であり condition 仕様自体ではありません。
   why_needed:
-    zh: 把条件规范与求值发生分开，才能回答同一条件在不同状态、不同时间为何产生不同路由。
-    en: Separating the condition specification from evaluation explains why the same condition yields different routes for different states and times.
-    ja: condition specification と evaluation occurrence を分け、同一条件が state/time により異なる route を生む理由を説明します。
+    zh: 把条件规范与求值发生分开，才能解释同一 LangGraph route function 在不同 state 下为何返回不同下一节点。
+    en: Separating condition specification from evaluation explains why the same LangGraph route function returns different next nodes for different states.
+    ja: condition specification と evaluation occurrence を分け同一 route function が state により異なる next node を返す理由を説明します。
   includes:
     - zh: 基于状态字段、分类结果、置信度、预算、时间或门控结果的可复用判定表达式。
       en: Reusable predicates over state fields, classifications, confidence, budget, time, or gate outcomes.
-      ja: state field・classification・confidence・budget・time・gate outcome に対する reusable predicate。
+      ja: state field・classification・confidence・budget・time・gate outcome predicate。
   excludes:
     - zh: 一次求值结果、脚本执行活动、状态读取动作、路由目标和终止事件。
       en: One evaluation result, script execution activity, state-read action, routing target, and termination event.
       ja: evaluation result・script execution・state read・routing target・termination event。
   semantic_kind: specification
   aliases: []
+engineering:
+  explanation:
+    zh: LangGraph route function 接收 state 并返回 path map 键或 Command(goto=...)；Moonweave 把表达式版本存为 RoutingCondition，把一次返回值与时间存为 RoutingDecision 证据。CrewAI selector/candidate 函数中的 predicate 同样应外提为 RoutingCondition 规范。
+    en: LangGraph route functions receive state and return path-map keys or Command(goto=...); Moonweave stores expression revisions as RoutingCondition and one return value with time as RoutingDecision evidence. CrewAI selector/candidate predicates should likewise be externalized as RoutingCondition specifications.
+    ja: LangGraph route function は state を受け path map key/Command を返し expression revision は RoutingCondition、戻り値は RoutingDecision 証拠です。
+  typical_input:
+    - description: LangGraph routing function reading frozen state.
+      format: |
+        def route_by_category(state):
+            if state.get("category") == "billing":
+                return "billing"
+            if state.get("category") == "technical":
+                return "technical"
+            return END
+      source_claims: [claim-routing-condition-langgraph]
+  typical_output:
+    - description: Reusable condition specification without runtime value.
+      format: |
+        {
+          "routing_specification_id": "condition-confidence-high",
+          "version": "4",
+          "expression": "state.confidence >= 0.85",
+          "result_type": "boolean"
+        }
+      source_claims: [claim-routing-condition-design]
+  reference_implementations:
+    - name: LangGraph
+      url: https://langchain-ai.github.io/langgraph/
+      description: conditional_edges routing function return values.
+    - name: CrewAI
+      url: https://docs.crewai.com
+      description: Selector and candidate function predicates.
+    - name: OpenAI Agents SDK
+      url: https://openai.github.io/openai-agents-python/
+      description: Handoff routing predicates in agent loops.
 structure:
   identity_keys: []
   fields:
@@ -45,12 +79,12 @@ structure:
       definitions:
         zh: 声明解释表达式所需的受控语言或求值器版本。
         en: Declares the controlled language or evaluator revision needed to interpret the expression.
-        ja: expression を解釈する controlled language/evaluator revision を宣言します。
+        ja: expression interpreter language/evaluator revision。
       allowed_values: []
       pattern: null
       example_value: cel@1
       source_claims:
-        - claim-routing-condition-001
+        - claim-routing-condition-design
     - id: expression
       labels:
         zh: 条件表达式
@@ -64,12 +98,12 @@ structure:
       definitions:
         zh: 保存只读、确定性的判定表达式。
         en: Stores the read-only deterministic predicate expression.
-        ja: read-only deterministic predicate expression を保存します。
+        ja: read-only deterministic predicate expression。
       allowed_values: []
       pattern: null
       example_value: state.confidence >= 0.85
       source_claims:
-        - claim-routing-condition-001
+        - claim-routing-condition-langgraph
     - id: input_schema_ref
       labels:
         zh: 输入模式引用
@@ -83,12 +117,12 @@ structure:
       definitions:
         zh: 引用求值时允许读取的冻结状态模式。
         en: References the frozen-state schema readable during evaluation.
-        ja: evaluation 中に読める frozen-state schema を参照します。
+        ja: evaluation 中 readable frozen-state schema。
       allowed_values: []
       pattern: null
       example_value: routing-state@4
       source_claims:
-        - claim-routing-condition-001
+        - claim-routing-condition-design
     - id: result_type
       labels:
         zh: 结果类型
@@ -100,28 +134,61 @@ structure:
         min: 1
         max: 1
       definitions:
-        zh: 限定求值输出为布尔值或受控枚举。
-        en: Constrains evaluation output to Boolean or a controlled enumeration.
-        ja: evaluation output を Boolean または controlled enum に制約します。
+        zh: 限定求值输出为布尔值或受控枚举（含 LangGraph path map 键）。
+        en: Constrains evaluation output to Boolean or controlled enumeration including LangGraph path-map keys.
+        ja: Boolean または controlled enum（LangGraph path map key 含む）。
       allowed_values: []
       pattern: null
       example_value: boolean
       source_claims:
-        - claim-routing-condition-001
+        - claim-routing-condition-langgraph
   constraints: []
   required_relation_constraints: []
 examples:
-  - id: RoutingCondition-example-positive-manual-20260716
-    kind: positive
+  - id: RoutingCondition-example-langgraph-route-return
     labels:
-      zh: 高置信度条件
-      en: High-confidence condition
-      ja: high-confidence condition
-    scenario_id: null
+      zh: LangGraph 路由函数返回值规范
+      en: LangGraph route function return specification
+      ja: LangGraph route function return specification
     descriptions:
-      zh: condition-confidence-high@4 使用 cel@1 对 routing-state@4 中的 confidence 字段判断是否大于等于 0.85；它没有当前状态值和求值时间。
-      en: condition-confidence-high@4 uses cel@1 to test whether confidence in routing-state@4 is at least 0.85; it carries no current state value or evaluation time.
-      ja: condition-confidence-high@4 は cel@1 で routing-state@4.confidence >= 0.85 を宣言し、current value/evaluation time は持ちません。
+      zh: condition-category-billing@3 表达式 state.category=='billing'，result_type=enum，对应 route function 返回 "billing" 键的条件版本。
+      en: condition-category-billing@3 expression state.category=='billing' with result_type=enum corresponds to the condition revision whose route function returns the "billing" key.
+      ja: condition-category-billing@3 は route function が "billing" を返す条件版です。
+    example_source:
+      product: LangGraph
+      url: https://langchain-ai.github.io/langgraph/
+      version: conditional_edges routing function
+    field_values:
+      routing_specification_id: condition-category-billing
+      version: "3"
+      eligible_target_types:
+        - worker
+      valid_from: 2026-07-16T00:00:00Z
+      expression_language: python@3.11
+      expression: state.get("category") == "billing"
+      input_schema_ref: routing-state@3
+      result_type: enum
+    related_node_ids:
+      - RoutingCondition
+      - BranchCondition
+      - RoutingDecision
+    related_relation_ids:
+      - RoutingDecision-evaluates-RoutingCondition
+    source_claims:
+      - claim-routing-condition-langgraph
+  - id: RoutingCondition-example-confidence-boolean
+    labels:
+      zh: 高置信度布尔条件
+      en: High-confidence boolean condition
+      ja: high-confidence boolean condition
+    descriptions:
+      zh: condition-confidence-high@4 使用 cel@1 判断 routing-state@4.confidence>=0.85，无当前值或求值时间。
+      en: condition-confidence-high@4 uses cel@1 to test routing-state@4.confidence>=0.85 with no current value or evaluation time.
+      ja: condition-confidence-high@4 は confidence>=0.85 を宣言する reusable spec です。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: reusable predicate
     field_values:
       routing_specification_id: condition-confidence-high
       version: "4"
@@ -134,63 +201,53 @@ examples:
       result_type: boolean
     related_node_ids:
       - RoutingCondition
-      - RoutingDecision
-    related_relation_ids:
-      - RoutingDecision-evaluates-RoutingCondition
-    expected_result:
-      zh: 建立可被多次决定求值的条件规范。
-      en: Create a condition specification reusable across decisions.
-      ja: multiple decision が evaluate できる condition specification を作成します。
-    why_valid_or_invalid:
-      zh: 表达式、输入模式与结果类型完整，且没有冒充一次求值。
-      en: Expression, input schema, and result type are complete without masquerading as one evaluation.
-      ja: expression・input schema・result type が完全で one evaluation を装いません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    related_relation_ids: []
     source_claims:
-      - claim-routing-condition-001
-      - claim-routing-condition-002
-  - id: RoutingCondition-example-boundary-manual-20260716
-    kind: boundary
+      - claim-routing-condition-design
+  - id: RoutingCondition-example-crewai-selector
     labels:
-      zh: 条件求值为真
-      en: Condition evaluated true
-      ja: condition evaluated true
-    scenario_id: routing-review-routingcondition-boundary
+      zh: CrewAI 选择器谓词
+      en: CrewAI selector predicate
+      ja: CrewAI selector predicate
     descriptions:
-      zh: decision-884 在 04:20 读取 state@12 并记录 true；这是一次决定中的求值事实，不是条件规范的新版本。
-      en: decision-884 reads state@12 at 04:20 and records true; this is an evaluation fact within one decision, not a new condition revision.
-      ja: decision-884 が 04:20 state@12 を読み true を記録するのは one decision evaluation fact で condition revision ではありません。
+      zh: condition-research-needed@2 声明 manager 在 unresolved_sources>0 时选择 researcher；对应 custom selector predicate 规范。
+      en: condition-research-needed@2 declares manager selects researcher when unresolved_sources>0 as a custom selector predicate specification.
+      ja: condition-research-needed@2 は unresolved_sources>0 時 researcher 選択 predicate です。
+    example_source:
+      product: CrewAI
+      url: https://docs.crewai.com
+      version: custom selector function
+    field_values:
+      routing_specification_id: condition-research-needed
+      version: "2"
+      expression: state.unresolved_sources > 0
+      result_type: boolean
+    related_node_ids:
+      - RoutingCondition
+      - RoutingPolicy
+    related_relation_ids: []
+    source_claims:
+      - claim-routing-condition-crewai
+  - id: RoutingCondition-example-boundary-evaluated-true
+    labels:
+      zh: 求值 true 不是条件规范
+      en: Evaluated true is not condition spec
+      ja: evaluated true は condition spec ではない
+    descriptions:
+      zh: decision-884 在 04:20 读取 state@12 并记录 true；这是一次 RoutingDecision 求值事实。
+      en: decision-884 reads state@12 at 04:20 and records true; this is one RoutingDecision evaluation fact.
+      ja: decision-884 の true 記録は RoutingDecision evaluation fact です。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: condition versus evaluation
     field_values: {}
     related_node_ids:
       - RoutingDecision
       - RoutingCondition
     related_relation_ids: []
-    expected_result:
-      zh: 把 true 与时间存入 RoutingDecision，不创建 RoutingCondition。
-      en: Store true and time on RoutingDecision; do not create a RoutingCondition.
-      ja: true/time を RoutingDecision に保存し RoutingCondition を作りません。
-    why_valid_or_invalid:
-      zh: 发生结果由输入与时间识别，规范由表达式版本识别。
-      en: The occurrence is identified by input and time; the specification by expression revision.
-      ja: occurrence は input/time、specification は expression revision で識別します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-routing-condition-001
-      - claim-routing-condition-002
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: RoutingPolicy
-    shared_parent_concept_id: RoutingSpecification
-    differentia:
-      zh: RoutingCondition 是一个可独立求值的判定；RoutingPolicy 组合多个条件、候选 Route、优先级和回退。
-      en: RoutingCondition is one independently evaluable predicate; RoutingPolicy composes conditions, candidate Routes, precedence, and fallback.
-      ja: RoutingCondition は independently evaluable predicate、RoutingPolicy は conditions/routes/precedence/fallback の composition です。
-    source_claims:
-      - claim-routing-condition-001
+      - claim-routing-condition-design
 parent_relation:
   id: RoutingCondition-is_a-RoutingSpecification
   predicate: is_a
@@ -201,9 +258,9 @@ parent_relation:
     en: is a
     ja: の一種である
   definitions:
-    zh: RoutingCondition 是一种 RoutingSpecification；其种差是声明决定可对冻结状态求值的布尔或枚举判定。
+    zh: RoutingCondition 是一种 RoutingSpecification；其种差是声明可对冻结状态求值的布尔或枚举判定。
     en: A RoutingCondition is a RoutingSpecification distinguished by a Boolean or enumerated predicate a decision can evaluate against frozen state.
-    ja: RoutingCondition は decision が frozen state に対し evaluate できる Boolean/enum predicate を宣言する subtype です。
+    ja: RoutingCondition は frozen state に evaluate 可能な Boolean/enum predicate を宣言する subtype です。
   cardinality: null
   cardinality_not_applicable_reason:
     zh: 该关系表达类型级语义，不在此规定实例基数。
@@ -220,102 +277,60 @@ parent_relation:
   boundary_context: null
   constraints: []
   examples:
-    - id: RoutingCondition-is_a-RoutingSpecification-example-positive-manual-20260716
+    - id: RoutingCondition-is_a-RoutingSpecification-example-positive
       kind: positive
       labels:
         zh: 高置信度路由条件
         en: High-confidence routing condition
         ja: high-confidence routing condition
-      scenario_id: routing-relation-routingcondition-is_a-routingspecification-positive
       descriptions:
         zh: condition-confidence@4 声明 confidence>=0.85 和输入模式。
         en: condition-confidence@4 declares confidence>=0.85 and an input schema.
-        ja: condition-confidence@4 は confidence>=0.85 と input schema を宣言します。
+        ja: condition-confidence@4 は reusable evaluation specification です。
       field_values: {}
       related_node_ids:
         - RoutingCondition
         - RoutingSpecification
       related_relation_ids:
         - RoutingCondition-is_a-RoutingSpecification
-      expected_result:
-        zh: 归入 RoutingSpecification。
-        en: Classify under RoutingSpecification.
-        ja: RoutingSpecification 下に分類します。
-      why_valid_or_invalid:
-        zh: 该对象具有表达式版本和输入模式，是可复用的求值规范。
-        en: It is a reusable evaluation specification.
-        ja: reusable evaluation specification です。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-routing-condition-001
-        - claim-routing-condition-002
-    - id: RoutingCondition-is_a-RoutingSpecification-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 求值结果 true 不是条件类型
-        en: Evaluated true is not a condition type
-        ja: evaluated true は condition type ではない
-      scenario_id: routing-relation-routingcondition-is_a-routingspecification-boundary
-      descriptions:
-        zh: decision-884 在某状态上记录 true。
-        en: decision-884 records true for one state.
-        ja: decision-884 は one state に true を記録します。
-      field_values: {}
-      related_node_ids:
-        - RoutingCondition
-        - RoutingSpecification
-      related_relation_ids:
-        - RoutingCondition-is_a-RoutingSpecification
-      expected_result:
-        zh: 该结果只应保留为一次 RoutingDecision 的求值证据。
-        en: Keep it as decision evidence.
-        ja: decision evidence として保持します。
-      why_valid_or_invalid:
-        zh: 单次求值结果值不是具有表达式版本的可复用条件规范。
-        en: A result value is not a reusable specification.
-        ja: result value は reusable specification ではありません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-routing-condition-001
-        - claim-routing-condition-002
+        - claim-routing-condition-design
   source_claims:
-    - claim-routing-condition-001
-    - claim-routing-condition-002
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: accepted
+    - claim-routing-condition-design
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-orchestration-tool-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照权威来源逐项完成人工语义核验；概念定义、层级、关系、结构与来源主张成立。
-    en: Manual semantic verification against authoritative sources completed; concept definitions, hierarchy, relations, structure, and source claims hold.
-    ja: 権威ソースに照らし手動意味検証を完了し、概念定義・階層・関係・構造・出典主張が成立。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: langgraph-routing-condition
+    title: LangGraph
+    url: https://langchain-ai.github.io/langgraph/
+    source_type: official-doc
+    relevance: conditional_edges routing function return values as evaluation results.
+  - id: crewai-routing-condition
+    title: CrewAI documentation
+    url: https://docs.crewai.com
+    source_type: official-doc
+    relevance: Selector and candidate predicates.
+  - id: routing-condition-design
+    title: Moonweave routing and gates design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: RoutingCondition as reusable predicate specification.
 source_claims:
-  - id: claim-routing-condition-001
-    source: eng-fw-langgraph-graph-api
-    supports: LangGraph's Graph API distinguishes workflow state, executable nodes, static edges, conditional routing functions, termination targets, and Command values that combine state updates with a selected destination. Moonweave uses this to separate reusable routing specifications and targets from one RoutingDecision occurrence.
-    locator: LangGraph Graph API documentation, Graphs, Edges, Conditional edges, and Command sections
+  - id: claim-routing-condition-langgraph
+    source: langgraph-routing-condition
+    supports: LangGraph routing functions return path-map keys evaluated against state; Moonweave stores predicate revisions as RoutingCondition separate from one return value.
+    locator: Graph API — Conditional edges, routing function
+    evidence_kind: official
+    confidence: high
+  - id: claim-routing-condition-crewai
+    source: crewai-routing-condition
+    supports: CrewAI custom selector/candidate functions embed predicates mappable to RoutingCondition specifications.
+    locator: Selector Group Chat — custom selector/candidate
+    evidence_kind: official
+    confidence: high
+  - id: claim-routing-condition-design
+    source: routing-condition-design
+    supports: RoutingCondition is reusable specification distinct from RoutingDecision evaluation occurrence.
+    locator: RoutingCondition concept boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-routing-condition-002
-    source: eng-ont-prov-o
-    supports: W3C PROV-O distinguishes plans and other Entities from time-bounded Activities that use or generate Entities. Moonweave therefore treats routing policy and conditions as reusable specifications, RoutingDecision as an occurrence, and GateOutcome as information produced by gate evaluation.
-    locator: W3C PROV-O Recommendation Sections 3.1 and 3.2, Entity, Activity, generation, and Plan
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

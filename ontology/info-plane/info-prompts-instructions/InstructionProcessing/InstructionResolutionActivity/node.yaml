@@ -1,34 +1,57 @@
 schema: moonweave.ai/ontology-node/v1
 id: InstructionResolutionActivity
 kind: concept
-status: accepted
 labels:
   zh: 指令解决活动
   en: Instruction resolution activity
   ja: 指示解決活動
 semantics:
   short_definition:
-    zh: 应用权威、适用性、作用域和优先规则解决已检测冲突的活动。
-    en: An activity applying authority, applicability, scope, and precedence rules to a detected conflict.
-    ja: 検出済み conflict に authority・applicability・scope・precedence rule を適用する activity です。
+    zh: 依据 authority 与 priority 决定冲突 Instruction 最终生效集合的活动。
+    en: Activity deciding the final effective Instruction set from authority and priority among conflicts.
+    ja: authority/priority に基づき conflict Instruction の final effective set を決める activity。
   definition:
-    zh: 指令解决活动是一类 InstructionProcessing，它读取已检测冲突及相关元数据，按治理顺序计算有效、被压制或仍未解决的指令，并产生 InstructionResolution；活动执行本身不同于其结果记录。
-    en: InstructionResolutionActivity is InstructionProcessing that reads a detected conflict and its metadata, applies governing order to compute effective, suppressed, or unresolved instructions, and produces an InstructionResolution. The execution is distinct from its result record.
-    ja: InstructionResolutionActivity は detected conflict と metadata を読み、governing order で effective・suppressed・unresolved instruction を計算し InstructionResolution を生成する InstructionProcessing です。execution 自体は result record と異なります。
+    zh: InstructionResolutionActivity 消费 ConflictDetection 结果，产出 InstructionResolution 与可选 InstructionOverrideResolution；记录 effective 与 superseded 列表供 context assembly 使用。
+    en: InstructionResolutionActivity consumes ConflictDetection results, producing InstructionResolution and optional InstructionOverrideResolution; records effective and superseded lists for context assembly.
+    ja: ConflictDetection→Resolution→effective/superseded lists。
   why_needed:
-    zh: 活动节点保存采用的解析规则、时间和执行者，使结果可以重放而不会把结果误当作新指令。
-    en: The activity preserves the rule set, time, and executor needed to replay the outcome without mistaking that outcome for a new instruction.
-    ja: activity node は replay に必要な rule set・time・executor を保存し、outcome を新 instruction と誤認しません。
+    zh: 可审计 resolution 回答“为何 developer 指令仍覆盖 user 要求”。
+    en: Auditable resolution answers why developer instruction still overrides user request.
+    ja: auditable resolution outcome。
   includes:
-    - zh: 纳入一次读取冲突、比较元数据并产出解析记录的具体执行。
-      en: Includes a concrete execution that reads a conflict, compares metadata, and emits a resolution record.
-      ja: conflict を読み metadata を比較して resolution record を出力する具体 execution を含みます。
+    - zh: resolution_activity_id、输入 conflict 引用、产出 InstructionResolution。
+      en: resolution_activity_id, input conflict references, output InstructionResolution.
+      ja: activity_id/conflict refs/InstructionResolution。
   excludes:
-    - zh: 排除冲突检测、威胁缓解、InstructionResolution 记录以及声称覆盖的指令文本。
-      en: Excludes conflict detection, threat mitigation, the InstructionResolution record, and directive text claiming an override.
-      ja: conflict detection・threat mitigation・InstructionResolution record・override を主張する directive text を除外します。
+    - zh: Parsing 本身、PromptInjection mitigation、模型最终 compliance 证明。
+      en: Parsing itself, PromptInjection mitigation, and proof of final model compliance.
+      ja: parsing/injection mitigation/compliance proof。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: ires-session-27：platform inst-system-v12 effective，inst-user-override-3 superseded reason=lower-authority-than-platform-system。
+    en: "ires-session-27: platform inst-system-v12 effective, inst-user-override-3 superseded reason=lower-authority-than-platform-system."
+    ja: authority-based resolution。
+  typical_input: []
+  typical_output:
+    - description: Effective instruction set
+      format: '{"instruction_resolution_id":"ires-session-27","effective_instructions":["inst-system-v12"],"superseded_instructions":["inst-user-override-3"]}'
+      source_claims:
+        - claim-ires-design
+  reference_implementations:
+    - name: OpenAI Chat Completions API
+      url: https://platform.openai.com/docs/api-reference/chat/create
+      description: developer/system roles and message instructions.
+    - name: Anthropic Messages API
+      url: https://docs.anthropic.com/en/api/messages
+      description: Top-level system parameter for session instructions.
+    - name: MCP Prompts
+      url: https://modelcontextprotocol.io/specification/2025-06-18/server/prompts
+      description: prompts/list discovery and prompts/get template instantiation.
+    - name: Cursor Rules
+      url: https://cursor.com/docs/context/rules
+      description: Versioned project rules as persistent instructions.
 structure:
   identity_keys: []
   fields:
@@ -37,90 +60,82 @@ structure:
         zh: 规则集版本
         en: Rule-set version
         ja: rule set version
+      definitions:
+        zh: 记录本次比较实际采用的治理规则版本。
+        en: Records the governing-rule version actually applied by this comparison.
+        ja: comparison が実際に適用した governing-rule version を記録します。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 记录本次比较实际采用的治理规则版本。
-        en: Records the governing-rule version actually applied by this comparison.
-        ja: comparison が実際に適用した governing-rule version を記録します。
-      allowed_values: []
       pattern: null
       example_value: model-spec/2025-10-27
+      allowed_values: []
       source_claims:
         - claim-instruction-resolution-activity-001
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: InstructionResolutionActivity-manual-positive-20260716
-    kind: positive
+  - id: InstructionResolutionActivity-example-session-27
     labels:
-      zh: 指令解决活动正例
-      en: Instruction resolution activity positive case
-      ja: 指示解決活動正例
-    scenario_id: null
+      zh: session-27 解析
+      en: Session-27 resolution
+      ja: session-27 resolution
     descriptions:
-      zh: resolve-91 读取 developer 与 user 的冲突和两者作用域，按 model-spec/2025-10-27 选出 developer 指令并产出 resolution-91。
-      en: resolve-91 reads a developer/user conflict with both scopes, applies model-spec/2025-10-27, selects the developer instruction, and produces resolution-91.
-      ja: resolve-91 は developer/user conflict と両 scope を読み model-spec/2025-10-27 を適用し、developer instruction を選んで resolution-91 を生成します。
+      zh: ires-session-27 platform 指令生效，user override superseded。
+      en: ires-session-27 platform instruction prevails, user override superseded.
+      ja: platform wins。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: resolution
     field_values:
-      rule_set_version: model-spec/2025-10-27
-      processing_id: resolve-91
-      started_at: 2026-07-16T10:05:00Z
+      instruction_resolution_id: ires-session-27
     related_node_ids:
       - InstructionResolutionActivity
-      - InstructionConflict
       - InstructionResolution
-    related_relation_ids:
-      - InstructionResolutionActivity-resolves-InstructionConflict
-      - InstructionResolutionActivity-produces-InstructionResolution
-    expected_result:
-      zh: 活动与冲突建立 resolves 事实，并通过 produces 指向独立结果记录。
-      en: The activity resolves the conflict and points through produces to a separate result record.
-      ja: activity は conflict と resolves fact を結び、produces で独立 result record を指します。
-    why_valid_or_invalid:
-      zh: 输入冲突、比较依据、执行身份和输出记录均明确，活动与结果未混同。
-      en: Input conflict, comparison basis, execution identity, and output record are explicit, with activity and result kept distinct.
-      ja: input conflict・comparison basis・execution identity・output record が明示され activity と result を混同していません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    related_relation_ids: []
     source_claims:
-      - claim-instruction-resolution-activity-001
-  - id: InstructionResolutionActivity-manual-boundary-20260716
-    kind: boundary
+      - claim-ires-design
+  - id: InstructionResolutionActivity-example-peer-priority
     labels:
-      zh: 指令解决活动边界例
-      en: Instruction resolution activity boundary case
-      ja: 指示解決活動境界例
-    scenario_id: null
+      zh: 同级 priority
+      en: Peer priority
+      ja: peer priority
     descriptions:
-      zh: 安全系统隔离含注入迹象的工具输出并撤销权限；这是 threat mitigation，而不是普通权威顺序解析。
-      en: A security system quarantines tool output with injection evidence and revokes permission; that is threat mitigation, not ordinary authority-order resolution.
-      ja: security system が injection evidence を含む tool output を quarantine し permission を revoke するのは threat mitigation で、通常 authority-order resolution ではありません。
+      zh: 同等 authority 下后发 user 指令在 Resolution 中胜出。
+      en: Later user directive wins in Resolution at equal authority.
+      ja: later-at-equal-authority。
+    example_source:
+      product: OpenAI
+      url: https://platform.openai.com/docs/api-reference/chat/create
+      version: peer order
     field_values: {}
     related_node_ids:
       - InstructionResolutionActivity
-      - MitigationAction
-      - PromptInjectionSignal
     related_relation_ids: []
-    expected_result:
-      zh: 该执行归安全防御活动，不归类为 InstructionResolutionActivity。
-      en: The execution belongs to security defense and is not classified as InstructionResolutionActivity.
-      ja: execution は security defense に属し InstructionResolutionActivity へ分類しません。
-    why_valid_or_invalid:
-      zh: 其身份由威胁证据和缓解动作决定，而不是由合法指令间的治理顺序决定。
-      en: Its identity depends on threat evidence and mitigation rather than governance ordering among legitimate instructions.
-      ja: identity は合法 instruction 間の governance ordering ではなく threat evidence・mitigation に依存します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-instruction-resolution-activity-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-ires-design
+  - id: InstructionResolutionActivity-example-no-conflict-input
+    labels:
+      zh: 无冲突输入
+      en: No conflict input
+      ja: conflict input なし
+    descriptions:
+      zh: 无 ConflictDetection 结果时 Resolution 不得臆造 superseded。
+      en: Resolution must not invent superseded without ConflictDetection results.
+      ja: no conflict→no superseded。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
+    field_values: {}
+    related_node_ids:
+      - InstructionResolutionActivity
+    related_relation_ids: []
+    source_claims:
+      - claim-ires-design
 parent_relation:
   id: InstructionResolutionActivity-is_a-InstructionProcessing
   predicate: is_a
@@ -151,12 +166,10 @@ parent_relation:
   constraints: []
   examples:
     - id: InstructionResolutionActivity-is_a-InstructionProcessing-manual-positive-20260716
-      kind: positive
       labels:
         zh: is_a 正例
         en: is_a positive case
         ja: is_a 正例
-      scenario_id: null
       descriptions:
         zh: resolve-91 应用 developer-over-user 规则并产出 resolution-91，满足处理活动和解决种差。
         en: resolve-91 applies developer-over-user and produces resolution-91, satisfying both processing identity and resolution differentia.
@@ -167,25 +180,13 @@ parent_relation:
         - InstructionProcessing
       related_relation_ids:
         - InstructionResolutionActivity-is_a-InstructionProcessing
-      expected_result:
-        zh: 类型路径把解决活动置于 InstructionProcessing 下。
-        en: The type path places resolution activity under InstructionProcessing.
-        ja: type path は resolution activity を InstructionProcessing 下に置きます。
-      why_valid_or_invalid:
-        zh: 对象是执行事件且具体职责是计算解析结果。
-        en: The object is an execution event specifically computing a resolution outcome.
-        ja: object は resolution outcome を計算する execution event です。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
         - claim-instruction-resolution-activity-002
     - id: InstructionResolutionActivity-is_a-InstructionProcessing-manual-boundary-20260716
-      kind: boundary
       labels:
         zh: is_a 边界例
         en: is_a boundary case
         ja: is_a 境界例
-      scenario_id: null
       descriptions:
         zh: InstructionResolution 保存结果但不执行规则应用。
         en: InstructionResolution stores the result but does not execute rule application.
@@ -196,23 +197,11 @@ parent_relation:
         - InstructionProcessing
       related_relation_ids:
         - InstructionResolutionActivity-is_a-InstructionProcessing
-      expected_result:
-        zh: 结果记录保持 information 类型，不继承 InstructionProcessing。
-        en: The result record remains information and does not inherit InstructionProcessing.
-        ja: result record は information のままで InstructionProcessing を継承しません。
-      why_valid_or_invalid:
-        zh: 执行与结果由 produces 连接而非种属等同。
-        en: Execution and result are connected by produces rather than type equivalence.
-        ja: execution と result は type equivalence ではなく produces で接続します。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
         - claim-instruction-resolution-activity-002
   source_claims:
     - claim-instruction-resolution-activity-002
-  distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations:
   - id: InstructionResolutionActivity-resolves-InstructionConflict
@@ -244,12 +233,10 @@ relations:
     constraints: []
     examples:
       - id: InstructionResolutionActivity-resolves-InstructionConflict-manual-positive-20260716
-        kind: positive
         labels:
           zh: resolves 正例
           en: resolves positive case
           ja: resolves 正例
-        scenario_id: null
         descriptions:
           zh: resolve-91 对 conflict-91 应用 developer-over-user 并得到确定有效指令。
           en: resolve-91 applies developer-over-user to conflict-91 and obtains a determinate effective instruction.
@@ -260,25 +247,13 @@ relations:
           - InstructionConflict
         related_relation_ids:
           - InstructionResolutionActivity-resolves-InstructionConflict
-        expected_result:
-          zh: 冲突记录与解决执行关联，并可找到后续 InstructionResolution。
-          en: The conflict is linked to the resolution execution and its subsequent InstructionResolution.
-          ja: conflict は resolution execution と後続 InstructionResolution に結び付けられます。
-        why_valid_or_invalid:
-          zh: 活动针对具体冲突执行规则且产生可审计结论。
-          en: The activity applies rules to a specific conflict and reaches an auditable conclusion.
-          ja: activity は specific conflict に rule を適用し監査可能 conclusion に達します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-instruction-resolution-activity-003
       - id: InstructionResolutionActivity-resolves-InstructionConflict-manual-boundary-20260716
-        kind: boundary
         labels:
           zh: resolves 边界例
           en: resolves boundary case
           ja: resolves 境界例
-        scenario_id: null
         descriptions:
           zh: 解析器因缺少指令来源暂停并请求澄清，没有产生有效或未解决结论记录。
           en: Resolution pauses for clarification because source evidence is missing and produces no effective or unresolved conclusion record.
@@ -289,40 +264,24 @@ relations:
           - InstructionConflict
         related_relation_ids:
           - InstructionResolutionActivity-resolves-InstructionConflict
-        expected_result:
-          zh: 该尝试不得提前标记 resolves。
-          en: The attempt must not be marked resolves prematurely.
-          ja: attempt を prematurely resolves と記録しません。
-        why_valid_or_invalid:
-          zh: resolves 要求完成而非仅启动解析。
-          en: Resolves requires completion, not merely starting resolution.
-          ja: resolves には resolution の開始だけでなく completion が必要です。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-instruction-resolution-activity-003
     source_claims:
       - claim-instruction-resolution-activity-003
-    distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:InstructionConflict
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-info-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Model Spec 指令权威链、Agents SDK instructions 与 MCP prompts 逐项核验；Instruction 元数据层级、PromptTemplate 实例化与 InstructionProcessing 解析-冲突-解决语义成立。
-    en: Verified against OpenAI Model Spec instruction authority chain, Agents SDK instructions, and MCP prompts; Instruction metadata tiers, PromptTemplate instantiation, and InstructionProcessing parse-conflict-resolve semantics hold.
-    ja: OpenAI Model Spec instruction authority chain、Agents SDK instructions、MCP prompts に照らし Instruction metadata tier/PromptTemplate instantiation/InstructionProcessing parse-conflict-resolve semantics を個別確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-openai-chat
+    title: OpenAI Chat Completions API Reference
+    publisher: OpenAI
+    url: https://platform.openai.com/docs/api-reference/chat/create
+    source_type: official-doc
+    relevance: developer and system role behavioral instructions.
+  - id: src-info-prompts-design
+    title: Moonweave info-prompts-instructions module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Instruction normative identity separate from Message carriage.
 source_claims:
   - id: claim-instruction-resolution-activity-001
     source: eng-spec-openai-model-2025-10-27
@@ -330,18 +289,21 @@ source_claims:
     locator: Model Spec 2025-10-27 > Instructions and levels of authority; The chain of command > Follow all applicable instructions
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-instruction-resolution-activity-002
     source: eng-spec-openai-model-2025-10-27
     supports: The Model Spec prescribes the ordered reconciliation of conflicting instructions. Moonweave classifies execution of that reconciliation as specialized InstructionProcessing.
     locator: Model Spec 2025-10-27 > Instructions and levels of authority; The chain of command > Follow all applicable instructions
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-instruction-resolution-activity-003
     source: eng-spec-openai-model-2025-10-27
     supports: The Model Spec gives the authority and same-level ordering used to reconcile conflicts. Moonweave records successful application of that order through InstructionResolutionActivity-resolves-InstructionConflict.
     locator: Model Spec 2025-10-27 > Instructions and levels of authority; The chain of command > Follow all applicable instructions
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
+  - id: claim-ires-design
+    source: src-info-prompts-design
+    supports: InstructionResolutionActivity produces auditable effective and superseded instruction lists.
+    locator: InstructionResolutionActivity
+    evidence_kind: design-inference
+    confidence: high

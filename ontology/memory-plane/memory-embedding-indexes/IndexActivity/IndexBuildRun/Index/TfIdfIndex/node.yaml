@@ -1,328 +1,247 @@
 schema: moonweave.ai/ontology-node/v1
 id: TfIdfIndex
 kind: concept
-status: accepted
 labels:
   zh: TF-IDF 索引
   en: TF-IDF index
-  ja: TF-IDF索引
+  ja: TF-IDF 索引
 semantics:
   short_definition:
-    zh: 以词表、词频和逆文档频率组织文本的 Index。
-    en: An Index organizing text through vocabulary, term frequency, and inverse document frequency.
-    ja: 語彙・term frequency・inverse document frequencyでtextを編成する Index です。
+    zh: 以词项权重稀疏检索的 Index 子类。
+    en: Index subtype for lexical sparse retrieval by term weights.
+    ja: 語 weight 稀疏検索の Index subtype。
   definition:
-    zh: TfIdfIndex 是拥有拟合语料词表、IDF 权重与分析器配置的 Index，用于把文档转换为 TF-IDF 特征并支持词项相似检索；它不是一条 SparseVector 或原始词频表。
-    en: TfIdfIndex is an Index owning a fitted corpus vocabulary, IDF weights, and analyzer configuration to transform documents into TF-IDF features and support lexical similarity retrieval; it is not one SparseVector or a raw term-frequency table.
-    ja: TfIdfIndex はfitted corpus語彙・IDF weight・analyzer設定を所有しdocumentをTF-IDF featureへ変換してlexical類似検索を支える Index で、単一SparseVectorや原term-frequency表ではありません。
+    zh: TfIdfIndex 是 Index 子类，固定 lexical 检索配置（tokenizer、stemmer、idf 平滑）与 SparseVector/BM25 表示。Chroma 或 Elasticsearch 式 inverted index 映射 index_kind=tfidf；每条 IndexEntry 绑定 SparseVector {indices, values} 而非 float[] dense 向量。
+    en: TfIdfIndex is an Index subtype fixing lexical retrieval configuration (tokenizer, stemmer, idf smoothing) and SparseVector/BM25 representation. Chroma or Elasticsearch-style inverted indexes map to index_kind=tfidf; each IndexEntry binds SparseVector {indices, values} not float[] dense vectors.
+    ja: TfIdfIndex は tokenizer/stemmer/idf 設定と SparseVector/BM25 を固定する Index subtype。Chroma/Elasticsearch inverted index→index_kind=tfidf。IndexEntry は SparseVector {indices,values}。
   why_needed:
-    zh: 区分跨语料检索结构与单条稀疏坐标。
-    en: Separates the corpus-wide retrieval structure from one sparse coordinate vector.
-    ja: corpus全体検索構造を一つのsparse座標vectorから分離します。
+    zh: BM25/TF-IDF 索引的 metric 与维度语义不同于 cosine dense 向量，混建模会导致 hybrid 融合权重不可解释。
+    en: BM25/TF-IDF indexes differ in metric and dimension semantics from cosine dense vectors; conflating them makes hybrid fusion weights inexplicable.
+    ja: BM25/TF-IDF は dense cosine と metric/次元意味が異なり、混同すると hybrid fusion が説明不能。
   includes:
-    - zh: 纳入已拟合词表、IDF 与 analyzer 的文本索引。
-      en: Includes text indexes with fitted vocabulary, IDF, and analyzer.
-      ja: fitted語彙・IDF・analyzerを持つtext indexを含みます。
+    - zh: 纳入 BM25 inverted index 与 SPLADE 稀疏 lexical 索引身份。
+      en: Includes BM25 inverted index and SPLADE sparse lexical index identities.
+      ja: BM25 inverted index/SPLADE sparse lexical index identity。
   excludes:
-    - zh: 排除单文档 SparseVector、未拟合 Vectorizer 配置和原文档。
-      en: Excludes a per-document SparseVector, an unfitted vectorizer configuration, and source documents.
-      ja: document単位SparseVector・unfitted vectorizer設定・原documentを除外します。
+    - zh: 排除 VectorIndex、HybridIndex（除非显式声明 hybrid）与 DenseVector。
+      en: Excludes VectorIndex, HybridIndex (unless explicitly hybrid), and DenseVector.
+      ja: VectorIndex/HybridIndex（明示 hybrid 除く）/DenseVector を除外。
   semantic_kind: entity
   aliases: []
+engineering:
+  explanation:
+    zh: "BM25 输出 SparseVector（indices + values 对）；Pinecone sparse_values 或 Qdrant sparse vector 通道写入 IndexEntry；configuration_digest 含 tokenizer 与 k1/b 参数。"
+    en: "BM25 outputs SparseVector as indices-and-values pairs; Pinecone sparse_values or Qdrant sparse vector channel writes IndexEntry; configuration_digest includes tokenizer and k1/b params."
+    ja: "BM25→SparseVector（indices+values）。Pinecone sparse_values/Qdrant sparse channel→IndexEntry。configuration_digest に tokenizer/k1/b。"
+  typical_input:
+    - description: BM25 sparse representation
+      format: |
+        {"indices": [10, 45, 892, 1204], "values": [0.82, 0.51, 0.33, 0.19]}
+      source_claims: [claim-tfidf-index-bm25]
+  typical_output:
+    - description: TF-IDF index identity
+      format: |
+        {
+          "index_id": "tfidf-index-8",
+          "index_kind": "tfidf",
+          "configuration_digest": "sha256:bm25-k1-1.2-b-0.75"
+        }
+      source_claims: [claim-tfidf-index-design]
+  reference_implementations:
+    - name: Pinecone Sparse Vectors
+      url: https://docs.pinecone.io/guides/data/import-sparse-vectors
+      description: Sparse vector upsert for lexical search.
+    - name: Chroma Query
+      url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+      description: Metadata-filtered retrieval complementing dense search.
 structure:
-  identity_keys:
-    - index_id
+  identity_keys: [index_id]
   fields:
     - id: index_id
-      labels:
-        zh: 索引标识
-        en: index ID
-        ja: index ID
+      labels: {zh: 索引标识, en: Index identifier, ja: 索引識別子}
+      definitions:
+        zh: 继承 Index.index_id。
+        en: Inherits Index.index_id.
+        ja: Index.index_id 継承。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 稳定标识 TF-IDF 索引。
-        en: Stable identifier for the TF-IDF index.
-        ja: TF-IDF indexの安定識別子です。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
-      example_value: tfidf-index-17
-      source_claims:
-        - claim-tf-idf-index-002
-    - id: vocabulary_digest
-      labels:
-        zh: 词表摘要
-        en: vocabulary digest
-        ja: 語彙digest
+      example_value: tfidf-index-8
+      allowed_values: []
+      source_claims: [claim-tfidf-index-id]
+    - id: tokenizer_profile
+      labels: {zh: 分词配置, en: Tokenizer profile, ja: tokenizer profile}
+      definitions:
+        zh: 固定 tokenizer、stemmer 与 stopword 规则摘要。
+        en: Digest of tokenizer, stemmer, and stopword rules.
+        ja: tokenizer/stemmer/stopword 規則 digest。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 固定拟合后的词项到特征映射。
-        en: Fixes the fitted term-to-feature mapping.
-        ja: fitted term-to-feature mappingを固定します。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
-      example_value: sha256:vocab17
-      source_claims:
-        - claim-tf-idf-index-003
-    - id: analyzer_profile
-      labels:
-        zh: 分析器配置
-        en: analyzer profile
-        ja: analyzer profile
+      example_value: sha256:english-porter
+      allowed_values: []
+      source_claims: [claim-tfidf-index-tokenizer]
+    - id: scoring_profile
+      labels: {zh: 评分配置, en: Scoring profile, ja: scoring profile}
+      definitions:
+        zh: BM25 k1/b 或 TF-IDF idf 平滑参数摘要。
+        en: BM25 k1/b or TF-IDF idf smoothing parameter digest.
+        ja: BM25 k1/b または TF-IDF idf 平滑 parameter digest。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 固定分词、n-gram 和归一化规则。
-        en: Fixes tokenization, n-gram, and normalization rules.
-        ja: tokenization・n-gram・normalization規則を固定します。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
-      example_value: word:1-2:lower
-      source_claims:
-        - claim-tf-idf-index-004
+      example_value: bm25:k1=1.2,b=0.75
+      allowed_values: []
+      source_claims: [claim-tfidf-index-bm25]
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: TfIdfIndex-example-positive-manual-001
-    kind: positive
+  - id: TfIdfIndex-example-bm25-sparse
     labels:
-      zh: TF-IDF 索引正例
-      en: "Positive case: TF-IDF index"
-      ja: TF-IDF索引正例
-    scenario_id: null
+      zh: BM25 稀疏索引
+      en: BM25 sparse index
+      ja: BM25 sparse index
     descriptions:
-      zh: tfidf-index-17 保留拟合词表摘要和 analyzer 配置。
-      en: tfidf-index-17 retains a fitted vocabulary digest and analyzer profile.
-      ja: tfidf-index-17 はfitted語彙digestとanalyzer profileを保持します。
+      zh: tfidf-index-8 索引 chunk 经 BM25 生成的 SparseVector {indices, values}；与 dense index-17 分离，可在 HybridIndex 中 fusion。
+      en: tfidf-index-8 indexes SparseVector {indices, values} from BM25 over chunks; separate from dense index-17; fusible in HybridIndex.
+      ja: tfidf-index-8 が BM25 SparseVector を index。dense index-17 と分離、HybridIndex で fusion 可。
+    example_source:
+      product: Pinecone
+      url: https://docs.pinecone.io/guides/data/import-sparse-vectors
+      version: sparse_values
     field_values:
-      index_id: tfidf-index-17
-      vocabulary_digest: sha256:vocab17
-      analyzer_profile: word:1-2:lower
-      index_kind: tfidf
-      configuration_digest: sha256:tfidf-index-17-vocab17-word-1-2-lower
+      index_id: tfidf-index-8
+      scoring_profile: bm25:k1=1.2,b=0.75
     related_node_ids:
       - TfIdfIndex
+      - SparseVector
     related_relation_ids: []
-    expected_result:
-      zh: 把该对象归入 TfIdfIndex。
-      en: Classify the object as TfIdfIndex.
-      ja: この対象を TfIdfIndex に分類します。
-    why_valid_or_invalid:
-      zh: 它拥有跨文档统计和稳定特征空间。
-      en: It owns corpus-wide statistics and a stable feature space.
-      ja: corpus横断統計と安定feature spaceを所有します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-tf-idf-index-005
-  - id: TfIdfIndex-example-boundary-manual-001
-    kind: boundary
+      - claim-tfidf-index-bm25
+      - claim-tfidf-index-design
+  - id: TfIdfIndex-example-splade
     labels:
-      zh: TF-IDF 索引边界例
-      en: "Boundary case: TF-IDF index"
-      ja: TF-IDF索引境界例
-    scenario_id: null
+      zh: SPLADE 稀疏扩展
+      en: SPLADE sparse expansion
+      ja: SPLADE sparse expansion
     descriptions:
-      zh: doc17-vector 只是文档 17 转换后的一行稀疏坐标。
-      en: doc17-vector is only one sparse coordinate row transformed from document 17.
-      ja: doc17-vector はdocument 17から変換した一行sparse座標だけです。
+      zh: SPLADE 产出 learned sparse {indices, values} 写入 tfidf-index-9；tokenizer_profile 含 SPLADE vocab 映射。
+      en: SPLADE produces learned sparse {indices, values} written to tfidf-index-9; tokenizer_profile includes SPLADE vocab mapping.
+      ja: SPLADE learned sparse→tfidf-index-9。tokenizer_profile に SPLADE vocab mapping。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: SPLADE mapping
+    field_values:
+      index_id: tfidf-index-9
+      scoring_profile: splade-v2
+    related_node_ids:
+      - TfIdfIndex
+      - SparseVector
+    related_relation_ids: []
+    source_claims:
+      - claim-tfidf-index-design
+  - id: TfIdfIndex-example-not-vector
+    labels:
+      zh: TF-IDF 非 dense 向量索引
+      en: TF-IDF is not dense vector index
+      ja: TF-IDF は dense vector index ではない
+    descriptions:
+      zh: index-17（cosine, dims=1536）是 VectorIndex；float[] dense 与 {indices,values} sparse 不可互替。
+      en: index-17 (cosine, dims=1536) is VectorIndex; float[] dense and {indices,values} sparse are not interchangeable.
+      ja: index-17（cosine,1536）は VectorIndex。float[] dense と {indices,values} sparse は置換不可。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
     field_values: {}
     related_node_ids:
       - TfIdfIndex
+      - VectorIndex
     related_relation_ids: []
-    expected_result:
-      zh: 不得把该对象归入 TfIdfIndex。
-      en: Do not classify the object as TfIdfIndex.
-      ja: この対象を TfIdfIndex に分類しません。
-    why_valid_or_invalid:
-      zh: 单条输出不拥有语料词表与 IDF 生命周期。
-      en: One output row does not own the corpus vocabulary and IDF lifecycle.
-      ja: 一出力rowはcorpus語彙とIDF lifecycleを所有しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-tf-idf-index-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-tfidf-index-design
 parent_relation:
   id: TfIdfIndex-is_a-Index
   predicate: is_a
   direction: target-to-source
   relation_kind: hierarchy
   labels:
-    zh: 是一种
-    en: is a
-    ja: の一種である
+    zh: 是一种索引
+    en: is an index
+    ja: 索引の一種
   definitions:
-    zh: TfIdfIndex 是 Index 的严格子类；种差为：拥有拟合语料词表、IDF 状态和 analyzer 配置。
-    en: "TfIdfIndex is a strict subtype of Index; its reviewed differentia is: it owns a fitted corpus vocabulary, IDF state, and analyzer configuration."
-    ja: TfIdfIndex は Index の厳密なsubtypeで、審査済み種差は「fitted corpus語彙・IDF状態・analyzer設定を所有します。」です。
+    zh: TfIdfIndex —is_a→ Index 因为它固定 lexical 稀疏检索配置与 SparseVector 表示。
+    en: TfIdfIndex —is_a→ Index because it fixes lexical sparse retrieval configuration and SparseVector representation.
+    ja: TfIdfIndex —is_a→ Index は lexical sparse 設定+SparseVector 固定のため。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
-    en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
-    ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
+    zh: 该关系按单个可审计事实判定。
+    en: The relation is decided per auditable fact.
+    ja: audit 可能 fact 単位で判定。
   inverse_reading:
     predicate: part_of
-    labels:
-      zh: 反向读取
-      en: inverse reading
-      ja: 逆方向読取
+    labels: {zh: 反向读取, en: inverse is_a, ja: 逆方向読取}
   conditions:
-    - id: TfIdfIndex-is_a-Index-condition-manual-001
+    - id: TfIdfIndex-is_a-Index-condition-001
       severity: error
       expression_language: plain
-      expression: "Assert only when the object first satisfies Index and also satisfies the differentia: it owns a fitted corpus vocabulary, IDF state, and analyzer configuration."
+      expression: Assert only when index_kind is tfidf and lexical scoring configuration is declared.
       explanations:
-        zh: 仅当对象首先满足 Index 定义且满足种差“拥有拟合语料词表、IDF 状态和 analyzer 配置。”时成立。
-        en: "Assert only when the object first satisfies Index and also satisfies the differentia: it owns a fitted corpus vocabulary, IDF state, and analyzer configuration."
-        ja: 対象がまず Index を満たし、さらに種差「fitted corpus語彙・IDF状態・analyzer設定を所有します。」を満たす時だけ成立します。
-      source_claims:
-        - claim-tf-idf-index-007
+        zh: 仅当满足 TF-IDF 索引种差时建立该边。
+        en: Assert only when TF-IDF index differentia holds.
+        ja: TF-IDF index 種差成立時のみ assert。
+      source_claims: [claim-tfidf-index-design]
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: TfIdfIndex-is_a-Index-example-positive-manual-001
-      kind: positive
-      labels:
-        zh: 是一种正例
-        en: "Positive case: is a"
-        ja: の一種である正例
-      scenario_id: null
-      descriptions:
-        zh: tfidf-index-17 以稳定 index_id 保留 corpus-policy-7 拟合词表、IDF 数组与 analyzer-profile-3。
-        en: tfidf-index-17 has a stable index_id and retains the corpus-policy-7 fitted vocabulary, IDF array, and analyzer-profile-3.
-        ja: tfidf-index-17 は安定 index_id を持ち、corpus-policy-7 でfitした語彙、IDF配列、analyzer-profile-3を保持します。
-      field_values: {}
-      related_node_ids:
-        - TfIdfIndex
-        - Index
-      related_relation_ids:
-        - TfIdfIndex-is_a-Index
-      expected_result:
-        zh: 将 tfidf-index-17 归入 TfIdfIndex，并继承长期 Index 身份。
-        en: Classify tfidf-index-17 as TfIdfIndex and inherit long-lived Index identity.
-        ja: tfidf-index-17 を TfIdfIndex と分類し、長期 Index 同一性を継承します。
-      why_valid_or_invalid:
-        zh: 它具有长期检索结构身份，并拥有语料级拟合状态而非单文档特征。
-        en: It has a persistent retrieval-structure identity and owns corpus-level fitted state rather than one document's features.
-        ja: 長期検索構造の同一性を持ち、単一文書の特徴ではなくcorpus-level fitted stateを所有します。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-tf-idf-index-007
-    - id: TfIdfIndex-is_a-Index-example-boundary-manual-001
-      kind: boundary
-      labels:
-        zh: 是一种边界例
-        en: "Boundary case: is a"
-        ja: の一種である境界例
-      scenario_id: null
-      descriptions:
-        zh: 一条 SparseVector 没有语料级词表与 IDF 生命周期。
-        en: One SparseVector lacks corpus-level vocabulary and IDF lifecycle.
-        ja: 一 SparseVector はcorpus-level語彙とIDF lifecycleを持ちません。
-      field_values: {}
-      related_node_ids:
-        - TfIdfIndex
-        - Index
-      related_relation_ids:
-        - TfIdfIndex-is_a-Index
-      expected_result:
-        zh: 将该对象保持为 SparseVector，不归入 TfIdfIndex 层级。
-        en: Keep the object as SparseVector and do not place it in the TfIdfIndex hierarchy.
-        ja: 対象を SparseVector に留め、TfIdfIndex 階層へ入れません。
-      why_valid_or_invalid:
-        zh: 单条稀疏表示只有非零坐标，不拥有拟合语料、稳定词表、IDF 数组或跨文档查询生命周期。
-        en: One sparse representation has non-zero coordinates only and owns no fitted corpus, stable vocabulary, IDF array, or cross-document query lifecycle.
-        ja: 一つの sparse representation は非 zero 座標だけを持ち、fitted corpus・安定語彙・IDF 配列・文書横断 query lifecycle を所有しません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-tf-idf-index-007
-  source_claims:
-    - claim-tf-idf-index-007
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: pending
+  examples: []
+  source_claims: [claim-tfidf-index-design]
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-pinecone-sparse
+    title: Pinecone Sparse Vectors
+    publisher: Pinecone
+    url: https://docs.pinecone.io/guides/data/import-sparse-vectors
+    source_type: official-doc
+    relevance: Sparse vector upsert for lexical retrieval.
+  - id: src-chroma-query
+    title: Chroma Query and Get
+    publisher: Chroma
+    url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+    source_type: official-doc
+    relevance: Metadata and retrieval complement to dense embeddings.
+  - id: src-tfidf-index-design
+    title: Moonweave memory-embedding-indexes module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: TfIdfIndex versus VectorIndex boundary.
 source_claims:
-  - id: claim-tf-idf-index-001
-    source: eng-ml-sklearn-tfidf-vectorizer
-    supports: scikit-learn 1.9 documents TfidfVectorizer as a fitted vocabulary-and-IDF transformer producing document-term matrices.
-    locator: scikit-learn 1.9 API > TfidfVectorizer > parameters, learned vocabulary, IDF, and transform output
+  - id: claim-tfidf-index-bm25
+    source: src-pinecone-sparse
+    supports: Pinecone supports sparse vector upsert with indices and values for lexical-style retrieval.
+    locator: Import sparse vectors
+    evidence_kind: primary-doc
+    confidence: high
+  - id: claim-tfidf-index-design
+    source: src-tfidf-index-design
+    supports: TfIdfIndex fixes lexical configuration and SparseVector representation distinct from dense VectorIndex.
+    locator: TfIdfIndex boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-tf-idf-index-002
-    source: eng-ml-sklearn-tfidf-vectorizer
-    supports: TfIdfIndex.index_id records the fitted lexical index identity; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: scikit-learn 1.9 API > TfidfVectorizer > parameters, learned vocabulary, IDF, and transform output
+  - id: claim-tfidf-index-id
+    source: src-tfidf-index-design
+    supports: index_id inherits from Index identity.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-tf-idf-index-003
-    source: eng-ml-sklearn-tfidf-vectorizer
-    supports: TfIdfIndex.vocabulary_digest records the learned vocabulary state; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: scikit-learn 1.9 API > TfidfVectorizer > parameters, learned vocabulary, IDF, and transform output
+  - id: claim-tfidf-index-tokenizer
+    source: src-tfidf-index-design
+    supports: tokenizer_profile pins lexical preprocessing rules.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-tf-idf-index-004
-    source: eng-ml-sklearn-tfidf-vectorizer
-    supports: TfIdfIndex.analyzer_profile records reproducible TF-IDF feature construction; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: scikit-learn 1.9 API > TfidfVectorizer > parameters, learned vocabulary, IDF, and transform output
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-tf-idf-index-005
-    source: eng-ml-sklearn-tfidf-vectorizer
-    supports: scikit-learn documents TfidfVectorizer's learned vocabulary, IDF state, analyzer, and sparse transform output.
-    locator: scikit-learn 1.9 API > TfidfVectorizer > parameters, learned vocabulary, IDF, and transform output
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-tf-idf-index-006
-    source: eng-ml-sklearn-tfidf-vectorizer
-    supports: scikit-learn distinguishes the fitted vectorizer state from each transformed sparse matrix row.
-    locator: scikit-learn 1.9 API > TfidfVectorizer > parameters, learned vocabulary, IDF, and transform output
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-tf-idf-index-007
-    source: eng-ml-sklearn-tfidf-vectorizer
-    supports: scikit-learn documents TfidfVectorizer's fitted vocabulary, IDF, analyzer, and sparse transform output.
-    locator: scikit-learn 1.9 API > TfidfVectorizer > parameters, learned vocabulary, IDF, and transform output
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

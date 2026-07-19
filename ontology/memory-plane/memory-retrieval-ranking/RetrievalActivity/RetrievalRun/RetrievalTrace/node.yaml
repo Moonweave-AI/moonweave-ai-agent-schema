@@ -1,34 +1,59 @@
 schema: moonweave.ai/ontology-node/v1
 id: RetrievalTrace
 kind: concept
-status: accepted
 labels:
   zh: 检索追踪记录
   en: Retrieval trace
   ja: 検索trace
 semantics:
   short_definition:
-    zh: 记录一次检索运行的请求、实际索引版本、阶段身份和关键配置的可重放追踪信息。
-    en: A replay record of one retrieval run's request, actual index version, stage identities, and material configuration.
-    ja: 一retrieval runのrequest・actual index version・stage identity・主要configurationを記録するreplay traceです。
+    zh: 可重放检索阶段的审计记录。
+    en: Audit record replaying retrieval stages.
+    ja: retrieval stage を replay 可能な監査 record。
   definition:
-    zh: RetrievalTrace 是 RetrievalRun 的组成信息，按执行顺序记录请求、实际 IndexVersion、候选生成和排序活动及其版本化参数；它支持定位首个分歧阶段，但不是通用日志流、运行本身或最终结果。
-    en: RetrievalTrace is the information component of RetrievalRun that records the request, actual IndexVersion, candidate-generation and ranking activities, and their versioned parameters in execution order. It supports locating the first divergent replay stage but is not a generic log stream, the run itself, or the final result.
-    ja: RetrievalTrace はRetrievalRunのinformation componentでrequest・actual IndexVersion・candidate-generation/ranking activity・versioned parameterを実行順に記録します。first divergent replay stageを特定しますがgeneric log stream・run自体・final resultではありません。
+    zh: RetrievalTrace 记录一次 RetrievalRun 的阶段链：实际 IndexVersion、各 CandidateGenerationActivity/RankingOperation 参数（含 RRF rank_constant、Cohere model/top_n、top_k）与产物引用；用于解释为何返回特定候选顺序，不是运行本身或 ContextPackage。
+    en: "RetrievalTrace records a RetrievalRun stage chain: actual IndexVersion, each CandidateGenerationActivity/RankingOperation parameter (including RRF rank_constant, Cohere model/top_n, top_k), and artifact references. It explains why a specific candidate order was returned; it is not the run itself or a ContextPackage."
+    ja: RetrievalTrace は RetrievalRun の stage chain（actual IndexVersion、RRF rank_constant、Cohere model/top_n、top_k 等）と artifact 参照を記録。candidate 順序説明用で run 自体/ContextPackage ではない。
   why_needed:
-    zh: 为可重放检索提供最小充分的阶段、版本和参数证据。
-    en: Provides minimally sufficient stage, version, and parameter evidence for replayable retrieval.
-    ja: replayable retrievalに最小十分なstage・version・parameter evidenceを提供します。
+    zh: 没有 trace，就无法回答“换 rrf_k=60 为 30 后顺序为何变化”或“Cohere 模型升级后分数来自哪一阶段”。
+    en: Without trace, teams cannot explain order changes when rrf_k shifts from 60 to 30 or which stage produced scores after a Cohere model upgrade.
+    ja: trace がなければ rrf_k 変更や Cohere model 升级後の score 由来を説明できません。
   includes:
-    - zh: 纳入能把运行还原到请求、索引版本、阶段顺序与不可替代模型/参数的结构化记录。
-      en: Includes structured records that reconstruct request, index version, stage order, and non-substitutable model or parameter choices.
-      ja: request・index version・stage order・置換不能model/parameterを再構成できるstructured recordを含みます。
+    - zh: 纳入含 stage 列表、参数与产物引用的可重放审计记录。
+      en: Includes replayable audit records with stage lists, parameters, and artifact references.
+      ja: stage 列表・参数・artifact 参照を含む replayable audit record。
   excludes:
-    - zh: 排除无关联日志文本、仅有最终候选的结果、指标汇总和上下文追踪。
-      en: Excludes uncorrelated log text, results containing only final candidates, metric summaries, and context traces.
-      ja: 未相関log text・final candidateだけのresult・metric summary・context traceを除外します。
+    - zh: 排除运行对象、原始日志流与上下文包。
+      en: Excludes run objects, raw log streams, and context packages.
+      ja: run object・raw log stream・context package を除外。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: trace JSON 应包含 stages[]：method、limit/top_k、rrf_k、rerank_model；绑定 actual_index_version_id。
+    en: Trace JSON should include stages[] with method, limit/top_k, rrf_k, rerank_model bound to actual_index_version_id.
+    ja: trace JSON に stages[]（method/limit/top_k/rrf_k/rerank_model）と actual_index_version_id。
+  typical_input: []
+  typical_output: []
+  reference_implementations:
+    - name: Mem0 Search API
+      url: https://docs.mem0.ai
+      description: POST /v1/memories/search/
+    - name: Pinecone Query
+      url: https://docs.pinecone.io/guides/search/query-data
+      description: index.query
+    - name: Chroma Query
+      url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+      description: collection.query
+    - name: LangGraph Store Search
+      url: https://langchain-ai.github.io/langgraph/reference/store/
+      description: BaseStore.search
+    - name: Cohere Rerank API
+      url: https://docs.cohere.com/reference/rerank
+      description: POST /v2/rerank
+    - name: ColBERT
+      url: https://arxiv.org/abs/2004.12832
+      description: MaxSim scoring
 structure:
   identity_keys:
     - trace_id
@@ -36,134 +61,131 @@ structure:
     - id: trace_id
       labels:
         zh: 追踪标识
-        en: trace ID
-        ja: trace ID
+        en: Trace identifier
+        ja: trace 識別子
+      definitions:
+        zh: 稳定标识一次检索追踪记录。
+        en: Stable identifier for one retrieval trace.
+        ja: 一 retrieval trace を安定識別。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 稳定标识一次检索运行的追踪记录。
-        en: Stable identifier for one retrieval run's trace record.
-        ja: 一retrieval runのtrace recordを安定識別します。
-      allowed_values: []
       pattern: null
-      example_value: retrieval-trace-426
+      example_value: trace-426
+      allowed_values: []
       source_claims:
-        - claim-retrieval-trace-002
-    - id: run_id
+        - claim-retrieval-trace-id
+    - id: retrieval_run_id
       labels:
-        zh: 运行标识
-        en: run ID
-        ja: run ID
+        zh: 检索运行标识
+        en: Retrieval run identifier
+        ja: retrieval run 識別子
+      definitions:
+        zh: 所属 RetrievalRun。
+        en: Owning RetrievalRun.
+        ja: 所属 RetrievalRun。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 标识该追踪记录所属的 RetrievalRun。
-        en: Identifies the RetrievalRun owning this trace.
-        ja: このtraceを所有するRetrievalRunを識別します。
-      allowed_values: []
       pattern: null
-      example_value: retrieval-run-411
+      example_value: run-411
+      allowed_values: []
       source_claims:
-        - claim-retrieval-trace-003
-    - id: stage_sequence
+        - claim-retrieval-trace-run
+    - id: actual_index_version_id
       labels:
-        zh: 阶段序列
-        en: stage sequence
-        ja: stage sequence
-      datatype: array<string>
+        zh: 实际索引版本
+        en: Actual index version
+        ja: 実際 index 版
+      definitions:
+        zh: 重放必须匹配的 IndexVersion。
+        en: IndexVersion replay must match.
+        ja: replay 一致必須 IndexVersion。
+      datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 按实际执行顺序记录阶段活动标识。
-        en: Records stage activity identifiers in actual execution order.
-        ja: 実際execution orderでstage activity IDを記録します。
-      allowed_values: []
       pattern: null
-      example_value:
-        - candidate-generation-412
-        - candidate-scoring-414
-        - rank-fusion-415
-        - rerank-416
-        - topk-417
+      example_value: index-v19
+      allowed_values: []
       source_claims:
-        - claim-retrieval-trace-004
+        - claim-retrieval-trace-index
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: RetrievalTrace-example-positive-manual-001
-    kind: positive
+  - id: RetrievalTrace-example-hybrid
     labels:
-      zh: 检索追踪记录正例
-      en: "Positive case: Retrieval trace"
-      ja: 検索trace正例
-    scenario_id: null
+      zh: Hybrid 流水线 trace
+      en: Hybrid pipeline trace
+      ja: Hybrid pipeline trace
     descriptions:
-      zh: trace-426 记录 request-419、index-v19 与五个实际阶段的顺序和版本。
-      en: trace-426 records request-419, index-v19, and the order and versions of five actual stages.
-      ja: trace-426 はrequest-419・index-v19・五actual stageのorder/versionを記録します。
+      zh: trace-426 记录 run-411：BM25 limit=40、dense top_k=40、RRF rrf_k=60、Cohere rerank-v3.5 top_n=10、final top_k=5。
+      en: "trace-426 records run-411: BM25 limit=40, dense top_k=40, RRF rrf_k=60, Cohere rerank-v3.5 top_n=10, final top_k=5."
+      ja: trace-426 が stage 参数链を記録。
+    example_source:
+      product: https://moonweave.ai/ontology/agent-system/2.0.0/
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: stage chain
     field_values:
-      trace_id: retrieval-trace-426
-      run_id: retrieval-run-411
-      stage_sequence:
-        - candidate-generation-412
-        - candidate-scoring-414
-        - rank-fusion-415
-        - rerank-416
-        - topk-417
+      trace_id: trace-426
+      retrieval_run_id: run-411
+      actual_index_version_id: index-v19
+      stages:
+        - method: RRF
+          rrf_k: 60
+        - method: cohere-rerank-v3.5
+          top_n: 10
     related_node_ids:
       - RetrievalTrace
     related_relation_ids: []
-    expected_result:
-      zh: 归类为 RetrievalTrace。
-      en: Classify the object as RetrievalTrace.
-      ja: RetrievalTrace として分類します。
-    why_valid_or_invalid:
-      zh: 记录足以从同一请求与索引版本逐阶段重放并定位差异。
-      en: The record is sufficient to replay from the same request and index version and locate stage divergence.
-      ja: 同じrequest/index versionからstage別replayしdivergenceを特定できます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-retrieval-trace-005
-  - id: RetrievalTrace-example-boundary-manual-001
-    kind: boundary
+      - claim-retrieval-trace-hybrid
+  - id: RetrievalTrace-example-mem0
     labels:
-      zh: 检索追踪记录边界例
-      en: "Boundary case: Retrieval trace"
-      ja: 検索trace境界例
-    scenario_id: null
+      zh: Mem0 trace
+      en: Mem0 trace
+      ja: Mem0 trace
     descriptions:
-      zh: log-426 只写“检索完成”，没有请求、索引版本或阶段参数。
-      en: log-426 only says 'retrieval completed' and omits request, index version, and stage parameters.
-      ja: log-426 はretrieval completedとだけ記しrequest・index version・stage parameterがありません。
+      zh: trace-427 记录 Mem0 search query digest、user_id、top_k=5 与 returned memory ids。
+      en: trace-427 records Mem0 search query digest, user_id, top_k=5, and returned memory ids.
+      ja: trace-427 が Mem0 search 参数を記録。
+    example_source:
+      product: Mem0
+      url: https://docs.mem0.ai
+      version: search trace
+    field_values:
+      trace_id: trace-427
+      retrieval_run_id: run-411
+    related_node_ids:
+      - RetrievalTrace
+    related_relation_ids: []
+    source_claims:
+      - claim-retrieval-trace-mem0
+  - id: RetrievalTrace-example-not-result
+    labels:
+      zh: Trace 非 Result
+      en: Trace is not Result
+      ja: trace は result ではない
+    descriptions:
+      zh: RetrievalResult 封装返回候选；RetrievalTrace 解释如何得到该顺序。
+      en: RetrievalResult packages returned candidates; RetrievalTrace explains how that order was produced.
+      ja: RetrievalResult は返却候補、RetrievalTrace は順序生成過程。
+    example_source:
+      product: https://moonweave.ai/ontology/agent-system/2.0.0/
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
     field_values: {}
     related_node_ids:
       - RetrievalTrace
+      - RetrievalResult
     related_relation_ids: []
-    expected_result:
-      zh: 不得归类为 RetrievalTrace。
-      en: Do not classify the object as RetrievalTrace.
-      ja: RetrievalTrace として分類しません。
-    why_valid_or_invalid:
-      zh: 它不足以作为可重放 RetrievalTrace。
-      en: It is insufficient as a replayable RetrievalTrace.
-      ja: replayable RetrievalTraceとして不十分です。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-retrieval-trace-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-retrieval-trace-boundary
 parent_relation:
   id: RetrievalRun-has_trace-RetrievalTrace
   predicate: part_of
@@ -198,18 +220,16 @@ parent_relation:
         en: Assert only when the RetrievalTrace is a non-substitutable information component within this RetrievalRun's identity boundary and activity identity is not conflated with artifact identity.
         ja: RetrievalTraceがこのRetrievalRun identity boundary内の置換不能information componentでactivity/artifact identityを混同しない場合だけassertします。
       source_claims:
-        - claim-retrieval-trace-007
+        - claim-retrieval-trace-id
   temporal_scope: valid-time
   boundary_context: null
   constraints: []
   examples:
     - id: RetrievalRun-has_trace-RetrievalTrace-example-positive-manual-001
-      kind: positive
       labels:
         zh: has_trace RetrievalTrace正例
         en: "Positive case: has_trace RetrievalTrace"
         ja: RetrievalTraceをhas_trace正例
-      scenario_id: null
       descriptions:
         zh: run-411 拥有 trace-426，二者共享 run_id。
         en: run-411 owns trace-426 and both share run_id.
@@ -220,25 +240,13 @@ parent_relation:
         - RetrievalTrace
       related_relation_ids:
         - RetrievalRun-has_trace-RetrievalTrace
-      expected_result:
-        zh: 建立该有向事实，并保留条件与证据。
-        en: Assert the directed fact with its condition and evidence retained.
-        ja: condition/evidenceを保持してdirected factをassertします。
-      why_valid_or_invalid:
-        zh: 实例满足端点定义、方向和该关系的显式成立条件。
-        en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-        ja: endpoint定義・direction・明示assertion conditionを満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-retrieval-trace-007
+        - claim-retrieval-trace-id
     - id: RetrievalRun-has_trace-RetrievalTrace-example-boundary-manual-001
-      kind: boundary
       labels:
         zh: has_trace RetrievalTrace边界例
         en: "Boundary case: has_trace RetrievalTrace"
         ja: RetrievalTraceをhas_trace境界例
-      scenario_id: null
       descriptions:
         zh: 通用监控日志没有完整运行重放身份。
         en: A generic monitoring log lacks complete run-replay identity.
@@ -249,23 +257,12 @@ parent_relation:
         - RetrievalTrace
       related_relation_ids:
         - RetrievalRun-has_trace-RetrievalTrace
-      expected_result:
-        zh: 验证器不得建立该有向关系事实。
-        en: Do not assert the directed fact.
-        ja: directed factをassertしません。
-      why_valid_or_invalid:
-        zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-        en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-        ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-retrieval-trace-007
+        - claim-retrieval-trace-id
   source_claims:
-    - claim-retrieval-trace-007
+    - claim-retrieval-trace-id
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: pending
   endpoint_order: parent-to-child
 relations:
   - id: RetrievalTrace-records-IndexVersion
@@ -301,18 +298,16 @@ relations:
           en: Assert only when the trace value agrees with the RetrievalRun-reads-IndexVersion fact.
           ja: trace version値がRetrievalRun-reads-IndexVersion factと一致する時だけassertします。
         source_claims:
-          - claim-retrieval-trace-008
+          - claim-retrieval-trace-id
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
       - id: RetrievalTrace-records-IndexVersion-example-positive-manual-001
-        kind: positive
         labels:
           zh: records IndexVersion正例
           en: "Positive case: records IndexVersion"
           ja: IndexVersionをrecords正例
-        scenario_id: null
         descriptions:
           zh: trace-426 records actual index-v19。
           en: trace-426 records actual index-v19.
@@ -323,25 +318,13 @@ relations:
           - IndexVersion
         related_relation_ids:
           - RetrievalTrace-records-IndexVersion
-        expected_result:
-          zh: 建立该有向事实，并保留条件与证据。
-          en: Assert the directed fact with its condition and evidence retained.
-          ja: condition/evidenceを保持してdirected factをassertします。
-        why_valid_or_invalid:
-          zh: 实例满足端点定义、方向和该关系的显式成立条件。
-          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-          ja: endpoint定義・direction・明示assertion conditionを満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-retrieval-trace-008
+          - claim-retrieval-trace-id
       - id: RetrievalTrace-records-IndexVersion-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: records IndexVersion边界例
           en: "Boundary case: records IndexVersion"
           ja: IndexVersionをrecords境界例
-        scenario_id: null
         descriptions:
           zh: 请求目标与实际读取版本不一致时不得记录错误版本。
           en: Do not record the requested target as actual when a different version was read.
@@ -352,23 +335,12 @@ relations:
           - IndexVersion
         related_relation_ids:
           - RetrievalTrace-records-IndexVersion
-        expected_result:
-          zh: 验证器不得建立该有向关系事实。
-          en: Do not assert the directed fact.
-          ja: directed factをassertしません。
-        why_valid_or_invalid:
-          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-retrieval-trace-008
+          - claim-retrieval-trace-id
     source_claims:
-      - claim-retrieval-trace-008
+      - claim-retrieval-trace-id
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:IndexVersion
   - id: RetrievalTrace-records-RankingOperation
     predicate: records
@@ -403,18 +375,16 @@ relations:
           en: Assert only when the operation is a phase of this run and its parameter snapshot is sufficient for replay.
           ja: operationがこのrun phaseでparameter snapshotがreplayに十分な時だけassertします。
         source_claims:
-          - claim-retrieval-trace-008
+          - claim-retrieval-trace-id
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
       - id: RetrievalTrace-records-RankingOperation-example-positive-manual-001
-        kind: positive
         labels:
           zh: records RankingOperation正例
           en: "Positive case: records RankingOperation"
           ja: RankingOperationをrecords正例
-        scenario_id: null
         descriptions:
           zh: trace-426 records ranking-413 and its RRF/rerank/TopK parameters。
           en: trace-426 records ranking-413 and its RRF, rerank, and Top-K parameters.
@@ -425,25 +395,13 @@ relations:
           - RankingOperation
         related_relation_ids:
           - RetrievalTrace-records-RankingOperation
-        expected_result:
-          zh: 建立该有向事实，并保留条件与证据。
-          en: Assert the directed fact with its condition and evidence retained.
-          ja: condition/evidenceを保持してdirected factをassertします。
-        why_valid_or_invalid:
-          zh: 实例满足端点定义、方向和该关系的显式成立条件。
-          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-          ja: endpoint定義・direction・明示assertion conditionを満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-retrieval-trace-008
+          - claim-retrieval-trace-id
       - id: RetrievalTrace-records-RankingOperation-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: records RankingOperation边界例
           en: "Boundary case: records RankingOperation"
           ja: RankingOperationをrecords境界例
-        scenario_id: null
         descriptions:
           zh: 只记录“ranking complete”而无阶段参数不能建立。
           en: A 'ranking complete' string without stage parameters does not establish this edge.
@@ -454,23 +412,12 @@ relations:
           - RankingOperation
         related_relation_ids:
           - RetrievalTrace-records-RankingOperation
-        expected_result:
-          zh: 验证器不得建立该有向关系事实。
-          en: Do not assert the directed fact.
-          ja: directed factをassertしません。
-        why_valid_or_invalid:
-          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-retrieval-trace-008
+          - claim-retrieval-trace-id
     source_claims:
-      - claim-retrieval-trace-008
+      - claim-retrieval-trace-id
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:RankingOperation
   - id: RetrievalTrace-records-RetrievalRequest
     predicate: records
@@ -505,18 +452,16 @@ relations:
           en: Assert only when the trace's run fulfills the same request_id.
           ja: trace.run_id所属runが同じrequest_idをfulfillする時だけassertします。
         source_claims:
-          - claim-retrieval-trace-009
+          - claim-retrieval-trace-id
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
       - id: RetrievalTrace-records-RetrievalRequest-example-positive-manual-001
-        kind: positive
         labels:
           zh: records RetrievalRequest正例
           en: "Positive case: records RetrievalRequest"
           ja: RetrievalRequestをrecords正例
-        scenario_id: null
         descriptions:
           zh: trace-426 records request-419。
           en: trace-426 records request-419.
@@ -527,25 +472,13 @@ relations:
           - RetrievalRequest
         related_relation_ids:
           - RetrievalTrace-records-RetrievalRequest
-        expected_result:
-          zh: 建立该有向事实，并保留条件与证据。
-          en: Assert the directed fact with its condition and evidence retained.
-          ja: condition/evidenceを保持してdirected factをassertします。
-        why_valid_or_invalid:
-          zh: 实例满足端点定义、方向和该关系的显式成立条件。
-          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-          ja: endpoint定義・direction・明示assertion conditionを満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-retrieval-trace-009
+          - claim-retrieval-trace-id
       - id: RetrievalTrace-records-RetrievalRequest-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: records RetrievalRequest边界例
           en: "Boundary case: records RetrievalRequest"
           ja: RetrievalRequestをrecords境界例
-        scenario_id: null
         descriptions:
           zh: 相同 query_text 的另一请求不能替换 request-419。
           en: Another request with the same query_text cannot substitute for request-419.
@@ -556,101 +489,71 @@ relations:
           - RetrievalRequest
         related_relation_ids:
           - RetrievalTrace-records-RetrievalRequest
-        expected_result:
-          zh: 验证器不得建立该有向关系事实。
-          en: Do not assert the directed fact.
-          ja: directed factをassertしません。
-        why_valid_or_invalid:
-          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-retrieval-trace-009
+          - claim-retrieval-trace-id
     source_claims:
-      - claim-retrieval-trace-009
+      - claim-retrieval-trace-id
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:RetrievalRequest
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-memory-retrieval-design
+    title: Moonweave design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Module boundary.
+  - id: src-mem0-search
+    title: Mem0 Platform Documentation
+    publisher: Mem0
+    url: https://docs.mem0.ai
+    source_type: official-doc
+    relevance: Mem0 search API.
+  - id: src-elastic-rrf
+    title: Elasticsearch RRF
+    publisher: Elastic
+    url: https://www.elastic.co/guide/en/elasticsearch/reference/current/rrf.html
+    source_type: official-doc
+    relevance: RRF formula.
+  - id: src-cohere-rerank
+    title: Cohere Rerank API
+    publisher: Cohere
+    url: https://docs.cohere.com/reference/rerank
+    source_type: official-doc
+    relevance: POST /v2/rerank.
 source_claims:
-  - id: claim-retrieval-trace-001
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents ordered prefetch, fusion, nested-query, limit, and score parameters whose values materially affect multi-stage output; Moonweave records them in a replay trace.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+  - id: claim-retrieval-trace-hybrid
+    source: src-memory-retrieval-design
+    supports: Trace records multi-stage parameters for replay.
+    locator: stages
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieval-trace-002
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents ordered prefetch, fusion, nested-query, limit, and score parameters whose values materially affect multi-stage output; Moonweave records them in a replay trace. Moonweave records RetrievalTrace.trace_id as the stated auditable datum: Stable identifier for one retrieval run's trace record."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+  - id: claim-retrieval-trace-mem0
+    source: src-mem0-search
+    supports: Mem0 search parameters belong in trace.
+    locator: search
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-retrieval-trace-boundary
+    source: src-memory-retrieval-design
+    supports: Trace is distinct from RetrievalResult.
+    locator: boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieval-trace-003
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents ordered prefetch, fusion, nested-query, limit, and score parameters whose values materially affect multi-stage output; Moonweave records them in a replay trace. Moonweave records RetrievalTrace.run_id as the stated auditable datum: Identifies the RetrievalRun owning this trace."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+  - id: claim-retrieval-trace-id
+    source: src-memory-retrieval-design
+    supports: trace_id identifies the trace.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieval-trace-004
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents ordered prefetch, fusion, nested-query, limit, and score parameters whose values materially affect multi-stage output; Moonweave records them in a replay trace. Moonweave records RetrievalTrace.stage_sequence as the stated auditable datum: Records stage activity identifiers in actual execution order."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+  - id: claim-retrieval-trace-run
+    source: src-memory-retrieval-design
+    supports: retrieval_run_id links trace to run.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieval-trace-005
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents ordered prefetch, fusion, nested-query, limit, and score parameters whose values materially affect multi-stage output; Moonweave records them in a replay trace. Multi-stage retrieval semantics make stage order and parameter capture necessary for reproducibility.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+  - id: claim-retrieval-trace-index
+    source: src-memory-retrieval-design
+    supports: actual_index_version_id required for replay.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieval-trace-006
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents ordered prefetch, fusion, nested-query, limit, and score parameters whose values materially affect multi-stage output; Moonweave records them in a replay trace. The documented multi-stage mechanisms require material stage inputs and parameters, not a completion string alone.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-retrieval-trace-007
-    source: eng-vector-qdrant-hybrid-query
-    supports: The cited official retrieval documentation supports the component roles of these endpoints; Moonweave makes the ownership direction explicit for a non-duplicative graph.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-retrieval-trace-008
-    source: eng-vector-qdrant-hybrid-query
-    supports: The cited official documentation supports the endpoint roles and direction of this retrieval fact; the exact relation identifier and ownership boundary are Moonweave design decisions.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-retrieval-trace-009
-    source: eng-fw-langchain-retrieval
-    supports: The cited official documentation supports the endpoint roles and direction of this retrieval fact; the exact relation identifier and ownership boundary are Moonweave design decisions.
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

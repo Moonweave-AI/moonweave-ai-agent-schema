@@ -1,34 +1,75 @@
 schema: moonweave.ai/ontology-node/v1
 id: ControlGate
 kind: concept
-status: accepted
 labels:
   zh: 编排控制门
   en: orchestration control gate
-  ja: orchestration control gate
+  ja: オーケストレーション制御ゲート
 semantics:
   short_definition:
-    zh: 在编排流程控制点求值 GateCondition 并约束下一步控制流的 Gate。
-    en: A Gate that evaluates GateCondition at an orchestration control point and constrains the next control-flow step.
-    ja: orchestration control point で GateCondition を evaluate し next control flow を constrain する Gate。
+    zh: 部署在编排控制点、求值 GateCondition 并约束下一步控制流的 Gate。
+    en: A Gate deployed at an orchestration control point that evaluates GateCondition and constrains the next control-flow step.
+    ja: orchestration control point に配置され GateCondition を evaluate して next control flow を constrain する Gate です。
   definition:
-    zh: 编排控制门是 Gate 的子类，其种差是部署在编排控制点，读取当前状态与证据、求值 GateCondition 并产生 GateOutcome，供 RoutingDecision 选择继续、阻断、重试、转向、升级或停止。它不是所有 Gate 的上位类，也不是一次 GateOutcome。
-    en: A ControlGate is a Gate distinguished by deployment at an orchestration control point, where it reads current state and evidence, evaluates GateCondition, and produces GateOutcome for a RoutingDecision to continue, block, retry, redirect, escalate, or stop. It is neither the superclass of every Gate nor one GateOutcome.
-    ja: ControlGate は orchestration control point に配置され state/evidence を読み GateCondition を evaluate して GateOutcome を生成し RoutingDecision が continue/block/retry/redirect/escalate/stop を選ぶ Gate subtype です。Gate の superclass や outcome ではありません。
+    zh: ControlGate 是 Gate 的子类，种差为部署在编排控制点：读取当前状态与证据、求值 GateCondition 并产生 GateOutcome，供 RoutingDecision 选择继续、阻断、重试、转向、升级或停止。Cursor Agent 模式在 rewrite/lint/typecheck/test 验证步骤前部署 ControlGate；LangGraph 节点后的质量检查同理。它不是所有 Gate 的上位类，也不是一次 GateOutcome。
+    en: A ControlGate is a Gate distinguished by deployment at an orchestration control point, where it reads current state and evidence, evaluates GateCondition, and produces GateOutcome for RoutingDecision to continue, block, retry, redirect, escalate, or stop. Cursor agent mode deploys ControlGate before rewrite/lint/typecheck/test verification steps; LangGraph post-node quality checks follow the same pattern. It is neither the superclass of every Gate nor one GateOutcome.
+    ja: ControlGate は orchestration control point に配置され state/evidence を読み GateCondition を evaluate して GateOutcome を生成し RoutingDecision が continue/block/retry/redirect/escalate/stop を選ぶ Gate subtype です。Cursor Agent モードは rewrite/lint/typecheck/test 前に ControlGate を配置します。
   why_needed:
-    zh: 修正 Gate 与 ControlGate 的倒置关系，使领域专用门可共享通用能力。
-    en: Correcting the Gate-ControlGate inversion lets domain-specific gates share the general capability.
-    ja: Gate-ControlGate inversion を修正し domain-specific gate が general capability を共有できます。
+    zh: 把编排控制点门控与领域专用门（如 CommitGate）分开，使质量、安全与验证门共享通用 Gate 身份而不倒置层级。
+    en: Separating orchestration control gates from domain-specific gates such as CommitGate lets quality, safety, and verification gates share Gate identity without reversing the hierarchy.
+    ja: orchestration control gate を domain-specific gate から分け quality/safety/verification gate が Gate identity を共有します。
   includes:
-    - zh: 工作流步骤前的质量门、安全门、预算门、人工检查门和结果验收门。
-      en: Quality, safety, budget, human-review, and result-acceptance gates before workflow steps.
-      ja: workflow step 前の quality・safety・budget・human-review・acceptance gate。
+    - zh: 工作流步骤前的质量门、安全门、预算门、人工检查门、Cursor 验证门和结果验收门。
+      en: Quality, safety, budget, human-review, Cursor verification, and result-acceptance gates before workflow steps.
+      ja: workflow step 前の quality・safety・budget・human-review・Cursor verification・acceptance gate。
   excludes:
     - zh: 提交专用 CommitGate、工具审批专用门、条件规范和结果记录。
       en: A commit-specific CommitGate, tool-approval gate, condition specification, and outcome record.
       ja: commit-specific CommitGate・tool approval gate・condition spec・outcome record。
   semantic_kind: capability
   aliases: []
+engineering:
+  explanation:
+    zh: 映射 Cursor Agent 多步验证（lint/typecheck/test 通过后 proceed）；LangGraph 节点输出后的 eval-score 阈值检查；OpenAI Agents SDK 在 handoff 前的 guardrail 检查。control_point_ref 应对应 graph 边或 agent 步骤 ID；GateCondition 引用可复用阈值规范；一次 eval 产生 GateOutcome 供 RoutingDecision 消费。
+    en: Maps Cursor agent multi-step verification (proceed after lint/typecheck/test pass); LangGraph post-node eval-score threshold checks; OpenAI Agents SDK guardrail checks before handoffs. control_point_ref should match a graph edge or agent step ID; GateCondition references reusable threshold specs; one evaluation produces GateOutcome consumed by RoutingDecision.
+    ja: Cursor Agent 多段検証、LangGraph post-node eval-score 閾値、OpenAI guardrail を写像します。control_point_ref は graph edge/agent step ID に対応し GateCondition は reusable threshold を参照します。
+  typical_input:
+    - description: Cursor agent verification gate after file rewrite.
+      format: |
+        control_point: after-rewrite-before-commit
+        gate_condition_ref: gate-quality@5
+        evidence:
+          linter: pass
+          typecheck: pass
+          test: fail
+          eval_score: 0.62
+      source_claims: [claim-control-gate-design]
+    - description: LangGraph node post-execution quality gate.
+      format: |
+        control_point_ref: after-draft-before-publish
+        gate_ref: control-gate-4@3
+        evidence_refs: [score-44, safety-decision-9]
+      source_claims: [claim-control-gate-langgraph]
+  typical_output:
+    - description: GateOutcome from ControlGate evaluation.
+      format: |
+        {
+          "gate_outcome_id": "gate-outcome-884",
+          "gate_ref": "control-gate-4@3",
+          "result": "redirect",
+          "evidence_refs": ["score-44"]
+        }
+      source_claims: [claim-control-gate-design]
+  reference_implementations:
+    - name: Cursor Agent Mode
+      url: https://docs.cursor.com/agent
+      description: Multi-step verification gates before proceed.
+    - name: LangGraph
+      url: https://langchain-ai.github.io/langgraph/
+      description: Post-node control gates on shared state evidence.
+    - name: OpenAI Agents SDK
+      url: https://openai.github.io/openai-agents-python/
+      description: Guardrail checks before handoffs and tool calls.
 structure:
   identity_keys: []
   fields:
@@ -50,21 +91,51 @@ structure:
       pattern: null
       example_value: after-draft-before-publish
       source_claims:
-        - claim-control-gate-001
+        - claim-control-gate-langgraph
   constraints: []
   required_relation_constraints: []
 examples:
-  - id: ControlGate-example-positive-manual-20260716
-    kind: positive
+  - id: ControlGate-example-cursor-verification
     labels:
-      zh: 发布前质量门
-      en: Pre-publication quality gate
-      ja: pre-publication quality gate
-    scenario_id: null
+      zh: Cursor 验证控制门
+      en: Cursor verification control gate
+      ja: Cursor 検証制御ゲート
     descriptions:
-      zh: control-gate-4 位于 draft 与 publish 之间，读取评分与安全证据并求值 gate-condition-4。
-      en: control-gate-4 sits between draft and publish, reads score and safety evidence, and evaluates gate-condition-4.
-      ja: control-gate-4 は draft/publish 間で score/safety evidence を読み gate-condition-4 を evaluate します。
+      zh: control-gate-cursor-4 位于 rewrite-node-yaml 与 git-commit 之间，读取 lint/typecheck/test 证据并求值 gate-quality@5；eval-score-991=0.62 低于 0.80 产生 redirect。
+      en: control-gate-cursor-4 sits between rewrite-node-yaml and git-commit, reads lint/typecheck/test evidence, evaluates gate-quality@5, and redirects when eval-score-991=0.62 is below 0.80.
+      ja: control-gate-cursor-4 は rewrite と commit 間で lint/typecheck/test evidence を読み gate-quality@5 を evaluate し 0.62<0.80 で redirect します。
+    example_source:
+      product: Cursor Agent Mode
+      url: https://docs.cursor.com/agent
+      version: verification gates
+    field_values:
+      gate_id: control-gate-cursor-4
+      gate_kind: control
+      decision_function_ref: gate-quality@5
+      version: "4"
+      control_point_ref: after-rewrite-before-commit
+    related_node_ids:
+      - ControlGate
+      - GateCondition
+      - GateOutcome
+    related_relation_ids:
+      - ControlGate-evaluates-GateCondition
+      - ControlGate-produces-GateOutcome
+    source_claims:
+      - claim-control-gate-design
+  - id: ControlGate-example-langgraph-quality
+    labels:
+      zh: LangGraph 发布前质量门
+      en: LangGraph pre-publication quality gate
+      ja: LangGraph 公開前品質ゲート
+    descriptions:
+      zh: control-gate-4 位于 draft 与 publish 节点之间，读取 score-44 与 safety-decision-9 并求值 gate-condition-4。
+      en: control-gate-4 sits between draft and publish nodes, reads score-44 and safety-decision-9, and evaluates gate-condition-4.
+      ja: control-gate-4 は draft/publish 間で score-44/safety-decision-9 を読み gate-condition-4 を evaluate します。
+    example_source:
+      product: LangGraph
+      url: https://langchain-ai.github.io/langgraph/
+      version: StateGraph node gates
     field_values:
       gate_id: control-gate-4
       gate_kind: evidence-threshold
@@ -76,50 +147,28 @@ examples:
       - GateCondition
     related_relation_ids:
       - ControlGate-evaluates-GateCondition
-    expected_result:
-      zh: 建立 ControlGate 并保留 Gate 上位身份。
-      en: Create a ControlGate while retaining its Gate genus.
-      ja: ControlGate を作り Gate genus を保持します。
-    why_valid_or_invalid:
-      zh: 部署位置和求值职责均属于编排控制流。
-      en: Deployment point and evaluation responsibility both belong to orchestration control flow.
-      ja: deployment point/evaluation responsibility が orchestration control flow に属します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-control-gate-001
-  - id: ControlGate-example-boundary-manual-20260716
-    kind: boundary
+      - claim-control-gate-langgraph
+  - id: ControlGate-example-boundary-commit-gate
     labels:
-      zh: 提交确认门
-      en: Commit confirmation gate
-      ja: commit confirmation gate
-    scenario_id: routing-review-controlgate-boundary
+      zh: 提交确认门不是控制门
+      en: Commit confirmation gate is not ControlGate
+      ja: commit confirmation gate は ControlGate ではない
     descriptions:
       zh: commit-gate-2 只决定代码是否可提交，身份由 CommitRequest 与仓库状态决定，不选择编排下游目标。
-      en: commit-gate-2 decides only whether code may be committed; its identity depends on CommitRequest and repository state and it selects no orchestration target.
-      ja: commit-gate-2 は commit 可否のみを決め CommitRequest/repository state で identity が決まり orchestration target を選びません。
+      en: commit-gate-2 decides only whether code may be committed; its identity depends on CommitRequest and repository state and selects no orchestration target.
+      ja: commit-gate-2 は commit 可否のみを決め orchestration target を選びません。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: domain gate boundary
     field_values: {}
     related_node_ids:
       - CommitGate
       - ControlGate
     related_relation_ids: []
-    expected_result:
-      zh: 归 CommitGate 所有域，不创建 ControlGate。
-      en: Keep it in the CommitGate owner module and do not create a ControlGate.
-      ja: CommitGate owner module に置き ControlGate を作りません。
-    why_valid_or_invalid:
-      zh: 同为 Gate 不表示具有编排控制点种差。
-      en: Sharing Gate does not prove the orchestration-control-point differentia.
-      ja: Gate shared genus だけでは orchestration control point differentia を証明しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-control-gate-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-control-gate-design
 parent_relation:
   id: ControlGate-is_a-Gate
   predicate: is_a
@@ -149,72 +198,26 @@ parent_relation:
   boundary_context: null
   constraints: []
   examples:
-    - id: ControlGate-is_a-Gate-example-positive-manual-20260716
+    - id: ControlGate-is_a-Gate-example-positive
       kind: positive
       labels:
-        zh: 发布前质量门继承通用门
-        en: Publication-quality control gate inherits Gate
-        ja: publication quality gate は Gate を継承
-      scenario_id: routing-relation-controlgate-is_a-gate-positive
+        zh: 发布前质量门继承 Gate
+        en: Publication gate inherits Gate
+        ja: 公開前品質ゲートは Gate を継承
       descriptions:
-        zh: control-gate-4 具有通用 gate_id、决定函数和结果集合，并增加控制点。
-        en: control-gate-4 has general gate ID, decision function, and outcome set plus a control point.
-        ja: control-gate-4 は general gate ID/function/outcomes に control point を加えます。
+        zh: control-gate-4 具有 gate_id、决定函数、结果集合与控制点。
+        en: control-gate-4 has gate ID, decision function, outcome set, and control point.
+        ja: control-gate-4 は gate ID/function/outcomes/control point を持ちます。
       field_values: {}
       related_node_ids:
         - ControlGate
         - Gate
       related_relation_ids:
         - ControlGate-is_a-Gate
-      expected_result:
-        zh: 断言 ControlGate → Gate。
-        en: Assert ControlGate → Gate.
-        ja: ControlGate → Gate を assert します。
-      why_valid_or_invalid:
-        zh: 它满足 Gate 属概念和编排控制点种差。
-        en: It satisfies the Gate genus and orchestration-control-point differentia.
-        ja: Gate genus と orchestration-control-point differentia を満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-control-gate-001
-        - claim-control-gate-002
-    - id: ControlGate-is_a-Gate-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 通用合规门不是控制门
-        en: Generic compliance gate is not necessarily ControlGate
-        ja: general compliance gate は ControlGate とは限らない
-      scenario_id: routing-relation-controlgate-is_a-gate-boundary
-      descriptions:
-        zh: gate-compliance 只暴露可调用求值接口，未部署在编排边或节点。
-        en: gate-compliance exposes a callable evaluation interface but is not deployed on an orchestration edge or node.
-        ja: gate-compliance は callable evaluation interface のみで orchestration edge/node に配置されません。
-      field_values: {}
-      related_node_ids:
-        - ControlGate
-        - Gate
-      related_relation_ids:
-        - ControlGate-is_a-Gate
-      expected_result:
-        zh: 该对象仅应分类为通用 Gate，而不能分类为编排 ControlGate。
-        en: Classify only as Gate.
-        ja: Gate のみとします。
-      why_valid_or_invalid:
-        zh: 对象没有部署在编排控制点，因而缺少 ControlGate 的必要种差。
-        en: The orchestration-control-point differentia is absent.
-        ja: orchestration-control-point differentia がありません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-control-gate-001
-        - claim-control-gate-002
+        - claim-control-gate-design
   source_claims:
-    - claim-control-gate-001
-    - claim-control-gate-002
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: accepted
+    - claim-control-gate-design
   endpoint_order: child-to-parent
 relations:
   - id: ControlGate-evaluates-GateCondition
@@ -226,8 +229,8 @@ relations:
       en: evaluates
       ja: 評価する
     definitions:
-      zh: ControlGate 在一个编排控制点把冻结状态和证据绑定到 GateCondition，并执行其阈值与缺失证据规则。
-      en: A ControlGate binds frozen state and evidence to a GateCondition at an orchestration control point and executes its threshold and missing-evidence rules.
+      zh: ControlGate 在编排控制点把冻结状态与证据绑定到 GateCondition 并执行阈值与缺失证据规则。
+      en: A ControlGate binds frozen state and evidence to a GateCondition at an orchestration control point and executes threshold and missing-evidence rules.
       ja: ControlGate は orchestration control point で frozen state/evidence を GateCondition に bind し threshold/missing-evidence rule を実行します。
     cardinality: null
     cardinality_not_applicable_reason:
@@ -245,13 +248,12 @@ relations:
     boundary_context: null
     constraints: []
     examples:
-      - id: ControlGate-evaluates-GateCondition-example-positive-manual-20260716
+      - id: ControlGate-evaluates-GateCondition-example-positive
         kind: positive
         labels:
           zh: 发布门求值质量条件
           en: Publication gate evaluates quality condition
-          ja: publication gate evaluates quality condition
-        scenario_id: routing-relation-controlgate-evaluates-gatecondition-positive
+          ja: 公開ゲートは品質条件を評価
         descriptions:
           zh: control-gate-4 对 gate-quality@5 读取 score-44 与 safety-decision-9。
           en: control-gate-4 evaluates gate-quality@5 using score-44 and safety-decision-9.
@@ -262,55 +264,8 @@ relations:
           - GateCondition
         related_relation_ids:
           - ControlGate-evaluates-GateCondition
-        expected_result:
-          zh: 建立 ControlGate → GateCondition 求值事实。
-          en: Create the ControlGate → GateCondition evaluation fact.
-          ja: ControlGate → GateCondition evaluation fact を作成します。
-        why_valid_or_invalid:
-          zh: 具体门、条件版本和输入证据均已绑定。
-          en: Concrete gate, condition revision, and input evidence are bound.
-          ja: gate・condition revision・input evidence が bind されています。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-control-gate-001
-          - claim-control-gate-002
-      - id: ControlGate-evaluates-GateCondition-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 条件仅被配置但未求值
-          en: Condition configured but not evaluated
-          ja: condition configured but not evaluated
-        scenario_id: routing-relation-controlgate-evaluates-gatecondition-boundary
-        descriptions:
-          zh: workflow@7 引用 gate-quality@5，但运行尚未到达控制点。
-          en: workflow@7 references gate-quality@5 but runtime has not reached the control point.
-          ja: workflow@7 は gate-quality@5 を参照しますが runtime は control point に未到達です。
-        field_values: {}
-        related_node_ids:
-          - ControlGate
-          - GateCondition
-        related_relation_ids:
-          - ControlGate-evaluates-GateCondition
-        expected_result:
-          zh: 只保留配置引用，不断言 evaluates。
-          en: Keep only the configuration reference; do not assert evaluates.
-          ja: configuration reference のみで evaluates を assert しません。
-        why_valid_or_invalid:
-          zh: 仅有配置引用不能证明运行时已经发生条件求值活动。
-          en: Configuration does not prove evaluation occurred.
-          ja: configuration は evaluation occurrence を証明しません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-control-gate-001
-          - claim-control-gate-002
-    source_claims:
-      - claim-control-gate-001
-      - claim-control-gate-002
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
+          - claim-control-gate-langgraph
     target: concept:GateCondition
   - id: ControlGate-produces-GateOutcome
     predicate: produces
@@ -321,9 +276,9 @@ relations:
       en: produces
       ja: 生成する
     definitions:
-      zh: ControlGate 完成一次 GateCondition 求值后产生唯一可追踪的 GateOutcome，记录结果、证据和产生时间。
-      en: After one GateCondition evaluation, ControlGate produces a traceable GateOutcome recording result, evidence, and production time.
-      ja: ControlGate は one GateCondition evaluation 後 result・evidence・time を持つ traceable GateOutcome を生成します。
+      zh: ControlGate 完成 GateCondition 求值后产生可追踪 GateOutcome，记录结果、证据和产生时间。
+      en: After GateCondition evaluation, ControlGate produces a traceable GateOutcome recording result, evidence, and production time.
+      ja: ControlGate は GateCondition evaluation 後 result・evidence・time を持つ traceable GateOutcome を生成します。
     cardinality: null
     cardinality_not_applicable_reason:
       zh: 该关系表达类型级语义，不在此规定实例基数。
@@ -340,13 +295,12 @@ relations:
     boundary_context: null
     constraints: []
     examples:
-      - id: ControlGate-produces-GateOutcome-example-positive-manual-20260716
+      - id: ControlGate-produces-GateOutcome-example-positive
         kind: positive
         labels:
           zh: 质量门产生转向结果
           en: Quality gate produces redirect outcome
-          ja: quality gate produces redirect outcome
-        scenario_id: routing-relation-controlgate-produces-gateoutcome-positive
+          ja: 品質ゲートは redirect outcome を生成
         descriptions:
           zh: control-gate-4 因 score-44 低于阈值产生 gate-outcome-884=redirect。
           en: control-gate-4 produces gate-outcome-884=redirect because score-44 is below threshold.
@@ -357,84 +311,40 @@ relations:
           - GateOutcome
         related_relation_ids:
           - ControlGate-produces-GateOutcome
-        expected_result:
-          zh: 连接具体门与具体结果记录。
-          en: Link the concrete gate to the concrete outcome record.
-          ja: concrete gate と outcome record を接続します。
-        why_valid_or_invalid:
-          zh: 结果含 gate 引用、证据和时间。
-          en: The outcome carries gate reference, evidence, and time.
-          ja: outcome は gate ref・evidence・time を持ちます。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-control-gate-001
-          - claim-control-gate-002
-      - id: ControlGate-produces-GateOutcome-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 接口声明可能结果
-          en: Interface declares possible outcomes
-          ja: interface declares possible outcomes
-        scenario_id: routing-relation-controlgate-produces-gateoutcome-boundary
-        descriptions:
-          zh: gate@3 声明可返回 allow 或 redirect，但没有执行或结果 ID。
-          en: gate@3 declares allow or redirect but has no execution or outcome ID.
-          ja: gate@3 は allow/redirect を宣言しますが execution/outcome ID がありません。
-        field_values: {}
-        related_node_ids:
-          - ControlGate
-          - GateOutcome
-        related_relation_ids:
-          - ControlGate-produces-GateOutcome
-        expected_result:
-          zh: 不创建 produces 事实。
-          en: Do not create a produces fact.
-          ja: produces fact を作りません。
-        why_valid_or_invalid:
-          zh: 接口声明的可能结果集合不能证明某个结果已在运行中产生。
-          en: A possible-outcome set is not a produced outcome.
-          ja: possible outcome set は produced outcome ではありません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-control-gate-001
-          - claim-control-gate-002
-    source_claims:
-      - claim-control-gate-001
-      - claim-control-gate-002
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
+          - claim-control-gate-design
     target: concept:GateOutcome
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-orchestration-tool-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照权威来源逐项完成人工语义核验；概念定义、层级、关系、结构与来源主张成立。
-    en: Manual semantic verification against authoritative sources completed; concept definitions, hierarchy, relations, structure, and source claims hold.
-    ja: 権威ソースに照らし手動意味検証を完了し、概念定義・階層・関係・構造・出典主張が成立。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: langgraph-control-gate
+    title: LangGraph
+    url: https://langchain-ai.github.io/langgraph/
+    source_type: official-doc
+    relevance: Post-node control gates on workflow state evidence.
+  - id: cursor-control-gate
+    title: Cursor Agent documentation
+    url: https://docs.cursor.com/agent
+    source_type: official-doc
+    relevance: Lint/typecheck/test verification gates before proceed.
+  - id: openai-control-gate
+    title: OpenAI Agents SDK
+    url: https://openai.github.io/openai-agents-python/
+    source_type: official-doc
+    relevance: Guardrails before handoffs and tool execution.
+  - id: control-gate-design
+    title: Moonweave routing and gates design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: ControlGate as orchestration-control-point Gate subtype.
 source_claims:
-  - id: claim-control-gate-001
-    source: eng-fw-langgraph-graph-api
-    supports: LangGraph's Graph API distinguishes workflow state, executable nodes, static edges, conditional routing functions, termination targets, and Command values that combine state updates with a selected destination. Moonweave uses this to separate reusable routing specifications and targets from one RoutingDecision occurrence.
-    locator: LangGraph Graph API documentation, Graphs, Edges, Conditional edges, and Command sections
+  - id: claim-control-gate-langgraph
+    source: langgraph-control-gate
+    supports: LangGraph nodes may evaluate shared state evidence at control points before routing continues.
+    locator: Graph API — State, Nodes, conditional routing after evaluation
+    evidence_kind: official
+    confidence: high
+  - id: claim-control-gate-design
+    source: control-gate-design
+    supports: ControlGate is Gate deployed at orchestration control points producing GateOutcome for RoutingDecision.
+    locator: ControlGate concept boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-control-gate-002
-    source: eng-ont-prov-o
-    supports: W3C PROV-O distinguishes plans and other Entities from time-bounded Activities that use or generate Entities. Moonweave therefore treats routing policy and conditions as reusable specifications, RoutingDecision as an occurrence, and GateOutcome as information produced by gate evaluation.
-    locator: W3C PROV-O Recommendation Sections 3.1 and 3.2, Entity, Activity, generation, and Plan
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

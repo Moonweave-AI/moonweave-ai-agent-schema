@@ -1,454 +1,325 @@
 schema: moonweave.ai/ontology-node/v1
 id: InboundResponse
 kind: concept
-status: accepted
 labels:
   zh: 入站响应
   en: inbound response
-  ja: inbound response
+  ja: 受信応答
 semantics:
   short_definition:
-    zh: 从经识别远端返回并对应既有出站请求的响应消息。
-    en: A response message returned from an identified remote endpoint for an existing outbound request.
-    ja: identified remote endpoint から existing outbound request に返る response message。
+    zh: 与特定 OutboundRequest 协议关联的入站响应消息。
+    en: An inbound response message protocol-correlated to a specific OutboundRequest.
+    ja: 特定 OutboundRequest と protocol correlate する inbound response message。
   definition:
-    zh: 入站响应是一种 NetworkMessage，其种差是从远端或代理方向进入受控主体，带状态或结果码、响应端点引用、内容引用、接收时间及可选重定向位置，并通过 responds_to 对应一个 OutboundRequest。它不是调用事件、远端端点或已经通过内容安全审查的 ToolResult。
-    en: An InboundResponse is a NetworkMessage distinguished by arrival from a remote or proxy direction with status or result code, responding-endpoint reference, content reference, receive time, optional redirect location, and a responds_to link to one OutboundRequest. It is not the call event, remote endpoint, or a ToolResult whose content has already passed safety review.
-    ja: InboundResponse は remote/proxy 方向から controlled subject へ到着し status/result code・responding endpoint ref・content ref・receive time・optional redirect location と一 OutboundRequest への responds_to を持つ NetworkMessage です。call event・remote endpoint・content safety review 済み ToolResult ではありません。
+    zh: InboundResponse 是 NetworkMessage 的入站特化，拥有 response_id、status code、header digest、correlation_id 与 responds_to OutboundRequest 引用。它保留 raw protocol 事实供 tool 域引用，但 ToolResult 归 tool-invocation-execution。302 redirect 响应触发新 OutboundRequest 链，不得继承原 allow。
+    en: "InboundResponse is the inbound specialization of NetworkMessage with response_id, status code, header digest, correlation_id, and responds_to OutboundRequest reference. It retains raw protocol facts for tool-domain reference but ToolResult belongs to tool-invocation-execution. A 302 redirect response triggers a new OutboundRequest chain without inheriting the original allow."
+    ja: InboundResponse は NetworkMessage の inbound 特化で response_id/status code/header digest/correlation_id/responds_to OutboundRequest reference を持つ。raw protocol fact を tool domain 参照用保持するが ToolResult は tool-invocation-execution。302 redirect response は新 OutboundRequest chain trigger、原 allow 継承不可。
   why_needed:
-    zh: 明确响应与请求、调用和端点的关系后，才能验证来源、重定向链和内容处理，而不把远端输入直接当作可信工具结果。
-    en: Relating response explicitly to request, call, and endpoint enables provenance, redirect-chain, and content handling checks without treating remote input as a trusted tool result.
-    ja: response を request/call/endpoint に明示接続し remote input を trusted tool result とせず provenance・redirect chain・content handling を検査できます。
+    zh: 响应与请求精确关联后，才能在并发 HTTP/2 流上证明 in-resp-884 回答 out-req-884，并检测 302 到 metadata endpoint 的 SSRF 风险。
+    en: Precise response-to-request correlation proves in-resp-884 answers out-req-884 on concurrent HTTP/2 streams and detects SSRF risk from 302 to metadata endpoints.
+    ja: response/request precise correlate 後 HTTP/2 並行 stream で in-resp-884 が out-req-884 応答を証明し 302 metadata endpoint SSRF risk 検出可。
   includes:
-    - zh: HTTP 响应、SOCKS 回复和远程协议的结果消息，包括拒绝与重定向响应。
-      en: HTTP responses, SOCKS replies, and result messages from remote protocols, including denial and redirect responses.
-      ja: HTTP response・SOCKS reply・remote protocol result message（denial/redirect を含む）。
+    - zh: 含 status、correlation_id、responds_to、Location header（redirect）与 body digest。
+      en: Includes status, correlation_id, responds_to, Location header for redirects, and body digest.
+      ja: status/correlation_id/responds_to/Location header（redirect）/body digest を含む。
   excludes:
-    - zh: NetworkCall 事件、NetworkEndpoint 实体、输出给模型的 ToolResult 和没有请求关联的抓包片段。
-      en: NetworkCall events, NetworkEndpoint Entities, ToolResult exposed to a model, and packet fragments with no request correlation.
-      ja: NetworkCall event・NetworkEndpoint Entity・model 向け ToolResult・request correlation のない packet fragment。
+    - zh: 不包含 ToolResult 解析、SideEffect 事件、NetworkPolicy 或 OutboundRequest 发起记录。
+      en: Excludes ToolResult parsing, SideEffect event, NetworkPolicy, or OutboundRequest initiation record.
+      ja: ToolResult parse/SideEffect event/NetworkPolicy/OutboundRequest initiation record は含まない。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: 集成：HTTP/2 stream 17 in-resp-884 status=200 responds_to out-req-884；302 in-resp-302 Location metadata IP 触发 authorization_chain_complete=false；MCP 工具域可引用 raw InboundResponse 再解析为 ToolResult。
+    en: "Integration: HTTP/2 stream 17 in-resp-884 status=200 responds_to out-req-884; 302 in-resp-302 Location metadata IP triggers authorization_chain_complete=false; MCP tool domain may reference raw InboundResponse before parsing ToolResult."
+    ja: 統合：HTTP/2 stream 17 in-resp-884 status=200 responds_to out-req-884。302 in-resp-302 Location metadata IP authorization_chain_complete=false。MCP tool domain raw InboundResponse 参照後 ToolResult parse 可。
+  typical_input:
+    - description: HTTP response correlated to outbound request.
+      format: |
+        response_id: in-resp-884
+        status: 200
+        correlation_id: stream-17
+        responds_to: out-req-884
+      source_claims:
+        - claim-inbound-response-design
+  typical_output:
+    - description: Redirect requiring new authorization chain.
+      format: |
+        status: 302
+        location: http://169.254.169.254/latest/meta-data/
+        authorization_chain_complete: false
+      source_claims:
+        - claim-inbound-response-design
+  reference_implementations:
+    - name: RFC 9110 HTTP Semantics
+      url: https://www.rfc-editor.org/rfc/rfc9110.html
+      description: HTTP response status, headers, and redirect Location.
+    - name: MCP Specification — Tools
+      url: https://spec.modelcontextprotocol.io/specification/2025-06-18/server/tools/
+      description: Raw response before ToolResult parsing.
 structure:
   identity_keys:
-    - status_or_result_code
-    - responding_endpoint_ref
+    - response_id
   fields:
-    - id: status_or_result_code
+    - id: response_id
       labels:
-        zh: 状态或结果码
-        en: status or result code
-        ja: status or result code
+        zh: 响应标识
+        en: response ID
+        ja: 応答 ID
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
       definitions:
-        zh: 记录协议定义的响应状态、回复码或结果类别。
-        en: Records the protocol-defined response status, reply code, or result class.
-        ja: protocol-defined response status・reply code・result class。
+        zh: 一次 InboundResponse 的唯一 ID。
+        en: Unique ID of one InboundResponse.
+        ja: 一回 InboundResponse の一意 ID。
       allowed_values: []
       pattern: null
-      example_value: "302"
+      example_value: in-resp-884
       source_claims:
-        - claim-inbound-response-001
-        - claim-inbound-response-002
-    - id: responding_endpoint_ref
+        - claim-inbound-response-design
+    - id: status
       labels:
-        zh: 响应端点引用
-        en: responding-endpoint reference
-        ja: responding-endpoint reference
+        zh: 状态码
+        en: status code
+        ja: status code
+      datatype: integer
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: HTTP 或其他协议响应状态码。
+        en: HTTP or other protocol response status code.
+        ja: HTTP 等 protocol response status code。
+      allowed_values: []
+      pattern: null
+      example_value: 200
+      source_claims:
+        - claim-inbound-response-rfc9110
+    - id: correlation_id
+      labels:
+        zh: 协议关联标识
+        en: protocol correlation ID
+        ja: protocol correlation ID
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
       definitions:
-        zh: 引用实际返回响应且完成身份验证的端点。
-        en: References the verified endpoint that actually returned the response.
-        ja: 実際に response を返し identity verification 済みの endpoint。
+        zh: HTTP/2 stream ID、request ID 或 connection tuple 等并发关联键。
+        en: Concurrent correlation key such as HTTP/2 stream ID, request ID, or connection tuple.
+        ja: HTTP/2 stream ID/request ID/connection tuple 等並行 correlate key。
       allowed_values: []
       pattern: null
-      example_value: endpoint-api-example-443
+      example_value: stream-17
       source_claims:
-        - claim-inbound-response-001
-        - claim-inbound-response-003
-    - id: content_reference
-      labels:
-        zh: 内容引用
-        en: content reference
-        ja: content reference
-      datatype: string
-      required: false
-      cardinality:
-        min: 0
-        max: 1
-      definitions:
-        zh: 引用响应正文，不在关系图中复制不可信内容。
-        en: References response content without copying untrusted body data into the relation graph.
-        ja: untrusted body data を relation graph にコピーせず参照します。
-      allowed_values: []
-      pattern: null
-      example_value: artifact-response-884
+        - claim-inbound-response-design
+  constraints:
+    - id: network-response-correlation-required
+      severity: error
+      expression_language: plain
+      expression: InboundResponse responds_to OutboundRequest requires protocol correlation; Host and status alone insufficient under concurrent calls
+      explanations:
+        zh: 主机共现无法在并发请求间建立唯一溯源。
+        en: Host co-occurrence cannot establish unique provenance across concurrent requests.
+        ja: Host 共起は並行 request 間 unique provenance 確立不可。
       source_claims:
-        - claim-inbound-response-001
-    - id: received_at
-      labels:
-        zh: 接收时间
-        en: received at
-        ja: received at
-      datatype: date-time
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 记录受控边界接收响应的时间。
-        en: Records when the controlled boundary received the response.
-        ja: controlled boundary が response を受信した時刻。
-      allowed_values: []
-      pattern: null
-      example_value: 2026-07-16T02:31:05Z
-      source_claims:
-        - claim-inbound-response-001
-    - id: redirect_location
-      labels:
-        zh: 重定向位置
-        en: redirect location
-        ja: redirect location
-      datatype: string
-      required: false
-      cardinality:
-        min: 0
-        max: 1
-      definitions:
-        zh: 若响应要求重定向，保存未经自动信任的新目标引用以供重新解析和授权。
-        en: For a redirect response, preserves the new target reference without automatically trusting it, so it can be resolved and authorized again.
-        ja: redirect response の new target ref を自動 trust せず保存し再 resolution/authorization します。
-      allowed_values: []
-      pattern: null
-      example_value: https://cdn.example.net/job/884
-      source_claims:
-        - claim-inbound-response-001
-  constraints: []
+        - claim-inbound-response-design
   required_relation_constraints: []
 examples:
-  - id: InboundResponse-example-positive-manual-20260716
-    kind: positive
+  - id: InboundResponse-http2-correlated
     labels:
-      zh: 需重新授权的重定向响应
-      en: Redirect requiring reauthorization
-      ja: reauthorization 必須 redirect
-    scenario_id: null
+      zh: HTTP/2 关联响应
+      en: HTTP/2 correlated response
+      ja: HTTP/2 correlate response
     descriptions:
-      zh: in-resp-884 从已验证 api.example.com 端点返回 302 与 Location=https://cdn.example.net/job/884，并通过 responds_to 关联 out-req-884；新 authority 尚未获准。
-      en: in-resp-884 returns 302 from verified api.example.com with Location=https://cdn.example.net/job/884 and responds_to out-req-884; the new authority is not yet authorized.
-      ja: in-resp-884 は verified api.example.com から 302/Location を返し out-req-884 に responds_to しますが new authority は未 authorization です。
+      zh: in-resp-884 status=200 HTTP/2 stream 17 responds_to out-req-884；call_status=completed。
+      en: in-resp-884 status=200 HTTP/2 stream 17 responds_to out-req-884; call_status=completed.
+      ja: in-resp-884 status=200 HTTP/2 stream 17 responds_to out-req-884。call_status=completed。
+    example_source:
+      product: RFC 9110
+      url: https://www.rfc-editor.org/rfc/rfc9110.html
+      version: HTTP/2 correlation
     field_values:
-      message_id: in-resp-884
-      occurred_at: 2026-07-16T02:31:05Z
-      protocol: https
-      status_or_result_code: "302"
-      responding_endpoint_ref: endpoint-api-example-443
-      content_reference: artifact-response-884
-      received_at: 2026-07-16T02:31:05Z
-      redirect_location: https://cdn.example.net/job/884
+      response_id: in-resp-884
+      status: 200
+      correlation_id: stream-17
     related_node_ids:
       - InboundResponse
       - OutboundRequest
-      - NetworkEndpoint
-      - NetworkMessage
+      - NetworkCall
     related_relation_ids:
-      - InboundResponse-is_a-NetworkMessage
       - InboundResponse-responds_to-OutboundRequest
-    expected_result:
-      zh: 记录响应和重定向目标，并要求新调用重新解析与策略判断。
-      en: Record the response and redirect target and require a new call to resolve and evaluate policy again.
-      ja: response/redirect target を記録し new call で再 resolution/policy evaluation を要求します。
-    why_valid_or_invalid:
-      zh: 响应来源和原请求均明确，但重定向 authority 不继承原端点许可。
-      en: Response source and original request are explicit, while redirect authority does not inherit the original endpoint allowance.
-      ja: response source/original request は明確でも redirect authority は original endpoint allowance を継承しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-inbound-response-001
-      - claim-inbound-response-003
-  - id: InboundResponse-example-boundary-manual-20260716
-    kind: boundary
+      - claim-inbound-response-rfc9110
+  - id: InboundResponse-metadata-redirect
     labels:
-      zh: 模型可见的工具结果
-      en: Model-visible tool result
-      ja: model-visible tool result
-    scenario_id: network-review-inboundresponse-boundary
+      zh: 元数据端点重定向响应
+      en: Metadata endpoint redirect response
+      ja: metadata endpoint redirect response
     descriptions:
-      zh: 系统已解析、扫描并裁剪远端响应，转换成带成功标志的 ToolResult 供模型消费；原始网络状态码和端点证据另行保留。
-      en: The system parsed, scanned, and trimmed a remote response into a success-flagged ToolResult for model consumption, while raw status and endpoint evidence remain separate.
-      ja: system は remote response を parse/scan/trim し model 向け ToolResult に変換、raw status/endpoint evidence は別保持します。
-    field_values: {}
+      zh: api.example.com 返回 302 Location 169.254.169.254；authorization_chain_complete=false，不得跟随 inherit allow。
+      en: api.example.com returns 302 Location 169.254.169.254; authorization_chain_complete=false, must not follow inheriting allow.
+      ja: api.example.com 302 Location 169.254.169.254。authorization_chain_complete=false、allow 継承 follow 不可。
+    example_source:
+      product: OWASP SSRF
+      url: https://owasp.org/www-community/attacks/Server_Side_Request_Forgery
+      version: redirect SSRF
+    field_values:
+      status: 302
+      location: http://169.254.169.254/latest/meta-data/
     related_node_ids:
-      - ToolResult
+      - InboundResponse
+      - OutboundRequest
+    related_relation_ids: []
+    source_claims:
+      - claim-inbound-response-design
+  - id: InboundResponse-toolresult-boundary
+    labels:
+      zh: ToolResult 非入站响应
+      en: ToolResult is not inbound response
+      ja: ToolResult は inbound response ではない
+    descriptions:
+      zh: 解析后的 MCP Tool Result 是独立事实；InboundResponse 保留 raw protocol 供引用。
+      en: Parsed MCP Tool Result is a separate fact; InboundResponse retains raw protocol for reference.
+      ja: 解析後 MCP Tool Result は独立 fact。InboundResponse raw protocol 保持参照用。
+    example_source:
+      product: MCP
+      url: https://spec.modelcontextprotocol.io/specification/2025-06-18/server/tools/
+      version: Tool Result
+    field_values:
+      accepted: false
+    related_node_ids:
       - InboundResponse
     related_relation_ids: []
-    expected_result:
-      zh: ToolResult 与 InboundResponse 保持两个节点并以处理关系连接。
-      en: Keep ToolResult and InboundResponse as two nodes connected by processing provenance.
-      ja: ToolResult/InboundResponse を二 node とし processing provenance で接続します。
-    why_valid_or_invalid:
-      zh: 协议输入与经安全处理的工具输出具有不同内容和信任边界。
-      en: Protocol input and safety-processed tool output have different content and trust boundaries.
-      ja: protocol input と safety-processed tool output は content/trust boundary が異なります。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-inbound-response-001
-      - claim-inbound-response-003
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: OutboundRequest
-    shared_parent_concept_id: NetworkMessage
-    differentia:
-      zh: InboundResponse 从远端返回状态与内容并对应请求；OutboundRequest 从受控主体发向目标。
-      en: InboundResponse returns status and content from a remote endpoint for a request; OutboundRequest travels from the controlled subject toward a target.
-      ja: InboundResponse は remote から request への status/content、OutboundRequest は controlled subject から target への message です。
+      - claim-inbound-response-mcp
+  - id: InboundResponse-host-cooccurrence-boundary
+    labels:
+      zh: Host 共现不足以关联
+      en: Host co-occurrence insufficient
+      ja: Host 共起不十分
+    descriptions:
+      zh: 两并发 GET api.example.com 仅 Host 相同不能建立 responds_to；必须 correlation_id。
+      en: Two concurrent GET api.example.com cannot establish responds_to by Host alone; correlation_id required.
+      ja: 並行 GET api.example.com 二件 Host 一致だけ responds_to 不可。correlation_id 必須。
+    example_source:
+      product: Moonweave design
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: response correlation
+    field_values:
+      host_co_occurrence_sufficient: false
+    related_node_ids:
+      - InboundResponse
+      - OutboundRequest
+    related_relation_ids: []
     source_claims:
-      - claim-inbound-response-001
+      - claim-inbound-response-design
 parent_relation:
   id: InboundResponse-is_a-NetworkMessage
   predicate: is_a
   direction: target-to-source
   relation_kind: hierarchy
   labels:
-    zh: 是一种
-    en: is a
-    ja: is a
+    zh: 是一种网络消息
+    en: is a network message
+    ja: ネットワークメッセージの一種
   definitions:
-    zh: InboundResponse 是 NetworkMessage 的子类：它保留协议消息身份，并增加从远端返回的状态或结果、响应端点、接收时间、内容及可选重定向位置等入站种差。
-    en: "InboundResponse is a subtype of NetworkMessage: it retains protocol-message identity and adds inbound differentia of remote status or result, responding endpoint, receive time, content, and optional redirect location."
-    ja: InboundResponse は NetworkMessage subtype で protocol message identity を保持し remote status/result・responding endpoint・receive time・content・optional redirect location の inbound differentia を追加します。
+    zh: 每个 InboundResponse 都是 NetworkMessage，种差是入站方向与 responds_to 关联。
+    en: Every InboundResponse is a NetworkMessage distinguished by inbound direction and responds_to correlation.
+    ja: すべての InboundResponse は NetworkMessage で inbound direction/responds_to correlate が種差。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 分类继承描述概念包含，不使用实例关系基数。
-    en: Taxonomic inheritance describes concept inclusion and does not use instance-relation cardinality.
-    ja: taxonomic inheritance は concept inclusion を表し instance relation cardinality を使いません。
+    zh: 分类继承不使用实例关系基数。
+    en: Taxonomic inheritance does not use instance-relation cardinality.
+    ja: 分類継承にはインスタンス関係の基数を用いません。
   inverse_reading:
-    predicate: part_of
+    predicate: has_subtype
     labels:
-      zh: 以 入站响应 为子类
-      en: has subtype 入站响应
-      ja: 入站响应 を subtype に持つ
+      zh: 有下位类型
+      en: has subtype
+      ja: 下位型を持つ
   conditions: []
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: InboundResponse-is_a-NetworkMessage-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 入站重定向响应
-        en: Inbound redirect response
-        ja: inbound redirect response
-      scenario_id: network-relation-inboundresponse-is_a-networkmessage-positive
-      descriptions:
-        zh: in-resp-884 带 message_id、HTTP/2、302 状态、响应端点、接收时间和 Location 字段。
-        en: in-resp-884 carries message_id, HTTP/2, status 302, responding endpoint, receive time, and Location field.
-        ja: in-resp-884 は message_id・HTTP/2・302・responding endpoint・receive time・Location を持ちます。
-      field_values: {}
-      related_node_ids:
-        - InboundResponse
-        - NetworkMessage
-      related_relation_ids:
-        - InboundResponse-is_a-NetworkMessage
-      expected_result:
-        zh: 断言 InboundResponse is_a NetworkMessage。
-        en: Assert InboundResponse is_a NetworkMessage.
-        ja: InboundResponse is_a NetworkMessage を主張します。
-      why_valid_or_invalid:
-        zh: 响应满足消息身份并具有远端返回的入站种差。
-        en: The response satisfies message identity and has remote-return inbound differentia.
-        ja: response は message identity/remote-return inbound differentia を満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-inbound-response-001
-    - id: InboundResponse-is_a-NetworkMessage-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 远端端点不是响应
-        en: Remote endpoint is not response
-        ja: remote endpoint は response ではない
-      scenario_id: network-relation-inboundresponse-is_a-networkmessage-boundary
-      descriptions:
-        zh: endpoint-api-example-443 有地址、端口和证书身份，但没有状态、正文、接收时间或对应请求。
-        en: endpoint-api-example-443 has address, port, and certificate identity but no status, body, receive time, or corresponding request.
-        ja: endpoint-api-example-443 は address・port・certificate identity を持ちますが status・body・receive time・request がありません。
-      field_values: {}
-      related_node_ids:
-        - InboundResponse
-        - NetworkMessage
-        - NetworkEndpoint
-      related_relation_ids:
-        - InboundResponse-is_a-NetworkMessage
-      expected_result:
-        zh: 不得把 NetworkEndpoint 分类为 InboundResponse。
-        en: Do not classify NetworkEndpoint as InboundResponse.
-        ja: NetworkEndpoint を InboundResponse と分類しません。
-      why_valid_or_invalid:
-        zh: 实体端点和传输消息属于不同类别。
-        en: Endpoint Entity and transferred message are different categories.
-        ja: endpoint Entity と transferred message は category が異なります。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-inbound-response-001
-        - claim-inbound-response-003
   source_claims:
-    - claim-inbound-response-001
-    - claim-inbound-response-002
-  distinct_fact_rationale:
-    zh: InboundResponse 满足 NetworkMessage 的全部身份条件并增加不可替换的种差。
-    en: InboundResponse satisfies every identity condition of NetworkMessage and adds a non-substitutable differentia.
-    ja: InboundResponse は NetworkMessage の全 identity condition を満たし non-substitutable differentia を追加します。
+    - claim-inbound-response-design
+  distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations:
   - id: InboundResponse-responds_to-OutboundRequest
     predicate: responds_to
     direction: source-to-target
-    relation_kind: information
+    relation_kind: causal
     labels:
-      zh: 回应出站请求
+      zh: 响应出站请求
       en: responds to outbound request
-      ja: outbound request に responds
+      ja: 送信要求に応答
     definitions:
-      zh: InboundResponse 通过 responds_to 指向协议相关标识、流或调用链证明其所回应的 OutboundRequest；重定向响应仍回应原请求，新目标需要新请求，不得仅按主机相同建立关联。
-      en: InboundResponse points through responds_to to the OutboundRequest proven by protocol correlation ID, stream, or call chain. A redirect response still answers the original request and its new target requires a new request; host equality alone cannot establish the relation.
-      ja: InboundResponse は protocol correlation ID・stream・call chain で証明された OutboundRequest を responds_to で指します。redirect response も original request への response で new target は new request を要し host equality のみでは成立しません。
-    cardinality:
-      source:
-        min: 0
-        max: null
-      target:
-        min: 1
-        max: 1
-    cardinality_not_applicable_reason: null
+      zh: InboundResponse responds_to OutboundRequest 当且仅当 protocol correlation 匹配同一交换；Host 共现不足。
+      en: InboundResponse responds_to OutboundRequest only when protocol correlation matches the same exchange; Host co-occurrence is insufficient.
+      ja: InboundResponse responds_to OutboundRequest は protocol correlation が同一 exchange に match 時のみ。Host 共起不十分。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 一次请求通常对应零或一主响应（redirect 可能多个）。
+      en: One request usually has zero or one primary response; redirects may have multiple.
+      ja: 一 request 通常零または一 primary response。redirect で複数可。
     inverse_reading:
-      predicate: is_responds_to_of
+      predicate: receives_response
       labels:
-        zh: 反向读取 responds_to
-        en: is responds_to of
-        ja: responds_to の inverse
+        zh: 接收响应
+        en: receives response
+        ja: 応答を受信
     conditions: []
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
-    examples:
-      - id: InboundResponse-responds_to-OutboundRequest-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: HTTP/2 流关联
-          en: HTTP/2 stream correlation
-          ja: HTTP/2 stream correlation
-        scenario_id: network-relation-inboundresponse-responds_to-outboundrequest-positive
-        descriptions:
-          zh: in-resp-884 与 out-req-884 共享 HTTP/2 stream 17 和请求 correlation ID，响应在该流结束。
-          en: in-resp-884 and out-req-884 share HTTP/2 stream 17 and request correlation ID, and the response closes that stream.
-          ja: in-resp-884/out-req-884 は HTTP/2 stream 17/correlation ID を共有し response が stream を close します。
-        field_values: {}
-        related_node_ids:
-          - InboundResponse
-          - OutboundRequest
-        related_relation_ids:
-          - InboundResponse-responds_to-OutboundRequest
-        expected_result:
-          zh: 建立 in-resp-884 responds_to out-req-884。
-          en: Assert in-resp-884 responds_to out-req-884.
-          ja: in-resp-884 responds_to out-req-884 を主張します。
-        why_valid_or_invalid:
-          zh: 协议关联和流生命周期唯一确定请求—响应对应。
-          en: Protocol correlation and stream lifecycle uniquely determine request-response correspondence.
-          ja: protocol correlation/stream lifecycle が request-response correspondence を一意にします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-inbound-response-001
-      - id: InboundResponse-responds_to-OutboundRequest-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 同主机并发响应
-          en: Concurrent response from same host
-          ja: same host concurrent response
-        scenario_id: network-relation-inboundresponse-responds_to-outboundrequest-boundary
-        descriptions:
-          zh: 两个并发 GET 指向同一 authority，某响应只有 Host 信息而没有 stream、请求 ID 或调用关联。
-          en: Two concurrent GETs target the same authority, while one response has only Host information and no stream, request ID, or call correlation.
-          ja: 二 concurrent GET が same authority を target し response は Host のみで stream/request ID/call correlation がありません。
-        field_values: {}
-        related_node_ids:
-          - InboundResponse
-          - OutboundRequest
-        related_relation_ids:
-          - InboundResponse-responds_to-OutboundRequest
-        expected_result:
-          zh: 保持未关联，不猜测 responds_to。
-          en: Keep it uncorrelated and do not guess responds_to.
-          ja: uncorrelated のまま responds_to を推測しません。
-        why_valid_or_invalid:
-          zh: 同一 authority 无法区分并发请求。
-          en: The same authority cannot distinguish concurrent requests.
-          ja: same authority では concurrent request を区別できません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-inbound-response-001
     source_claims:
-      - claim-inbound-response-001
+      - claim-inbound-response-design
     distinct_fact_rationale:
-      zh: 该边连接两份消息身份，与调用 receives 事件关联互补而不重复。
-      en: This edge correlates two message identities and complements, rather than duplicates, the call's receives occurrence fact.
-      ja: 二 message identity を correlate し call receives occurrence fact と相補的で重複しません。
+      zh: NetworkCall completed 不能 alone 推出 responds_to 哪一请求。
+      en: NetworkCall completed alone cannot imply which request responds_to holds.
+      ja: NetworkCall completed だけでは responds_to 対象 request は導けない。
     layout_role: cross-link
-    review_status: accepted
     target: concept:OutboundRequest
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-safety-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: Verified against Cursor sandbox.json egress control, HTTP/SOCKS proxy semantics, and network policy patterns; endpoint, policy, and call lifecycle modeling hold.
-    en: Verified against Cursor sandbox.json egress control, HTTP/SOCKS proxy semantics, and network policy patterns; endpoint, policy, and call lifecycle modeling hold.
-    ja: Verified against Cursor sandbox.json egress control, HTTP/SOCKS proxy semantics, and network policy patterns; endpoint, policy, and call lifecycle modeling hold.
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: rfc9110-http
+    title: RFC 9110 HTTP Semantics
+    url: https://www.rfc-editor.org/rfc/rfc9110.html
+    source_type: standard
+    relevance: HTTP response status, headers, redirects, and correlation.
+  - id: mcp-tools-2025-06-18
+    title: MCP Specification — Tools
+    url: https://spec.modelcontextprotocol.io/specification/2025-06-18/server/tools/
+    source_type: official-spec
+    relevance: Raw InboundResponse separate from ToolResult.
+  - id: safety-network-design
+    title: Moonweave safety-network-control module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: InboundResponse protocol correlation and redirect re-authorization rules.
 source_claims:
-  - id: claim-inbound-response-001
-    source: eng-proto-rfc9110-http-semantics
-    supports: RFC 9110 distinguishes HTTP request and response messages, target resources and authorities, origin servers, proxy intermediaries, direct versus proxy routing, redirects, and response status; Moonweave places these protocol facts under broader network concepts.
-    locator: RFC 9110 Sections 3.1-3.7, 4.2-4.3, 6, 7.1-7.4, 10.2, and 15.4
+  - id: claim-inbound-response-rfc9110
+    source: rfc9110-http
+    supports: RFC 9110 HTTP responses map to InboundResponse with status and redirect Location headers.
+    locator: HTTP responses
+    evidence_kind: official
+    confidence: high
+  - id: claim-inbound-response-mcp
+    source: mcp-tools-2025-06-18
+    supports: MCP tool domain references raw InboundResponse before ToolResult parsing.
+    locator: Tool Result separation
+    evidence_kind: official
+    confidence: high
+  - id: claim-inbound-response-design
+    source: safety-network-design
+    supports: Moonweave requires protocol correlation for responds_to and rejects redirect allow inheritance.
+    locator: InboundResponse boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-inbound-response-002
-    source: eng-proto-rfc1928-socks5
-    supports: RFC 1928 defines SOCKS client-to-server negotiation, authentication selection, CONNECT/BIND/UDP ASSOCIATE commands, IPv4/domain/IPv6 addressing, relay establishment, and denial replies; Moonweave treats SOCKSProxy as a protocol-specific Proxy subtype.
-    locator: RFC 1928 Sections 3-7, TCP client procedure, requests, addressing, replies, and UDP client procedure
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-inbound-response-003
-    source: eng-network-nist-zero-trust
-    supports: NIST SP 800-207 distinguishes an access request, per-resource policy decision, policy administrator, policy enforcement point, and the communication path that is enabled, monitored, and terminated; Moonweave uses those distinctions to separate policy, interaction occurrence, endpoint, and effective route evidence.
-    locator: NIST SP 800-207 Sections 2.1-2.2 and 3.2, policy engine, policy administrator, and policy enforcement point
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

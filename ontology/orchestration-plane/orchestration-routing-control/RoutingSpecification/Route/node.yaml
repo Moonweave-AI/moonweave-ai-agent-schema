@@ -1,34 +1,69 @@
 schema: moonweave.ai/ontology-node/v1
 id: Route
 kind: concept
-status: accepted
 labels:
   zh: 路由路径
   en: route
-  ja: route
+  ja: ルート
 semantics:
   short_definition:
     zh: 从一个控制位置指向一个类型化目标的静态路由规范。
     en: A static routing specification from one control location to one typed target.
-    ja: one control location から typed target へ指す static routing specification。
+    ja: one control location から typed target へ指す static routing specification です。
   definition:
-    zh: 路由路径是 RoutingSpecification 的子类，其种差是声明来源控制位置、目标引用、可选条件和传递契约的静态边；它规定“可以去哪里”，而 RoutingDecision 记录一次运行“实际选择了哪里”。
-    en: A Route is a RoutingSpecification distinguished by a static edge declaring source control location, target reference, optional conditions, and transfer contract. It states where control may go, while RoutingDecision records where one run actually went.
-    ja: Route は source control location・target ref・optional condition・transfer contract を宣言する static edge という differentia を持つ RoutingSpecification subtype です。possible destination と actual selected destination を区別します。
+    zh: Route 是 RoutingSpecification 的子类，种差为声明 source_control_ref、target_ref、可选 condition_refs 与 transfer_contract 的静态边。LangGraph add_edge(source, target) 与 conditional_edges 映射中的单条 source→target 路径对应 Route；它规定“可以去哪里”，RoutingDecision 记录一次运行“实际选择了哪里”。Send(node, state) 的动态派发可引用多条 Route 候选。
+    en: A Route is a RoutingSpecification distinguished by a static edge declaring source_control_ref, target_ref, optional condition_refs, and transfer_contract. A single source→target path in LangGraph add_edge(source, target) and conditional_edges maps corresponds to Route; it states where control may go while RoutingDecision records where one run actually went. Dynamic Send(node, state) dispatch may reference multiple Route candidates.
+    ja: Route は source control location→typed RoutingTarget の static edge という differentia を持つ subtype です。LangGraph edge/conditional_edges の単一 path が Route に対応します。
   why_needed:
-    zh: 把静态路径与动态选择分开，可避免图上的连线被误读为已经发生的路由。
-    en: Separating static path from dynamic selection prevents a diagram edge from being misread as an occurred route.
-    ja: static path と dynamic selection を分け diagram edge を occurred routing と誤読しません。
+    zh: 把静态路径与动态选择分开，可避免 compiled graph 边被误读为已经发生的路由。
+    en: Separating static path from dynamic selection prevents compiled graph edges from being misread as occurred routing.
+    ja: static path と dynamic selection を分け graph edge を occurred routing と誤読しません。
   includes:
     - zh: 工作流节点、分支、工具、协议适配器或停止目标之间的可选控制边。
       en: Eligible control edges among workflow nodes, branches, tools, protocol adapters, or stop targets.
-      ja: workflow node・branch・tool・protocol adapter・stop target 間の eligible control edge。
+      ja: workflow node・branch・tool・protocol adapter・stop target 間 eligible control edge。
   excludes:
     - zh: 一次选择事件、网络 Route、文件路径和没有类型化目标的视觉连线。
-      en: One selection event, a network Route, a filesystem path, and a visual connector without a typed target.
+      en: One selection event, a network Route, a filesystem path, and visual connectors without typed targets.
       ja: selection event・network Route・filesystem path・typed target のない visual connector。
   semantic_kind: specification
   aliases: []
+engineering:
+  explanation:
+    zh: LangGraph builder.add_edge("classify", "billing_handler") 创建 Route；conditional_edges 的 path map {"billing":"billing_handler","END":END} 中每条命名映射也是 Route。Command(goto="billing_handler") 与 Send("worker", payload) 是运行时选择证据，不是 Route 本身。transfer_contract 应对齐 LangGraph Send/Command 的状态投影。
+    en: LangGraph builder.add_edge("classify", "billing_handler") creates a Route; each named mapping in conditional_edges path maps is also a Route. Command(goto="billing_handler") and Send("worker", payload) are runtime selection evidence, not Route itself. transfer_contract should align with LangGraph Send/Command state projection.
+    ja: LangGraph add_edge/conditional_edges path map の各 mapping が Route です。Command/Send は runtime selection 証拠です。
+  typical_input:
+    - description: LangGraph static and conditional edge declaration.
+      format: |
+        builder.add_edge("classify", "billing_handler")
+        builder.add_conditional_edges(
+            "classify",
+            route_by_category,
+            {"billing": "billing_handler", "technical": "technical_handler", END: END},
+        )
+      source_claims: [claim-route-langgraph]
+  typical_output:
+    - description: Versioned Route specification.
+      format: |
+        {
+          "routing_specification_id": "route-billing",
+          "version": "1",
+          "source_control_ref": "classify-request",
+          "target_ref": "target-billing-worker",
+          "condition_refs": ["condition-billing-intent"]
+        }
+      source_claims: [claim-route-design]
+  reference_implementations:
+    - name: LangGraph
+      url: https://langchain-ai.github.io/langgraph/
+      description: add_edge, conditional_edges, Send, Command goto as routes.
+    - name: OpenAI Agents SDK
+      url: https://openai.github.io/openai-agents-python/
+      description: Handoff paths as static routes between agents.
+    - name: A2A Protocol
+      url: https://a2a-protocol.org/latest/specification/
+      description: Remote agent routes via tasks/send targets.
 structure:
   identity_keys: []
   fields:
@@ -43,14 +78,14 @@ structure:
         min: 1
         max: 1
       definitions:
-        zh: 引用路径开始的节点或控制点。
-        en: References the node or control point where the route begins.
+        zh: 引用路径开始的 LangGraph 节点或控制点。
+        en: References the LangGraph node or control point where the route begins.
         ja: route start node/control point を参照します。
       allowed_values: []
       pattern: null
       example_value: classify-request
       source_claims:
-        - claim-route-001
+        - claim-route-langgraph
     - id: target_ref
       labels:
         zh: 目标引用
@@ -69,7 +104,7 @@ structure:
       pattern: null
       example_value: target-billing-worker
       source_claims:
-        - claim-route-001
+        - claim-route-langgraph
     - id: condition_refs
       labels:
         zh: 条件引用
@@ -89,7 +124,7 @@ structure:
       example_value:
         - condition-billing-intent
       source_claims:
-        - claim-route-001
+        - claim-route-langgraph
     - id: transfer_contract
       labels:
         zh: 传递契约
@@ -101,9 +136,9 @@ structure:
         min: 1
         max: 1
       definitions:
-        zh: 固定该路径交给目标的载荷模式、来源状态投影、交付方式和目标接受证据引用；四项共同界定边上实际允许传递的内容。
-        en: Fixes the payload schema, source-state projection, delivery mode, and target-acceptance evidence reference; together these four parts define what the edge may transfer.
-        ja: この経路が対象へ渡す payload schema、元状態の projection、delivery mode、対象の受入証拠参照を固定し、辺で受け渡せる内容を四項目で定めます。
+        zh: 固定该路径交给目标的载荷模式、状态投影、交付方式与接受证据引用。
+        en: Fixes payload schema, source-state projection, delivery mode, and acceptance evidence for the edge.
+        ja: payload schema/state projection/delivery mode/acceptance evidence を固定します。
       allowed_values: []
       pattern: null
       example_value:
@@ -116,21 +151,23 @@ structure:
         delivery_mode: state-projection
         acceptance_evidence_ref: billing-worker-input-validation
       source_claims:
-        - claim-route-003
+        - claim-route-langgraph
   constraints: []
   required_relation_constraints: []
 examples:
-  - id: Route-example-positive-manual-20260716
-    kind: positive
+  - id: Route-example-langgraph-static-edge
     labels:
-      zh: 账单分支路径
-      en: Billing branch route
-      ja: billing branch route
-    scenario_id: null
+      zh: LangGraph 静态边
+      en: LangGraph static edge
+      ja: LangGraph static edge
     descriptions:
-      zh: route-billing 从 classify-request 指向 target-billing-worker，在 condition-billing-intent 成立时按 support-ticket-v3 投影 ticket_id、customer_id、intent 与 summary，并以 billing-worker-input-validation 作为目标接受证据。
-      en: route-billing points from classify-request to target-billing-worker when condition-billing-intent is true, projects ticket_id, customer_id, intent, and summary under support-ticket-v3, and requires billing-worker-input-validation as acceptance evidence.
-      ja: route-billing は condition-billing-intent 成立時に classify-request から target-billing-worker へ進み、support-ticket-v3 に従って ticket_id、customer_id、intent、summary を投影し、billing-worker-input-validation を受入証拠とします。
+      zh: route-billing 从 classify-request 指向 target-billing-worker，对应 add_edge("classify", "billing_handler")。
+      en: route-billing points from classify-request to target-billing-worker, matching add_edge("classify", "billing_handler").
+      ja: route-billing は add_edge("classify","billing_handler") に対応します。
+    example_source:
+      product: LangGraph
+      url: https://langchain-ai.github.io/langgraph/
+      version: add_edge
     field_values:
       routing_specification_id: route-billing
       version: "1"
@@ -155,66 +192,78 @@ examples:
       - RoutingTarget
     related_relation_ids:
       - Route-points_to-RoutingTarget
-    expected_result:
-      zh: 建立静态 Route，等待运行时决定求值。
-      en: Create a static Route to be evaluated by runtime decisions.
-      ja: runtime decision が evaluate する static Route を作成します。
-    why_valid_or_invalid:
-      zh: 来源、目标、启用条件与传递契约均被固定，因此既能判断路径是否可用，也能核对交给目标的内容是否合约。
-      en: The source, target, enabling condition, and transfer contract are fixed, so both route eligibility and the payload handed to the target can be checked.
-      ja: 起点、対象、有効化条件、引き渡し契約が固定されているため、経路の適用可否と対象へ渡す内容の適合性を検査できます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-route-001
-  - id: Route-example-boundary-manual-20260716
-    kind: boundary
+      - claim-route-langgraph
+  - id: Route-example-langgraph-conditional-map
     labels:
-      zh: HTTP 代理路由
-      en: HTTP proxy route
-      ja: HTTP proxy route
-    scenario_id: routing-review-route-boundary
+      zh: LangGraph 条件边映射
+      en: LangGraph conditional edge mapping
+      ja: LangGraph conditional edge mapping
     descriptions:
-      zh: proxy-route-3 描述请求经代理到网络端点，其身份由 endpoint 和 proxy 决定，不是编排控制流。
-      en: proxy-route-3 describes a request through a proxy to a network endpoint; endpoint and proxy determine its identity, not orchestration control flow.
-      ja: proxy-route-3 は proxy→network endpoint を記述し identity は endpoint/proxy で決まり orchestration control flow ではありません。
+      zh: route-technical 是 conditional_edges path map 中 technical→technical_handler 条目，启用 condition-technical-intent。
+      en: route-technical is the technical→technical_handler entry in a conditional_edges path map, enabled by condition-technical-intent.
+      ja: route-technical は conditional_edges path map の technical 条目です。
+    example_source:
+      product: LangGraph
+      url: https://langchain-ai.github.io/langgraph/
+      version: conditional_edges path map
+    field_values:
+      routing_specification_id: route-technical
+      version: "1"
+      source_control_ref: classify-request
+      target_ref: target-technical-worker
+      condition_refs:
+        - condition-technical-intent
+    related_node_ids:
+      - Route
+      - BranchCondition
+    related_relation_ids: []
+    source_claims:
+      - claim-route-langgraph
+  - id: Route-example-openai-handoff
+    labels:
+      zh: OpenAI handoff 静态路径
+      en: OpenAI handoff static route
+      ja: OpenAI handoff static route
+    descriptions:
+      zh: route-triage-to-billing 从 triage_agent 指向 target-billing-agent，对应 transfer_to_billing_agent handoff 配置。
+      en: route-triage-to-billing goes from triage_agent to target-billing-agent, matching transfer_to_billing_agent handoff configuration.
+      ja: route-triage-to-billing は transfer_to_billing_agent handoff 設定に対応します。
+    example_source:
+      product: OpenAI Agents SDK
+      url: https://openai.github.io/openai-agents-python/
+      version: handoffs
+    field_values:
+      routing_specification_id: route-triage-to-billing
+      version: "1"
+      source_control_ref: triage_agent
+      target_ref: target-billing-agent
+    related_node_ids:
+      - Route
+      - RoutingTarget
+    related_relation_ids: []
+    source_claims:
+      - claim-route-openai
+  - id: Route-example-boundary-decision
+    labels:
+      zh: 已选路径不是 Route 定义
+      en: Selected path is not Route definition
+      ja: selected path は Route 定義ではない
+    descriptions:
+      zh: decision-884 在 04:20 选择 route-billing；该记录是 RoutingDecision，不是新的 Route 类型。
+      en: decision-884 selects route-billing at 04:20; that record is RoutingDecision, not a new Route type.
+      ja: decision-884 の selection は RoutingDecision です。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: route versus decision
     field_values: {}
     related_node_ids:
-      - ProxyRoute
       - Route
+      - RoutingDecision
     related_relation_ids: []
-    expected_result:
-      zh: 归网络访问控制，不创建编排 Route。
-      en: Keep it in network access control and do not create an orchestration Route.
-      ja: network control に置き orchestration Route を作りません。
-    why_valid_or_invalid:
-      zh: 相同词名不足以证明对象具有相同的领域身份与控制语义。
-      en: A shared word does not imply the same domain identity.
-      ja: same word は same domain identity を意味しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-route-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: RoutingCondition
-    shared_parent_concept_id: RoutingSpecification
-    differentia:
-      zh: Route 声明可到达的目标；RoutingCondition 声明决定目标是否适用的可求值判定。
-      en: Route declares a reachable target; RoutingCondition declares an evaluable predicate deciding whether a target is applicable.
-      ja: Route は reachable target、RoutingCondition は target applicability の evaluable predicate を宣言します。
-    source_claims:
-      - claim-route-001
-  - sibling_concept_id: RoutingPolicy
-    shared_parent_concept_id: RoutingSpecification
-    differentia:
-      zh: 端点特定对照：父节点 RoutingSpecification：Route（semantic kind=specification，骨架 Route-is_a-RoutingSpecification）；RoutingPolicy（semantic kind=specification，骨架 RoutingPolicy-is_a-RoutingSpecification）。双端条件：Route 条件：“从一个控制位置指向一个类型化目标的静态路由规范”；RoutingPolicy 条件：“规定如何从候选路径与目标中作出选择的版本化路由规范”。条件不得互借；各自成立后方可归类。
-      en: "Endpoint-specific contrast: parent RoutingSpecification: Route (semantic kind=specification, backbone Route-is_a-RoutingSpecification); RoutingPolicy (semantic kind=specification, backbone RoutingPolicy-is_a-RoutingSpecification). Endpoint conditions: Route condition: “A static routing specification from one control location to one typed target”; RoutingPolicy condition: “A versioned routing specification governing how a target is selected from candidate paths and targets”. Conditions cannot be borrowed; classify each endpoint only from its own evidence."
-      ja: 端点別対照：親 RoutingSpecification：Route（semantic kind=specification、バックボーン Route-is_a-RoutingSpecification）；RoutingPolicy（semantic kind=specification、バックボーン RoutingPolicy-is_a-RoutingSpecification）。両端条件：Route の条件：「one control location から typed target へ指す static routing specification」；RoutingPolicy の条件：「candidate path/target から selection する方法を govern する versioned routing specification」。条件を流用せず、各端を固有の証拠で分類します。
-    source_claims:
-      - claim-route-004
+      - claim-route-design
 parent_relation:
   id: Route-is_a-RoutingSpecification
   predicate: is_a
@@ -227,7 +276,7 @@ parent_relation:
   definitions:
     zh: Route 是一种 RoutingSpecification；其种差是声明从控制位置到类型化 RoutingTarget 的静态可用路径。
     en: A Route is a RoutingSpecification distinguished by declaring a static eligible path from a control location to a typed RoutingTarget.
-    ja: Route は control location から typed RoutingTarget への static eligible path を宣言する RoutingSpecification subtype です。
+    ja: Route は control location から typed RoutingTarget への static eligible path を宣言する subtype です。
   cardinality: null
   cardinality_not_applicable_reason:
     zh: 该关系表达类型级语义，不在此规定实例基数。
@@ -244,72 +293,26 @@ parent_relation:
   boundary_context: null
   constraints: []
   examples:
-    - id: Route-is_a-RoutingSpecification-example-positive-manual-20260716
+    - id: Route-is_a-RoutingSpecification-example-positive
       kind: positive
       labels:
         zh: 账单分支路径
         en: Billing branch route
         ja: billing branch route
-      scenario_id: routing-relation-route-is_a-routingspecification-positive
       descriptions:
         zh: route-billing 声明 classify-request 到 billing-worker 的可用控制边。
         en: route-billing declares an eligible control edge from classify-request to billing-worker.
-        ja: route-billing は classify-request から billing-worker への eligible edge を宣言します。
+        ja: route-billing は eligible edge を宣言します。
       field_values: {}
       related_node_ids:
         - Route
         - RoutingSpecification
       related_relation_ids:
         - Route-is_a-RoutingSpecification
-      expected_result:
-        zh: 归入 RoutingSpecification。
-        en: Classify under RoutingSpecification.
-        ja: RoutingSpecification 下に分類します。
-      why_valid_or_invalid:
-        zh: 该对象完整声明了可复用的静态控制路径规范及其目标。
-        en: It is a reusable static control specification.
-        ja: reusable static control specification です。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-route-001
-        - claim-route-002
-    - id: Route-is_a-RoutingSpecification-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 已选路径不是 Route 类定义
-        en: A selected path is not a Route classification fact
-        ja: selected path は Route class definition ではない
-      scenario_id: routing-relation-route-is_a-routingspecification-boundary
-      descriptions:
-        zh: decision-884 在 04:20 选择 route-billing；该记录是 RoutingDecision。
-        en: decision-884 selects route-billing at 04:20; that record is a RoutingDecision.
-        ja: decision-884 の 04:20 route selection は RoutingDecision です。
-      field_values: {}
-      related_node_ids:
-        - Route
-        - RoutingSpecification
-      related_relation_ids:
-        - Route-is_a-RoutingSpecification
-      expected_result:
-        zh: 不从选择事实新建 Route 类型。
-        en: Do not create a new Route type from the selection fact.
-        ja: selection fact から new Route type を作りません。
-      why_valid_or_invalid:
-        zh: 静态路径规范与一次运行选择记录具有不同身份和生命周期。
-        en: Static specification and occurrence record have different identities.
-        ja: static specification と occurrence record は identity が異なります。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-route-001
-        - claim-route-002
+        - claim-route-design
   source_claims:
-    - claim-route-001
-    - claim-route-002
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: accepted
+    - claim-route-design
   endpoint_order: child-to-parent
 relations:
   - id: Route-points_to-RoutingTarget
@@ -321,9 +324,9 @@ relations:
       en: points to
       ja: 指し示す
     definitions:
-      zh: Route 的目标引用解析为一个类型与能力约束一致的 RoutingTarget；该边声明可到达性，不声明运行时已选择。
-      en: A Route's target reference resolves to a RoutingTarget whose type and capability constraints agree; the edge declares eligibility, not runtime selection.
-      ja: Route target ref は type/capability constraint が一致する RoutingTarget に resolve し、edge は eligibility を宣言し runtime selection は主張しません。
+      zh: Route 的 target_ref 解析为类型与能力约束一致的 RoutingTarget；声明可到达性，不声明运行时已选择。
+      en: A Route's target_ref resolves to a RoutingTarget whose type and capability constraints agree; declares eligibility, not runtime selection.
+      ja: Route target ref は type/capability constraint が一致する RoutingTarget に resolve し eligibility を宣言します。
     cardinality: null
     cardinality_not_applicable_reason:
       zh: 该关系表达类型级语义，不在此规定实例基数。
@@ -340,112 +343,57 @@ relations:
     boundary_context: null
     constraints: []
     examples:
-      - id: Route-points_to-RoutingTarget-example-positive-manual-20260716
+      - id: Route-points_to-RoutingTarget-example-positive
         kind: positive
         labels:
-          zh: 账单路径指向账单 worker 目标
-          en: Billing route points to billing-worker target
-          ja: billing route points to billing worker target
-        scenario_id: routing-relation-route-points_to-routingtarget-positive
+          zh: 账单路径指向 worker 目标
+          en: Billing route points to worker target
+          ja: billing route points to worker target
         descriptions:
-          zh: route-billing.target_ref 解析为 target-billing-worker，类型为 worker。
+          zh: route-billing.target_ref 解析为 target-billing-worker，类型 worker。
           en: route-billing.target_ref resolves to target-billing-worker of type worker.
-          ja: route-billing.target_ref は worker type の target-billing-worker に resolve します。
+          ja: route-billing.target_ref は worker type target に resolve します。
         field_values: {}
         related_node_ids:
           - Route
           - RoutingTarget
         related_relation_ids:
           - Route-points_to-RoutingTarget
-        expected_result:
-          zh: 建立静态路径到类型化目标的映射。
-          en: Create the static-path-to-typed-target mapping.
-          ja: static path から typed target への mapping を作成します。
-        why_valid_or_invalid:
-          zh: 目标引用、受控类型和能力约束均一致且能够确定解析。
-          en: Reference, type, and capability constraints agree.
-          ja: reference・type・capability constraint が一致します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-route-001
-      - id: Route-points_to-RoutingTarget-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 无类型 URL 不是路由目标
-          en: Untyped URL is not a routing target
-          ja: untyped URL は routing target ではない
-        scenario_id: routing-relation-route-points_to-routingtarget-boundary
-        descriptions:
-          zh: route-x 只含字符串 https://example.invalid，没有 target ID、类型或 owner。
-          en: route-x contains only https://example.invalid with no target ID, type, or owner.
-          ja: route-x は URL string のみで target ID/type/owner がありません。
-        field_values: {}
-        related_node_ids:
-          - Route
-          - RoutingTarget
-        related_relation_ids:
-          - Route-points_to-RoutingTarget
-        expected_result:
-          zh: 拒绝 points_to 关系直到建立类型化目标。
-          en: Reject points_to until a typed target exists.
-          ja: typed target 作成まで points_to を拒否します。
-        why_valid_or_invalid:
-          zh: 字符串地址不可证明控制流目标身份。
-          en: A string address does not prove control-flow target identity.
-          ja: string address は control-flow target identity を証明しません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-route-001
-    source_claims:
-      - claim-route-001
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
+          - claim-route-langgraph
     target: concept:RoutingTarget
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-orchestration-tool-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照权威来源逐项完成人工语义核验；概念定义、层级、关系、结构与来源主张成立。
-    en: Manual semantic verification against authoritative sources completed; concept definitions, hierarchy, relations, structure, and source claims hold.
-    ja: 権威ソースに照らし手動意味検証を完了し、概念定義・階層・関係・構造・出典主張が成立。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: langgraph-route
+    title: LangGraph
+    url: https://langchain-ai.github.io/langgraph/
+    source_type: official-doc
+    relevance: Edges, conditional_edges, Send, Command as static routes.
+  - id: openai-route
+    title: OpenAI Agents SDK
+    url: https://openai.github.io/openai-agents-python/
+    source_type: official-doc
+    relevance: Handoff paths between agents.
+  - id: route-design
+    title: Moonweave routing and gates design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Route as static RoutingSpecification edge.
 source_claims:
-  - id: claim-route-001
-    source: eng-fw-langgraph-graph-api
-    supports: LangGraph's Graph API distinguishes workflow state, executable nodes, static edges, conditional routing functions, termination targets, and Command values that combine state updates with a selected destination. Moonweave uses this to separate reusable routing specifications and targets from one RoutingDecision occurrence.
-    locator: LangGraph Graph API documentation, Graphs, Edges, Conditional edges, and Command sections
+  - id: claim-route-langgraph
+    source: langgraph-route
+    supports: LangGraph edges and conditional_edges path maps declare static source-to-target routes distinct from one routing occurrence.
+    locator: Graph API — Edges, Conditional edges, Send, Command
+    evidence_kind: official
+    confidence: high
+  - id: claim-route-openai
+    source: openai-route
+    supports: OpenAI handoff configuration declares static agent-to-agent routes.
+    locator: Handoffs — agent transfer configuration
+    evidence_kind: official
+    confidence: high
+  - id: claim-route-design
+    source: route-design
+    supports: Moonweave Route is reusable static path specification separate from RoutingDecision.
+    locator: Route concept boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-route-002
-    source: eng-ont-prov-o
-    supports: W3C PROV-O distinguishes plans and other Entities from time-bounded Activities that use or generate Entities. Moonweave therefore treats routing policy and conditions as reusable specifications, RoutingDecision as an occurrence, and GateOutcome as information produced by gate evaluation.
-    locator: W3C PROV-O Recommendation Sections 3.1 and 3.2, Entity, Activity, generation, and Plan
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-route-003
-    source: eng-fw-langgraph-graph-api
-    supports: The official LangGraph Graph API specifies that Send names the destination and supplies the state passed to it, while Command combines state updates with goto. Moonweave makes that state-transfer boundary explicit and reviewable as a Route transfer contract.
-    locator: LangGraph Graph API > Graphs > Send and Command > update and goto
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-route-004
-    source: eng-fw-langgraph-graph-api
-    supports: LangGraph distinguishes declared graph edges from conditional routing functions and Command-based dynamic destinations. Moonweave therefore defines Route as one source-to-target path and RoutingPolicy as the versioned decision specification that selects among paths; the class boundary is a design inference.
-    locator: LangGraph Graph API documentation, Graphs, Edges, Conditional edges, and Command sections
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

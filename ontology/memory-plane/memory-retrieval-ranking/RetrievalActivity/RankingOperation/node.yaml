@@ -1,34 +1,67 @@
 schema: moonweave.ai/ontology-node/v1
 id: RankingOperation
 kind: concept
-status: accepted
 labels:
   zh: 排序操作
   en: Ranking operation
   ja: 順位付け操作
 semantics:
   short_definition:
-    zh: 对既有候选集合计算、组合或裁剪顺序的检索活动。
-    en: A retrieval activity that scores, combines, or truncates the ordering of an existing candidate set.
-    ja: 既存candidate setの順序を採点・結合・切詰めするretrieval activityです。
+    zh: 改变既有候选顺序或保留范围的排序活动。
+    en: Ranking activity that changes order or retained range of existing candidates.
+    ja: 既存 candidate の順序または保持範囲を変える ranking activity。
   definition:
-    zh: RankingOperation 是以既有 CandidateSet 为输入并改变其分数解释、相对顺序或保留范围的活动上位概念；它覆盖评分、融合、重排与 TopK，但不负责从索引首次召回候选。
-    en: RankingOperation is the activity superclass for operations that consume an existing CandidateSet and change its score interpretation, relative order, or retained range. It covers scoring, fusion, reranking, and TopK selection, but not first-stage recall from an index.
-    ja: RankingOperation は既存CandidateSetをconsumeしscore解釈・相対順序・保持範囲を変えるactivity上位概念です。scoring・fusion・reranking・TopKを含みfirst-stage recallは含みません。
+    zh: RankingOperation 消费已有 CandidateSet 并改变分数解释、相对顺序或保留范围的活动上位概念；覆盖 CandidateScoringActivity、RankFusion、RerankActivity 与 TopKSelection，但不从索引首次召回。
+    en: RankingOperation is the activity superclass consuming an existing CandidateSet to change score interpretation, relative order, or retained range. It covers CandidateScoringActivity, RankFusion, RerankActivity, and TopKSelection but not first-stage index recall.
+    ja: RankingOperation は既存 CandidateSet を consume し score 解釈・相対順序・保持範囲を変える activity 上位概念。CandidateScoringActivity/RankFusion/RerankActivity/TopKSelection を含み first-stage recall は含みません。
   why_needed:
-    zh: 为多种排序机制建立共同父节点，同时保留各机制的不同输入、输出和语义。
-    en: Gives ranking mechanisms a shared parent while preserving their distinct inputs, outputs, and semantics.
-    ja: ranking機構に共通parentを与えつつ各入力・出力・意味の違いを保持します。
+    zh: 多种排序机制需要共同父节点，同时保留 Cohere rerank 与 RRF 不同的输入输出语义。
+    en: Multiple ranking mechanisms need a shared parent while preserving distinct Cohere rerank versus RRF semantics.
+    ja: Cohere rerank と RRF の異なる入出力意味を保ちつつ共通 parent が必要です。
   includes:
     - zh: 纳入对已生成候选执行评分、融合、重排和截断的有身份活动。
       en: Includes identified activities that score, fuse, rerank, or truncate already generated candidates.
-      ja: 生成済candidateをscore・fuse・rerank・truncateするidentity付きactivityを含みます。
+      ja: 生成済 candidate を score/fuse/rerank/truncate する identity 付き activity。
   excludes:
-    - zh: 排除候选生成、请求对象、结果对象、静态排序配置和上下文采用决策。
-      en: Excludes candidate generation, request and result objects, static ranking configuration, and context-admission decisions.
-      ja: candidate generation・request/result object・static ranking configuration・context admission decisionを除外します。
+    - zh: 排除候选生成、请求/结果对象与上下文采用。
+      en: Excludes candidate generation, request/result objects, and context admission.
+      ja: candidate generation・request/result・context admission を除外。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: Cohere POST /v2/rerank、Elasticsearch RRF、ColBERT MaxSim 与 top_k 截断均属于 RankingOperation 子类；input_candidate_set_id 指向消费前的集合。
+    en: Cohere POST /v2/rerank, Elasticsearch RRF, ColBERT MaxSim, and top_k truncation are RankingOperation subtypes; input_candidate_set_id points to the consumed set.
+    ja: Cohere rerank・Elasticsearch RRF・ColBERT MaxSim・top_k truncation は RankingOperation subtype。input_candidate_set_id は consume 前 set を指す。
+  typical_input:
+    - description: Ranking stage input
+      format: '{ "ranking_operation_id": "ranking-413", "input_candidate_set_id": "candidate-set-413" }'
+      source_claims:
+        - claim-ranking-operation-design
+  typical_output:
+    - description: Reordered or truncated output set
+      format: '{ "output_candidate_set_id": "candidate-set-reranked-416", "stage": "rerank" }'
+      source_claims:
+        - claim-ranking-operation-design
+  reference_implementations:
+    - name: Mem0 Search API
+      url: https://docs.mem0.ai
+      description: POST /v1/memories/search/ with query, entity IDs, filters, and top_k.
+    - name: Pinecone Query
+      url: https://docs.pinecone.io/guides/search/query-data
+      description: index.query with vector, namespace, filter, and top_k.
+    - name: Chroma Query
+      url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+      description: collection.query with query_texts or query_embeddings and n_results.
+    - name: LangGraph Store Search
+      url: https://langchain-ai.github.io/langgraph/reference/store/
+      description: BaseStore.search with namespace prefix and semantic query.
+    - name: Cohere Rerank API
+      url: https://docs.cohere.com/reference/rerank
+      description: POST /v2/rerank with model rerank-v3.x, query, documents, top_n.
+    - name: ColBERT
+      url: https://arxiv.org/abs/2004.12832
+      description: Late interaction retrieval via token-level MaxSim scoring.
 structure:
   identity_keys:
     - ranking_operation_id
@@ -36,106 +69,172 @@ structure:
     - id: ranking_operation_id
       labels:
         zh: 排序操作标识
-        en: ranking operation ID
-        ja: ranking operation ID
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
+        en: Ranking operation identifier
+        ja: 順位付け操作識別子
       definitions:
         zh: 稳定标识一次排序阶段执行。
         en: Stable identifier for one ranking-stage execution.
-        ja: 一つのranking-stage executionを安定識別します。
-      allowed_values: []
-      pattern: null
-      example_value: ranking-operation-413
-      source_claims:
-        - claim-ranking-operation-002
-    - id: input_candidate_set_id
-      labels:
-        zh: 输入候选集合标识
-        en: input candidate set ID
-        ja: input candidate set ID
+        ja: 一 ranking-stage execution を安定識別。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 标识排序前所消费的候选集合。
-        en: Identifies the candidate set consumed before ranking.
-        ja: ranking前にconsumeするcandidate setを識別します。
+      pattern: null
+      example_value: ranking-operation-413
       allowed_values: []
+      source_claims:
+        - claim-ranking-operation-id
+    - id: input_candidate_set_id
+      labels:
+        zh: 输入候选集合标识
+        en: Input candidate set identifier
+        ja: 入力 candidate set 識別子
+      definitions:
+        zh: 标识排序前消费的 CandidateSet。
+        en: Identifies the CandidateSet consumed before ranking.
+        ja: ranking 前に consume する CandidateSet を識別。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
       pattern: null
       example_value: candidate-set-413
+      allowed_values: []
       source_claims:
-        - claim-ranking-operation-003
+        - claim-ranking-operation-input
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: RankingOperation-example-positive-manual-001
-    kind: positive
+  - id: RankingOperation-example-rrf
     labels:
-      zh: 排序操作正例
-      en: "Positive case: Ranking operation"
-      ja: 順位付け操作正例
-    scenario_id: null
+      zh: RRF 融合排序
+      en: RRF fusion ranking
+      ja: RRF 融合 ranking
     descriptions:
-      zh: ranking-413 消费 candidate-set-413 并执行一个已记录的排序阶段。
-      en: ranking-413 consumes candidate-set-413 and executes a recorded ranking stage.
-      ja: ranking-413 はcandidate-set-413をconsumeし記録済みranking stageを実行します。
+      zh: ranking-415 消费含 dense 与 lexical 两路的 candidate-set-415 并执行 RRF 融合。
+      en: ranking-415 consumes candidate-set-415 with dense and lexical lists and runs RRF fusion.
+      ja: ranking-415 が dense/lexical 二 list を含む set を consume し RRF fusion。
+    example_source:
+      product: Elasticsearch
+      url: https://www.elastic.co/guide/en/elasticsearch/reference/current/rrf.html
+      version: RRF rank_constant=60
     field_values:
-      ranking_operation_id: ranking-operation-413
-      input_candidate_set_id: candidate-set-413
-      activity_id: ranking-operation-413
-      started_at: 2026-07-16T12:01:00Z
+      ranking_operation_id: rank-fusion-415
+      input_candidate_set_id: candidate-set-dense-lexical-415
     related_node_ids:
       - RankingOperation
+      - RankFusion
     related_relation_ids: []
-    expected_result:
-      zh: 归类为 RankingOperation。
-      en: Classify the object as RankingOperation.
-      ja: RankingOperation として分類します。
-    why_valid_or_invalid:
-      zh: 活动以既有候选集合为输入并改变排序状态。
-      en: The activity consumes an existing candidate set and changes its ranking state.
-      ja: activityは既存candidate setをinputとしranking stateを変更します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-ranking-operation-004
-  - id: RankingOperation-example-boundary-manual-001
-    kind: boundary
+      - claim-ranking-operation-rrf
+      - claim-ranking-operation-design
+  - id: RankingOperation-example-cohere
     labels:
-      zh: 排序操作边界例
-      en: "Boundary case: Ranking operation"
-      ja: 順位付け操作境界例
-    scenario_id: null
+      zh: Cohere 重排排序
+      en: Cohere rerank ranking
+      ja: Cohere rerank ranking
     descriptions:
-      zh: generation-413 从索引首次召回候选，尚未消费既有候选集合。
-      en: generation-413 performs first-stage recall from an index and does not consume an existing candidate set.
-      ja: generation-413 はindexからfirst-stage recallを行い既存candidate setをconsumeしません。
-    field_values: {}
+      zh: ranking-416 消费 20 条融合候选并调用 Cohere rerank(top_n=10)。
+      en: ranking-416 consumes 20 fused candidates and calls Cohere rerank(top_n=10).
+      ja: ranking-416 が 20 fused candidate を consume し Cohere rerank(top_n=10)。
+    example_source:
+      product: Cohere
+      url: https://docs.cohere.com/reference/rerank
+      version: POST /v2/rerank
+    field_values:
+      ranking_operation_id: rerank-416
+      input_candidate_set_id: candidate-set-fused-415
     related_node_ids:
       - RankingOperation
+      - RerankActivity
     related_relation_ids: []
-    expected_result:
-      zh: 不得归类为 RankingOperation。
-      en: Do not classify the object as RankingOperation.
-      ja: RankingOperation として分類しません。
-    why_valid_or_invalid:
-      zh: 它属于 CandidateGenerationActivity，而不是 RankingOperation。
-      en: It is CandidateGenerationActivity, not RankingOperation.
-      ja: CandidateGenerationActivityでありRankingOperationではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-ranking-operation-005
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-ranking-operation-cohere
+  - id: RankingOperation-example-topk
+    labels:
+      zh: Top-K 截断排序
+      en: Top-K truncation ranking
+      ja: Top-K truncation ranking
+    descriptions:
+      zh: ranking-417 对已排序 80 候选按 top_k=12 稳定截断。
+      en: ranking-417 stably truncates 80 ordered candidates to top_k=12.
+      ja: ranking-417 が ordered 80 candidate を top_k=12 に truncate。
+    example_source:
+      product: Pinecone
+      url: https://docs.pinecone.io/guides/search/query-data
+      version: top_k parameter
+    field_values:
+      ranking_operation_id: topk-417
+      input_candidate_set_id: candidate-set-reranked-416
+    related_node_ids:
+      - RankingOperation
+      - TopKSelection
+    related_relation_ids: []
+    source_claims:
+      - claim-ranking-operation-topk
+sources:
+  - id: src-cohere-rerank
+    title: Cohere Rerank API
+    publisher: Cohere
+    url: https://docs.cohere.com/reference/rerank
+    source_type: official-doc
+    relevance: POST /v2/rerank with rerank-v3 models, query, documents, top_n.
+  - id: src-elastic-rrf
+    title: Elasticsearch Reciprocal Rank Fusion
+    publisher: Elastic
+    url: https://www.elastic.co/guide/en/elasticsearch/reference/current/rrf.html
+    source_type: official-doc
+    relevance: RRF formula, rank_constant, and rank_window_size.
+  - id: src-pinecone-query
+    title: Pinecone Query Guide
+    publisher: Pinecone
+    url: https://docs.pinecone.io/guides/search/query-data
+    source_type: official-doc
+    relevance: index.query with vector, namespace, filter, top_k.
+  - id: src-memory-retrieval-design
+    title: Moonweave memory-retrieval-ranking module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Separates retrieval stages, scores, results, and context admission.
+source_claims:
+  - id: claim-ranking-operation-rrf
+    source: src-elastic-rrf
+    supports: RRF combines independently ranked lists into one ordering.
+    locator: RRF
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-ranking-operation-cohere
+    source: src-cohere-rerank
+    supports: Cohere rerank is a second-stage ranking operation over existing candidates.
+    locator: POST /v2/rerank
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-ranking-operation-topk
+    source: src-pinecone-query
+    supports: top_k truncation selects the first K candidates from an ordered set.
+    locator: top_k
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-ranking-operation-design
+    source: src-memory-retrieval-design
+    supports: RankingOperation consumes existing CandidateSet values.
+    locator: module boundary
+    evidence_kind: design-inference
+    confidence: high
+  - id: claim-ranking-operation-id
+    source: src-memory-retrieval-design
+    supports: ranking_operation_id identifies one ranking stage.
+    locator: structure
+    evidence_kind: design-inference
+    confidence: high
+  - id: claim-ranking-operation-input
+    source: src-memory-retrieval-design
+    supports: input_candidate_set_id records the pre-ranking set.
+    locator: structure
+    evidence_kind: design-inference
+    confidence: high
 parent_relation:
   id: RankingOperation-is_a-RetrievalActivity
   predicate: is_a
@@ -170,18 +269,16 @@ parent_relation:
         en: "Assert only when the instance satisfies the complete RetrievalActivity definition and the child differentia: it consumes an existing CandidateSet and changes score interpretation, order, or retained range."
         ja: instanceがRetrievalActivity完全定義とchild differentia「既存CandidateSetをconsumeしscore解釈・順序・保持範囲を変える」を共に満たす時だけassertします。
       source_claims:
-        - claim-ranking-operation-006
+        - claim-ranking-operation-design
   temporal_scope: timeless
   boundary_context: null
   constraints: []
   examples:
     - id: RankingOperation-is_a-RetrievalActivity-example-positive-manual-001
-      kind: positive
       labels:
         zh: 是一种RetrievalActivity正例
         en: "Positive case: is a RetrievalActivity"
         ja: RetrievalActivityの一種正例
-      scenario_id: null
       descriptions:
         zh: ranking-413 消费 candidate-set-423 并改变其排序状态。
         en: ranking-413 consumes candidate-set-423 and changes its ranking state.
@@ -192,25 +289,13 @@ parent_relation:
         - RetrievalActivity
       related_relation_ids:
         - RankingOperation-is_a-RetrievalActivity
-      expected_result:
-        zh: 建立该有向事实，并保留条件与证据。
-        en: Assert the directed fact with its condition and evidence retained.
-        ja: condition/evidenceを保持してdirected factをassertします。
-      why_valid_or_invalid:
-        zh: 实例满足端点定义、方向和该关系的显式成立条件。
-        en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-        ja: endpoint定義・direction・明示assertion conditionを満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-ranking-operation-006
+        - claim-ranking-operation-design
     - id: RankingOperation-is_a-RetrievalActivity-example-boundary-manual-001
-      kind: boundary
       labels:
         zh: 是一种RetrievalActivity边界例
         en: "Boundary case: is a RetrievalActivity"
         ja: RetrievalActivityの一種境界例
-      scenario_id: null
       descriptions:
         zh: generation-412 从索引首次召回，尚无既有 CandidateSet 输入。
         en: generation-412 performs first recall and has no existing CandidateSet input.
@@ -221,81 +306,11 @@ parent_relation:
         - RetrievalActivity
       related_relation_ids:
         - RankingOperation-is_a-RetrievalActivity
-      expected_result:
-        zh: 验证器不得建立该有向关系事实。
-        en: Do not assert the directed fact.
-        ja: directed factをassertしません。
-      why_valid_or_invalid:
-        zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-        en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-        ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-ranking-operation-006
+        - claim-ranking-operation-design
   source_claims:
-    - claim-ranking-operation-006
+    - claim-ranking-operation-design
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: pending
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
-source_claims:
-  - id: claim-ranking-operation-001
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents fusion and multi-stage refinement over previously retrieved candidates; Moonweave groups these order-changing stages under RankingOperation.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-ranking-operation-002
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents fusion and multi-stage refinement over previously retrieved candidates; Moonweave groups these order-changing stages under RankingOperation. Moonweave records RankingOperation.ranking_operation_id as the stated auditable datum: Stable identifier for one ranking-stage execution."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-ranking-operation-003
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents fusion and multi-stage refinement over previously retrieved candidates; Moonweave groups these order-changing stages under RankingOperation. Moonweave records RankingOperation.input_candidate_set_id as the stated auditable datum: Identifies the candidate set consumed before ranking."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-ranking-operation-004
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents fusion and multi-stage refinement over previously retrieved candidates; Moonweave groups these order-changing stages under RankingOperation. Official hybrid and reranking documentation separates ordering stages from initial candidate retrieval.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-ranking-operation-005
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents fusion and multi-stage refinement over previously retrieved candidates; Moonweave groups these order-changing stages under RankingOperation. Qdrant distinguishes prefetch candidate retrieval from later fusion or refinement.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-ranking-operation-006
-    source: eng-vector-qdrant-hybrid-query
-    supports: The official documentation supports the operational distinction used in this child differentia; Moonweave's RankingOperation-to-RetrievalActivity subclass placement is an explicit ontology design decision.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

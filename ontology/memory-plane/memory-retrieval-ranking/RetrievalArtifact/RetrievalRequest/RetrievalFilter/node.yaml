@@ -1,159 +1,194 @@
 schema: moonweave.ai/ontology-node/v1
 id: RetrievalFilter
 kind: concept
-status: accepted
 labels:
   zh: 检索过滤条件
   en: Retrieval filter
   ja: 検索フィルター
 semantics:
   short_definition:
-    zh: 在候选生成前限制可参与检索记录范围的请求组成规范。
-    en: A request-component specification that limits which records may participate before candidate generation.
-    ja: candidate generation前に参加可能record範囲を制限するrequest-component specificationです。
+    zh: 召回前限制记录范围的约束。
+    en: Pre-recall constraint limiting record scope.
+    ja: recall 前に record 範囲を制限する constraint。
   definition:
-    zh: RetrievalFilter 是 RetrievalRequest 中的约束表达式，按声明语言限制候选可见范围，例如命名空间、租户、时间或元数据条件；它不表达信息需求、不计算相关性，也不等同于检索后的上下文筛选。
-    en: RetrievalFilter is a constraint expression within RetrievalRequest that limits candidate visibility by namespace, tenant, time, or metadata under a declared language. It neither expresses the information need nor computes relevance, and it is not post-retrieval context filtering.
-    ja: RetrievalFilter はRetrievalRequest内のconstraint expressionで指定languageによりnamespace・tenant・time・metadataでcandidate visibilityを制限します。information needやrelevanceを表さずpost-retrieval context filteringでもありません。
+    zh: RetrievalFilter 保存候选生成前求值的约束表达式；映射 Pinecone index.query 的 filter 元数据 dict、Chroma 的 where/where_document、Mem0 search 的 filters 对象。它不表达信息需求，也不是检索后的上下文筛选。
+    en: RetrievalFilter stores constraints evaluated before candidate generation. It maps Pinecone index.query metadata filter dict, Chroma where/where_document, and Mem0 search filters object. It neither expresses the information need nor post-retrieval context filtering.
+    ja: RetrievalFilter は recall 前 constraint。Pinecone filter dict/Chroma where/where_document/Mem0 filters を写像。information need でも post-retrieval context filter でもない。
   why_needed:
-    zh: 把检索前约束与查询语义、排序分数和上下文排除原因分开。
-    en: Separates pre-retrieval constraints from query semantics, ranking scores, and context-exclusion reasons.
-    ja: pre-retrieval constraintをquery semantics・ranking score・context exclusion reasonから分離します。
+    zh: tenant 过滤与 query 语义是两件不同的事；把 filter dict 写进 request 才能解释为何某条记忆未进入候选池。
+    en: Tenant filtering and query semantics are different concerns; recording filter dict on the request explains why a memory never entered the candidate pool.
+    ja: tenant filter と query 语义は別。filter dict 記録で candidate pool 除外理由を説明。
   includes:
-    - zh: 纳入能在候选生成阶段求值的命名空间、权限、时间与元数据过滤表达式。
-      en: Includes namespace, authorization, temporal, and metadata expressions evaluable during candidate generation.
-      ja: candidate generation中に評価可能なnamespace・authorization・temporal・metadata expressionを含みます。
+    - zh: 纳入 namespace、tenant、时间与 metadata 等召回前过滤表达式。
+      en: Includes pre-recall filters for namespace, tenant, time, and metadata.
+      ja: namespace/tenant/time/metadata 等 pre-recall filter。
   excludes:
-    - zh: 排除自然语言查询、模型评分阈值、TopK 数量、上下文预算和安全扫描结论。
-      en: Excludes natural-language queries, model-score thresholds, TopK size, context budget, and safety-scan findings.
-      ja: natural-language query・model score threshold・TopK size・context budget・safety scan findingを除外します。
+    - zh: 排除 query 文本、rerank 阈值、token 预算排除。
+      en: Excludes query text, rerank thresholds, and token-budget exclusions.
+      ja: query text/rerank threshold/token budget exclusion を除外。
   semantic_kind: specification
   aliases: []
+engineering:
+  explanation:
+    zh: filter_expression JSON←Pinecone filter；where/where_document←Chroma；filters←Mem0。expression_language 声明 pinecone-metadata/chroma-where/mem0-filters。
+    en: filter_expression JSON from Pinecone filter; where/where_document from Chroma; filters from Mem0. expression_language declares pinecone-metadata/chroma-where/mem0-filters.
+    ja: Pinecone/Chroma/Mem0 filter API 写像。
+  typical_input: []
+  typical_output: []
+  reference_implementations:
+    - name: Mem0 Search API
+      url: https://docs.mem0.ai
+      description: POST /v1/memories/search/
+    - name: Pinecone Query
+      url: https://docs.pinecone.io/guides/search/query-data
+      description: index.query
+    - name: Chroma Query
+      url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+      description: collection.query
+    - name: LangGraph Store Search
+      url: https://langchain-ai.github.io/langgraph/reference/store/
+      description: BaseStore.search
+    - name: Cohere Rerank API
+      url: https://docs.cohere.com/reference/rerank
+      description: POST /v2/rerank
+    - name: ColBERT
+      url: https://arxiv.org/abs/2004.12832
+      description: MaxSim scoring
 structure:
   identity_keys:
     - filter_id
   fields:
     - id: filter_id
       labels:
-        zh: 过滤条件标识
-        en: filter ID
-        ja: filter ID
+        zh: 过滤标识
+        en: Filter identifier
+        ja: filter 識別子
+      definitions:
+        zh: 请求内稳定标识过滤条件。
+        en: Stable filter identifier within request.
+        ja: request 内 filter 識別子。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 在所属请求内稳定标识一个过滤条件。
-        en: Stable identifier for one filter within its request.
-        ja: owner request内で一filterを安定識別します。
-      allowed_values: []
       pattern: null
       example_value: filter-421
+      allowed_values: []
       source_claims:
-        - claim-retrieval-filter-002
-    - id: expression
+        - claim-retrieval-filter-id
+    - id: filter_expression
       labels:
         zh: 过滤表达式
-        en: filter expression
+        en: Filter expression
         ja: filter expression
-      datatype: string
+      definitions:
+        zh: JSON 或 DSL 约束；Pinecone {"category":{"$eq":"preferences"}}、Chroma where={"user_id":"alice"}。
+        en: JSON or DSL constraint; Pinecone metadata filter or Chroma where clause.
+        ja: Pinecone metadata filter/Chroma where JSON。
+      datatype: object
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 保存实际执行的约束表达式。
-        en: Constraint expression actually evaluated by retrieval.
-        ja: retrievalで実際に評価するconstraint expressionです。
-      allowed_values: []
       pattern: null
-      example_value: tenant_id = 'acme' AND created_at >= '2026-01-01'
+      example_value:
+        user_id: alice
+      allowed_values: []
       source_claims:
-        - claim-retrieval-filter-003
+        - claim-retrieval-filter-expr
     - id: expression_language
       labels:
         zh: 表达式语言
-        en: expression language
+        en: Expression language
         ja: expression language
+      definitions:
+        zh: 声明解析语法：pinecone-metadata、chroma-where、mem0-filters。
+        en: "Declares parse syntax: pinecone-metadata, chroma-where, mem0-filters."
+        ja: pinecone-metadata/chroma-where/mem0-filters。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 声明表达式的解析与求值语法。
-        en: Declares the syntax used to parse and evaluate the expression.
-        ja: expressionのparse/evaluate syntaxを宣言します。
-      allowed_values: []
       pattern: null
-      example_value: qdrant-filter
+      example_value: chroma-where
+      allowed_values: []
       source_claims:
-        - claim-retrieval-filter-004
+        - claim-retrieval-filter-lang
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: RetrievalFilter-example-positive-manual-001
-    kind: positive
+  - id: RetrievalFilter-example-pinecone
     labels:
-      zh: 检索过滤条件正例
-      en: "Positive case: Retrieval filter"
-      ja: 検索フィルター正例
-    scenario_id: null
+      zh: Pinecone metadata filter
+      en: Pinecone metadata filter
+      ja: Pinecone metadata filter
     descriptions:
-      zh: filter-421 在候选生成前把检索范围限制为 acme 租户的 2026 年记录。
-      en: filter-421 restricts candidate generation to 2026 records for tenant acme.
-      ja: filter-421 はcandidate generation前にacme tenantの2026 recordへ範囲を制限します。
+      zh: filter-421 filter_expression={"category":{"$eq":"preferences"}} expression_language=pinecone-metadata。
+      en: filter-421 Pinecone metadata filter for category=preferences.
+      ja: filter-421 Pinecone filter dict。
+    example_source:
+      product: Pinecone
+      url: https://docs.pinecone.io/guides/search/query-data
+      version: filter parameter
     field_values:
       filter_id: filter-421
-      expression: tenant_id = 'acme' AND created_at >= '2026-01-01'
-      expression_language: qdrant-filter
+      filter_expression:
+        category:
+          $eq: preferences
+      expression_language: pinecone-metadata
     related_node_ids:
       - RetrievalFilter
     related_relation_ids: []
-    expected_result:
-      zh: 归类为 RetrievalFilter。
-      en: Classify the object as RetrievalFilter.
-      ja: RetrievalFilter として分類します。
-    why_valid_or_invalid:
-      zh: 约束在召回前求值并改变可参与候选生成的记录范围。
-      en: The constraint is evaluated before recall and changes which records may become candidates.
-      ja: constraintはrecall前に評価されcandidateになり得るrecord範囲を変えます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-retrieval-filter-005
-  - id: RetrievalFilter-example-boundary-manual-001
-    kind: boundary
+      - claim-retrieval-filter-pinecone
+  - id: RetrievalFilter-example-chroma-where
     labels:
-      zh: 检索过滤条件边界例
-      en: "Boundary case: Retrieval filter"
-      ja: 検索フィルター境界例
-    scenario_id: null
+      zh: Chroma where 子句
+      en: Chroma where clause
+      ja: Chroma where 句
     descriptions:
-      zh: context-exclusion-421 因剩余 token 不足拒绝一个已检索候选。
-      en: context-exclusion-421 rejects an already retrieved candidate because the token budget is insufficient.
-      ja: context-exclusion-421 はtoken budget不足で既にretrieved candidateを拒否します。
-    field_values: {}
+      zh: filter-422 where={"user_id":"alice"} 限制 Chroma collection.query 范围。
+      en: filter-422 where={"user_id":"alice"} scopes Chroma collection.query.
+      ja: filter-422 Chroma where。
+    example_source:
+      product: Chroma
+      url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+      version: where filter
+    field_values:
+      filter_id: filter-422
+      filter_expression:
+        user_id: alice
+      expression_language: chroma-where
     related_node_ids:
       - RetrievalFilter
     related_relation_ids: []
-    expected_result:
-      zh: 不得归类为 RetrievalFilter。
-      en: Do not classify the object as RetrievalFilter.
-      ja: RetrievalFilter として分類しません。
-    why_valid_or_invalid:
-      zh: 这是上下文组装的后置排除，不是 RetrievalFilter。
-      en: This is downstream context-assembly exclusion, not RetrievalFilter.
-      ja: downstream context-assembly exclusionでRetrievalFilterではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-retrieval-filter-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-retrieval-filter-chroma
+  - id: RetrievalFilter-example-mem0
+    labels:
+      zh: Mem0 filters 对象
+      en: Mem0 filters object
+      ja: Mem0 filters object
+    descriptions:
+      zh: filter-423 filters={"category":"preferences"} 映射 Mem0 search filters 字段。
+      en: filter-423 maps to Mem0 search filters field.
+      ja: filter-423→Mem0 filters。
+    example_source:
+      product: Mem0
+      url: https://docs.mem0.ai
+      version: search filters
+    field_values:
+      filter_id: filter-423
+      filter_expression:
+        category: preferences
+      expression_language: mem0-filters
+    related_node_ids:
+      - RetrievalFilter
+    related_relation_ids: []
+    source_claims:
+      - claim-retrieval-filter-mem0
 parent_relation:
   id: RetrievalRequest-has_filter-RetrievalFilter
   predicate: part_of
@@ -188,18 +223,16 @@ parent_relation:
         en: Assert only when the RetrievalFilter is a non-substitutable information component within this RetrievalRequest's identity boundary and activity identity is not conflated with artifact identity.
         ja: RetrievalFilterがこのRetrievalRequest identity boundary内の置換不能information componentでactivity/artifact identityを混同しない場合だけassertします。
       source_claims:
-        - claim-retrieval-filter-007
+        - claim-retrieval-filter-id
   temporal_scope: valid-time
   boundary_context: null
   constraints: []
   examples:
     - id: RetrievalRequest-has_filter-RetrievalFilter-example-positive-manual-001
-      kind: positive
       labels:
         zh: has_filter RetrievalFilter正例
         en: "Positive case: has_filter RetrievalFilter"
         ja: RetrievalFilterをhas_filter正例
-      scenario_id: null
       descriptions:
         zh: request-419 拥有 filter-421 并在运行前固定它。
         en: request-419 owns filter-421 and fixes it before execution.
@@ -210,25 +243,13 @@ parent_relation:
         - RetrievalFilter
       related_relation_ids:
         - RetrievalRequest-has_filter-RetrievalFilter
-      expected_result:
-        zh: 建立该有向事实，并保留条件与证据。
-        en: Assert the directed fact with its condition and evidence retained.
-        ja: condition/evidenceを保持してdirected factをassertします。
-      why_valid_or_invalid:
-        zh: 实例满足端点定义、方向和该关系的显式成立条件。
-        en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-        ja: endpoint定義・direction・明示assertion conditionを満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-retrieval-filter-007
+        - claim-retrieval-filter-id
     - id: RetrievalRequest-has_filter-RetrievalFilter-example-boundary-manual-001
-      kind: boundary
       labels:
         zh: has_filter RetrievalFilter边界例
         en: "Boundary case: has_filter RetrievalFilter"
         ja: RetrievalFilterをhas_filter境界例
-      scenario_id: null
       descriptions:
         zh: 上下文预算排除不是 RetrievalFilter。
         en: Context-budget exclusion is not a RetrievalFilter.
@@ -239,88 +260,72 @@ parent_relation:
         - RetrievalFilter
       related_relation_ids:
         - RetrievalRequest-has_filter-RetrievalFilter
-      expected_result:
-        zh: 验证器不得建立该有向关系事实。
-        en: Do not assert the directed fact.
-        ja: directed factをassertしません。
-      why_valid_or_invalid:
-        zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-        en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-        ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-retrieval-filter-007
+        - claim-retrieval-filter-id
   source_claims:
-    - claim-retrieval-filter-007
+    - claim-retrieval-filter-id
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: pending
   endpoint_order: parent-to-child
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-pinecone-query
+    title: Pinecone Query Guide
+    publisher: Pinecone
+    url: https://docs.pinecone.io/guides/search/query-data
+    source_type: official-doc
+    relevance: index.query.
+  - id: src-chroma-query
+    title: Chroma Query Documentation
+    publisher: Chroma
+    url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+    source_type: official-doc
+    relevance: collection.query.
+  - id: src-mem0-search
+    title: Mem0 Platform Documentation
+    publisher: Mem0
+    url: https://docs.mem0.ai
+    source_type: official-doc
+    relevance: Mem0 search API.
+  - id: src-memory-retrieval-design
+    title: Moonweave design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Module boundary.
 source_claims:
-  - id: claim-retrieval-filter-001
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents query and prefetch filtering within hybrid and multi-stage retrieval; Moonweave models the effective filter as a request component.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+  - id: claim-retrieval-filter-pinecone
+    source: src-pinecone-query
+    supports: Pinecone index.query accepts metadata filter dict.
+    locator: filter
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-retrieval-filter-chroma
+    source: src-chroma-query
+    supports: Chroma collection.query accepts where/where_document.
+    locator: where
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-retrieval-filter-mem0
+    source: src-mem0-search
+    supports: Mem0 search accepts filters object.
+    locator: filters
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-retrieval-filter-id
+    source: src-memory-retrieval-design
+    supports: filter_id identifies filter within request.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieval-filter-002
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents query and prefetch filtering within hybrid and multi-stage retrieval; Moonweave models the effective filter as a request component. Moonweave records RetrievalFilter.filter_id as the stated auditable datum: Stable identifier for one filter within its request."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+  - id: claim-retrieval-filter-expr
+    source: src-pinecone-query
+    supports: filter_expression stores evaluated constraint.
+    locator: expression
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-retrieval-filter-lang
+    source: src-memory-retrieval-design
+    supports: expression_language declares filter syntax.
+    locator: language
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieval-filter-003
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents query and prefetch filtering within hybrid and multi-stage retrieval; Moonweave models the effective filter as a request component. Moonweave records RetrievalFilter.expression as the stated auditable datum: Constraint expression actually evaluated by retrieval."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-retrieval-filter-004
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents query and prefetch filtering within hybrid and multi-stage retrieval; Moonweave models the effective filter as a request component. Moonweave records RetrievalFilter.expression_language as the stated auditable datum: Declares the syntax used to parse and evaluate the expression."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-retrieval-filter-005
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents query and prefetch filtering within hybrid and multi-stage retrieval; Moonweave models the effective filter as a request component. Qdrant query stages accept filtering conditions before candidate refinement.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-retrieval-filter-006
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents query and prefetch filtering within hybrid and multi-stage retrieval; Moonweave models the effective filter as a request component. The source's query filters operate within retrieval, not downstream context assembly.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-retrieval-filter-007
-    source: eng-vector-qdrant-hybrid-query
-    supports: The cited official retrieval documentation supports the component roles of these endpoints; Moonweave makes the ownership direction explicit for a non-duplicative graph.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

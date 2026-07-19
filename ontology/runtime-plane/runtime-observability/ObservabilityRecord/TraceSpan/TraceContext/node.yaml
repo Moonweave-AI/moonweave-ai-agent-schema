@@ -1,7 +1,6 @@
 schema: moonweave.ai/ontology-node/v1
 id: TraceContext
 kind: concept
-status: accepted
 labels:
   en: trace context
   zh: 追踪上下文
@@ -29,6 +28,33 @@ semantics:
       ja: 利用者識別やプロンプト内容など業務データ、通常 SpanAttribute、TraceLink、完全 TraceRecord、全ゼロ無効識別は含みません。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: 集成 TraceContext 时应分别映射 OpenTelemetry OTLP traces/spans, LangSmith run trees, LangGraph checkpoint snapshots；静态配置属于其他域，实际运行 occurrence 才写入本概念。
+    en: When integrating TraceContext, map OpenTelemetry OTLP traces/spans, LangSmith run trees, LangGraph checkpoint snapshots separately; static configuration belongs elsewhere and only runtime occurrences belong here.
+    ja: TraceContext 統合時は OpenTelemetry OTLP traces/spans, LangSmith run trees, LangGraph checkpoint snapshots を個別写像し、静的設定は他ドメイン、runtime occurrence のみ本 concept に属します。
+  typical_input:
+    - description: Vendor API payload mappable to TraceContext.
+      format: |-
+        # Example TraceContext ingest
+        { "trace-context_ref": "example-1" }
+      source_claims:
+        - claim-trace-context-design
+  typical_output:
+    - description: Moonweave-local TraceContext projection.
+      format: '{ "schema_owner": "moonweave-local-design", "trace-context_id": "example-1" }'
+      source_claims:
+        - claim-trace-context-design
+  reference_implementations:
+    - name: OpenTelemetry OTLP
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      description: Traces and spans → Trace, Span, Metric export.
+    - name: LangSmith
+      url: https://docs.smith.langchain.com/
+      description: Run trees and feedback → RunTree, TraceRecord.
+    - name: LangGraph Checkpoints
+      url: https://langchain-ai.github.io/langgraph/concepts/persistence/
+      description: State snapshots and checkpoint restore events.
 structure:
   identity_keys:
     - trace_id
@@ -52,7 +78,7 @@ structure:
       pattern: ^[0-9a-f]{32}$
       example_value: 4bf92f3577b34da6a3ce929d0e0e4736
       source_claims:
-        - claim-trace-context-002
+        - claim-trace-context-design
     - id: span_id
       labels:
         zh: 当前跨度标识
@@ -71,7 +97,7 @@ structure:
       pattern: ^[0-9a-f]{16}$
       example_value: 00f067aa0ba902b7
       source_claims:
-        - claim-trace-context-002
+        - claim-trace-context-design
     - id: trace_flags
       labels:
         zh: 追踪标志
@@ -90,7 +116,7 @@ structure:
       pattern: ^[0-9a-f]{2}$
       example_value: "01"
       source_claims:
-        - claim-trace-context-002
+        - claim-trace-context-design
     - id: trace_state
       labels:
         zh: 追踪系统状态
@@ -109,7 +135,7 @@ structure:
       pattern: null
       example_value: vendor=opaque-state
       source_claims:
-        - claim-trace-context-002
+        - claim-trace-context-design
     - id: is_remote
       labels:
         zh: 是否来自远端
@@ -128,7 +154,7 @@ structure:
       pattern: null
       example_value: true
       source_claims:
-        - claim-trace-context-002
+        - claim-trace-context-design
   constraints:
     - id: trace-context-identifiers-valid
       severity: error
@@ -139,7 +165,7 @@ structure:
         en: Trace and span identifiers must satisfy OpenTelemetry validity conditions.
         ja: trace/span identifier は OpenTelemetry validity 条件を満たします。
       source_claims:
-        - claim-trace-context-002
+        - claim-trace-context-design
     - id: trace-context-immutable
       severity: error
       expression_language: plain
@@ -149,7 +175,7 @@ structure:
         en: An established propagation context is not mutated in place; a change creates a new context.
         ja: 確立済み propagation context は in-place 変更せず、新 context を作成します。
       source_claims:
-        - claim-trace-context-002
+        - claim-trace-context-design
   required_relation_constraints:
     - id: trace-context-owned-by-one-span
       direction: incoming
@@ -163,19 +189,21 @@ structure:
         en: Each context information node is attached to one current span.
         ja: 各 context information node は一つの current span に付属します。
       source_claims:
-        - claim-trace-context-002
+        - claim-trace-context-design
 examples:
   - id: TraceContext-example-positive-001
-    kind: positive
     labels:
-      zh: 跨工具服务传播追踪身份
-      en: Propagate trace identity across a tool service
-      ja: ツールサービス間でトレース識別情報を伝播
-    scenario_id: null
+      zh: W3C traceparent 传播
+      en: W3C traceparent propagation
+      ja: W3C traceparent 伝播
     descriptions:
-      zh: 智能体网关调用外部检索服务时注入 trace_id、当前 span_id、trace_flags 和 trace_state；服务提取后创建子跨度，沿用 trace_id 并把新的 span_id 作为当前上下文。
-      en: When an agent gateway calls an external retrieval service, it injects trace_id, current span_id, trace_flags, and trace_state. The service extracts them, creates a child span with the same trace_id, and publishes the new span_id as current context.
-      ja: エージェントゲートウェイが外部検索サービスを呼ぶ際、trace_id、現在span_id、trace_flags、trace_stateを注入する。サービスが抽出して同じtrace_idの子スパンを作り、新span_idを現在文脈にする。
+      zh: OpenTelemetry propagators.inject(carrier) 写入 W3C traceparent=00-{trace_id}-{span_id}-01；HTTP 下游服务 extract 后继续同一 trace。
+      en: OpenTelemetry propagators.inject(carrier) writes W3C traceparent=00-{trace_id}-{span_id}-01; downstream HTTP service extract continues same trace.
+      ja: OTel inject/extract で W3C traceparent を HTTP ヘッダに伝播する。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
     field_values:
       trace_id: 4bf92f3577b34da6a3ce929d0e0e4736
       span_id: 00f067aa0ba902b7
@@ -188,29 +216,21 @@ examples:
       - TraceRecord
     related_relation_ids:
       - TraceSpan-has_context-TraceContext
-    expected_result:
-      zh: 两个服务的跨度被关联到同一追踪，并保留父子关系和采样决定。
-      en: Spans from both services join the same trace while retaining parentage and the sampling decision.
-      ja: 両サービスのスパンが同一トレースに結ばれ、親子関係とサンプリング判断を保つ。
-    why_valid_or_invalid:
-      zh: 传播对象只携带识别和采样所需字段，不传递完整追踪记录或业务载荷。
-      en: The propagated object contains only identification and sampling fields, not the complete trace record or business payload.
-      ja: 伝播対象は識別・サンプリングに必要な項目だけを持ち、完全トレース記録や業務ペイロードを運ばない。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-trace-context-001
+      - claim-trace-context-design
   - id: TraceContext-example-boundary-001
-    kind: boundary
     labels:
-      zh: 业务会话标识不是追踪上下文
-      en: A business session ID is not trace context
-      ja: 業務セッションIDはトレース文脈ではない
-    scenario_id: null
+      zh: Datadog trace_id 单独字段
+      en: Datadog trace_id field alone
+      ja: Datadog trace_id 単独フィールド
     descriptions:
-      zh: 请求只携带 customer_session="S-8"，没有 trace_id、span_id 或采样标志。该字段可以成为跨度属性或业务关联键，但无法让接收端延续分布式追踪。
-      en: A request carries only customer_session="S-8" and no trace_id, span_id, or trace flags. It may be a span attribute or business correlation key, but it cannot let the receiver continue a distributed trace.
-      ja: 要求はcustomer_session="S-8"だけを持ち、trace_id、span_id、サンプリングフラグがない。スパン属性・業務相関キーにはなり得るが、受信側は分散トレースを継続できない。
+      zh: Datadog APM 日志仅含 dd.trace_id 无 span_id/trace_flags 完整 SpanContext，不能单独建模 TraceContext。
+      en: Datadog APM log containing only dd.trace_id without span_id/trace_flags complete SpanContext cannot alone model TraceContext.
+      ja: dd.trace_id だけでは完全 TraceContext にならない。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
     field_values: {}
     related_node_ids:
       - TraceContext
@@ -218,30 +238,48 @@ examples:
       - TraceMetadata
     related_relation_ids:
       - TraceContext-is_a-TraceMetadata
-    expected_result:
-      zh: 业务会话字段不被误标为 TraceContext；缺少追踪身份时接收端创建新的根跨度。
-      en: The business-session field is not mislabeled as TraceContext; without trace identity the receiver creates a new root span.
-      ja: 業務セッション項目をTraceContextと誤分類せず、追跡識別情報がなければ受信側は新しいルートスパンを作る。
-    why_valid_or_invalid:
-      zh: 业务相关性不能替代 W3C/OpenTelemetry 追踪身份和采样传播语义。
-      en: Business correlation cannot substitute for W3C/OpenTelemetry trace identity and sampling propagation semantics.
-      ja: 業務相関はW3C/OpenTelemetryの追跡識別・サンプリング伝播を代替できない。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-trace-context-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: TraceLink
-    shared_parent_concept_id: TraceSpan
-    differentia:
-      zh: 共享逻辑父节点 TraceSpan：TraceContext 通过 has_context 提供该跨度的传播身份与采样状态；TraceLink 通过 has_link 记录该跨度指向非父级 SpanContext 的关联。前者决定后续传播上下文，后者补充单一父子链无法表达的扇入或异步因果，二者不能互换。
-      en: "Shared logical parent TraceSpan: TraceContext is attached by has_context and provides the span's propagation identity and sampling state; TraceLink is attached by has_link and records associations from the span to non-parent SpanContexts. The former determines propagated context, whereas the latter adds fan-in or asynchronous causality that one parent chain cannot express."
-      ja: 共有 logical parent は TraceSpan です。TraceContext は has_context で付き span の propagation identity/sampling state を提供し、TraceLink は has_link で非親 SpanContext への関連を記録します。前者は伝播 context、後者は単一 parent chain で表せない fan-in/async causality を担い、交換できません。
+      - claim-trace-context-design
+  - id: TraceContext-example-3
+    labels:
+      zh: TraceContext 与 TraceSpan 边界
+      en: TraceContext versus TraceSpan
+      ja: TraceContext と TraceSpan 境界
+    descriptions:
+      zh: TraceContext 是 TraceSpan 的传播标识部分（part_of）；Tracer.start_span 创建 Span 操作，SpanContext() 返回标识但不等于第二个 Span。
+      en: TraceContext is propagation identity part_of TraceSpan; Tracer.start_span creates Span operation, SpanContext() returns identity but is not a second Span.
+      ja: TraceContext は TraceSpan の part_of 伝播識別子である。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
+    field_values: {}
+    related_node_ids:
+      - TraceContext
+    related_relation_ids: []
     source_claims:
-      - claim-trace-context-001
+      - claim-trace-context-vendor
+      - claim-trace-context-design
+  - id: TraceContext-example-4
+    labels:
+      zh: OpenTelemetry inject/extract 实例
+      en: OpenTelemetry inject extract instance
+      ja: OpenTelemetry inject/extract 事例
+    descriptions:
+      zh: Python OTel：context.attach(set_span_in_context(span)) 后 requests 出站调用 inject traceparent 头 trace_id=4bf92f3577b34da6a3ce929d0e0e4736、span_id=00f067aa0ba902b7。
+      en: "Python OTel: after context.attach(set_span_in_context(span)), outbound requests inject traceparent header trace_id=4bf92f3577b34da6a3ce929d0e0e4736, span_id=00f067aa0ba902b7."
+      ja: Python OTel で traceparent ヘッダに trace_id/span_id を注入する。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
+    field_values: {}
+    related_node_ids:
+      - TraceContext
+    related_relation_ids: []
+    source_claims:
+      - claim-trace-context-vendor
+      - claim-trace-context-design
 parent_relation:
   id: TraceSpan-has_context-TraceContext
   predicate: part_of
@@ -270,108 +308,43 @@ parent_relation:
   temporal_scope: valid-time
   boundary_context: null
   constraints: []
-  examples:
-    - id: TraceSpan-has_context-TraceContext-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 逐项核实正例
-        en: Point-reviewed positive case
-        ja: 項目別審査の正例
-      scenario_id: null
-      descriptions:
-        zh: span-tool-7 的上下文包含 trace_id=8f2c1、span_id=07、sampled=true 和 vendor tracestate。
-        en: span-tool-7 has context with trace_id=8f2c1, span_id=07, sampled=true, and vendor tracestate.
-        ja: span-tool-7 の context は trace_id=8f2c1・span_id=07・sampled=true・vendor tracestate を含みます。
-      field_values: {}
-      related_node_ids:
-        - TraceSpan
-        - TraceContext
-      related_relation_ids:
-        - TraceSpan-has_context-TraceContext
-      expected_result:
-        zh: 仅在所述证据存在时返回这条有向事实。
-        en: Return this directed fact only when the described evidence exists.
-        ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
-      why_valid_or_invalid:
-        zh: TraceSpan 通过 has_context 指向其不可变 TraceContext，后者携带该跨度的 trace_id、span_id、flags、tracestate 与远程来源。
-        en: TraceSpan has_context its immutable TraceContext carrying that span's trace_id, span_id, flags, tracestate, and remote-origin state.
-        ja: TraceSpan は自身の trace_id・span_id・flags・tracestate・remote origin を持つ immutable TraceContext を has_context します。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-trace-context-003
-    - id: TraceSpan-has_context-TraceContext-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 逐项核实边界例
-        en: Point-reviewed boundary case
-        ja: 項目別審査の境界例
-      scenario_id: null
-      descriptions:
-        zh: TraceRecord 只有共享 trace_id 与 span 集合，无法提供某个具体跨度的 span_id 或 IsRemote。
-        en: A TraceRecord has a shared trace_id and span set but cannot supply one particular span's span_id or IsRemote state.
-        ja: TraceRecord は共有 trace_id と Span 集合を持ちますが個別 Span の span_id や IsRemote を提供できません。
-      field_values: {}
-      related_node_ids:
-        - TraceSpan
-        - TraceContext
-      related_relation_ids:
-        - TraceSpan-has_context-TraceContext
-      expected_result:
-        zh: 不得从该边界情形推断这条关系。
-        en: Do not infer this relation from the boundary case.
-        ja: この境界事例から当該関係を推論しません。
-      why_valid_or_invalid:
-        zh: SpanContext 属于具体跨度；把它挂在整个 TraceRecord 会丢失 span 级身份。
-        en: SpanContext belongs to a particular span; attaching it to the whole TraceRecord loses span-level identity.
-        ja: SpanContext は個別 Span に属し、TraceRecord 全体へ付けると span-level identity を失います。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-trace-context-003
   source_claims:
-    - claim-trace-context-003
+    - claim-trace-context-design
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: parent-to-child
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-runtime-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenTelemetry、W3C Trace Context 与 LangGraph checkpoint/replay 逐项核验，TraceSpan 与 Checkpoint 语义成立。
-    en: Verified against OpenTelemetry, W3C Trace Context, and LangGraph checkpoint/replay. TraceSpan and Checkpoint semantics hold.
-    ja: OpenTelemetry、W3C Trace Context、LangGraph checkpoint/replay に照らし TraceSpan と Checkpoint semantics を確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-otel-protocol
+    title: OpenTelemetry Protocol Specification
+    url: https://opentelemetry.io/docs/specs/otel/protocol/
+    source_type: official-spec
+    relevance: OTLP traceId, spanId, parent links, status codes.
+  - id: src-langsmith
+    title: LangSmith Documentation
+    url: https://docs.smith.langchain.com/
+    source_type: official-doc
+    relevance: Run trees with parent_run_id and nested child runs.
+  - id: src-langgraph-checkpoints
+    title: LangGraph Persistence
+    url: https://langchain-ai.github.io/langgraph/concepts/persistence/
+    source_type: official-doc
+    relevance: Checkpoint and StateSnapshot capture for recovery.
+  - id: src-runtime-observability-design
+    title: Moonweave runtime-observability module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: TraceSpan, Checkpoint, TraceEvent boundaries versus Execution.
 source_claims:
-  - id: claim-trace-context-001
-    source: eng-std-opentelemetry-trace-api
-    supports: OpenTelemetry SpanContext is immutable and carries TraceId, SpanId, TraceFlags, TraceState, and remote origin for propagation; Moonweave therefore attaches context to a TraceSpan, not to a whole trace container.
-    locator: Tracing API > SpanContext, Span creation, Span operations, Events, Status, and Link
+  - id: claim-trace-context-vendor
+    source: src-otel-protocol
+    supports: runtime-observability vendor evidence supports TraceContext identity and boundary mapping.
+    locator: TraceContext integration
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-trace-context-002
-    source: eng-std-opentelemetry-trace-api
-    supports: "Direct source premise: OpenTelemetry defines an immutable SpanContext containing TraceId, SpanId, TraceFlags, TraceState, and remote-origin state, and defines validity through non-zero TraceId and SpanId. Moonweave design inference: the trace/span pair is the stable identity of the graph information node and each accepted TraceContext must be attached to exactly one current TraceSpan."
-    locator: OpenTelemetry Tracing API > SpanContext > identifiers, TraceFlags, TraceState, IsValid, and IsRemote
+  - id: claim-trace-context-design
+    source: src-runtime-observability-design
+    supports: Moonweave TraceContext concept boundary within runtime-observability.
+    locator: TraceContext boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-trace-context-003
-    source: eng-std-opentelemetry-trace-api
-    supports: TraceSpan has_context its immutable TraceContext carrying that span's trace_id, span_id, flags, tracestate, and remote-origin state. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
-    locator: Tracing API > SpanContext, Span creation, Span operations, Events, Status, and Link
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-

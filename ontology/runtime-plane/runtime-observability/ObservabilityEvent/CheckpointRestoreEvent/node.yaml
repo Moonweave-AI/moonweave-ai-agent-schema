@@ -1,7 +1,6 @@
 schema: moonweave.ai/ontology-node/v1
 id: CheckpointRestoreEvent
 kind: concept
-status: accepted
 labels:
   en: checkpoint restore event
   zh: 检查点恢复事件
@@ -29,6 +28,33 @@ semantics:
       ja: 状態を読み戻す RestoreActivity、および履歴ステップの再実行を求める ReplayEvent は含みません。
   semantic_kind: event
   aliases: []
+engineering:
+  explanation:
+    zh: 集成 CheckpointRestoreEvent 时应分别映射 OpenTelemetry OTLP traces/spans, LangSmith run trees, LangGraph checkpoint snapshots；静态配置属于其他域，实际运行 occurrence 才写入本概念。
+    en: When integrating CheckpointRestoreEvent, map OpenTelemetry OTLP traces/spans, LangSmith run trees, LangGraph checkpoint snapshots separately; static configuration belongs elsewhere and only runtime occurrences belong here.
+    ja: CheckpointRestoreEvent 統合時は OpenTelemetry OTLP traces/spans, LangSmith run trees, LangGraph checkpoint snapshots を個別写像し、静的設定は他ドメイン、runtime occurrence のみ本 concept に属します。
+  typical_input:
+    - description: Vendor API payload mappable to CheckpointRestoreEvent.
+      format: |-
+        # Example CheckpointRestoreEvent ingest
+        { "checkpoint-restore-event_ref": "example-1" }
+      source_claims:
+        - claim-checkpoint-restore-event-design
+  typical_output:
+    - description: Moonweave-local CheckpointRestoreEvent projection.
+      format: '{ "schema_owner": "moonweave-local-design", "checkpoint-restore-event_id": "example-1" }'
+      source_claims:
+        - claim-checkpoint-restore-event-design
+  reference_implementations:
+    - name: OpenTelemetry OTLP
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      description: Traces and spans → Trace, Span, Metric export.
+    - name: LangSmith
+      url: https://docs.smith.langchain.com/
+      description: Run trees and feedback → RunTree, TraceRecord.
+    - name: LangGraph Checkpoints
+      url: https://langchain-ai.github.io/langgraph/concepts/persistence/
+      description: State snapshots and checkpoint restore events.
 structure:
   identity_keys: []
   fields: []
@@ -36,16 +62,18 @@ structure:
   required_relation_constraints: []
 examples:
   - id: CheckpointRestoreEvent-example-positive-001
-    kind: positive
     labels:
-      zh: 操作员发起检查点恢复
-      en: Operator initiates checkpoint restoration
-      ja: 操作者がチェックポイント復元を開始
-    scenario_id: null
+      zh: LangGraph interrupt 后 resume
+      en: LangGraph interrupt resume
+      ja: LangGraph interrupt 後 resume
     descriptions:
-      zh: 操作员在故障调查中选择 checkpoint_id=cp-42；系统立即记录发起者、目标会话、选定检查点、发生时间和“回到审批前”的原因，随后创建一个持续的恢复活动。
-      en: During incident investigation, an operator selects checkpoint_id cp-42. The system records the initiator, target session, selected checkpoint, occurrence time, and “return before approval” reason, then starts a duration-bearing restore activity.
-      ja: 障害調査で操作者がcheckpoint_id cp-42を選ぶ。システムは開始者、対象セッション、選択したチェックポイント、発生時刻、「承認前へ戻る」という理由を記録し、その後に継続時間を持つ復元活動を開始する。
+      zh: LangGraph interrupt 后 graph.invoke(resume_command, config={configurable:{thread_id:thread-1}}) 从 checkpoint 恢复，产生 CheckpointRestoreEvent checkpoint_id=1f070a87...。
+      en: After LangGraph interrupt, graph.invoke(resume_command, config={configurable:{thread_id:thread-1}}) restores from checkpoint producing CheckpointRestoreEvent checkpoint_id=1f070a87....
+      ja: LangGraph resume が CheckpointRestoreEvent を生成する。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
     field_values:
       event_id: checkpoint-restore-request-cp42
       event_kind: checkpoint-restore
@@ -63,29 +91,21 @@ examples:
     related_relation_ids:
       - CheckpointRestoreEvent-is_a-ObservabilityEvent
       - CheckpointRestoreEvent-triggers-RestoreActivity
-    expected_result:
-      zh: 瞬时发起事实被识别为检查点恢复事件；读取和重建状态则归属于后续恢复活动。
-      en: The instantaneous initiation fact is classified as a CheckpointRestoreEvent; reading and reinstating state belongs to the subsequent RestoreActivity.
-      ja: 瞬時の開始事実はCheckpointRestoreEventと判定され、状態の読込みと再構成は後続のRestoreActivityに属する。
-    why_valid_or_invalid:
-      zh: 事件记录何时、由谁、针对哪个检查点发起恢复，但不冒充具有持续时间的恢复过程。
-      en: The event states when, by whom, and from which checkpoint restoration was initiated without impersonating the duration-bearing restoration process.
-      ja: イベントはいつ誰がどのチェックポイントから復元を始めたかを示し、継続時間を持つ復元過程とは区別される。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-checkpoint-restore-event-001
+      - claim-checkpoint-restore-event-design
   - id: CheckpointRestoreEvent-example-boundary-001
-    kind: boundary
     labels:
-      zh: 恢复过程不是瞬时事件
-      en: Restoration work is not the initiating event
-      ja: 復元作業は開始イベントではない
-    scenario_id: null
+      zh: Pod restart 非 CheckpointRestoreEvent
+      en: Pod restart not CheckpointRestoreEvent
+      ja: Pod restart は CheckpointRestoreEvent ではない
     descriptions:
-      zh: 恢复器用十二秒读取检查点、校验摘要、重建状态并写入新快照。这段有开始和结束、消耗检查点并产生状态的工作是恢复活动，不应被压成一个恢复事件。
-      en: A restorer spends twelve seconds reading the checkpoint, validating its digest, rebuilding state, and writing a new snapshot. This start-to-finish work consumes and produces records, so it is a RestoreActivity rather than the initiating event.
-      ja: 復元器が12秒かけてチェックポイントを読み、ダイジェストを検証し、状態を再構成して新しいスナップショットを書く。この開始から終了までの作業は記録を消費・生成するRestoreActivityであり、開始イベントではない。
+      zh: Kubernetes Pod container restart 是 RuntimeEnvironment/Container 生命周期，不是 LangGraph CheckpointRestoreEvent。
+      en: Kubernetes Pod container restart is RuntimeEnvironment/Container lifecycle, not LangGraph CheckpointRestoreEvent.
+      ja: K8s Pod restart は CheckpointRestoreEvent ではない。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
     field_values: {}
     related_node_ids:
       - CheckpointRestoreEvent
@@ -96,30 +116,48 @@ examples:
     related_relation_ids:
       - CheckpointRestoreEvent-is_a-ObservabilityEvent
       - CheckpointRestoreEvent-triggers-RestoreActivity
-    expected_result:
-      zh: 持续恢复工作归入 RestoreActivity；仅发起时点及其上下文归入 CheckpointRestoreEvent。
-      en: The duration-bearing work is classified as RestoreActivity; only the initiation occurrence and its context belong to CheckpointRestoreEvent.
-      ja: 継続する作業はRestoreActivityに分類され、開始時点とその文脈だけがCheckpointRestoreEventに属する。
-    why_valid_or_invalid:
-      zh: 事件和活动的同一性条件不同：前者是时点事实，后者是具有过程与产出的执行。
-      en: "Event and activity have different identity conditions: one is a time-point fact, the other is a process with work and outputs."
-      ja: イベントと活動は同一性条件が異なり、前者は時点の事実、後者は作業と出力を持つ過程である。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-checkpoint-restore-event-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: ReplayEvent
-    shared_parent_concept_id: ObservabilityEvent
-    differentia:
-      zh: 端点特定对照：父节点 ObservabilityEvent：CheckpointRestoreEvent（semantic kind=event，骨架 CheckpointRestoreEvent-is_a-ObservabilityEvent）；ReplayEvent（semantic kind=event，骨架 ReplayEvent-is_a-ObservabilityEvent）。双端条件：CheckpointRestoreEvent 条件：“检查点恢复事件属于可观测运行事件，区别于其他同类对象的条件是：它记录从已保存检查点恢复运行会话、参与者、图或工作流的可观测事件，并保存恢复溯源”；ReplayEvent 条件：“回放事件是以如下事实为区分特征的可观测运行事件：它记录为了调试、评估、复现或审查而回放追踪、跨度、会话片段、检查点或产物谱系的可观测事件”。条件不得互借；各自成立后方可归类。
-      en: "Endpoint-specific contrast: parent ObservabilityEvent: CheckpointRestoreEvent (semantic kind=event, backbone CheckpointRestoreEvent-is_a-ObservabilityEvent); ReplayEvent (semantic kind=event, backbone ReplayEvent-is_a-ObservabilityEvent). Endpoint conditions: CheckpointRestoreEvent condition: “Checkpoint restore event is an observability event whose defining condition is that it is an observable event that restores a runtime session, actor, graph, or workflow from a saved checkpoint and records restore provenance”; ReplayEvent condition: “Replay event is an observability event; its differentiating condition is that it is an observable event that replays a trace, span, session segment, checkpoint, or artifact lineage for debugging, evaluation, reproduction, or review”. Conditions cannot be borrowed; classify each endpoint only from its own evidence."
-      ja: 端点別対照：親 ObservabilityEvent：CheckpointRestoreEvent（semantic kind=event、バックボーン CheckpointRestoreEvent-is_a-ObservabilityEvent）；ReplayEvent（semantic kind=event、バックボーン ReplayEvent-is_a-ObservabilityEvent）。両端条件：CheckpointRestoreEvent の条件：「チェックポイント復元イベントは観測可能実行イベントのうち、次の事実を定義条件とする対象です：それは、保存済みチェックポイントから実行セッション、アクター、グラフ、ワークフローを復元する観測可能イベントを記録し、復元来歴を残します」；ReplayEvent の条件：「再生イベントは観測可能実行イベントの一種であり、次の条件で区別されます：それは、デバッグ、評価、再現、レビューのためにトレース、スパン、セッション区間、チェックポイント、成果物系譜を再生する観測可能イベントを記録します」。条件を流用せず、各端を固有の証拠で分類します。
+      - claim-checkpoint-restore-event-design
+  - id: CheckpointRestoreEvent-example-3
+    labels:
+      zh: RestoreEvent 与 RestoreActivity 边界
+      en: RestoreEvent versus RestoreActivity
+      ja: RestoreEvent と RestoreActivity 境界
+    descriptions:
+      zh: CheckpointRestoreEvent 记录 restore 发生；RestoreActivity 是执行 restore 的 Activity；事件与 Activity 分开保存。
+      en: CheckpointRestoreEvent records restore occurrence; RestoreActivity is Activity performing restore; save event and Activity separately.
+      ja: RestoreEvent と RestoreActivity は分離保存する。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
+    field_values: {}
+    related_node_ids:
+      - CheckpointRestoreEvent
+    related_relation_ids: []
     source_claims:
-      - claim-checkpoint-restore-event-001
+      - claim-checkpoint-restore-event-vendor
+      - claim-checkpoint-restore-event-design
+  - id: CheckpointRestoreEvent-example-4
+    labels:
+      zh: HITL approve 后 restore 实例
+      en: HITL approve restore instance
+      ja: HITL approve 後 restore 事例
+    descriptions:
+      zh: HITL approve 后 CheckpointRestoreEvent event_id=restore-61、thread_id=thread-1、restored_checkpoint_id=1f070a87...、restored_at=2026-01-15T10:30:00Z。
+      en: After HITL approve, CheckpointRestoreEvent event_id=restore-61, thread_id=thread-1, restored_checkpoint_id=1f070a87..., restored_at=2026-01-15T10:30:00Z.
+      ja: HITL approve 後 restore-61 CheckpointRestoreEvent を記録する。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
+    field_values: {}
+    related_node_ids:
+      - CheckpointRestoreEvent
+    related_relation_ids: []
+    source_claims:
+      - claim-checkpoint-restore-event-vendor
+      - claim-checkpoint-restore-event-design
 parent_relation:
   id: CheckpointRestoreEvent-is_a-ObservabilityEvent
   predicate: is_a
@@ -148,70 +186,10 @@ parent_relation:
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: CheckpointRestoreEvent-is_a-ObservabilityEvent-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 逐项核实正例
-        en: Point-reviewed positive case
-        ja: 項目別審査の正例
-      scenario_id: null
-      descriptions:
-        zh: 操作员在 10:14:03 请求会话 t-7 从 cp-12 恢复，事件保存操作者、原因与检查点标识。
-        en: At 10:14:03 an operator requests session t-7 to restore from cp-12; the event records actor, reason, and checkpoint identity.
-        ja: 10:14:03 に operator が session t-7 を cp-12 から復元するよう要求し、event は actor・理由・checkpoint ID を記録します。
-      field_values: {}
-      related_node_ids:
-        - CheckpointRestoreEvent
-        - ObservabilityEvent
-      related_relation_ids:
-        - CheckpointRestoreEvent-is_a-ObservabilityEvent
-      expected_result:
-        zh: 仅在所述证据存在时返回这条有向事实。
-        en: Return this directed fact only when the described evidence exists.
-        ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
-      why_valid_or_invalid:
-        zh: 每个 CheckpointRestoreEvent 都是 ObservabilityEvent，其种差是在确定时刻记录针对特定检查点的恢复请求或启动，而不是执行状态重建。
-        en: Every CheckpointRestoreEvent is an ObservabilityEvent distinguished by recording, at a determinate time, a restore request or start for one checkpoint rather than performing state reconstruction.
-        ja: すべての CheckpointRestoreEvent は ObservabilityEvent で、特定時刻に一つの Checkpoint への復元要求または開始を記録し、状態再構成自体は行わない点が種差です。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-checkpoint-restore-event-002
-    - id: CheckpointRestoreEvent-is_a-ObservabilityEvent-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 逐项核实边界例
-        en: Point-reviewed boundary case
-        ja: 項目別審査の境界例
-      scenario_id: null
-      descriptions:
-        zh: 后台过程持续三秒读取和重建状态，并最终使会话可恢复运行。
-        en: A background process spends three seconds reading and reconstructing state until the session becomes resumable.
-        ja: background 処理が三秒かけて状態を読み再構成し、session を再開可能にします。
-      field_values: {}
-      related_node_ids:
-        - CheckpointRestoreEvent
-        - ObservabilityEvent
-      related_relation_ids:
-        - CheckpointRestoreEvent-is_a-ObservabilityEvent
-      expected_result:
-        zh: 不得从该边界情形推断这条关系。
-        en: Do not infer this relation from the boundary case.
-        ja: この境界事例から当該関係を推論しません。
-      why_valid_or_invalid:
-        zh: 持续的状态重建是 RestoreActivity；触发时刻的事件不能替代该活动。
-        en: Duration-bearing state reconstruction is RestoreActivity; the trigger event cannot substitute for that activity.
-        ja: 継続時間を持つ状態再構成は RestoreActivity で、trigger event はその活動を代替しません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-checkpoint-restore-event-002
   source_claims:
-    - claim-checkpoint-restore-event-002
+    - claim-checkpoint-restore-event-design
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations:
   - id: CheckpointRestoreEvent-triggers-RestoreActivity
@@ -241,107 +219,42 @@ relations:
     temporal_scope: timeless
     boundary_context: null
     constraints: []
-    examples:
-      - id: CheckpointRestoreEvent-triggers-RestoreActivity-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 逐项核实正例
-          en: Point-reviewed positive case
-          ja: 項目別審査の正例
-        scenario_id: null
-        descriptions:
-          zh: restore-request-44 在 10:14:03 被接受，并启动 restore-44；后者持续三秒读取 cp-12 和重建状态。
-          en: restore-request-44 is accepted at 10:14:03 and starts restore-44, which spends three seconds loading cp-12 and reconstructing state.
-          ja: restore-request-44 が 10:14:03 に受理され restore-44 を開始し、後者は三秒かけ cp-12 を読み状態を再構成します。
-        field_values: {}
-        related_node_ids:
-          - CheckpointRestoreEvent
-          - RestoreActivity
-        related_relation_ids:
-          - CheckpointRestoreEvent-triggers-RestoreActivity
-        expected_result:
-          zh: 仅在所述证据存在时返回这条有向事实。
-          en: Return this directed fact only when the described evidence exists.
-          ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
-        why_valid_or_invalid:
-          zh: CheckpointRestoreEvent 通过 triggers 指向由该恢复请求实际启动的 RestoreActivity，并保留瞬时触发与持续重建两种身份。
-          en: CheckpointRestoreEvent triggers the RestoreActivity actually started by that request, preserving separate identities for the instantaneous trigger and duration-bearing reconstruction.
-          ja: CheckpointRestoreEvent は要求により実際に開始された RestoreActivity を triggers し、瞬時 trigger と継続 reconstruction の identity を分離します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-checkpoint-restore-event-003
-      - id: CheckpointRestoreEvent-triggers-RestoreActivity-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 逐项核实边界例
-          en: Point-reviewed boundary case
-          ja: 項目別審査の境界例
-        scenario_id: null
-        descriptions:
-          zh: 恢复请求被策略拒绝并记录 denied，因而没有任何 RestoreActivity 启动。
-          en: A restore request is denied by policy and no RestoreActivity starts.
-          ja: restore request が policy で denied となり RestoreActivity は開始されません。
-        field_values: {}
-        related_node_ids:
-          - CheckpointRestoreEvent
-          - RestoreActivity
-        related_relation_ids:
-          - CheckpointRestoreEvent-triggers-RestoreActivity
-        expected_result:
-          zh: 不得从该边界情形推断这条关系。
-          en: Do not infer this relation from the boundary case.
-          ja: この境界事例から当該関係を推論しません。
-        why_valid_or_invalid:
-          zh: 事件出现不自动意味着活动已触发；必须有实际启动关联。
-          en: The event's existence does not imply that an activity started; an actual trigger association is required.
-          ja: event の存在だけで活動開始を意味せず、実際の trigger association が必要です。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-checkpoint-restore-event-003
     source_claims:
-      - claim-checkpoint-restore-event-003
+      - claim-checkpoint-restore-event-design
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:RestoreActivity
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-runtime-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenTelemetry、W3C Trace Context 与 LangGraph checkpoint/replay 逐项核验，TraceSpan 与 Checkpoint 语义成立。
-    en: Verified against OpenTelemetry, W3C Trace Context, and LangGraph checkpoint/replay. TraceSpan and Checkpoint semantics hold.
-    ja: OpenTelemetry、W3C Trace Context、LangGraph checkpoint/replay に照らし TraceSpan と Checkpoint semantics を確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-otel-protocol
+    title: OpenTelemetry Protocol Specification
+    url: https://opentelemetry.io/docs/specs/otel/protocol/
+    source_type: official-spec
+    relevance: OTLP traceId, spanId, parent links, status codes.
+  - id: src-langsmith
+    title: LangSmith Documentation
+    url: https://docs.smith.langchain.com/
+    source_type: official-doc
+    relevance: Run trees with parent_run_id and nested child runs.
+  - id: src-langgraph-checkpoints
+    title: LangGraph Persistence
+    url: https://langchain-ai.github.io/langgraph/concepts/persistence/
+    source_type: official-doc
+    relevance: Checkpoint and StateSnapshot capture for recovery.
+  - id: src-runtime-observability-design
+    title: Moonweave runtime-observability module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: TraceSpan, Checkpoint, TraceEvent boundaries versus Execution.
 source_claims:
-  - id: claim-checkpoint-restore-event-001
-    source: eng-fw-langgraph-persistence
-    supports: LangGraph resumes or replays from a selected checkpoint identifier; Moonweave distinguishes the instantaneous restore request or start occurrence from the state-reconstruction activity it triggers.
-    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
+  - id: claim-checkpoint-restore-event-vendor
+    source: src-otel-protocol
+    supports: runtime-observability vendor evidence supports CheckpointRestoreEvent identity and boundary mapping.
+    locator: CheckpointRestoreEvent integration
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-checkpoint-restore-event-002
-    source: eng-fw-langgraph-persistence
-    supports: Every CheckpointRestoreEvent is an ObservabilityEvent distinguished by recording, at a determinate time, a restore request or start for one checkpoint rather than performing state reconstruction. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
-    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
+  - id: claim-checkpoint-restore-event-design
+    source: src-runtime-observability-design
+    supports: Moonweave CheckpointRestoreEvent concept boundary within runtime-observability.
+    locator: CheckpointRestoreEvent boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-checkpoint-restore-event-003
-    source: eng-fw-langgraph-persistence
-    supports: CheckpointRestoreEvent triggers the RestoreActivity actually started by that request, preserving separate identities for the instantaneous trigger and duration-bearing reconstruction. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
-    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-

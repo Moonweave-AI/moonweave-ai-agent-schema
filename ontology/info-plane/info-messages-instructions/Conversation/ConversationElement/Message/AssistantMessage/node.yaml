@@ -1,20 +1,19 @@
 schema: moonweave.ai/ontology-node/v1
 id: AssistantMessage
 kind: concept
-status: accepted
 labels:
   zh: 助手消息
   en: Assistant message
   ja: アシスタントメッセージ
 semantics:
   short_definition:
-    zh: 由模型或智能体以 assistant 角色产生的消息。
-    en: A message produced by a model or agent with the assistant role.
-    ja: modelまたはagentがassistant roleで生成するmessageです。
+    zh: 由模型或智能体以 assistant 角色产生的对话侧响应消息。
+    en: Conversation-side response message produced by a model or agent with assistant role.
+    ja: model/agent が assistant role で生成する対話側 response message。
   definition:
-    zh: AssistantMessage 是 Message 的角色专门类型，表示模型或智能体作为对话参与方产生的一次通信；它可包含面向用户的回复或工具调用意图，但不是 ModelCall、Action、ToolInvocation 或最终业务产物。
-    en: AssistantMessage is a role specialization of Message representing one communication produced by the model or agent as a conversation participant. It may contain a user-facing reply or tool-call intent, but it is not a ModelCall, Action, ToolInvocation, or final business artifact.
-    ja: AssistantMessage はmodel/agentがconversation participantとして生成する一communicationを表すMessage specializationです。user-facing replyやtool-call intentを含み得ますがModelCall・Action・ToolInvocation・final business artifactではありません。
+    zh: AssistantMessage 映射 OpenAI role:assistant、Anthropic assistant turn 与 A2A role:agent 的模型侧输出；可含面向用户的文本或 tool_use/function_call 意图，但不是 ModelCall、ToolInvocation 或最终 Artifact。end_turn 记录 Anthropic stop_reason=end_turn 等等价信号。
+    en: AssistantMessage maps OpenAI role:assistant, Anthropic assistant turns, and A2A role:agent model-side output. It may contain user-facing text or tool_use/function_call intent but is not a ModelCall, ToolInvocation, or final Artifact. end_turn records Anthropic stop_reason=end_turn and equivalents.
+    ja: AssistantMessage は OpenAI assistant/Anthropic assistant/A2A agent 出力に写像。tool_use 意图は block 参照。
   why_needed:
     zh: 将助手输出的通信包络与生成它的运行、规划动作和工具执行分离，使回放时能准确定位“说了什么”与“做了什么”。
     en: Separates the assistant's communication envelope from the run, planned action, and tool execution that produced or followed it, allowing replay to distinguish what was said from what was done.
@@ -29,6 +28,34 @@ semantics:
       ja: ToolObservationMessage・ModelCall・ActionPlan・ReportArtifact・user message内で偽装されたassistant textを除外します。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: OpenAI assistant message 可含 content 与 tool_calls；Anthropic assistant content[] 可交替 text 与 tool_use；流式 delta 在 completed 前只是临时片段。AssistantMessage 在 tool_use 后必须能链接后续 ToolResultMessage。
+    en: OpenAI assistant messages may include content and tool_calls; Anthropic assistant content[] alternates text and tool_use; stream deltas are transient until completed. AssistantMessage with tool_use must link to a later ToolResultMessage.
+    ja: OpenAI tool_calls・Anthropic tool_use を assistant message として記録。
+  typical_input:
+    - description: OpenAI assistant with tool_calls
+      format: '{"role":"assistant","tool_calls":[{"id":"call_01","type":"function","function":{"name":"get_weather","arguments":"{}"}}]}'
+      source_claims:
+        - claim-assistant-openai
+  typical_output:
+    - description: Anthropic assistant tool_use
+      format: '{"role":"assistant","content":[{"type":"tool_use","id":"toolu_01","name":"lookup","input":{"id":"Q1"}}]}'
+      source_claims:
+        - claim-assistant-anthropic
+  reference_implementations:
+    - name: OpenAI Chat Completions API
+      url: https://platform.openai.com/docs/api-reference/chat/create
+      description: messages[] with role and content parts.
+    - name: Anthropic Messages API
+      url: https://docs.anthropic.com/en/api/messages
+      description: system parameter and role/content block turns.
+    - name: MCP Prompts
+      url: https://modelcontextprotocol.io/specification/2025-06-18/server/prompts
+      description: prompts/get returns injectable messages array.
+    - name: A2A Protocol
+      url: https://a2a-protocol.org/latest/specification/
+      description: Message with role, messageId, contextId, and parts.
 structure:
   identity_keys: []
   fields:
@@ -37,18 +64,18 @@ structure:
         zh: 助手标识
         en: assistant ID
         ja: アシスタントID
+      definitions:
+        zh: 引用产生消息的模型或智能体参与方。
+        en: References the model or agent participant that produced the message.
+        ja: messageを生成したmodel/agent participantを参照します。
       datatype: reference
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 引用产生消息的模型或智能体参与方。
-        en: References the model or agent participant that produced the message.
-        ja: messageを生成したmodel/agent participantを参照します。
-      allowed_values: []
       pattern: null
       example_value: AgentActor:travel-assistant
+      allowed_values: []
       source_claims:
         - claim-assistant-message-002
     - id: end_turn
@@ -56,96 +83,84 @@ structure:
         zh: 结束轮次
         en: end turn
         ja: ターン終了
+      definitions:
+        zh: 记录助手是否请求把控制权交还给应用。
+        en: Records whether the assistant requests yielding control back to the application.
+        ja: assistantがapplicationへcontrolを返すよう要求するか記録します。
       datatype: boolean
       required: false
       cardinality:
         min: 0
         max: 1
-      definitions:
-        zh: 记录助手是否请求把控制权交还给应用。
-        en: Records whether the assistant requests yielding control back to the application.
-        ja: assistantがapplicationへcontrolを返すよう要求するか記録します。
-      allowed_values: []
       pattern: null
       example_value: true
+      allowed_values: []
       source_claims:
         - claim-assistant-message-003
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: AssistantMessage-example-positive-manual-001
-    kind: positive
+  - id: AssistantMessage-example-openai-tool-calls
     labels:
-      zh: 助手消息正例
-      en: "Positive case: Assistant message"
-      ja: アシスタントメッセージ正例
-    scenario_id: null
+      zh: OpenAI tool_calls
+      en: OpenAI tool_calls
+      ja: OpenAI tool_calls
     descriptions:
-      zh: msg-assistant-89 由 travel-assistant 生成最终答复，并以 end_turn=true 交还控制。
-      en: msg-assistant-89 is produced by travel-assistant as the final reply and sets end_turn=true.
-      ja: msg-assistant-89 はtravel-assistantがfinal replyとして生成しend_turn=trueでcontrolを返します。
+      zh: msg-905-assistant 含 function tool_calls call_01；AssistantMessage 记录 assistant_id 与 tool call block 引用。
+      en: msg-905-assistant includes function tool_calls call_01; AssistantMessage records assistant_id and tool-call block refs.
+      ja: tool_calls 付き assistant message。
+    example_source:
+      product: OpenAI
+      url: https://platform.openai.com/docs/api-reference/chat/create
+      version: tool_calls
     field_values:
-      assistant_id: AgentActor:travel-assistant
-      end_turn: true
-      message_role: assistant
-      sender_id: AgentActor:travel-assistant
-      element_id: msg-assistant-89
-      conversation_id: conv-travel-202
-      sequence_index: 6
+      message_id: msg-905-assistant
+      assistant_id: Model:gpt-4o
     related_node_ids:
       - AssistantMessage
     related_relation_ids: []
-    expected_result:
-      zh: 识别为 AssistantMessage。
-      en: Identify AssistantMessage.
-      ja: AssistantMessageと識別します。
-    why_valid_or_invalid:
-      zh: 发送角色、生成主体和控制交还字段共同符合助手消息身份。
-      en: Sender role, producing participant, and control-yield field all fit assistant-message identity.
-      ja: sender role・producing participant・control-yield fieldがassistant-message identityに一致します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-assistant-message-004
-  - id: AssistantMessage-example-boundary-manual-001
-    kind: boundary
+      - claim-assistant-openai
+  - id: AssistantMessage-example-anthropic-text
     labels:
-      zh: 助手消息边界例
-      en: "Boundary case: Assistant message"
-      ja: アシスタントメッセージ境界例
-    scenario_id: null
+      zh: Anthropic 文本回复
+      en: Anthropic text reply
+      ja: Anthropic 文本 reply
     descriptions:
-      zh: report-89 是助手生成后保存的 PDF 文件，具有 artifact_id 而没有 message_id 或 assistant role。
-      en: report-89 is a PDF saved after assistant generation; it has artifact_id but no message_id or assistant role.
-      ja: report-89 はassistant生成後保存されたPDFでartifact_idを持ちmessage_idやassistant roleを持ちません。
+      zh: assistant 返回 text block 与 end_turn=true；映射为 AssistantMessage。
+      en: Assistant returns text block with end_turn=true mapped to AssistantMessage.
+      ja: text block assistant 応答。
+    example_source:
+      product: Anthropic
+      url: https://docs.anthropic.com/en/api/messages
+      version: text block
+    field_values:
+      message_id: msg-902-assistant
+      end_turn: true
+    related_node_ids:
+      - AssistantMessage
+    related_relation_ids: []
+    source_claims:
+      - claim-assistant-anthropic
+  - id: AssistantMessage-example-not-model-call
+    labels:
+      zh: 非 ModelCall
+      en: Not ModelCall
+      ja: ModelCall ではない
+    descriptions:
+      zh: 一次 HTTP 调用元数据不是 AssistantMessage；必须有 role=assistant 消息包络。
+      en: HTTP call metadata is not AssistantMessage; role=assistant envelope is required.
+      ja: HTTP metadata は AssistantMessage ではない。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
     field_values: {}
     related_node_ids:
       - AssistantMessage
     related_relation_ids: []
-    expected_result:
-      zh: 不得识别为 AssistantMessage；它是 ReportArtifact。
-      en: Do not identify AssistantMessage; it is a ReportArtifact.
-      ja: AssistantMessageとせずReportArtifactです。
-    why_valid_or_invalid:
-      zh: 由助手产生不等于消息；业务产物拥有独立身份与生命周期。
-      en: Being produced by an assistant does not make an object a message; a business artifact has its own identity and lifecycle.
-      ja: assistant生成というだけでmessageではなくbusiness artifactは独自identity/lifecycleを持ちます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-assistant-message-005
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: UserMessage
-    shared_parent_concept_id: Message
-    differentia:
-      zh: AssistantMessage 由模型或智能体以 assistant 角色生成；UserMessage 由最终用户或其应用入口以 user 角色提交。
-      en: AssistantMessage is produced by a model or agent with role assistant; UserMessage is submitted by an end user or user-facing application entry point with role user.
-      ja: AssistantMessageはmodel/agentがrole=assistantで生成しUserMessageはend user/user-facing entry pointがrole=userで提出します。
-    source_claims:
-      - claim-assistant-message-006
+      - claim-assistant-design
 parent_relation:
   id: AssistantMessage-is_a-Message
   predicate: is_a
@@ -176,12 +191,10 @@ parent_relation:
   constraints: []
   examples:
     - id: AssistantMessage-is_a-Message-example-positive-manual-001
-      kind: positive
       labels:
         zh: 是一种消息正例
         en: "Positive case: is a message"
         ja: メッセージの一種正例
-      scenario_id: null
       descriptions:
         zh: msg-assistant-89 的外部 role=assistant，发送主体为 travel-assistant。
         en: msg-assistant-89 has external role=assistant and sender travel-assistant.
@@ -192,25 +205,13 @@ parent_relation:
         - Message
       related_relation_ids:
         - AssistantMessage-is_a-Message
-      expected_result:
-        zh: 断言 AssistantMessage-is_a-Message。
-        en: Assert AssistantMessage-is_a-Message.
-        ja: AssistantMessage-is_a-Messageをassertします。
-      why_valid_or_invalid:
-        zh: 可信角色和生成主体满足子类种差。
-        en: Trusted role and producing participant satisfy the subtype differentia.
-        ja: trusted roleとproducing participantがsubtype differentiaを満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
         - claim-assistant-message-007
     - id: AssistantMessage-is_a-Message-example-boundary-manual-001
-      kind: boundary
       labels:
         zh: 是一种消息边界例
         en: "Boundary case: is a message"
         ja: メッセージの一種境界例
-      scenario_id: null
       descriptions:
         zh: report-89 是助手生成的 PDF，但没有 role 或 message_id。
         en: report-89 is an assistant-generated PDF with no role or message_id.
@@ -221,44 +222,37 @@ parent_relation:
         - Message
       related_relation_ids:
         - AssistantMessage-is_a-Message
-      expected_result:
-        zh: 不得通过该边把 ReportArtifact 归为 Message。
-        en: Do not classify ReportArtifact as Message with this edge.
-        ja: このedgeでReportArtifactをMessageに分類しません。
-      why_valid_or_invalid:
-        zh: 生产者相同不等于通信身份相同，产物仍有自己的标识。
-        en: A shared producer does not imply shared communication identity; the artifact retains its own identifier.
-        ja: 同じproducerでもcommunication identityは同じではなくartifactは独自identifierを保ちます。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
         - claim-assistant-message-008
   source_claims:
     - claim-assistant-message-009
-  distinct_fact_rationale:
-    zh: 角色专门化建立在受信包络元数据上，而不是文本语气或生成产物类型。
-    en: Role specialization rests on trusted envelope metadata, not textual voice or the type of generated artifact.
-    ja: role specializationはtrusted envelope metadataに基づきtextual voiceや生成artifact typeに基づきません。
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-info-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Chat Completions 角色、Model Spec 权威链、A2A Message/Part 与 MCP JSON-RPC 包络逐项核验；Conversation、Message 角色子类、ToolObservationMessage 与 ProtocolEnvelope 语义成立。
-    en: Verified against OpenAI Chat Completions roles, Model Spec authority chain, A2A Message/Part, and MCP JSON-RPC envelopes; Conversation, Message role specializations, ToolObservationMessage, and ProtocolEnvelope semantics hold.
-    ja: OpenAI Chat Completions role、Model Spec authority chain、A2A Message/Part、MCP JSON-RPC envelope に照らし Conversation/Message role specialization/ToolObservationMessage/ProtocolEnvelope semantics を個別確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-openai-chat
+    title: OpenAI Chat Completions API Reference
+    publisher: OpenAI
+    url: https://platform.openai.com/docs/api-reference/chat/create
+    source_type: official-doc
+    relevance: role/content message arrays and developer role.
+  - id: src-anthropic-messages
+    title: Anthropic Messages API Reference
+    publisher: Anthropic
+    url: https://docs.anthropic.com/en/api/messages
+    source_type: official-doc
+    relevance: system parameter and content blocks including tool_use/tool_result.
+  - id: src-a2a-message
+    title: A2A Protocol Specification
+    publisher: A2A Protocol
+    url: https://a2a-protocol.org/latest/specification/
+    source_type: standard
+    relevance: Message role, messageId, contextId, taskId, and Parts.
+  - id: src-info-messages-design
+    title: Moonweave info-messages-instructions module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Conversation and Message identity separate from carried content.
 source_claims:
   - id: claim-assistant-message-001
     source: eng-spec-openai-model-spec-2025
@@ -266,60 +260,69 @@ source_claims:
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-assistant-message-002
     source: eng-spec-openai-model-spec-2025
     supports: "The Model Spec defines the assistant as the model's conversation participant, assistant-role content as model output, and end_turn as an assistant-message field. For AssistantMessage, the assistant_id field records exactly this auditable datum: References the model or agent participant that produced the message."
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-assistant-message-003
     source: eng-spec-openai-model-spec-2025
     supports: "The Model Spec defines the assistant as the model's conversation participant, assistant-role content as model output, and end_turn as an assistant-message field. For AssistantMessage, the end_turn field records exactly this auditable datum: Records whether the assistant requests yielding control back to the application."
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-assistant-message-004
     source: eng-spec-openai-model-spec-2025
     supports: The Model Spec defines the assistant as the model's conversation participant, assistant-role content as model output, and end_turn as an assistant-message field. The Model Spec defines the assistant as the model's conversation participant and end_turn as an assistant-message field.
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-assistant-message-005
     source: eng-spec-openai-model-spec-2025
     supports: The Model Spec defines the assistant as the model's conversation participant, assistant-role content as model output, and end_turn as an assistant-message field. The source's assistant role applies to conversation messages, not every artifact a model-assisted workflow produces.
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-assistant-message-006
     source: eng-spec-openai-model-spec-2025
     supports: The Model Spec defines the assistant as the model's conversation participant, assistant-role content as model output, and end_turn as an assistant-message field. Moonweave contrasts AssistantMessage with UserMessage under Message using the endpoint-specific identity condition stated in this differentia.
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-assistant-message-007
     source: eng-spec-openai-model-spec-2025
     supports: The Model Spec defines assistant as the model's conversation participant and assistant as a required role value for model-generated messages. The case directly applies the documented assistant-role message fields.
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-assistant-message-008
     source: eng-spec-openai-model-spec-2025
     supports: The Model Spec defines assistant as the model's conversation participant and assistant as a required role value for model-generated messages. The Model Spec's assistant role applies to conversation messages, not all outputs.
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-assistant-message-009
     source: eng-spec-openai-model-spec-2025
     supports: The Model Spec defines assistant as the model's conversation participant and assistant as a required role value for model-generated messages.
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
+  - id: claim-assistant-openai
+    source: src-openai-chat
+    supports: OpenAI assistant role may include tool_calls alongside content.
+    locator: assistant tool_calls
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-assistant-anthropic
+    source: src-anthropic-messages
+    supports: Anthropic assistant messages return ordered text and tool_use blocks.
+    locator: assistant content blocks
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-assistant-design
+    source: src-info-messages-design
+    supports: AssistantMessage is communication envelope distinct from ModelCall execution records.
+    locator: AssistantMessage boundary
+    evidence_kind: design-inference
+    confidence: high

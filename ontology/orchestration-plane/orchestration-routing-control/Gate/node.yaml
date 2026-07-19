@@ -1,34 +1,85 @@
 schema: moonweave.ai/ontology-node/v1
 id: Gate
 kind: concept
-status: accepted
 labels:
   zh: 门控能力
   en: gate capability
-  ja: gate capability
+  ja: ゲート能力
 semantics:
   short_definition:
-    zh: 在控制点求值条件并产生允许、阻断、转向或升级结果的通用能力。
-    en: A general capability that evaluates conditions at a control point and produces allow, block, redirect, or escalate outcomes.
-    ja: control point で condition を evaluate し allow/block/redirect/escalate outcome を生成する general capability。
+    zh: 在控制点暂停或求值并产出 allow/block/redirect/escalate 等结果的复用能力。
+    en: A reusable capability that pauses or evaluates at a control point and yields allow, block, redirect, or escalate outcomes.
+    ja: 制御点で一時停止または評価し allow/block/redirect/escalate 等 outcome を返す reusable capability です。
   definition:
-    zh: 门控能力是一种可复用能力，以门控标识、能力类型、决定函数和版本为身份，在控制点接收证据、求值条件并产生 GateOutcome。ControlGate 是其面向编排控制流的子类；具体 CommitGate 或 ToolApprovalGate 也可在各自域中继承 Gate。Gate 不是求值结果、条件规范或一次路由决定。
-    en: A Gate is a reusable capability identified by gate ID, capability kind, decision function, and version. At a control point it receives evidence, evaluates conditions, and produces a GateOutcome. ControlGate is its orchestration-control-flow subtype, while domain gates such as CommitGate or ToolApprovalGate may also inherit Gate. A Gate is not an outcome, condition specification, or one routing decision.
-    ja: Gate は gate ID・capability kind・decision function・version で識別する reusable capability で control point にて evidence を受け condition を evaluate し GateOutcome を生成します。ControlGate は orchestration subtype で Gate は outcome/condition/decision ではありません。
+    zh: Gate 是以 gate_id、gate_kind、decision_function_ref 与 version 标识的可复用门控能力；在控制点接收证据、求值条件并产生 GateOutcome。LangGraph interrupt() 在工具调用前暂停图执行；CrewAI human_input=True 在任务前请求人工输入；审批门在敏感操作前等待外部决定。Gate 不是一次 GateOutcome、RoutingCondition 规范或 RoutingDecision。
+    en: A Gate is a reusable gate capability identified by gate_id, gate_kind, decision_function_ref, and version. At a control point it receives evidence, evaluates conditions, and produces GateOutcome. LangGraph interrupt() pauses graph execution before a tool call; CrewAI human_input=True requests human input before a task; approval gates wait for external decisions before sensitive operations. A Gate is not one GateOutcome, a RoutingCondition specification, or a RoutingDecision.
+    ja: Gate は gate_id・gate_kind・decision_function_ref・version で識別する reusable gate capability で、制御点で evidence を受け condition を evaluate し GateOutcome を生成します。LangGraph interrupt() は tool call 前に graph を pause、CrewAI human_input=True は task 前に human input を要求、approval gate は sensitive operation 前に外部決定を待ちます。Gate は GateOutcome・RoutingCondition 仕様・RoutingDecision ではありません。
   why_needed:
-    zh: 以 Gate 为上位概念可让编排门、提交门和审批门共享真实能力语义，而不倒置父子。
-    en: Using Gate as the genus lets orchestration, commit, and approval gates share genuine capability semantics without reversing parent and child.
-    ja: Gate を genus とし orchestration/commit/approval gate が genuine capability semantics を共有し parent-child inversion を防ぎます。
+    zh: 统一编排门、提交门与审批门的上位能力语义，避免把一次结果或静态条件误报成可调用门控。
+    en: A common gate genus lets orchestration, commit, and approval gates share capability semantics without misreporting one outcome or static condition as a callable gate.
+    ja: 共通 gate genus により orchestration/commit/approval gate が capability semantics を共有し、one outcome や static condition を callable gate と誤報しません。
   includes:
-    - zh: 能够接收条件与证据、执行求值并给出可审计结果的控制点能力。
+    - zh: 可接收条件与证据、执行求值并返回可审计结果的控制点能力。
       en: Control-point capabilities that receive conditions and evidence, evaluate them, and return auditable outcomes.
       ja: condition/evidence を受け evaluate し auditable outcome を返す control-point capability。
+    - zh: LangGraph interrupt/resume、CrewAI 人工输入门与工具审批前的暂停点。
+      en: LangGraph interrupt/resume, CrewAI human-input gates, and pause points before tool approval.
+      ja: LangGraph interrupt/resume、CrewAI human-input gate、tool approval 前 pause point。
   excludes:
-    - zh: 普通布尔字段、分支条件文本、一次允许结果和只在页面上分隔社区的视觉节点。
-      en: A plain Boolean field, branch-condition text, one allow outcome, and a visual node used only to separate communities.
-      ja: plain Boolean・branch condition text・one allow outcome・visual community separator。
+    - zh: 普通布尔字段、分支条件文本、一次 allow 结果和仅用于 UI 分隔的视觉节点。
+      en: A plain Boolean field, branch-condition text, one allow outcome, and visual nodes used only for UI separation.
+      ja: plain Boolean・branch condition text・one allow outcome・UI 分離のみの visual node。
   semantic_kind: capability
   aliases: []
+engineering:
+  explanation:
+    zh: 集成时将 LangGraph interrupt({"kind":"approval",...}) 与 resume(value) 映射为可暂停 Gate；CrewAI Task(human_input=True) 映射为人工审批门；OpenAI Agents SDK 可在 handoff 前插入审批检查。compiled graph 中的 gate 节点是能力定义；interrupt 返回值或 resume payload 是一次 GateOutcome 的证据输入。
+    en: Map LangGraph interrupt({"kind":"approval",...}) and resume(value) to a pausable Gate; map CrewAI Task(human_input=True) to a human-approval gate; OpenAI Agents SDK may insert approval checks before handoffs. A gate node in a compiled graph is a capability definition; the interrupt return or resume payload is evidence input for one GateOutcome.
+    ja: LangGraph interrupt/resume を pausable Gate に、CrewAI Task(human_input=True) を human approval gate に写像します。compiled graph の gate node は capability 定義、interrupt 戻り値/resume payload は GateOutcome 証拠入力です。
+  typical_input:
+    - description: LangGraph interrupt before a destructive tool call.
+      format: |
+        from langgraph.types import interrupt, Command
+
+        def tool_approval_gate(state):
+            decision = interrupt({
+                "kind": "tool_approval",
+                "tool_call": state["pending_tool"],
+            })
+            if decision == "approve":
+                return Command(goto="execute_tool")
+            return Command(goto="reject_tool")
+      source_claims: [claim-gate-langgraph]
+    - description: CrewAI task requiring human input before execution.
+      format: |
+        from crewai import Task
+
+        review_task = Task(
+            description="Review generated SQL before execution",
+            expected_output="approved or rejected",
+            human_input=True,
+        )
+      source_claims: [claim-gate-crewai]
+  typical_output:
+    - description: Moonweave GateOutcome projection after gate evaluation.
+      format: |
+        {
+          "gate_ref": "gate-tool-approval@2",
+          "result": "allow",
+          "evidence_refs": ["human-decision-771"],
+          "produced_at": "2026-07-16T04:20:00Z"
+        }
+      source_claims: [claim-gate-design]
+  reference_implementations:
+    - name: LangGraph
+      url: https://langchain-ai.github.io/langgraph/
+      description: interrupt/resume for human-in-the-loop gates before node continuation.
+    - name: CrewAI
+      url: https://docs.crewai.com
+      description: human_input=True on Task for pre-execution human gates.
+    - name: OpenAI Agents SDK
+      url: https://openai.github.io/openai-agents-python/
+      description: Session loop gates before handoffs or tool execution.
 structure:
   identity_keys:
     - gate_id
@@ -50,9 +101,9 @@ structure:
         ja: one gate capability を stable に識別します。
       allowed_values: []
       pattern: null
-      example_value: gate-support-quality
+      example_value: gate-tool-approval
       source_claims:
-        - claim-gate-001
+        - claim-gate-design
     - id: gate_kind
       labels:
         zh: 门控类型
@@ -69,9 +120,9 @@ structure:
         ja: control・commit・approval・safety 等 capability kind。
       allowed_values: []
       pattern: null
-      example_value: control
+      example_value: approval
       source_claims:
-        - claim-gate-001
+        - claim-gate-design
     - id: decision_function_ref
       labels:
         zh: 决定函数引用
@@ -88,9 +139,9 @@ structure:
         ja: condition evaluation を行う versioned function/policy entry を参照します。
       allowed_values: []
       pattern: null
-      example_value: quality-gate-evaluator@3
+      example_value: tool-approval-evaluator@2
       source_claims:
-        - claim-gate-001
+        - claim-gate-design
     - id: version
       labels:
         zh: 能力版本
@@ -107,108 +158,123 @@ structure:
         ja: gate input/output/evaluation semantics の revision を固定します。
       allowed_values: []
       pattern: null
-      example_value: "3"
+      example_value: "2"
       source_claims:
-        - claim-gate-002
+        - claim-gate-design
   constraints: []
   required_relation_constraints: []
 examples:
-  - id: Gate-example-positive-manual-20260716
-    kind: positive
+  - id: Gate-example-langgraph-interrupt
     labels:
-      zh: 质量控制门能力
-      en: Quality-control gate capability
-      ja: quality-control gate capability
-    scenario_id: null
+      zh: LangGraph 工具审批门
+      en: LangGraph tool-approval gate
+      ja: LangGraph tool approval gate
     descriptions:
-      zh: gate-support-quality@3 接受质量分、人工覆盖和安全状态，调用 evaluator@3，返回 allow、block、redirect 或 escalate。
-      en: gate-support-quality@3 accepts quality score, human override, and safety state, invokes evaluator@3, and returns allow, block, redirect, or escalate.
-      ja: gate-support-quality@3 は quality score・human override・safety state を受け evaluator@3 で allow/block/redirect/escalate を返します。
+      zh: gate-tool-approval@2 在 execute_tool 前调用 interrupt，等待外部 approve/reject 后 resume；ControlGate 部署在 pending_tool 控制点。
+      en: gate-tool-approval@2 calls interrupt before execute_tool, waits for external approve/reject, then resumes; ControlGate deploys at the pending_tool control point.
+      ja: gate-tool-approval@2 は execute_tool 前に interrupt し外部 approve/reject 後 resume します。
+    example_source:
+      product: LangGraph
+      url: https://langchain-ai.github.io/langgraph/
+      version: interrupt/resume
     field_values:
-      gate_id: gate-support-quality
-      gate_kind: control
-      decision_function_ref: quality-gate-evaluator@3
-      version: "3"
+      gate_id: gate-tool-approval
+      gate_kind: approval
+      decision_function_ref: tool-approval-evaluator@2
+      version: "2"
     related_node_ids:
       - Gate
       - ControlGate
+      - GateOutcome
     related_relation_ids:
       - ControlGate-is_a-Gate
-    expected_result:
-      zh: 建立通用 Gate，并让 ControlGate 继承它。
-      en: Create the general Gate and let ControlGate inherit it.
-      ja: general Gate を作り ControlGate が継承します。
-    why_valid_or_invalid:
-      zh: 具有可重用求值接口和结果集合，不是某次结果。
-      en: It has a reusable evaluation interface and outcome set rather than one result.
-      ja: reusable evaluation interface/outcome set を持ち one result ではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-gate-001
-      - claim-gate-002
-  - id: Gate-example-boundary-manual-20260716
-    kind: boundary
+      - claim-gate-langgraph
+      - claim-gate-design
+  - id: Gate-example-crewai-human-input
     labels:
-      zh: 允许结果
-      en: Allow outcome
-      ja: allow outcome
-    scenario_id: routing-review-gate-boundary
+      zh: CrewAI 人工输入门
+      en: CrewAI human-input gate
+      ja: CrewAI human-input gate
     descriptions:
-      zh: outcome-884 记录某次求值为 allow、证据摘要和 04:20 时间，但没有可调用求值能力。
-      en: outcome-884 records allow, an evidence digest, and 04:20 for one evaluation, but provides no callable evaluation capability.
-      ja: outcome-884 は one evaluation の allow・evidence digest・04:20 を記録しますが callable capability はありません。
+      zh: gate-human-sql-review@1 对应 human_input=True 任务；crew 在运行 SQL 任务前暂停并收集人工批准证据。
+      en: gate-human-sql-review@1 corresponds to a human_input=True task; the crew pauses before running the SQL task and collects human-approval evidence.
+      ja: gate-human-sql-review@1 は human_input=True task に対応し SQL task 前に pause して human approval evidence を収集します。
+    example_source:
+      product: CrewAI
+      url: https://docs.crewai.com
+      version: Task human_input=True
+    field_values:
+      gate_id: gate-human-sql-review
+      gate_kind: approval
+      decision_function_ref: human-input-gate@1
+      version: "1"
+    related_node_ids:
+      - Gate
+      - GateOutcome
+    related_relation_ids: []
+    source_claims:
+      - claim-gate-crewai
+      - claim-gate-design
+  - id: Gate-example-boundary-outcome
+    labels:
+      zh: 允许结果不是 Gate
+      en: Allow outcome is not Gate
+      ja: allow outcome は Gate ではない
+    descriptions:
+      zh: gate-outcome-884 记录 allow、证据摘要与 04:20 时间，但没有可调用求值能力或 decision_function_ref。
+      en: gate-outcome-884 records allow, an evidence digest, and 04:20 for one evaluation but provides no callable evaluation capability or decision_function_ref.
+      ja: gate-outcome-884 は one evaluation の allow を記録しますが callable capability はありません。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: specification versus occurrence boundary
     field_values: {}
     related_node_ids:
       - GateOutcome
       - Gate
     related_relation_ids: []
-    expected_result:
-      zh: 分类为 GateOutcome，不分类为 Gate。
-      en: Classify it as GateOutcome, not Gate.
-      ja: GateOutcome とし Gate にはしません。
-    why_valid_or_invalid:
-      zh: 结果是能力一次执行的产物，不是能力本身。
-      en: An outcome is a product of one capability execution, not the capability itself.
-      ja: outcome は capability execution product で capability 自体ではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-gate-002
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-gate-design
 parent_relation: null
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-orchestration-tool-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照权威来源逐项完成人工语义核验；概念定义、层级、关系、结构与来源主张成立。
-    en: Manual semantic verification against authoritative sources completed; concept definitions, hierarchy, relations, structure, and source claims hold.
-    ja: 権威ソースに照らし手動意味検証を完了し、概念定義・階層・関係・構造・出典主張が成立。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: langgraph-gate
+    title: LangGraph
+    url: https://langchain-ai.github.io/langgraph/
+    source_type: official-doc
+    relevance: interrupt/resume gates before tool calls and conditional continuation.
+  - id: crewai-gate
+    title: CrewAI documentation
+    url: https://docs.crewai.com
+    source_type: official-doc
+    relevance: human_input=True approval gates on tasks.
+  - id: openai-agents-gate
+    title: OpenAI Agents SDK
+    url: https://openai.github.io/openai-agents-python/
+    source_type: official-doc
+    relevance: Session-loop approval before handoffs and tools.
+  - id: gate-design
+    title: Moonweave routing and gates design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Separates gate capability from GateOutcome occurrence.
 source_claims:
-  - id: claim-gate-001
-    source: eng-fw-langgraph-graph-api
-    supports: LangGraph's Graph API distinguishes workflow state, executable nodes, static edges, conditional routing functions, termination targets, and Command values that combine state updates with a selected destination. Moonweave uses this to separate reusable routing specifications and targets from one RoutingDecision occurrence.
-    locator: LangGraph Graph API documentation, Graphs, Edges, Conditional edges, and Command sections
+  - id: claim-gate-langgraph
+    source: langgraph-gate
+    supports: LangGraph interrupt pauses graph execution and resume supplies external decision evidence for gate evaluation.
+    locator: Graph API — interrupt, resume, human-in-the-loop
+    evidence_kind: official
+    confidence: high
+  - id: claim-gate-crewai
+    source: crewai-gate
+    supports: CrewAI human_input=True creates a human gate before task execution proceeds.
+    locator: Concepts — Tasks, human_input
+    evidence_kind: official
+    confidence: high
+  - id: claim-gate-design
+    source: gate-design
+    supports: Moonweave treats Gate as reusable capability distinct from GateOutcome information records.
+    locator: Gate concept boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-gate-002
-    source: eng-ont-prov-o
-    supports: W3C PROV-O distinguishes plans and other Entities from time-bounded Activities that use or generate Entities. Moonweave therefore treats routing policy and conditions as reusable specifications, RoutingDecision as an occurrence, and GateOutcome as information produced by gate evaluation.
-    locator: W3C PROV-O Recommendation Sections 3.1 and 3.2, Entity, Activity, generation, and Plan
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

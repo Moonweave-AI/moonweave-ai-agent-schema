@@ -1,20 +1,19 @@
 schema: moonweave.ai/ontology-node/v1
 id: Message
 kind: concept
-status: accepted
 labels:
   zh: 消息
   en: Message
   ja: メッセージ
 semantics:
   short_definition:
-    zh: 由稳定标识、发送角色和有序内容共同界定的一次通信记录。
-    en: One communication record delimited by a stable ID, sender role, and ordered content.
-    ja: stable ID・sender role・ordered contentで区切られる一回のcommunication recordです。
+    zh: 由发送角色、稳定标识与有序内容共同界定的一次通信记录。
+    en: One communication record delimited by sender role, stable identity, and ordered content.
+    ja: sender role・stable identity・ordered content で区切られる一 communication record。
   definition:
-    zh: Message 是 ConversationElement 的具体子类，以 message_id 标识一次通信，并记录 role、发送者、接收方、内容与可选关联；它承载内容或指令但不拥有 ContentBlock、Instruction、ContextPackage 或工具执行结果的本体定义。
-    en: Message is a concrete ConversationElement identified by message_id and recording role, sender, recipient, content, and optional correlations. It carries content or instructions but does not own the ontology definitions of ContentBlock, Instruction, ContextPackage, or tool execution results.
-    ja: Message はmessage_idで識別されrole・sender・recipient・content・任意correlationを記録する具体ConversationElementです。contentやinstructionを運びますがContentBlock・Instruction・ContextPackage・tool execution resultのontology定義を所有しません。
+    zh: Message 是 ConversationElement 的具体子类，以 message_id 标识一次通信，记录 role、sender、recipient 与 content block 引用；它映射 OpenAI {role, content}、Anthropic {role, content:[blocks]} 与 A2A Message{role, parts[]}，但不拥有 ContentBlock、Instruction 或 ToolResult 的本体定义。
+    en: Message is a concrete ConversationElement identified by message_id, recording role, sender, recipient, and content-block references. It maps OpenAI {role, content}, Anthropic {role, content:[blocks]}, and A2A Message {role, parts[]}, but does not own ContentBlock, Instruction, or ToolResult ontology definitions.
+    ja: Message は message_id で識別され OpenAI/Anthropic/A2A wire shape に写像。ContentBlock/Instruction/ToolResult 本体は所有しない。
   why_needed:
     zh: 为不同模型、协议和发送主体提供共同通信身份，同时把角色、内容载体、指令效力和传输包络保持为可区分事实。
     en: Provides a common communication identity across models, protocols, and senders while keeping role, content carrier, instruction force, and transport envelope distinct.
@@ -29,6 +28,34 @@ semantics:
       ja: ConversationTurn・ContentBlock・Instruction・ProtocolEnvelope・ToolResult・runtime eventを除外します。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: OpenAI content 可为 string 或 typed part 数组；Anthropic turn 内 content 为 block 数组；A2A parts[] 含 text/file/data。Message 保留 role 与 message_id，具体 part/block 类型通过 contains_content_block 边引用内容表示模块。
+    en: OpenAI content may be a string or typed part array; Anthropic turn content is a block array; A2A parts[] include text/file/data. Message keeps role and message_id; concrete part/block types link via contains_content_block to content representation.
+    ja: OpenAI/Anthropic/A2A content 形状を role+message_id で保持し block 型は relation 参照。
+  typical_input:
+    - description: OpenAI user message with parts
+      format: '{"role":"user","content":[{"type":"text","text":"Hi"},{"type":"image_url","image_url":{"url":"https://example.com/a.png"}}]}'
+      source_claims:
+        - claim-message-openai
+  typical_output:
+    - description: Anthropic assistant blocks
+      format: '{"role":"assistant","content":[{"type":"text","text":"Done."},{"type":"tool_use","id":"toolu_01","name":"lookup","input":{}}]}'
+      source_claims:
+        - claim-message-anthropic
+  reference_implementations:
+    - name: OpenAI Chat Completions API
+      url: https://platform.openai.com/docs/api-reference/chat/create
+      description: messages[] with role and content parts.
+    - name: Anthropic Messages API
+      url: https://docs.anthropic.com/en/api/messages
+      description: system parameter and role/content block turns.
+    - name: MCP Prompts
+      url: https://modelcontextprotocol.io/specification/2025-06-18/server/prompts
+      description: prompts/get returns injectable messages array.
+    - name: A2A Protocol
+      url: https://a2a-protocol.org/latest/specification/
+      description: Message with role, messageId, contextId, and parts.
 structure:
   identity_keys: []
   fields:
@@ -37,18 +64,18 @@ structure:
         zh: 发送角色
         en: message role
         ja: 送信役割
+      definitions:
+        zh: 记录产生消息的系统、开发者、用户、助手、工具或外部智能体角色。
+        en: Records the system, developer, user, assistant, tool, or external-agent role that produced the message.
+        ja: messageを生成したsystem・developer・user・assistant・tool・external-agent roleを記録します。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 记录产生消息的系统、开发者、用户、助手、工具或外部智能体角色。
-        en: Records the system, developer, user, assistant, tool, or external-agent role that produced the message.
-        ja: messageを生成したsystem・developer・user・assistant・tool・external-agent roleを記録します。
-      allowed_values: []
       pattern: null
       example_value: user
+      allowed_values: []
       source_claims:
         - claim-message-002
     - id: sender_id
@@ -56,18 +83,18 @@ structure:
         zh: 发送者标识
         en: sender ID
         ja: 送信者ID
+      definitions:
+        zh: 指向产生消息的可审计主体身份。
+        en: References the auditable actor identity that produced the message.
+        ja: messageを生成した監査可能actor identityを参照します。
       datatype: reference
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 指向产生消息的可审计主体身份。
-        en: References the auditable actor identity that produced the message.
-        ja: messageを生成した監査可能actor identityを参照します。
-      allowed_values: []
       pattern: null
       example_value: UserActor:customer-88
+      allowed_values: []
       source_claims:
         - claim-message-003
     - id: recipient
@@ -75,18 +102,18 @@ structure:
         zh: 接收目标
         en: recipient
         ja: 受信先
+      definitions:
+        zh: 记录应用或工具用于路由该消息的可选接收目标。
+        en: Optional application or tool routing target for the message.
+        ja: applicationまたはtoolがmessageをrouteする任意受信先です。
       datatype: string
       required: false
       cardinality:
         min: 0
         max: 1
-      definitions:
-        zh: 记录应用或工具用于路由该消息的可选接收目标。
-        en: Optional application or tool routing target for the message.
-        ja: applicationまたはtoolがmessageをrouteする任意受信先です。
-      allowed_values: []
       pattern: null
       example_value: assistant
+      allowed_values: []
       source_claims:
         - claim-message-004
     - id: reply_to_id
@@ -94,18 +121,18 @@ structure:
         zh: 回复目标标识
         en: reply-to ID
         ja: 返信先ID
+      definitions:
+        zh: 标识该消息明确回复的先前 Message。
+        en: Identifies the prior Message explicitly answered by this message.
+        ja: このmessageが明示返信するprior Messageを識別します。
       datatype: string
       required: false
       cardinality:
         min: 0
         max: 1
-      definitions:
-        zh: 标识该消息明确回复的先前 Message。
-        en: Identifies the prior Message explicitly answered by this message.
-        ja: このmessageが明示返信するprior Messageを識別します。
-      allowed_values: []
       pattern: null
       example_value: msg-936
+      allowed_values: []
       source_claims:
         - claim-message-005
     - id: context_id
@@ -113,97 +140,109 @@ structure:
         zh: 外部语境标识
         en: context ID
         ja: 外部context ID
+      definitions:
+        zh: 保存协议提供的交互分组标识，不替代 Conversation 关系。
+        en: Preserves a protocol-supplied interaction grouping identifier without replacing the Conversation relation.
+        ja: protocol提供interaction grouping identifierを保持しConversation関係を置換しません。
       datatype: string
       required: false
       cardinality:
         min: 0
         max: 1
-      definitions:
-        zh: 保存协议提供的交互分组标识，不替代 Conversation 关系。
-        en: Preserves a protocol-supplied interaction grouping identifier without replacing the Conversation relation.
-        ja: protocol提供interaction grouping identifierを保持しConversation関係を置換しません。
-      allowed_values: []
       pattern: null
       example_value: a2a-context-61
+      allowed_values: []
       source_claims:
         - claim-message-006
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: Message-example-positive-manual-001
-    kind: positive
+  - id: Message-example-openai-multimodal
     labels:
-      zh: 消息正例
-      en: "Positive case: Message"
-      ja: メッセージ正例
-    scenario_id: null
+      zh: OpenAI 多模态消息
+      en: OpenAI multimodal message
+      ja: OpenAI マルチモーダル message
     descriptions:
-      zh: msg-940 由 customer-88 以 user 角色发送，包含一个文本块并明确回复 msg-936。
-      en: msg-940 is sent by customer-88 with user role, contains one text block, and explicitly replies to msg-936.
-      ja: msg-940 はcustomer-88がuser roleで送り一text blockを含みmsg-936へ明示返信します。
+      zh: msg-842-1 role=user 含 text 与 image_url part，映射为一条 Message 与两个 content block。
+      en: msg-842-1 role=user contains text and image_url parts mapped to one Message and two content blocks.
+      ja: msg-842-1 が text/image_url part を含む。
+    example_source:
+      product: OpenAI
+      url: https://platform.openai.com/docs/api-reference/chat/create
+      version: content parts
     field_values:
+      message_id: msg-842-1
       message_role: user
-      sender_id: UserActor:customer-88
-      recipient: assistant
-      reply_to_id: msg-936
-      context_id: a2a-context-61
-      element_id: msg-940
-      conversation_id: a2a-context-61
-      sequence_index: 4
     related_node_ids:
       - Message
+      - UserMessage
     related_relation_ids: []
-    expected_result:
-      zh: 识别为 Message，并按 role 继续判定 UserMessage。
-      en: Identify Message and continue by role to UserMessage.
-      ja: Messageと識別しroleからUserMessageを判定します。
-    why_valid_or_invalid:
-      zh: 记录具有独立通信标识、发送角色、主体和内容，而回复关系保持为可追踪链接。
-      en: The record has an independent communication ID, sender role, actor, and content while reply remains a traceable link.
-      ja: 独立communication ID・sender role・actor・contentを持ちreplyはtraceable linkです。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-message-007
-  - id: Message-example-boundary-manual-001
-    kind: boundary
+      - claim-message-openai
+  - id: Message-example-anthropic-tool-use
     labels:
-      zh: 消息边界例
-      en: "Boundary case: Message"
-      ja: メッセージ境界例
-    scenario_id: null
+      zh: Anthropic tool_use 消息
+      en: Anthropic tool_use message
+      ja: Anthropic tool_use message
     descriptions:
-      zh: content-940 只是 msg-940 内的 UTF-8 文本，没有 message_id、角色或发送者。
-      en: content-940 is only UTF-8 text inside msg-940 and has no message_id, role, or sender.
-      ja: content-940 はmsg-940内UTF-8 textだけでmessage_id・role・senderを持ちません。
+      zh: msg-902-assistant content[] 含 tool_use block；Message 记录 role=assistant 并通过 block 引用表达调用意图。
+      en: msg-902-assistant content[] includes tool_use block; Message records role=assistant and tool intent via block references.
+      ja: msg-902-assistant が tool_use block を含む。
+    example_source:
+      product: Anthropic
+      url: https://docs.anthropic.com/en/api/messages
+      version: tool_use block
+    field_values:
+      message_id: msg-902-assistant
+      message_role: assistant
+    related_node_ids:
+      - Message
+      - AssistantMessage
+    related_relation_ids: []
+    source_claims:
+      - claim-message-anthropic
+  - id: Message-example-a2a-parts
+    labels:
+      zh: A2A parts 消息
+      en: A2A parts message
+      ja: A2A parts message
+    descriptions:
+      zh: msg-a2a-441 role=agent parts 含 text/file/data；Message 保留 messageId 与 role，Part 映射为 content block。
+      en: msg-a2a-441 role=agent parts include text/file/data; Message keeps messageId and role while Parts map to content blocks.
+      ja: msg-a2a-441 の parts を block へ写像。
+    example_source:
+      product: A2A Protocol
+      url: https://a2a-protocol.org/latest/specification/
+      version: Message.parts
+    field_values:
+      message_id: msg-a2a-441
+      message_role: agent
+      context_id: ctx-billing-27
+    related_node_ids:
+      - Message
+      - ExternalAgentMessage
+    related_relation_ids: []
+    source_claims:
+      - claim-message-a2a
+  - id: Message-example-not-text-block
+    labels:
+      zh: 非 TextBlock
+      en: Not a TextBlock
+      ja: TextBlock ではない
+    descriptions:
+      zh: UTF-8 文本片段没有 message_id 与 role，不得识别为 Message。
+      en: A UTF-8 text fragment without message_id and role must not be identified as Message.
+      ja: message_id/role なし文本は Message ではない。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
     field_values: {}
     related_node_ids:
       - Message
     related_relation_ids: []
-    expected_result:
-      zh: 不得识别为 Message；它是 TextBlock。
-      en: Do not identify Message; it is a TextBlock.
-      ja: MessageとせずTextBlockです。
-    why_valid_or_invalid:
-      zh: 内容载体不具备一次通信的包络身份，不能由文本外观推断消息角色。
-      en: A content carrier lacks communication-envelope identity; message role cannot be inferred from text appearance.
-      ja: content carrierはcommunication-envelope identityを欠きtext外観からmessage roleを推定できません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-message-008
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: ConversationTurn
-    shared_parent_concept_id: ConversationElement
-    differentia:
-      zh: Message 以 message_id 表示一次通信并直接承载内容；ConversationTurn 以 turn_id 聚合一个或多个 Message。
-      en: Message is one communication unit under message_id and directly carries content; ConversationTurn groups one or more Message records under turn_id.
-      ja: Messageはmessage_idで一通信を表しcontentを直接運び、ConversationTurnはturn_idで一つ以上のMessageをまとめます。
-    source_claims:
-      - claim-message-009
+      - claim-message-design
 parent_relation:
   id: Message-is_a-ConversationElement
   predicate: is_a
@@ -234,12 +273,10 @@ parent_relation:
   constraints: []
   examples:
     - id: Message-is_a-ConversationElement-example-positive-manual-001
-      kind: positive
       labels:
         zh: 是一种会话元素正例
         en: "Positive case: is a conversation element"
         ja: 会話要素の一種正例
-      scenario_id: null
       descriptions:
         zh: msg-940 在 conv-support-042 的位置 5，并拥有独立 message_id 与 role。
         en: msg-940 occupies position 5 in conv-support-042 and has its own message_id and role.
@@ -250,25 +287,13 @@ parent_relation:
         - ConversationElement
       related_relation_ids:
         - Message-is_a-ConversationElement
-      expected_result:
-        zh: 断言 Message-is_a-ConversationElement。
-        en: Assert Message-is_a-ConversationElement.
-        ja: Message-is_a-ConversationElementをassertします。
-      why_valid_or_invalid:
-        zh: 它满足可寻址会话成员全部条件，并增加消息种差。
-        en: It satisfies every addressable conversation-member condition and adds message differentia.
-        ja: addressable conversation-member全条件を満たしmessage differentiaを追加します。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
         - claim-message-010
     - id: Message-is_a-ConversationElement-example-boundary-manual-001
-      kind: boundary
       labels:
         zh: 是一种会话元素边界例
         en: "Boundary case: is a conversation element"
         ja: 会話要素の一種境界例
-      scenario_id: null
       descriptions:
         zh: text-block-940 只在 msg-940 内部占内容位置，没有会话级 message_id。
         en: text-block-940 occupies a content position inside msg-940 but has no conversation-level message_id.
@@ -279,26 +304,11 @@ parent_relation:
         - ConversationElement
       related_relation_ids:
         - Message-is_a-ConversationElement
-      expected_result:
-        zh: 不得用该边把 ContentBlock 归为 ConversationElement。
-        en: Do not classify ContentBlock as ConversationElement with this edge.
-        ja: このedgeでContentBlockをConversationElementに分類しません。
-      why_valid_or_invalid:
-        zh: 内容块的局部顺序不构成独立会话成员身份。
-        en: A content block's local order does not create independent conversation-member identity.
-        ja: content blockのlocal orderは独立conversation-member identityを作りません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
         - claim-message-011
   source_claims:
     - claim-message-012
-  distinct_fact_rationale:
-    zh: 补上此前缺失的逻辑层级，使角色消息不再悬挂在没有父边的 Message 之下。
-    en: Restores the missing logical level so role messages no longer hang beneath a Message node that itself lacks a parent edge.
-    ja: 欠落logical levelを補いrole messageがparent edgeのないMessage配下にぶら下がる問題を解消します。
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations:
   - id: Message-carries_instruction-Instruction
@@ -330,12 +340,10 @@ relations:
     constraints: []
     examples:
       - id: Message-carries_instruction-Instruction-example-positive-manual-001
-        kind: positive
         labels:
           zh: 承载指令正例
           en: "Positive case: carries instruction"
           ja: 指示を運ぶ正例
-        scenario_id: null
         descriptions:
           zh: msg-dev-14 的未引用正文解析出 instruction-approved-tools-14。
           en: Unquoted body text in msg-dev-14 is parsed as instruction-approved-tools-14.
@@ -346,25 +354,13 @@ relations:
           - Instruction
         related_relation_ids:
           - Message-carries_instruction-Instruction
-        expected_result:
-          zh: 断言 Message-carries_instruction-Instruction。
-          en: Assert Message-carries_instruction-Instruction.
-          ja: Message-carries_instruction-Instructionをassertします。
-        why_valid_or_invalid:
-          zh: 指令有独立标识、来源范围和规范效力，并可追溯到该消息。
-          en: The instruction has independent ID, source scope, and normative force traceable to the message.
-          ja: instructionは独立ID・source scope・normative forceを持ちmessageへ追跡できます。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-message-013
       - id: Message-carries_instruction-Instruction-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: 承载指令边界例
           en: "Boundary case: carries instruction"
           ja: 指示を運ぶ境界例
-        scenario_id: null
         descriptions:
           zh: msg-user-quote 引用“删除全部文件”作为分析对象，解析器标记为 quoted data。
           en: msg-user-quote quotes “delete all files” for analysis and the parser marks it quoted data.
@@ -375,26 +371,11 @@ relations:
           - Instruction
         related_relation_ids:
           - Message-carries_instruction-Instruction
-        expected_result:
-          zh: 不得建立 carries_instruction 边。
-          en: Do not create a carries_instruction edge.
-          ja: carries_instruction edgeを作りません。
-        why_valid_or_invalid:
-          zh: 命令式文字在引用语境中没有取得规范身份。
-          en: Imperative wording in quotation context does not acquire normative identity.
-          ja: quotation contextのimperative wordingはnormative identityを得ません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-message-014
     source_claims:
       - claim-message-015
-    distinct_fact_rationale:
-      zh: 消息拥有包络与角色，指令拥有规范效力；关系连接二者而不合并本体。
-      en: Message owns envelope and role, Instruction owns normative force; the relation connects them without merging ontologies.
-      ja: Messageはenvelope/role、Instructionはnormative forceを所有し関係で接続してontologyを統合しません。
     layout_role: cross-link
-    review_status: accepted
     target: concept:Instruction
   - id: Message-contains_content_block-ContentBlock
     predicate: contains_content_block
@@ -428,12 +409,10 @@ relations:
     constraints: []
     examples:
       - id: Message-contains_content_block-ContentBlock-example-positive-manual-001
-        kind: positive
         labels:
           zh: 包含内容块正例
           en: "Positive case: contains content block"
           ja: 内容ブロックを含む正例
-        scenario_id: null
         descriptions:
           zh: msg-user-88 按位置 0 包含 TextBlock，位置 1 包含 FileAttachmentBlock。
           en: msg-user-88 contains a TextBlock at position 0 and FileAttachmentBlock at position 1.
@@ -444,25 +423,13 @@ relations:
           - ContentBlock
         related_relation_ids:
           - Message-contains_content_block-ContentBlock
-        expected_result:
-          zh: 保留两条 contains_content_block 事实和块顺序。
-          en: Keep both contains_content_block facts and block order.
-          ja: 二つのcontains_content_block factとblock orderを保持します。
-        why_valid_or_invalid:
-          zh: 每个块拥有独立载体类型，而消息保持单一通信身份。
-          en: Each block has its own carrier type while the message retains one communication identity.
-          ja: 各blockは独自carrier typeを持ちmessageは一communication identityを保持します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-message-016
       - id: Message-contains_content_block-ContentBlock-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: 包含内容块边界例
           en: "Boundary case: contains content block"
           ja: 内容ブロックを含む境界例
-        scenario_id: null
         descriptions:
           zh: source-file-88 是附件引用的原始文件资源，不是消息正文成员。
           en: source-file-88 is the source file referenced by an attachment, not a body member of the message.
@@ -473,26 +440,11 @@ relations:
           - ContentBlock
         related_relation_ids:
           - Message-contains_content_block-ContentBlock
-        expected_result:
-          zh: 不得建立 Message contains_content_block SourceReference。
-          en: Do not assert Message contains_content_block SourceReference.
-          ja: Message contains_content_block SourceReferenceをassertしません。
-        why_valid_or_invalid:
-          zh: 附件内容块与其引用的来源资源具有不同身份。
-          en: An attachment content block and its referenced source resource have different identities.
-          ja: attachment content blockと参照source resourceは別identityです。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-message-017
     source_claims:
       - claim-message-018
-    distinct_fact_rationale:
-      zh: 消息与内容块通过组成关系连接，避免把 TextBlock、ImageBlock 等直接挂成 Message 子类。
-      en: Message and content blocks connect by composition, preventing TextBlock, ImageBlock, and peers from being hung as Message subtypes.
-      ja: Messageとcontent blockをcompositionで接続しTextBlock/ImageBlock等をMessage subtypeにしません。
     layout_role: cross-link
-    review_status: accepted
     target: concept:ContentBlock
   - id: Message-references_context-ContextPackage
     predicate: references_context
@@ -523,12 +475,10 @@ relations:
     constraints: []
     examples:
       - id: Message-references_context-ContextPackage-example-positive-manual-001
-        kind: positive
         labels:
           zh: 引用上下文包正例
           en: "Positive case: references context package"
           ja: コンテキストパッケージを参照正例
-        scenario_id: null
         descriptions:
           zh: msg-assistant-89 记录 context_package_id=context-pkg-v31，且该版本在发送前已冻结。
           en: msg-assistant-89 records context_package_id=context-pkg-v31, which was frozen before send time.
@@ -539,25 +489,13 @@ relations:
           - ContextPackage
         related_relation_ids:
           - Message-references_context-ContextPackage
-        expected_result:
-          zh: 断言 Message references_context ContextPackage。
-          en: Assert Message references_context ContextPackage.
-          ja: Message references_context ContextPackageをassertします。
-        why_valid_or_invalid:
-          zh: 消息保存精确版本引用，时间与不可变性条件均满足。
-          en: The message preserves an exact version reference and satisfies temporal and immutability conditions.
-          ja: messageはexact version referenceを保持しtemporal/immutability条件を満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-message-019
       - id: Message-references_context-ContextPackage-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: 引用上下文包边界例
           en: "Boundary case: references context package"
           ja: コンテキストパッケージを参照境界例
-        scenario_id: null
         descriptions:
           zh: msg-user-88 只有外部 A2A contextId，没有本地 ContextPackage 版本映射。
           en: msg-user-88 has only an external A2A contextId and no mapping to a local ContextPackage version.
@@ -568,26 +506,11 @@ relations:
           - ContextPackage
         related_relation_ids:
           - Message-references_context-ContextPackage
-        expected_result:
-          zh: 不得建立 references_context 边。
-          en: Do not create a references_context edge.
-          ja: references_context edgeを作りません。
-        why_valid_or_invalid:
-          zh: 协议分组标识不能被猜测为具体不可变上下文产物。
-          en: A protocol grouping ID cannot be guessed to denote a specific immutable context artifact.
-          ja: protocol grouping IDを具体immutable context artifactと推測できません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-message-020
     source_claims:
       - claim-message-021
-    distinct_fact_rationale:
-      zh: 消息只拥有发言包络；被引用上下文的版本、预算与装配活动继续属于记忆上下文本体。
-      en: Message owns only the utterance envelope; referenced-context version, budget, and assembly activity remain in the memory-context ontology.
-      ja: Messageはutterance envelopeだけを所有しreferenced-context version・budget・assembly activityはmemory-context ontologyに残します。
     layout_role: cross-link
-    review_status: accepted
     target: concept:ContextPackage
   - id: Message-replies_to-Message
     predicate: replies_to
@@ -621,12 +544,10 @@ relations:
     constraints: []
     examples:
       - id: Message-replies_to-Message-example-positive-manual-001
-        kind: positive
         labels:
           zh: 回复消息正例
           en: "Positive case: replies to message"
           ja: メッセージへ返信正例
-        scenario_id: null
         descriptions:
           zh: msg-assistant-89 的 reply_to_id 明确等于 msg-user-88，且两者同属 conv-support-042。
           en: msg-assistant-89 explicitly sets reply_to_id=msg-user-88 and both belong to conv-support-042.
@@ -636,25 +557,13 @@ relations:
           - Message
         related_relation_ids:
           - Message-replies_to-Message
-        expected_result:
-          zh: 断言 msg-assistant-89 replies_to msg-user-88。
-          en: Assert msg-assistant-89 replies_to msg-user-88.
-          ja: msg-assistant-89 replies_to msg-user-88をassertします。
-        why_valid_or_invalid:
-          zh: 目标身份、会话范围和先后顺序均明确。
-          en: Target identity, conversation scope, and order are explicit.
-          ja: target identity・conversation scope・orderが明示されています。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-message-022
       - id: Message-replies_to-Message-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: 回复消息边界例
           en: "Boundary case: replies to message"
           ja: メッセージへ返信境界例
-        scenario_id: null
         descriptions:
           zh: msg-assistant-90 与 msg-user-88 主题相似，但没有 reply_to_id，且属于另一会话。
           en: msg-assistant-90 is topically similar to msg-user-88 but has no reply_to_id and belongs to another conversation.
@@ -664,26 +573,11 @@ relations:
           - Message
         related_relation_ids:
           - Message-replies_to-Message
-        expected_result:
-          zh: 不得推断 replies_to。
-          en: Do not infer replies_to.
-          ja: replies_toを推論しません。
-        why_valid_or_invalid:
-          zh: 语义相似度不能替代显式消息关联和会话范围。
-          en: Semantic similarity cannot substitute for explicit message correlation and conversation scope.
-          ja: semantic similarityはexplicit message correlation/conversation scopeを代替できません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-message-023
     source_claims:
       - claim-message-024
-    distinct_fact_rationale:
-      zh: 回复是消息实例之间的语用关系，不是消息类型、轮次组成或协议响应包络。
-      en: Reply is a pragmatic relation between message instances, not a message type, turn composition, or protocol response envelope.
-      ja: replyはmessage instance間pragmatic relationでmessage type・turn composition・protocol response envelopeではありません。
     layout_role: cross-link
-    review_status: accepted
     target: concept:Message
   - id: Message-scanned_by-PatternScan
     predicate: scanned_by
@@ -714,12 +608,10 @@ relations:
     constraints: []
     examples:
       - id: Message-scanned_by-PatternScan-example-positive-manual-001
-        kind: positive
         labels:
           zh: 由模式扫描检查正例
           en: "Positive case: scanned by pattern scan"
           ja: パターン走査で検査正例
-        scenario_id: null
         descriptions:
           zh: scan-901 实际读取 msg-user-88 的文本块与附件，并形成 injection finding。
           en: scan-901 actually reads msg-user-88's text blocks and attachment and produces an injection finding.
@@ -730,25 +622,13 @@ relations:
           - PatternScan
         related_relation_ids:
           - Message-scanned_by-PatternScan
-        expected_result:
-          zh: 断言 msg-user-88 scanned_by scan-901。
-          en: Assert msg-user-88 scanned_by scan-901.
-          ja: msg-user-88 scanned_by scan-901をassertします。
-        why_valid_or_invalid:
-          zh: 扫描输入、执行身份和检测结果均可追踪。
-          en: Scan input, execution identity, and finding are traceable.
-          ja: scan input・execution identity・findingを追跡できます。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-message-025
       - id: Message-scanned_by-PatternScan-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: 由模式扫描检查边界例
           en: "Boundary case: scanned by pattern scan"
           ja: パターン走査で検査境界例
-        scenario_id: null
         descriptions:
           zh: policy-901 规定所有用户消息应扫描，但 msg-user-89 尚未执行任何 PatternScan。
           en: policy-901 requires scanning every user message, but no PatternScan has yet run for msg-user-89.
@@ -759,43 +639,36 @@ relations:
           - PatternScan
         related_relation_ids:
           - Message-scanned_by-PatternScan
-        expected_result:
-          zh: 不得断言 msg-user-89 scanned_by PatternScan。
-          en: Do not assert msg-user-89 scanned_by PatternScan.
-          ja: msg-user-89 scanned_by PatternScanをassertしません。
-        why_valid_or_invalid:
-          zh: 配置义务不是已发生检查事实，必须存在具体扫描执行记录。
-          en: A configured obligation is not a performed-check fact; a concrete scan execution record must exist.
-          ja: configured obligationはperformed-check factではなく具体scan execution recordが必要です。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-message-026
     source_claims:
       - claim-message-027
-    distinct_fact_rationale:
-      zh: 用清晰主谓关系替换旧的重复谓词名，并保持安全检测为跨域治理事实。
-      en: Replaces the duplicated legacy predicate phrase with a clear subject-predicate relation while keeping safety inspection a cross-domain governance fact.
-      ja: 重複legacy predicate phraseを明瞭subject-predicate relationへ置換しsafety inspectionをcross-domain governance factとして保持します。
     layout_role: cross-link
-    review_status: accepted
     target: concept:PatternScan
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-info-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Chat Completions 角色、Model Spec 权威链、A2A Message/Part 与 MCP JSON-RPC 包络逐项核验；Conversation、Message 角色子类、ToolObservationMessage 与 ProtocolEnvelope 语义成立。
-    en: Verified against OpenAI Chat Completions roles, Model Spec authority chain, A2A Message/Part, and MCP JSON-RPC envelopes; Conversation, Message role specializations, ToolObservationMessage, and ProtocolEnvelope semantics hold.
-    ja: OpenAI Chat Completions role、Model Spec authority chain、A2A Message/Part、MCP JSON-RPC envelope に照らし Conversation/Message role specialization/ToolObservationMessage/ProtocolEnvelope semantics を個別確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-openai-chat
+    title: OpenAI Chat Completions API Reference
+    publisher: OpenAI
+    url: https://platform.openai.com/docs/api-reference/chat/create
+    source_type: official-doc
+    relevance: role/content message arrays and developer role.
+  - id: src-anthropic-messages
+    title: Anthropic Messages API Reference
+    publisher: Anthropic
+    url: https://docs.anthropic.com/en/api/messages
+    source_type: official-doc
+    relevance: system parameter and content blocks including tool_use/tool_result.
+  - id: src-a2a-message
+    title: A2A Protocol Specification
+    publisher: A2A Protocol
+    url: https://a2a-protocol.org/latest/specification/
+    source_type: standard
+    relevance: Message role, messageId, contextId, taskId, and Parts.
+  - id: src-info-messages-design
+    title: Moonweave info-messages-instructions module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Conversation and Message identity separate from carried content.
 source_claims:
   - id: claim-message-001
     source: eng-proto-a2a-spec
@@ -803,186 +676,183 @@ source_claims:
     locator: A2A v0.3.0 Specification §6.4 Message and §6.5 Part (lines 1226–1315)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-002
     source: eng-proto-a2a-spec
     supports: "A2A §6.4 defines Message as one communication turn with role, parts, messageId, and optional contextId/taskId; the Model Spec likewise separates role, recipient, and content fields. For Message, the message_role field records exactly this auditable datum: Records the system, developer, user, assistant, tool, or external-agent role that produced the message."
     locator: A2A v0.3.0 Specification §6.4 Message and §6.5 Part (lines 1226–1315)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-003
     source: eng-proto-a2a-spec
     supports: "A2A §6.4 defines Message as one communication turn with role, parts, messageId, and optional contextId/taskId; the Model Spec likewise separates role, recipient, and content fields. For Message, the sender_id field records exactly this auditable datum: References the auditable actor identity that produced the message."
     locator: A2A v0.3.0 Specification §6.4 Message and §6.5 Part (lines 1226–1315)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-004
     source: eng-proto-a2a-spec
     supports: "A2A §6.4 defines Message as one communication turn with role, parts, messageId, and optional contextId/taskId; the Model Spec likewise separates role, recipient, and content fields. For Message, the recipient field records exactly this auditable datum: Optional application or tool routing target for the message."
     locator: A2A v0.3.0 Specification §6.4 Message and §6.5 Part (lines 1226–1315)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-005
     source: eng-proto-a2a-spec
     supports: "A2A §6.4 defines Message as one communication turn with role, parts, messageId, and optional contextId/taskId; the Model Spec likewise separates role, recipient, and content fields. For Message, the reply_to_id field records exactly this auditable datum: Identifies the prior Message explicitly answered by this message."
     locator: A2A v0.3.0 Specification §6.4 Message and §6.5 Part (lines 1226–1315)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-006
     source: eng-proto-a2a-spec
     supports: "A2A §6.4 defines Message as one communication turn with role, parts, messageId, and optional contextId/taskId; the Model Spec likewise separates role, recipient, and content fields. For Message, the context_id field records exactly this auditable datum: Preserves a protocol-supplied interaction grouping identifier without replacing the Conversation relation."
     locator: A2A v0.3.0 Specification §6.4 Message and §6.5 Part (lines 1226–1315)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-007
     source: eng-proto-a2a-spec
     supports: A2A §6.4 defines Message as one communication turn with role, parts, messageId, and optional contextId/taskId; the Model Spec likewise separates role, recipient, and content fields. The case instantiates the documented messageId/role/content model and optional reply correlation.
     locator: A2A v0.3.0 Specification §6.4 Message and §6.5 Part (lines 1226–1315)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-008
     source: eng-proto-a2a-spec
     supports: A2A §6.4 defines Message as one communication turn with role, parts, messageId, and optional contextId/taskId; the Model Spec likewise separates role, recipient, and content fields. Both Model Spec and A2A distinguish message fields from the content chunks or Parts carried by the message.
     locator: A2A v0.3.0 Specification §6.4 Message and §6.5 Part (lines 1226–1315)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-009
     source: eng-proto-a2a-spec
     supports: A2A §6.4 defines Message as one communication turn with role, parts, messageId, and optional contextId/taskId; the Model Spec likewise separates role, recipient, and content fields. Moonweave contrasts Message with ConversationTurn under ConversationElement using the endpoint-specific identity condition stated in this differentia.
     locator: A2A v0.3.0 Specification §6.4 Message and §6.5 Part (lines 1226–1315)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-010
     source: eng-proto-a2a-spec
     supports: A2A defines Message as a uniquely identified communication turn associated with context; Moonweave treats that addressable communication as a ConversationElement subtype. The case follows A2A's messageId/contextId model and the Model Spec's ordered conversation messages.
     locator: A2A v0.3.0 Specification §6.4 Message and §6.5 Part (lines 1226–1315)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-011
     source: eng-proto-a2a-spec
     supports: A2A defines Message as a uniquely identified communication turn associated with context; Moonweave treats that addressable communication as a ConversationElement subtype. A2A separates Message from its Part content, providing the boundary.
     locator: A2A v0.3.0 Specification §6.4 Message and §6.5 Part (lines 1226–1315)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-012
     source: eng-proto-a2a-spec
     supports: A2A defines Message as a uniquely identified communication turn associated with context; Moonweave treats that addressable communication as a ConversationElement subtype.
     locator: A2A v0.3.0 Specification §6.4 Message and §6.5 Part (lines 1226–1315)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-013
     source: eng-spec-openai-model-spec-2025
     supports: The Model Spec explains that instructions are identified in system, developer, and user messages while role determines authority; Moonweave keeps the message and instruction identities distinct. The case follows the Model Spec's candidate-instruction identification from message content.
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-014
     source: eng-spec-openai-model-spec-2025
     supports: The Model Spec explains that instructions are identified in system, developer, and user messages while role determines authority; Moonweave keeps the message and instruction identities distinct. The Model Spec excludes quoted or untrusted text from candidate instructions unless authority delegates to it.
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-015
     source: eng-spec-openai-model-spec-2025
     supports: The Model Spec explains that instructions are identified in system, developer, and user messages while role determines authority; Moonweave keeps the message and instruction identities distinct.
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-016
     source: eng-proto-a2a-spec
     supports: A2A §6.4 defines Message.parts and §6.5 defines Part as text, file, or data; the Model Spec likewise defines message content as a sequence of multimodal chunks. The case directly instantiates A2A multi-part message content.
     locator: A2A v0.3.0 Specification §6.4 Message and §6.5 Part (lines 1226–1315)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-017
     source: eng-proto-a2a-spec
     supports: A2A §6.4 defines Message.parts and §6.5 defines Part as text, file, or data; the Model Spec likewise defines message content as a sequence of multimodal chunks. A2A distinguishes message Part content from external file references/metadata.
     locator: A2A v0.3.0 Specification §6.4 Message and §6.5 Part (lines 1226–1315)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-018
     source: eng-proto-a2a-spec
     supports: A2A §6.4 defines Message.parts and §6.5 defines Part as text, file, or data; the Model Spec likewise defines message content as a sequence of multimodal chunks.
     locator: A2A v0.3.0 Specification §6.4 Message and §6.5 Part (lines 1226–1315)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-019
     source: eng-proto-a2a-spec
     supports: A2A Message carries contextId to group related interactions; Moonweave uses an explicit relation when a local Message cites a versioned ContextPackage rather than treating contextId as ownership. The case refines protocol context correlation into an auditable local reference to an immutable assembled context.
     locator: A2A v0.3.0 Specification §6.4 Message and §6.5 Part (lines 1226–1315)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-020
     source: eng-proto-a2a-spec
     supports: A2A Message carries contextId to group related interactions; Moonweave uses an explicit relation when a local Message cites a versioned ContextPackage rather than treating contextId as ownership. A2A contextId groups interactions but does not define Moonweave ContextPackage identity.
     locator: A2A v0.3.0 Specification §6.4 Message and §6.5 Part (lines 1226–1315)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-021
     source: eng-proto-a2a-spec
     supports: A2A Message carries contextId to group related interactions; Moonweave uses an explicit relation when a local Message cites a versioned ContextPackage rather than treating contextId as ownership.
     locator: A2A v0.3.0 Specification §6.4 Message and §6.5 Part (lines 1226–1315)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-022
     source: eng-proto-a2a-spec
     supports: A2A assigns stable messageId values and preserves ordered histories, enabling Moonweave to record an explicit reply-to link when the application supplies it. Stable message identity and ordering make the explicit reply relation auditable.
     locator: A2A v0.3.0 Specification §6.4 Message and §6.5 Part (lines 1226–1315)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-023
     source: eng-proto-a2a-spec
     supports: A2A assigns stable messageId values and preserves ordered histories, enabling Moonweave to record an explicit reply-to link when the application supplies it. A2A messageId/contextId support explicit correlation, not similarity-based reply inference.
     locator: A2A v0.3.0 Specification §6.4 Message and §6.5 Part (lines 1226–1315)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-024
     source: eng-proto-a2a-spec
     supports: A2A assigns stable messageId values and preserves ordered histories, enabling Moonweave to record an explicit reply-to link when the application supplies it.
     locator: A2A v0.3.0 Specification §6.4 Message and §6.5 Part (lines 1226–1315)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-025
     source: eng-fw-openai-guardrails
     supports: OpenAI Agents SDK input guardrails receive the same agent input, run a check, and may trip before agent execution; Moonweave records which concrete PatternScan inspected a Message. The case instantiates a concrete input guardrail check rather than a configured-but-unrun rule.
     locator: Guardrails > Input guardrails, execution modes, and tripwire handling (lines 180–210)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-026
     source: eng-fw-openai-guardrails
     supports: OpenAI Agents SDK input guardrails receive the same agent input, run a check, and may trip before agent execution; Moonweave records which concrete PatternScan inspected a Message. The guardrails documentation distinguishes configured guardrails from their actual execution and tripwire results.
     locator: Guardrails > Input guardrails, execution modes, and tripwire handling (lines 180–210)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-message-027
     source: eng-fw-openai-guardrails
     supports: OpenAI Agents SDK input guardrails receive the same agent input, run a check, and may trip before agent execution; Moonweave records which concrete PatternScan inspected a Message.
     locator: Guardrails > Input guardrails, execution modes, and tripwire handling (lines 180–210)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
+  - id: claim-message-openai
+    source: src-openai-chat
+    supports: OpenAI messages combine role with string or typed content parts.
+    locator: messages > role/content
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-message-anthropic
+    source: src-anthropic-messages
+    supports: Anthropic messages combine role with ordered content blocks including tool_use.
+    locator: message format > content blocks
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-message-a2a
+    source: src-a2a-message
+    supports: A2A Message combines role with ordered text/file/data Parts.
+    locator: Message > parts
+    evidence_kind: primary-spec
+    confidence: high
+  - id: claim-message-design
+    source: src-info-messages-design
+    supports: Message owns communication envelope; carried blocks and instructions connect by relations only.
+    locator: Message boundary
+    evidence_kind: design-inference
+    confidence: high

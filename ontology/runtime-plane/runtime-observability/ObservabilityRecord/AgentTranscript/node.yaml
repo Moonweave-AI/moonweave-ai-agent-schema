@@ -1,7 +1,6 @@
 schema: moonweave.ai/ontology-node/v1
 id: AgentTranscript
 kind: concept
-status: accepted
 labels:
   en: agent transcript
   zh: 智能体转录记录
@@ -29,6 +28,33 @@ semantics:
       ja: 参加者に未開示の内部プロンプト、隠れた推論、生の認証情報、否認防止用 AuditRecord、因果計時用 TraceRecord は含みません。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: 集成 AgentTranscript 时应分别映射 OpenTelemetry OTLP traces/spans, LangSmith run trees, LangGraph checkpoint snapshots；静态配置属于其他域，实际运行 occurrence 才写入本概念。
+    en: When integrating AgentTranscript, map OpenTelemetry OTLP traces/spans, LangSmith run trees, LangGraph checkpoint snapshots separately; static configuration belongs elsewhere and only runtime occurrences belong here.
+    ja: AgentTranscript 統合時は OpenTelemetry OTLP traces/spans, LangSmith run trees, LangGraph checkpoint snapshots を個別写像し、静的設定は他ドメイン、runtime occurrence のみ本 concept に属します。
+  typical_input:
+    - description: Vendor API payload mappable to AgentTranscript.
+      format: |-
+        # Example AgentTranscript ingest
+        { "agent-transcript_ref": "example-1" }
+      source_claims:
+        - claim-agent-transcript-design
+  typical_output:
+    - description: Moonweave-local AgentTranscript projection.
+      format: '{ "schema_owner": "moonweave-local-design", "agent-transcript_id": "example-1" }'
+      source_claims:
+        - claim-agent-transcript-design
+  reference_implementations:
+    - name: OpenTelemetry OTLP
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      description: Traces and spans → Trace, Span, Metric export.
+    - name: LangSmith
+      url: https://docs.smith.langchain.com/
+      description: Run trees and feedback → RunTree, TraceRecord.
+    - name: LangGraph Checkpoints
+      url: https://langchain-ai.github.io/langgraph/concepts/persistence/
+      description: State snapshots and checkpoint restore events.
 structure:
   identity_keys: []
   fields: []
@@ -36,16 +62,18 @@ structure:
   required_relation_constraints: []
 examples:
   - id: AgentTranscript-example-positive-001
-    kind: positive
     labels:
-      zh: 面向参与者的交互顺序记录
-      en: Participant-visible interaction sequence
-      ja: 参加者に見えた対話順序の記録
-    scenario_id: null
+      zh: OpenAI Thread Messages 列表
+      en: OpenAI Thread Messages list
+      ja: OpenAI Thread Messages 一覧
     descriptions:
-      zh: 一次客服运行依次向参与者显示用户消息、智能体转交提示、退款工具调用摘要、工具结果和最终答复；转录记录按实际显示顺序保存这些条目，并以引用指向生成的退款凭证。
-      en: A support run shows the user message, an agent-handoff notice, a refund-tool call summary, the tool result, and the final reply. The transcript preserves that displayed order and references the generated refund artifact.
-      ja: サポート実行で、利用者メッセージ、エージェント引継ぎ通知、返金ツール呼出しの要約、結果、最終回答が順に表示される。転写記録はその表示順と返金成果物への参照を保存する。
+      zh: OpenAI client.beta.threads.messages.list(thread_id=, order="asc") 返回 role=user/assistant 消息序列，AgentTranscript transcript_id=transcript-18、message_count=18。
+      en: OpenAI client.beta.threads.messages.list(thread_id=, order="asc") returns role=user/assistant message sequence, AgentTranscript transcript_id=transcript-18, message_count=18.
+      ja: OpenAI messages.list が AgentTranscript 対話転写である。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
     field_values:
       record_id: transcript-support-run-204
       record_kind: agent-transcript
@@ -57,29 +85,21 @@ examples:
       - ObservabilityRecord
     related_relation_ids:
       - AgentTranscript-is_a-ObservabilityRecord
-    expected_result:
-      zh: 该对象被识别为智能体转录记录，并可据显示顺序重建参与者实际看到的交互。
-      en: The object is classified as an AgentTranscript and reconstructs what participants actually saw in display order.
-      ja: この対象はAgentTranscriptと判定され、参加者が実際に見たやり取りを表示順に再構成できる。
-    why_valid_or_invalid:
-      zh: 记录对象是已外显交互的有序视图；它没有声称覆盖未显示的内部状态或完整因果跨度。
-      en: The record is an ordered view of externalized interaction; it does not claim to contain undisclosed internal state or the complete causal span graph.
-      ja: 記録は外部化された対話の順序付きビューであり、非表示の内部状態や完全な因果スパングラフを含むとは主張しない。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-agent-transcript-001
+      - claim-agent-transcript-design
   - id: AgentTranscript-example-boundary-001
-    kind: boundary
     labels:
-      zh: 隐藏遥测不属于参与者转录
-      en: Hidden telemetry is not a participant transcript
-      ja: 非表示テレメトリは参加者転写ではない
-    scenario_id: null
+      zh: LangSmith run.inputs 非 Transcript
+      en: LangSmith run.inputs not Transcript
+      ja: LangSmith run.inputs は Transcript ではない
     descriptions:
-      zh: 同一运行还保存采样决策、内部跨度属性和未向用户披露的策略检查结果。这些数据可进入追踪或审计记录，但不能因为与会话相关就写入参与者转录。
-      en: The same run stores a sampling decision, internal span attributes, and a policy-check result never disclosed to the user. Those facts may belong in trace or audit evidence, but correlation with the conversation does not put them in the participant transcript.
-      ja: 同じ実行にはサンプリング判断、内部スパン属性、利用者に開示されないポリシー検査結果もある。これらは追跡・監査証拠になり得るが、会話と相関するだけでは参加者転写に入らない。
+      zh: LangSmith run.inputs={"query":"..."} 是 trace 输入预览，不是完整 Thread Messages AgentTranscript。
+      en: LangSmith run.inputs={"query":"..."} is trace input preview, not full Thread Messages AgentTranscript.
+      ja: LangSmith run.inputs は Transcript ではない。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
     field_values: {}
     related_node_ids:
       - AgentTranscript
@@ -88,30 +108,48 @@ examples:
       - ObservabilityRecord
     related_relation_ids:
       - AgentTranscript-is_a-ObservabilityRecord
-    expected_result:
-      zh: 未外显的遥测字段被排除；转录只保留实际可见或明确发出的条目。
-      en: Undisclosed telemetry is excluded; the transcript retains only entries actually shown or explicitly emitted.
-      ja: 非開示のテレメトリは除外され、実際に表示または明示的に送出された項目だけが転写に残る。
-    why_valid_or_invalid:
-      zh: 转录的判定依据是参与者可见顺序，而不是同一 trace_id 下所有可观测数据的并集。
-      en: Transcript membership is determined by participant-visible order, not by the union of everything sharing a trace identifier.
-      ja: 転写への所属は参加者に見えた順序で決まり、同じトレース識別子を持つ全データの集合では決まらない。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-agent-transcript-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: AuditRecord
-    shared_parent_concept_id: ObservabilityRecord
-    differentia:
-      zh: 共享父节点对照：父节点 ObservabilityRecord：AgentTranscript（semantic kind=information，骨架 AgentTranscript-is_a-ObservabilityRecord）；AuditRecord（semantic kind=information，骨架 AuditRecord-is_a-ObservabilityRecord）。双端条件：AgentTranscript 条件：“作为可观测记录，智能体转录记录由这一事实区分：它按顺序保存实际可见或已发出的消息、动作、工具调用、模型输出、策略决策、警告和产物引用”；AuditRecord 条件：“审计记录属于可观测记录，区别于其他同类对象的条件是：它是附着在运行会话或追踪上的原始审计证据，保存发生了什么以及关联了谁或什么，但不承担反馈解释职责”。逐端验证；父节点不证明任一身份。
-      en: "Shared-parent contrast: parent ObservabilityRecord: AgentTranscript (semantic kind=information, backbone AgentTranscript-is_a-ObservabilityRecord); AuditRecord (semantic kind=information, backbone AuditRecord-is_a-ObservabilityRecord). Endpoint conditions: AgentTranscript condition: “Agent transcript belongs to the observability record category and differs from broader members in that it is an ordered runtime transcript of messages, actions, tool calls, model outputs, policy decisions, warnings, and artifact references that were actually visible or emitted”; AuditRecord condition: “Audit record is an observability record whose defining condition is that it is a raw audit evidence attached to a runtime session or trace, preserving what happened and who or what was associated without performing feedback interpretation”. Verify each endpoint; the parent proves neither identity."
-      ja: 共有親対照：親 ObservabilityRecord：AgentTranscript（semantic kind=information、バックボーン AgentTranscript-is_a-ObservabilityRecord）；AuditRecord（semantic kind=information、バックボーン AuditRecord-is_a-ObservabilityRecord）。両端条件：AgentTranscript の条件：「エージェント転写記録は観測記録として、次の条件により他の対象と区別されます：それは、実際に可視化または発行されたメッセージ、行動、ツール呼び出し、モデル出力、ポリシー判断、警告、成果物参照を順序付きで保存します」；AuditRecord の条件：「監査記録は観測記録のうち、次の事実を定義条件とする対象です：それは実行セッションまたはトレースに付く生の監査証拠であり、何が起き、誰または何が関連したかを保存しますが、フィードバック上の解釈は行いません」。各端を検証し、親だけでは同一性を証明しません。
+      - claim-agent-transcript-design
+  - id: AgentTranscript-example-3
+    labels:
+      zh: Transcript 与 TraceSpan 边界
+      en: Transcript versus TraceSpan boundary
+      ja: Transcript と TraceSpan 境界
+    descriptions:
+      zh: AgentTranscript 持久化对话条目；TraceSpan 记录操作 timing；transcript 内容不等于 span attributes。
+      en: AgentTranscript persists dialogue items; TraceSpan records operation timing; transcript content is not span attributes.
+      ja: Transcript は対話、TraceSpan は操作 timing である。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
+    field_values: {}
+    related_node_ids:
+      - AgentTranscript
+    related_relation_ids: []
     source_claims:
-      - claim-agent-transcript-001
+      - claim-agent-transcript-vendor
+      - claim-agent-transcript-design
+  - id: AgentTranscript-example-4
+    labels:
+      zh: support thread 18 条消息实例
+      en: support thread 18 messages instance
+      ja: support thread 18 メッセージ事例
+    descriptions:
+      zh: AgentTranscript transcript_id=transcript-18、thread_id=thread_abc、message_count=18、last_message_at=2026-01-15T10:15:00Z。
+      en: AgentTranscript transcript_id=transcript-18, thread_id=thread_abc, message_count=18, last_message_at=2026-01-15T10:15:00Z.
+      ja: transcript-18 に 18 件メッセージを記録する。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
+    field_values: {}
+    related_node_ids:
+      - AgentTranscript
+    related_relation_ids: []
+    source_claims:
+      - claim-agent-transcript-vendor
+      - claim-agent-transcript-design
 parent_relation:
   id: AgentTranscript-is_a-ObservabilityRecord
   predicate: is_a
@@ -140,101 +178,43 @@ parent_relation:
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: AgentTranscript-is_a-ObservabilityRecord-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 逐项核实正例
-        en: Point-reviewed positive case
-        ja: 項目別審査の正例
-      scenario_id: null
-      descriptions:
-        zh: 转录依次保存用户问题、已展示的工具调用摘要、人工批准和最终答复，并注明每项显示时刻。
-        en: A transcript preserves a user question, displayed tool-call summary, human approval, and final answer in presentation order with display times.
-        ja: transcript が user 質問、表示済み tool-call 要約、human approval、最終回答を表示時刻付き順序で保存します。
-      field_values: {}
-      related_node_ids:
-        - AgentTranscript
-        - ObservabilityRecord
-      related_relation_ids:
-        - AgentTranscript-is_a-ObservabilityRecord
-      expected_result:
-        zh: 仅在所述证据存在时返回这条有向事实。
-        en: Return this directed fact only when the described evidence exists.
-        ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
-      why_valid_or_invalid:
-        zh: 每个 AgentTranscript 都是 ObservabilityRecord，其种差是按参与者实际接收或界面实际显示的顺序保存消息、工具摘要、输出与人工介入。
-        en: Every AgentTranscript is an ObservabilityRecord distinguished by preserving messages, tool summaries, outputs, and human interventions in the order actually received or displayed to participants.
-        ja: すべての AgentTranscript は ObservabilityRecord で、参加者が実際に受信または画面表示された順に message・tool 要約・output・human intervention を保存する点が種差です。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-agent-transcript-002
-    - id: AgentTranscript-is_a-ObservabilityRecord-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 逐项核实边界例
-        en: Point-reviewed boundary case
-        ja: 項目別審査の境界例
-      scenario_id: null
-      descriptions:
-        zh: 追踪记录只保存 span_id、parent_id、起止时间和隐藏的内部属性，没有可见消息顺序。
-        en: A trace record contains span_id, parent_id, timing, and internal attributes but no participant-visible message order.
-        ja: trace record は span_id・parent_id・時刻・内部属性を含みますが、参加者可視の message 順序を持ちません。
-      field_values: {}
-      related_node_ids:
-        - AgentTranscript
-        - ObservabilityRecord
-      related_relation_ids:
-        - AgentTranscript-is_a-ObservabilityRecord
-      expected_result:
-        zh: 不得从该边界情形推断这条关系。
-        en: Do not infer this relation from the boundary case.
-        ja: この境界事例から当該関係を推論しません。
-      why_valid_or_invalid:
-        zh: 跨度因果数据属于 TraceRecord 或 TraceSpan；没有外显交互顺序就不满足转录种差。
-        en: Span causality belongs to TraceRecord or TraceSpan; without externalized interaction order it lacks transcript's differentia.
-        ja: Span 因果は TraceRecord または TraceSpan に属し、外部化 interaction 順序がなければ transcript の種差を欠きます。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-agent-transcript-002
   source_claims:
-    - claim-agent-transcript-002
+    - claim-agent-transcript-design
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-runtime-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenTelemetry、W3C Trace Context 与 LangGraph checkpoint/replay 逐项核验，TraceSpan 与 Checkpoint 语义成立。
-    en: Verified against OpenTelemetry, W3C Trace Context, and LangGraph checkpoint/replay. TraceSpan and Checkpoint semantics hold.
-    ja: OpenTelemetry、W3C Trace Context、LangGraph checkpoint/replay に照らし TraceSpan と Checkpoint semantics を確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-otel-protocol
+    title: OpenTelemetry Protocol Specification
+    url: https://opentelemetry.io/docs/specs/otel/protocol/
+    source_type: official-spec
+    relevance: OTLP traceId, spanId, parent links, status codes.
+  - id: src-langsmith
+    title: LangSmith Documentation
+    url: https://docs.smith.langchain.com/
+    source_type: official-doc
+    relevance: Run trees with parent_run_id and nested child runs.
+  - id: src-langgraph-checkpoints
+    title: LangGraph Persistence
+    url: https://langchain-ai.github.io/langgraph/concepts/persistence/
+    source_type: official-doc
+    relevance: Checkpoint and StateSnapshot capture for recovery.
+  - id: src-runtime-observability-design
+    title: Moonweave runtime-observability module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: TraceSpan, Checkpoint, TraceEvent boundaries versus Execution.
 source_claims:
-  - id: claim-agent-transcript-001
-    source: eng-fw-openai-tracing
-    supports: OpenAI tracing records agent runs, generations, tool calls, handoffs, guardrails, transcription, and speech spans; Moonweave's transcript preserves the participant-visible projection while excluding hidden trace causality.
-    locator: Tracing > Traces and spans, Default tracing, Sensitive data, and custom processors
+  - id: claim-agent-transcript-vendor
+    source: src-otel-protocol
+    supports: runtime-observability vendor evidence supports AgentTranscript identity and boundary mapping.
+    locator: AgentTranscript integration
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-agent-transcript-002
-    source: eng-fw-openai-tracing
-    supports: Every AgentTranscript is an ObservabilityRecord distinguished by preserving messages, tool summaries, outputs, and human interventions in the order actually received or displayed to participants. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
-    locator: Tracing > Traces and spans, Default tracing, Sensitive data, and custom processors
+  - id: claim-agent-transcript-design
+    source: src-runtime-observability-design
+    supports: Moonweave AgentTranscript concept boundary within runtime-observability.
+    locator: AgentTranscript boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-

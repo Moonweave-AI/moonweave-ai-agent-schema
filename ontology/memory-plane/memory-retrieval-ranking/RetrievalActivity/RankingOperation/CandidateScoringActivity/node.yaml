@@ -1,34 +1,59 @@
 schema: moonweave.ai/ontology-node/v1
 id: CandidateScoringActivity
 kind: concept
-status: accepted
 labels:
   zh: 候选评分
   en: Candidate scoring
   ja: 候補採点
 semantics:
   short_definition:
-    zh: 用一个声明的方法或模型为检索候选生成阶段性分数的排序活动。
-    en: A ranking activity that produces stage-specific scores for retrieval candidates with a declared method or model.
-    ja: 指定method/modelでretrieval candidateにstage-specific scoreを生成するranking activityです。
+    zh: 为候选生成阶段性分数的排序活动。
+    en: Ranking activity that produces stage-specific scores for candidates.
+    ja: candidate に stage-specific score を生成する ranking activity。
   definition:
-    zh: CandidateScoringActivity 是逐候选计算 RetrievalScore 的活动；它记录评分方法或模型版本，但不把多个已排序列表融合为一列，也不把评分结果误作最终入选。
-    en: CandidateScoringActivity computes a RetrievalScore for each candidate using a recorded method or model version. It neither fuses multiple ranked lists nor treats a score as final selection.
-    ja: CandidateScoringActivity は記録済method/model versionで各candidateのRetrievalScoreを計算します。複数ranked listのfusionもscoreをfinal selection扱いもしません。
+    zh: CandidateScoringActivity 逐候选计算 RetrievalScore，记录 scoring_method 与 model_version；Pinecone/Chroma 返回的 cosine/dot-product、ColBERT MaxSim 与 BM25 分数均在此活动产生，但不融合列表或决定最终采用。
+    en: CandidateScoringActivity computes a RetrievalScore per candidate with scoring_method and model_version. Cosine/dot-product from Pinecone/Chroma, ColBERT MaxSim, and BM25 scores are produced here but it neither fuses lists nor decides final admission.
+    ja: CandidateScoringActivity は candidate ごとに RetrievalScore を計算し scoring_method/model_version を記録。Pinecone/Chroma cosine/dot-product・ColBERT MaxSim・BM25 はここで生成するが list fusion/final admission は行いません。
   why_needed:
-    zh: 将“计算分数”从融合、重排和截断中单独表达，使每个分数能追溯到产生阶段。
-    en: Separates score production from fusion, reranking, and truncation so each score can be traced to its producing stage.
-    ja: score生成をfusion・reranking・truncationから分離し各scoreを生成stageへ追跡可能にします。
+    zh: 必须把“算分”和 RRF 融合、Cohere rerank 分开，否则无法解释为什么 BM25 8.73 与 rerank 0.917 不能直接比大小。
+    en: Score production must stay separate from RRF fusion and Cohere rerank; otherwise BM25 8.73 and rerank 0.917 look comparable when they are not.
+    ja: score 生成を RRF/Cohere rerank と分離しないと BM25 8.73 と rerank 0.917 が比較可能に見えてしまいます。
   includes:
-    - zh: 纳入词汇、向量相似度或模型评分，只要活动为候选形成可审计分数。
-      en: Includes lexical, vector-similarity, or model scoring when an activity creates auditable candidate scores.
-      ja: candidateに監査可能scoreを作るlexical・vector similarity・model scoringを含みます。
+    - zh: 纳入词汇、向量相似度或 ColBERT late interaction 等产生可审计分数的活动。
+      en: Includes lexical, vector-similarity, or ColBERT late-interaction activities producing auditable scores.
+      ja: lexical/vector similarity/ColBERT late interaction 等で監査可能 score を生成する activity。
   excludes:
-    - zh: 排除仅组合排名、仅选择 TopK、仅保存分数值或只做上下文筛选的对象。
-      en: Excludes operations that only combine ranks or select TopK, score-value records themselves, and context filtering.
-      ja: rank結合のみ・TopK選択のみ・score value record自体・context filteringを除外します。
+    - zh: 排除 RRF 融合、Top-K 截断与 RetrievalScore 数值记录本身。
+      en: Excludes RRF fusion, Top-K truncation, and RetrievalScore value records themselves.
+      ja: RRF fusion・Top-K truncation・RetrievalScore value record 自体を除外。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: Pinecone ScoredVector.score、Chroma distance、ColBERT MaxSim 与 BM25 输出映射到 RetrievalScore；scoring_method 声明 cosine-similarity、dot-product、bm25、colbert-maxsim 等。
+    en: Pinecone ScoredVector.score, Chroma distance, ColBERT MaxSim, and BM25 outputs map to RetrievalScore; scoring_method declares cosine-similarity, dot-product, bm25, colbert-maxsim, etc.
+    ja: Pinecone ScoredVector.score・Chroma distance・ColBERT MaxSim・BM25 を RetrievalScore に写像。scoring_method は cosine-similarity/dot-product/bm25/colbert-maxsim 等。
+  typical_input: []
+  typical_output: []
+  reference_implementations:
+    - name: Mem0 Search API
+      url: https://docs.mem0.ai
+      description: POST /v1/memories/search/ with query, entity IDs, filters, and top_k.
+    - name: Pinecone Query
+      url: https://docs.pinecone.io/guides/search/query-data
+      description: index.query with vector, namespace, filter, and top_k.
+    - name: Chroma Query
+      url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+      description: collection.query with query_texts or query_embeddings and n_results.
+    - name: LangGraph Store Search
+      url: https://langchain-ai.github.io/langgraph/reference/store/
+      description: BaseStore.search with namespace prefix and semantic query.
+    - name: Cohere Rerank API
+      url: https://docs.cohere.com/reference/rerank
+      description: POST /v2/rerank with model rerank-v3.x, query, documents, top_n.
+    - name: ColBERT
+      url: https://arxiv.org/abs/2004.12832
+      description: Late interaction retrieval via token-level MaxSim scoring.
 structure:
   identity_keys:
     - scoring_activity_id
@@ -36,137 +61,130 @@ structure:
     - id: scoring_activity_id
       labels:
         zh: 评分活动标识
-        en: scoring activity ID
-        ja: scoring activity ID
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
+        en: Scoring activity identifier
+        ja: 採点 activity 識別子
       definitions:
         zh: 稳定标识一次候选评分执行。
         en: Stable identifier for one candidate-scoring execution.
-        ja: 一つのcandidate-scoring executionを安定識別します。
-      allowed_values: []
-      pattern: null
-      example_value: candidate-scoring-414
-      source_claims:
-        - claim-candidate-scoring-activity-002
-    - id: scoring_method
-      labels:
-        zh: 评分方法
-        en: scoring method
-        ja: 採点方式
+        ja: 一 candidate-scoring execution を安定識別。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 声明分数的算法、度量或模型族。
-        en: Declares the algorithm, metric, or model family that gives the score meaning.
-        ja: score意味を決めるalgorithm・metric・model familyを宣言します。
+      pattern: null
+      example_value: candidate-scoring-414
       allowed_values: []
+      source_claims:
+        - claim-candidate-scoring-id
+    - id: scoring_method
+      labels:
+        zh: 评分方法
+        en: Scoring method
+        ja: 採点方式
+      definitions:
+        zh: 声明分数算法：cosine-similarity、dot-product、bm25、colbert-maxsim 等。
+        en: "Declares scoring algorithm: cosine-similarity, dot-product, bm25, colbert-maxsim, etc."
+        ja: cosine-similarity/dot-product/bm25/colbert-maxsim 等 algorithm を宣言。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
       pattern: null
       example_value: cosine-similarity
+      allowed_values: []
       source_claims:
-        - claim-candidate-scoring-activity-003
+        - claim-candidate-scoring-method
     - id: model_version
       labels:
         zh: 模型版本
-        en: model version
-        ja: model version
+        en: Model version
+        ja: モデル版
+      definitions:
+        zh: 模型参与评分时的不可替代版本，如 embed-model-v6 或 colbert-v2。
+        en: Non-substitutable model version when a model performs scoring, e.g., embed-model-v6 or colbert-v2.
+        ja: model 採点時の置換不能版（embed-model-v6/colbert-v2 等）。
       datatype: string
       required: false
       cardinality:
         min: 0
         max: 1
-      definitions:
-        zh: 当模型参与评分时记录其不可替代版本。
-        en: Records the non-substitutable model version when a model performs scoring.
-        ja: modelがscoringする場合の置換不能versionを記録します。
-      allowed_values: []
       pattern: null
       example_value: embed-model-v6
+      allowed_values: []
       source_claims:
-        - claim-candidate-scoring-activity-004
+        - claim-candidate-scoring-model
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: CandidateScoringActivity-example-positive-manual-001
-    kind: positive
+  - id: CandidateScoringActivity-example-pinecone-cosine
     labels:
-      zh: 候选评分正例
-      en: "Positive case: Candidate scoring"
-      ja: 候補採点正例
-    scenario_id: null
+      zh: Pinecone cosine 评分
+      en: Pinecone cosine scoring
+      ja: Pinecone cosine 採点
     descriptions:
-      zh: scoring-414 用 cosine-similarity 为 candidate-414 形成相似度分数。
-      en: scoring-414 uses cosine similarity to produce a similarity score for candidate-414.
-      ja: scoring-414 はcosine similarityでcandidate-414のsimilarity scoreを生成します。
+      zh: scoring-414 读取 Pinecone ScoredVector.score=0.842（cosine）并为 candidate-424 写入 SimilarityScore。
+      en: scoring-414 reads Pinecone ScoredVector.score=0.842 (cosine) and writes SimilarityScore for candidate-424.
+      ja: scoring-414 が Pinecone score=0.842 を読み candidate-424 に SimilarityScore。
+    example_source:
+      product: Pinecone
+      url: https://docs.pinecone.io/guides/search/query-data
+      version: ScoredVector.score
     field_values:
       scoring_activity_id: candidate-scoring-414
       scoring_method: cosine-similarity
       model_version: embed-model-v6
-      ranking_operation_id: candidate-scoring-414
-      input_candidate_set_id: candidate-set-413
-      activity_id: candidate-scoring-414
-      started_at: 2026-07-16T12:02:00Z
     related_node_ids:
       - CandidateScoringActivity
+      - SimilarityScore
     related_relation_ids: []
-    expected_result:
-      zh: 归类为 CandidateScoringActivity。
-      en: Classify the object as CandidateScoringActivity.
-      ja: CandidateScoringActivity として分類します。
-    why_valid_or_invalid:
-      zh: 活动、方法、候选和输出分数均可独立追踪。
-      en: The activity, method, candidate, and output score are independently traceable.
-      ja: activity・method・candidate・output scoreを個別追跡できます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-candidate-scoring-activity-005
-  - id: CandidateScoringActivity-example-boundary-manual-001
-    kind: boundary
+      - claim-candidate-scoring-pinecone
+  - id: CandidateScoringActivity-example-colbert
     labels:
-      zh: 候选评分边界例
-      en: "Boundary case: Candidate scoring"
-      ja: 候補採点境界例
-    scenario_id: null
+      zh: ColBERT MaxSim 评分
+      en: ColBERT MaxSim scoring
+      ja: ColBERT MaxSim 採点
     descriptions:
-      zh: score-414 仅保存 0.82 这个数值，没有执行身份。
-      en: score-414 only stores the value 0.82 and has no execution identity.
-      ja: score-414 は0.82を保存するだけでexecution identityがありません。
-    field_values: {}
+      zh: scoring-415 用 colbert-maxsim 对长文档候选计算 late interaction score=14.7。
+      en: scoring-415 computes late interaction score=14.7 for long-document candidates with colbert-maxsim.
+      ja: scoring-415 が colbert-maxsim で late interaction score=14.7。
+    example_source:
+      product: ColBERT
+      url: https://arxiv.org/abs/2004.12832
+      version: MaxSim scoring
+    field_values:
+      scoring_activity_id: candidate-scoring-415
+      scoring_method: colbert-maxsim
+      model_version: colbert-v2
     related_node_ids:
       - CandidateScoringActivity
     related_relation_ids: []
-    expected_result:
-      zh: 不得归类为 CandidateScoringActivity。
-      en: Do not classify the object as CandidateScoringActivity.
-      ja: CandidateScoringActivity として分類しません。
-    why_valid_or_invalid:
-      zh: 它是 RetrievalScore 信息对象，不是 CandidateScoringActivity。
-      en: It is a RetrievalScore information object, not CandidateScoringActivity.
-      ja: RetrievalScore information objectでCandidateScoringActivityではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-candidate-scoring-activity-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: RerankActivity
-    shared_parent_concept_id: RankingOperation
-    differentia:
-      zh: 已审查兄弟区分：父节点 RankingOperation：CandidateScoringActivity（semantic kind=activity，骨架 CandidateScoringActivity-is_a-RankingOperation）；RerankActivity（semantic kind=activity，骨架 RerankActivity-is_a-RankingOperation）。双端条件：CandidateScoringActivity 条件：“用一个声明的方法或模型为检索候选生成阶段性分数的排序活动”；RerankActivity 条件：“用声明的重排模型重新评估初始候选并形成新顺序的第二阶段活动”。任一条件成立不推出另一端。
-      en: "Reviewed sibling distinction: parent RankingOperation: CandidateScoringActivity (semantic kind=activity, backbone CandidateScoringActivity-is_a-RankingOperation); RerankActivity (semantic kind=activity, backbone RerankActivity-is_a-RankingOperation). Endpoint conditions: CandidateScoringActivity condition: “A ranking activity that produces stage-specific scores for retrieval candidates with a declared method or model”; RerankActivity condition: “A second-stage activity that reassesses initial candidates with a declared reranker model and forms a new order”. Either condition leaves the other unproven."
-      ja: 審査済み兄弟区別：親 RankingOperation：CandidateScoringActivity（semantic kind=activity、バックボーン CandidateScoringActivity-is_a-RankingOperation）；RerankActivity（semantic kind=activity、バックボーン RerankActivity-is_a-RankingOperation）。両端条件：CandidateScoringActivity の条件：「指定method/modelでretrieval candidateにstage-specific scoreを生成するranking activityです」；RerankActivity の条件：「指定reranker modelでinitial candidateを再評価しnew orderを作るsecond-stage activityです」。一方の成立は他方を証明しません。
+      - claim-candidate-scoring-colbert
+  - id: CandidateScoringActivity-example-chroma-distance
+    labels:
+      zh: Chroma 距离转分数
+      en: Chroma distance to score
+      ja: Chroma distance から score
+    descriptions:
+      zh: scoring-416 将 Chroma query 返回的 distance=0.18 映射为 similarity score 并记录 scoring_method=cosine-distance。
+      en: scoring-416 maps Chroma query distance=0.18 to a similarity score with scoring_method=cosine-distance.
+      ja: scoring-416 が Chroma distance=0.18 を similarity score に写像。
+    example_source:
+      product: Chroma
+      url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+      version: QueryResult distances
+    field_values:
+      scoring_activity_id: candidate-scoring-416
+      scoring_method: cosine-distance
+    related_node_ids:
+      - CandidateScoringActivity
+      - SimilarityScore
+    related_relation_ids: []
     source_claims:
-      - claim-candidate-scoring-activity-007
-      - claim-candidate-scoring-activity-008
+      - claim-candidate-scoring-chroma
 parent_relation:
   id: CandidateScoringActivity-is_a-RankingOperation
   predicate: is_a
@@ -201,18 +219,16 @@ parent_relation:
         en: "Assert only when the instance satisfies the complete RankingOperation definition and the child differentia: it produces RetrievalScore values per candidate under a declared method without fusing lists or deciding final admission."
         ja: instanceがRankingOperation完全定義とchild differentia「指定methodでcandidate別RetrievalScoreを生成しlist fusion/final admissionを行わない」を共に満たす時だけassertします。
       source_claims:
-        - claim-candidate-scoring-activity-009
+        - claim-candidate-scoring-id
   temporal_scope: timeless
   boundary_context: null
   constraints: []
   examples:
     - id: CandidateScoringActivity-is_a-RankingOperation-example-positive-manual-001
-      kind: positive
       labels:
         zh: 是一种RankingOperation正例
         en: "Positive case: is a RankingOperation"
         ja: RankingOperationの一種正例
-      scenario_id: null
       descriptions:
         zh: scoring-414 用 cosine 为 candidate-424 生成分数。
         en: scoring-414 produces a cosine score for candidate-424.
@@ -223,25 +239,13 @@ parent_relation:
         - RankingOperation
       related_relation_ids:
         - CandidateScoringActivity-is_a-RankingOperation
-      expected_result:
-        zh: 建立该有向事实，并保留条件与证据。
-        en: Assert the directed fact with its condition and evidence retained.
-        ja: condition/evidenceを保持してdirected factをassertします。
-      why_valid_or_invalid:
-        zh: 实例满足端点定义、方向和该关系的显式成立条件。
-        en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-        ja: endpoint定義・direction・明示assertion conditionを満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-candidate-scoring-activity-009
+        - claim-candidate-scoring-id
     - id: CandidateScoringActivity-is_a-RankingOperation-example-boundary-manual-001
-      kind: boundary
       labels:
         zh: 是一种RankingOperation边界例
         en: "Boundary case: is a RankingOperation"
         ja: RankingOperationの一種境界例
-      scenario_id: null
       descriptions:
         zh: topk-417 只截取已有顺序，不计算分数。
         en: topk-417 only truncates an existing order and computes no score.
@@ -252,23 +256,12 @@ parent_relation:
         - RankingOperation
       related_relation_ids:
         - CandidateScoringActivity-is_a-RankingOperation
-      expected_result:
-        zh: 验证器不得建立该有向关系事实。
-        en: Do not assert the directed fact.
-        ja: directed factをassertしません。
-      why_valid_or_invalid:
-        zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-        en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-        ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-candidate-scoring-activity-009
+        - claim-candidate-scoring-id
   source_claims:
-    - claim-candidate-scoring-activity-009
+    - claim-candidate-scoring-id
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: pending
   endpoint_order: child-to-parent
 relations:
   - id: CandidateScoringActivity-produces-RetrievalScore
@@ -304,18 +297,16 @@ relations:
           en: Assert only when the score's scoring_stage and method provenance trace back to this activity.
           ja: scoreのscoring_stage/method provenanceがこのactivityへ追跡一致する時だけassertします。
         source_claims:
-          - claim-candidate-scoring-activity-010
+          - claim-candidate-scoring-id
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
       - id: CandidateScoringActivity-produces-RetrievalScore-example-positive-manual-001
-        kind: positive
         labels:
           zh: produces RetrievalScore正例
           en: "Positive case: produces RetrievalScore"
           ja: RetrievalScoreをproduces正例
-        scenario_id: null
         descriptions:
           zh: scoring-414 produces similarity-score-429。
           en: scoring-414 produces similarity-score-429.
@@ -326,25 +317,13 @@ relations:
           - RetrievalScore
         related_relation_ids:
           - CandidateScoringActivity-produces-RetrievalScore
-        expected_result:
-          zh: 建立该有向事实，并保留条件与证据。
-          en: Assert the directed fact with its condition and evidence retained.
-          ja: condition/evidenceを保持してdirected factをassertします。
-        why_valid_or_invalid:
-          zh: 实例满足端点定义、方向和该关系的显式成立条件。
-          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-          ja: endpoint定義・direction・明示assertion conditionを満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-candidate-scoring-activity-010
+          - claim-candidate-scoring-id
       - id: CandidateScoringActivity-produces-RetrievalScore-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: produces RetrievalScore边界例
           en: "Boundary case: produces RetrievalScore"
           ja: RetrievalScoreをproduces境界例
-        scenario_id: null
         descriptions:
           zh: 从别的模型导入的分数不能归给 scoring-414。
           en: A score imported from another model is not produced by scoring-414.
@@ -355,23 +334,12 @@ relations:
           - RetrievalScore
         related_relation_ids:
           - CandidateScoringActivity-produces-RetrievalScore
-        expected_result:
-          zh: 验证器不得建立该有向关系事实。
-          en: Do not assert the directed fact.
-          ja: directed factをassertしません。
-        why_valid_or_invalid:
-          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-candidate-scoring-activity-010
+          - claim-candidate-scoring-id
     source_claims:
-      - claim-candidate-scoring-activity-010
+      - claim-candidate-scoring-id
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:RetrievalScore
   - id: CandidateScoringActivity-scores-RetrievedCandidate
     predicate: scores
@@ -406,18 +374,16 @@ relations:
           en: Assert only when scoring input names candidate_id and the output score belongs to the same candidate.
           ja: scoring inputがcandidate_idを含みoutput scoreが同candidateに属す時だけassertします。
         source_claims:
-          - claim-candidate-scoring-activity-010
+          - claim-candidate-scoring-id
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
       - id: CandidateScoringActivity-scores-RetrievedCandidate-example-positive-manual-001
-        kind: positive
         labels:
           zh: scores RetrievedCandidate正例
           en: "Positive case: scores RetrievedCandidate"
           ja: RetrievedCandidateをscores正例
-        scenario_id: null
         descriptions:
           zh: scoring-414 scores candidate-424。
           en: scoring-414 scores candidate-424.
@@ -428,25 +394,13 @@ relations:
           - RetrievedCandidate
         related_relation_ids:
           - CandidateScoringActivity-scores-RetrievedCandidate
-        expected_result:
-          zh: 建立该有向事实，并保留条件与证据。
-          en: Assert the directed fact with its condition and evidence retained.
-          ja: condition/evidenceを保持してdirected factをassertします。
-        why_valid_or_invalid:
-          zh: 实例满足端点定义、方向和该关系的显式成立条件。
-          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-          ja: endpoint定義・direction・明示assertion conditionを満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-candidate-scoring-activity-010
+          - claim-candidate-scoring-id
       - id: CandidateScoringActivity-scores-RetrievedCandidate-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: scores RetrievedCandidate边界例
           en: "Boundary case: scores RetrievedCandidate"
           ja: RetrievedCandidateをscores境界例
-        scenario_id: null
         descriptions:
           zh: 批次同现但未包含 candidate-424 不能建立评分边。
           en: Batch co-occurrence without candidate-424 as input does not establish scoring.
@@ -457,108 +411,71 @@ relations:
           - RetrievedCandidate
         related_relation_ids:
           - CandidateScoringActivity-scores-RetrievedCandidate
-        expected_result:
-          zh: 验证器不得建立该有向关系事实。
-          en: Do not assert the directed fact.
-          ja: directed factをassertしません。
-        why_valid_or_invalid:
-          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-candidate-scoring-activity-010
+          - claim-candidate-scoring-id
     source_claims:
-      - claim-candidate-scoring-activity-010
+      - claim-candidate-scoring-id
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:RetrievedCandidate
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-pinecone-query
+    title: Pinecone Query Guide
+    publisher: Pinecone
+    url: https://docs.pinecone.io/guides/search/query-data
+    source_type: official-doc
+    relevance: index.query with vector, namespace, filter, top_k.
+  - id: src-chroma-query
+    title: Chroma Query Documentation
+    publisher: Chroma
+    url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+    source_type: official-doc
+    relevance: collection.query with query_texts, n_results, where filter.
+  - id: src-colbert
+    title: ColBERT — Efficient and Effective Passage Search
+    publisher: arXiv
+    url: https://arxiv.org/abs/2004.12832
+    source_type: arXiv
+    relevance: Token-level late interaction MaxSim scoring.
+  - id: src-memory-retrieval-design
+    title: Moonweave memory-retrieval-ranking module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Separates retrieval stages, scores, results, and context admission.
 source_claims:
-  - id: claim-candidate-scoring-activity-001
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents scored dense and sparse query results and score-distribution concerns during fusion; Moonweave records the score-producing execution separately from its score artifacts.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+  - id: claim-candidate-scoring-pinecone
+    source: src-pinecone-query
+    supports: Pinecone ScoredVector.score is a dense similarity metric.
+    locator: ScoredVector
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-candidate-scoring-chroma
+    source: src-chroma-query
+    supports: Chroma returns distances convertible to similarity scores.
+    locator: QueryResult
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-candidate-scoring-colbert
+    source: src-colbert
+    supports: ColBERT MaxSim produces late interaction scores per candidate.
+    locator: paper
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-candidate-scoring-id
+    source: src-memory-retrieval-design
+    supports: scoring_activity_id identifies one scoring execution.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-candidate-scoring-activity-002
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents scored dense and sparse query results and score-distribution concerns during fusion; Moonweave records the score-producing execution separately from its score artifacts. Moonweave records CandidateScoringActivity.scoring_activity_id as the stated auditable datum: Stable identifier for one candidate-scoring execution."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+  - id: claim-candidate-scoring-method
+    source: src-memory-retrieval-design
+    supports: scoring_method declares the algorithm family.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-candidate-scoring-activity-003
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents scored dense and sparse query results and score-distribution concerns during fusion; Moonweave records the score-producing execution separately from its score artifacts. Moonweave records CandidateScoringActivity.scoring_method as the stated auditable datum: Declares the algorithm, metric, or model family that gives the score meaning."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+  - id: claim-candidate-scoring-model
+    source: src-memory-retrieval-design
+    supports: model_version pins the embedding or rerank model used.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-candidate-scoring-activity-004
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents scored dense and sparse query results and score-distribution concerns during fusion; Moonweave records the score-producing execution separately from its score artifacts. Moonweave records CandidateScoringActivity.model_version as the stated auditable datum: Records the non-substitutable model version when a model performs scoring."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-candidate-scoring-activity-005
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents scored dense and sparse query results and score-distribution concerns during fusion; Moonweave records the score-producing execution separately from its score artifacts. Qdrant documents score-producing retrieval and warns that different score distributions affect fusion.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-candidate-scoring-activity-006
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents scored dense and sparse query results and score-distribution concerns during fusion; Moonweave records the score-producing execution separately from its score artifacts. The source's scored results are outputs of the query stage, not the stage activity itself.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-candidate-scoring-activity-007
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant's hybrid and multi-stage query model combines prefetched candidate sets through fusion and later query stages. This supports CandidateScoringActivity as the broader stage-specific scoring activity; Moonweave separately reserves RerankActivity for a second-stage reassessment, a distinction Qdrant does not define as an ontology hierarchy.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-candidate-scoring-activity-008
-    source: eng-vector-pinecone-reranking
-    supports: Pinecone documents reranking as a second stage that takes initial retrieval results and returns a reordered set using rerank request parameters. This supports the narrower RerankActivity endpoint; pairing it with the broader CandidateScoringActivity is Moonweave's explicit activity taxonomy rather than a Pinecone-defined class hierarchy.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-candidate-scoring-activity-009
-    source: eng-vector-qdrant-hybrid-query
-    supports: The official documentation supports the operational distinction used in this child differentia; Moonweave's CandidateScoringActivity-to-RankingOperation subclass placement is an explicit ontology design decision.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-candidate-scoring-activity-010
-    source: eng-vector-qdrant-hybrid-query
-    supports: The cited official documentation supports the endpoint roles and direction of this retrieval fact; the exact relation identifier and ownership boundary are Moonweave design decisions.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

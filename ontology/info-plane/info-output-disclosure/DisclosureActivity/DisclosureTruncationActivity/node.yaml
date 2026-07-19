@@ -1,20 +1,19 @@
 schema: moonweave.ai/ontology-node/v1
 id: DisclosureTruncationActivity
 kind: concept
-status: accepted
 labels:
   zh: 披露截断活动
   en: disclosure truncation activity
   ja: 開示切詰め活動
 semantics:
   short_definition:
-    zh: 按照已选输出窗口保留部分范围并记录省略范围的披露活动。
-    en: A disclosure activity that retains ranges under a selected output window and records omitted ranges.
-    ja: selected output window に従い range を保持し omitted range を記録する disclosure activity。
+    zh: 按 OutputWindow 规范截断源输出可保留范围的披露活动。
+    en: Disclosure activity truncating retainable source ranges per OutputWindow specification.
+    ja: OutputWindow 仕様に従い source range を truncate する disclosure activity。
   definition:
-    zh: 披露截断活动是 DisclosureActivity 的子类，其种差是应用一份已选 OutputWindow，把来源输出分成保留范围与 TruncatedContextSpan，并保持可回溯偏移；它不是直接丢弃原始输出，也不是安全抑制。
-    en: A DisclosureTruncationActivity is a DisclosureActivity distinguished by applying a selected OutputWindow, dividing source output into retained ranges and TruncatedContextSpan records while preserving traceable offsets. It neither deletes the original output nor constitutes safety suppression.
-    ja: DisclosureTruncationActivity は selected OutputWindow を apply し source output を retained range と TruncatedContextSpan に分け traceable offset を保持する subtype です。original output deletion や safety suppression ではありません。
+    zh: DisclosureTruncationActivity 应用 HeadTailWindow 或容量上限，产生 TruncatedContextSpan 记录被窗口切掉的范围；对应 OpenAI 流式聚合前只保留前 N 字符或 Anthropic 长回复裁剪。
+    en: DisclosureTruncationActivity applies HeadTailWindow or capacity limits, producing TruncatedContextSpan for clipped ranges—like keeping first N characters before OpenAI stream aggregation or clipping long Anthropic replies.
+    ja: DisclosureTruncationActivity は TruncatedContextSpan を生成。
   why_needed:
     zh: 独立记录截断活动可以区分容量裁剪与策略抑制，并验证实际窗口。
     en: Recording truncation separately distinguishes capacity clipping from policy suppression and makes the applied window verifiable.
@@ -29,6 +28,33 @@ semantics:
       ja: privacy/authorization による complete withholding と persisted source output modification。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: window/800-char 等对 chars:640..1199 执行 truncate；必须与 selection 范围闭包一致。
+    en: window/800-char truncates chars:640..1199; must align with selection range closure.
+    ja: truncate range は closure と一致。
+  typical_input:
+    - description: Truncation activity
+      format: '{"disclosure_activity_id":"disclose-trunc-204","output_window_id":"window/800-char","source_range":"chars:640..1199"}'
+      source_claims:
+        - claim-disclosure-trunc-design
+  typical_output: []
+  reference_implementations:
+    - name: OpenAI Responses API
+      url: https://platform.openai.com/docs/api-reference/responses
+      description: response.output[] items and output_text helper.
+    - name: OpenAI Streaming Responses
+      url: https://platform.openai.com/docs/guides/streaming-responses
+      description: SSE response.output_text.delta and response.completed events.
+    - name: Anthropic Messages API
+      url: https://docs.anthropic.com/en/api/messages
+      description: Assistant content blocks and streaming deltas.
+    - name: Server-Sent Events
+      url: https://html.spec.whatwg.org/multipage/server-sent-events.html
+      description: Event-stream framing for incremental delivery.
+    - name: A2A Protocol
+      url: https://a2a-protocol.org/latest/specification/
+      description: Task Artifact as durable completed output.
 structure:
   identity_keys: []
   fields:
@@ -37,94 +63,82 @@ structure:
         zh: 应用窗口引用
         en: applied-window reference
         ja: applied-window reference
+      definitions:
+        zh: 引用本次实际执行的 OutputWindow 版本。
+        en: References the OutputWindow revision actually applied.
+        ja: 実際に apply した OutputWindow revision を参照します。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 引用本次实际执行的 OutputWindow 版本。
-        en: References the OutputWindow revision actually applied.
-        ja: 実際に apply した OutputWindow revision を参照します。
-      allowed_values: []
       pattern: null
       example_value: output-window-9@2
+      allowed_values: []
       source_claims:
         - claim-disclosure-truncation-activity-001
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: DisclosureTruncationActivity-example-positive-manual-20260716
-    kind: positive
+  - id: DisclosureTruncationActivity-example-char-window
     labels:
-      zh: 保留首尾日志
-      en: Retain log head and tail
-      ja: log head/tail を保持
-    scenario_id: null
+      zh: 字符窗口截断
+      en: Character window truncation
+      ja: 文字 window truncate
     descriptions:
-      zh: truncate-884 对 2,000 行日志应用 output-window-9@2，保留首 80 行和末 40 行并记录中间省略范围。
-      en: truncate-884 applies output-window-9@2 to a 2,000-line log, retaining the first eighty and last forty lines and recording the omitted middle range.
-      ja: truncate-884 は 2,000-line log に window を apply し first 80/last 40 lines を保持して middle omitted range を記録します。
-    field_values:
-      applied_window_ref: output-window-9@2
-      disclosure_activity_id: truncate-884
-      source_output_ref: output-41
-      audience_ref: user-7
-      started_at: 2026-07-16T04:00:00Z
-      status: completed
-    related_node_ids:
-      - DisclosureTruncationActivity
-      - OutputWindow
-      - TruncatedContextSpan
-    related_relation_ids:
-      - DisclosureTruncationActivity-applies-OutputWindow
-      - DisclosureTruncationActivity-produces-TruncatedContextSpan
-    expected_result:
-      zh: 建立截断活动和可寻址省略范围。
-      en: Create the truncation activity and an addressable omitted range.
-      ja: truncation activity と addressable omitted range を作成します。
-    why_valid_or_invalid:
-      zh: 窗口版本、原始范围、保留范围和省略范围均可核验。
-      en: Window revision, original extent, retained extent, and omitted extent are verifiable.
-      ja: window revision・original/retained/omitted extent を検証できます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-disclosure-truncation-activity-001
-      - claim-disclosure-truncation-activity-002
-  - id: DisclosureTruncationActivity-example-boundary-manual-20260716
-    kind: boundary
-    labels:
-      zh: 敏感令牌被隐藏
-      en: Sensitive token withheld
-      ja: sensitive token withheld
-    scenario_id: output-disclosure-disclosuretruncationactivity-boundary
-    descriptions:
-      zh: 一段访问令牌即使很短也因 DisclosureRule 被完全隐藏，没有容量窗口或保留范围。
-      en: An access token is withheld in full under a DisclosureRule despite being short; no capacity window or retained range applies.
-      ja: short access token が DisclosureRule により完全 withheld され capacity window/retained range はありません。
+      zh: 800 字符窗口截断 chars:640..1199 并记录 TruncatedContextSpan。
+      en: 800-char window truncates chars:640..1199 and records TruncatedContextSpan.
+      ja: char window truncate。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: char window
     field_values: {}
     related_node_ids:
-      - DisclosureSuppressionActivity
+      - DisclosureTruncationActivity
+      - TruncatedContextSpan
+    related_relation_ids: []
+    source_claims:
+      - claim-disclosure-trunc-design
+  - id: DisclosureTruncationActivity-example-head-tail
+    labels:
+      zh: Head-tail 保留
+      en: Head-tail retention
+      ja: head-tail 保持
+    descriptions:
+      zh: HeadTailWindow 保留前 400 与后 200 字符，中间标记 truncate。
+      en: HeadTailWindow retains first 400 and last 200 chars; middle marked truncate.
+      ja: head-tail window。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: HeadTailWindow
+    field_values: {}
+    related_node_ids:
+      - DisclosureTruncationActivity
+      - HeadTailWindow
+    related_relation_ids: []
+    source_claims:
+      - claim-disclosure-trunc-design
+  - id: DisclosureTruncationActivity-example-stream-incomplete
+    labels:
+      zh: 流式未完成
+      en: Incomplete stream
+      ja: 未完成 stream
+    descriptions:
+      zh: 仅有 SSE delta 没有 response.completed 时不得对最终披露执行 truncate 完成断言。
+      en: With only SSE deltas and no response.completed, do not assert final truncation completion.
+      ja: completed 前 truncate 完成断言不可。
+    example_source:
+      product: OpenAI
+      url: https://platform.openai.com/docs/guides/streaming-responses
+      version: streaming boundary
+    field_values: {}
+    related_node_ids:
       - DisclosureTruncationActivity
     related_relation_ids: []
-    expected_result:
-      zh: 分类为披露抑制，不分类为截断。
-      en: Classify it as disclosure suppression, not truncation.
-      ja: disclosure suppression とし truncation にはしません。
-    why_valid_or_invalid:
-      zh: 种差是策略禁止披露，而不是窗口容量。
-      en: The differentia is a policy prohibition, not window capacity.
-      ja: differentia は policy prohibition で window capacity ではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-disclosure-truncation-activity-003
-      - claim-disclosure-truncation-activity-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-disclosure-trunc-stream
 parent_relation:
   id: DisclosureTruncationActivity-is_a-DisclosureActivity
   predicate: is_a
@@ -155,12 +169,10 @@ parent_relation:
   constraints: []
   examples:
     - id: DisclosureTruncationActivity-is_a-DisclosureActivity-example-positive-manual-20260716
-      kind: positive
       labels:
         zh: 确认披露截断活动属于输出披露活动
         en: Confirm disclosure truncation activity is an output disclosure activity
         ja: 開示切詰め活動は出力開示活動であるを確認
-      scenario_id: output-disclosure-disclosuretruncationactivity-is_a-disclosureactivity-positive
       descriptions:
         zh: truncate-884 对 2,000 行输出应用首尾窗口，并记录第 81–1960 行缺口。
         en: truncate-884 applies a head-tail window to 2,000 output lines and records the gap at lines 81–1960.
@@ -171,26 +183,14 @@ parent_relation:
         - DisclosureActivity
       related_relation_ids:
         - DisclosureTruncationActivity-is_a-DisclosureActivity
-      expected_result:
-        zh: 将 truncate-884 归为披露截断活动，并继承披露活动字段。
-        en: Classify truncate-884 as a disclosure truncation activity inheriting disclosure-activity fields.
-        ja: truncate-884 を開示切詰め活動とし開示活動 field を継承させます。
-      why_valid_or_invalid:
-        zh: 窗口应用、保留范围和省略范围共同构成截断活动种差。
-        en: Window application, retained extents, and omitted extents jointly establish the truncation differentia.
-        ja: window 適用・保持範囲・省略範囲が切詰め活動の種差を構成します。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
         - claim-disclosure-truncation-activity-002
         - claim-disclosure-truncation-activity-001
     - id: DisclosureTruncationActivity-is_a-DisclosureActivity-example-boundary-manual-20260716
-      kind: boundary
       labels:
         zh: 拒绝误判披露截断活动属于输出披露活动
         en: Reject a false disclosure truncation activity is an output disclosure activity
         ja: 開示切詰め活動は出力開示活動であるの誤判定を拒否
-      scenario_id: output-disclosure-disclosuretruncationactivity-is_a-disclosureactivity-boundary
       descriptions:
         zh: secret-rule-3 完全扣留一个短令牌，没有容量窗口或保留范围。
         en: secret-rule-3 withholds a short token completely, with no capacity window or retained extent.
@@ -201,25 +201,13 @@ parent_relation:
         - DisclosureActivity
       related_relation_ids:
         - DisclosureTruncationActivity-is_a-DisclosureActivity
-      expected_result:
-        zh: 不得沿该边把规则抑制活动归为截断活动。
-        en: Do not classify the rule-suppression activity as a truncation activity through this edge.
-        ja: rule suppression activity をこの辺で切詰め活動に分類しません。
-      why_valid_or_invalid:
-        zh: 策略扣留和容量截断是不同种差，即使都产生不可见范围。
-        en: Rule withholding and capacity truncation have different differentiae even though both yield invisible extents.
-        ja: rule withholding と capacity truncation は不可視範囲を生じても種差が異なります。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
         - claim-disclosure-truncation-activity-002
         - claim-disclosure-truncation-activity-001
   source_claims:
     - claim-disclosure-truncation-activity-002
     - claim-disclosure-truncation-activity-001
-  distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations:
   - id: DisclosureTruncationActivity-applies-OutputWindow
@@ -250,23 +238,21 @@ relations:
         severity: error
         expression_language: plain
         expression: Assert only when the identified truncation activity actually executes the exact OutputWindow identity and version and records retained and omitted extents; a prior decision selecting the window is not yet application.
-        explanations:
+        source_claims:
+          - claim-disclosure-truncation-activity-004
+        explanation:
           zh: 仅当同一次截断活动实际执行精确 OutputWindow 身份和版本，并记录保留与省略范围时成立；先前决定选择窗口并不等于活动已经应用。
           en: Assert only when the identified truncation activity actually executes the exact OutputWindow identity and version and records retained and omitted extents; a prior decision selecting the window is not yet application.
           ja: 識別済み truncation activity が正確な OutputWindow ID/version を実行し、retained/omitted extent を記録した場合だけ成立します。先行 decision の window 選択はまだ application ではありません。
-        source_claims:
-          - claim-disclosure-truncation-activity-004
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
       - id: DisclosureTruncationActivity-applies-OutputWindow-example-positive-manual-20260716
-        kind: positive
         labels:
           zh: 确认披露截断活动应用输出窗口
           en: Confirm disclosure truncation activity applies an output window
           ja: 開示切詰め活動が出力 window を適用するを確認
-        scenario_id: output-disclosure-disclosuretruncationactivity-applies-outputwindow-positive
         descriptions:
           zh: truncate-884 读取 output-window-9@2，并按 head=80、tail=40 计算保留范围。
           en: truncate-884 reads output-window-9@2 and computes retained extents with head=80 and tail=40.
@@ -277,26 +263,14 @@ relations:
           - OutputWindow
         related_relation_ids:
           - DisclosureTruncationActivity-applies-OutputWindow
-        expected_result:
-          zh: 记录 truncate-884 applies output-window-9@2。
-          en: Record that truncate-884 applies output-window-9@2.
-          ja: truncate-884 applies output-window-9@2 を記録します。
-        why_valid_or_invalid:
-          zh: 活动输入版本和实际计算边界都与窗口规范相符。
-          en: The activity's input revision and computed boundaries both conform to the window specification.
-          ja: activity input revision と計算境界が window 仕様に一致します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-disclosure-truncation-activity-001
           - claim-disclosure-truncation-activity-002
       - id: DisclosureTruncationActivity-applies-OutputWindow-example-boundary-manual-20260716
-        kind: boundary
         labels:
           zh: 拒绝误判披露截断活动应用输出窗口
           en: Reject a false disclosure truncation activity applies an output window
           ja: 開示切詰め活動が出力 window を適用するの誤判定を拒否
-        scenario_id: output-disclosure-disclosuretruncationactivity-applies-outputwindow-boundary
         descriptions:
           zh: decision-885 选择 window-10，但执行在开始前取消，没有计算任何范围。
           en: decision-885 selects window-10, but execution is cancelled before starting and computes no extent.
@@ -307,28 +281,13 @@ relations:
           - OutputWindow
         related_relation_ids:
           - DisclosureTruncationActivity-applies-OutputWindow
-        expected_result:
-          zh: 保留 selects_window，不建立 applies 关系。
-          en: Keep selects_window but do not create the applies relation.
-          ja: selects_window を保持し applies relation を作りません。
-        why_valid_or_invalid:
-          zh: 治理选择不证明执行发生，应用关系需要活动证据。
-          en: Governance selection does not prove execution; the applies relation requires activity evidence.
-          ja: governance selection は実行を証明せず applies relation には activity evidence が必要です。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-disclosure-truncation-activity-001
           - claim-disclosure-truncation-activity-002
     source_claims:
       - claim-disclosure-truncation-activity-001
       - claim-disclosure-truncation-activity-002
-    distinct_fact_rationale:
-      zh: 本关系只表达所列源端到目标端的具体事实，不把相邻节点、共享受众或时间接近自动推成该事实。
-      en: This relation states only the listed source-to-target fact; adjacent nodes, a shared audience, or temporal proximity do not imply it.
-      ja: この relation は列挙した source-to-target 事実だけを表し、隣接 node・shared audience・time proximity から自動推論しません。
     layout_role: cross-link
-    review_status: accepted
     target: concept:OutputWindow
   - id: DisclosureTruncationActivity-produces-TruncatedContextSpan
     predicate: produces
@@ -359,12 +318,10 @@ relations:
     constraints: []
     examples:
       - id: DisclosureTruncationActivity-produces-TruncatedContextSpan-example-positive-manual-20260716
-        kind: positive
         labels:
           zh: 确认披露截断活动产生截断省略范围
           en: Confirm disclosure truncation activity produces a truncation-omission span
           ja: 開示切詰め活動が切詰め省略範囲を生成するを確認
-        scenario_id: output-disclosure-disclosuretruncationactivity-produces-truncatedcontextspan-positive
         descriptions:
           zh: truncate-884 完成后生成 span-41，记录 output-41 第 81–1960 行缺口。
           en: On completion, truncate-884 generates span-41 for the gap at lines 81–1960 of output-41.
@@ -375,26 +332,14 @@ relations:
           - TruncatedContextSpan
         related_relation_ids:
           - DisclosureTruncationActivity-produces-TruncatedContextSpan
-        expected_result:
-          zh: 记录 truncate-884 produces span-41。
-          en: Record that truncate-884 produces span-41.
-          ja: truncate-884 produces span-41 を記録します。
-        why_valid_or_invalid:
-          zh: 活动窗口、来源与省略范围元数据完全对应。
-          en: Activity window, source, and omission metadata correspond exactly.
-          ja: activity window・source・omission metadata が完全に対応します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-disclosure-truncation-activity-002
           - claim-disclosure-truncation-activity-001
       - id: DisclosureTruncationActivity-produces-TruncatedContextSpan-example-boundary-manual-20260716
-        kind: boundary
         labels:
           zh: 拒绝误判披露截断活动产生截断省略范围
           en: Reject a false disclosure truncation activity produces a truncation-omission span
           ja: 開示切詰め活動が切詰め省略範囲を生成するの誤判定を拒否
-        scenario_id: output-disclosure-disclosuretruncationactivity-produces-truncatedcontextspan-boundary
         descriptions:
           zh: span-42 来自另一运行的 output-52，窗口和时间均与 truncate-884 不同。
           en: span-42 belongs to output-52 in another run and has a different window and time from truncate-884.
@@ -405,45 +350,26 @@ relations:
           - TruncatedContextSpan
         related_relation_ids:
           - DisclosureTruncationActivity-produces-TruncatedContextSpan
-        expected_result:
-          zh: 不得把 span-42 关联为 truncate-884 的产物。
-          en: Do not link span-42 as a product of truncate-884.
-          ja: span-42 を truncate-884 の生成物として結びません。
-        why_valid_or_invalid:
-          zh: 端点共为截断类型不能替代同一活动沿革匹配。
-          en: Sharing truncation types cannot replace matching the same activity provenance.
-          ja: 両端が truncation type でも同一 activity provenance の一致を代替しません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-disclosure-truncation-activity-002
           - claim-disclosure-truncation-activity-001
     source_claims:
       - claim-disclosure-truncation-activity-002
       - claim-disclosure-truncation-activity-001
-    distinct_fact_rationale:
-      zh: 本关系只表达所列源端到目标端的具体事实，不把相邻节点、共享受众或时间接近自动推成该事实。
-      en: This relation states only the listed source-to-target fact; adjacent nodes, a shared audience, or temporal proximity do not imply it.
-      ja: この relation は列挙した source-to-target 事実だけを表し、隣接 node・shared audience・time proximity から自動推論しません。
     layout_role: cross-link
-    review_status: accepted
     target: concept:TruncatedContextSpan
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-info-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: Manual semantic verification completed.
-    en: Verified against progressive disclosure, MCP audience annotations, and W3C citation anchoring.
-    ja: Manual semantic verification completed.
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-openai-responses
+    title: OpenAI Responses API Reference
+    publisher: OpenAI
+    url: https://platform.openai.com/docs/api-reference/responses
+    source_type: official-doc
+    relevance: response.output[] typed items and output_text aggregation.
+  - id: src-info-output-design
+    title: Moonweave info-output-disclosure module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Audience-bound disclosure after model output is produced.
 source_claims:
   - id: claim-disclosure-truncation-activity-001
     source: eng-fw-deepagents-js-docs
@@ -451,25 +377,33 @@ source_claims:
     locator: Deep Agents JavaScript documentation, Context engineering > Offloading, large tool result preview
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-disclosure-truncation-activity-002
     source: eng-ont-prov-o
     supports: W3C PROV-O distinguishes an Activity that uses or generates Entities from the generated Entity and from the Agent bearing responsibility. Moonweave applies that distinction to disclosure activities, their decision and disposition records, and the actors who can see a released segment.
     locator: W3C PROV-O Recommendation Sections 2 and 3.1, Entity, Activity, Agent, usage and generation
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-disclosure-truncation-activity-003
     source: eng-security-nist-abac
     supports: NIST SP 800-162 evaluates subject, object, requested operation, environment, policy, and rules to compute an authorization decision. Moonweave uses the same separation when an audience, output object, display operation, and environment determine whether output is published, truncated, or suppressed.
     locator: NIST SP 800-162 Sections 2.1-2.3 and Figure 2, basic ABAC scenario
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-disclosure-truncation-activity-004
     source: eng-fw-deepagents-js-docs
     supports: Deep Agents grounds actual bounded-preview execution and preservation of a stable full-output reference. Separating selection from application is Moonweave design inference.
     locator: Context engineering > bounded preview and stable file reference for large results
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
+  - id: claim-disclosure-trunc-design
+    source: src-info-output-design
+    supports: DisclosureTruncationActivity records window-applied clipping as TruncatedContextSpan.
+    locator: truncation activity
+    evidence_kind: design-inference
+    confidence: high
+  - id: claim-disclosure-trunc-stream
+    source: src-openai-stream
+    supports: Truncation completion requires terminal stream completion event.
+    locator: response.completed
+    evidence_kind: primary-api
+    confidence: high

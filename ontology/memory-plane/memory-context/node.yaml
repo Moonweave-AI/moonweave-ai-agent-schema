@@ -1,1702 +1,540 @@
 schema: moonweave.ai/ontology-node/v1
 id: memory-context
 kind: module
-status: accepted
 labels:
   zh: 上下文组装
   en: Context assembly
   ja: コンテキスト組み立て
 semantics:
   short_definition:
-    zh: 上下文组装回答“哪些候选信息以什么顺序和篇幅真正进入某次模型调用”。ContextAssemblyActivity 记录选择、排序、裁剪和完整组装过程；ContextArtifact 记录包、窗口、槽位、摘要与排除结果；ContextSpecification 记录可复用的组装规范与预算。
-    en: "Context assembly closes through three genuine branches: ContextAssemblyActivity owns selection, ordering, and trimming processes; ContextArtifact owns packages, windows, slots, and exclusions; ContextSpecification owns reusable rules and capacity budgets. ContextSourceRole records only participation of an independent source reference in a concrete slot."
-    ja: context assembly は三 genuine branch で閉じます。ContextAssemblyActivity は selection/ordering/trimming process、ContextArtifact は package/window/slot/exclusion、ContextSpecification は reusable rule/capacity budget を所有し、ContextSourceRole は independent source reference の concrete slot participation だけを記録します。
+    zh: 从候选信息中选择、排序并裁剪，组装成一次模型调用的可见上下文。
+    en: Select, order, and trim candidate information into the visible context for one model call.
+    ja: 候補情報を選択・整列・裁断し、一回のモデル呼び出し向け可視コンテキストへ組み立てます。
   definition:
-    zh: 上下文组装以活动、产物和规范三条真实分支构成闭环：ContextAssemblyActivity 承载选择、排序与裁剪过程，ContextArtifact 承载包、窗口、槽位与排除记录，ContextSpecification 承载可复用规则和容量预算；ContextSourceRole 只记录一个独立来源引用在具体槽位中的参与。
-    en: "Context assembly closes through three genuine branches: ContextAssemblyActivity owns selection, ordering, and trimming processes; ContextArtifact owns packages, windows, slots, and exclusions; ContextSpecification owns reusable rules and capacity budgets. ContextSourceRole records only participation of an independent source reference in a concrete slot."
-    ja: context assembly は三 genuine branch で閉じます。ContextAssemblyActivity は selection/ordering/trimming process、ContextArtifact は package/window/slot/exclusion、ContextSpecification は reusable rule/capacity budget を所有し、ContextSourceRole は independent source reference の concrete slot participation だけを記録します。
+    zh: 上下文组装是记忆域中“把已发现或已检索的候选变成一次模型调用实际输入”的闭环。它负责决定哪些消息、记忆片段、工具结果、检索块或用户显式引用进入当前窗口，以什么顺序排列，以及在 token 预算不足时裁剪或摘要哪些内容。组装产物应是可版本化、可重放的输入包，并记录被排除项及原因。该模块不重新评分检索候选、不持久写入长期记忆，也不决定面向最终用户的输出披露范围。
+    en: Context assembly closes the memory-domain loop that turns discovered or retrieved candidates into the actual input for one model call. It decides which messages, memory snippets, tool results, retrieved chunks, or user-selected references enter the current window, in what order, and what to trim or summarize when the token budget is exhausted. The result should be a versioned, replayable input package with recorded exclusions and reasons. This module does not rescore retrieval candidates, persist long-term memory, or govern audience-facing output disclosure.
+    ja: コンテキスト組み立ては、発見・検索済み候補を一回のモデル呼び出しの実入力へ変換する記憶ドメインの閉ループです。どのメッセージ、記憶断片、ツール結果、検索 chunk、ユーザー明示参照を現在ウィンドウへ、どの順序で入れ、token 予算不足時に何を切詰め・要約するかを決めます。成果物は版管理可能で再現可能な入力パッケージと除外理由記録であるべきです。本モジュールは検索候補の再採点、長期記憶の永続化、最終ユーザー向け出力開示範囲の決定は行いません。
   why_needed:
-    zh: 从发现与检索候选中选择、排序、裁剪和版本化当前运行可用的不可变上下文。
-    en: Select, order, trim, and version immutable context available to the current run from discovery and retrieval candidates.
-    ja: 発見・検索候補から現在実行で利用できる不変コンテキストを選択、整列、裁断、版管理します。
+    zh: 没有上下文组装，系统无法解释“这次模型调用到底看到了什么、为何没看到别的内容”。候选检索结果会整包塞进 prompt，旧工具输出占满窗口，用户 @ 引用的文件可能被遗漏，压缩后也无法重放当时输入。
+    en: Without context assembly, the system cannot explain what a model call actually saw or why other material was omitted. Retrieved candidates get dumped wholesale into the prompt, stale tool output fills the window, user @-referenced files may be skipped, and post-compaction inputs become unreplayable.
+    ja: コンテキスト組み立てがなければ、モデル呼び出しが実際に何を見、なぜ他を見なかったか説明できません。検索候補が丸ごと prompt に入り、古いツール出力が窓を占有し、ユーザー @ 参照ファイルが漏れ、圧縮後も当時入力を再現できません。
   includes:
-    - zh: ContextArtifact 下的 ContextWindow、ContextSummary 与 ContextPackage；ContextWindow 组成有序 ContextSlot，ContextSlot 再组成由独立 SourceReference 承担的 ContextSourceRole；以及 ContextIngressEvent 和不可变上下文版本。
-      en: ContextWindow, ContextSummary, and ContextPackage under ContextArtifact; ordered ContextSlots composed by ContextWindow; ContextSourceRoles composed by slots and borne by independent SourceReferences; plus ContextIngressEvent and immutable context versions.
-      ja: ContextArtifact 配下の ContextWindow・ContextSummary・ContextPackage、ContextWindow が構成する ordered ContextSlot、slot が構成し independent SourceReference が担う ContextSourceRole、ContextIngressEvent、不変 context version。
-    - zh: ContextAssemblyActivity 下的 ContextAssembly 与 ContextAssemblyPhase→选择/排序/裁剪活动链；ContextSpecification 下的 ContextRule→ContextOrderingRule 与 ContextBudget；以及 ContextExclusion 和 ContextRefreshEvent。
-      en: ContextAssembly and the ContextAssemblyPhase-to-selection/ordering/trimming activity chain under ContextAssemblyActivity; ContextRule-to-ContextOrderingRule and ContextBudget under ContextSpecification; plus ContextExclusion and ContextRefreshEvent.
-      ja: ContextAssemblyActivity 配下の ContextAssembly と ContextAssemblyPhase→selection/ordering/trimming activity chain、ContextSpecification 配下の ContextRule→ContextOrderingRule と ContextBudget、ContextExclusion、ContextRefreshEvent。
+    - zh: 为单次调用选择、排序、压缩或摘要最相关信息，并组装成受预算与窗口约束的可见上下文包。
+      en: Selecting, ordering, compressing, or summarizing the most relevant information for one call and assembling it into a visible context package bounded by budget and window limits.
+      ja: 一回の呼び出し向けに最も関連する情報を選択・順位付け・圧縮・要約し、予算とウィンドウ制約下の可視コンテキストパッケージへ組み立てます。
+    - zh: 记录本次组装的 token 预算、系统预留、被排除片段及排除原因，使输入变化可审计、可版本化。
+      en: Recording the token budget, system reservation, excluded fragments, and exclusion reasons for one assembly so input changes remain auditable and versioned.
+      ja: 一回の組み立てについて token 予算、system 予約、除外断片、除外理由を記録し、入力変化を監査可能・版管理可能にします。
   excludes:
-    - zh: 候选的发现与评分归上下文发现或检索与排序；组装不重写候选来源和得分。
-      en: Candidate discovery and scoring belong to context discovery or retrieval and ranking; assembly does not rewrite candidate provenance or scores.
-      ja: 候補の発見と採点はコンテキスト発見または検索と順位付けに属し、組み立ては候補の来歴や得点を書き換えません。
-    - zh: 面向受众的输出选择、截断和披露记录归输出披露；ContextWindow 不是输出窗口。
-      en: Audience-facing output selection, truncation, and disclosure records belong to output disclosure; ContextWindow is not an output window.
-      ja: 受け手向けの出力選択、切詰め、開示記録は出力開示に属し、ContextWindow は出力窓ではありません。
+    - zh: 候选的发现、索引构建与相关性评分；组装只消费上游结果，不重写其来源与分数。
+      en: Candidate discovery, index construction, and relevance scoring; assembly consumes upstream results without rewriting their provenance or scores.
+      ja: 候補の発見、索引構築、関連性採点。組み立ては上流結果を消費するだけで、来歴や得点を書き換えません。
+    - zh: 面向受众的输出选择、截断和披露；输入上下文窗口不等于最终展示给用户的输出窗口。
+      en: Audience-facing output selection, truncation, and disclosure; an input context window is not the output window shown to the user.
+      ja: 受け手向け出力選択、切詰め、開示。入力コンテキスト窓はユーザーへ表示される出力窓ではありません。
+    - zh: 跨会话持久记忆写入、向量索引更新与生命周期治理；组装最多引用这些结果，不拥有其持久身份。
+      en: Cross-session persistent memory writes, vector index updates, and lifecycle governance; assembly may reference these outcomes but does not own their durable identity.
+      ja: セッション横断の永続記憶書き込み、ベクトル索引更新、ライフサイクル管理。組み立ては結果を参照するだけで、永続 identity を所有しません。
   semantic_kind: null
   aliases: []
-purpose:
-  zh: 从发现与检索候选中选择、排序、裁剪和版本化当前运行可用的不可变上下文。
-  en: Select, order, trim, and version immutable context available to the current run from discovery and retrieval candidates.
-  ja: 発見・検索候補から現在実行で利用できる不変コンテキストを選択、整列、裁断、版管理します。
-structure: null
+engineering:
+  explanation:
+    zh: 主流产品把“写入记忆”“检索候选”和“纳入本次调用”拆成不同层。本模块映射 Cursor 的 @ 引用、最近文件与接近上限时的 auto-compact；Claude Code 的 /context 预算视图与阈值 summarization；Anthropic/LangChain 的 write/select/compress/isolate 策略；Pichay 的 L1–L4 需求分页；以及 Context Recycling 的五层固定预算工作区。规范（预算规则、槽位顺序）与一次组装发生事实（实际包版本、排除记录）必须分开建模。
+    en: Mainstream products split memory writes, retrieval candidates, and admission to the current call into different layers. This module maps Cursor @ references, recent files, and auto-compact near capacity; Claude Code /context budget views and threshold summarization; Anthropic/LangChain write/select/compress/isolate strategies; Pichay L1–L4 demand paging; and Context Recycling's five-layer fixed-budget workspace. Specifications (budget rules, slot order) must stay distinct from one assembly occurrence (actual package version, exclusion records).
+    ja: 主要製品は記憶書き込み、検索候補、今回呼び出しへの採用を別層に分けます。本モジュールは Cursor の @ 参照・recent files・上限接近時 auto-compact、Claude Code の /context 予算表示と閾値 summarization、Anthropic/LangChain の write/select/compress/isolate、Pichay L1–L4 demand paging、Context Recycling の五層固定予算 workspace を写像します。仕様（予算規則、slot 順序）と一回の assembly 発生事実（実 package 版、除外記録）は分離モデル化します。
+  typical_input:
+    - description: Cursor agent context — @ file/folder references, recent edits, semantic search hits, and workspace rules assembled before the model call.
+      format: |
+        # User message with explicit references
+        @src/auth/middleware.ts @docs/onboarding.md
+        Where is session validation handled?
+
+        # Client-side assembly (conceptual)
+        {
+          "referenced_files": ["src/auth/middleware.ts", "docs/onboarding.md"],
+          "recent_files": ["src/auth/session.ts"],
+          "semantic_hits": [{"path": "src/auth/middleware.ts", "score": 0.91}],
+          "rules": [".cursor/rules/security.mdc"]
+        }
+      source_claims: [claim-memory-context-cursor]
+    - description: Claude Code pre-compaction context — live token breakdown via /context and auto-compact when usage nears threshold (~83–95% of effective window).
+      format: |
+        /context
+        # => system prompt, tools, messages, rules, memory files by category
+
+        # settings.json env (optional earlier compaction)
+        {
+          "env": {
+            "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "70"
+          }
+        }
+
+        # manual compaction with focus
+        /compact focus on auth middleware changes and open test failures
+      source_claims: [claim-memory-context-claude-code]
+    - description: LangChain context-engineering loop — select retrieved chunks, compress stale tool output, isolate sub-agent scratchpad outside the main window.
+      format: |
+        # Write: persist outside window
+        state["scratchpad"] = {"files_touched": ["auth/middleware.ts"]}
+
+        # Select: pull only relevant store/RAG items this turn
+        selected = store.search(("tenant-7", "docs"), query="session validation")
+
+        # Compress: SummarizationMiddleware on message history
+        # Isolate: sub-agent returns 1–2k token summary to parent
+      source_claims: [claim-memory-context-langchain]
+    - description: Pichay demand paging — treat the live context window as L1 cache; evict stale pages and fault-in on re-read.
+      format: |
+        # Transparent proxy interposes on message stream
+        POST /v1/messages
+        [
+          {"role": "system", "content": "..."},
+          {"role": "user", "content": "Re-read src/auth/middleware.ts"},
+          {"role": "assistant", "content": "[Paged out: Read src/auth/middleware.ts (8,192 bytes). Re-read if needed.]"}
+        ]
+        # => page fault detected; fault-in original file content into L1 window
+      source_claims: [claim-memory-context-pichay]
+    - description: Context Recycling fixed-budget workspace — proactive load of Layers 0–1 (~3–12K tokens) from disk-backed Layers 2–3 before inference.
+      format: |
+        {
+          "active_context_budget_tokens": 12000,
+          "layers": {
+            "L0_stable_prefix": ["system.md", "tool_schemas"],
+            "L1_recyclable_workspace": ["current_task.md", "selected_chunks"],
+            "L2_bm25_index": "in_memory_routing",
+            "L3_disk_store": "sqlite://session_store"
+          },
+          "proactive_load_query": "authentication middleware session validation"
+        }
+      source_claims: [claim-memory-context-recycling]
+  typical_output:
+    - description: Moonweave-local context package projection — versioned ordered slots, token accounting, and exclusions.
+      format: |
+        {
+          "schema_owner": "moonweave-local-design",
+          "context_assembly_id": "assembly-204",
+          "context_package_id": "package-204",
+          "context_package_version": 3,
+          "content_digest_sha256": "355247694ba49e2a3be867fbf737a3d157f0a5ed4c9d60723c1fb47ef880dc1e",
+          "token_budget": {
+            "ceiling": 32000,
+            "system_reservation": 4096,
+            "accepted_content": 27304,
+            "remaining": 600
+          },
+          "ordered_slots": [
+            {"ordinal": 1, "role": "system_instruction", "source_ref": "instruction-v12"},
+            {"ordinal": 2, "role": "user_message", "source_ref": "message-v41"},
+            {"ordinal": 3, "role": "retrieved_chunk", "source_ref": "chunk-policy-003"}
+          ],
+          "exclusions": [
+            {"source_ref": "chunk-42", "reason": "capacity-insufficient-after-system-reservation"}
+          ]
+        }
+      source_claims: [claim-memory-context-design]
+  reference_implementations:
+    - name: Cursor Agent Context
+      url: https://cursor.com/docs/agent/tools/search
+      description: "@ references, recent files, semantic codebase search, and self-summarization/auto-compact near context limits."
+    - name: Claude Code Context Window
+      url: https://code.claude.com/docs/en/context-window
+      description: /context token breakdown, automatic compaction, /compact focus instructions, and sub-agent isolation.
+    - name: LangChain Context Engineering
+      url: https://docs.langchain.com/oss/python/langchain/context-engineering
+      description: Write, select, compress, and isolate strategies with middleware and LangGraph state.
+    - name: LangChain Context Engineering Blog
+      url: https://www.langchain.com/blog/context-engineering-for-agents
+      description: Canonical write/select/compress/isolate framework for agent context curation.
+    - name: Pichay — Demand Paging for Context Windows
+      url: https://arxiv.org/abs/2603.09023
+      description: L1–L4 memory hierarchy, eviction, page faults, and working-set pinning for LLM context.
+    - name: Context Recycling
+      url: https://arxiv.org/abs/2606.26105
+      description: Five-layer hierarchy and fixed-budget recyclable workspace for long-horizon inference.
+    - name: Manus Context Engineering
+      url: https://manus.im/en/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus
+      description: Progressive disclosure, filesystem-as-context, and recency-biased plan injection.
+structure:
+  identity_keys: [context_assembly_id, context_package_id, context_package_version]
+  fields:
+    - id: context_assembly_id
+      labels: {zh: 上下文组装标识, en: Context assembly identifier, ja: コンテキスト組立識別子}
+      definitions:
+        zh: 唯一标识一次从候选到最终输入包的组装运行，不是包本身或单次模型调用的运行标识。
+        en: Uniquely identifies one assembly run from candidates to a final input package, not the package itself or the model-call run identifier.
+        ja: 候補から最終入力パッケージまでの一回の組立実行を一意に識別し、パッケージ自体やモデル呼び出し run ID ではありません。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: '^[A-Za-z0-9._:-]{3,128}$'
+      example_value: assembly-204
+      allowed_values: []
+      source_claims: [claim-memory-context-design]
+    - id: context_package_id
+      labels: {zh: 上下文包标识, en: Context package identifier, ja: コンテキストパッケージ識別子}
+      definitions:
+        zh: 标识一组可版本化上下文包 lineage 的稳定 ID；同一 lineage 的不同版本共享此 ID。
+        en: Stable ID for a versioned context-package lineage; different versions in one lineage share this ID.
+        ja: 版管理可能なコンテキストパッケージ系列の安定 ID。同一系列の異なる版はこれを共有します。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: '^[A-Za-z0-9._:-]{3,128}$'
+      example_value: package-204
+      allowed_values: []
+      source_claims: [claim-memory-context-design]
+    - id: context_package_version
+      labels: {zh: 上下文包版本, en: Context package version, ja: コンテキストパッケージ版}
+      definitions:
+        zh: 标识同一上下文包 lineage 中的不可变版本；压缩、刷新或重新选择候选后必须递增。
+        en: Identifies one immutable version within a context-package lineage; must increment after compaction, refresh, or re-selection.
+        ja: 同一コンテキストパッケージ系列内の不変版を識別。圧縮、更新、候補再選択後は増分必須です。
+      datatype: integer
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: 3
+      allowed_values: []
+      source_claims: [claim-memory-context-design]
+    - id: content_digest_sha256
+      labels: {zh: 内容摘要, en: Content digest, ja: 内容ダイジェスト}
+      definitions:
+        zh: 对最终有序槽位内容与元数据的 SHA-256 摘要，用于重放校验；不得用 token 计数代替。
+        en: SHA-256 digest over final ordered slot contents and metadata for replay verification; must not be replaced by token counts.
+        ja: 最終 ordered slot 内容と metadata の SHA-256 ダイジェスト。再現検証用。token 数で代用不可。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: '^[a-f0-9]{64}$'
+      example_value: 355247694ba49e2a3be867fbf737a3d157f0a5ed4c9d60723c1fb47ef880dc1e
+      allowed_values: []
+      source_claims: [claim-memory-context-design]
+    - id: token_ceiling
+      labels: {zh: Token 上限, en: Token ceiling, ja: Token 上限}
+      definitions:
+        zh: 本次组装允许进入模型输入的总 token 预算上限，含系统预留前的名义容量。
+        en: Nominal total token budget allowed into model input for this assembly, before system reservation accounting.
+        ja: 今回の組み立てでモデル入力へ許可される token 予算上限（system 予約前の名目容量）。
+      datatype: integer
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: 32000
+      allowed_values: []
+      source_claims: [claim-memory-context-claude-code, claim-memory-context-recycling]
+    - id: system_reservation
+      labels: {zh: 系统预留, en: System reservation, ja: システム予約}
+      definitions:
+        zh: 为系统指令、工具 schema 或固定前缀保留且不可被候选内容挤占的 token 配额。
+        en: Token quota reserved for system instructions, tool schemas, or fixed prefixes that candidate content must not consume.
+        ja: system 指示、tool schema、固定 prefix 用に予約され、候補内容が消費してはならない token 枠。
+      datatype: integer
+      required: false
+      cardinality: {min: 0, max: 1}
+      pattern: null
+      example_value: 4096
+      allowed_values: []
+      source_claims: [claim-memory-context-design]
+    - id: slot_ordinal
+      labels: {zh: 槽位序号, en: Slot ordinal, ja: スロット順序}
+      definitions:
+        zh: 在最终上下文窗口中的从 1 开始的唯一顺序位置；相同序号不得重复。
+        en: Unique 1-based position in the final context window; the same ordinal must not repeat.
+        ja: 最終コンテキストウィンドウ内の 1 始まり一意位置。同一 ordinal の重複不可。
+      datatype: integer
+      required: true
+      cardinality: {min: 1, max: null}
+      pattern: null
+      example_value: 1
+      allowed_values: []
+      source_claims: [claim-memory-context-design]
+    - id: source_ref
+      labels: {zh: 来源引用, en: Source reference, ja: 出典参照}
+      definitions:
+        zh: 指向槽位所引用内容的独立来源与固定版本，例如消息、分块、记忆记录或用户 @ 文件状态。
+        en: Independent source and pinned version referenced by a slot, such as a message, chunk, memory record, or user @ file state.
+        ja: スロットが参照する独立出典と固定版。message、chunk、記憶レコード、ユーザー @ ファイル状態など。
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: chunk-policy-003@v7
+      allowed_values: []
+      source_claims: [claim-memory-context-cursor, claim-memory-context-design]
+  constraints:
+    - id: context-package-requires-pinned-sources
+      severity: error
+      expression_language: plain
+      expression: Every admitted slot must reference a pinned source identity; copied text without source_ref makes the package non-replayable.
+      explanation:
+        zh: 没有固定来源，相同摘要可能对应多条记录，无法审计模型实际读取了哪一版。
+        en: Without a pinned source, identical digests can match multiple records and the model's actual read version cannot be audited.
+        ja: 固定出典がなければ同一 digest が複数 record に一致し、モデルが実際に読んだ版を監査できません。
+      source_claims: [claim-memory-context-design]
+    - id: context-exclusion-requires-reason
+      severity: error
+      expression_language: plain
+      expression: Any candidate omitted from the final window must record exclusion reason and required versus available token counts when capacity-driven.
+      explanation:
+        zh: 只记录“未纳入”而不说明预算或策略原因，无法解释为何相关检索块没有进入调用。
+        en: Recording omission without budget or policy reason cannot explain why a relevant retrieved chunk never entered the call.
+        ja: 予算や方針理由なしの「未採用」記録では、関連検索 chunk が呼び出しに入らなかった理由を説明できません。
+      source_claims: [claim-memory-context-design, claim-memory-context-recycling]
+    - id: top-k-not-equal-to-context-admission
+      severity: warning
+      expression_language: plain
+      expression: Retrieval Top-K membership must not be treated as automatic context admission; assembly must record its own package version.
+      explanation:
+        zh: 检索返回的候选集合不等于模型最终看见的输入集合。
+        en: A retrieval candidate set is not the same as the input set the model ultimately sees.
+        ja: 検索候補集合はモデルが最終的に見る入力集合と同一ではありません。
+      source_claims: [claim-memory-context-langchain]
+  required_relations: []
 examples:
-  - id: memory-context-cq-version-membership-v3-example-positive
-    kind: positive
+  - id: memory-context-example-cursor-assembly
     labels:
-      zh: 包窗口来源链正例
-      en: Package-window-source chain positive case
-      ja: 包-window-出典鎖の正例
-    scenario_id: null
+      zh: Cursor 上下文组装
+      en: Cursor context assembly
+      ja: Cursor コンテキスト組み立て
     descriptions:
-      zh: assembly-88 产生 package-88，包包含 window-88；窗口的六个槽位各自带 ordinal，并组成一个由固定状态的独立 SourceReference 承担的 ContextSourceRole。
-      en: assembly-88 produces package-88 containing window-88; each of six slots has an ordinal and composes a ContextSourceRole borne by an independent SourceReference pinned to a determinate state.
-      ja: assembly-88 は window-88 を含む package-88 を生成し、六 slot は ordinal と ContextSourceRole を持ち、各 role は determinate state に固定した independent SourceReference が担います。
+      zh: 开发者在 Cursor Agent 中发送“@src/auth/middleware.ts 会话校验在哪？”客户端先解析 @ 引用加载 middleware.ts 全文，再合并最近编辑的 session.ts 与语义搜索命中，按系统规则→用户消息→引用文件→recent files 顺序组装；token 接近窗口 95% 时触发 auto-compact，把早期探索性读取摘要化并生成新 package 版本。
+      en: In Cursor Agent the developer sends "@src/auth/middleware.ts Where is session validation handled?" The client resolves @ references to load middleware.ts, merges recent edits in session.ts and semantic search hits, and assembles system rules → user message → referenced files → recent files. Near ~95% of the effective window, auto-compact summarizes early exploratory reads and bumps the package version.
+      ja: 開発者が Cursor Agent で「@src/auth/middleware.ts セッション検証はどこ？」と送信。クライアントは @ 参照を解決して middleware.ts を読み、recent 編集の session.ts と意味検索命中を統合し、system rules→user message→参照ファイル→recent files の順で組み立てます。実効ウィンドウ約 95% で auto-compact が早期探索読取を要約し package 版を更新します。
+    example_source:
+      product: Cursor
+      url: https://cursor.com/docs/agent/tools/search
+      version: "Agent @ references, semantic search, self-summarization"
     field_values:
-      context_assembly_id: assembly-88
-      context_package:
-        package_id: package-88
-        schema_version: context-package/3.0
-        sha256: 355247694ba49e2a3be867fbf737a3d157f0a5ed4c9d60723c1fb47ef880dc1e
-      context_window:
-        window_id: window-88
-        token_count: 31544
-      ordered_slots:
-        - slot_id: slot-88-01
-          ordinal: 1
-          source_role_id: role-slot-88-01
-          source_reference_id: ref-system-instruction
-          source_identity_id: instruction-v12
-        - slot_id: slot-88-02
-          ordinal: 2
-          source_role_id: role-slot-88-02
-          source_reference_id: ref-thread-7-turn-41
-          source_identity_id: message-v1
-        - slot_id: slot-88-03
-          ordinal: 3
-          source_role_id: role-slot-88-03
-          source_reference_id: ref-thread-7-turn-42
-          source_identity_id: message-v1
-        - slot_id: slot-88-04
-          ordinal: 4
-          source_role_id: role-slot-88-04
-          source_reference_id: ref-preference-theme
-          source_identity_id: memory-record-v5
-        - slot_id: slot-88-05
-          ordinal: 5
-          source_role_id: role-slot-88-05
-          source_reference_id: ref-call-weather-19
-          source_identity_id: tool-result-v1
-        - slot_id: slot-88-06
-          ordinal: 6
-          source_role_id: role-slot-88-06
-          source_reference_id: ref-doc-policy-chunk-003
-          source_identity_id: chunk-v7
+      user_message: "@src/auth/middleware.ts Where is session validation handled?"
+      referenced_files:
+        - src/auth/middleware.ts
+      recent_files:
+        - src/auth/session.ts
+      semantic_hits:
+        - path: src/auth/middleware.ts
+          score: 0.91
+      assembly_order:
+        - system_rules
+        - user_message
+        - referenced_files
+        - recent_files
+      auto_compact_trigger_pct: 95
+      post_compact_package_version: 2
     related_node_ids:
-      - ContextAssembly
-      - ContextPackage
-      - ContextWindow
-      - ContextSlot
-      - ContextSourceRole
-      - SourceReference
-    related_relation_ids:
-      - ContextAssembly-produces-ContextPackage
-      - ContextPackage-has_window-ContextWindow
-      - ContextWindow-has_slot-ContextSlot
-      - ContextSlot-has_source_role-ContextSourceRole
-      - ContextSourceRole-borne_by-SourceReference
-    expected_result:
-      zh: 按顺序返回 assembly-88、package-88、window-88、六个唯一序号、六个槽位作用域来源角色及其各自承担者和固定来源状态。
-      en: Return assembly-88, package-88, window-88, all six unique ordinals, six slot-scoped source roles, and each role's bearer and pinned source state in order.
-      ja: assembly-88・package-88・window-88・六 unique ordinal・六 slot-scoped source role と各 bearer/pinned source state を順に返します。
-    why_valid_or_invalid:
-      zh: 包摘要、最终窗口身份、唯一槽位序号和版本化来源路径共同固定了这次模型调用所见的准确投影，因此可重放。
-      en: The package digest, final-window identity, unique ordinals, and versioned source paths make this exact model-call projection replayable.
-      ja: package digest、最終 window の同一性、一意な slot 順序、版付き source path が、この model call の正確な投影を固定するため再生可能です。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - memory-context
+      - memory-retrieval-ranking
+    related_relation_ids: []
     source_claims:
-      - claim-memory-context-003
-  - id: memory-context-cq-version-membership-v3-example-counter
-    kind: counterexample
+      - claim-memory-context-cursor
+      - claim-memory-context-design
+  - id: memory-context-example-claude-auto-compact
     labels:
-      zh: 槽位无来源反例
-      en: Unprovenanced slot counterexample
-      ja: 出典なしslotの反例
-    scenario_id: null
+      zh: Claude Code 自动压缩
+      en: Claude Code auto-compact
+      ja: Claude Code 自動コンパクト
     descriptions:
-      zh: window-draft 有一个复制文本槽位，但没有 ContextSourceRole、独立 SourceReference 或固定 SourceIdentity。
-      en: window-draft contains a copied-text slot with no ContextSourceRole, independent SourceReference, or pinned SourceIdentity.
-      ja: window-draft は copied-text slot を持ちますが ContextSourceRole・independent SourceReference・pinned SourceIdentity がありません。
+      zh: 长会话中 Claude Code 通过 /context 显示 system、tools、messages、rules 各类 token 占用。当使用量接近有效窗口阈值（文档约 95%，实现常更早）时 autoCompact 在 compact_boundary 之前的历史上运行 summarization，保留 CLAUDE.md 与未 scoped 规则，而 path-scoped 规则需待再次读文件后重载；用户也可 /compact focus on failing tests 主动压缩。
+      en: During a long Claude Code session, /context shows token usage by system, tools, messages, and rules. When usage nears the effective window threshold (documented around 95%, often earlier in practice), autoCompact summarizes history before compact_boundary, preserving CLAUDE.md and unscoped rules while path-scoped rules reload only after matching files are read again. The user may also run /compact focus on failing tests manually.
+      ja: 長セッションで Claude Code は /context により system・tools・messages・rules の token 使用量を表示。実効ウィンドウ閾値（文書上約 95%、実装ではより早い）に近づくと autoCompact が compact_boundary より前の履歴を要約し、CLAUDE.md と unscoped rules を保持、path-scoped rules は一致ファイル再読後に再ロード。ユーザーは /compact focus on failing tests も実行可能。
+    example_source:
+      product: Claude Code
+      url: https://code.claude.com/docs/en/context-window
+      version: autoCompact, /context, /compact
     field_values:
-      context_package_id: package-draft-17
-      context_window_id: window-draft
-      slot_id: slot-draft-04
-      slot_ordinal: 4
-      copied_text_sha256: 7333d79dd1c9a7608dc5c0c5f1e1e2292c1dd6165ac145121e48b19fbf507fb1
-      context_source_role_present: false
-      source_reference_present: false
-      source_identity_present: false
-      replayable: false
+      context_command: /context
+      auto_compact_strategy: autoCompact
+      documented_threshold_pct: 95
+      compact_boundary_present: true
+      preserved_after_compact:
+        - CLAUDE.md
+        - unscoped_rules
+      reloaded_on_file_read:
+        - path_scoped_rules
+      manual_compact: /compact focus on failing tests
     related_node_ids:
-      - ContextAssembly
-      - ContextPackage
-      - ContextWindow
-      - ContextSlot
-      - ContextSourceRole
-      - SourceReference
-    related_relation_ids:
-      - ContextAssembly-produces-ContextPackage
-      - ContextPackage-has_window-ContextWindow
-      - ContextWindow-has_slot-ContextSlot
-      - ContextSlot-has_source_role-ContextSourceRole
-      - ContextSourceRole-borne_by-SourceReference
-    expected_result:
-      zh: 在 slot-draft-04 停止遍历，逐项报告来源角色、独立引用和固定来源状态缺失，并把 package-draft-17 判为不可重放。
-      en: Stop at slot-draft-04, report its missing source role, independent reference, and pinned source state, and classify package-draft-17 as non-replayable.
-      ja: slot-draft-04 で traversal を止め source role・independent reference・pinned source state の欠落を報告し package-draft-17 を non-replayable とします。
-    why_valid_or_invalid:
-      zh: 相同文本摘要可能来自多条记录或多个消息版本，无法说明组装活动实际读取了哪一个实体及其哪个字段。
-      en: A copied digest can match several records or message versions; it cannot identify which entity and field the assembly actually read.
-      ja: 同じ text digest は複数の record や message version に一致し得るため、assembly が実際に読んだ entity と field を特定できません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - memory-context
+    related_relation_ids: []
     source_claims:
-      - claim-memory-context-004
-  - id: memory-context-cq-budget-accounting-v3-example-positive
-    kind: positive
+      - claim-memory-context-claude-code
+      - claim-memory-context-design
+  - id: memory-context-example-pichay-demand-paging
     labels:
-      zh: 预算排除正例
-      en: Budget exclusion positive case
-      ja: 予算除外の正例
-    scenario_id: null
+      zh: Pichay 需求分页
+      en: Pichay demand paging
+      ja: Pichay デマンドページング
     descriptions:
-      zh: assembly-88 使用 budget-32k 并记录 exclude-42；exclude-42 指向 chunk-42，原因是保留系统指令后仅剩 600 tokens。
-      en: assembly-88 uses budget-32k and records exclude-42, which points to chunk-42 because only 600 tokens remained after the system reservation.
-      ja: assembly-88 は budget-32k を使い exclude-42 を記録し、system予約後600tokensだけのため chunk-42 を指します。
+      zh: "Pichay 作为客户端与推理 API 之间的透明代理，把实时上下文窗口视为 L1 缓存。陈旧工具输出被逐出并替换为“[Paged out: Read file.py … Re-read if needed.]”占位符；当模型再次请求该文件时触发 page fault 并 fault-in 原文。fault 历史驱动 working-set pinning，在 681 轮生产部署中上下文消耗最高降 93%。"
+      en: "Pichay acts as a transparent proxy between client and inference API, treating the live context window as L1 cache. Stale tool output is evicted and replaced with \"[Paged out: Read file.py … Re-read if needed.]\" placeholders; when the model re-requests the file, a page fault fault-ins the original content. Fault history drives working-set pinning, reducing context consumption by up to 93% over 681 production turns."
+      ja: "Pichay は client と inference API 間の透明 proxy として live context window を L1 cache 扱いします。古いツール出力は追い出され「[Paged out: Read file.py … Re-read if needed.]」プレースホルダーに置換。モデルが再要求すると page fault で原文を fault-in。fault 履歴が working-set pinning を駆動し、681 turn 本番で context 消費を最大 93% 削減。"
+    example_source:
+      product: Pichay
+      url: https://arxiv.org/abs/2603.09023
+      version: "arXiv:2603.09023 — L1 eviction, L2 pinning, L3 compaction"
     field_values:
-      context_assembly_id: assembly-88
-      context_budget:
-        budget_id: budget-32k
-        unit: token
-        ceiling: 32000
-        system_reservation: 4096
-        accepted_content: 27304
-        remaining: 600
-      excluded_chunk:
-        chunk_id: chunk-42
-        token_count: 912
-      context_exclusion:
-        exclusion_id: exclude-42
-        reason_code: capacity-insufficient-after-system-reservation
-        required_tokens: 912
-        available_tokens: 600
-        policy_id: context-trim-policy@v4
+      hierarchy_level: L1_generation_window
+      eviction_marker: "[Paged out: Read file.py (8192 bytes). Re-read if needed.]"
+      page_fault_trigger: model_re_requests_evicted_content
+      pinning_policy: fault_history_working_set
+      production_turns: 681
+      max_context_reduction_pct: 93
     related_node_ids:
-      - ContextAssembly
-      - ContextBudget
-      - ContextExclusion
-      - Chunk
-    related_relation_ids:
-      - context_assembly_uses_budget
-      - ContextAssembly-records-ContextExclusion
-      - context_exclusion_excludes_chunk
-    expected_result:
-      zh: 按 32,000 − 4,096 − 27,304 = 600 tokens 重算，并因 chunk-42 需要 912 tokens 而复现该排除决定。
-      en: Recalculate 32,000 − 4,096 − 27,304 = 600 tokens and reproduce the exclusion because chunk-42 requires 912 tokens.
-      ja: 32,000 − 4,096 − 27,304 = 600 tokens と再計算し、chunk-42 が 912 tokens を要するため同じ除外判断を再現します。
-    why_valid_or_invalid:
-      zh: 预算单位、上限、预留、消耗和候选大小均被固定。
-      en: Budget unit, ceiling, reservation, consumption, and candidate size are fixed.
-      ja: 予算単位・上限・予約・消費・候補sizeが固定されています。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - memory-context
+    related_relation_ids: []
     source_claims:
-      - claim-memory-context-005
-  - id: memory-context-cq-budget-accounting-v3-example-counter
-    kind: counterexample
+      - claim-memory-context-pichay
+  - id: memory-context-example-langgraph-scratchpad
     labels:
-      zh: 静默丢弃反例
-      en: Silent drop counterexample
-      ja: 黙示破棄の反例
-    scenario_id: null
+      zh: LangGraph 草稿状态组装
+      en: LangGraph scratchpad state assembly
+      ja: LangGraph スクラッチパッド状態組み立て
     descriptions:
-      zh: assembly-bad 的最终窗口缺少 chunk-43，但没有 ContextExclusion、预算读数或策略理由。
-      en: assembly-bad's final window omits chunk-43 but has no ContextExclusion, budget reading, or policy reason.
-      ja: assembly-bad の最終windowは chunk-43 を欠きますが ContextExclusion・予算値・方針理由がありません。
+      zh: LangGraph 智能体把跨步观察写入 state.scratchpad（write），每轮只 select 当前任务相关的 store 条目与检索块（select），SummarizationMiddleware 压缩陈旧消息（compress），子图在隔离 state 中运行并返回摘要给父图（isolate）。父图最终把这些字段按固定前缀→动态后缀顺序组装成一次 model call 的 messages 参数。
+      en: A LangGraph agent writes cross-step observations to state.scratchpad (write), selects only store entries and retrieved chunks relevant to the current step each turn (select), compresses stale messages via SummarizationMiddleware (compress), and runs a subgraph in isolated state returning a summary to the parent (isolate). The parent assembles these fields into the messages argument for one model call with stable prefix first and dynamic suffix last.
+      ja: LangGraph エージェントは跨 step 観察を state.scratchpad へ write し、各 turn で現 step に関連する store 項目と検索 chunk のみ select、SummarizationMiddleware で古い message を compress、subgraph を分離 state で実行して親へ summary を返します（isolate）。親は stable prefix→dynamic suffix の順で一回 model call の messages 引数へ組み立てます。
+    example_source:
+      product: LangGraph / LangChain
+      url: https://docs.langchain.com/oss/python/langchain/context-engineering
+      version: write/select/compress/isolate with middleware
     field_values:
-      context_assembly_id: assembly-bad
-      final_window_id: window-bad
-      omitted_chunk_id: chunk-43
-      final_window_token_count: 28640
-      budget_snapshot_present: false
-      context_exclusion_present: false
-      policy_reason_present: false
-      indistinguishable_alternatives:
-        - not-retrieved
-        - policy-filtered
-        - retrieval-error
-        - capacity-trimmed
+      strategies:
+        - write
+        - select
+        - compress
+        - isolate
+      scratchpad_field: state.scratchpad
+      middleware:
+        - SummarizationMiddleware
+      subgraph_return: condensed_summary_only
+      assembly_order: stable_prefix_then_dynamic_suffix
     related_node_ids:
-      - ContextAssembly
-      - ContextBudget
-      - ContextExclusion
-      - Chunk
-    related_relation_ids:
-      - context_assembly_uses_budget
-      - ContextAssembly-records-ContextExclusion
-      - context_exclusion_excludes_chunk
-    expected_result:
-      zh: 不得由缺席反推容量排除；应把预算快照、排除记录和策略原因分别列为未解决的证据缺口。
-      en: Do not infer a capacity exclusion from absence; return the missing budget snapshot, exclusion record, and policy reason as unresolved evidence.
-      ja: 不在だけから容量除外を推論せず、budget snapshot・exclusion record・policy reason の欠落を未解決証拠として個別に返します。
-    why_valid_or_invalid:
-      zh: 未记录决定就无法区分未检索、过滤、错误或容量裁剪。
-      en: Without a recorded decision, non-retrieval, filtering, error, and capacity trimming cannot be distinguished.
-      ja: 判断記録なしでは未検索・filter・error・容量裁断を区別できません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - memory-context
+      - memory-retrieval-ranking
+    related_relation_ids: []
     source_claims:
-      - claim-memory-context-006
-  - id: memory-context-cq-refresh-versioning-v3-example-positive
-    kind: positive
+      - claim-memory-context-langchain
+      - claim-memory-context-design
+  - id: memory-context-example-manus-progressive-disclosure
     labels:
-      zh: 刷新版本链正例
-      en: Refresh version chain positive case
-      ja: 更新版鎖の正例
-    scenario_id: null
+      zh: Manus 渐进式披露
+      en: Manus progressive disclosure
+      ja: Manus 段階的開示
     descriptions:
-      zh: refresh-19 指向 package-18，因工具清单变化触发 assembly-19，后者产生不同 digest 的 package-19。
-      en: refresh-19 identifies package-18, triggers assembly-19 because the tool inventory changed, and that assembly produces package-19 with a distinct digest.
-      ja: refresh-19 は package-18 を指し tool一覧変更で assembly-19 を起動し、別digestの package-19 を生成します。
+      zh: Manus 在启动时只把 Agent Skills 的 Level-1 元数据（name/description，约 100 tokens/skill）装入上下文；触发技能时再加载 Level-2 SKILL.md 指令（<5k tokens）；Level-3 脚本与资源通过沙箱文件系统按需读取。每步重写 todo.md 并把当前目标复述到上下文末尾，使全局计划保持在近期注意力区，而不是一次性把所有技能与历史灌进窗口。
+      en: Manus loads only Level-1 Agent Skill metadata (name/description, ~100 tokens per skill) at startup; loads Level-2 SKILL.md instructions (<5k tokens) when a skill triggers; reads Level-3 scripts and resources on demand from the sandbox filesystem. Each step rewrites todo.md and recites current objectives at the context tail so the global plan stays in recent attention instead of stuffing all skills and history into the window at once.
+      ja: Manus は起動時に Agent Skills の Level-1 metadata（name/description、約 100 tokens/skill）だけを context へ載せ、skill 発火時に Level-2 SKILL.md 指令（<5k tokens）をロード、Level-3 script/resource は sandbox filesystem から on-demand 読取。各 step で todo.md を書き換え現目標を context 末尾へ復唱し、全 skill と履歴を一度に窓へ詰め込まず global plan を recent attention 域に保ちます。
+    example_source:
+      product: Manus
+      url: https://manus.im/en/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus
+      version: progressive disclosure + filesystem-as-context
     field_values:
-      refresh_event_id: refresh-19
-      predecessor_package_id: package-18
-      predecessor_sha256: 2a3439ca19ce99d6f6e35b62ed68b56585b7a89a92bf4a5d1ce2c73d20b6fd81
-      refresh_reason_code: tool-inventory-version-changed
-      previous_tool_inventory_version: tools@18
-      new_tool_inventory_version: tools@19
-      triggered_assembly_id: assembly-19
-      successor_package_id: package-19
-      successor_sha256: 15eaa6ef948f82b87cc85b3a48d0731d64a3097f7ce85d0fbabfd1bb176b3194
-      predecessor_preserved: true
+      skill_level_1_tokens_per_skill: 100
+      skill_level_2_max_tokens: 5000
+      skill_level_3_access: on_demand_filesystem
+      standing_state_file: todo.md
+      recency_injection: rewrite_at_context_tail
+      filesystem_as_context: true
     related_node_ids:
-      - ContextRefreshEvent
-      - ContextPackage
-      - ContextAssembly
-    related_relation_ids:
-      - ContextRefreshEvent-identifies_predecessor-ContextPackage
-      - ContextRefreshEvent-triggers-ContextAssembly
-      - ContextAssembly-produces-ContextPackage
-    expected_result:
-      zh: 返回前序包、刷新原因、新组装和后继包的有序链。
-      en: Return the ordered predecessor, refresh reason, new assembly, and successor chain.
-      ja: 前版包・更新理由・新組立・後続包の順序鎖を返します。
-    why_valid_or_invalid:
-      zh: 不同的包摘要以及 refresh-to-assembly 显式链同时保留旧投影，并说明新投影因何、由哪次组装产生。
-      en: Distinct package digests and the explicit refresh-to-assembly chain preserve both the old projection and the cause of the new one.
-      ja: 異なる package digest と明示的な refresh-to-assembly chain が旧投影を保持し、新投影の原因と生成 assembly を示します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - memory-context
+    related_relation_ids: []
     source_claims:
-      - claim-memory-context-007
-  - id: memory-context-cq-refresh-versioning-v3-example-counter
-    kind: counterexample
-    labels:
-      zh: 原地覆盖反例
-      en: In-place overwrite counterexample
-      ja: 上書きの反例
-    scenario_id: null
-    descriptions:
-      zh: package-current 被直接覆盖为新内容，没有 predecessor ID、ContextRefreshEvent 或新 assembly ID。
-      en: package-current is overwritten with new content and has no predecessor ID, ContextRefreshEvent, or new assembly ID.
-      ja: package-current は新内容で上書きされ predecessor ID・ContextRefreshEvent・新 assembly ID がありません。
-    field_values:
-      package_id_before: package-current
-      package_id_after: package-current
-      sha256_before: 65028fce9ffecab0bd0ef74c649a9c619f22d29c02fe3cdca022f5af7c43074e
-      sha256_after: 6d9dfc17a5a384587883d65fc16d968959f15b211bc1c102d8de8899996e893f
-      same_identity_overwritten: true
-      predecessor_id_present: false
-      refresh_event_present: false
-      new_assembly_id_present: false
-      replayable: false
-    related_node_ids:
-      - ContextRefreshEvent
-      - ContextPackage
-      - ContextAssembly
-    related_relation_ids:
-      - ContextRefreshEvent-identifies_predecessor-ContextPackage
-      - ContextRefreshEvent-triggers-ContextAssembly
-      - ContextAssembly-produces-ContextPackage
-    expected_result:
-      zh: 报告同一身份被原地覆盖、前序链断裂，以及因缺少刷新事件和生产组装而无法重放。
-      en: Report an in-place overwrite, a broken predecessor chain, and a non-replayable refresh because no event or producing assembly is identified.
-      ja: 同一 identity の上書き、predecessor chain の断裂、および refresh event と生成 assembly の欠落による再生不能を報告します。
-    why_valid_or_invalid:
-      zh: 原地覆盖消除了前序身份和产生新内容的活动证据。
-      en: In-place overwrite erases predecessor identity and the activity evidence producing new content.
-      ja: 上書きは前版同一性と新内容生成活動証拠を消します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-context-008
+      - claim-memory-context-manus
+      - claim-memory-context-design
 parent_relation: null
 relations: []
-module_contract:
-  interaction_contract:
-    applicability: operational
-    facets:
-      input:
-        applicable: true
-        description:
-          zh: 上下文组装接收记忆记录、已检索分块、发现结果与跨模块 CommandOutputObservation；前三类由 consumes 事实交接，输出观测只有在 ContextIngressEvent-makes_available-CommandOutputObservation 明确选择后才成为本次包的候选证据。
-          en: Context assembly receives memory records, retrieved chunks, discovery results, and cross-module CommandOutputObservations. The first three hand off through consumes facts; an output observation becomes candidate evidence only when ContextIngressEvent-makes_available-CommandOutputObservation explicitly selects it.
-          ja: context assembly は memory record・retrieved chunk・discovery result・module 横断 CommandOutputObservation を受け取ります。前三者は consumes fact で受渡し、output observation は ContextIngressEvent-makes_available-CommandOutputObservation が明示選択した場合だけ candidate evidence になります。
-        family_concept_ids:
-          - MemoryRecord
-          - RetrievedChunk
-          - DiscoveryResult
-          - CommandOutputObservation
-        relation_ids:
-          - ContextAssembly-consumes-MemoryRecord
-          - ContextAssembly-consumes-RetrievedChunk
-          - ContextAssembly-consumes-DiscoveryResult
-          - ContextIngressEvent-makes_available-CommandOutputObservation
-        not_applicable_reason: null
-      output:
-        applicable: true
-        description:
-          zh: 上下文组装产生可重放 ContextPackage 与 ContextExclusion；ContextIngressEvent 另以 ingested_into_context 固定每次接纳所写入的确切包版本，包再包含提交给模型的有界有序窗口。
-          en: Context assembly produces replayable ContextPackages and ContextExclusions. ContextIngressEvent separately fixes the exact package version populated by each admission through ingested_into_context, and the package contains the bounded ordered model-input window.
-          ja: context assembly は再現可能 ContextPackage と ContextExclusion を生成します。ContextIngressEvent は ingested_into_context で各 admission が投入した正確な package version を固定し、package は bounded ordered model-input window を含みます。
-        family_concept_ids:
-          - ContextPackage
-          - ContextWindow
-          - ContextExclusion
-          - ContextIngressEvent
-        relation_ids:
-          - ContextAssembly-produces-ContextPackage
-          - ContextPackage-has_window-ContextWindow
-          - ContextAssembly-records-ContextExclusion
-          - ingested_into_context
-        not_applicable_reason: null
-      failure:
-        applicable: false
-        description: null
-        family_concept_ids: []
-        relation_ids: []
-        not_applicable_reason:
-          zh: 该本体不负责判定运行失败。消息、运行主体或输出披露需要指出实际使用了哪份上下文而不改变其成员时，引用 ContextPackage 或版本。
-          en: This ontology does not own runtime-failure adjudication. Messages, runtime actors, or output disclosure references ContextPackage or a version when identifying the context actually used without changing its members.
-          ja: このオントロジーは実行失敗の判定を所有しません。メッセージ、実行主体、出力開示がメンバーを変えず実際に使用したコンテキストを示すとき、ContextPackage または版を参照します。
-      recovery:
-        applicable: false
-        description: null
-        family_concept_ids: []
-        relation_ids: []
-        not_applicable_reason:
-          zh: 该本体不负责启动恢复流程。消息、运行主体或输出披露需要指出实际使用了哪份上下文而不改变其成员时，引用 ContextPackage 或版本。
-          en: This ontology does not initiate a recovery workflow. Messages, runtime actors, or output disclosure references ContextPackage or a version when identifying the context actually used without changing its members.
-          ja: このオントロジーは回復ワークフローを開始しません。メッセージ、実行主体、出力開示がメンバーを変えず実際に使用したコンテキストを示すとき、ContextPackage または版を参照します。
-    review:
-      review_status: accepted
-      reviewers:
-        - reviewer_id: moonweave-memory-domain-reviewer
-          reviewer_role: domain
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 上下文组装与输出披露按唯一 owner 和可判定问题分界。
-            en: Context assembly and Output disclosure are separated by unique ownership and answerable questions.
-            ja: コンテキスト組み立てと出力開示は一意の所有者と判定可能な問いで分離されます。
-        - reviewer_id: moonweave-ontology-structure-reviewer
-          reviewer_role: ontology
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 上下文组装与输出披露按唯一 owner 和可判定问题分界。
-            en: Context assembly and Output disclosure are separated by unique ownership and answerable questions.
-            ja: コンテキスト組み立てと出力開示は一意の所有者と判定可能な問いで分離されます。
-  taxonomy_contract:
-    applicability: mixed-backbone
-    not_applicable_reason: null
-    hierarchy_policy: arbitrary-depth-reviewed-backbone
-    key_root_concept_ids:
-      - ContextArtifact
-      - ContextAssemblyActivity
-      - ContextSpecification
-    allowed_backbone_predicates:
-      - has_source_role
-      - has_slot
-      - has_visible_window
-      - ingested_into_context
-      - is_a
-      - triggers
-    flat_root_exception_concept_ids: []
-    review:
-      review_status: accepted
-      reviewers:
-        - reviewer_id: moonweave-memory-domain-reviewer
-          reviewer_role: domain
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 逐项核验后保留三条诚实根：ContextArtifact 承载可保存和传递的组装信息，ContextAssemblyActivity 承载选择、排序、裁剪与刷新活动，ContextSpecification 承载可跨运行复用的规则与容量预算。ContextRule 与 ContextBudget 通过 is_a 进入规范分支；applies 和 uses_budget 只记录某次活动采用规范的横向事实。
-            en: "Point-by-point review retains three honest roots: ContextArtifact carries storable, transferable assembled information; ContextAssemblyActivity carries selection, ordering, trimming, and refresh activities; ContextSpecification carries rules and capacity budgets reusable across runs. ContextRule and ContextBudget enter the specification branch through is_a, while applies and uses_budget record only a particular activity's adoption as cross-link facts."
-            ja: 個別審査後は三 honest root を維持します。ContextArtifact は保存・転送可能な assembled information、ContextAssemblyActivity は selection・ordering・trimming・refresh activity、ContextSpecification は run 横断で再利用する rule/capacity budget を担います。ContextRule/ContextBudget は is_a で specification branch に入り applies/uses_budget は一 activity の adoption cross-link のみです。
-        - reviewer_id: moonweave-ontology-structure-reviewer
-          reviewer_role: ontology
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 本体审查确认 ContextArtifact、ContextAssemblyActivity 与 ContextSpecification 互不充当全局父。规范分支中 ContextRule 与 ContextBudget 是同属上位规范但种差不同的兄弟：前者声明条件—效力，后者声明计量单位、上限、预留与溢出动作。ContextSlot 组成 ContextSourceRole，而独立 SourceReference 只通过 borne_by 横向连接，避免复制来源身份。
-            en: "Ontology review confirms that ContextArtifact, ContextAssemblyActivity, and ContextSpecification do not act as global parents for one another. In the specification branch, ContextRule and ContextBudget are siblings with different differentia: the former declares condition-to-effect behavior, while the latter declares unit, ceiling, reservation, and overflow action. ContextSlot composes ContextSourceRole, and the independent SourceReference is connected only through the borne_by cross-link so source identity is not copied."
-            ja: 本体審査は ContextArtifact・ContextAssemblyActivity・ContextSpecification が互いの global parent にならないと確認しました。specification branch で ContextRule と ContextBudget は sibling ですが、前者は condition-to-effect、後者は unit・ceiling・reservation・overflow action を宣言します。ContextSlot は ContextSourceRole を構成し independent SourceReference は borne_by cross-link のみで結び source identity を複製しません。
-  competency_questions:
-    - id: memory-context-cq-version-membership-v3
-      semantic_key: memory-context.package-window-lineage
-      primary_owner_module_id: memory-context
-      related_module_ids:
-        - info-storage-sources
-      questions:
-        zh: 一次 ContextAssembly 产生了哪个可重放 ContextPackage，该包包含哪个最终 ContextWindow，窗口中的每个 ContextSlot 来自哪里？
-        en: Which replayable ContextPackage did a ContextAssembly produce, which final ContextWindow does it contain, and where did each ContextSlot originate?
-        ja: ContextAssembly はどの再現可能 ContextPackage を生成し、どの最終 ContextWindow を含み、各 ContextSlot はどこから来ましたか。
-      query: Traverse ContextAssembly to its produced ContextPackage, the package's final ContextWindow, the window's ordered ContextSlots, each slot's ContextSourceRole, and the independent SourceReference bearing that role.
-      expected_assertion: The answer returns one versioned package, its contained final window, every position-unique slot, one slot-scoped source role per admitted source, and the pinned independent SourceReference bearing each role.
-      evidence_binding:
-        applicability: relation-backed
-        owner_concept_ids:
-          - ContextAssembly
-          - ContextPackage
-          - ContextWindow
-          - ContextSlot
-          - ContextSourceRole
-        related_concept_ids:
-          - SourceReference
-        relation_ids:
-          - ContextAssembly-produces-ContextPackage
-          - ContextPackage-has_window-ContextWindow
-          - ContextWindow-has_slot-ContextSlot
-          - ContextSlot-has_source_role-ContextSourceRole
-          - ContextSourceRole-borne_by-SourceReference
-        not_applicable_reason: null
-      positive_example_ids:
-        - memory-context-cq-version-membership-v3-example-positive
-      counterexample_ids:
-        - memory-context-cq-version-membership-v3-example-counter
-      source_claims:
-        - claim-memory-context-009
-        - claim-memory-context-010
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已人工验证组装、包、窗口、槽位、槽位作用域来源角色及独立来源引用构成连续五跳证据链。
-              en: Manually verified a continuous five-hop evidence chain from assembly through package, window, slot, and slot-scoped source role to its independent source reference.
-              ja: assembly から package・window・slot・slot-scoped source role を経て independent source reference までの連続 five-hop evidence chain を個別確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 结构复核确认 ContextSource 已弃用；槽位必须先组成 ContextSourceRole，再由 accepted borne_by 关系指向 info-storage-sources 拥有的 SourceReference。
-              en: "Ontology review confirms that ContextSource is deprecated: a slot composes ContextSourceRole, which then points through the accepted borne_by relation to SourceReference owned by info-storage-sources."
-              ja: ontology review は ContextSource が deprecated であることを確認しました。slot は ContextSourceRole を構成し、accepted borne_by relation で info-storage-sources 所有の SourceReference を指します。
-    - id: memory-context-cq-budget-accounting-v3
-      semantic_key: memory-context.budget-and-exclusion
-      primary_owner_module_id: memory-context
-      related_module_ids:
-        - memory-chunking-situating
-      questions:
-        zh: 一次 ContextAssembly 使用了哪份 ContextBudget，并因容量或策略排除了哪些 Chunk，理由是否可审计？
-        en: Which ContextBudget did a ContextAssembly use, which Chunks were excluded for capacity or policy reasons, and are those reasons auditable?
-        ja: ContextAssembly はどの ContextBudget を使い、容量・方針理由でどの Chunk を除外し、その理由を監査できますか。
-      query: Read the ContextBudget used by the assembly, follow its recorded ContextExclusions to excluded Chunks, and compare each reason with the budget unit, ceiling, reservation, and decision stage.
-      expected_assertion: The answer returns the exact budget version, excluded Chunks, and a per-exclusion reason tied to measured capacity or an explicit rule rather than silently dropping content.
-      evidence_binding:
-        applicability: relation-backed
-        owner_concept_ids:
-          - ContextAssembly
-          - ContextBudget
-          - ContextExclusion
-        related_concept_ids:
-          - Chunk
-        relation_ids:
-          - context_exclusion_excludes_chunk
-        not_applicable_reason: null
-      positive_example_ids:
-        - memory-context-cq-budget-accounting-v3-example-positive
-      counterexample_ids:
-        - memory-context-cq-budget-accounting-v3-example-counter
-      source_claims:
-        - claim-memory-context-011
-        - claim-memory-context-012
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已人工验证预算、排除决定与被排除分块形成可重算的审计链。
-              en: Manually verified a recomputable audit chain from budget through exclusion decision to omitted Chunk.
-              ja: 予算から除外判断・除外Chunkまで再計算可能監査鎖を個別確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已人工验证预算、排除决定与被排除分块形成可重算的审计链。
-              en: Manually verified a recomputable audit chain from budget through exclusion decision to omitted Chunk.
-              ja: 予算から除外判断・除外Chunkまで再計算可能監査鎖を個別確認しました。
-    - id: memory-context-cq-refresh-versioning-v3
-      semantic_key: memory-context.refresh-versioning
-      primary_owner_module_id: memory-context
-      related_module_ids: []
-      questions:
-        zh: 哪次 ContextRefreshEvent 指向哪个前序 ContextPackage、触发了哪次新 ContextAssembly，并产生了哪个后继包？
-        en: Which predecessor ContextPackage did a ContextRefreshEvent identify, which new ContextAssembly did it trigger, and which successor package resulted?
-        ja: ContextRefreshEvent はどの前版 ContextPackage を指し、どの新 ContextAssembly を起動し、どの後続包を生成しましたか。
-      query: Traverse the refresh event to its predecessor ContextPackage and triggered ContextAssembly, then follow the assembly to the produced successor ContextPackage and compare version identifiers.
-      expected_assertion: The answer returns an ordered predecessor-event-assembly-successor chain with distinct package versions and a recorded refresh reason.
-      evidence_binding:
-        applicability: owner-only
-        owner_concept_ids:
-          - ContextRefreshEvent
-          - ContextPackage
-          - ContextAssembly
-        related_concept_ids: []
-        relation_ids: []
-        not_applicable_reason:
-          zh: 刷新事件、前序/后继上下文包和新组装活动均属于本模块；这里追踪内部版本链，不存在跨模块证据端点。
-          en: The refresh event, predecessor and successor packages, and new assembly activity all belong to this module; the question traces an internal version chain with no cross-module evidence endpoint.
-          ja: refresh event・前後package・新assembly activityはいずれも本moduleに属し、cross-module evidence endpointなしで内部版連鎖を追跡します。
-      positive_example_ids:
-        - memory-context-cq-refresh-versioning-v3-example-positive
-      counterexample_ids:
-        - memory-context-cq-refresh-versioning-v3-example-counter
-      source_claims:
-        - claim-memory-context-013
-        - claim-memory-context-014
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已人工验证前序包、刷新事件、新组装与后继包形成有序版本链。
-              en: Manually verified an ordered version chain from predecessor package through refresh event and new assembly to successor package.
-              ja: 前版包・refresh event・新組立・後続包の順序付き版鎖を個別確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已人工验证前序包、刷新事件、新组装与后继包形成有序版本链。
-              en: Manually verified an ordered version chain from predecessor package through refresh event and new assembly to successor package.
-              ja: 前版包・refresh event・新組立・後続包の順序付き版鎖を個別確認しました。
-  key_notion:
-    zh: 上下文组装
-    en: context assembly
-    ja: コンテキスト組立
-  owns_when:
-    zh: 当对象的身份取决于某次上下文组装、所产生的包版本、槽位成员与顺序、预算取舍、排除原因或为组装提供的可复用规范时，由本模块拥有。
-    en: Own an object when its identity is determined by one context assembly, an admission event binding selected observations to a determinate package version, slot order, source selection, budget trimming, or immutable context version.
-    ja: 対象の同一性が一回のコンテキスト組み立て、選択済み観測を特定 package 版へ結び付ける admission event、slot 順序、出典選択、予算裁断、または不変コンテキスト版で決まる場合に所有します。
-  references_when:
-    zh: 本模块从发现或检索模块引用候选及其分数，从来源模块引用出处；消息、运行主体或输出披露需要指出实际使用的输入时，只引用已确定成员的 ContextPackage 版本。
-    en: Messages, runtime actors, or output disclosure references ContextPackage or a version when identifying the context actually used without changing its members.
-    ja: メッセージ、実行主体、出力開示がメンバーを変えず実際に使用したコンテキストを示すとき、ContextPackage または版を参照します。
-  boundary_decisions:
-    - other_module_id: info-container-command
-      subject_concept_ids:
-        - ContextIngressEvent
-        - ContextSummary
-      decision: owns
-      owner_module_id: memory-context
-      rationale:
-        zh: 本条只投影两条真实跨模块边的上下文侧端点：ContextIngressEvent 使既有 CommandOutputObservation 可用于一次组装，ContextSummary 则是该观测经摘要后形成的上下文输入。ContextPackage 是组装域内部产物，不是这两条边的端点。
-        en: "This row projects only the context-side endpoints of two real cross-module facts: ContextIngressEvent makes an existing CommandOutputObservation available to one assembly, while ContextSummary is the summarized context input derived from that observation. ContextPackage is an internal assembly artifact, not an endpoint of either edge."
-        ja: この行は二つの実在する module 横断事実の context 側 endpoint だけを投影します。ContextIngressEvent は既存 CommandOutputObservation を一 assembly で利用可能にし、ContextSummary はその observation を要約した context input です。ContextPackage は assembly domain 内部 artifact で、どちらの edge の endpoint でもありません。
-      relation_ids:
-        - ContextIngressEvent-makes_available-CommandOutputObservation
-        - summarized_as_context_input
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-context-015
-        - claim-memory-context-016
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 逐项复核确认上下文侧端点恰为 ContextIngressEvent 与 ContextSummary；内部关系 ingested_into_context 和内部产物 ContextPackage 不得冒充 info-container-command 边界。
-              en: Point-by-point review confirms that ContextIngressEvent and ContextSummary are exactly the context-side endpoints; the internal ingested_into_context relation and ContextPackage artifact cannot be presented as an info-container-command boundary.
-              ja: 項目別審査により context 側 endpoint は ContextIngressEvent と ContextSummary だけと確認しました。内部 relation ingested_into_context と ContextPackage artifact を info-container-command 境界に見せません。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 结构复核确认两条 accepted 跨界关系分别连接 ContextIngressEvent 与 ContextSummary 到同一 CommandOutputObservation；本条完整投影这两个 owner 侧端点。
-              en: Structural review confirms that the two accepted boundary relations connect ContextIngressEvent and ContextSummary to the same CommandOutputObservation; this row completely projects those two owner-side endpoints.
-              ja: 構造審査により二つの accepted boundary relation は ContextIngressEvent と ContextSummary を同じ CommandOutputObservation へ接続すると確認し、この行は二つの owner 側 endpoint を完全に投影します。
-    - other_module_id: info-container-command
-      subject_concept_ids:
-        - CommandOutputObservation
-      decision: references
-      owner_module_id: info-container-command
-      rationale:
-        zh: 上下文组装拥有把既有 CommandOutputObservation 接入确定 ContextPackage 版本的 ContextIngressEvent、选择范围与裁剪决定；执行观测拥有原始输出通道、分块顺序和退出状态。 本条只引用 info-container-command 拥有的 CommandOutputObservation。
-        en: Context assembly owns the ContextIngressEvent that admits an existing CommandOutputObservation into a determinate ContextPackage version, together with range selection and trimming decisions; execution observations own the original output channel, chunk order, and exit status. This row only references CommandOutputObservation owned by info-container-command.
-        ja: context assembly は既存 CommandOutputObservation を特定 ContextPackage 版へ受け入れる ContextIngressEvent、範囲選択、裁断判断を所有し、execution observations は元の出力チャネル、チャンク順序、終了状態を所有します。 この行は info-container-command 所有の CommandOutputObservation のみを参照します。
-      relation_ids:
-        - ContextIngressEvent-makes_available-CommandOutputObservation
-        - summarized_as_context_input
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-context-015
-        - claim-memory-context-016
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 上下文组装拥有把既有 CommandOutputObservation 接入确定 ContextPackage 版本的 ContextIngressEvent、选择范围与裁剪决定；执行观测拥有原始输出通道、分块顺序和退出状态。 本条只引用 info-container-command 拥有的 CommandOutputObservation。
-              en: Context assembly owns the ContextIngressEvent that admits an existing CommandOutputObservation into a determinate ContextPackage version, together with range selection and trimming decisions; execution observations own the original output channel, chunk order, and exit status. This row only references CommandOutputObservation owned by info-container-command.
-              ja: context assembly は既存 CommandOutputObservation を特定 ContextPackage 版へ受け入れる ContextIngressEvent、範囲選択、裁断判断を所有し、execution observations は元の出力チャネル、チャンク順序、終了状態を所有します。 この行は info-container-command 所有の CommandOutputObservation のみを参照します。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 上下文组装拥有把既有 CommandOutputObservation 接入确定 ContextPackage 版本的 ContextIngressEvent、选择范围与裁剪决定；执行观测拥有原始输出通道、分块顺序和退出状态。 本条只引用 info-container-command 拥有的 CommandOutputObservation。
-              en: Context assembly owns the ContextIngressEvent that admits an existing CommandOutputObservation into a determinate ContextPackage version, together with range selection and trimming decisions; execution observations own the original output channel, chunk order, and exit status. This row only references CommandOutputObservation owned by info-container-command.
-              ja: context assembly は既存 CommandOutputObservation を特定 ContextPackage 版へ受け入れる ContextIngressEvent、範囲選択、裁断判断を所有し、execution observations は元の出力チャネル、チャンク順序、終了状態を所有します。 この行は info-container-command 所有の CommandOutputObservation のみを参照します。
-    - other_module_id: memory-chunking-situating
-      subject_concept_ids:
-        - ContextExclusion
-      decision: owns
-      owner_module_id: memory-context
-      rationale:
-        zh: ContextExclusion 记录某次 ContextAssembly 在给定 ContextBudget 下为何舍弃候选内容，其身份来自组装决定。
-        en: ContextExclusion records why one ContextAssembly omitted candidate content under a given ContextBudget; its identity comes from the assembly decision.
-        ja: ContextExclusion は特定の ContextAssembly が ContextBudget 下で候補内容を除外した理由を記録し、同一性は組立判断に由来します。
-      relation_ids:
-        - context_exclusion_excludes_chunk
-      relation_not_applicable_reason: null
-      overlap_not_applicable_reason:
-        zh: 该邻接记录组装活动对 Chunk 的使用或排除，不把 ContextExclusion 与 Chunk 视为同类候选，因此不存在概念所有权竞争。
-        en: This adjacency records an assembly's use or exclusion of a Chunk; ContextExclusion and Chunk are not alternative classifications, so there is no competing concept ownership.
-        ja: この adjacency は assembly による Chunk の使用・除外を記録します。ContextExclusion と Chunk は代替分類ではなく concept ownership の競合はありません。
-      source_claims:
-        - claim-memory-context-017
-        - claim-memory-context-018
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已核实 ContextExclusion 是组装预算下的排除决定，Chunk 是被引用但未被改写的来源对象；跨域边不是上下位关系。
-              en: Verified that ContextExclusion is an exclusion decision under an assembly budget, while Chunk is a referenced source object that is not rewritten; the cross-domain edge is not a subtype relation.
-              ja: ContextExclusion は組立予算下の除外判断、Chunk は参照されても書き換えられない出典対象であり、cross-domain edge は上下位関係ではありません。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已核实 ContextExclusion 是组装预算下的排除决定，Chunk 是被引用但未被改写的来源对象；跨域边不是上下位关系。
-              en: Verified that ContextExclusion is an exclusion decision under an assembly budget, while Chunk is a referenced source object that is not rewritten; the cross-domain edge is not a subtype relation.
-              ja: ContextExclusion は組立予算下の除外判断、Chunk は参照されても書き換えられない出典対象であり、cross-domain edge は上下位関係ではありません。
-    - other_module_id: memory-chunking-situating
-      subject_concept_ids:
-        - Chunk
-      decision: references
-      owner_module_id: memory-chunking-situating
-      rationale:
-        zh: Chunk 保留文本范围、来源版本与分块谱系；进入或退出一个上下文包不会改变其规范身份。
-        en: Chunk retains its text extent, source version, and chunking lineage; admission to or exclusion from a context package does not change its canonical identity.
-        ja: Chunk はテキスト範囲・出典版・分割系譜を保ち、context package への採用や除外で正規同一性は変わりません。
-      relation_ids:
-        - context_exclusion_excludes_chunk
-      relation_not_applicable_reason: null
-      overlap_not_applicable_reason:
-        zh: 该邻接记录组装活动对 Chunk 的使用或排除，不把 ContextExclusion 与 Chunk 视为同类候选，因此不存在概念所有权竞争。
-        en: This adjacency records an assembly's use or exclusion of a Chunk; ContextExclusion and Chunk are not alternative classifications, so there is no competing concept ownership.
-        ja: この adjacency は assembly による Chunk の使用・除外を記録します。ContextExclusion と Chunk は代替分類ではなく concept ownership の競合はありません。
-      source_claims:
-        - claim-memory-context-017
-        - claim-memory-context-018
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已核实 ContextExclusion 是组装预算下的排除决定，Chunk 是被引用但未被改写的来源对象；跨域边不是上下位关系。
-              en: Verified that ContextExclusion is an exclusion decision under an assembly budget, while Chunk is a referenced source object that is not rewritten; the cross-domain edge is not a subtype relation.
-              ja: ContextExclusion は組立予算下の除外判断、Chunk は参照されても書き換えられない出典対象であり、cross-domain edge は上下位関係ではありません。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已核实 ContextExclusion 是组装预算下的排除决定，Chunk 是被引用但未被改写的来源对象；跨域边不是上下位关系。
-              en: Verified that ContextExclusion is an exclusion decision under an assembly budget, while Chunk is a referenced source object that is not rewritten; the cross-domain edge is not a subtype relation.
-              ja: ContextExclusion は組立予算下の除外判断、Chunk は参照されても書き換えられない出典対象であり、cross-domain edge は上下位関係ではありません。
-    - other_module_id: info-output-disclosure
-      subject_concept_ids:
-        - OutputWindow
-      decision: references
-      owner_module_id: info-output-disclosure
-      rationale:
-        zh: OutputWindow 是输出披露域拥有的面向受众输出范围；本条只通过 VisibleContextWindow-conforms_to-OutputWindow 引用它。ContextSelectionDecision 属于上下文组装且不是该关系端点，不能混入输出侧投影。
-        en: OutputWindow is the audience-facing output range owned by output disclosure and is referenced here only through VisibleContextWindow-conforms_to-OutputWindow. ContextSelectionDecision belongs to context assembly and is not an endpoint of that relation, so it cannot appear in the output-side projection.
-        ja: OutputWindow は output disclosure が所有する audience-facing output range であり、ここでは VisibleContextWindow-conforms_to-OutputWindow だけを通じて参照します。ContextSelectionDecision は context assembly に属し同 relation の endpoint ではないため output 側投影へ混在させません。
-      relation_ids:
-        - VisibleContextWindow-conforms_to-OutputWindow
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-context-019
-        - claim-memory-context-020
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 逐项复核确认输出侧唯一端点是 OutputWindow；已废弃的 selects_from 关系与上下文侧 ContextSelectionDecision 均不属于本条。
-              en: Point-by-point review confirms that OutputWindow is the sole output-side endpoint; the retired selects_from relation and context-owned ContextSelectionDecision do not belong in this row.
-              ja: 項目別審査により output 側の唯一 endpoint は OutputWindow と確認し、deprecated selects_from relation と context-owned ContextSelectionDecision はこの行に含めません。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 结构复核确认 accepted 跨界事实只有 VisibleContextWindow-conforms_to-OutputWindow，故 owner-homogeneous 输出侧集合严格为 OutputWindow。
-              en: Structural review confirms that VisibleContextWindow-conforms_to-OutputWindow is the only accepted cross-boundary fact, so the owner-homogeneous output-side set is exactly OutputWindow.
-              ja: 構造審査により accepted な module 横断事実は VisibleContextWindow-conforms_to-OutputWindow だけで、owner-homogeneous output 側集合は OutputWindow のみと確認しました。
-    - other_module_id: info-output-disclosure
-      subject_concept_ids:
-        - VisibleContextWindow
-      decision: owns
-      owner_module_id: memory-context
-      rationale:
-        zh: 上下文组装拥有运行输入侧的 ContextWindow、槽位、预算和版本；输出披露拥有运行输出侧面向受众的显示范围与记录。 本条仅记录 VisibleContextWindow；其 canonical owner 是上下文组装（memory-context），因此 memory-context 在此拥有这些概念。
-        en: Context assembly owns input-side ContextWindow values, slots, budgets, and versions; output disclosure owns audience-facing display ranges and records on the output side. This record is limited to VisibleContextWindow; their canonical owner is Context assembly (memory-context), so memory-context owns these concepts here.
-        ja: コンテキスト組み立ては実行入力側の ContextWindow、slot、予算、版を所有し、出力開示は実行出力側の受け手向け表示範囲と記録を所有します。 この記録は VisibleContextWindow だけを対象とし、canonical owner はコンテキスト組み立て（memory-context）です。したがって memory-context はここでこれらを所有します。
-      relation_ids:
-        - VisibleContextWindow-conforms_to-OutputWindow
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-context-021
-        - claim-memory-context-022
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 上下文组装拥有运行输入侧的 ContextWindow、槽位、预算和版本；输出披露拥有运行输出侧面向受众的显示范围与记录。 本条仅记录 VisibleContextWindow；其 canonical owner 是上下文组装（memory-context），因此 memory-context 在此拥有这些概念。
-              en: Context assembly owns input-side ContextWindow values, slots, budgets, and versions; output disclosure owns audience-facing display ranges and records on the output side. This record is limited to VisibleContextWindow; their canonical owner is Context assembly (memory-context), so memory-context owns these concepts here.
-              ja: コンテキスト組み立ては実行入力側の ContextWindow、slot、予算、版を所有し、出力開示は実行出力側の受け手向け表示範囲と記録を所有します。 この記録は VisibleContextWindow だけを対象とし、canonical owner はコンテキスト組み立て（memory-context）です。したがって memory-context はここでこれらを所有します。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 上下文组装拥有运行输入侧的 ContextWindow、槽位、预算和版本；输出披露拥有运行输出侧面向受众的显示范围与记录。 本条仅记录 VisibleContextWindow；其 canonical owner 是上下文组装（memory-context），因此 memory-context 在此拥有这些概念。
-              en: Context assembly owns input-side ContextWindow values, slots, budgets, and versions; output disclosure owns audience-facing display ranges and records on the output side. This record is limited to VisibleContextWindow; their canonical owner is Context assembly (memory-context), so memory-context owns these concepts here.
-              ja: コンテキスト組み立ては実行入力側の ContextWindow、slot、予算、版を所有し、出力開示は実行出力側の受け手向け表示範囲と記録を所有します。 この記録は VisibleContextWindow だけを対象とし、canonical owner はコンテキスト組み立て（memory-context）です。したがって memory-context はここでこれらを所有します。
-    - other_module_id: info-messages-instructions
-      subject_concept_ids:
-        - Message
-      decision: references
-      owner_module_id: info-messages-instructions
-      rationale:
-        zh: 上下文组装拥有 ContextAssembly、Package、Window、Slot、Source 及选择排序裁剪活动；消息与对话拥有被纳入或引用的 Message 及其会话顺序。 本条仅记录 Message；其 canonical owner 是消息与会话（info-messages-instructions），因此 memory-context 在此引用这些概念。
-        en: Context assembly owns ContextAssembly, Package, Window, Slot, Source, and selection, ordering, or trimming activities; messages and conversations own included or referencing Message and its dialogue order. This record is limited to Message; their canonical owner is Messages and conversations (info-messages-instructions), so memory-context references these concepts here.
-        ja: context assembly は ContextAssembly、Package、Window、Slot、Source、selection/ordering/trimming activity を所有し、message/conversation は include/reference される Message と dialogue order を所有します。 この記録は Message だけを対象とし、canonical owner はメッセージと会話（info-messages-instructions）です。したがって memory-context はここでこれらを参照します。
-      relation_ids:
-        - ContextPackage-contains_message-Message
-        - Message-references_context-ContextPackage
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-context-023
-        - claim-memory-context-024
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 上下文组装拥有 ContextAssembly、Package、Window、Slot、Source 及选择排序裁剪活动；消息与对话拥有被纳入或引用的 Message 及其会话顺序。 本条仅记录 Message；其 canonical owner 是消息与会话（info-messages-instructions），因此 memory-context 在此引用这些概念。
-              en: Context assembly owns ContextAssembly, Package, Window, Slot, Source, and selection, ordering, or trimming activities; messages and conversations own included or referencing Message and its dialogue order. This record is limited to Message; their canonical owner is Messages and conversations (info-messages-instructions), so memory-context references these concepts here.
-              ja: context assembly は ContextAssembly、Package、Window、Slot、Source、selection/ordering/trimming activity を所有し、message/conversation は include/reference される Message と dialogue order を所有します。 この記録は Message だけを対象とし、canonical owner はメッセージと会話（info-messages-instructions）です。したがって memory-context はここでこれらを参照します。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 上下文组装拥有 ContextAssembly、Package、Window、Slot、Source 及选择排序裁剪活动；消息与对话拥有被纳入或引用的 Message 及其会话顺序。 本条仅记录 Message；其 canonical owner 是消息与会话（info-messages-instructions），因此 memory-context 在此引用这些概念。
-              en: Context assembly owns ContextAssembly, Package, Window, Slot, Source, and selection, ordering, or trimming activities; messages and conversations own included or referencing Message and its dialogue order. This record is limited to Message; their canonical owner is Messages and conversations (info-messages-instructions), so memory-context references these concepts here.
-              ja: context assembly は ContextAssembly、Package、Window、Slot、Source、selection/ordering/trimming activity を所有し、message/conversation は include/reference される Message と dialogue order を所有します。 この記録は Message だけを対象とし、canonical owner はメッセージと会話（info-messages-instructions）です。したがって memory-context はここでこれらを参照します。
-    - other_module_id: info-messages-instructions
-      subject_concept_ids:
-        - ContextPackage
-      decision: owns
-      owner_module_id: memory-context
-      rationale:
-        zh: 上下文组装拥有 ContextAssembly、Package、Window、Slot、Source 及选择排序裁剪活动；消息与对话拥有被纳入或引用的 Message 及其会话顺序。 本条仅记录 ContextPackage；其 canonical owner 是上下文组装（memory-context），因此 memory-context 在此拥有这些概念。
-        en: Context assembly owns ContextAssembly, Package, Window, Slot, Source, and selection, ordering, or trimming activities; messages and conversations own included or referencing Message and its dialogue order. This record is limited to ContextPackage; their canonical owner is Context assembly (memory-context), so memory-context owns these concepts here.
-        ja: context assembly は ContextAssembly、Package、Window、Slot、Source、selection/ordering/trimming activity を所有し、message/conversation は include/reference される Message と dialogue order を所有します。 この記録は ContextPackage だけを対象とし、canonical owner はコンテキスト組み立て（memory-context）です。したがって memory-context はここでこれらを所有します。
-      relation_ids:
-        - ContextPackage-contains_message-Message
-        - Message-references_context-ContextPackage
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-context-025
-        - claim-memory-context-026
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 上下文组装拥有 ContextAssembly、Package、Window、Slot、Source 及选择排序裁剪活动；消息与对话拥有被纳入或引用的 Message 及其会话顺序。 本条仅记录 ContextPackage；其 canonical owner 是上下文组装（memory-context），因此 memory-context 在此拥有这些概念。
-              en: Context assembly owns ContextAssembly, Package, Window, Slot, Source, and selection, ordering, or trimming activities; messages and conversations own included or referencing Message and its dialogue order. This record is limited to ContextPackage; their canonical owner is Context assembly (memory-context), so memory-context owns these concepts here.
-              ja: context assembly は ContextAssembly、Package、Window、Slot、Source、selection/ordering/trimming activity を所有し、message/conversation は include/reference される Message と dialogue order を所有します。 この記録は ContextPackage だけを対象とし、canonical owner はコンテキスト組み立て（memory-context）です。したがって memory-context はここでこれらを所有します。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 上下文组装拥有 ContextAssembly、Package、Window、Slot、Source 及选择排序裁剪活动；消息与对话拥有被纳入或引用的 Message 及其会话顺序。 本条仅记录 ContextPackage；其 canonical owner 是上下文组装（memory-context），因此 memory-context 在此拥有这些概念。
-              en: Context assembly owns ContextAssembly, Package, Window, Slot, Source, and selection, ordering, or trimming activities; messages and conversations own included or referencing Message and its dialogue order. This record is limited to ContextPackage; their canonical owner is Context assembly (memory-context), so memory-context owns these concepts here.
-              ja: context assembly は ContextAssembly、Package、Window、Slot、Source、selection/ordering/trimming activity を所有し、message/conversation は include/reference される Message と dialogue order を所有します。 この記録は ContextPackage だけを対象とし、canonical owner はコンテキスト組み立て（memory-context）です。したがって memory-context はここでこれらを所有します。
-    - other_module_id: info-indexing
-      subject_concept_ids:
-        - DiscoveryResult
-      decision: references
-      owner_module_id: info-indexing
-      rationale:
-        zh: 上下文组装拥有根据预算和规则选择、排序、裁剪候选并形成可消费输入的活动；上下文发现拥有产生候选和相关性观测的 DiscoveryActivity 与轻量索引视图。 本条仅记录 DiscoveryResult；其 canonical owner 是上下文发现（info-indexing），因此 memory-context 在此引用这些概念。
-        en: Context assembly owns activities that select, order, and trim candidates under budgets and rules into consumable input; context discovery owns DiscoveryActivity and lightweight index views producing candidates and relevance observations. This record is limited to DiscoveryResult; their canonical owner is Context discovery (info-indexing), so memory-context references these concepts here.
-        ja: context assembly は budget/rule 下で candidate を select/order/trim して consumable input にする activity を所有し、context discovery は candidate/relevance observation を生成する DiscoveryActivity と lightweight index view を所有します。 この記録は DiscoveryResult だけを対象とし、canonical owner はコンテキスト発見（info-indexing）です。したがって memory-context はここでこれらを参照します。
-      relation_ids:
-        - ContextAssembly-consumes-DiscoveryResult
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-context-027
-        - claim-memory-context-028
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 上下文组装拥有根据预算和规则选择、排序、裁剪候选并形成可消费输入的活动；上下文发现拥有产生候选和相关性观测的 DiscoveryActivity 与轻量索引视图。 本条仅记录 DiscoveryResult；其 canonical owner 是上下文发现（info-indexing），因此 memory-context 在此引用这些概念。
-              en: Context assembly owns activities that select, order, and trim candidates under budgets and rules into consumable input; context discovery owns DiscoveryActivity and lightweight index views producing candidates and relevance observations. This record is limited to DiscoveryResult; their canonical owner is Context discovery (info-indexing), so memory-context references these concepts here.
-              ja: context assembly は budget/rule 下で candidate を select/order/trim して consumable input にする activity を所有し、context discovery は candidate/relevance observation を生成する DiscoveryActivity と lightweight index view を所有します。 この記録は DiscoveryResult だけを対象とし、canonical owner はコンテキスト発見（info-indexing）です。したがって memory-context はここでこれらを参照します。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 上下文组装拥有根据预算和规则选择、排序、裁剪候选并形成可消费输入的活动；上下文发现拥有产生候选和相关性观测的 DiscoveryActivity 与轻量索引视图。 本条仅记录 DiscoveryResult；其 canonical owner 是上下文发现（info-indexing），因此 memory-context 在此引用这些概念。
-              en: Context assembly owns activities that select, order, and trim candidates under budgets and rules into consumable input; context discovery owns DiscoveryActivity and lightweight index views producing candidates and relevance observations. This record is limited to DiscoveryResult; their canonical owner is Context discovery (info-indexing), so memory-context references these concepts here.
-              ja: context assembly は budget/rule 下で candidate を select/order/trim して consumable input にする activity を所有し、context discovery は candidate/relevance observation を生成する DiscoveryActivity と lightweight index view を所有します。 この記録は DiscoveryResult だけを対象とし、canonical owner はコンテキスト発見（info-indexing）です。したがって memory-context はここでこれらを参照します。
-    - other_module_id: info-indexing
-      subject_concept_ids:
-        - ContextAssembly
-      decision: owns
-      owner_module_id: memory-context
-      rationale:
-        zh: 上下文组装拥有根据预算和规则选择、排序、裁剪候选并形成可消费输入的活动；上下文发现拥有产生候选和相关性观测的 DiscoveryActivity 与轻量索引视图。 本条仅记录 ContextAssembly；其 canonical owner 是上下文组装（memory-context），因此 memory-context 在此拥有这些概念。
-        en: Context assembly owns activities that select, order, and trim candidates under budgets and rules into consumable input; context discovery owns DiscoveryActivity and lightweight index views producing candidates and relevance observations. This record is limited to ContextAssembly; their canonical owner is Context assembly (memory-context), so memory-context owns these concepts here.
-        ja: context assembly は budget/rule 下で candidate を select/order/trim して consumable input にする activity を所有し、context discovery は candidate/relevance observation を生成する DiscoveryActivity と lightweight index view を所有します。 この記録は ContextAssembly だけを対象とし、canonical owner はコンテキスト組み立て（memory-context）です。したがって memory-context はここでこれらを所有します。
-      relation_ids:
-        - ContextAssembly-consumes-DiscoveryResult
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-context-029
-        - claim-memory-context-030
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 上下文组装拥有根据预算和规则选择、排序、裁剪候选并形成可消费输入的活动；上下文发现拥有产生候选和相关性观测的 DiscoveryActivity 与轻量索引视图。 本条仅记录 ContextAssembly；其 canonical owner 是上下文组装（memory-context），因此 memory-context 在此拥有这些概念。
-              en: Context assembly owns activities that select, order, and trim candidates under budgets and rules into consumable input; context discovery owns DiscoveryActivity and lightweight index views producing candidates and relevance observations. This record is limited to ContextAssembly; their canonical owner is Context assembly (memory-context), so memory-context owns these concepts here.
-              ja: context assembly は budget/rule 下で candidate を select/order/trim して consumable input にする activity を所有し、context discovery は candidate/relevance observation を生成する DiscoveryActivity と lightweight index view を所有します。 この記録は ContextAssembly だけを対象とし、canonical owner はコンテキスト組み立て（memory-context）です。したがって memory-context はここでこれらを所有します。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 上下文组装拥有根据预算和规则选择、排序、裁剪候选并形成可消费输入的活动；上下文发现拥有产生候选和相关性观测的 DiscoveryActivity 与轻量索引视图。 本条仅记录 ContextAssembly；其 canonical owner 是上下文组装（memory-context），因此 memory-context 在此拥有这些概念。
-              en: Context assembly owns activities that select, order, and trim candidates under budgets and rules into consumable input; context discovery owns DiscoveryActivity and lightweight index views producing candidates and relevance observations. This record is limited to ContextAssembly; their canonical owner is Context assembly (memory-context), so memory-context owns these concepts here.
-              ja: context assembly は budget/rule 下で candidate を select/order/trim して consumable input にする activity を所有し、context discovery は candidate/relevance observation を生成する DiscoveryActivity と lightweight index view を所有します。 この記録は ContextAssembly だけを対象とし、canonical owner はコンテキスト組み立て（memory-context）です。したがって memory-context はここでこれらを所有します。
-    - other_module_id: info-storage-sources
-      subject_concept_ids:
-        - SourceReference
-      decision: references
-      owner_module_id: info-storage-sources
-      rationale:
-        zh: ContextSlot 组成槽位作用域的 ContextSourceRole，并以 borne_by 关系指出实际来源；独立 SourceReference 的对象、位置、版本与锚身份仍由来源本体拥有。
-        en: ContextSlot composes a slot-scoped ContextSourceRole and uses borne_by to identify the actual source; source ontology retains the independent SourceReference identity for object, location, version, and anchor.
-        ja: ContextSlot は slot-scoped ContextSourceRole を構成し borne_by で実 source を示します。object・location・version・anchor による independent SourceReference identity は source ontology が保持します。
-      relation_ids:
-        - ContextSourceRole-borne_by-SourceReference
-      relation_not_applicable_reason: null
-      overlap_not_applicable_reason:
-        zh: ContextSourceRole 是某来源在一个槽位中的参与角色，SourceReference 是可独立复用的来源引用；role 与 bearer 由明确关系连接且 semantic kind 不同，不是争夺同一身份的候选。
-        en: ContextSourceRole is a source's participation role in one slot, whereas SourceReference is an independently reusable source reference. Role and bearer are linked explicitly and have different semantic kinds, so they are not competing identity candidates.
-        ja: ContextSourceRole は一 slot における source の participation role、SourceReference は独立再利用可能な source reference です。role と bearer は明示 relation で結ばれ semantic kind も異なるため、同一 identity を争う候補ではありません。
-      source_claims:
-        - claim-memory-context-031
-        - claim-memory-context-032
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-17
-            decision_note:
-              zh: 领域复核确认槽位来源角色随槽位和包版本变化，独立 SourceReference 身份不随参与位置变化。
-              en: Domain review confirms that a slot source role varies with slot and package version, while independent SourceReference identity does not vary with participation position.
-              ja: domain review は slot source role が slot/package version に応じて変わり、independent SourceReference identity は participation position で変わらないことを確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-17
-            decision_note:
-              zh: 结构复核确认 accepted ContextSourceRole-borne_by-SourceReference 是角色到承担者的信息关系，不是 is_a，也不存在重叠候选。
-              en: Ontology review confirms that accepted ContextSourceRole-borne_by-SourceReference is an information relation from role to bearer, not is_a, and creates no overlap candidate family.
-              ja: ontology review は accepted ContextSourceRole-borne_by-SourceReference が role から bearer への information relation であり is_a ではなく、overlap candidate family を作らないことを確認しました。
-    - other_module_id: info-storage-sources
-      subject_concept_ids:
-        - ContextSourceRole
-      decision: owns
-      owner_module_id: memory-context
-      rationale:
-        zh: 本条投影上下文侧的 ContextSourceRole：它以 package_version、slot_id 和 bearer_reference_id 为身份，记录某个独立来源在一次具体上下文槽位中的参与角色。与对侧记录相同，本条只包含 ContextSourceRole —borne_by→ SourceReference；角色生命周期随包结束，来源引用本身不被复制或改写。
-        en: This row projects the context-side ContextSourceRole, identified by package_version, slot_id, and bearer_reference_id, which records an independent source's participation in one concrete context slot. Like its peer row, it contains only ContextSourceRole —borne_by→ SourceReference. The role ends with the package while the source reference is neither copied nor rewritten.
-        ja: この行は context 側 ContextSourceRole を projection します。package_version・slot_id・bearer_reference_id で識別され、一 independent source の具体 context slot 参加 role を記録します。対側と同じく ContextSourceRole —borne_by→ SourceReference だけを含み、role は package と共に終了しても source reference は複製・改変されません。
-      relation_ids:
-        - ContextSourceRole-borne_by-SourceReference
-      relation_not_applicable_reason: null
-      overlap_not_applicable_reason:
-        zh: ContextSourceRole 是依赖槽位存在的角色，SourceReference 是可跨包复用的信息引用；明确的 borne_by 边已足以表达两者联系，无需把角色和承担者列为同类重叠候选。
-        en: ContextSourceRole is a slot-dependent role, whereas SourceReference is an information reference reusable across packages. The explicit borne_by edge fully expresses their connection, so role and bearer are not same-kind overlap candidates.
-        ja: ContextSourceRole は slot-dependent role、SourceReference は package 間で再利用できる information reference です。明示 borne_by edge で接続を十分表せるため、role と bearer は同種 overlap candidate ではありません。
-      source_claims:
-        - claim-memory-context-033
-        - claim-memory-context-034
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-17
-            decision_note:
-              zh: 逐项复核确认 ContextSourceRole 是包版本与槽位共同限定的参与身份；同一 SourceReference 可在不同包中承担多个彼此独立的角色。
-              en: Point-by-point review confirms that ContextSourceRole is participation identity jointly scoped by package version and slot; one SourceReference may bear several independent roles in different packages.
-              ja: 項目別審査により ContextSourceRole は package version と slot で共同限定される participation identity であり、一 SourceReference が異なる package で複数独立 role を担えることを確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-17
-            decision_note:
-              zh: 结构复核确认本条与对侧拥有完全相同的 accepted 关系集合，并且 subject 只包含 memory-context 拥有的真实端点 ContextSourceRole。
-              en: Ontology review confirms that this row has exactly the same accepted relation set as its peer and that its subject is only the genuine memory-context-owned endpoint ContextSourceRole.
-              ja: ontology review は本 row が対側と同一 accepted relation set を持ち、subject が memory-context 所有の実 endpoint ContextSourceRole のみであることを確認しました。
-  overlap_checks:
-    - other_module_id: info-container-command
-      semantic_area:
-        zh: 执行观测身份与上下文接纳身份
-        en: Execution-observation identity versus context-admission identity
-        ja: 実行観測の同一性とコンテキスト受入の同一性
-      candidate_concept_ids:
-        - ContextIngressEvent
-        - ContextPackage
-      overlap_reason:
-        zh: 同一 CommandOutputObservation 可被多个 ContextIngressEvent 以不同范围接入不同 ContextPackage 版本；接纳不会改写原观测的通道和顺序。 本条仅记录 ContextIngressEvent、ContextPackage；其 canonical owner 是上下文组装（memory-context），因此 memory-context 在此拥有这些概念。
-        en: The same CommandOutputObservation can be admitted by several ContextIngressEvents with different ranges into different ContextPackage versions; admission does not rewrite the observation's channel or order. This record is limited to ContextIngressEvent and ContextPackage; their canonical owner is Context assembly (memory-context), so memory-context owns them here.
-        ja: 同じ CommandOutputObservation は複数 ContextIngressEvent により異なる範囲で別々の ContextPackage 版へ受け入れられますが、受入は観測のチャネルや順序を書き換えません。 この記録は ContextIngressEvent と ContextPackage だけを対象とし、canonical owner はコンテキスト組み立て（memory-context）です。
-      disambiguation_test:
-        zh: 由 execution、channel、sequence 与 observed range 识别的对象归执行观测；由 ContextPackage 版本、接纳事件、slot、选择或裁剪决定识别的对象归上下文组装。
-        en: An object identified by execution, channel, sequence, and observed range belongs to execution observations; one identified by ContextPackage version, admission event, slot, selection, or trimming decision belongs to context assembly.
-        ja: execution・channel・sequence・observed range で識別される対象は execution observations、ContextPackage 版・admission event・slot・selection・trimming decision で識別される対象は context assembly に属します。
-      result: distinct
-      owner_module_id: memory-context
-      source_claims:
-        - claim-memory-context-015
-        - claim-memory-context-016
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 由 execution、channel、sequence 与 observed range 识别的对象归执行观测；由 ContextPackage 版本、接纳事件、slot、选择或裁剪决定识别的对象归上下文组装。 ContextIngressEvent 与 ContextPackage 的 canonical owner 是 memory-context。
-              en: An object identified by execution, channel, sequence, and observed range belongs to execution observations; one identified by ContextPackage version, admission event, slot, selection, or trimming decision belongs to context assembly. ContextIngressEvent and ContextPackage have canonical owner memory-context.
-              ja: execution・channel・sequence・observed range で識別される対象は execution observations、ContextPackage 版・admission event・slot・selection・trimming decision で識別される対象は context assembly に属します。 ContextIngressEvent と ContextPackage の canonical owner は memory-context です。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 由 execution、channel、sequence 与 observed range 识别的对象归执行观测；由 ContextPackage 版本、接纳事件、slot、选择或裁剪决定识别的对象归上下文组装。 ContextIngressEvent 与 ContextPackage 的 canonical owner 是 memory-context。
-              en: An object identified by execution, channel, sequence, and observed range belongs to execution observations; one identified by ContextPackage version, admission event, slot, selection, or trimming decision belongs to context assembly. ContextIngressEvent and ContextPackage have canonical owner memory-context.
-              ja: execution・channel・sequence・observed range で識別される対象は execution observations、ContextPackage 版・admission event・slot・selection・trimming decision で識別される対象は context assembly に属します。 ContextIngressEvent と ContextPackage の canonical owner は memory-context です。
-    - other_module_id: info-container-command
-      semantic_area:
-        zh: 执行观测身份与上下文接纳身份
-        en: Execution-observation identity versus context-admission identity
-        ja: 実行観測の同一性とコンテキスト受入の同一性
-      candidate_concept_ids:
-        - CommandOutputObservation
-        - OutputStream
-      overlap_reason:
-        zh: 同一 CommandOutputObservation 可被多个 ContextIngressEvent 以不同范围接入不同 ContextPackage 版本；接纳不会改写原观测的通道和顺序。 本条仅记录 CommandOutputObservation、OutputStream；其 canonical owner 是执行观测（info-container-command），因此 memory-context 在此引用这些概念。
-        en: The same CommandOutputObservation can be admitted by several ContextIngressEvents with different ranges into different ContextPackage versions; admission does not rewrite the observation's channel or order. This record is limited to CommandOutputObservation and OutputStream; their canonical owner is Execution observations (info-container-command), so memory-context references them here.
-        ja: 同じ CommandOutputObservation は複数 ContextIngressEvent により異なる範囲で別々の ContextPackage 版へ受け入れられますが、受入は観測のチャネルや順序を書き換えません。 この記録は CommandOutputObservation と OutputStream だけを対象とし、canonical owner は実行観測（info-container-command）です。
-      disambiguation_test:
-        zh: 由 execution、channel、sequence 与 observed range 识别的对象归执行观测；由 ContextPackage 版本、接纳事件、slot、选择或裁剪决定识别的对象归上下文组装。
-        en: An object identified by execution, channel, sequence, and observed range belongs to execution observations; one identified by ContextPackage version, admission event, slot, selection, or trimming decision belongs to context assembly.
-        ja: execution・channel・sequence・observed range で識別される対象は execution observations、ContextPackage 版・admission event・slot・selection・trimming decision で識別される対象は context assembly に属します。
-      result: distinct
-      owner_module_id: info-container-command
-      source_claims:
-        - claim-memory-context-015
-        - claim-memory-context-016
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 由 execution、channel、sequence 与 observed range 识别的对象归执行观测；由 ContextPackage 版本、接纳事件、slot、选择或裁剪决定识别的对象归上下文组装。 CommandOutputObservation 与 OutputStream 的 canonical owner 是 info-container-command。
-              en: An object identified by execution, channel, sequence, and observed range belongs to execution observations; one identified by ContextPackage version, admission event, slot, selection, or trimming decision belongs to context assembly. CommandOutputObservation and OutputStream have canonical owner info-container-command.
-              ja: execution・channel・sequence・observed range で識別される対象は execution observations、ContextPackage 版・admission event・slot・selection・trimming decision で識別される対象は context assembly に属します。 CommandOutputObservation と OutputStream の canonical owner は info-container-command です。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 由 execution、channel、sequence 与 observed range 识别的对象归执行观测；由 ContextPackage 版本、接纳事件、slot、选择或裁剪决定识别的对象归上下文组装。 CommandOutputObservation 与 OutputStream 的 canonical owner 是 info-container-command。
-              en: An object identified by execution, channel, sequence, and observed range belongs to execution observations; one identified by ContextPackage version, admission event, slot, selection, or trimming decision belongs to context assembly. CommandOutputObservation and OutputStream have canonical owner info-container-command.
-              ja: execution・channel・sequence・observed range で識別される対象は execution observations、ContextPackage 版・admission event・slot・selection・trimming decision で識別される対象は context assembly に属します。 CommandOutputObservation と OutputStream の canonical owner は info-container-command です。
-    - other_module_id: info-output-disclosure
-      semantic_area:
-        zh: 上下文裁剪与输出截断
-        en: Context trimming versus output truncation
-        ja: コンテキスト裁断と出力切詰め
-      candidate_concept_ids:
-        - VisibleContextWindow
-      overlap_reason:
-        zh: 两者都可能缩短内容，但上下文裁剪决定模型输入成员，输出截断决定受众看到的运行结果。 本条仅记录 VisibleContextWindow；其 canonical owner 是上下文组装（memory-context），因此 memory-context 在此拥有这些概念。
-        en: Both may shorten content, but context trimming determines model-input membership while output truncation determines which runtime-result parts an audience sees. This record is limited to VisibleContextWindow; their canonical owner is Context assembly (memory-context), so memory-context owns these concepts here.
-        ja: どちらも内容を短縮し得ますが、コンテキスト裁断はモデル入力メンバー、出力切詰めは受け手が見る実行結果を決めます。 この記録は VisibleContextWindow だけを対象とし、canonical owner はコンテキスト組み立て（memory-context）です。したがって memory-context はここでこれらを所有します。
-      disambiguation_test:
-        zh: 若操作改变下一次运行的 ContextSlot 或 ContextPackage 版本，则归上下文组装；若只改变已产生结果的外显范围，则归输出披露。
-        en: If the operation changes ContextSlot membership or ContextPackage version for a run, it belongs to context assembly; if it changes only the visible range of an already produced result, it belongs to output disclosure.
-        ja: operation が run の ContextSlot membership または ContextPackage version を変えるなら context assembly、生成済 result の visible range だけを変えるなら output disclosure に属します。
-      result: distinct
-      owner_module_id: memory-context
-      source_claims:
-        - claim-memory-context-035
-        - claim-memory-context-036
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 若操作改变下一次运行的 ContextSlot 或 ContextPackage 版本，则归上下文组装；若只改变已产生结果的外显范围，则归输出披露。
-              en: If the operation changes ContextSlot membership or ContextPackage version for a run, it belongs to context assembly; if it changes only the visible range of an already produced result, it belongs to output disclosure.
-              ja: operation が run の ContextSlot membership または ContextPackage version を変えるなら context assembly、生成済 result の visible range だけを変えるなら output disclosure に属します。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 若操作改变下一次运行的 ContextSlot 或 ContextPackage 版本，则归上下文组装；若只改变已产生结果的外显范围，则归输出披露。
-              en: If the operation changes ContextSlot membership or ContextPackage version for a run, it belongs to context assembly; if it changes only the visible range of an already produced result, it belongs to output disclosure.
-              ja: operation が run の ContextSlot membership または ContextPackage version を変えるなら context assembly、生成済 result の visible range だけを変えるなら output disclosure に属します。
-    - other_module_id: info-output-disclosure
-      semantic_area:
-        zh: 上下文裁剪与输出截断
-        en: Context trimming versus output truncation
-        ja: コンテキスト裁断と出力切詰め
-      candidate_concept_ids:
-        - OutputWindow
-      overlap_reason:
-        zh: 两者都可能缩短内容，但上下文裁剪决定模型输入成员，输出截断决定受众看到的运行结果。 本条仅记录 OutputWindow；其 canonical owner 是输出披露（info-output-disclosure），因此 memory-context 在此引用这些概念。
-        en: Both may shorten content, but context trimming determines model-input membership while output truncation determines which runtime-result parts an audience sees. This record is limited to OutputWindow; their canonical owner is Output disclosure (info-output-disclosure), so memory-context references these concepts here.
-        ja: どちらも内容を短縮し得ますが、コンテキスト裁断はモデル入力メンバー、出力切詰めは受け手が見る実行結果を決めます。 この記録は OutputWindow だけを対象とし、canonical owner は出力開示（info-output-disclosure）です。したがって memory-context はここでこれらを参照します。
-      disambiguation_test:
-        zh: 若操作改变下一次运行的 ContextSlot 或 ContextPackage 版本，则归上下文组装；若只改变已产生结果的外显范围，则归输出披露。
-        en: If the operation changes ContextSlot membership or ContextPackage version for a run, it belongs to context assembly; if it changes only the visible range of an already produced result, it belongs to output disclosure.
-        ja: operation が run の ContextSlot membership または ContextPackage version を変えるなら context assembly、生成済 result の visible range だけを変えるなら output disclosure に属します。
-      result: distinct
-      owner_module_id: info-output-disclosure
-      source_claims:
-        - claim-memory-context-037
-        - claim-memory-context-038
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 若操作改变下一次运行的 ContextSlot 或 ContextPackage 版本，则归上下文组装；若只改变已产生结果的外显范围，则归输出披露。
-              en: If the operation changes ContextSlot membership or ContextPackage version for a run, it belongs to context assembly; if it changes only the visible range of an already produced result, it belongs to output disclosure.
-              ja: operation が run の ContextSlot membership または ContextPackage version を変えるなら context assembly、生成済 result の visible range だけを変えるなら output disclosure に属します。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 若操作改变下一次运行的 ContextSlot 或 ContextPackage 版本，则归上下文组装；若只改变已产生结果的外显范围，则归输出披露。
-              en: If the operation changes ContextSlot membership or ContextPackage version for a run, it belongs to context assembly; if it changes only the visible range of an already produced result, it belongs to output disclosure.
-              ja: operation が run の ContextSlot membership または ContextPackage version を変えるなら context assembly、生成済 result の visible range だけを変えるなら output disclosure に属します。
-    - other_module_id: info-messages-instructions
-      semantic_area:
-        zh: 上下文容器结构与消息对话结构
-        en: Context-container structure versus message-dialogue structure
-        ja: context container structure と message dialogue structure
-      candidate_concept_ids:
-        - ContextPackage
-      overlap_reason:
-        zh: 历史 Message 可作为 ContextSource，但 ContextSlot 是输入位置而不是新 Message，package 顺序也不改写 conversation 顺序。 本条仅记录 ContextPackage；其 canonical owner 是上下文组装（memory-context），因此 memory-context 在此拥有这些概念。
-        en: A historical Message can be a ContextSource, but ContextSlot is an input position rather than a new Message, and package order does not rewrite conversation order. This record is limited to ContextPackage; their canonical owner is Context assembly (memory-context), so memory-context owns these concepts here.
-        ja: historical Message は ContextSource になれますが、ContextSlot は input position で新 Message ではなく、package order は conversation order を書き換えません。 この記録は ContextPackage だけを対象とし、canonical owner はコンテキスト組み立て（memory-context）です。したがって memory-context はここでこれらを所有します。
-      disambiguation_test:
-        zh: 由 conversation、turn、sender 和 message position 识别的对象归消息与对话；由 assembly run、package version、slot 和 budget 识别的对象归上下文组装。
-        en: An object identified by conversation, turn, sender, and message position belongs to messages and conversations; one identified by assembly run, package version, slot, and budget belongs to context assembly.
-        ja: conversation・turn・sender・message position で識別されれば message/conversation、assembly run・package version・slot・budget で識別されれば context assembly に属します。
-      result: distinct
-      owner_module_id: memory-context
-      source_claims:
-        - claim-memory-context-039
-        - claim-memory-context-040
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 由 conversation、turn、sender 和 message position 识别的对象归消息与对话；由 assembly run、package version、slot 和 budget 识别的对象归上下文组装。
-              en: An object identified by conversation, turn, sender, and message position belongs to messages and conversations; one identified by assembly run, package version, slot, and budget belongs to context assembly.
-              ja: conversation・turn・sender・message position で識別されれば message/conversation、assembly run・package version・slot・budget で識別されれば context assembly に属します。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 由 conversation、turn、sender 和 message position 识别的对象归消息与对话；由 assembly run、package version、slot 和 budget 识别的对象归上下文组装。
-              en: An object identified by conversation, turn, sender, and message position belongs to messages and conversations; one identified by assembly run, package version, slot, and budget belongs to context assembly.
-              ja: conversation・turn・sender・message position で識別されれば message/conversation、assembly run・package version・slot・budget で識別されれば context assembly に属します。
-    - other_module_id: info-messages-instructions
-      semantic_area:
-        zh: 上下文容器结构与消息对话结构
-        en: Context-container structure versus message-dialogue structure
-        ja: context container structure と message dialogue structure
-      candidate_concept_ids:
-        - Message
-      overlap_reason:
-        zh: 历史 Message 可作为 ContextSource，但 ContextSlot 是输入位置而不是新 Message，package 顺序也不改写 conversation 顺序。 本条仅记录 Message；其 canonical owner 是消息与会话（info-messages-instructions），因此 memory-context 在此引用这些概念。
-        en: A historical Message can be a ContextSource, but ContextSlot is an input position rather than a new Message, and package order does not rewrite conversation order. This record is limited to Message; their canonical owner is Messages and conversations (info-messages-instructions), so memory-context references these concepts here.
-        ja: historical Message は ContextSource になれますが、ContextSlot は input position で新 Message ではなく、package order は conversation order を書き換えません。 この記録は Message だけを対象とし、canonical owner はメッセージと会話（info-messages-instructions）です。したがって memory-context はここでこれらを参照します。
-      disambiguation_test:
-        zh: 由 conversation、turn、sender 和 message position 识别的对象归消息与对话；由 assembly run、package version、slot 和 budget 识别的对象归上下文组装。
-        en: An object identified by conversation, turn, sender, and message position belongs to messages and conversations; one identified by assembly run, package version, slot, and budget belongs to context assembly.
-        ja: conversation・turn・sender・message position で識別されれば message/conversation、assembly run・package version・slot・budget で識別されれば context assembly に属します。
-      result: distinct
-      owner_module_id: info-messages-instructions
-      source_claims:
-        - claim-memory-context-041
-        - claim-memory-context-042
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 由 conversation、turn、sender 和 message position 识别的对象归消息与对话；由 assembly run、package version、slot 和 budget 识别的对象归上下文组装。
-              en: An object identified by conversation, turn, sender, and message position belongs to messages and conversations; one identified by assembly run, package version, slot, and budget belongs to context assembly.
-              ja: conversation・turn・sender・message position で識別されれば message/conversation、assembly run・package version・slot・budget で識別されれば context assembly に属します。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 由 conversation、turn、sender 和 message position 识别的对象归消息与对话；由 assembly run、package version、slot 和 budget 识别的对象归上下文组装。
-              en: An object identified by conversation, turn, sender, and message position belongs to messages and conversations; one identified by assembly run, package version, slot, and budget belongs to context assembly.
-              ja: conversation・turn・sender・message position で識別されれば message/conversation、assembly run・package version・slot・budget で識別されれば context assembly に属します。
-    - other_module_id: info-indexing
-      semantic_area:
-        zh: 候选生成与输入包形成
-        en: Candidate generation versus input-package formation
-        ja: candidate generation と input package formation
-      candidate_concept_ids:
-        - ContextSelectionActivity
-      overlap_reason:
-        zh: DiscoveryResult 可存在却未被采用；ContextPackage 只能通过明确选择说明其内容，不能把候选排名当作最终 slot 顺序。 本条仅记录 ContextSelectionActivity；其 canonical owner 是上下文组装（memory-context），因此 memory-context 在此拥有这些概念。
-        en: A DiscoveryResult can exist without admission; ContextPackage content requires explicit selection and cannot treat candidate rank as final slot order. This record is limited to ContextSelectionActivity; their canonical owner is Context assembly (memory-context), so memory-context owns these concepts here.
-        ja: DiscoveryResult は admission なしで存在でき、ContextPackage content は明示 selection が必要で candidate rank を最終 slot order とみなしません。 この記録は ContextSelectionActivity だけを対象とし、canonical owner はコンテキスト組み立て（memory-context）です。したがって memory-context はここでこれらを所有します。
-      disambiguation_test:
-        zh: 由 discovery activity、query 和 relevance observation 识别的对象归上下文发现；由 context assembly、budget、slot 和 package version 识别的对象归上下文组装。
-        en: An object identified by discovery activity, query, and relevance observation belongs to context discovery; one identified by context assembly, budget, slot, and package version belongs to context assembly.
-        ja: discovery activity・query・relevance observation で識別されれば context discovery、context assembly・budget・slot・package version で識別されれば context assembly に属します。
-      result: distinct
-      owner_module_id: memory-context
-      source_claims:
-        - claim-memory-context-043
-        - claim-memory-context-044
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 由 discovery activity、query 和 relevance observation 识别的对象归上下文发现；由 context assembly、budget、slot 和 package version 识别的对象归上下文组装。
-              en: An object identified by discovery activity, query, and relevance observation belongs to context discovery; one identified by context assembly, budget, slot, and package version belongs to context assembly.
-              ja: discovery activity・query・relevance observation で識別されれば context discovery、context assembly・budget・slot・package version で識別されれば context assembly に属します。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 由 discovery activity、query 和 relevance observation 识别的对象归上下文发现；由 context assembly、budget、slot 和 package version 识别的对象归上下文组装。
-              en: An object identified by discovery activity, query, and relevance observation belongs to context discovery; one identified by context assembly, budget, slot, and package version belongs to context assembly.
-              ja: discovery activity・query・relevance observation で識別されれば context discovery、context assembly・budget・slot・package version で識別されれば context assembly に属します。
-    - other_module_id: info-indexing
-      semantic_area:
-        zh: 候选生成与输入包形成
-        en: Candidate generation versus input-package formation
-        ja: candidate generation と input package formation
-      candidate_concept_ids:
-        - DiscoveryResult
-      overlap_reason:
-        zh: DiscoveryResult 可存在却未被采用；ContextPackage 只能通过明确选择说明其内容，不能把候选排名当作最终 slot 顺序。 本条仅记录 DiscoveryResult；其 canonical owner 是上下文发现（info-indexing），因此 memory-context 在此引用这些概念。
-        en: A DiscoveryResult can exist without admission; ContextPackage content requires explicit selection and cannot treat candidate rank as final slot order. This record is limited to DiscoveryResult; their canonical owner is Context discovery (info-indexing), so memory-context references these concepts here.
-        ja: DiscoveryResult は admission なしで存在でき、ContextPackage content は明示 selection が必要で candidate rank を最終 slot order とみなしません。 この記録は DiscoveryResult だけを対象とし、canonical owner はコンテキスト発見（info-indexing）です。したがって memory-context はここでこれらを参照します。
-      disambiguation_test:
-        zh: 由 discovery activity、query 和 relevance observation 识别的对象归上下文发现；由 context assembly、budget、slot 和 package version 识别的对象归上下文组装。
-        en: An object identified by discovery activity, query, and relevance observation belongs to context discovery; one identified by context assembly, budget, slot, and package version belongs to context assembly.
-        ja: discovery activity・query・relevance observation で識別されれば context discovery、context assembly・budget・slot・package version で識別されれば context assembly に属します。
-      result: distinct
-      owner_module_id: info-indexing
-      source_claims:
-        - claim-memory-context-045
-        - claim-memory-context-046
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 由 discovery activity、query 和 relevance observation 识别的对象归上下文发现；由 context assembly、budget、slot 和 package version 识别的对象归上下文组装。
-              en: An object identified by discovery activity, query, and relevance observation belongs to context discovery; one identified by context assembly, budget, slot, and package version belongs to context assembly.
-              ja: discovery activity・query・relevance observation で識別されれば context discovery、context assembly・budget・slot・package version で識別されれば context assembly に属します。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-14
-            decision_note:
-              zh: 由 discovery activity、query 和 relevance observation 识别的对象归上下文发现；由 context assembly、budget、slot 和 package version 识别的对象归上下文组装。
-              en: An object identified by discovery activity, query, and relevance observation belongs to context discovery; one identified by context assembly, budget, slot, and package version belongs to context assembly.
-              ja: discovery activity・query・relevance observation で識別されれば context discovery、context assembly・budget・slot・package version で識別されれば context assembly に属します。
-review:
-  status: pending
-  method: manual-semantic
-  reviewer: codex-manual-semantic
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已人工核验模块边界及直接根节点：本模块以一次模型调用或执行步骤的上下文装配为身份边界，负责规格、装配活动与装配产物；候选发现、持久记忆、提示模板和结果披露分别由其他模块负责。关系、字段、示例与来源主张仍须逐项核验。
-    en: The module boundary and direct roots were manually reviewed around one call- or step-scoped context assembly. Discovery, persistent memory, prompt templates, and post-result disclosure remain outside this module.
-    ja: 一回のモデル呼出しまたは実行ステップに対するコンテキスト組立を境界として、仕様、組立活動、組立成果物を所有することを手動確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: pending
-    structure: pending
-    examples: pending
-    source_claims: []
+sources:
+  - id: src-cursor-context
+    title: Cursor Agent Search and Context Documentation
+    publisher: Cursor
+    url: https://cursor.com/docs/agent/tools/search
+    source_type: official-doc
+    relevance: "@ references, semantic search, recent files, and self-summarization/auto-compact behavior."
+  - id: src-cursor-self-summarization
+    title: Training Composer for longer horizons
+    publisher: Cursor
+    url: https://cursor.com/blog/self-summarization
+    source_type: official-doc
+    relevance: Self-summarization and token-efficient compaction for long agent trajectories.
+  - id: src-claude-code-context
+    title: Explore the context window
+    publisher: Anthropic
+    url: https://code.claude.com/docs/en/context-window
+    source_type: official-doc
+    relevance: /context breakdown, auto-compact, /compact, and rule persistence across compaction.
+  - id: src-langchain-context-engineering
+    title: Context engineering in agents
+    publisher: LangChain
+    url: https://docs.langchain.com/oss/python/langchain/context-engineering
+    source_type: official-doc
+    relevance: Write, select, compress, isolate strategies and middleware lifecycle hooks.
+  - id: src-langchain-context-blog
+    title: Context Engineering for Agents
+    publisher: LangChain
+    url: https://www.langchain.com/blog/context-engineering-for-agents
+    source_type: official-doc
+    relevance: Canonical four-strategy context curation framework for agents.
+  - id: src-pichay-2026
+    title: "The Missing Memory Hierarchy: Demand Paging for LLM Context Windows"
+    publisher: arXiv
+    url: https://arxiv.org/abs/2603.09023
+    source_type: arXiv
+    relevance: L1–L4 hierarchy, demand paging, page faults, and working-set pinning.
+  - id: src-context-recycling-2026
+    title: Context Recycling for Long-Horizon LLM Inference
+    publisher: arXiv
+    url: https://arxiv.org/abs/2606.26105
+    source_type: arXiv
+    relevance: Five-layer memory hierarchy and fixed-budget recyclable workspace.
+  - id: src-manus-context
+    title: Context Engineering for AI Agents — Lessons from Building Manus
+    publisher: Manus
+    url: https://manus.im/en/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus
+    source_type: official-doc
+    relevance: Progressive disclosure, filesystem-as-context, and recency-biased plan injection.
+  - id: src-memory-context-design
+    title: Moonweave memory-context module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Separates assembly specifications from package occurrences and retrieval admission.
 source_claims:
-  - id: claim-memory-context-001
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain defines context engineering as controlling the information and tools supplied to an agent, separates transient model context from persistent state and stores, and identifies messages, tools, model, and response format as per-call context components. This directly supports an operational context-assembly concern. LangChain does not define Moonweave's ContextAssembly, ContextPackage version, slot ordering, or module ownership; those are Moonweave design inferences.
-    locator: Context engineering in agents > Overview > What you can control; Data sources; Model context; Life-cycle context
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-002
-    source: lit-agent-memory-as-action
-    supports: Source lit-agent-memory-as-action at Paper > Memory as Action; abstract and method or system-architecture sections supports operational notions used in memory-context, including key notion ContextAssembly (context assembly). The source does not define Moonweave Module memory-context, its class or relation placement, or its ownership boundary. Treating objects under owns_when "Own an object when its identity is determined by one context assembly, an admission event binding selected observations to a determinate package version, slot order, source selection, budget trimming, or immutable context version." as owned by memory-context is a Moonweave design inference over the registered evidence.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-003
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain distinguishes transient model context from the state, store, runtime, and tool sources represented in this traceable chain.
-    locator: Context engineering in agents > What you can control > Model Context; Data sources > State and Store
+  - id: claim-memory-context-cursor
+    source: src-cursor-context
+    supports: Cursor assembles agent context from @ file/folder references, recent edits, semantic codebase search hits, and workspace rules before each model call.
+    locator: Agent tools > search; @ reference behavior
+    evidence_kind: official
+    confidence: high
+  - id: claim-memory-context-claude-code
+    source: src-claude-code-context
+    supports: Claude Code exposes live token breakdown via /context and compacts conversation history automatically or via /compact when usage nears the effective window threshold.
+    locator: Context window docs — /context, compaction, rule persistence
+    evidence_kind: official
+    confidence: high
+  - id: claim-memory-context-langchain
+    source: src-langchain-context-engineering
+    supports: LangChain context engineering organizes curation into write, select, compress, and isolate strategies with middleware controlling per-step model context.
+    locator: Context engineering in agents — strategies and middleware
+    evidence_kind: official
+    confidence: high
+  - id: claim-memory-context-pichay
+    source: src-pichay-2026
+    supports: Pichay treats the live LLM context window as L1 cache with demand paging, page faults on re-read, and fault-driven working-set pinning across an L1–L4 hierarchy.
+    locator: arXiv:2603.09023 — architecture and production evaluation
+    evidence_kind: academic
+    confidence: high
+  - id: claim-memory-context-recycling
+    source: src-context-recycling-2026
+    supports: Context Recycling manages a fixed active context budget (~3–12K tokens) as a recyclable workspace backed by BM25 and disk layers for unbounded sessions.
+    locator: arXiv:2606.26105 — five-layer hierarchy and proactive loading
+    evidence_kind: academic
+    confidence: high
+  - id: claim-memory-context-manus
+    source: src-manus-context
+    supports: Manus uses progressive disclosure to load skill metadata first and detailed instructions or filesystem resources only on demand, keeping the active window lean.
+    locator: Manus blog — progressive disclosure and filesystem-as-context
+    evidence_kind: official
+    confidence: high
+  - id: claim-memory-context-design
+    source: src-memory-context-design
+    supports: Moonweave separates context specifications from assembly occurrences, requiring pinned source references, token accounting, and explicit exclusion records for replayable packages.
+    locator: memory-context module boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-context-004
-    source: eng-ont-prov-o
-    supports: PROV-O requires an identified source entity for derivation; copied content alone does not supply one.
-    locator: PROV-O Recommendation §2.1 Starting Point Terms > prov:Entity, prov:used, and prov:wasDerivedFrom
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-context-005
-    source: eng-fw-deepagents-context-engineering
-    supports: Deep Agents' explicit input limits and compression thresholds support recomputable capacity-based omission decisions.
-    locator: Deep Agents context engineering > Context compression > Offloading and Summarization thresholds
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-context-006
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain treats selection and trimming as deliberate interventions; silent absence does not identify which intervention occurred.
-    locator: Context engineering in agents > What you can control > transient Model Context and per-call selection
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-context-007
-    source: eng-ont-prov-o
-    supports: PROV-O entity and activity lineage supports keeping predecessor and generated successor versions distinct.
-    locator: PROV-O Recommendation §2.1 Starting Point Terms > prov:Activity, prov:used, and prov:wasGeneratedBy
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-context-008
-    source: eng-ont-prov-o
-    supports: PROV-O lineage depends on separately identified entities and generating activities, which an in-place overwrite fails to retain.
-    locator: PROV-O Recommendation §2.1 Starting Point Terms > prov:Activity, prov:Entity, and prov:wasGeneratedBy
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-context-009
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain distinguishes model-call context from its state, store, runtime, and tool sources; the CQ makes the assembled projection and each source traceable.
-    locator: LangChain context engineering > Model context > What you can control
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-context-010
-    source: eng-ont-prov-o
-    supports: PROV-O's activity-generation and entity-derivation terms support retaining the producing assembly and source lineage for one versioned package.
-    locator: PROV-O Recommendation > Starting Point Terms > Activity, Entity, used, wasGeneratedBy, and wasDerivedFrom
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-context-011
-    source: eng-fw-deepagents-context-engineering
-    supports: Deep Agents handles model input limits through explicit thresholds, offloading, and summarization; the CQ requires an auditable budget and omission decision.
-    locator: Context engineering in Deep Agents > Context compression > Offloading and Summarization
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-context-012
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain treats selection and context reduction as explicit interventions, supporting recorded inclusion and exclusion decisions rather than silent truncation.
-    locator: LangChain context engineering > Model context > What you can control
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-context-013
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain describes context interventions at model-call lifecycle points; Moonweave records refresh as a version-producing event and assembly rather than in-place mutation.
-    locator: LangChain context engineering > Life-cycle context
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-context-014
-    source: eng-ont-prov-o
-    supports: PROV-O supports distinguishing the predecessor entity, triggering event or activity, and generated successor entity in a version lineage.
-    locator: PROV-O Recommendation > Starting Point Terms > Activity, Entity, used, wasGeneratedBy, and wasDerivedFrom
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-context-015
-    source: eng-fw-deepagents-context-engineering
-    supports: Deep Agents separates large tool-result content from transient model context and preserves source content behind references. This supports keeping CommandOutputObservation as source evidence while a separate ContextIngressEvent records admission to a determinate ContextPackage; the exact Moonweave classes, relations, and ownership split are reviewed design inferences.
-    locator: Context engineering > Offloading > large tool inputs and results; Filesystem preservation; Summarization
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-context-016
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain distinguishes transient model context selected for one model call from persistent state and source data. This supports treating admission as a context-assembly fact that does not rewrite the admitted execution observation; the exact Moonweave ownership and relation directions are reviewed design inferences.
-    locator: Context engineering in agents > Overview > What you can control; Transient context; Model context
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-017
-    source: eng-fw-deepagents-context-engineering
-    supports: Deep Agents context engineering offloads large tool inputs and results to files, preserves the original content, and replaces inline history with references that can be searched and retrieved. This supports separating an execution observation from its admission or summary in active context; Moonweave's channel/chunk schema and ownership boundary are design inferences.
-    locator: Context engineering > Offloading > large tool inputs and results; Filesystem preservation; Summarization
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-context-018
-    source: eng-fw-langchain-context-engineering
-    supports: "LangChain defines model context as the transient material selected for a single model call and separates it from persistent state and store data. This provides the comparison boundary: a source Chunk can be selected into a call without changing the Chunk's own identity. The document/range/provenance test and Moonweave ownership assignment are design inferences."
-    locator: Context engineering in agents > Overview > What you can control; Transient context; Model context
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-019
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain treats model context as the material entering a model call and response format as the structure of the produced response. This supports keeping input-side VisibleContextWindow distinct from audience-facing OutputWindow. Moonweave infers the explicit conforms_to boundary without treating a context-selection decision as an output object.
-    locator: Context engineering in agents > Overview > What you can control; Model context; Response Format
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-020
-    source: lit-agent-memory-as-action
-    supports: "Memory as Action treats memory operations as choices over what information is available to the agent, which supports separating the selected input window from downstream output disclosure. Moonweave design inference: OutputWindow remains owned by info-output-disclosure and is referenced here only as the conformance target of VisibleContextWindow."
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-021
-    source: eng-fw-deepagents-context-engineering
-    supports: Deep Agents distinguishes input context, runtime context, context compression, isolation, and long-term memory, and describes offloading and summarization as mechanisms that keep relevant information within window limits. This supports a VisibleContextWindow identified by the selected and compressed material available to an agent run. The Moonweave class name, immutable package version, and owner memory-context remain design inferences.
-    locator: Context engineering in Deep Agents > Types of context; Context compression > Offloading; Context compression > Summarization
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-022
-    source: lit-agent-memory-as-action
-    supports: Source lit-agent-memory-as-action at Paper > Memory as Action; abstract and method or system-architecture sections supports operational notions used to compare memory-context with info-output-disclosure, including VisibleContextWindow. The source does not define Moonweave Modules memory-context or info-output-disclosure, their class or relation placement, or their ownership split. Under memory-context's owns_when "Own an object when its identity is determined by one context assembly, an admission event binding selected observations to a determinate package version, slot order, source selection, budget trimming, or immutable context version.", Moonweave applies the disambiguation test "If the operation changes ContextSlot membership or ContextPackage version for a run, it belongs to context assembly; if it changes only the visible range of an already produced result, it belongs to output disclosure."; result=owns and owner=memory-context are a Moonweave design inference over the registered evidence.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-023
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain defines Messages as the conversation-history list sent to an LLM and states that this list can be modified transiently for a call without changing saved state. That distinction supports referencing a Message as source material while keeping the message's conversation, sender, and turn identity outside context assembly. Moonweave assigns Message to info-messages-instructions by design inference.
-    locator: Context engineering in agents > Transient context; Model context > Messages
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-024
-    source: lit-agent-memory-as-action
-    supports: Source lit-agent-memory-as-action at Paper > Memory as Action; abstract and method or system-architecture sections supports operational notions used to compare memory-context with info-messages-instructions, including Message. The source does not define Moonweave Modules memory-context or info-messages-instructions, their class or relation placement, or their ownership split. Under memory-context's owns_when "Own an object when its identity is determined by one context assembly, an admission event binding selected observations to a determinate package version, slot order, source selection, budget trimming, or immutable context version.", Moonweave applies the disambiguation test "An object identified by conversation, turn, sender, and message position belongs to messages and conversations; one identified by assembly run, package version, slot, and budget belongs to context assembly."; result=references and owner=info-messages-instructions are a Moonweave design inference over the registered evidence.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-025
-    source: eng-fw-deepagents-context-engineering
-    supports: Deep Agents enumerates multiple context sources and management operations—input prompt material, runtime configuration, compression, isolation, and long-term memory—that are assembled for a run. This supports a run-specific aggregate distinct from any one Message. ContextPackage, its version and slot model, and canonical ownership by memory-context are Moonweave design inferences.
-    locator: Context engineering in Deep Agents > Types of context; Input context; Runtime context; Context compression
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-026
-    source: lit-agent-memory-as-action
-    supports: Source lit-agent-memory-as-action at Paper > Memory as Action; abstract and method or system-architecture sections supports operational notions used to compare memory-context with info-messages-instructions, including ContextPackage. The source does not define Moonweave Modules memory-context or info-messages-instructions, their class or relation placement, or their ownership split. Under memory-context's owns_when "Own an object when its identity is determined by one context assembly, an admission event binding selected observations to a determinate package version, slot order, source selection, budget trimming, or immutable context version.", Moonweave applies the disambiguation test "An object identified by conversation, turn, sender, and message position belongs to messages and conversations; one identified by assembly run, package version, slot, and budget belongs to context assembly."; result=owns and owner=memory-context are a Moonweave design inference over the registered evidence.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-027
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain says model context may draw from state, long-term stores, and runtime context, while model context controls what is actually supplied to a call. This supports treating an upstream DiscoveryResult as selectable source data rather than as an assembled context artifact. DiscoveryResult and its owner info-indexing are Moonweave design inferences not defined by LangChain.
-    locator: Context engineering in agents > Data sources; Model context
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-028
-    source: lit-agent-memory-as-action
-    supports: Source lit-agent-memory-as-action at Paper > Memory as Action; abstract and method or system-architecture sections supports operational notions used to compare memory-context with info-indexing, including DiscoveryResult. The source does not define Moonweave Modules memory-context or info-indexing, their class or relation placement, or their ownership split. Under memory-context's owns_when "Own an object when its identity is determined by one context assembly, an admission event binding selected observations to a determinate package version, slot order, source selection, budget trimming, or immutable context version.", Moonweave applies the disambiguation test "An object identified by discovery activity, query, and relevance observation belongs to context discovery; one identified by context assembly, budget, slot, and package version belongs to context assembly."; result=references and owner=info-indexing are a Moonweave design inference over the registered evidence.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-029
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain defines context engineering as selecting and formatting the information and tools supplied to a model call, with middleware able to update context at agent-life-cycle steps. This supports a ContextAssembly activity downstream of discovery. The run, budget, slot, version identity and owner memory-context are Moonweave ontology decisions.
-    locator: Context engineering in agents > Overview; How it works; Model context
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-030
-    source: lit-agent-memory-as-action
-    supports: Source lit-agent-memory-as-action at Paper > Memory as Action; abstract and method or system-architecture sections supports operational notions used to compare memory-context with info-indexing, including ContextAssembly. The source does not define Moonweave Modules memory-context or info-indexing, their class or relation placement, or their ownership split. Under memory-context's owns_when "Own an object when its identity is determined by one context assembly, an admission event binding selected observations to a determinate package version, slot order, source selection, budget trimming, or immutable context version.", Moonweave applies the disambiguation test "An object identified by discovery activity, query, and relevance observation belongs to context discovery; one identified by context assembly, budget, slot, and package version belongs to context assembly."; result=owns and owner=memory-context are a Moonweave design inference over the registered evidence.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-031
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain distinguishes transient model context from persistent state, stores, runtime context, and tool sources. This supports recording a source's slot-scoped participation separately from the independent source reference; ContextSourceRole and its exact owner split are Moonweave design inferences.
-    locator: Context engineering in agents > Data sources; Model context
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-032
-    source: eng-ont-prov-o
-    supports: PROV-O separates an entity from the qualified role it bears in an association. This supports keeping SourceReference identity distinct from ContextSourceRole while linking them explicitly; the slot-scoped relation is a Moonweave design inference.
-    locator: PROV-O Recommendation §3.2 > qualifiedAssociation and hadRole
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-033
-    source: eng-ont-prov-o
-    supports: PROV-O distinguishes a qualified role in an association from the entity bearing that role. This supports owning the slot-scoped ContextSourceRole separately from SourceReference; the exact package and slot identity keys and borne_by predicate are Moonweave design inferences.
-    locator: PROV-O Recommendation §3.2 > qualifiedAssociation and hadRole
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-034
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain separates transient model context from persistent stores and other data sources. That distinction supports a call-scoped participation role without transferring identity from the independent source reference; Moonweave's role class and owner split are design inferences.
-    locator: Context engineering in agents > Data sources; Model context
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-035
-    source: eng-fw-deepagents-context-engineering
-    supports: Deep Agents manages input context, compression, and isolation to control what remains in scope within token limits. This supports VisibleContextWindow as an input-context selection artifact rather than a view over already produced output. The exact class and its owner memory-context are Moonweave design inferences.
-    locator: Context engineering in Deep Agents > Types of context; Context compression; Context isolation with subagents
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-036
-    source: lit-agent-memory-as-action
-    supports: Source lit-agent-memory-as-action at Paper > Memory as Action; abstract and method or system-architecture sections supports operational notions used to compare memory-context with info-output-disclosure, including VisibleContextWindow. The source does not define Moonweave Modules memory-context or info-output-disclosure, their class or relation placement, or their ownership split. Under memory-context's owns_when "Own an object when its identity is determined by one context assembly, an admission event binding selected observations to a determinate package version, slot order, source selection, budget trimming, or immutable context version.", Moonweave applies the disambiguation test "If the operation changes ContextSlot membership or ContextPackage version for a run, it belongs to context assembly; if it changes only the visible range of an already produced result, it belongs to output disclosure."; result=distinct and owner=memory-context are a Moonweave design inference over the registered evidence.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-037
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain separates model-call input context from the response format governing the final response. This provides the negative evidence for keeping OutputWindow distinct from input context assembly, although LangChain does not define an OutputWindow object. Moonweave assigns that presentation object to info-output-disclosure by design inference.
-    locator: Context engineering in agents > Model context; Response Format
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-038
-    source: lit-agent-memory-as-action
-    supports: Source lit-agent-memory-as-action at Paper > Memory as Action; abstract and method or system-architecture sections supports operational notions used to compare memory-context with info-output-disclosure, including OutputWindow. The source does not define Moonweave Modules memory-context or info-output-disclosure, their class or relation placement, or their ownership split. Under memory-context's owns_when "Own an object when its identity is determined by one context assembly, an admission event binding selected observations to a determinate package version, slot order, source selection, budget trimming, or immutable context version.", Moonweave applies the disambiguation test "If the operation changes ContextSlot membership or ContextPackage version for a run, it belongs to context assembly; if it changes only the visible range of an already produced result, it belongs to output disclosure."; result=distinct and owner=info-output-disclosure are a Moonweave design inference over the registered evidence.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-039
-    source: eng-fw-deepagents-context-engineering
-    supports: Deep Agents assembles several context kinds for a run and can compress or isolate them independently of the underlying messages. This supports ContextPackage as distinct from a Message even when messages are package members. The package/version abstraction and owner memory-context are Moonweave design inferences.
-    locator: Context engineering in Deep Agents > Types of context; Input context; Context compression; Context isolation with subagents
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-040
-    source: lit-agent-memory-as-action
-    supports: Source lit-agent-memory-as-action at Paper > Memory as Action; abstract and method or system-architecture sections supports operational notions used to compare memory-context with info-messages-instructions, including ContextPackage. The source does not define Moonweave Modules memory-context or info-messages-instructions, their class or relation placement, or their ownership split. Under memory-context's owns_when "Own an object when its identity is determined by one context assembly, an admission event binding selected observations to a determinate package version, slot order, source selection, budget trimming, or immutable context version.", Moonweave applies the disambiguation test "An object identified by conversation, turn, sender, and message position belongs to messages and conversations; one identified by assembly run, package version, slot, and budget belongs to context assembly."; result=distinct and owner=memory-context are a Moonweave design inference over the registered evidence.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-041
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain identifies Messages as conversation history and permits transient per-call modification without changing saved state. This supports keeping Message identity distinct from the assembled transient context that happens to include it. The conversation/turn/sender identity rule and owner info-messages-instructions are Moonweave design inferences.
-    locator: Context engineering in agents > Transient context; Model context > Messages
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-042
-    source: lit-agent-memory-as-action
-    supports: Source lit-agent-memory-as-action at Paper > Memory as Action; abstract and method or system-architecture sections supports operational notions used to compare memory-context with info-messages-instructions, including Message. The source does not define Moonweave Modules memory-context or info-messages-instructions, their class or relation placement, or their ownership split. Under memory-context's owns_when "Own an object when its identity is determined by one context assembly, an admission event binding selected observations to a determinate package version, slot order, source selection, budget trimming, or immutable context version.", Moonweave applies the disambiguation test "An object identified by conversation, turn, sender, and message position belongs to messages and conversations; one identified by assembly run, package version, slot, and budget belongs to context assembly."; result=distinct and owner=info-messages-instructions are a Moonweave design inference over the registered evidence.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-043
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain's context-engineering controls decide which information and tools enter an individual model call, while data sources such as state and stores remain separately identified. This supports ContextSelectionActivity as a downstream admission operation distinct from upstream discovery. Its exact class and owner memory-context are Moonweave design inferences.
-    locator: Context engineering in agents > Data sources; Model context; How it works
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-044
-    source: lit-agent-memory-as-action
-    supports: Source lit-agent-memory-as-action at Paper > Memory as Action; abstract and method or system-architecture sections supports operational notions used to compare memory-context with info-indexing, including ContextSelectionActivity. The source does not define Moonweave Modules memory-context or info-indexing, their class or relation placement, or their ownership split. Under memory-context's owns_when "Own an object when its identity is determined by one context assembly, an admission event binding selected observations to a determinate package version, slot order, source selection, budget trimming, or immutable context version.", Moonweave applies the disambiguation test "An object identified by discovery activity, query, and relevance observation belongs to context discovery; one identified by context assembly, budget, slot, and package version belongs to context assembly."; result=distinct and owner=memory-context are a Moonweave design inference over the registered evidence.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-045
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain lists state and stores as data sources from which model context may draw; it does not equate source retrieval results with the context finally supplied to a model. This supports keeping DiscoveryResult distinct from context selection and packaging. DiscoveryResult and its owner info-indexing are Moonweave design inferences.
-    locator: Context engineering in agents > Data sources; Model context
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-memory-context-046
-    source: lit-agent-memory-as-action
-    supports: Source lit-agent-memory-as-action at Paper > Memory as Action; abstract and method or system-architecture sections supports operational notions used to compare memory-context with info-indexing, including DiscoveryResult. The source does not define Moonweave Modules memory-context or info-indexing, their class or relation placement, or their ownership split. Under memory-context's owns_when "Own an object when its identity is determined by one context assembly, an admission event binding selected observations to a determinate package version, slot order, source selection, budget trimming, or immutable context version.", Moonweave applies the disambiguation test "An object identified by discovery activity, query, and relevance observation belongs to context discovery; one identified by context assembly, budget, slot, and package version belongs to context assembly."; result=distinct and owner=info-indexing are a Moonweave design inference over the registered evidence.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted

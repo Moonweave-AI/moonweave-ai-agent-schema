@@ -1,7 +1,6 @@
 schema: moonweave.ai/ontology-node/v1
 id: TelemetryEvent
 kind: concept
-status: accepted
 labels:
   en: telemetry event
   zh: 遥测事件
@@ -29,6 +28,34 @@ semantics:
       ja: まだパイプラインへ送出されていないスパン内 TraceEvent、メトリック定義、メトリック観測値、符号化済み LogRecord は含みません。
   semantic_kind: event
   aliases: []
+engineering:
+  explanation:
+    zh: TelemetryEvent（StreamEvent 类）映射 OpenAI response.output_item.added、Anthropic content_block_delta 与 LangGraph stream_mode values；须绑定 execution_ref 或 run_attempt_ref。
+    en: TelemetryEvent (StreamEvent class) maps OpenAI response.output_item.added, Anthropic content_block_delta, and LangGraph stream_mode values; must bind execution_ref or run_attempt_ref.
+    ja: TelemetryEvent（StreamEvent）は SSE/stream 断片を execution/attempt に束縛して記録します。
+  typical_input:
+    - description: OTLP export or LangSmith run tree ingest.
+      format: |-
+        event: content_block_delta
+        data: {"type":"content_block_delta",...}
+      source_claims:
+        - claim-otel-observability
+        - claim-telemetry-event-design
+  typical_output:
+    - description: Moonweave observability record projection.
+      format: '{"stream_event_type":"content_block_delta","run_attempt_ref":"attempt-1"}'
+      source_claims:
+        - claim-telemetry-event-design
+  reference_implementations:
+    - name: OpenTelemetry OTLP
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      description: Traces and spans → Trace, Span, Metric export.
+    - name: LangSmith
+      url: https://docs.smith.langchain.com/
+      description: Run trees and feedback → RunTree, TraceRecord.
+    - name: LangGraph Checkpoints
+      url: https://langchain-ai.github.io/langgraph/concepts/persistence/
+      description: State snapshots and checkpoint restore events.
 structure:
   identity_keys: []
   fields: []
@@ -36,16 +63,18 @@ structure:
   required_relation_constraints: []
 examples:
   - id: TelemetryEvent-example-positive-001
-    kind: positive
     labels:
-      zh: 追踪事件进入遥测管道
-      en: Trace event enters the telemetry pipeline
-      ja: トレースイベントがテレメトリ経路へ入る
-    scenario_id: null
+      zh: OTel metrics 导出批次
+      en: OTel metrics export batch
+      ja: OTel metrics エクスポートバッチ
     descriptions:
-      zh: 跨度内的 cache.miss 事件被 SDK 观测后，在 10:22:31 作为遥测发射进入批处理器；发射记录保存 instrumentation scope、resource、源事件引用和采集时点，之后写入日志流。
-      en: After the SDK observes a cache.miss event on a span, it emits telemetry into a batch processor at 10:22:31. The emission record preserves instrumentation scope, resource, source-event reference, and collection time before entering a log stream.
-      ja: スパン上のcache.missイベントをSDKが観測し、10:22:31にテレメトリとしてバッチ処理器へ送出する。送出記録はinstrumentation scope、resource、元イベント参照、収集時刻を保存し、その後ログストリームへ入る。
+      zh: OpenTelemetry PeriodicExportingMetricReader 导出 OTLP metrics batch：metric agent_loop_turns、value=8、labels={service.name:"support-agent"}。
+      en: 'OpenTelemetry PeriodicExportingMetricReader exports OTLP metrics batch: metric agent_loop_turns, value=8, labels={service.name:"support-agent"}.'
+      ja: OTel metrics export batch が TelemetryEvent である。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
     field_values:
       event_id: telemetry-cache-miss-emission-103
       event_kind: telemetry
@@ -63,29 +92,21 @@ examples:
     related_relation_ids:
       - TelemetryEvent-is_a-ObservabilityEvent
       - telemetry_event_derived_from_trace_event
-    expected_result:
-      zh: 管道发射事实被识别为 TelemetryEvent，并可追溯到原 TraceEvent。
-      en: The pipeline-emission occurrence is classified as TelemetryEvent and remains traceable to the original TraceEvent.
-      ja: パイプライン送出事実はTelemetryEventに分類され、元TraceEventへ追跡できる。
-    why_valid_or_invalid:
-      zh: 原事件表示运行中发生了什么；遥测事件表示采集系统何时、以何种作用域接收或发出了它。
-      en: The source event states what occurred in the run; the telemetry event states when and under which scope instrumentation admitted it to the pipeline.
-      ja: 元イベントは実行中の発生内容を、テレメトリイベントは計装がいつどのスコープで経路へ取り込んだかを示す。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-telemetry-event-002
+      - claim-telemetry-event-design
   - id: TelemetryEvent-example-boundary-001
-    kind: boundary
     labels:
-      zh: 度量定义与日志记录不是遥测发射事件
-      en: Metric definitions and log records are not telemetry emissions
-      ja: メトリック定義とログ記録は送出イベントではない
-    scenario_id: null
+      zh: LangSmith run latency 非 TelemetryEvent
+      en: LangSmith run latency not TelemetryEvent
+      ja: LangSmith run latency は TelemetryEvent ではない
     descriptions:
-      zh: 系统声明 latency_ms 直方图并保存一条带 Timestamp、Body、Severity 的 LogRecord。前者是可复用度量定义，后者是持久信息记录；两者都不能仅因属于遥测体系就归入 TelemetryEvent。
-      en: A system declares a latency_ms histogram and stores a LogRecord with Timestamp, Body, and Severity. The first is a reusable metric definition and the second is a persisted information record; neither is a TelemetryEvent merely because both belong to telemetry.
-      ja: システムがlatency_msヒストグラムを定義し、Timestamp・Body・Severity付きLogRecordを保存する。前者は再利用可能な測定定義、後者は永続情報記録であり、テレメトリに属するだけでTelemetryEventにはならない。
+      zh: LangSmith run.latency_ms 是 TraceSpan/RunTree 属性，不是 OTel Metrics SDK TelemetryEvent 导出批次。
+      en: LangSmith run.latency_ms is TraceSpan/RunTree attribute, not OTel Metrics SDK TelemetryEvent export batch.
+      ja: LangSmith latency は Trace 属性であり TelemetryEvent ではない。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
     field_values: {}
     related_node_ids:
       - TelemetryEvent
@@ -93,22 +114,48 @@ examples:
       - ObservabilityEvent
     related_relation_ids:
       - TelemetryEvent-is_a-ObservabilityEvent
-    expected_result:
-      zh: 图谱保持事件、度量定义和日志记录的不同语义种类，不使用 TelemetryEvent 作为总括类型。
-      en: The graph preserves event, metric-definition, and log-record kinds instead of using TelemetryEvent as an umbrella.
-      ja: イベント、メトリック定義、ログ記録の意味種別を保ち、TelemetryEventを総称型にしない。
-    why_valid_or_invalid:
-      zh: 遥测事件以一次管道发射时点为身份；规范定义和持久记录具有不同身份条件。
-      en: TelemetryEvent identity is one pipeline-emission occurrence; a specification and a persisted record have different identity conditions.
-      ja: TelemetryEventは一回の経路送出を同一性条件とし、仕様と永続記録は別条件を持つ。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-telemetry-event-002
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-telemetry-event-design
+  - id: TelemetryEvent-example-3
+    labels:
+      zh: TelemetryEvent 与 TraceEvent 边界
+      en: TelemetryEvent versus TraceEvent
+      ja: TelemetryEvent と TraceEvent 境界
+    descriptions:
+      zh: TelemetryEvent 承载 metrics 信号；TraceEvent 承载 span 内事件；同一运行可同时产生两者但 record_kind 不同。
+      en: TelemetryEvent carries metrics signal; TraceEvent carries in-span events; same run can produce both with different record_kind.
+      ja: TelemetryEvent と TraceEvent は record_kind が異なる。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
+    field_values: {}
+    related_node_ids:
+      - TelemetryEvent
+    related_relation_ids: []
+    source_claims:
+      - claim-telemetry-event-design
+      - claim-telemetry-event-design
+  - id: TelemetryEvent-example-4
+    labels:
+      zh: agent_loop_turns 指标事件
+      en: agent_loop_turns metric event
+      ja: agent_loop_turns メトリックイベント
+    descriptions:
+      zh: Datadog Agent OTLP intake 收到 gauge agent.token_usage_total=1500 在 2026-01-15T10:00:12Z 作为 TelemetryEvent 批次成员。
+      en: Datadog Agent OTLP intake receives gauge agent.token_usage_total=1500 at 2026-01-15T10:00:12Z as TelemetryEvent batch member.
+      ja: Datadog OTLP gauge を TelemetryEvent として記録する。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
+    field_values: {}
+    related_node_ids:
+      - TelemetryEvent
+    related_relation_ids: []
+    source_claims:
+      - claim-telemetry-event-design
+      - claim-telemetry-event-design
 parent_relation:
   id: TelemetryEvent-is_a-ObservabilityEvent
   predicate: is_a
@@ -137,70 +184,10 @@ parent_relation:
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: TelemetryEvent-is_a-ObservabilityEvent-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 逐项核实正例
-        en: Point-reviewed positive case
-        ja: 項目別審査の正例
-      scenario_id: null
-      descriptions:
-        zh: 缓存回退发生后，插桩发出带 event_name、Timestamp、ObservedTimestamp、resource 和 attributes 的事件。
-        en: After cache fallback, instrumentation emits an event with event_name, Timestamp, ObservedTimestamp, resource, and attributes.
-        ja: cache fallback 後、計装が event_name・Timestamp・ObservedTimestamp・resource・attributes 付き event を発行します。
-      field_values: {}
-      related_node_ids:
-        - TelemetryEvent
-        - ObservabilityEvent
-      related_relation_ids:
-        - TelemetryEvent-is_a-ObservabilityEvent
-      expected_result:
-        zh: 仅在所述证据存在时返回这条有向事实。
-        en: Return this directed fact only when the described evidence exists.
-        ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
-      why_valid_or_invalid:
-        zh: 每个 TelemetryEvent 都是 ObservabilityEvent，其种差是由插桩将一次已观察发生转换为可采集、处理或传输的遥测事件。
-        en: Every TelemetryEvent is an ObservabilityEvent distinguished by instrumentation converting an observed occurrence into an event ready for telemetry collection, processing, or transport.
-        ja: すべての TelemetryEvent は ObservabilityEvent で、計装が観測発生を収集・処理・転送可能な telemetry event に変換する点が種差です。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-telemetry-event-003
-    - id: TelemetryEvent-is_a-ObservabilityEvent-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 逐项核实边界例
-        en: Point-reviewed boundary case
-        ja: 項目別審査の境界例
-      scenario_id: null
-      descriptions:
-        zh: 指标规范定义 latency 的单位和聚合方式，却没有任何一次发生或发出时刻。
-        en: A metric specification defines latency unit and aggregation but contains no occurrence or emission time.
-        ja: metric specification が latency 単位と集約を定義しますが、発生時刻も emission 時刻もありません。
-      field_values: {}
-      related_node_ids:
-        - TelemetryEvent
-        - ObservabilityEvent
-      related_relation_ids:
-        - TelemetryEvent-is_a-ObservabilityEvent
-      expected_result:
-        zh: 不得从该边界情形推断这条关系。
-        en: Do not infer this relation from the boundary case.
-        ja: この境界事例から当該関係を推論しません。
-      why_valid_or_invalid:
-        zh: 可复用指标规范是 specification，不是确定时刻发生的 TelemetryEvent。
-        en: A reusable metric specification is a specification, not a TelemetryEvent occurring at a determinate time.
-        ja: 再利用可能な metric specification は確定時刻に発生する TelemetryEvent ではありません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-telemetry-event-003
   source_claims:
-    - claim-telemetry-event-004
+    - claim-telemetry-event-design
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations:
   - id: telemetry_event_derived_from_trace_event
@@ -230,128 +217,48 @@ relations:
     temporal_scope: timeless
     boundary_context: null
     constraints: []
-    examples:
-      - id: telemetry_event_derived_from_trace_event-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 逐项核实正例
-          en: Point-reviewed positive case
-          ja: 項目別審査の正例
-        scenario_id: null
-        descriptions:
-          zh: trace event cache.miss 被映射为带 EventName=cache.miss、TraceId、SpanId 与属性的 TelemetryEvent。
-          en: Trace event cache.miss is mapped to a TelemetryEvent with EventName=cache.miss, TraceId, SpanId, and attributes.
-          ja: trace event cache.miss が EventName=cache.miss・TraceId・SpanId・attributes 付き TelemetryEvent に mapping されます。
-        field_values: {}
-        related_node_ids:
-          - TelemetryEvent
-          - TraceEvent
-        related_relation_ids:
-          - telemetry_event_derived_from_trace_event
-        expected_result:
-          zh: 仅在所述证据存在时返回这条有向事实。
-          en: Return this directed fact only when the described evidence exists.
-          ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
-        why_valid_or_invalid:
-          zh: TelemetryEvent 通过 derived_from 指向提供原始 span 内发生证据的 TraceEvent；转换可调整格式，但不得制造第二份运行真相。
-          en: TelemetryEvent is derived_from the TraceEvent supplying original span-local occurrence evidence; transformation may change representation but must not create a second runtime truth.
-          ja: TelemetryEvent は元の Span-local occurrence evidence を持つ TraceEvent から derived_from され、表現変換は可能でも第二 runtime truth を作りません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-telemetry-event-005
-      - id: telemetry_event_derived_from_trace_event-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 逐项核实边界例
-          en: Point-reviewed boundary case
-          ja: 項目別審査の境界例
-        scenario_id: null
-        descriptions:
-          zh: 监控器独立产生 cpu.high 事件；它没有对应 TraceEvent，只读取主机指标。
-          en: A monitor independently emits cpu.high from host metrics and has no corresponding TraceEvent.
-          ja: monitor が host metrics から cpu.high を独立発行し、対応 TraceEvent はありません。
-        field_values: {}
-        related_node_ids:
-          - TelemetryEvent
-          - TraceEvent
-        related_relation_ids:
-          - telemetry_event_derived_from_trace_event
-        expected_result:
-          zh: 不得从该边界情形推断这条关系。
-          en: Do not infer this relation from the boundary case.
-          ja: この境界事例から当該関係を推論しません。
-        why_valid_or_invalid:
-          zh: TelemetryEvent 可以有其他来源；只有保存原 TraceEvent 身份的转换才建立 derived_from。
-          en: TelemetryEvent may have other origins; derived_from requires a transformation retaining original TraceEvent identity.
-          ja: TelemetryEvent は別 origin も持て、derived_from は元 TraceEvent identity を保持する変換に限ります。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-telemetry-event-005
     source_claims:
-      - claim-telemetry-event-005
+      - claim-telemetry-event-design
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:TraceEvent
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-runtime-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenTelemetry、W3C Trace Context 与 LangGraph checkpoint/replay 逐项核验，TraceSpan 与 Checkpoint 语义成立。
-    en: Verified against OpenTelemetry, W3C Trace Context, and LangGraph checkpoint/replay. TraceSpan and Checkpoint semantics hold.
-    ja: OpenTelemetry、W3C Trace Context、LangGraph checkpoint/replay に照らし TraceSpan と Checkpoint semantics を確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-otel-protocol
+    title: OpenTelemetry Protocol Specification
+    url: https://opentelemetry.io/docs/specs/otel/protocol/
+    source_type: official-spec
+    relevance: OTLP traceId, spanId, parent links, status codes.
+  - id: src-langsmith
+    title: LangSmith Documentation
+    url: https://docs.smith.langchain.com/
+    source_type: official-doc
+    relevance: Run trees with parent_run_id and nested child runs.
+  - id: src-langgraph-checkpoints
+    title: LangGraph Persistence
+    url: https://langchain-ai.github.io/langgraph/concepts/persistence/
+    source_type: official-doc
+    relevance: Checkpoint and StateSnapshot capture for recovery.
+  - id: src-runtime-observability-design
+    title: Moonweave runtime-observability module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: TraceSpan, Checkpoint, TraceEvent boundaries versus Execution.
 source_claims:
-  - id: claim-telemetry-event-001
-    source: eng-observe-opentelemetry-logs
-    supports: OpenTelemetry Events are structured LogRecords emitted by instrumentation with occurrence and observation time; Moonweave uses TelemetryEvent for the emitted occurrence before stream placement and keeps the original span-local TraceEvent distinct.
-    locator: Logs Data Model > Events and Log and Event Record Definition
+  - id: claim-otel-observability
+    source: src-otel-protocol
+    supports: OpenTelemetry OTLP export provides traceId, spanId, and parent links for TraceSpan mapping.
+    locator: OTLP > TracesData
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-telemetry-event-002
-    source: eng-std-opentelemetry-spec
-    supports: OpenTelemetry Events are structured LogRecords emitted by instrumentation with occurrence and observation time; Moonweave uses TelemetryEvent for the emitted occurrence before stream placement and keeps the original span-local TraceEvent distinct.
-    locator: Logs Data Model > Events and Log and Event Record Definition
+  - id: claim-langsmith-observability
+    source: src-langsmith
+    supports: LangSmith run trees expose parent_run_id hierarchy mappable to TraceRecord.
+    locator: Runs > run tree
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-telemetry-event-003
-    source: eng-std-opentelemetry-spec
-    supports: Every TelemetryEvent is an ObservabilityEvent distinguished by instrumentation converting an observed occurrence into an event ready for telemetry collection, processing, or transport. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
-    locator: Logs Data Model > Events and Log and Event Record Definition
+  - id: claim-telemetry-event-design
+    source: src-runtime-observability-design
+    supports: TelemetryEvent records stream fragments bound to execution context.
+    locator: TelemetryEvent boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-telemetry-event-004
-    source: eng-observe-opentelemetry-logs
-    supports: Every TelemetryEvent is an ObservabilityEvent distinguished by instrumentation converting an observed occurrence into an event ready for telemetry collection, processing, or transport. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
-    locator: Logs Data Model > Events and Log and Event Record Definition
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-telemetry-event-005
-    source: eng-observe-opentelemetry-logs
-    supports: TelemetryEvent is derived_from the TraceEvent supplying original span-local occurrence evidence; transformation may change representation but must not create a second runtime truth. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
-    locator: Logs Data Model > Events and Log and Event Record Definition
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-telemetry-event-006
-    source: eng-observe-opentelemetry-logs
-    supports: TelemetryEvent emitted_to the LogStream that actually receives it and assigns stream position; a configured candidate destination is not an emission fact. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
-    locator: Logs Data Model > Events and Log and Event Record Definition
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-

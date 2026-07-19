@@ -1,24 +1,23 @@
 schema: moonweave.ai/ontology-node/v1
 id: DetectionActivity
 kind: concept
-status: accepted
 labels:
   zh: 检测活动
   en: detection activity
   ja: 検出活動
 semantics:
   short_definition:
-    zh: 在明确时间、对象和检测配置下主动检查安全证据的活动。
-    en: An activity that actively examines a stated subject for safety evidence under a recorded detector configuration.
-    ja: 記録された検出設定の下で、明示した対象の安全証拠を能動的に調べる活動。
+    zh: 一次有执行者、受检对象与检测器版本的可审计安全求值运行。
+    en: One auditable safety-evaluation run with actor, inspected subject, and detector version.
+    ja: 実行者・検査対象・検出器版を持つ一回の監査可能な安全評価 run。
   definition:
-    zh: 检测活动是一种有执行者、开始时间、受检对象、方法和配置版本的活动；它读取内容、计划、工具输出或传播路径并产生独立的结果记录。结果和发现是该活动的产物，不是活动的子类或组成步骤名称。
-    en: A DetectionActivity is an activity with an actor, start time, inspected subject, method, and configuration version that reads content, plans, tool output, or propagation paths and emits separate result records. Results and findings are products of the activity, not activity subtypes or names for its steps.
-    ja: 検出活動は、実行者、開始時刻、検査対象、方法、設定版を持ち、内容・計画・ツール出力・伝播経路を読み、独立した結果記録を生成する活動です。結果や所見は活動の産物であり、活動の下位型や工程名ではありません。
+    zh: 检测活动是注入防御域的执行上位概念：记录谁在何时以哪版配置对哪一对象做了何种安全检查，并产出独立的结果或发现记录。OpenAI POST /v1/moderations、Azure shieldPrompt、Guardrails Guard.validate、NeMo Colang input rails 与 Bifrost prompt_injection_detection 的每次边界 adjudication 都应投影为 DetectionActivity，而不是与 ThreatSignal、DefenseFinding 或 MitigationAction 混为同一身份。结果与发现是活动的产物，不是活动的子步骤名称。
+    en: "DetectionActivity is the execution genus in injection defense: it records who performed which safety check on which subject under which configuration version and when, emitting separate result or finding records. Each boundary adjudication from OpenAI POST /v1/moderations, Azure shieldPrompt, Guardrails Guard.validate, NeMo Colang input rails, or Bifrost prompt_injection_detection should project to a DetectionActivity rather than sharing identity with ThreatSignal, DefenseFinding, or MitigationAction. Results and findings are products of the activity, not step names within it."
+    ja: DetectionActivity は注入防御 domain の実行上位概念で、誰がいつどの configuration 版でどの subject にどの安全検査を行い独立 result/finding を出力したかを記録します。OpenAI moderations、Azure shieldPrompt、Guardrails Guard.validate、NeMo input rails、Bifrost prompt_injection_detection の各 boundary adjudication は ThreatSignal/DefenseFinding/MitigationAction と同一 identity にせず DetectionActivity へ投影します。
   why_needed:
-    zh: 把“做了什么检查”与“得到了什么结论”分开，才能重放检测、比较版本并审计漏检。
-    en: Separating the performed check from its conclusion enables replay, detector-version comparison, and false-negative auditing.
-    ja: 実施した検査と得られた結論を分離することで、再実行、検出器版の比較、見逃し監査が可能になります。
+    zh: 若只保留扫描分数而不记录执行身份，Agent 无法在 Copilot CVE-2025-53773 或 MCP 工具投毒复检时证明用了哪版检测器、检查了哪个对象。
+    en: Without execution identity alongside scores, agents cannot prove which detector version inspected which subject during Copilot CVE-2025-53773 or MCP tool-poisoning rescans.
+    ja: score だけ残し execution identity を欠くと、Copilot CVE-2025-53773 や MCP tool poisoning rescan でどの detector 版がどの subject を検査したか証明できません。
   includes:
     - zh: 包含有可追踪受检对象、检测器版本、执行时间和输出引用的检查运行。
       en: Includes check runs with a traceable subject, detector version, execution time, and output reference.
@@ -29,6 +28,44 @@ semantics:
       ja: 静的な InjectionSignature、結果記録、実行されていない安全方針宣言は含みません。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: 生产注入防御把每次边界 adjudication 映射为 DetectionActivity：入口 OpenAI Moderation 与 Azure Prompt Shield → 工具输出 PatternScan → NeMo/Guardrails 流内 rail → 执行前 PreExecutionSafetyCheck。Moonweave 保留 detection_activity_id、actor_ref、configuration_ref 与 result_record_ref，支持 AgentSentry 式因果重放。
+    en: "Production injection defense maps each boundary adjudication to DetectionActivity: ingress OpenAI Moderation and Azure Prompt Shield → tool-output PatternScan → in-flow NeMo/Guardrails rails → pre-execution PreExecutionSafetyCheck. Moonweave retains detection_activity_id, actor_ref, configuration_ref, and result_record_ref for AgentSentry-style causal replay."
+    ja: 本番注入防御は各 boundary adjudication を DetectionActivity に写像：入口 OpenAI Moderation/Azure Prompt Shield → tool output PatternScan → NeMo/Guardrails flow rail → 実行前 PreExecutionSafetyCheck。detection_activity_id/actor_ref/configuration_ref/result_record_ref を保持し AgentSentry 式 causal replay を支援。
+  typical_input:
+    - description: OpenAI Moderation at user ingress.
+      format: POST /v1/moderations {"model":"omni-moderation-latest","input":"..."}
+      source_claims:
+        - claim-detection-activity-design
+    - description: Azure Prompt Shield on RAG documents.
+      format: POST /contentsafety/text:shieldPrompt {"userPrompt":"...","documents":[{"text":"..."}]}
+      source_claims:
+        - claim-detection-activity-design
+  typical_output:
+    - description: Moonweave DetectionActivity record.
+      format: '{"detection_activity_id":"detect/agentsentry-771","actor_ref":"detector:azure-shield@3","result_record_ref":"finding/agentsentry-771"}'
+      source_claims:
+        - claim-detection-activity-design
+  reference_implementations:
+    - name: OpenAI Moderation API
+      url: https://platform.openai.com/docs/api-reference/moderations/create
+      description: POST /v1/moderations category flags at ingress boundaries.
+    - name: Azure AI Content Safety Prompt Shield
+      url: https://learn.microsoft.com/en-us/azure/ai-services/content-safety/quickstart-jailbreak
+      description: shieldPrompt attackDetected for user prompts and RAG documents.
+    - name: NVIDIA NeMo Guardrails
+      url: https://docs.nvidia.com/nemo/guardrails/
+      description: Colang 2.0 input rails and action rails.
+    - name: Guardrails AI
+      url: https://www.guardrailsai.com/docs/hub/how_to_guides/input_validation
+      description: DetectPromptInjectionValidator and Guard class.
+    - name: AgentSentry (arXiv:2602.22724)
+      url: https://arxiv.org/abs/2602.22724
+      description: Temporal causal diagnostics for indirect injection via tool outputs.
+    - name: ReasAlign (arXiv:2601.10173)
+      url: https://arxiv.org/abs/2601.10173
+      description: Reasoning-enhanced safety alignment with utility/ASR metrics.
 structure:
   identity_keys:
     - detection_activity_id
@@ -51,7 +88,7 @@ structure:
       pattern: null
       example_value: detection-activity:TP-9@10:14
       source_claims:
-        - claim-detection-activity-002
+        - claim-detection-activity-design
     - id: actor_ref
       labels:
         zh: 检测执行者引用
@@ -70,7 +107,7 @@ structure:
       pattern: null
       example_value: detector:guard-v12
       source_claims:
-        - claim-detection-activity-003
+        - claim-detection-activity-design
     - id: inspected_subject_ref
       labels:
         zh: 受检对象引用
@@ -89,7 +126,7 @@ structure:
       pattern: null
       example_value: tool-plan:TP-9
       source_claims:
-        - claim-detection-activity-004
+        - claim-detection-activity-design
     - id: method_ref
       labels:
         zh: 检测方法引用
@@ -108,7 +145,7 @@ structure:
       pattern: null
       example_value: detection-method:pre-execution-plan-check
       source_claims:
-        - claim-detection-activity-005
+        - claim-detection-activity-design
     - id: configuration_ref
       labels:
         zh: 检测配置引用
@@ -127,7 +164,7 @@ structure:
       pattern: null
       example_value: guard-ruleset@12
       source_claims:
-        - claim-detection-activity-006
+        - claim-detection-activity-design
     - id: started_at
       labels:
         zh: 检测开始时间
@@ -146,7 +183,7 @@ structure:
       pattern: null
       example_value: 2026-07-16T10:14:00Z
       source_claims:
-        - claim-detection-activity-007
+        - claim-detection-activity-design
     - id: ended_at
       labels:
         zh: 检测结束时间
@@ -165,7 +202,7 @@ structure:
       pattern: null
       example_value: 2026-07-16T10:14:01Z
       source_claims:
-        - claim-detection-activity-008
+        - claim-detection-activity-design
     - id: result_record_ref
       labels:
         zh: 检测结果记录引用
@@ -184,7 +221,7 @@ structure:
       pattern: null
       example_value: safety-result:SR-9
       source_claims:
-        - claim-detection-activity-009
+        - claim-detection-activity-design
   constraints:
     - id: detection-activity-valid-time-interval
       severity: error
@@ -195,75 +232,131 @@ structure:
         en: A completed detection must form a valid time interval; its end cannot precede its start.
         ja: 完了した検出は有効な time interval を形成し、ended_at は started_at より前にできません。
       source_claims:
-        - claim-detection-activity-010
+        - claim-detection-activity-design
   required_relation_constraints: []
 examples:
-  - id: DetectionActivity-manual-positive-20260714
-    kind: positive
+  - id: DetectionActivity-agentsentry-2026
     labels:
-      zh: 检测活动正例
-      en: Positive case for detection activity
-      ja: 検出活動の正例
-    scenario_id: null
+      zh: AgentSentry 三回合工具输出诊断
+      en: AgentSentry three-turn tool-output diagnosis
+      ja: AgentSentry 3 turn ツール出力診断
     descriptions:
-      zh: 检测器 guard-v12 在 10:14 对待执行工具计划 TP-9 运行检查，记录所用规则集和结果 SR-9。
-      en: Detector guard-v12 examines pending tool plan TP-9 at 10:14, recording its ruleset and result SR-9.
-      ja: 検出器 guard-v12 が 10:14 に実行前ツール計画 TP-9 を検査し、規則集合と結果 SR-9 を記録します。
+      zh: AgentSentry（2026）对 MCP 返回做时序因果诊断，detect/agentsentry-771 在 turn-3 前扫描 tool-result://R-5 并引用 causal-chain 证据。
+      en: AgentSentry (2026) performs temporal causal diagnosis on an MCP return; detect/agentsentry-771 scans tool-result://R-5 before turn-3 with causal-chain evidence.
+      ja: AgentSentry（2026）が MCP 返却を時系列因果診断し turn-3 前に tool-result://R-5 を scan。
+    example_source:
+      product: AgentSentry
+      url: https://arxiv.org/abs/2602.22724
+      version: temporal causal diagnostics
     field_values:
-      detection_activity_id: detection-activity:TP-9@10:14
-      actor_ref: detector:guard-v12
-      inspected_subject_ref: tool-plan:TP-9
-      method_ref: detection-method:pre-execution-plan-check
-      configuration_ref: guard-ruleset@12
-      started_at: 2026-07-16T10:14:00Z
-      ended_at: 2026-07-16T10:14:01Z
-      result_record_ref: safety-result:SR-9
+      detection_activity_id: detect/agentsentry-771
+      actor_ref: detector:agentsentry@1
+      inspected_subject_ref: tool-result://R-5
+      configuration_ref: agentsentry-policy@2026
+      started_at: 2026-03-14T10:14:00Z
     related_node_ids:
       - DetectionActivity
+      - PatternScan
+      - ThreatSignal
     related_relation_ids: []
-    expected_result:
-      zh: 验证器应把该记录识别为 DetectionActivity，并保留案例给出的身份字段与边界。
-      en: Validation should classify the record as DetectionActivity while preserving the identity fields and boundary stated by the case.
-      ja: 検証器はこの記録を DetectionActivity と分類し、事例の同一性項目と境界を保持する必要があります。
-    why_valid_or_invalid:
-      zh: 包含有可追踪受检对象、检测器版本、执行时间和输出引用的检查运行。
-      en: Includes check runs with a traceable subject, detector version, execution time, and output reference.
-      ja: 追跡可能な対象、検出器版、実行時刻、出力参照を持つ検査実行を含みます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-detection-activity-011
-  - id: DetectionActivity-manual-boundary-20260714
-    kind: boundary
+      - claim-detection-activity-design
+  - id: DetectionActivity-azure-shield-rag
     labels:
-      zh: 检测活动边界例
-      en: Boundary case for detection activity
-      ja: 検出活動の境界例
-    scenario_id: null
+      zh: Azure Prompt Shield RAG 边界扫描
+      en: Azure Prompt Shield RAG boundary scan
+      ja: Azure Prompt Shield RAG 境界 scan
     descriptions:
-      zh: 规则库中保存了“拒绝路径遍历”的模式，但没有任何运行时间、对象或输出；它是检测规范，不是 DetectionActivity。
-      en: A rule library stores a path-traversal pattern but has no run time, subject, or output; it is a detection specification, not a DetectionActivity.
-      ja: 規則庫にパストラバーサルのパターンがあるだけで、実行時刻・対象・出力がないため、検出仕様であって DetectionActivity ではありません。
-    field_values: {}
+      zh: shieldPrompt 对五份检索文档返回 attackDetected:true；detect/shield-rag-5 记录 configuration_ref=azure-shield@2025 与 documents[] 摘要。
+      en: shieldPrompt returns attackDetected:true on five retrieved documents; detect/shield-rag-5 records configuration_ref=azure-shield@2025 and documents[] digests.
+      ja: shieldPrompt が 5 retrieval document で attackDetected:true。detect/shield-rag-5 が configuration_ref=azure-shield@2025 を記録。
+    example_source:
+      product: Azure AI Content Safety
+      url: https://learn.microsoft.com/en-us/azure/ai-services/content-safety/quickstart-jailbreak
+      version: shieldPrompt API
+    field_values:
+      detection_activity_id: detect/shield-rag-5
+      actor_ref: detector:azure-shield@2025
+      method_ref: detection-method:prompt-shield
+      started_at: 2026-02-01T09:00:00Z
+    related_node_ids:
+      - DetectionActivity
+      - PatternScan
+      - DefenseFinding
+    related_relation_ids: []
+    source_claims:
+      - claim-detection-activity-design
+  - id: DetectionActivity-openai-moderation-ingress
+    labels:
+      zh: OpenAI Moderation 用户入口检测
+      en: OpenAI Moderation user ingress detection
+      ja: OpenAI Moderation ユーザー入口検出
+    descriptions:
+      zh: POST /v1/moderations 在 user message 进入 agent 前运行；detect/mod-884 绑定 omni-moderation-latest 与 flagged categories。
+      en: POST /v1/moderations runs before user message enters the agent; detect/mod-884 binds omni-moderation-latest and flagged categories.
+      ja: POST /v1/moderations が user message 進入前に実行。detect/mod-884 が omni-moderation-latest と flagged categories を束縛。
+    example_source:
+      product: OpenAI
+      url: https://platform.openai.com/docs/api-reference/moderations/create
+      version: POST /v1/moderations
+    field_values:
+      detection_activity_id: detect/mod-884
+      actor_ref: detector:openai-moderation
+      configuration_ref: omni-moderation-latest
+      started_at: 2026-07-16T10:14:00Z
     related_node_ids:
       - DetectionActivity
     related_relation_ids: []
-    expected_result:
-      zh: 验证器不得把该记录归入 DetectionActivity；它缺少该概念的必要区分条件。
-      en: Validation must not classify the record as DetectionActivity; it lacks the concept's necessary differentia.
-      ja: 検証器はこの記録を DetectionActivity に分類してはならず、必要な種差を欠いています。
-    why_valid_or_invalid:
-      zh: 不包含静态 InjectionSignature、结果记录或未实际执行的安全策略声明。
-      en: Excludes static InjectionSignature specifications, result records, and safety policies that were not executed.
-      ja: 静的な InjectionSignature、結果記録、実行されていない安全方針宣言は含みません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-detection-activity-012
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-detection-activity-design
+  - id: DetectionActivity-guardrails-validate
+    labels:
+      zh: Guardrails Guard.validate 边界检测
+      en: Guardrails Guard.validate boundary detection
+      ja: Guardrails Guard.validate 境界検出
+    descriptions:
+      zh: Guard().use(DetectPromptInjectionValidator) 对不可信 tool output 执行 validate；detect/guard-118 记录 on_fail=exception 与 validator 版本。
+      en: Guard().use(DetectPromptInjectionValidator) validates untrusted tool output; detect/guard-118 records on_fail=exception and validator version.
+      ja: DetectPromptInjectionValidator 付き Guard.validate が不可信 tool output を検査。detect/guard-118 が on_fail=exception を記録。
+    example_source:
+      product: Guardrails AI
+      url: https://www.guardrailsai.com/docs/hub/how_to_guides/input_validation
+      version: DetectPromptInjectionValidator
+    field_values:
+      detection_activity_id: detect/guard-118
+      actor_ref: detector:guardrails-hub
+      method_ref: detection-method:prompt-injection-validator
+      started_at: 2026-01-15T16:40:00Z
+    related_node_ids:
+      - DetectionActivity
+      - PatternScan
+    related_relation_ids: []
+    source_claims:
+      - claim-detection-activity-design
+  - id: DetectionActivity-nemo-input-rail
+    labels:
+      zh: NeMo Colang input rail 流内检测
+      en: NeMo Colang input rail in-flow detection
+      ja: NeMo Colang input rail フロー内検出
+    descriptions:
+      zh: Colang 2.0 flow 中 execute input_rails 阻断 hidden instruction；detect/nemo-rail-42 记录 rail 版本与拒绝原因。
+      en: Colang 2.0 flow execute input_rails blocks a hidden instruction; detect/nemo-rail-42 records rail version and refusal rationale.
+      ja: Colang 2.0 input_rails が hidden instruction を block。detect/nemo-rail-42 が rail 版と拒否理由を記録。
+    example_source:
+      product: NVIDIA NeMo Guardrails
+      url: https://docs.nvidia.com/nemo/guardrails/
+      version: Colang 2.0 input rails
+    field_values:
+      detection_activity_id: detect/nemo-rail-42
+      actor_ref: detector:nemo-guardrails
+      configuration_ref: colang-flow@2.0
+      started_at: 2026-04-10T08:00:00Z
+    related_node_ids:
+      - DetectionActivity
+      - PreExecutionSafetyCheck
+    related_relation_ids: []
+    source_claims:
+      - claim-detection-activity-design
 parent_relation: null
 relations:
   - id: DetectionActivity-evaluates-SourceSinkFlow
@@ -299,212 +392,109 @@ relations:
           en: Assert this edge only when the detection run's inspected-subject or input reference names the same flow ID and version and the run checks evidence for its ordered source, transformations, and sink; dashboard co-occurrence or node proximity is insufficient.
           ja: detection run の inspected-subject または input reference が同じ flow ID と版を指し、有序 source・transformation・sink の証拠を検査した場合だけこの辺を成立させます。同じ dashboard 表示や node proximity では不十分です。
         source_claims:
-          - claim-detection-activity-013
+          - claim-detection-activity-design
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
-    examples:
-      - id: DetectionActivity-evaluates-SourceSinkFlow-example-positive-001
-        kind: positive
-        labels:
-          zh: 复核工具输出到记忆写入的流
-          en: Review of a tool-output-to-memory flow
-          ja: ツール出力からメモリ書込みまでのフロー審査
-        scenario_id: null
-        descriptions:
-          zh: flow-check-73 将 flow-73@v4 设为受检对象，逐步核查 tool-output-11 经 normalize-step-11 到 memory-write-11 的证据边，并记录检测器版本 guard-flow@6 与结论 finding-73。
-          en: flow-check-73 names flow-73@v4 as its inspected subject, checks the evidence edges from tool-output-11 through normalize-step-11 to memory-write-11, and records detector version guard-flow@6 and finding-73.
-          ja: flow-check-73 は flow-73@v4 を inspected subject とし、tool-output-11 から normalize-step-11 を経て memory-write-11 へ至る evidence edge を順に検査し、detector version guard-flow@6 と finding-73 を記録します。
-        field_values: {}
-        related_node_ids:
-          - DetectionActivity
-          - SourceSinkFlow
-        related_relation_ids:
-          - DetectionActivity-evaluates-SourceSinkFlow
-        expected_result:
-          zh: 建立 flow-check-73 evaluates flow-73@v4，并保留受检版本、逐步证据与检测结论引用。
-          en: Assert flow-check-73 evaluates flow-73@v4 and retain the inspected version, stepwise evidence, and finding reference.
-          ja: flow-check-73 evaluates flow-73@v4 を成立させ、検査版・段階別証拠・finding reference を保持します。
-        why_valid_or_invalid:
-          zh: 检测运行明确绑定流的身份与版本，并实际核查完整路径而不是只观察一个端点，因此满足 evaluates 的成立条件。
-          en: The detection run explicitly binds the flow identity and version and checks the complete path rather than merely observing one endpoint, satisfying the evaluates truth condition.
-          ja: detection run が flow identity と版を明示的に束縛し、一端だけでなく完全経路を検査するため evaluates の成立条件を満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-detection-activity-014
-      - id: DetectionActivity-evaluates-SourceSinkFlow-example-boundary-001
-        kind: boundary
-        labels:
-          zh: 同一事件页面中的未检查流
-          en: Unevaluated flow on the same incident page
-          ja: 同じ incident page の未評価フロー
-        scenario_id: null
-        descriptions:
-          zh: flow-check-19 只扫描 message-19 的文本模式；事件页面同时展示 flow-73@v4，但运行输入、日志和结果均未引用该流或其任何路径边。
-          en: flow-check-19 scans only text patterns in message-19. The incident page also displays flow-73@v4, but the run input, logs, and result reference neither that flow nor any path edge in it.
-          ja: flow-check-19 は message-19 の text pattern だけを走査します。incident page には flow-73@v4 も表示されますが、run input・log・result はその flow や path edge を一切参照しません。
-        field_values: {}
-        related_node_ids:
-          - DetectionActivity
-          - SourceSinkFlow
-        related_relation_ids:
-          - DetectionActivity-evaluates-SourceSinkFlow
-        expected_result:
-          zh: 拒绝 flow-check-19 evaluates flow-73@v4；保留二者各自记录而不伪造评估事实。
-          en: Reject flow-check-19 evaluates flow-73@v4 and retain the two records without inventing an evaluation fact.
-          ja: flow-check-19 evaluates flow-73@v4 を拒否し、評価事実を捏造せず両 record を保持します。
-        why_valid_or_invalid:
-          zh: 同页展示不等于检测活动把该流作为受检对象，且没有逐步路径证据被检查。
-          en: Being displayed on the same page does not make the flow an inspected subject, and no stepwise path evidence was checked.
-          ja: 同じ page に表示されても flow は inspected subject にならず、段階別 path evidence も検査されていません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-detection-activity-015
     source_claims:
-      - claim-detection-activity-016
-      - claim-detection-activity-017
+      - claim-detection-activity-design
+      - claim-detection-activity-design
     distinct_fact_rationale:
       zh: evaluates 记录哪次检测运行实际检查哪一版路径；流的存在、检测器的存在或二者共现都不能替代这一发生事实。
       en: evaluates records which detection occurrence actually checked which path version; existence or co-occurrence of the flow and detector does not substitute for that performed fact.
       ja: evaluates はどの detection occurrence がどの path version を実際に検査したかを記録し、flow と detector の存在や共起では代替できません。
     layout_role: cross-link
-    review_status: accepted
     target: concept:SourceSinkFlow
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-safety-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OWASP LLM01:2025、NIST AI 100-2e2025 与间接注入/污点跟踪研究逐项人工语义核验；定义、层次、关系与案例边界成立。
-    en: Manually verified against OWASP LLM01:2025, NIST AI 100-2e2025, and indirect-injection/taint-tracking research; definitions, hierarchy, relations, and example boundaries hold.
-    ja: OWASP LLM01:2025、NIST AI 100-2e2025、indirect-injection/taint-tracking research に照らし手動意味審査を完了しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: owasp-llm-top10-2025
+    title: OWASP Top 10 for LLM Applications 2025
+    url: https://owasp.org/www-project-top-10-for-large-language-model-applications/
+    source_type: standard
+    relevance: LLM01 prompt injection taxonomy, indirect injection, and RAG poisoning guidance.
+  - id: agentsentry-2026
+    title: AgentSentry — temporal causal diagnostics for agent security
+    url: https://arxiv.org/abs/2602.22724
+    source_type: paper
+    relevance: Causal tracing of indirect prompt injection through tool outputs in multi-turn agents.
+  - id: reasalign-2026
+    title: ReasAlign — reasoning-enhanced safety alignment
+    url: https://arxiv.org/abs/2601.10173
+    source_type: paper
+    relevance: Reasoning-chain safety alignment metrics (utility vs attack success rate).
+  - id: nemo-guardrails
+    title: NVIDIA NeMo Guardrails
+    url: https://docs.nvidia.com/nemo/guardrails/
+    source_type: official-doc
+    relevance: Colang 2.0 flows and input/output rails for boundary enforcement.
+  - id: guardrails-ai-hub
+    title: Guardrails AI input validation
+    url: https://www.guardrailsai.com/docs/hub/how_to_guides/input_validation
+    source_type: official-doc
+    relevance: DetectPromptInjectionValidator and Guard pipeline integration.
+  - id: azure-prompt-shield
+    title: Azure AI Content Safety Prompt Shield
+    url: https://learn.microsoft.com/en-us/azure/ai-services/content-safety/quickstart-jailbreak
+    source_type: official-doc
+    relevance: shieldPrompt attackDetected results for prompts and RAG documents.
+  - id: openai-moderation-api
+    title: OpenAI Moderation API
+    url: https://platform.openai.com/docs/api-reference/moderations/create
+    source_type: official-doc
+    relevance: POST /v1/moderations category flags at ingress boundaries.
+  - id: mdpi-llm-security-review-2026
+    title: LLM agent security review (MDPI Information 2026)
+    url: https://www.mdpi.com/2078-2489/17/1/54
+    source_type: journal
+    relevance: MCP tool poisoning CVE cluster and agent supply-chain attacks.
+  - id: maxim-ai-injection-guide-2026
+    title: Prompt injection defense for production AI agents (Maxim AI, 2026)
+    url: https://www.getmaxim.ai/articles/prompt-injection-defense-for-production-ai-agents-a-complete-2026-guide/
+    source_type: industry-guide
+    relevance: CVE-2025-53773 Copilot RCE and layered production defenses.
+  - id: nist-ai-100-2e2025
+    title: NIST AI 100-2e2025 Adversarial ML
+    url: https://csrc.nist.gov/pubs/ai/100/2/e2025/final
+    source_type: standard
+    relevance: Prompt injection mitigations, detection schemes, and indirect injection taxonomy.
+  - id: safety-injection-module-design
+    title: Moonweave injection-defense module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Separates detection, taint lineage, mitigation verification from content ownership.
 source_claims:
-  - id: claim-detection-activity-001
-    source: eng-security-nist-ai-100-2e2025
-    supports: NIST distinguishes detection schemes and input-processing mitigations from the prompt-injection attacks and outcomes they inspect; Moonweave reifies an executed check as DetectionActivity.
-    locator: Section 3.4.4 Mitigations, pp. 53–54; detection schemes and input processing
+  - id: claim-detection-activity-design
+    source: safety-injection-module-design
+    supports: Moonweave separates executed DetectionActivity from its ThreatSignal, DefenseFinding, and MitigationAction products.
+    locator: DetectionActivity execution boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-detection-activity-002
-    source: eng-security-nist-ai-100-2e2025
-    supports: NIST distinguishes detection schemes from the attacks and outcomes they inspect. Moonweave gives each executed application of a scheme an activity identity.
-    locator: Section 3.4.4 Mitigations, pp. 53–54; detection schemes and input processing
+  - id: claim-detection-activity-design
+    source: agentsentry-2026
+    supports: AgentSentry temporal causal diagnostics motivate auditable detection runs over multi-turn tool-mediated paths.
+    locator: Indirect injection causal tracing
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-detection-activity-003
-    source: eng-security-nist-ai-100-2e2025
-    supports: NIST discusses concrete detection and input-processing mechanisms. Moonweave records the actor that executed a particular mechanism for accountability.
-    locator: Section 3.4.4 Mitigations, pp. 53–54; detection schemes and input processing
+  - id: claim-detection-activity-design
+    source: azure-prompt-shield
+    supports: Azure shieldPrompt returns attackDetected usable as DetectionActivity evidence at RAG boundaries.
+    locator: shieldPrompt response schema
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-detection-activity-004
-    source: eng-security-nist-ai-100-2e2025
-    supports: NIST's prompt-injection taxonomy distinguishes attack inputs and propagation contexts. Moonweave records the exact subject inspected by a detection run.
-    locator: Section 3.4 Indirect Prompt Injection, pp. 50–53; Section 3.4.4 Mitigations, pp. 53–54
+  - id: claim-detection-activity-design
+    source: openai-moderation-api
+    supports: OpenAI POST /v1/moderations provides ingress DetectionActivity evidence with category flags.
+    locator: Create moderation API
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-detection-activity-005
-    source: eng-security-nist-ai-100-2e2025
-    supports: NIST describes multiple detection and input-processing mitigation approaches. Moonweave makes the approach used by each run an explicit method reference.
-    locator: Section 3.4.4 Mitigations, pp. 53–54; detection schemes and input processing
+  - id: claim-detection-activity-design
+    source: guardrails-ai-hub
+    supports: Guardrails Guard.validate with DetectPromptInjectionValidator maps to a boundary DetectionActivity.
+    locator: Hub validator usage
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-detection-activity-006
-    source: eng-security-nist-ai-100-2e2025
-    supports: NIST treats detection schemes and mitigations as configurable mechanisms. Moonweave freezes the configuration version used by each executed check.
-    locator: Section 3.4.4 Mitigations, pp. 53–54; detection schemes and input processing
+  - id: claim-detection-activity-design
+    source: nemo-guardrails
+    supports: NeMo Colang 2.0 input rails execute in-flow detection before downstream tool planning.
+    locator: Input rails documentation
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-detection-activity-007
-    source: eng-security-nist-ai-100-2e2025
-    supports: NIST discusses input processing and detection as mitigations applied in a system flow. Moonweave timestamps the start of each executed mitigation activity.
-    locator: Section 3.4.4 Mitigations, pp. 53–54
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-detection-activity-008
-    source: eng-security-nist-ai-100-2e2025
-    supports: NIST motivates executed detection mitigations. Moonweave models their optional completion timestamp and temporal ordering as an activity-design inference.
-    locator: Section 3.4.4 Mitigations, pp. 53–54
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-detection-activity-009
-    source: eng-security-nist-ai-100-2e2025
-    supports: NIST distinguishes detection mechanisms from attack findings and outcomes. Moonweave links each executed mechanism to its separate result record.
-    locator: Section 3.4.4 Mitigations, pp. 53–54; detection schemes and input processing
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-detection-activity-010
-    source: eng-security-nist-ai-100-2e2025
-    supports: NIST motivates execution of detection mitigations; Moonweave adds ordinary activity-time consistency as a design inference.
-    locator: Section 3.4.4 Mitigations, pp. 53–54
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-detection-activity-011
-    source: eng-security-nist-ai-100-2e2025
-    supports: "NIST distinguishes detection schemes and input-processing mitigations from the prompt-injection attacks and outcomes they inspect; Moonweave reifies an executed check as DetectionActivity. The positive case specifically tests this distinction: Detector guard-v12 examines pending tool plan TP-9 at 10:14, recording its ruleset and result SR-9."
-    locator: Section 3.4.4 Mitigations, pp. 53–54; detection schemes and input processing
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-detection-activity-012
-    source: eng-security-nist-ai-100-2e2025
-    supports: "NIST distinguishes detection schemes and input-processing mitigations from the prompt-injection attacks and outcomes they inspect; Moonweave reifies an executed check as DetectionActivity. The boundary case specifically tests this distinction: A rule library stores a path-traversal pattern but has no run time, subject, or output; it is a detection specification, not a DetectionActivity."
-    locator: Section 3.4.4 Mitigations, pp. 53–54; detection schemes and input processing
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-detection-activity-013
-    source: eng-security-mcp-nsa-2026
-    supports: NSA requires inspection of each output in chained MCP pipelines plus traceable logging across actions and identities. Moonweave infers that a DetectionActivity evaluates a SourceSinkFlow only when the run is bound to that versioned path and checks its evidence-bearing steps.
-    locator: NSA MCP Security Design Considerations (May 2026), pp. 12–13, chained-output inspection and instrumentation for logging and detection
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-detection-activity-014
-    source: eng-security-mcp-nsa-2026
-    supports: NSA recommends inspecting each chained tool output before forwarding it and retaining traceable sequences of actions, sources, and identities. Moonweave reifies that concrete path review as a DetectionActivity evaluating a versioned SourceSinkFlow.
-    locator: NSA MCP Security Design Considerations (May 2026), pp. 12–13, output-pipeline monitoring and traceable audit logging
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-detection-activity-015
-    source: eng-security-nist-ai-100-2e2025
-    supports: NIST separates executed detection and input-processing mitigations from the adversarial conditions they inspect. Moonweave therefore rejects an evaluates edge when a detection run never identifies or examines the proposed SourceSinkFlow.
-    locator: NIST AI 100-2e2025, Section 3.4.4, pp. 53–54, detection schemes and input-processing mitigations
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-detection-activity-016
-    source: eng-security-mcp-nsa-2026
-    supports: NSA requires monitoring chained execution, inspecting each output before downstream use, and logging a traceable sequence of actions and identities. Moonweave models a concrete inspection run over an evidence-backed path as DetectionActivity evaluates SourceSinkFlow.
-    locator: NSA MCP Security Design Considerations (May 2026), pp. 12–13, chained execution monitoring and logging for detection
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-detection-activity-017
-    source: eng-security-nist-ai-100-2e2025
-    supports: NIST distinguishes detection schemes and input-processing mitigations from the attacks and outcomes they inspect. Moonweave preserves that distinction by linking the DetectionActivity occurrence to, rather than retyping, the SourceSinkFlow information record.
-    locator: NIST AI 100-2e2025, Section 3.4.4, pp. 53–54, prompt-injection detection and input processing
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

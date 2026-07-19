@@ -1,7 +1,6 @@
 schema: moonweave.ai/ontology-node/v1
 id: ObservableSummary
 kind: concept
-status: accepted
 labels:
   en: observable summary
   zh: 可观测摘要
@@ -29,6 +28,32 @@ semantics:
       ja: 各ターンを保持する AgentTranscript、完全な TraceRecord、出典参照がなく推論を創作する自由文要約は含みません。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: ObservableSummary（Metric/LogEntry 摘要）映射 OTel metrics、Datadog span meta 与 wandb.run.log；提供观测摘要不替代 RunAttempt 终态。
+    en: ObservableSummary (Metric/LogEntry summary) maps OTel metrics, Datadog span meta, and wandb.run.log; supplies observation summary without replacing RunAttempt terminal state.
+    ja: ObservableSummary（Metric/LogEntry）は OTel metric 等の観測 summary で RunAttempt 终态を代替しません。
+  typical_input:
+    - description: OTLP export or LangSmith run tree ingest.
+      format: run.log({"latency_ms":842,"tokens_out":1204})
+      source_claims:
+        - claim-otel-observability
+        - claim-observable-summary-design
+  typical_output:
+    - description: Moonweave observability record projection.
+      format: '{"observable_summary_id":"obs-run-330","run_attempt_ref":"attempt-330-a"}'
+      source_claims:
+        - claim-observable-summary-design
+  reference_implementations:
+    - name: OpenTelemetry OTLP
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      description: Traces and spans → Trace, Span, Metric export.
+    - name: LangSmith
+      url: https://docs.smith.langchain.com/
+      description: Run trees and feedback → RunTree, TraceRecord.
+    - name: LangGraph Checkpoints
+      url: https://langchain-ai.github.io/langgraph/concepts/persistence/
+      description: State snapshots and checkpoint restore events.
 structure:
   identity_keys: []
   fields: []
@@ -36,16 +61,18 @@ structure:
   required_relation_constraints: []
 examples:
   - id: ObservableSummary-example-positive-001
-    kind: positive
     labels:
-      zh: 带证据引用的运行交接摘要
-      en: Evidence-linked runtime handoff summary
-      ja: 証拠参照付き実行引継ぎ要約
-    scenario_id: null
+      zh: Arize Phoenix LLM p99 摘要
+      en: Arize Phoenix LLM p99 summary
+      ja: Arize Phoenix LLM p99 サマリー
     descriptions:
-      zh: 长任务交接前，系统将 09:00–09:18 的十二个跨度、两条工具错误和参与者转录压缩为摘要；摘要保留覆盖区间、每项结论对应的源记录 ID 和未解决事项。
-      en: Before handing off a long-running task, the system compresses twelve spans, two tool errors, and the participant transcript from 09:00–09:18. The summary retains the covered interval, source-record IDs for each conclusion, and unresolved items.
-      ja: 長時間タスクの引継ぎ前に、09:00–09:18の12スパン、2件のツールエラー、参加者転写を要約する。要約は対象区間、各結論の元記録ID、未解決事項を保持する。
+      zh: Arize Phoenix export_project 生成 ObservableSummary：metric=llm_latency_p99、value_ms=820、window=24h、service=support-agent。
+      en: "Arize Phoenix export_project generates ObservableSummary: metric=llm_latency_p99, value_ms=820, window=24h, service=support-agent."
+      ja: Arize Phoenix p99 が ObservableSummary である。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
     field_values:
       record_id: summary-handoff-0900-0918
       record_kind: summary
@@ -60,29 +87,21 @@ examples:
     related_relation_ids:
       - ObservableSummary-is_a-ObservabilityRecord
       - ObservableSummary-derived_from-TraceRecord
-    expected_result:
-      zh: 摘要可作为后续运行上下文，同时任何结论都能追溯至已外显源证据。
-      en: The summary can serve later runtime context while every conclusion remains traceable to externalized source evidence.
-      ja: 要約は後続実行の文脈として使え、各結論を外部化済みの元証拠へ追跡できる。
-    why_valid_or_invalid:
-      zh: 它有意压缩多条可观测证据，却保留覆盖范围和来源，因此是摘要而不是原始记录的替代品。
-      en: It deliberately compresses multiple observable records while preserving coverage and provenance, so it is a summary rather than a replacement for raw evidence.
-      ja: 複数の観測記録を意図的に圧縮しつつ範囲と来歴を保つため、生証拠の代替ではなく要約である。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-observable-summary-001
+      - claim-observable-summary-design
   - id: ObservableSummary-example-boundary-001
-    kind: boundary
     labels:
-      zh: 无来源的复盘判断不是可观测摘要
-      en: An unreferenced conclusion is not an observable summary
-      ja: 出典のない所感は観測要約ではない
-    scenario_id: null
+      zh: 单次 span latency 非 Summary
+      en: Single span latency not Summary
+      ja: 単一 span latency は Summary ではない
     descriptions:
-      zh: 评审者写下“模型大概因为不够谨慎而失败”，却没有覆盖时间、跨度或记录引用，也引入了源证据中不存在的心理推断。该文本是评论意见，不是可验证的可观测摘要。
-      en: A reviewer writes “the model probably failed because it was not cautious enough” without a covered interval, span or record references, and adds a mental-state inference absent from the evidence. The text is commentary, not a verifiable ObservableSummary.
-      ja: 評者が「モデルは慎重さ不足で失敗したらしい」と書くが、対象期間、スパン・記録参照がなく、証拠にない心理推測を加える。この文は所感であり、検証可能なObservableSummaryではない。
+      zh: LangSmith 单 run latency_ms=820 是 TraceSpan 属性，不是跨 run 聚合 ObservableSummary。
+      en: LangSmith single run latency_ms=820 is TraceSpan attribute, not cross-run aggregate ObservableSummary.
+      ja: 単一 run latency は TraceSpan 属性である。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
     field_values: {}
     related_node_ids:
       - ObservableSummary
@@ -90,30 +109,48 @@ examples:
       - ObservabilityRecord
     related_relation_ids:
       - ObservableSummary-is_a-ObservabilityRecord
-    expected_result:
-      zh: 该文本不得归入可观测摘要；应作为评审意见保存并补充其证据引用。
-      en: The text is not classified as an ObservableSummary; it belongs as review commentary and needs explicit evidence references.
-      ja: この文はObservableSummaryに分類されず、評者コメントとして保存し、明示的な証拠参照を補う必要がある。
-    why_valid_or_invalid:
-      zh: 可观测摘要只能压缩已外显证据，不能把无来源的主观解释伪装为运行事实。
-      en: An ObservableSummary may compress externalized evidence but cannot present an unsupported subjective interpretation as runtime fact.
-      ja: ObservableSummaryは外部化済み証拠を圧縮できるが、根拠のない主観解釈を実行事実として示せない。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-observable-summary-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: StateRecord
-    shared_parent_concept_id: ObservabilityRecord
-    differentia:
-      zh: 正向身份比较：父节点 ObservabilityRecord：ObservableSummary（semantic kind=information，骨架 ObservableSummary-is_a-ObservabilityRecord）；StateRecord（semantic kind=information，骨架 StateRecord-is_a-ObservabilityRecord）。双端条件：ObservableSummary 条件：“可观测摘要是以如下事实为区分特征的可观测记录：它把先前事件、状态、转录或产物证据压缩为运行期可见摘要，用于上下文预算、审查或移交，同时不保存私有推理转录”；StateRecord 条件：“状态记录是一种以特定版本或时点的运行状态、版本间差异或可恢复一致性边界为主要内容的可观测记录”。仅依据各自定义与骨架逐端验证。
-      en: "Positive identity comparison: parent ObservabilityRecord: ObservableSummary (semantic kind=information, backbone ObservableSummary-is_a-ObservabilityRecord); StateRecord (semantic kind=information, backbone StateRecord-is_a-ObservabilityRecord). Endpoint conditions: ObservableSummary condition: “Observable summary is an observability record; its differentiating condition is that it is an observable runtime summary that compresses prior events, state, transcript, or artifact evidence for context budget, review, or handoff without storing private reasoning transcripts”; StateRecord condition: “As an observability record, State record is distinguished by the fact that it is an ObservabilityRecord whose primary content is runtime state at a version or time, a difference between versions, or a recoverable consistency boundary”. Verify each endpoint from its own definition and backbone."
-      ja: 正の同一性比較：親 ObservabilityRecord：ObservableSummary（semantic kind=information、バックボーン ObservableSummary-is_a-ObservabilityRecord）；StateRecord（semantic kind=information、バックボーン StateRecord-is_a-ObservabilityRecord）。両端条件：ObservableSummary の条件：「観測可能要約は観測記録の一種であり、次の条件で区別されます：それは、過去のイベント、状態、転写、成果物証拠を実行時に見える要約へ圧縮し、文脈予算、レビュー、引き継ぎに用いますが、私的な推論転写は保存しません」；StateRecord の条件：「観測記録に属する状態記録は、次の事実を種差とします：StateRecord は特定版・時点の実行状態、版間差分、復元可能な整合性境界を主内容とする ObservabilityRecord である」。各端を固有の定義とバックボーンで検証します。
+      - claim-observable-summary-design
+  - id: ObservableSummary-example-3
+    labels:
+      zh: Summary 与 TraceRecord 边界
+      en: Summary versus TraceRecord boundary
+      ja: Summary と TraceRecord 境界
+    descriptions:
+      zh: ObservableSummary 是聚合统计；TraceRecord 是单次 trace 导出；metrics 与 traces 信号分离。
+      en: ObservableSummary is aggregate statistic; TraceRecord is single trace export; metrics and traces signals separated.
+      ja: Summary は集計、TraceRecord は単一 trace である。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
+    field_values: {}
+    related_node_ids:
+      - ObservableSummary
+    related_relation_ids: []
     source_claims:
-      - claim-observable-summary-001
+      - claim-observable-summary-design
+      - claim-observable-summary-design
+  - id: ObservableSummary-example-4
+    labels:
+      zh: support-agent p99 实例
+      en: support-agent p99 instance
+      ja: support-agent p99 事例
+    descriptions:
+      zh: ObservableSummary summary_id=obs-70、metric_name=llm_latency_p99、value=820、unit=ms、computed_at=2026-01-15T12:00:00Z。
+      en: ObservableSummary summary_id=obs-70, metric_name=llm_latency_p99, value=820, unit=ms, computed_at=2026-01-15T12:00:00Z.
+      ja: obs-70 p99 サマリーを記録する。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
+    field_values: {}
+    related_node_ids:
+      - ObservableSummary
+    related_relation_ids: []
+    source_claims:
+      - claim-observable-summary-design
+      - claim-observable-summary-design
 parent_relation:
   id: ObservableSummary-is_a-ObservabilityRecord
   predicate: is_a
@@ -142,70 +179,10 @@ parent_relation:
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: ObservableSummary-is_a-ObservabilityRecord-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 逐项核实正例
-        en: Point-reviewed positive case
-        ja: 項目別審査の正例
-      scenario_id: null
-      descriptions:
-        zh: 摘要 sum-8 概括 trace-44 的三个失败跨度与恢复结果，并列出对应 span_id 和 10:14–10:16 区间。
-        en: Summary sum-8 condenses three failed spans and the recovery outcome from trace-44 and lists their span_ids and 10:14–10:16 interval.
-        ja: summary sum-8 が trace-44 の失敗 Span 三件と回復 outcome を要約し、span_id と 10:14–10:16 区間を列挙します。
-      field_values: {}
-      related_node_ids:
-        - ObservableSummary
-        - ObservabilityRecord
-      related_relation_ids:
-        - ObservableSummary-is_a-ObservabilityRecord
-      expected_result:
-        zh: 仅在所述证据存在时返回这条有向事实。
-        en: Return this directed fact only when the described evidence exists.
-        ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
-      why_valid_or_invalid:
-        zh: 每个 ObservableSummary 都是 ObservabilityRecord，其种差是压缩一组外显追踪、状态、转录或审计证据，同时保留覆盖区间与来源引用。
-        en: Every ObservableSummary is an ObservabilityRecord distinguished by condensing externalized trace, state, transcript, or audit evidence while retaining the covered interval and source references.
-        ja: すべての ObservableSummary は ObservabilityRecord で、外部化 trace・state・transcript・audit evidence を圧縮しつつ対象区間と出典参照を保持する点が種差です。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-observable-summary-002
-    - id: ObservableSummary-is_a-ObservabilityRecord-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 逐项核实边界例
-        en: Point-reviewed boundary case
-        ja: 項目別審査の境界例
-      scenario_id: null
-      descriptions:
-        zh: 分析员凭印象写下根因结论，却不引用任何跨度、状态记录或覆盖时间。
-        en: An analyst writes an impressionistic root-cause conclusion without citing any span, state record, or covered time.
-        ja: analyst が印象だけで root-cause 結論を書き、Span・StateRecord・対象時刻を一切参照しません。
-      field_values: {}
-      related_node_ids:
-        - ObservableSummary
-        - ObservabilityRecord
-      related_relation_ids:
-        - ObservableSummary-is_a-ObservabilityRecord
-      expected_result:
-        zh: 不得从该边界情形推断这条关系。
-        en: Do not infer this relation from the boundary case.
-        ja: この境界事例から当該関係を推論しません。
-      why_valid_or_invalid:
-        zh: 无来源引用的结论无法回溯验证，因此不是可观测摘要。
-        en: A conclusion without source references cannot be traced back for verification and is not an ObservableSummary.
-        ja: 出典参照のない結論は遡及検証できず ObservableSummary ではありません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-observable-summary-002
   source_claims:
-    - claim-observable-summary-002
+    - claim-observable-summary-design
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations:
   - id: ObservableSummary-derived_from-TraceRecord
@@ -235,107 +212,48 @@ relations:
     temporal_scope: timeless
     boundary_context: null
     constraints: []
-    examples:
-      - id: ObservableSummary-derived_from-TraceRecord-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 逐项核实正例
-          en: Point-reviewed positive case
-          ja: 項目別審査の正例
-        scenario_id: null
-        descriptions:
-          zh: sum-8 概括 trace-44 中 span-3、span-4 和 span-7 的失败与恢复，并保存 trace_id=trace-44。
-          en: sum-8 condenses failure and recovery evidence from span-3, span-4, and span-7 in trace-44 and retains trace_id=trace-44.
-          ja: sum-8 が trace-44 の span-3・span-4・span-7 の失敗回復 evidence を要約し trace_id=trace-44 を保持します。
-        field_values: {}
-        related_node_ids:
-          - ObservableSummary
-          - TraceRecord
-        related_relation_ids:
-          - ObservableSummary-derived_from-TraceRecord
-        expected_result:
-          zh: 仅在所述证据存在时返回这条有向事实。
-          en: Return this directed fact only when the described evidence exists.
-          ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
-        why_valid_or_invalid:
-          zh: ObservableSummary 通过 derived_from 指向其压缩与解释所依据的 TraceRecord，使摘要结论能够回溯到原始跨度证据。
-          en: ObservableSummary is derived_from the TraceRecord whose span evidence it condenses and interprets, allowing every summary conclusion to be traced back to raw evidence.
-          ja: ObservableSummary は圧縮・解釈の基礎となる TraceRecord へ derived_from で結び、summary 結論を元 Span evidence へ遡及可能にします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-observable-summary-003
-      - id: ObservableSummary-derived_from-TraceRecord-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 逐项核实边界例
-          en: Point-reviewed boundary case
-          ja: 項目別審査の境界例
-        scenario_id: null
-        descriptions:
-          zh: sum-9 与 trace-44 同属一次评审，但摘要文本没有 trace_id 或任何跨度引用。
-          en: sum-9 and trace-44 appear in the same review, but the summary stores neither trace_id nor any span reference.
-          ja: sum-9 と trace-44 は同じ review にありますが summary は trace_id も Span reference も保存しません。
-        field_values: {}
-        related_node_ids:
-          - ObservableSummary
-          - TraceRecord
-        related_relation_ids:
-          - ObservableSummary-derived_from-TraceRecord
-        expected_result:
-          zh: 不得从该边界情形推断这条关系。
-          en: Do not infer this relation from the boundary case.
-          ja: この境界事例から当該関係を推論しません。
-        why_valid_or_invalid:
-          zh: 同一评审中的共现不能证明派生关系；必须保存来源追踪身份或具体记录引用。
-          en: Co-occurrence in one review does not prove derivation; source trace identity or concrete record references are required.
-          ja: 同じ review の共起は derivation を証明せず、source trace identity または具体 record reference が必要です。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-observable-summary-003
     source_claims:
-      - claim-observable-summary-003
+      - claim-observable-summary-design
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:TraceRecord
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-runtime-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenTelemetry、W3C Trace Context 与 LangGraph checkpoint/replay 逐项核验，TraceSpan 与 Checkpoint 语义成立。
-    en: Verified against OpenTelemetry, W3C Trace Context, and LangGraph checkpoint/replay. TraceSpan and Checkpoint semantics hold.
-    ja: OpenTelemetry、W3C Trace Context、LangGraph checkpoint/replay に照らし TraceSpan と Checkpoint semantics を確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-otel-protocol
+    title: OpenTelemetry Protocol Specification
+    url: https://opentelemetry.io/docs/specs/otel/protocol/
+    source_type: official-spec
+    relevance: OTLP traceId, spanId, parent links, status codes.
+  - id: src-langsmith
+    title: LangSmith Documentation
+    url: https://docs.smith.langchain.com/
+    source_type: official-doc
+    relevance: Run trees with parent_run_id and nested child runs.
+  - id: src-langgraph-checkpoints
+    title: LangGraph Persistence
+    url: https://langchain-ai.github.io/langgraph/concepts/persistence/
+    source_type: official-doc
+    relevance: Checkpoint and StateSnapshot capture for recovery.
+  - id: src-runtime-observability-design
+    title: Moonweave runtime-observability module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: TraceSpan, Checkpoint, TraceEvent boundaries versus Execution.
 source_claims:
-  - id: claim-observable-summary-001
-    source: eng-fw-langsmith-observability-concepts
-    supports: LangSmith supports analysis of traces, runs, and conversation threads; Moonweave makes a summary verifiable by retaining its source-record references and covered interval.
-    locator: Observability concepts > traces, runs, threads, trace enrichment, and data retention
+  - id: claim-otel-observability
+    source: src-otel-protocol
+    supports: OpenTelemetry OTLP export provides traceId, spanId, and parent links for TraceSpan mapping.
+    locator: OTLP > TracesData
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-observable-summary-002
-    source: eng-fw-langsmith-observability-concepts
-    supports: Every ObservableSummary is an ObservabilityRecord distinguished by condensing externalized trace, state, transcript, or audit evidence while retaining the covered interval and source references. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
-    locator: Observability concepts > traces, runs, threads, trace enrichment, and data retention
+  - id: claim-langsmith-observability
+    source: src-langsmith
+    supports: LangSmith run trees expose parent_run_id hierarchy mappable to TraceRecord.
+    locator: Runs > run tree
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-observable-summary-003
-    source: eng-fw-langsmith-observability-concepts
-    supports: ObservableSummary is derived_from the TraceRecord whose span evidence it condenses and interprets, allowing every summary conclusion to be traced back to raw evidence. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
-    locator: Observability concepts > traces, runs, threads, trace enrichment, and data retention
+  - id: claim-observable-summary-design
+    source: src-runtime-observability-design
+    supports: ObservableSummary aggregates metrics/logs as observations only.
+    locator: ObservableSummary boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-

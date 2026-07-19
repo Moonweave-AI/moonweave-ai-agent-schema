@@ -1,34 +1,56 @@
 schema: moonweave.ai/ontology-node/v1
 id: RetrievedChunk
 kind: concept
-status: accepted
 labels:
   zh: 已检索块候选
   en: Retrieved chunk candidate
   ja: 取得chunk候補
 semantics:
   short_definition:
-    zh: 其实际内容引用明确指向 Chunk 的检索候选子类。
-    en: A retrieved-candidate subtype whose content referent is explicitly a Chunk.
-    ja: actual content referentがChunkであるretrieved-candidate subtypeです。
+    zh: 命中具体 chunk 的候选细化。
+    en: Candidate refined to a specific chunk hit.
+    ja: 具体 chunk hit への candidate 细化。
   definition:
-    zh: RetrievedChunk 是 RetrievedCandidate 的严格子类：candidate_id 标识候选记录，chunk_id 指向由分块本体拥有的 Chunk；它继承候选的排名与分数，但不复制 Chunk 内容、上下文槽位或安全发现。
-    en: RetrievedChunk is the strict subtype of RetrievedCandidate whose candidate_id identifies the retrieval record and whose chunk_id refers to a Chunk owned by the chunking ontology. It inherits candidate rank and scores but does not duplicate chunk content, context slots, or safety findings.
-    ja: RetrievedChunk はRetrievedCandidateのstrict subtypeでcandidate_idがretrieval recordを、chunk_idがchunking ontology所有Chunkを参照します。candidate rank/scoreを継承しますがchunk content・context slot・safety findingを複製しません。
+    zh: RetrievedChunk 是 RetrievedCandidate 子类，当 referent_id 指向 Chunk/IndexEntry 等分块内容时使用；保留 chunk_id 与 source_span 引用，映射 Pinecone metadata.chunk_id 或 Chroma document metadata。它不是 Chunk 实体本身，而是检索命中视图。
+    en: RetrievedChunk is a RetrievedCandidate subtype when referent_id points to Chunk/IndexEntry content, preserving chunk_id and source_span references. Maps Pinecone metadata.chunk_id or Chroma document metadata. It is a retrieval hit view, not the Chunk entity itself.
+    ja: RetrievedChunk は referent が Chunk/IndexEntry の RetrievedCandidate subtype。chunk_id/source_span 保持。Chunk 实体自体ではない。
   why_needed:
-    zh: 在统一候选身份下保留 Chunk 命中的类型种差，而不再维护 CandidateChunk 平行节点。
-    en: Preserves the Chunk-hit differentia under one candidate identity instead of maintaining a parallel CandidateChunk node.
-    ja: 一candidate identityの下でChunk-hit differentiaを保持しparallel CandidateChunk nodeを廃止します。
+    zh: RAG 返回的是 chunk 片段而非整篇文档；必须区分“检索命中记录”与 chunk 规范实体以便回到原文边界。
+    en: RAG returns chunk segments not whole documents; retrieval hit records must differ from canonical Chunk entities for source-boundary return.
+    ja: RAG は chunk 片段を返すため hit record と Chunk entity を分離必須。
   includes:
-    - zh: 纳入 referent 明确为已存在 Chunk 的检索候选。
-      en: Includes retrieved candidates whose referent is an existing Chunk.
-      ja: referentが既存Chunkであるretrieved candidateを含みます。
+    - zh: 纳入 referent 为 chunk/index entry 的 RetrievedCandidate 细化。
+      en: Includes RetrievedCandidate refinements whose referent is a chunk or index entry.
+      ja: referent が chunk/index entry の细化。
   excludes:
-    - zh: 排除原始 Chunk 本身、非 Chunk 候选、上下文槽位、安全扫描结果和重复 CandidateChunk 身份。
-      en: Excludes the Chunk itself, non-Chunk candidates, context slots, safety scan results, and duplicate CandidateChunk identities.
-      ja: Chunk自体・non-Chunk candidate・context slot・safety scan result・duplicate CandidateChunk identityを除外します。
+    - zh: 排除 Chunk 规范实体、整文档 referent 与 ContextPackage。
+      en: Excludes canonical Chunk entities, whole-document referents, and ContextPackage.
+      ja: canonical Chunk/整 document referent/ContextPackage を除外。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: Pinecone include_metadata chunk_id→referent_id；Chroma metadatas chunk_id；Moonweave maps to RetrievedChunk with refers_to Chunk relation.
+    en: Pinecone include_metadata chunk_id→referent_id; Chroma metadatas chunk_id; Moonweave maps to RetrievedChunk with refers_to Chunk relation.
+    ja: metadata chunk_id 映射与 refers_to Chunk。
+  typical_input: []
+  typical_output: []
+  reference_implementations:
+    - name: Mem0 Search API
+      url: https://docs.mem0.ai
+      description: POST /v1/memories/search/
+    - name: Pinecone Query
+      url: https://docs.pinecone.io/guides/search/query-data
+      description: index.query / QueryResponse
+    - name: Chroma Query
+      url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+      description: collection.query / QueryResult
+    - name: Cohere Rerank API
+      url: https://docs.cohere.com/reference/rerank
+      description: POST /v2/rerank
+    - name: ColBERT
+      url: https://arxiv.org/abs/2004.12832
+      description: MaxSim scoring
 structure:
   identity_keys:
     - candidate_id
@@ -36,108 +58,126 @@ structure:
     - id: candidate_id
       labels:
         zh: 候选标识
-        en: candidate ID
-        ja: candidate ID
+        en: Candidate identifier
+        ja: candidate 識別子
+      definitions:
+        zh: 继承 RetrievedCandidate.candidate_id。
+        en: Inherits RetrievedCandidate.candidate_id.
+        ja: RetrievedCandidate.candidate_id 継承。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 继承并稳定标识该检索候选记录。
-        en: Inherited stable identifier for this retrieved-candidate record.
-        ja: このretrieved-candidate recordを継承して安定識別します。
-      allowed_values: []
       pattern: null
-      example_value: candidate-425
+      example_value: candidate-424
+      allowed_values: []
       source_claims:
-        - claim-retrieved-chunk-002
+        - claim-retrieved-chunk-candidate
     - id: chunk_id
       labels:
-        zh: 块标识
-        en: chunk ID
-        ja: chunk ID
+        zh: 分块标识
+        en: Chunk identifier
+        ja: chunk 識別子
+      definitions:
+        zh: 命中的 chunk 业务 id；通常等于 referent_id 或 metadata.chunk_id。
+        en: Hit chunk business id; usually equals referent_id or metadata.chunk_id.
+        ja: hit chunk id。metadata.chunk_id。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 引用分块本体拥有的实际 Chunk。
-        en: References the actual Chunk owned by the chunking ontology.
-        ja: chunking ontology所有actual Chunkを参照します。
-      allowed_values: []
       pattern: null
       example_value: chunk-882
+      allowed_values: []
       source_claims:
-        - claim-retrieved-chunk-003
+        - claim-retrieved-chunk-id
+    - id: source_span_ref
+      labels:
+        zh: 来源跨度引用
+        en: Source span reference
+        ja: source span 参照
+      definitions:
+        zh: 可选指向精确字符/token 边界的 span 引用。
+        en: Optional reference to exact character/token boundary span.
+        ja: optional character/token span ref。
+      datatype: string
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      pattern: null
+      example_value: source-span-policy-12
+      allowed_values: []
+      source_claims:
+        - claim-retrieved-chunk-span
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: RetrievedChunk-example-positive-manual-001
-    kind: positive
+  - id: RetrievedChunk-example-pinecone-metadata
     labels:
-      zh: 已检索块候选正例
-      en: "Positive case: Retrieved chunk candidate"
-      ja: 取得chunk候補正例
-    scenario_id: null
+      zh: Pinecone metadata chunk
+      en: Pinecone metadata chunk
+      ja: Pinecone metadata chunk
     descriptions:
-      zh: candidate-425 作为候选记录指向既有 chunk-882，而不复制其正文。
-      en: candidate-425 is a candidate record referring to existing chunk-882 without copying its body.
-      ja: candidate-425 はcandidate recordとして既存chunk-882をbody複製なしに参照します。
+      zh: candidate-424 RetrievedChunk chunk_id=chunk-882 from Pinecone metadata include_metadata=True。
+      en: candidate-424 RetrievedChunk chunk_id=chunk-882 from Pinecone metadata with include_metadata=True.
+      ja: Pinecone metadata chunk_id。
+    example_source:
+      product: Pinecone
+      url: https://docs.pinecone.io/guides/search/query-data
+      version: include_metadata
+    field_values:
+      candidate_id: candidate-424
+      chunk_id: chunk-882
+    related_node_ids:
+      - RetrievedChunk
+      - RetrievedCandidate
+    related_relation_ids: []
+    source_claims:
+      - claim-retrieved-chunk-pinecone
+  - id: RetrievedChunk-example-chroma
+    labels:
+      zh: Chroma document chunk
+      en: Chroma document chunk
+      ja: Chroma document chunk
+    descriptions:
+      zh: candidate-425 chunk_id from Chroma metadatas chunk_id field。
+      en: candidate-425 chunk_id from Chroma metadatas chunk_id field.
+      ja: Chroma metadatas chunk_id。
+    example_source:
+      product: Chroma
+      url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+      version: metadatas
     field_values:
       candidate_id: candidate-425
-      chunk_id: chunk-882
-      referent_id: chunk-882
-      rank_position: 4
-      artifact_id: candidate-425
-      created_at: 2026-07-16T12:05:00Z
+      chunk_id: chunk-policy-7-003
     related_node_ids:
       - RetrievedChunk
     related_relation_ids: []
-    expected_result:
-      zh: 归类为 RetrievedChunk。
-      en: Classify the object as RetrievedChunk.
-      ja: RetrievedChunk として分類します。
-    why_valid_or_invalid:
-      zh: 它先满足 RetrievedCandidate 定义，且 referent 的严格类型为 Chunk。
-      en: It satisfies RetrievedCandidate and its referent has the strict type Chunk.
-      ja: RetrievedCandidateを満たしreferentのstrict typeがChunkです。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-retrieved-chunk-004
-  - id: RetrievedChunk-example-boundary-manual-001
-    kind: boundary
+      - claim-retrieved-chunk-chroma
+  - id: RetrievedChunk-example-not-chunk-entity
     labels:
-      zh: 已检索块候选边界例
-      en: "Boundary case: Retrieved chunk candidate"
-      ja: 取得chunk候補境界例
-    scenario_id: null
+      zh: 非 Chunk 实体
+      en: Not Chunk entity
+      ja: Chunk 实体ではない
     descriptions:
-      zh: chunk-882 是索引前形成的原始分块实体，没有候选排名。
-      en: chunk-882 is the original chunk entity created before indexing and has no candidate rank.
-      ja: chunk-882 はindex前に作られcandidate rankを持たないoriginal chunk entityです。
+      zh: chunk-882 规范 Chunk 实体是 memory-chunking 产物；RetrievedChunk 只是本次检索命中视图。
+      en: Canonical chunk-882 Chunk entity belongs to memory-chunking; RetrievedChunk is only this retrieval hit view.
+      ja: canonical Chunk と hit view を分離。
+    example_source:
+      product: https://moonweave.ai/ontology/agent-system/2.0.0/
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
     field_values: {}
     related_node_ids:
       - RetrievedChunk
+      - memory-chunking-situating
     related_relation_ids: []
-    expected_result:
-      zh: 不得归类为 RetrievedChunk。
-      en: Do not classify the object as RetrievedChunk.
-      ja: RetrievedChunk として分類しません。
-    why_valid_or_invalid:
-      zh: 它是 Chunk，不是 RetrievedChunk 候选记录。
-      en: It is Chunk, not a RetrievedChunk candidate record.
-      ja: ChunkでRetrievedChunk candidate recordではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-retrieved-chunk-005
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-retrieved-chunk-boundary
 parent_relation:
   id: RetrievedChunk-is_a-RetrievedCandidate
   predicate: is_a
@@ -172,18 +212,16 @@ parent_relation:
         en: "Assert only when the instance satisfies the complete RetrievedCandidate definition and the child differentia: it satisfies the candidate definition and its referent has the strict type Chunk."
         ja: instanceがRetrievedCandidate完全定義とchild differentia「candidate定義を満たしreferentのstrict typeがChunkである」を共に満たす時だけassertします。
       source_claims:
-        - claim-retrieved-chunk-006
+        - claim-retrieved-chunk-id
   temporal_scope: timeless
   boundary_context: null
   constraints: []
   examples:
     - id: RetrievedChunk-is_a-RetrievedCandidate-example-positive-manual-001
-      kind: positive
       labels:
         zh: 是一种RetrievedCandidate正例
         en: "Positive case: is a RetrievedCandidate"
         ja: RetrievedCandidateの一種正例
-      scenario_id: null
       descriptions:
         zh: candidate-425 以 chunk_id=chunk-882 指向既有 Chunk。
         en: candidate-425 points to existing Chunk chunk-882.
@@ -194,25 +232,13 @@ parent_relation:
         - RetrievedCandidate
       related_relation_ids:
         - RetrievedChunk-is_a-RetrievedCandidate
-      expected_result:
-        zh: 建立该有向事实，并保留条件与证据。
-        en: Assert the directed fact with its condition and evidence retained.
-        ja: condition/evidenceを保持してdirected factをassertします。
-      why_valid_or_invalid:
-        zh: 实例满足端点定义、方向和该关系的显式成立条件。
-        en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-        ja: endpoint定義・direction・明示assertion conditionを満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-retrieved-chunk-006
+        - claim-retrieved-chunk-id
     - id: RetrievedChunk-is_a-RetrievedCandidate-example-boundary-manual-001
-      kind: boundary
       labels:
         zh: 是一种RetrievedCandidate边界例
         en: "Boundary case: is a RetrievedCandidate"
         ja: RetrievedCandidateの一種境界例
-      scenario_id: null
       descriptions:
         zh: candidate-425 若指向完整 Document 而非 Chunk，则只属于 RetrievedCandidate。
         en: If candidate-425 refers to a full Document rather than a Chunk, it remains only RetrievedCandidate.
@@ -223,23 +249,12 @@ parent_relation:
         - RetrievedCandidate
       related_relation_ids:
         - RetrievedChunk-is_a-RetrievedCandidate
-      expected_result:
-        zh: 验证器不得建立该有向关系事实。
-        en: Do not assert the directed fact.
-        ja: directed factをassertしません。
-      why_valid_or_invalid:
-        zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-        en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-        ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-retrieved-chunk-006
+        - claim-retrieved-chunk-id
   source_claims:
-    - claim-retrieved-chunk-006
+    - claim-retrieved-chunk-id
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: pending
   endpoint_order: child-to-parent
 relations:
   - id: RetrievedChunk-refers_to-Chunk
@@ -275,18 +290,16 @@ relations:
           en: Assert only when RetrievedChunk.chunk_id exactly matches the canonical Chunk identifier.
           ja: RetrievedChunk.chunk_idがcanonical Chunk IDと完全一致する時だけassertします。
         source_claims:
-          - claim-retrieved-chunk-007
+          - claim-retrieved-chunk-id
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
       - id: RetrievedChunk-refers_to-Chunk-example-positive-manual-001
-        kind: positive
         labels:
           zh: refers_to Chunk正例
           en: "Positive case: refers_to Chunk"
           ja: Chunkをrefers_to正例
-        scenario_id: null
         descriptions:
           zh: candidate-425 refers_to chunk-882。
           en: candidate-425 refers to chunk-882.
@@ -297,25 +310,13 @@ relations:
           - Chunk
         related_relation_ids:
           - RetrievedChunk-refers_to-Chunk
-        expected_result:
-          zh: 建立该有向事实，并保留条件与证据。
-          en: Assert the directed fact with its condition and evidence retained.
-          ja: condition/evidenceを保持してdirected factをassertします。
-        why_valid_or_invalid:
-          zh: 实例满足端点定义、方向和该关系的显式成立条件。
-          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-          ja: endpoint定義・direction・明示assertion conditionを満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-retrieved-chunk-007
+          - claim-retrieved-chunk-id
       - id: RetrievedChunk-refers_to-Chunk-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: refers_to Chunk边界例
           en: "Boundary case: refers_to Chunk"
           ja: Chunkをrefers_to境界例
-        scenario_id: null
         descriptions:
           zh: 文本内容相似但 chunk_id 不同不能建立引用边。
           en: Similar text with a different chunk_id does not establish the reference.
@@ -326,87 +327,65 @@ relations:
           - Chunk
         related_relation_ids:
           - RetrievedChunk-refers_to-Chunk
-        expected_result:
-          zh: 验证器不得建立该有向关系事实。
-          en: Do not assert the directed fact.
-          ja: directed factをassertしません。
-        why_valid_or_invalid:
-          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-retrieved-chunk-007
+          - claim-retrieved-chunk-id
     source_claims:
-      - claim-retrieved-chunk-007
+      - claim-retrieved-chunk-id
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:Chunk
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-pinecone-query
+    title: Pinecone Query Guide
+    publisher: Pinecone
+    url: https://docs.pinecone.io/guides/search/query-data
+    source_type: official-doc
+    relevance: QueryResponse.
+  - id: src-chroma-query
+    title: Chroma Query Documentation
+    publisher: Chroma
+    url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+    source_type: official-doc
+    relevance: QueryResult.
+  - id: src-memory-retrieval-design
+    title: Moonweave design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Module boundary.
 source_claims:
-  - id: claim-retrieved-chunk-001
-    source: eng-fw-langchain-retrieval
-    supports: LangChain retrievers return Document objects while storage remains separate; Moonweave represents a retrieved Chunk as a candidate record that refers to, rather than duplicates, the source Chunk.
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
+  - id: claim-retrieved-chunk-pinecone
+    source: src-pinecone-query
+    supports: Pinecone metadata can carry chunk_id for RetrievedChunk.
+    locator: metadata
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-retrieved-chunk-chroma
+    source: src-chroma-query
+    supports: Chroma metadatas can carry chunk_id.
+    locator: metadatas
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-retrieved-chunk-boundary
+    source: src-memory-retrieval-design
+    supports: RetrievedChunk is hit view not canonical Chunk.
+    locator: boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieved-chunk-002
-    source: eng-fw-langchain-retrieval
-    supports: "LangChain retrievers return Document objects while storage remains separate; Moonweave represents a retrieved Chunk as a candidate record that refers to, rather than duplicates, the source Chunk. Moonweave records RetrievedChunk.candidate_id as the stated auditable datum: Inherited stable identifier for this retrieved-candidate record."
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
+  - id: claim-retrieved-chunk-candidate
+    source: src-memory-retrieval-design
+    supports: candidate_id inherited from RetrievedCandidate.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieved-chunk-003
-    source: eng-fw-langchain-retrieval
-    supports: "LangChain retrievers return Document objects while storage remains separate; Moonweave represents a retrieved Chunk as a candidate record that refers to, rather than duplicates, the source Chunk. Moonweave records RetrievedChunk.chunk_id as the stated auditable datum: References the actual Chunk owned by the chunking ontology."
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
+  - id: claim-retrieved-chunk-id
+    source: src-memory-retrieval-design
+    supports: chunk_id identifies hit chunk.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieved-chunk-004
-    source: eng-fw-langchain-retrieval
-    supports: LangChain retrievers return Document objects while storage remains separate; Moonweave represents a retrieved Chunk as a candidate record that refers to, rather than duplicates, the source Chunk. Retrieval returns document-like units while the storage or chunking layer retains source-object identity.
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
+  - id: claim-retrieved-chunk-span
+    source: src-memory-retrieval-design
+    supports: source_span_ref optional boundary ref.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieved-chunk-005
-    source: eng-fw-langchain-retrieval
-    supports: LangChain retrievers return Document objects while storage remains separate; Moonweave represents a retrieved Chunk as a candidate record that refers to, rather than duplicates, the source Chunk. The retriever output references content objects rather than changing their original identity.
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-retrieved-chunk-006
-    source: eng-fw-langchain-retrieval
-    supports: The official documentation supports the operational distinction used in this child differentia; Moonweave's RetrievedChunk-to-RetrievedCandidate subclass placement is an explicit ontology design decision.
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-retrieved-chunk-007
-    source: eng-fw-langchain-retrieval
-    supports: The cited official documentation supports the endpoint roles and direction of this retrieval fact; the exact relation identifier and ownership boundary are Moonweave design decisions.
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

@@ -1,140 +1,121 @@
 schema: moonweave.ai/ontology-node/v1
 id: CommandOutputObservation
 kind: concept
-status: accepted
 labels:
   zh: 命令输出观测
   en: command output observation
   ja: コマンド出力観測
 semantics:
   short_definition:
-    zh: 对一次命令执行实际产生的标准输出、标准错误及其捕获边界所作的执行观测。
-    en: An execution observation of the stdout, stderr, and capture boundaries actually produced by one command execution.
-    ja: 一回のコマンド実行が実際に生成した標準出力・標準エラーと捕捉境界についての実行観測。
+    zh: 对命令执行 stdout/stderr 捕获边界与分块顺序的执行观测特化。
+    en: Execution observation specialization of stdout/stderr capture boundaries and chunk order from command execution.
+    ja: command 実行 stdout/stderr capture boundary/chunk order の execution observation 特化。
   definition:
-    zh: 命令输出观测是一种执行观测，它把某次命令范围 InvocationAttempt 中被收集器实际看到的 stdout、stderr 分块、顺序、截断状态和观测时刻固化为证据，并可关联对应的 ExecutionResult 与退出状态观测。它不是命令活动、调用尝试、执行结果或输出流内容本身。
-    en: A CommandOutputObservation is an ExecutionObservation that fixes the stdout and stderr chunks actually seen by a collector, their order, truncation state, and observation time for one command-scoped InvocationAttempt, with links to the corresponding ExecutionResult and exit-status observation. It is not the command activity, invocation attempt, result, or stream content.
-    ja: CommandOutputObservation は command-scoped InvocationAttempt で collector が実際に観測した stdout/stderr chunk・順序・truncation・時刻を evidence として固定し、ExecutionResult と exit-status observation に関連付ける ExecutionObservation です。command activity・invocation attempt・result・stream content 自体ではありません。
+    zh: CommandOutputObservation 映射 shell 命令 stdout/stderr、MCP Tool Result text content、Docker/E2B 容器 log stream；用 channel、sequence、observation_id 重组输出，文本载荷 cross-link 到 TextBlock。
+    en: CommandOutputObservation maps shell stdout/stderr, MCP Tool Result text content, and Docker/E2B container log streams; reassembles via channel, sequence, observation_id, cross-linking text payloads to TextBlock.
+    ja: CommandOutput/stdout/stderr/MCP tool result mapping。
   why_needed:
-    zh: 需要它把运行活动与可进入上下文的证据分开：同一 InvocationAttempt 可产生多次收集或截断后的观测，而尝试与 ExecutionResult 的身份不随展示方式改变。
-    en: "It separates runtime activity from context-ready evidence: one InvocationAttempt may be collected or truncated into different observations while the identities of the attempt and ExecutionResult remain unchanged."
-    ja: runtime activity と context-ready evidence を分離します。同一 InvocationAttempt から異なる collection/truncation の observation を作っても attempt と ExecutionResult の identity は変わりません。
+    zh: 分通道分块观测支持缺块检测与按通道引用 stderr 片段。
+    en: Per-channel chunked observations support missing-chunk detection and per-channel stderr citation.
+    ja: channel+sequence reassembly。
   includes:
-    - zh: 包含能够标识被观测执行结果，并记录实际捕获的 stdout/stderr 分块或明确的零长度流、观测时刻与截断状态的不可变记录。
-      en: Includes immutable records that identify the observed execution result and record captured stdout/stderr chunks—or an explicit zero-length stream—together with observation time and truncation state.
-      ja: 観測対象の実行結果を識別し、実際に捕捉した stdout/stderr チャンク、または明示的な空ストリームを、観測時刻と切詰め状態とともに記録する不変記録を含みます。
+    - zh: stdout/stderr chunks、sequence ordinals、truncation state、execution_reference_id。
+      en: stdout/stderr chunks, sequence ordinals, truncation state, execution_reference_id.
+      ja: chunks/sequence/truncation/exec ref。
   excludes:
-    - zh: 不包含 Command、InvocationAttempt 或 ExecutionResult；也不把单独的 ExitStatusObservation、原始 OutputStream、ContextIngressEvent 或仅保存命令文本的日志行归为本类。
-      en: Excludes Command, InvocationAttempt, and ExecutionResult, as well as a standalone ExitStatusObservation, raw OutputStream, ContextIngressEvent, or a log line that merely stores command text.
-      ja: Command・InvocationAttempt・ExecutionResult、および standalone ExitStatusObservation・raw OutputStream・ContextIngressEvent・command text だけの log line を含みません。
+    - zh: Command 调用活动、RunResult 身份、ExitStatusObservation（分开记录）。
+      en: Command invocation activity, RunResult identity, ExitStatusObservation (recorded separately).
+      ja: invocation/RunResult/exit status。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: cmdobs-build-17 stdout seq 0..1 stderr seq 0 重组；MCP ls -l text→stdout seq 0 StandardOutputChunk；missing seq 1→reconstruction_complete=false。
+    en: cmdobs-build-17 stdout seq 0..1 stderr seq 0 reassembly; MCP ls -l text→stdout seq 0 StandardOutputChunk; missing seq 1→reconstruction_complete=false.
+    ja: reassembly and gap detection。
+  typical_input:
+    - description: MCP Tool Result
+      format: '{"content":[{"type":"text","text":"total 24\n-rw-r--r-- 1 user staff 4096 README.md"}]}'
+      source_claims:
+        - claim-cmdobs-mcp
+  typical_output: []
+  reference_implementations:
+    - name: POSIX Shell Exit Status
+      url: https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html
+      description: stdout/stderr streams and exit codes.
+    - name: MCP Tools — Tool Result
+      url: https://modelcontextprotocol.io/specification/2025-06-18/server/tools
+      description: Tool Result content arrays returning command output.
+    - name: Docker Engine API — Container logs
+      url: https://docs.docker.com/engine/api/v1.43/#tag/Container/operation/ContainerLogs
+      description: Multiplexed stdout/stderr log streams.
 structure:
   identity_keys: []
   fields: []
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: CommandOutputObservation-example-positive-001
-    kind: positive
+  - id: CommandOutputObservation-example-reassembly
     labels:
-      zh: 命令输出观测正例
-      en: Positive example of command output observation
-      ja: コマンド出力観測の正例
-    scenario_id: null
+      zh: stdout/stderr 重组
+      en: stdout/stderr reassembly
+      ja: stdout/stderr 再構成
     descriptions:
-      zh: collector-3 在 01:02:03Z 完成对 command-exec-214 的采集：stdout 两个分块合成“12 tests passed”，stderr 一个分块为弃用警告，退出状态观测为 code 0；obs-command-001 仅保存已捕获视图并引用原执行结果。
-      en: "At 01:02:03Z collector-3 finishes collecting command-exec-214: two stdout chunks form “12 tests passed,” one stderr chunk carries a deprecation warning, and the exit-status observation is code 0. obs-command-001 stores only the captured view and references the original result."
-      ja: 01:02:03Z に collector-3 が command-exec-214 の収集を完了し、二つの stdout chunk が『12 tests passed』を構成し、一つの stderr chunk が非推奨 warning を持ち、終了状態観測は code 0 です。obs-command-001 は捕捉 view だけを保存し元結果を参照します。
+      zh: cmdobs-build-17 三 chunk 重组 compile/tests passed 与 deprecation warning。
+      en: cmdobs-build-17 three chunks reassemble compile/tests passed and deprecation warning.
+      ja: channel reassembly。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: reassembly
     field_values:
-      observation_id: obs-command-001
-      observed_at: 2026-07-13T01:02:03.000Z
+      observation_id: cmdobs-build-17
     related_node_ids:
       - CommandOutputObservation
-      - ExitStatusObservation
-    related_relation_ids:
-      - CommandOutputObservation-has_exit_status_observation-ExitStatusObservation
-    expected_result:
-      zh: obs-command-001 被归为 CommandOutputObservation，并可分别追到 stdout/stderr 分块、ExecutionResult 与 code 0 的 ExitStatusObservation。
-      en: obs-command-001 is classified as CommandOutputObservation and separately traces to stdout/stderr chunks, the ExecutionResult, and the code-0 ExitStatusObservation.
-      ja: obs-command-001 は CommandOutputObservation に分類され、stdout/stderr chunk、ExecutionResult、code 0 の ExitStatusObservation へ個別に追跡できます。
-    why_valid_or_invalid:
-      zh: 记录具有独立观测身份与时刻，内容来自一次已识别命令执行的实际通道采集，并未把活动或结果复制成本体成员。
-      en: The record has its own observation identity and time, derives content from actual channel capture of one identified command execution, and does not copy the activity or result as the observation.
-      ja: 記録は独自の観測同一性と時刻を持ち、一つの識別済みコマンド実行の実 channel 捕捉から内容を得て、活動や結果を観測として複製しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - StandardOutputChunk
+    related_relation_ids: []
     source_claims:
-      - claim-command-output-observation-003
-      - claim-command-output-observation-004
-  - id: CommandOutputObservation-example-boundary-001
-    kind: boundary
+      - claim-cmdobs-design
+  - id: CommandOutputObservation-example-mcp-ls
     labels:
-      zh: 命令输出观测边界例
-      en: Boundary case for command output observation
-      ja: コマンド出力観測の境界例
-    scenario_id: null
+      zh: MCP ls 输出
+      en: MCP ls output
+      ja: MCP ls 出力
     descriptions:
-      zh: command-exec-215 只留下 code 0 的 ExitStatusObservation；采集器明确报告 stdout 与 stderr 未被捕获，而不是空流已被观测。这个终止状态不能补造一份 CommandOutputObservation。
-      en: command-exec-215 leaves only a code-0 ExitStatusObservation; the collector explicitly reports that stdout and stderr were not captured, rather than observed as empty streams. The termination status cannot manufacture a CommandOutputObservation.
-      ja: command-exec-215 には code 0 の ExitStatusObservation だけが残り、収集器は stdout/stderr を空 stream として観測したのではなく未捕捉と報告します。この終了状態から CommandOutputObservation を作れません。
+      zh: cmdobs-ls-4 MCP Tool Result text→stdout sequence 0 cross-link TextBlock。
+      en: cmdobs-ls-4 MCP Tool Result text→stdout sequence 0 cross-link TextBlock.
+      ja: MCP output observation。
+    example_source:
+      product: Model Context Protocol
+      url: https://modelcontextprotocol.io/specification/2025-06-18/server/tools
+      version: Tool Result
+    field_values:
+      observation_id: cmdobs-ls-4
+    related_node_ids:
+      - CommandOutputObservation
+      - info-content-block-modality
+    related_relation_ids: []
+    source_claims:
+      - claim-cmdobs-mcp
+  - id: CommandOutputObservation-example-missing-chunk
+    labels:
+      zh: 缺块检测
+      en: Missing chunk detection
+      ja: 欠落 chunk 検出
+    descriptions:
+      zh: cmdobs-build-18 stdout seq 0,2 缺 seq 1→missing_sequences=[1]。
+      en: cmdobs-build-18 stdout seq 0,2 missing seq 1→missing_sequences=[1].
+      ja: gap detection。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: missing chunk
     field_values: {}
     related_node_ids:
       - CommandOutputObservation
-      - ExitStatusObservation
-    related_relation_ids:
-      - CommandOutputObservation-has_exit_status_observation-ExitStatusObservation
-    expected_result:
-      zh: 保留 ExitStatusObservation；由于没有任何已观测流、分块或明确零长度流，不创建 CommandOutputObservation。
-      en: Retain the ExitStatusObservation and create no CommandOutputObservation because no observed stream, chunk, or explicit zero-length stream exists.
-      ja: ExitStatusObservation を保持し、観測 stream、chunk、明示的空 stream がないため CommandOutputObservation を作成しません。
-    why_valid_or_invalid:
-      zh: 退出状态与输出捕获是可分别缺失的观测维度；知道命令终止方式不等于知道任何输出内容被观察到。
-      en: Termination status and output capture are independently missing observation dimensions; knowing how a command terminated does not mean any output content was observed.
-      ja: 終了状態と出力捕捉は独立して欠け得る観測次元であり、コマンドの終了方法を知っても出力内容を観測したことにはなりません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims: []
-  - id: CommandOutputObservation-example-instance-001
-    kind: instance
-    labels:
-      zh: 命令输出观测结构化实例
-      en: Structured instance of command output observation
-      ja: コマンド出力観測の構造化インスタンス
-    scenario_id: null
-    descriptions:
-      zh: obs-command-001 是 collector-3 于 2026-07-13T01:02:03Z 形成的命令输出观测记录；它标识一次固定采集视图，而不是 command-exec-214 或其结果对象。
-      en: obs-command-001 is the command-output observation formed by collector-3 at 2026-07-13T01:02:03Z. It identifies one fixed collection view, not command-exec-214 or its result object.
-      ja: obs-command-001 は collector-3 が 2026-07-13T01:02:03Z に形成したコマンド出力観測です。一つの固定収集 view を識別し、command-exec-214 や結果対象ではありません。
-    field_values:
-      observation_id: obs-command-001
-      observed_at: 2026-07-13T01:02:03.000Z
-    related_node_ids:
-      - CommandOutputObservation
     related_relation_ids: []
-    expected_result:
-      zh: observation_id 唯一，observed_at 是规范化 UTC 时刻；实例保持 CommandOutputObservation 类型。
-      en: observation_id is unique, observed_at is a normalized UTC instant, and the instance remains a CommandOutputObservation.
-      ja: observation_id は一意、observed_at は正規化 UTC 時刻で、instance は CommandOutputObservation のままです。
-    why_valid_or_invalid:
-      zh: 稳定标识与观测时间共同区分这份采集记录；输出、退出状态和结果身份通过关系保存，不被压成字段字符串。
-      en: Stable identity and observation time distinguish this collection record; output, exit status, and result identity remain relations rather than flattened field strings.
-      ja: 安定識別子と観測時刻がこの収集記録を区別し、出力、終了状態、結果同一性は field 文字列へ平坦化せず関係で保持します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims: []
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: ExitStatusObservation
-    shared_parent_concept_id: ExecutionObservation
-    differentia:
-      zh: 已审查兄弟区分：父节点 ExecutionObservation：CommandOutputObservation（semantic kind=information，骨架 CommandOutputObservation-is_a-ExecutionObservation）；ExitStatusObservation（semantic kind=information，骨架 ExitStatusObservation-is_a-ExecutionObservation）。双端条件：CommandOutputObservation 条件：“命令输出观测是一种执行观测；其区分条件是：它记录作为进入上下文的证据的可观察命令输出，同时不拥有产生该输出的命令执行或容器”；ExitStatusObservation 条件：“退出状态观测属于执行观测，区别于其他同类对象的条件是：它表示退出状态被观察并暂存为智能体步骤上下文证据后的形式”。任一条件成立不推出另一端。
-      en: "Reviewed sibling distinction: parent ExecutionObservation: CommandOutputObservation (semantic kind=information, backbone CommandOutputObservation-is_a-ExecutionObservation); ExitStatusObservation (semantic kind=information, backbone ExitStatusObservation-is_a-ExecutionObservation). Endpoint conditions: CommandOutputObservation condition: “As an execution observation, Command output observation is distinguished by the fact that it records observable command output as context-ingress evidence without owning the command execution or container that produced it”; ExitStatusObservation condition: “Exit status observation is an execution observation whose defining condition is that it represents an exit status after it has been observed and staged as context evidence for an agent step”. Either condition leaves the other unproven."
-      ja: 審査済み兄弟区別：親 ExecutionObservation：CommandOutputObservation（semantic kind=information、バックボーン CommandOutputObservation-is_a-ExecutionObservation）；ExitStatusObservation（semantic kind=information、バックボーン ExitStatusObservation-is_a-ExecutionObservation）。両端条件：CommandOutputObservation の条件：「実行観測に属するコマンド出力観測は、次の事実を種差とします：それは、コンテキスト取り込み証拠としての観測可能なコマンド出力を記録し、その出力を生んだ実行やコンテナ自体は所有しません」；ExitStatusObservation の条件：「終了状態観測は実行観測のうち、次の事実を定義条件とする対象です：それは、終了状態が観測され、エージェント手順のコンテキスト証拠としてステージングされた状態を表します」。一方の成立は他方を証明しません。
     source_claims:
-      - claim-command-output-observation-005
+      - claim-cmdobs-design
 parent_relation:
   id: CommandOutputObservation-is_a-ExecutionObservation
   predicate: is_a
@@ -165,12 +146,10 @@ parent_relation:
   constraints: []
   examples:
     - id: CommandOutputObservation-is_a-ExecutionObservation-example-positive-001
-      kind: positive
       labels:
         zh: 是一种执行观测正例
         en: "Accepted case: is an execution observation"
         ja: 実行観測の一種の受理例
-      scenario_id: null
       descriptions:
         zh: obs-42 同时记录 execution_id、stdout 分块序号和 exit_status_id，因而是针对命令执行结果的专门观测。
         en: Observation obs-42 records an execution identifier, stdout chunk sequence, and exit-status identifier, making it a specialized observation of command execution.
@@ -181,25 +160,13 @@ parent_relation:
         - ExecutionObservation
       related_relation_ids:
         - CommandOutputObservation-is_a-ExecutionObservation
-      expected_result:
-        zh: 把 obs-42 归入执行观测分支。
-        en: Classify obs-42 under execution observations.
-        ja: obs-42 を実行観測の配下に分類します。
-      why_valid_or_invalid:
-        zh: 其身份由被观测执行及其输出证据决定，而不是由文本内容本身决定。
-        en: Its identity is determined by the observed execution and output evidence, not by text content alone.
-        ja: 同一性はテキスト内容だけでなく、観測対象の実行と出力証拠によって決まります。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
         - claim-command-output-observation-006
     - id: CommandOutputObservation-is_a-ExecutionObservation-example-boundary-001
-      kind: boundary
       labels:
         zh: 是一种执行观测拒绝边界
         en: "Rejection boundary: is an execution observation"
         ja: 実行観測の一種の拒否境界
-      scenario_id: null
       descriptions:
         zh: 一段仅含“build complete”的 stdout 字节没有 execution_id、通道范围或观测记录。
         en: A stdout byte range containing only “build complete” has no execution identifier, channel range, or observation record.
@@ -210,26 +177,11 @@ parent_relation:
         - ExecutionObservation
       related_relation_ids:
         - CommandOutputObservation-is_a-ExecutionObservation
-      expected_result:
-        zh: 将其保留为输出段，不归类为命令输出观测。
-        en: Keep it as an output segment, not a command-output observation.
-        ja: 出力セグメントとして保持し、コマンド出力観測には分類しません。
-      why_valid_or_invalid:
-        zh: 输出内容是观测所引用的证据，不等同于带有执行溯源的观测记录。
-        en: Output content is evidence referenced by an observation, not the provenance-bearing observation record itself.
-        ja: 出力内容は観測が参照する証拠であり、実行来歴を持つ観測記録そのものではありません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
         - claim-command-output-observation-007
   source_claims:
     - claim-command-output-observation-008
-  distinct_fact_rationale:
-    zh: 命令输出观测是执行观测的专门类型：它以命令执行为被观测对象，并保存输出通道、顺序范围和完成状态的证据。 拒绝边界是：输出内容是观测所引用的证据，不等同于带有执行溯源的观测记录。
-    en: "A command-output observation is an execution observation specialized for evidence about a command's output channels, ordering ranges, and completion status. Its rejection boundary is: Output content is evidence referenced by an observation, not the provenance-bearing observation record itself."
-    ja: コマンド出力観測は、コマンドの出力チャネル、順序範囲、完了状態の証拠に特化した実行観測です。 拒否境界は次のとおりです。出力内容は観測が参照する証拠であり、実行来歴を持つ観測記録そのものではありません。
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations:
   - id: CommandOutputObservation-has_exit_status_observation-ExitStatusObservation
@@ -261,12 +213,10 @@ relations:
     constraints: []
     examples:
       - id: CommandOutputObservation-has_exit_status_observation-ExitStatusObservation-example-positive-001
-        kind: positive
         labels:
           zh: 记录退出状态观测正例
           en: "Accepted case: records exit-status observation"
           ja: 終了状態観測を記録の受理例
-        scenario_id: null
         descriptions:
           zh: 执行 exec-42 的输出观测 obs-42 记录 ExitStatusObservation status-42，其中 exit_code=2，且二者使用同一 execution_id。
           en: Output observation obs-42 for execution exec-42 records exit-status observation status-42 with exit_code=2 and the same execution identifier.
@@ -277,25 +227,13 @@ relations:
           - ExitStatusObservation
         related_relation_ids:
           - CommandOutputObservation-has_exit_status_observation-ExitStatusObservation
-        expected_result:
-          zh: 接受该边，并保留退出码作为独立观测。
-          en: Accept the edge and retain the exit code as a separate observation.
-          ja: この辺を受理し、終了コードを独立した観測として保持します。
-        why_valid_or_invalid:
-          zh: 两个观测明确指向同一次执行，退出码字段直接表达 POSIX 命令完成状态。
-          en: Both observations identify the same execution, and the exit-code field directly represents command completion status.
-          ja: 両観測は同一実行を識別し、終了コード欄がコマンド完了状態を直接表します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-command-output-observation-009
       - id: CommandOutputObservation-has_exit_status_observation-ExitStatusObservation-example-boundary-001
-        kind: boundary
         labels:
           zh: 记录退出状态观测拒绝边界
           en: "Rejection boundary: records exit-status observation"
           ja: 終了状態観測を記録の拒否境界
-        scenario_id: null
         descriptions:
           zh: stderr 中出现“permission denied”，但没有退出码、终止信号或对应 ExitStatusObservation 标识。
           en: Standard error contains “permission denied”, but no exit code, terminating signal, or exit-status observation identifier is recorded.
@@ -306,26 +244,11 @@ relations:
           - ExitStatusObservation
         related_relation_ids:
           - CommandOutputObservation-has_exit_status_observation-ExitStatusObservation
-        expected_result:
-          zh: 拒绝建立命令输出到退出状态观测的关联边。
-          en: Reject the exit-status-observation edge.
-          ja: 終了状態観測への辺を拒否します。
-        why_valid_or_invalid:
-          zh: 诊断文本可以伴随多种退出结果，不能替代命令的退出状态证据。
-          en: Diagnostic text can accompany several outcomes and cannot substitute for exit-status evidence.
-          ja: 診断文は複数の結果に伴い得るため、終了状態の証拠を代替できません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-command-output-observation-010
     source_claims:
       - claim-command-output-observation-011
-    distinct_fact_rationale:
-      zh: 把一次命令输出观测关联到同一命令执行的退出码或终止信号观测；该边只记录观测证据，不把诊断文本推断为退出状态。 拒绝边界是：诊断文本可以伴随多种退出结果，不能替代命令的退出状态证据。
-      en: "Associates a command-output observation with the exit-code or terminating-signal observation from the same command execution; diagnostic text alone is not an exit status. Its rejection boundary is: Diagnostic text can accompany several outcomes and cannot substitute for exit-status evidence."
-      ja: コマンド出力観測を、同じコマンド実行の終了コードまたは終了シグナルの観測へ関連付けます。診断文だけを終了状態とは扱いません。 拒否境界は次のとおりです。診断文は複数の結果に伴い得るため、終了状態の証拠を代替できません。
     layout_role: cross-link
-    review_status: accepted
     target: concept:ExitStatusObservation
   - id: CommandOutputObservation-references_execution_result-ExecutionResultReference
     predicate: references_execution_result
@@ -356,12 +279,10 @@ relations:
     constraints: []
     examples:
       - id: CommandOutputObservation-references_execution_result-ExecutionResultReference-example-positive-001
-        kind: positive
         labels:
           zh: 引用执行结果正例
           en: "Accepted case: references execution result"
           ja: 実行結果を参照の受理例
-        scenario_id: null
         descriptions:
           zh: obs-87 保存 result_ref=result://run-9/tool-3，并且该引用解析到产生这些输出分块的工具结果。
           en: Observation obs-87 stores result_ref=result://run-9/tool-3, which resolves to the tool result that owns the recorded output chunks.
@@ -372,25 +293,13 @@ relations:
           - ExecutionResultReference
         related_relation_ids:
           - CommandOutputObservation-references_execution_result-ExecutionResultReference
-        expected_result:
-          zh: 接受结果引用，但不内嵌结果载荷。
-          en: Accept the result reference without embedding the result payload.
-          ja: 結果本体を埋め込まず、結果参照を受理します。
-        why_valid_or_invalid:
-          zh: 稳定引用与观测属于同一工具执行，且能解析到唯一结果。
-          en: The stable reference belongs to the same tool execution and resolves to one result.
-          ja: 安定参照は同じツール実行に属し、一意の結果へ解決されます。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-command-output-observation-012
       - id: CommandOutputObservation-references_execution_result-ExecutionResultReference-example-boundary-001
-        kind: boundary
         labels:
           zh: 引用执行结果拒绝边界
           en: "Rejection boundary: references execution result"
           ja: 実行結果を参照の拒否境界
-        scenario_id: null
         descriptions:
           zh: 观测字段直接放入完整 ExecutionResult JSON，却没有引用标识或解析规则。
           en: The observation embeds a complete ExecutionResult JSON value but provides no reference identifier or resolution rule.
@@ -401,26 +310,11 @@ relations:
           - ExecutionResultReference
         related_relation_ids:
           - CommandOutputObservation-references_execution_result-ExecutionResultReference
-        expected_result:
-          zh: 拒绝把内嵌载荷登记为执行结果引用。
-          en: Do not register the embedded payload as an execution-result reference.
-          ja: 埋め込みペイロードを実行結果参照として登録しません。
-        why_valid_or_invalid:
-          zh: 结果对象与指向结果的引用具有不同身份和生命周期，不能互换。
-          en: A result object and a reference to that result have different identities and lifecycles.
-          ja: 結果オブジェクトと結果への参照は、同一性とライフサイクルが異なります。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-command-output-observation-013
     source_claims:
       - claim-command-output-observation-014
-    distinct_fact_rationale:
-      zh: 从命令输出观测指向可解析的执行结果引用，使输出证据能够回到完整工具结果，同时避免把结果载荷复制进观测节点。 拒绝边界是：结果对象与指向结果的引用具有不同身份和生命周期，不能互换。
-      en: "Points from a command-output observation to a resolvable execution-result reference so the evidence can reach the complete tool result without copying that result into the observation. Its rejection boundary is: A result object and a reference to that result have different identities and lifecycles."
-      ja: コマンド出力観測から解決可能な実行結果参照を指し、結果本体を観測へ複製せずに完全なツール結果へ到達できるようにします。 拒否境界は次のとおりです。結果オブジェクトと結果への参照は、同一性とライフサイクルが異なります。
     layout_role: cross-link
-    review_status: accepted
     target: concept:ExecutionResultReference
   - id: derived_from_trace_event
     predicate: derived_from_trace_event
@@ -460,12 +354,10 @@ relations:
     constraints: []
     examples:
       - id: derived_from_trace_event-example-positive-001
-        kind: positive
         labels:
           zh: 派生自追踪事件正例
           en: "Accepted case: derived from trace event"
           ja: トレースイベントから派生の受理例
-        scenario_id: null
         descriptions:
           zh: obs-55 的 provenance.event_id 指向 command.output 事件 evt-55，并记录 parser_version 与原始事件时间戳。
           en: Observation obs-55 names command.output event evt-55 in provenance.event_id and records the parser version and original event timestamp.
@@ -476,25 +368,13 @@ relations:
           - TraceEvent
         related_relation_ids:
           - derived_from_trace_event
-        expected_result:
-          zh: 接受从 evt-55 到 obs-55 的派生溯源。
-          en: Accept the derivation provenance from evt-55 to obs-55.
-          ja: evt-55 から obs-55 への派生来歴を受理します。
-        why_valid_or_invalid:
-          zh: 明确事件标识和转换元数据把观测绑定到唯一的追踪事件。
-          en: The event identifier and transformation metadata bind the observation to one trace event.
-          ja: イベント ID と変換メタデータが観測を一つのトレースイベントへ結び付けます。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-command-output-observation-015
       - id: derived_from_trace_event-example-boundary-001
-        kind: boundary
         labels:
           zh: 派生自追踪事件拒绝边界
           en: "Rejection boundary: derived from trace event"
           ja: トレースイベントから派生の拒否境界
-        scenario_id: null
         descriptions:
           zh: obs-56 与 evt-55 只有相同 trace_id 和相近时间，没有 event_id 或转换记录。
           en: Observation obs-56 merely shares trace_id and a nearby timestamp with evt-55; it has no event identifier or transformation record.
@@ -505,26 +385,11 @@ relations:
           - TraceEvent
         related_relation_ids:
           - derived_from_trace_event
-        expected_result:
-          zh: 拒绝推断 derived_from_trace_event。
-          en: Reject the derived_from_trace_event assertion.
-          ja: derived_from_trace_event の推論を拒否します。
-        why_valid_or_invalid:
-          zh: 同一追踪中可以存在多个事件，时间相关性不能确定唯一来源。
-          en: A trace can contain many events, so temporal correlation cannot identify a unique source.
-          ja: 一つのトレースには複数イベントがあり、時間相関だけでは出所を一意に決められません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-command-output-observation-016
     source_claims:
       - claim-command-output-observation-017
-    distinct_fact_rationale:
-      zh: 记录命令输出观测由某个带时间戳的追踪事件转换而来，并保留事件标识和转换溯源；共享 trace_id 或时间接近不足以证明派生。 拒绝边界是：同一追踪中可以存在多个事件，时间相关性不能确定唯一来源。
-      en: "Records that a command-output observation was transformed from a particular timestamped trace event while retaining event identity and transformation provenance; a shared trace identifier is insufficient. Its rejection boundary is: A trace can contain many events, so temporal correlation cannot identify a unique source."
-      ja: コマンド出力観測が特定のタイムスタンプ付きトレースイベントから変換され、イベント ID と変換来歴を保持することを記録します。同じ trace_id だけでは不十分です。 拒否境界は次のとおりです。一つのトレースには複数イベントがあり、時間相関だけでは出所を一意に決められません。
     layout_role: cross-link
-    review_status: accepted
     target: concept:TraceEvent
   - id: has_stderr_chunk
     predicate: has_stderr_chunk
@@ -555,12 +420,10 @@ relations:
     constraints: []
     examples:
       - id: has_stderr_chunk-example-positive-001
-        kind: positive
         labels:
           zh: 引用标准错误分块正例
           en: "Accepted case: references stderr chunk"
           ja: 標準エラーチャンクを参照の受理例
-        scenario_id: null
         descriptions:
           zh: obs-72 引用 stderr-chunk-3；该分块标记 channel=stderr、sequence=3、byte_range=1024..1535，且 execution_id 与观测一致。
           en: obs-72 references stderr-chunk-3, whose channel=stderr, sequence=3, byte_range=1024..1535, and execution identifier match the observation.
@@ -571,25 +434,13 @@ relations:
           - StandardErrorChunk
         related_relation_ids:
           - has_stderr_chunk
-        expected_result:
-          zh: 接受观测到 stderr 分块的证据引用。
-          en: Accept the evidence reference to the stderr chunk.
-          ja: stderr チャンクへの証拠参照を受理します。
-        why_valid_or_invalid:
-          zh: 通道、执行和范围元数据共同确认该分块属于观测所记录的标准错误证据。
-          en: Channel, execution, and range metadata identify the chunk as the standard-error evidence recorded by the observation.
-          ja: チャネル、実行、範囲メタデータが、そのチャンクを観測対象の標準エラー証拠として特定します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-command-output-observation-018
       - id: has_stderr_chunk-example-boundary-001
-        kind: boundary
         labels:
           zh: 引用标准错误分块拒绝边界
           en: "Rejection boundary: references stderr chunk"
           ja: 標準エラーチャンクを参照の拒否境界
-        scenario_id: null
         descriptions:
           zh: 诊断消息由 stderr 文本概括而来，但没有引用任何 StandardErrorChunk 标识或字节范围。
           en: A diagnostic message summarizes stderr text but cites no StandardErrorChunk identifier or byte range.
@@ -600,26 +451,11 @@ relations:
           - StandardErrorChunk
         related_relation_ids:
           - has_stderr_chunk
-        expected_result:
-          zh: 不从诊断消息反推 has_stderr_chunk。
-          en: Do not infer has_stderr_chunk from the diagnostic message.
-          ja: 診断メッセージから has_stderr_chunk を推論しません。
-        why_valid_or_invalid:
-          zh: 内容派生关系不能证明观测直接引用了哪一个标准错误分块。
-          en: Content derivation does not establish which standard-error chunk the observation directly references.
-          ja: 内容派生だけでは、観測がどの標準エラーチャンクを直接参照するか証明できません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-command-output-observation-019
     source_claims:
       - claim-command-output-observation-020
-    distinct_fact_rationale:
-      zh: 从命令输出观测指向它所记录的有边界标准错误分块，保留通道、序号和字节范围；这是一条证据引用边，不表示观测产生了分块。 拒绝边界是：内容派生关系不能证明观测直接引用了哪一个标准错误分块。
-      en: "Links a command-output observation to a bounded standard-error chunk it records, preserving channel, sequence, and byte range; this evidence reference does not claim that the observation produced the chunk. Its rejection boundary is: Content derivation does not establish which standard-error chunk the observation directly references."
-      ja: コマンド出力観測から、記録対象の境界付き標準エラーチャンクを指し、チャネル、順序、バイト範囲を保持します。観測がチャンクを生成したとは主張しません。 拒否境界は次のとおりです。内容派生だけでは、観測がどの標準エラーチャンクを直接参照するか証明できません。
     layout_role: cross-link
-    review_status: accepted
     target: concept:StandardErrorChunk
   - id: has_stdout_chunk
     predicate: has_stdout_chunk
@@ -650,12 +486,10 @@ relations:
     constraints: []
     examples:
       - id: has_stdout_chunk-example-positive-001
-        kind: positive
         labels:
           zh: 引用标准输出分块正例
           en: "Accepted case: references stdout chunk"
           ja: 標準出力チャンクを参照の受理例
-        scenario_id: null
         descriptions:
           zh: obs-71 引用 stdout-chunk-2；该分块标记 channel=stdout、sequence=2、byte_range=512..1023，且 execution_id 与观测一致。
           en: obs-71 references stdout-chunk-2, whose channel=stdout, sequence=2, byte_range=512..1023, and execution identifier match the observation.
@@ -666,25 +500,13 @@ relations:
           - StandardOutputChunk
         related_relation_ids:
           - has_stdout_chunk
-        expected_result:
-          zh: 接受观测到 stdout 分块的证据引用。
-          en: Accept the evidence reference to the stdout chunk.
-          ja: stdout チャンクへの証拠参照を受理します。
-        why_valid_or_invalid:
-          zh: 明确分块标识和通道范围使观测能够准确重放被记录的标准输出证据。
-          en: The chunk identifier and channel range let the observation replay the exact standard-output evidence it recorded.
-          ja: チャンク ID とチャネル範囲により、観測が記録した標準出力証拠を正確に再生できます。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-command-output-observation-021
       - id: has_stdout_chunk-example-boundary-001
-        kind: boundary
         labels:
           zh: 引用标准输出分块拒绝边界
           en: "Rejection boundary: references stdout chunk"
           ja: 標準出力チャンクを参照の拒否境界
-        scenario_id: null
         descriptions:
           zh: 观测摘要写着“command printed 20 lines”，但没有 stdout 分块标识、序号或范围。
           en: An observation summary says “command printed 20 lines” but supplies no stdout chunk identifier, sequence, or range.
@@ -695,26 +517,11 @@ relations:
           - StandardOutputChunk
         related_relation_ids:
           - has_stdout_chunk
-        expected_result:
-          zh: 不建立 has_stdout_chunk 边。
-          en: Do not create the has_stdout_chunk edge.
-          ja: has_stdout_chunk 辺を作成しません。
-        why_valid_or_invalid:
-          zh: 概括性描述没有定位可验证的标准输出分块，不能充当直接引用。
-          en: A summary does not identify a verifiable standard-output chunk and is not a direct reference.
-          ja: 要約は検証可能な標準出力チャンクを特定せず、直接参照にはなりません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-command-output-observation-022
     source_claims:
       - claim-command-output-observation-023
-    distinct_fact_rationale:
-      zh: 从命令输出观测指向它所记录的有边界标准输出分块，保留通道、序号和字节范围；这是一条证据引用边，不表示观测产生了分块。 拒绝边界是：概括性描述没有定位可验证的标准输出分块，不能充当直接引用。
-      en: "Links a command-output observation to a bounded standard-output chunk it records, preserving channel, sequence, and byte range; this evidence reference does not claim that the observation produced the chunk. Its rejection boundary is: A summary does not identify a verifiable standard-output chunk and is not a direct reference."
-      ja: コマンド出力観測から、記録対象の境界付き標準出力チャンクを指し、チャネル、順序、バイト範囲を保持します。観測がチャンクを生成したとは主張しません。 拒否境界は次のとおりです。要約は検証可能な標準出力チャンクを特定せず、直接参照にはなりません。
     layout_role: cross-link
-    review_status: accepted
     target: concept:StandardOutputChunk
   - id: CommandOutputObservation-observes-InvocationAttempt
     predicate: observes
@@ -754,12 +561,10 @@ relations:
     constraints: []
     examples:
       - id: produced_by_command_execution-example-positive-001
-        kind: positive
         labels:
           zh: 由命令执行产生正例
           en: "Accepted case: produced by command execution"
           ja: コマンド実行により生成の受理例
-        scenario_id: null
         descriptions:
           zh: obs-90 保存 observed_attempt_id=attempt-90，收集器在该尝试关闭输出管道后完成观测记录。
           en: obs-90 stores observed_attempt_id=attempt-90, and the collector completes the observation after that attempt closes its output pipes.
@@ -770,25 +575,13 @@ relations:
           - InvocationAttempt
         related_relation_ids:
           - CommandOutputObservation-observes-InvocationAttempt
-        expected_result:
-          zh: 接受 obs-90 由 exec-90 产生的溯源边。
-          en: Accept the production-provenance edge from obs-90 to exec-90.
-          ja: obs-90 から exec-90 への生成来歴辺を受理します。
-        why_valid_or_invalid:
-          zh: 执行器直接记录生产者标识和完成顺序，因果来源可验证。
-          en: The runner directly records the producer identifier and completion sequence, making causation verifiable.
-          ja: ランナーが生成者 ID と完了順序を直接記録し、因果出所を検証できます。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-command-output-observation-024
       - id: produced_by_command_execution-example-boundary-001
-        kind: boundary
         labels:
           zh: 由命令执行产生拒绝边界
           en: "Rejection boundary: produced by command execution"
           ja: コマンド実行により生成の拒否境界
-        scenario_id: null
         descriptions:
           zh: obs-91 与 attempt-90 位于同一 trace，但其 observed_attempt_id 指向 attempt-91。
           en: obs-91 shares a trace with attempt-90, but its observed_attempt_id points to attempt-91.
@@ -799,26 +592,11 @@ relations:
           - InvocationAttempt
         related_relation_ids:
           - CommandOutputObservation-observes-InvocationAttempt
-        expected_result:
-          zh: 拒绝 obs-91 produced_by exec-90。
-          en: Reject the claim that obs-91 was produced by exec-90.
-          ja: obs-91 が exec-90 により生成されたという主張を拒否します。
-        why_valid_or_invalid:
-          zh: 追踪容器可以包含多个命令执行，生产者必须由直接执行溯源确定。
-          en: A trace can contain several command executions; the producer must come from direct execution provenance.
-          ja: 一つのトレースに複数のコマンド実行があり得るため、生成者は直接の実行来歴で決めます。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-command-output-observation-025
     source_claims:
       - claim-command-output-observation-026
-    distinct_fact_rationale:
-      zh: 明确观测所针对的 InvocationAttempt；共享 trace 可能包含多个尝试，必须使用直接观测引用。
-      en: Identifies the InvocationAttempt observed; a shared trace may contain several attempts, so a direct observation reference is required.
-      ja: 観測対象 InvocationAttempt を明示し shared trace に複数 attempt があり得るため direct observation reference を要求します。
     layout_role: cross-link
-    review_status: accepted
     target: concept:InvocationAttempt
   - id: summarized_as_context_input
     predicate: summarized_as_context_input
@@ -858,12 +636,10 @@ relations:
     constraints: []
     examples:
       - id: summarized_as_context_input-example-positive-001
-        kind: positive
         labels:
           zh: 摘要为上下文输入正例
           en: "Accepted case: summarized as context input"
           ja: コンテキスト入力として要約の受理例
-        scenario_id: null
         descriptions:
           zh: summary-33 由 obs-33 创建，记录 source_observation_id、policy=retain-errors、covered_chunks=1..18 和原始 token 数。
           en: summary-33 is created from obs-33 and records source_observation_id, policy=retain-errors, covered_chunks=1..18, and original token count.
@@ -874,25 +650,13 @@ relations:
           - ContextSummary
         related_relation_ids:
           - summarized_as_context_input
-        expected_result:
-          zh: 接受 obs-33 到 summary-33 的摘要因果边。
-          en: Accept the summarization edge from obs-33 to summary-33.
-          ja: obs-33 から summary-33 への要約因果辺を受理します。
-        why_valid_or_invalid:
-          zh: 来源、策略和覆盖范围共同说明摘要确由该观测压缩而来，并可审计信息损失。
-          en: Source, policy, and coverage establish that the summary was compressed from that observation and make information loss auditable.
-          ja: 出所、方針、範囲が当該観測からの圧縮を示し、情報損失を監査できます。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-command-output-observation-027
       - id: summarized_as_context_input-example-boundary-001
-        kind: boundary
         labels:
           zh: 摘要为上下文输入拒绝边界
           en: "Rejection boundary: summarized as context input"
           ja: コンテキスト入力として要約の拒否境界
-        scenario_id: null
         descriptions:
           zh: 人工笔记与 obs-33 使用相似措辞，但没有 source_observation_id、覆盖分块或摘要策略。
           en: A human note uses wording similar to obs-33 but has no source_observation_id, covered chunks, or summarization policy.
@@ -903,43 +667,30 @@ relations:
           - ContextSummary
         related_relation_ids:
           - summarized_as_context_input
-        expected_result:
-          zh: 不把该笔记登记为 obs-33 的 ContextSummary。
-          en: Do not register the note as a ContextSummary derived from obs-33.
-          ja: そのメモを obs-33 由来の ContextSummary として登録しません。
-        why_valid_or_invalid:
-          zh: 语义相似不能替代可核验的压缩过程和来源标识。
-          en: Semantic similarity cannot replace a verifiable compression process and source identifier.
-          ja: 意味的類似は、検証可能な圧縮過程と出所 ID を代替できません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-command-output-observation-028
     source_claims:
       - claim-command-output-observation-029
-    distinct_fact_rationale:
-      zh: 表示命令输出观测在上下文预算约束下被压缩为 ContextSummary，并保留来源观测、压缩策略和覆盖范围；相似文本不构成摘要溯源。 拒绝边界是：语义相似不能替代可核验的压缩过程和来源标识。
-      en: "States that a command-output observation was compressed into a ContextSummary under a context budget while retaining source observation, compression policy, and coverage; similar wording alone is not summary provenance. Its rejection boundary is: Semantic similarity cannot replace a verifiable compression process and source identifier."
-      ja: コマンド出力観測がコンテキスト予算下で ContextSummary へ圧縮され、元観測、圧縮方針、対象範囲を保持することを示します。類似文だけでは要約来歴になりません。 拒否境界は次のとおりです。意味的類似は、検証可能な圧縮過程と出所 ID を代替できません。
     layout_role: cross-link
-    review_status: accepted
     target: concept:ContextSummary
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-info-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: Manual semantic verification completed.
-    en: Verified against POSIX stdout/stderr/exit status and shell redirection semantics.
-    ja: Manual semantic verification completed.
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-mcp-tool-result
+    title: MCP Server Tools Specification
+    publisher: Model Context Protocol
+    url: https://modelcontextprotocol.io/specification/2025-06-18/server/tools
+    source_type: official-spec
+    relevance: Tool Result text output from commands.
+  - id: src-posix-exit-status
+    title: POSIX Shell Command Language — Exit Status
+    publisher: IEEE/Open Group
+    url: https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html
+    source_type: standard
+    relevance: stdout/stderr and exit codes.
+  - id: src-info-container-design
+    title: Moonweave info-container-command module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Execution observations separate from invocation and RunResult.
 source_claims:
   - id: claim-command-output-observation-001
     source: eng-std-posix-shell-2024
@@ -947,200 +698,183 @@ source_claims:
     locator: POSIX.1-2024 Base Definitions §3.353–§3.357 and Shell Command Language §2.8.2
     evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-002
     source: eng-std-opentelemetry-spec
     supports: OpenTelemetry's LogRecord separates observation time from event time and attaches body, attributes, and resource context to the observed record. CommandOutputObservation adopts that observer-record boundary for captured command output; its aggregation of channel chunks and exit observation is a Moonweave design inference, not an OpenTelemetry class.
     locator: OpenTelemetry Logs Data Model > Log and Event Record Definition > ObservedTimestamp, Body, Resource, Attributes
     evidence_kind: official
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-003
     source: eng-std-posix-shell-2024
     supports: POSIX separately defines standard output, standard error, and command exit status. The example preserves those three observation dimensions separately instead of inferring output capture from exit status or merging the two channels.
     locator: POSIX.1-2024 Base Definitions §3.353–§3.355 and Shell Command Language §2.8.2
     evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-004
     source: eng-std-opentelemetry-spec
     supports: OpenTelemetry's LogRecord model distinguishes the event timestamp from ObservedTimestamp and carries body, attributes, and resource context. The example follows that observer-view pattern by assigning obs-command-001 its own observed_at and provenance rather than treating the execution result itself as the observation.
     locator: OpenTelemetry Logs Data Model > Log and Event Record Definition > Timestamp and ObservedTimestamp
     evidence_kind: official
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-005
     source: eng-std-posix-shell-2024
     supports: POSIX treats command exit status separately from the bytes written to standard output and standard error. That operational separation supports distinguishing an output-capture observation from a termination-status observation; their common ExecutionObservation parent is a Moonweave taxonomy decision.
     locator: POSIX.1-2024 Base Definitions §3.353–§3.355 and Shell Command Language §2.8.2
     evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-006
     source: eng-std-posix-shell-2024
     supports: "CommandOutputObservation-is_a-ExecutionObservation: The accepted record is Observation obs-42 records an execution identifier, stdout chunk sequence, and exit-status identifier, making it a specialized observation of command execution. POSIX distinguishes command execution from the standard-output and standard-error data it produces; Moonweave models the provenance-bearing observation as the specialized record. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: POSIX.1-2024 Shell Command Language, §2.7 Redirection and §2.7.2 Redirecting Output
     evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-007
     source: eng-std-posix-shell-2024
     supports: "CommandOutputObservation-is_a-ExecutionObservation: The rejected record is outside the relation because Output content is evidence referenced by an observation, not the provenance-bearing observation record itself. POSIX distinguishes command execution from the standard-output and standard-error data it produces; Moonweave models the provenance-bearing observation as the specialized record. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: POSIX.1-2024 Shell Command Language, §2.7 Redirection and §2.7.2 Redirecting Output
     evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-008
     source: eng-std-posix-shell-2024
     supports: "CommandOutputObservation-is_a-ExecutionObservation: The official material supports the operational distinction used by this edge. POSIX distinguishes command execution from the standard-output and standard-error data it produces; Moonweave models the provenance-bearing observation as the specialized record. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: POSIX.1-2024 Shell Command Language, §2.7 Redirection and §2.7.2 Redirecting Output
     evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-009
     source: eng-std-posix-shell-2024
     supports: "CommandOutputObservation-has_exit_status_observation-ExitStatusObservation: The accepted record is Output observation obs-42 for execution exec-42 records exit-status observation status-42 with exit_code=2 and the same execution identifier. POSIX defines a command's exit status separately from the bytes written to its output channels. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: POSIX.1-2024 Shell Command Language, §2.8.2 Exit Status for Commands
     evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-010
     source: eng-std-posix-shell-2024
     supports: "CommandOutputObservation-has_exit_status_observation-ExitStatusObservation: The rejected record is outside the relation because Diagnostic text can accompany several outcomes and cannot substitute for exit-status evidence. POSIX defines a command's exit status separately from the bytes written to its output channels. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: POSIX.1-2024 Shell Command Language, §2.8.2 Exit Status for Commands
     evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-011
     source: eng-std-posix-shell-2024
     supports: "CommandOutputObservation-has_exit_status_observation-ExitStatusObservation: The official material supports the operational distinction used by this edge. POSIX defines a command's exit status separately from the bytes written to its output channels. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: POSIX.1-2024 Shell Command Language, §2.8.2 Exit Status for Commands
     evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-012
     source: eng-fw-openai-agents-tools
     supports: "CommandOutputObservation-references_execution_result-ExecutionResultReference: The accepted record is Observation obs-87 stores result_ref=result://run-9/tool-3, which resolves to the tool result that owns the recorded output chunks. OpenAI tool executions return outputs that can be represented separately from the tracing or observation record that refers to them. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: "OpenAI Agents SDK Tools, Local runtime tools and Function tools: returning tool output"
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-013
     source: eng-fw-openai-agents-tools
     supports: "CommandOutputObservation-references_execution_result-ExecutionResultReference: The rejected record is outside the relation because A result object and a reference to that result have different identities and lifecycles. OpenAI tool executions return outputs that can be represented separately from the tracing or observation record that refers to them. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: "OpenAI Agents SDK Tools, Local runtime tools and Function tools: returning tool output"
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-014
     source: eng-fw-openai-agents-tools
     supports: "CommandOutputObservation-references_execution_result-ExecutionResultReference: The official material supports the operational distinction used by this edge. OpenAI tool executions return outputs that can be represented separately from the tracing or observation record that refers to them. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: "OpenAI Agents SDK Tools, Local runtime tools and Function tools: returning tool output"
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-015
     source: eng-std-opentelemetry-trace-api
     supports: "derived_from_trace_event: The accepted record is Observation obs-55 names command.output event evt-55 in provenance.event_id and records the parser version and original event timestamp. OpenTelemetry spans carry timestamped events with attributes; provenance can therefore identify the exact event used to derive an observation. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: OpenTelemetry Tracing API, Span Creation, Add Events, Links, and Span lifetime
     evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-016
     source: eng-std-opentelemetry-trace-api
     supports: "derived_from_trace_event: The rejected record is outside the relation because A trace can contain many events, so temporal correlation cannot identify a unique source. OpenTelemetry spans carry timestamped events with attributes; provenance can therefore identify the exact event used to derive an observation. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: OpenTelemetry Tracing API, Span Creation, Add Events, Links, and Span lifetime
     evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-017
     source: eng-std-opentelemetry-trace-api
     supports: "derived_from_trace_event: The official material supports the operational distinction used by this edge. OpenTelemetry spans carry timestamped events with attributes; provenance can therefore identify the exact event used to derive an observation. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: OpenTelemetry Tracing API, Span Creation, Add Events, Links, and Span lifetime
     evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-018
     source: eng-std-posix-shell-2024
     supports: "has_stderr_chunk: The accepted record is obs-72 references stderr-chunk-3, whose channel=stderr, sequence=3, byte_range=1024..1535, and execution identifier match the observation. POSIX treats standard error as file descriptor 2, distinct from standard output; chunk identity therefore preserves the stderr channel explicitly. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: POSIX.1-2024 Shell Command Language, §2.7 Redirection and §2.7.2 Redirecting Output
     evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-019
     source: eng-std-posix-shell-2024
     supports: "has_stderr_chunk: The rejected record is outside the relation because Content derivation does not establish which standard-error chunk the observation directly references. POSIX treats standard error as file descriptor 2, distinct from standard output; chunk identity therefore preserves the stderr channel explicitly. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: POSIX.1-2024 Shell Command Language, §2.7 Redirection and §2.7.2 Redirecting Output
     evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-020
     source: eng-std-posix-shell-2024
     supports: "has_stderr_chunk: The official material supports the operational distinction used by this edge. POSIX treats standard error as file descriptor 2, distinct from standard output; chunk identity therefore preserves the stderr channel explicitly. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: POSIX.1-2024 Shell Command Language, §2.7 Redirection and §2.7.2 Redirecting Output
     evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-021
     source: eng-std-posix-shell-2024
     supports: "has_stdout_chunk: The accepted record is obs-71 references stdout-chunk-2, whose channel=stdout, sequence=2, byte_range=512..1023, and execution identifier match the observation. POSIX treats standard output as file descriptor 1, distinct from standard error; chunk identity therefore preserves the stdout channel explicitly. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: POSIX.1-2024 Shell Command Language, §2.7 Redirection and §2.7.2 Redirecting Output
     evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-022
     source: eng-std-posix-shell-2024
     supports: "has_stdout_chunk: The rejected record is outside the relation because A summary does not identify a verifiable standard-output chunk and is not a direct reference. POSIX treats standard output as file descriptor 1, distinct from standard error; chunk identity therefore preserves the stdout channel explicitly. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: POSIX.1-2024 Shell Command Language, §2.7 Redirection and §2.7.2 Redirecting Output
     evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-023
     source: eng-std-posix-shell-2024
     supports: "has_stdout_chunk: The official material supports the operational distinction used by this edge. POSIX treats standard output as file descriptor 1, distinct from standard error; chunk identity therefore preserves the stdout channel explicitly. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: POSIX.1-2024 Shell Command Language, §2.7 Redirection and §2.7.2 Redirecting Output
     evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-024
     source: eng-std-posix-shell-2024
     supports: "CommandOutputObservation-observes-InvocationAttempt: POSIX distinguishes command execution, output streams, and completion status; Moonweave records the directly observed InvocationAttempt without claiming that the activity generated the observation record."
     locator: POSIX.1-2024 Shell Command Language, §2.9.1.4 Command Search and Execution
     evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-025
     source: eng-std-posix-shell-2024
     supports: "produced_by_command_execution: The rejected record is outside the relation because A trace can contain several command executions; the producer must come from direct execution provenance. POSIX command search and execution produces command output and a completion status; Moonweave records the responsible execution as explicit provenance. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: POSIX.1-2024 Shell Command Language, §2.9.1.4 Command Search and Execution
     evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-026
     source: eng-std-posix-shell-2024
     supports: "produced_by_command_execution: The official material supports the operational distinction used by this edge. POSIX command search and execution produces command output and a completion status; Moonweave records the responsible execution as explicit provenance. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: POSIX.1-2024 Shell Command Language, §2.9.1.4 Command Search and Execution
     evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-027
     source: eng-fw-deepagents-context-engineering
     supports: "summarized_as_context_input: The accepted record is summary-33 is created from obs-33 and records source_observation_id, policy=retain-errors, covered_chunks=1..18, and original token count. Deep Agents uses summarization and offloading to manage context limits while retaining compact information for later model calls. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: "Deep Agents Context engineering, Context compression: offloading and summarization"
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-028
     source: eng-fw-deepagents-context-engineering
     supports: "summarized_as_context_input: The rejected record is outside the relation because Semantic similarity cannot replace a verifiable compression process and source identifier. Deep Agents uses summarization and offloading to manage context limits while retaining compact information for later model calls. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: "Deep Agents Context engineering, Context compression: offloading and summarization"
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-command-output-observation-029
     source: eng-fw-deepagents-context-engineering
     supports: "summarized_as_context_input: The official material supports the operational distinction used by this edge. Deep Agents uses summarization and offloading to manage context limits while retaining compact information for later model calls. The endpoint direction and ontology classification are Moonweave's reviewed modeling decision."
     locator: "Deep Agents Context engineering, Context compression: offloading and summarization"
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
+  - id: claim-cmdobs-mcp
+    source: src-mcp-tool-result
+    supports: MCP Tool Result text maps to observed stdout chunks.
+    locator: Tool Result
+    evidence_kind: primary-spec
+    confidence: high
+  - id: claim-cmdobs-design
+    source: src-info-container-design
+    supports: CommandOutputObservation reassembles channel-ordered chunks with gap detection.
+    locator: CommandOutputObservation
+    evidence_kind: design-inference
+    confidence: high

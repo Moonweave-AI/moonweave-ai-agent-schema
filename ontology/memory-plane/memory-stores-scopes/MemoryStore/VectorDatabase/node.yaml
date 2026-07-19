@@ -1,266 +1,293 @@
 schema: moonweave.ai/ontology-node/v1
 id: VectorDatabase
 kind: concept
-status: accepted
 labels:
   zh: 向量数据库
-  en: Vector database
+  en: vector database
   ja: ベクトルデータベース
 semantics:
   short_definition:
-    zh: 托管向量索引、集合与查询服务的 MemoryStore。
-    en: A MemoryStore hosting vector indexes, collections, and query service.
-    ja: vector index・collection・query serviceをhostする MemoryStore です。
+    zh: 托管向量索引、集合与相似度查询服务的 MemoryStore。
+    en: A MemoryStore hosting vector indexes, collections, and similarity-query services.
+    ja: vector index・collection・類似度 query service を host する MemoryStore です。
   definition:
-    zh: VectorDatabase 是提供持久化、索引管理和向量检索接口的 MemoryStore 服务实例，可托管多个 VectorIndex；它不是某个索引、向量或索引版本。
-    en: VectorDatabase is a MemoryStore service instance providing persistence, index management, and vector-retrieval interfaces and may host multiple VectorIndex values; it is not one index, vector, or index version.
-    ja: VectorDatabase は永続化・index管理・vector検索interfaceを提供し複数 VectorIndex をhostできる MemoryStore service instanceで、単一index・vector・index版ではありません。
+    zh: VectorDatabase 是提供持久化、索引管理与向量检索接口的 MemoryStore 服务实例，可托管多个 VectorIndex；Pinecone index、Chroma server、Qdrant cluster 与 Weaviate instance 都是典型实现。它不是某个 index 配置、单个 vector id 或 embedding 向量本身——那些分别属于 memory-embedding-indexes 模块。Moonweave 用 database_id 与 endpoint 标识服务，用 hosts 关系连接 VectorIndex，而不把索引内部结构并入 MemoryStore 分类。
+    en: VectorDatabase is a MemoryStore service instance providing persistence, index management, and vector-retrieval interfaces and may host multiple VectorIndexes. Pinecone indexes, Chroma servers, Qdrant clusters, and Weaviate instances are typical implementations. It is not an index configuration, individual vector id, or embedding vector itself—those belong to memory-embedding-indexes. Moonweave identifies services by database_id and endpoint, connects VectorIndexes via hosts, without folding index internals into MemoryStore taxonomy.
+    ja: VectorDatabase は永続化・index 管理・vector 検索 interface を提供する MemoryStore service instance で複数 VectorIndex を host 可。Pinecone/Chroma/Qdrant/Weaviate が典型。index 設定・単一 vector id・embedding 自体ではなく memory-embedding-indexes 所属。database_id/endpoint で識別し hosts で VectorIndex 接続。
   why_needed:
-    zh: 区分存储服务、逻辑索引和索引快照。
-    en: Separates storage service, logical index, and index snapshot.
-    ja: 保存service・logical index・index snapshotを分離します。
+    zh: 向量后端与逻辑索引、索引快照是三层不同事实。把 Pinecone index 配置误当作“数据库本身”，会导致部署迁移、分片策略与 entry 存储无法分开审计。
+    en: Vector backends, logical indexes, and index snapshots are three distinct facts. Mistaking Pinecone index configuration for "the database itself" prevents auditing deployment migration, shard policy, and entry storage separately.
+    ja: vector backend・logical index・index snapshot は三層の別 fact。Pinecone index 設定を DB 自体と誤認すると移行・shard・entry 監査が分離できない。
   includes:
-    - zh: 纳入有稳定服务/集群身份与 endpoint 的向量存储实例。
-      en: Includes vector-store instances with stable service or cluster identity and endpoint.
-      ja: 安定service/cluster同一性とendpointを持つvector-store instanceを含みます。
+    - zh: Pinecone 项目 index、自托管 Qdrant/Weaviate 集群、Chroma HttpClient 连接的服务实例，以及带稳定 database_id 与 endpoint 的向量存储部署。
+      en: Pinecone project indexes, self-hosted Qdrant/Weaviate clusters, Chroma HttpClient-connected service instances, and vector-store deployments with stable database_id and endpoint.
+      ja: Pinecone index、自ホスト Qdrant/Weaviate、Chroma HttpClient 接続 instance、安定 database_id/endpoint 付き vector store 配備。
   excludes:
-    - zh: 排除 VectorIndex、IndexVersion 和单个 Point。
-      en: Excludes VectorIndex, IndexVersion, and an individual point.
-      ja: VectorIndex・IndexVersion・個別pointを除外します。
+    - zh: VectorIndex 逻辑配置、IndexVersion、单个 Point/Entry，以及进程内临时向量数组。
+      en: VectorIndex logical configuration, IndexVersion, individual Point/Entry, and in-process temporary vector arrays.
+      ja: VectorIndex 論理設定、IndexVersion、個別 Point/Entry、プロセス内一時 vector 配列。
   semantic_kind: entity
   aliases: []
+engineering:
+  explanation:
+    zh: Pinecone Pinecone(api_key) + Index(host) 提供 upsert/query/delete 与 namespace；Chroma HttpClient(host, port) + collection.add/query；Qdrant QdrantClient(url) + create_collection；Weaviate weaviate.connect_to_local() + collections。Moonweave VectorDatabase 记录 engine_version（如 pinecone-serverless-2024、qdrant-1.9）与 deployment_scope；VectorIndex 维度/距离/metric 归 embedding-indexes 模块，通过 VectorDatabase-hosts-VectorIndex 引用。
+    en: Pinecone Pinecone(api_key) + Index(host) provides upsert/query/delete with namespaces; Chroma HttpClient(host, port) + collection.add/query; Qdrant QdrantClient(url) + create_collection; Weaviate weaviate.connect_to_local() + collections. Moonweave VectorDatabase records engine_version (e.g., pinecone-serverless-2024, qdrant-1.9) and deployment_scope; VectorIndex dimension/distance/metric belongs to embedding-indexes via VectorDatabase-hosts-VectorIndex.
+    ja: Pinecone/Chroma/Qdrant/Weaviate 各 SDK の host/url + collection/index 操作。engine_version/deployment_scope を記録。VectorIndex 次元/距離/metric は embedding-indexes が hosts 経由で参照。
+  typical_input:
+    - description: Pinecone index client for vector upsert and query.
+      format: |
+        from pinecone import Pinecone
+        pc = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
+        index = pc.Index("hybrid-memories")
+        index.upsert(vectors=[...], namespace="tenant-7-user-alice")
+      source_claims: [claim-vector-database-pinecone]
+    - description: Chroma HTTP client and collection query.
+      format: |
+        client = chromadb.HttpClient(host="localhost", port=8000)
+        collection = client.get_collection("agent_memories_alice")
+        collection.query(query_embeddings=[...], n_results=5)
+      source_claims: [claim-vector-database-chroma]
+    - description: Qdrant client creating a collection for agent memories.
+      format: |
+        from qdrant_client import QdrantClient
+        client = QdrantClient(url="http://localhost:6333")
+        client.create_collection(collection_name="agent_memories", vectors_config=...)
+      source_claims: [claim-vector-database-qdrant]
+  typical_output:
+    - description: Moonweave-local VectorDatabase facility record.
+      format: |
+        {
+          "database_id": "vectordb-prod",
+          "memory_store_id": "store-vectordb-prod",
+          "endpoint": "https://hybrid-memories-abc123.svc.pinecone.io",
+          "engine_version": "pinecone-serverless-2024",
+          "deployment_scope": "remote",
+          "hosted_indexes": ["hybrid-memories"]
+        }
+      source_claims: [claim-vector-database-design]
+  reference_implementations:
+    - name: Pinecone
+      url: https://docs.pinecone.io
+      description: Managed vector index with namespace upsert and query.
+    - name: Chroma
+      url: https://docs.trychroma.com
+      description: Collection-based embedding storage and query.
+    - name: Qdrant
+      url: https://qdrant.tech/documentation/
+      description: Vector search engine with collections and points.
+    - name: Weaviate
+      url: https://weaviate.io/developers/weaviate
+      description: Vector database with schema-backed collections.
 structure:
   identity_keys:
     - database_id
   fields:
     - id: database_id
-      labels:
-        zh: 数据库标识
-        en: database ID
-        ja: database ID
+      labels: {zh: 数据库标识, en: database ID, ja: database ID}
+      definitions:
+        zh: 稳定标识向量数据库服务或集群实例。
+        en: Stable identifier for the vector database service or cluster instance.
+        ja: vector database service/cluster instance の安定 ID。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 稳定标识服务或集群。
-        en: Stable identifier for the service or cluster.
-        ja: serviceまたはclusterの安定識別子です。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
       example_value: vectordb-prod
-      source_claims:
-        - claim-vector-database-002
+      allowed_values: []
+      source_claims: [claim-vector-database-design]
+    - id: memory_store_id
+      labels: {zh: 记忆存储标识, en: memory store ID, ja: 記憶ストア ID}
+      definitions:
+        zh: 与 MemoryStore 身份对齐的 store id；VectorDatabase —is_a→ MemoryStore。
+        en: Store id aligned with MemoryStore identity; VectorDatabase —is_a→ MemoryStore.
+        ja: MemoryStore identity と整合する store id。VectorDatabase —is_a→ MemoryStore。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: store-vectordb-prod
+      allowed_values: []
+      source_claims: [claim-vector-database-design]
     - id: endpoint
-      labels:
-        zh: 访问端点
-        en: endpoint
-        ja: endpoint
+      labels: {zh: 访问端点, en: endpoint, ja: endpoint}
+      definitions:
+        zh: Pinecone index host URL、Chroma HTTP URL、Qdrant/Weaviate 连接地址。
+        en: Pinecone index host URL, Chroma HTTP URL, or Qdrant/Weaviate connection address.
+        ja: Pinecone host URL、Chroma HTTP URL、Qdrant/Weaviate 接続 address。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 记录管理与查询访问位置。
-        en: Records the management and query access location.
-        ja: 管理・query access locationを記録します。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
-      example_value: https://vector.internal
-      source_claims:
-        - claim-vector-database-003
+      example_value: https://hybrid-memories-abc123.svc.pinecone.io
+      allowed_values: []
+      source_claims: [claim-vector-database-pinecone]
     - id: engine_version
-      labels:
-        zh: 引擎版本
-        en: engine version
-        ja: engine版
+      labels: {zh: 引擎版本, en: engine version, ja: engine 版}
+      definitions:
+        zh: 固定向量引擎行为与 API 版本，如 pinecone-serverless-2024、chromadb-0.5、qdrant-1.9。
+        en: Fixes vector engine behavior and API version, such as pinecone-serverless-2024, chromadb-0.5, qdrant-1.9.
+        ja: pinecone-serverless-2024、chromadb-0.5、qdrant-1.9 等の engine/API 版。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 固定存储引擎行为版本。
-        en: Fixes the storage-engine behavior version.
-        ja: storage-engine挙動版を固定します。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
-      example_value: qdrant-2026.06
-      source_claims:
-        - claim-vector-database-004
-  constraints: []
-  required_relation_constraints: []
+      example_value: pinecone-serverless-2024
+      allowed_values: []
+      source_claims: [claim-vector-database-pinecone]
+    - id: deployment_scope
+      labels: {zh: 部署范围, en: deployment scope, ja: 配置範囲}
+      definitions:
+        zh: local、remote 或 hybrid 部署位置。
+        en: local, remote, or hybrid deployment placement.
+        ja: local/remote/hybrid の配備位置。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: remote
+      allowed_values: [local, remote, hybrid]
+      source_claims: [claim-vector-database-design]
+  constraints:
+    - id: vector-database-hosts-index-not-is-index
+      severity: warning
+      expression_language: plain
+      expression: VectorIndex logical structure must not be classified as VectorDatabase; only hosting relationship is recorded here
+      explanation:
+        zh: 托管向量索引的服务是 VectorDatabase；索引配置本身归表示与索引模块。
+        en: The service hosting vector indexes is VectorDatabase; index configuration belongs to representations and indexes module.
+        ja: vector index を host する service が VectorDatabase。index 設定は表現と索引 module 所属。
+      source_claims: [claim-vector-database-design]
+  required_relations: []
 examples:
-  - id: VectorDatabase-example-positive-manual-001
-    kind: positive
+  - id: vector-database-example-pinecone-serverless
     labels:
-      zh: 向量数据库正例
-      en: "Positive case: Vector database"
-      ja: ベクトルデータベース正例
-    scenario_id: null
+      zh: Pinecone Serverless 向量数据库
+      en: Pinecone Serverless vector database
+      ja: Pinecone Serverless vector database
     descriptions:
-      zh: vectordb-prod 以稳定数据库 ID、服务端点和命名空间持久化向量条目，并托管 customer-memory 与 docs 两个 VectorIndex。
-      en: Vectordb-prod persistently stores vector entries under a stable database ID, endpoint, and namespaces and hosts customer-memory and docs VectorIndexes.
-      ja: vectordb-prod は安定 DB ID、提供端点、namespace の下で vector entry を永続化し、customer-memory と docs の VectorIndex を托管します。
+      zh: 生产使用 Pinecone(api_key) 连接 index hybrid-memories，endpoint 为 https://hybrid-memories-abc123.svc.pinecone.io。upsert/query 在 namespace tenant-7-user-alice 下执行；Moonweave 建模为 database_id=vectordb-prod 的 VectorDatabase，并通过 hosts 连接 VectorIndex hybrid-memories。
+      en: Production uses Pinecone(api_key) against index hybrid-memories with endpoint https://hybrid-memories-abc123.svc.pinecone.io. upsert/query run under namespace tenant-7-user-alice; Moonweave models database_id=vectordb-prod VectorDatabase hosting VectorIndex hybrid-memories.
+      ja: Pinecone index hybrid-memories に upsert/query（namespace tenant-7-user-alice）。database_id=vectordb-prod VectorDatabase が VectorIndex hybrid-memories を host。
+    example_source:
+      product: Pinecone
+      url: https://docs.pinecone.io/guides/indexes/use-namespaces
+      version: Pinecone Index upsert and query
     field_values:
       database_id: vectordb-prod
-      endpoint: https://vector.internal
-      engine_version: qdrant-2026.06
+      memory_store_id: store-vectordb-prod
+      endpoint: https://hybrid-memories-abc123.svc.pinecone.io
+      engine_version: pinecone-serverless-2024
       deployment_scope: remote
-      memory_store_id: memory-store-vectordb-prod
-    related_node_ids:
-      - VectorDatabase
-    related_relation_ids: []
-    expected_result:
-      zh: 创建 VectorDatabase 与 MemoryStore 身份，并用 hosts 连接两个索引。
-      en: Create VectorDatabase and MemoryStore identities and connect both indexes with hosts.
-      ja: VectorDatabase と MemoryStore 同一性を作成し、二索引を hosts で結びます。
-    why_valid_or_invalid:
-      zh: 它拥有数据库级持久化、管理和查询边界，而索引是其中被托管的逻辑结构。
-      en: It owns database-level persistence, management, and query boundaries, while indexes are hosted logical structures.
-      ja: DB レベルの永続化、管理、問合せ境界を所有し、索引は托管論理構造です。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-vector-database-005
-  - id: VectorDatabase-example-boundary-manual-001
-    kind: boundary
+      pinecone_index: hybrid-memories
+    related_node_ids: [VectorDatabase, MemoryStore, MemoryNamespace, memory-embedding-indexes]
+    related_relation_ids: [VectorDatabase-is_a-MemoryStore, VectorDatabase-hosts-VectorIndex]
+    source_claims: [claim-vector-database-pinecone, claim-vector-database-design]
+  - id: vector-database-example-chroma-local
     labels:
-      zh: 向量数据库边界例
-      en: "Boundary case: Vector database"
-      ja: ベクトルデータベース境界例
-    scenario_id: null
+      zh: 本地 Chroma 向量数据库
+      en: Local Chroma vector database
+      ja: ローカル Chroma vector database
     descriptions:
-      zh: vector-index-17 只声明 1536 维、cosine 距离和分片策略，部署位置由 vectordb-prod 另行决定。
-      en: Vector-index-17 only declares dimension 1,536, cosine distance, and shard policy; vectordb-prod separately determines deployment.
-      ja: vector-index-17 は次元 1536、cosine 距離、分片方針だけを宣言し、配備は vectordb-prod が別に決めます。
-    field_values: {}
-    related_node_ids:
-      - VectorDatabase
-    related_relation_ids: []
-    expected_result:
-      zh: 将其归为 VectorIndex，不把逻辑索引误作 VectorDatabase。
-      en: Classify it as VectorIndex and do not treat the logical index as VectorDatabase.
-      ja: VectorIndex と分類し、論理索引を VectorDatabase と誤認しません。
-    why_valid_or_invalid:
-      zh: 索引配置没有数据库级端点、命名空间管理或多索引托管身份。
-      en: An index configuration lacks database-level endpoint, namespace management, and multi-index hosting identity.
-      ja: 索引設定は DB レベル端点、namespace 管理、多索引托管同一性を持ちません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-vector-database-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      zh: 开发环境 chromadb.HttpClient(host=localhost, port=8000) 托管 collections agent_memories_alice 与 docs；collection.add/query 提供向量持久化。Moonweave 将 HttpClient 连接建模为 backend_type=chroma、deployment_scope=local 的 VectorDatabase。
+      en: Dev uses chromadb.HttpClient(host=localhost, port=8000) hosting collections agent_memories_alice and docs; collection.add/query persist vectors. Moonweave models the HttpClient connection as VectorDatabase with backend_type=chroma, deployment_scope=local.
+      ja: chromadb.HttpClient(localhost:8000) が collections を host。backend_type=chroma, deployment_scope=local の VectorDatabase。
+    example_source:
+      product: Chroma
+      url: https://docs.trychroma.com/docs/collections/manage-collections
+      version: HttpClient and collection query
+    field_values:
+      database_id: vectordb-chroma-dev
+      memory_store_id: store-chroma-local
+      endpoint: http://localhost:8000
+      engine_version: chromadb-0.5
+      deployment_scope: local
+    related_node_ids: [VectorDatabase, MemoryStore, MemoryNamespace, memory-embedding-indexes]
+    related_relation_ids: [VectorDatabase-is_a-MemoryStore]
+    source_claims: [claim-vector-database-chroma, claim-vector-database-design]
+  - id: vector-database-example-qdrant-cluster
+    labels:
+      zh: Qdrant 集群向量数据库
+      en: Qdrant cluster vector database
+      ja: Qdrant cluster vector database
+    descriptions:
+      zh: 自托管 QdrantClient(url=http://qdrant.internal:6333) 创建 collection agent_memories 并 upsert points。Moonweave 记录 engine_version=qdrant-1.9，VectorIndex 维度与 cosine 配置通过 hosts 关系引用，不写入 VectorDatabase 字段。
+      en: Self-hosted QdrantClient(url=http://qdrant.internal:6333) creates collection agent_memories and upserts points. Moonweave records engine_version=qdrant-1.9; VectorIndex dimension and cosine config attach via hosts, not VectorDatabase fields.
+      ja: QdrantClient(http://qdrant.internal:6333) で collection agent_memories を作成し points upsert。engine_version=qdrant-1.9。VectorIndex 次元/cosine は hosts 参照。
+    example_source:
+      product: Qdrant
+      url: https://qdrant.tech/documentation/concepts/collections/
+      version: QdrantClient create_collection and upsert
+    field_values:
+      database_id: vectordb-qdrant-prod
+      memory_store_id: store-qdrant-prod
+      endpoint: http://qdrant.internal:6333
+      engine_version: qdrant-1.9
+      deployment_scope: remote
+    related_node_ids: [VectorDatabase, MemoryStore, memory-embedding-indexes]
+    related_relation_ids: [VectorDatabase-is_a-MemoryStore, VectorDatabase-hosts-VectorIndex]
+    source_claims: [claim-vector-database-qdrant, claim-vector-database-design]
+  - id: vector-database-example-index-config-boundary
+    labels:
+      zh: 索引配置不是向量数据库
+      en: Index configuration is not vector database
+      ja: index 設定は vector database ではない
+    descriptions:
+      zh: vector-index-17 只声明 1536 维、cosine 距离与 HNSW 参数，没有 database endpoint 或多索引托管身份。它是 VectorIndex 逻辑结构，由 vectordb-prod 通过 hosts 关系托管，而不是 VectorDatabase 本身。
+      en: vector-index-17 declares only 1536 dimensions, cosine distance, and HNSW parameters without database endpoint or multi-index hosting identity. It is VectorIndex logical structure hosted by vectordb-prod via hosts, not VectorDatabase itself.
+      ja: vector-index-17 は 1536 次元/cosine/HNSW のみで endpoint/多 index host identity なし。VectorIndex 論理構造で vectordb-prod が hosts。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: VectorDatabase versus VectorIndex boundary
+    field_values:
+      index_id: vector-index-17
+      dimensions: 1536
+      metric: cosine
+      is_vector_database: false
+    related_node_ids: [VectorDatabase, memory-embedding-indexes]
+    related_relation_ids: [VectorDatabase-hosts-VectorIndex]
+    source_claims: [claim-vector-database-design]
 parent_relation:
   id: VectorDatabase-is_a-MemoryStore
   predicate: is_a
   direction: target-to-source
   relation_kind: hierarchy
   labels:
-    zh: 是一种
-    en: is a
-    ja: の一種である
+    zh: 是一种记忆存储
+    en: is a memory store
+    ja: 記憶ストアの一種
   definitions:
     zh: VectorDatabase —is_a→ MemoryStore 表示该服务满足持久记忆存储身份，并以向量索引/检索作为专门种差。
-    en: VectorDatabase —is_a→ MemoryStore means that the service satisfies persistent memory-store identity with vector indexing and retrieval as its specialized differentia.
-    ja: VectorDatabase —is_a→ MemoryStore はserviceが永続memory-store同一性を満たしvector indexing/retrievalを専用種差とすることを表します。
+    en: VectorDatabase —is_a→ MemoryStore means the service satisfies persistent memory-store identity with vector indexing and retrieval as specialized differentia.
+    ja: VectorDatabase —is_a→ MemoryStore は永続 memory-store identity を満たし vector indexing/retrieval を専用種差とする。
   cardinality: null
   cardinality_not_applicable_reason:
     zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
     en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
-    ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
+    ja: fact 単位制約で schema 層一律 cardinality を課さない。
   inverse_reading:
     predicate: part_of
-    labels:
-      zh: 反向读取
-      en: inverse reading
-      ja: 逆方向読取
+    labels: {zh: 反向读取, en: has subtype, ja: 逆方向読取}
   conditions:
-    - id: VectorDatabase-is_a-MemoryStore-condition-manual-001
+    - id: VectorDatabase-is_a-MemoryStore-condition
       severity: error
       expression_language: plain
-      expression: Assert only when the service persists memory records and provides vector-index lifecycle management.
-      explanations:
-        zh: 仅当服务持久化记忆记录并提供向量索引生命周期时成立。
+      expression: Assert only when the service persists memory records and provides vector-index lifecycle management
+      explanation:
+        zh: 仅当服务持久化记忆记录并提供向量索引生命周期管理时成立。
         en: Assert only when the service persists memory records and provides vector-index lifecycle management.
-        ja: serviceがmemory recordを永続化しvector-index lifecycleを提供する時だけ成立します。
-      source_claims:
-        - claim-vector-database-007
+        ja: memory record 永続化と vector-index lifecycle 管理を提供する時のみ成立。
+      source_claims: [claim-vector-database-design]
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: VectorDatabase-is_a-MemoryStore-example-positive-manual-001
-      kind: positive
-      labels:
-        zh: 是一种正例
-        en: "Positive case: is a"
-        ja: の一種である正例
-      scenario_id: null
-      descriptions:
-        zh: vector-db-prod 以稳定数据库身份持久化记忆表示，提供写入、删除、命名空间和相似度查询能力。
-        en: Vector-db-prod persistently stores memory representations under a stable database identity and provides write, delete, namespace, and similarity-query operations.
-        ja: vector-db-prod は安定 DB 同一性の下で記憶表現を永続化し、書込、削除、namespace、類似度問合せを提供します。
-      field_values: {}
-      related_node_ids:
-        - VectorDatabase
-        - MemoryStore
-      related_relation_ids:
-        - VectorDatabase-is_a-MemoryStore
-      expected_result:
-        zh: 将其分类为 VectorDatabase 和 MemoryStore。
-        en: Classify it as VectorDatabase and MemoryStore.
-        ja: VectorDatabase かつ MemoryStore と分類します。
-      why_valid_or_invalid:
-        zh: 它满足持久记忆存储的一般条件，并以向量集合与相似度访问为种差。
-        en: It satisfies general persistent memory-store conditions and is distinguished by vector collections and similarity access.
-        ja: 一般永続 MemoryStore 条件を満たし、ベクトル collection と類似度アクセスで区別されます。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-vector-database-007
-    - id: VectorDatabase-is_a-MemoryStore-example-boundary-manual-001
-      kind: boundary
-      labels:
-        zh: 是一种边界例
-        en: "Boundary case: is a"
-        ja: の一種である境界例
-      scenario_id: null
-      descriptions:
-        zh: 进程内数组临时保存本轮向量，进程退出即丢失且没有数据库或命名空间身份。
-        en: An in-process array temporarily holds vectors for one turn, disappears on process exit, and has no database or namespace identity.
-        ja: プロセス内配列が一ターンだけベクトルを保持し、終了時に消え、DB・namespace 同一性を持ちません。
-      field_values: {}
-      related_node_ids:
-        - VectorDatabase
-        - MemoryStore
-      related_relation_ids:
-        - VectorDatabase-is_a-MemoryStore
-      expected_result:
-        zh: 可视为临时缓存，不归为 VectorDatabase。
-        en: Treat it as a transient cache, not a VectorDatabase.
-        ja: 一時 cache として扱い、VectorDatabase には分類しません。
-      why_valid_or_invalid:
-        zh: 临时容器不满足可持久、可管理的 MemoryStore 身份条件。
-        en: A transient container does not satisfy the persistent, manageable MemoryStore identity conditions.
-        ja: 一時 container は永続・管理可能 MemoryStore 同一性条件を満たしません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-vector-database-007
-  source_claims:
-    - claim-vector-database-007
+  examples: []
+  source_claims: [claim-vector-database-design]
   distinct_fact_rationale:
-    zh: is_a 说明 VectorDatabase 满足 MemoryStore 的持久化设施身份；hosts 说明它承载某个 VectorIndex；stores 说明 IndexEntry 持有某个 Representation。设施分类、索引承载与条目存储是三条不同事实。
-    en: is_a states that VectorDatabase satisfies persistent MemoryStore facility identity; hosts states that it carries a VectorIndex; stores states that an IndexEntry holds a Representation. Facility classification, index hosting, and entry storage are distinct facts.
-    ja: is_a は VectorDatabase が persistent MemoryStore facility identity を満たすこと、hosts は VectorIndex の収容、stores は IndexEntry の Representation 保持を示し、三 fact は異なります。
+    zh: is_a 说明 VectorDatabase 满足 MemoryStore 身份；hosts 说明它承载 VectorIndex；索引 entry 存储归 embedding-indexes 模块。
+    en: is_a states VectorDatabase satisfies MemoryStore identity; hosts states it carries VectorIndex; index entry storage belongs to embedding-indexes module.
+    ja: is_a は MemoryStore identity、hosts は VectorIndex 収容、entry 保存は embedding-indexes module。
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations:
   - id: VectorDatabase-hosts-VectorIndex
@@ -270,171 +297,89 @@ relations:
     labels:
       zh: 托管索引
       en: hosts index
-      ja: indexをhostする
+      ja: index を host する
     definitions:
       zh: VectorDatabase —hosts→ VectorIndex 表示数据库服务为该逻辑向量索引提供持久化、管理与查询端点。
-      en: VectorDatabase —hosts→ VectorIndex means that the database service provides persistence, management, and query endpoints for that logical vector index.
-      ja: VectorDatabase —hosts→ VectorIndex はdatabase serviceがlogical vector indexへ永続化・管理・query endpointを提供することを表します。
+      en: VectorDatabase —hosts→ VectorIndex means the database service provides persistence, management, and query endpoints for that logical vector index.
+      ja: database service が logical vector index へ永続化・管理・query endpoint を提供する。
     cardinality: null
     cardinality_not_applicable_reason:
       zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
       en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
-      ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
+      ja: fact 単位制約で schema 層一律 cardinality を課さない。
     inverse_reading:
-      predicate: inverse_hosts
-      labels:
-        zh: 反向读取
-        en: inverse reading
-        ja: 逆方向読取
+      predicate: hosted_by
+      labels: {zh: 反向：hosts, en: hosted by, ja: 逆方向：hosts}
     conditions:
-      - id: VectorDatabase-hosts-VectorIndex-condition-manual-001
+      - id: VectorDatabase-hosts-VectorIndex-condition
         severity: error
         expression_language: plain
-        expression: Assert only when the index's database identity or endpoint resolves to that service instance.
-        explanations:
+        expression: Assert only when the index database_id or endpoint resolves to that service instance
+        explanation:
           zh: 仅当索引的 database_id/endpoint 解析到该服务实例时成立。
-          en: Assert only when the index's database identity or endpoint resolves to that service instance.
-          ja: indexのdatabase identity/endpointがそのservice instanceへ解決する時だけ成立します。
-        source_claims:
-          - claim-vector-database-008
+          en: Assert only when the index database_id or endpoint resolves to that service instance.
+          ja: index の database_id/endpoint が当該 service instance に解決する時のみ成立。
+        source_claims: [claim-vector-database-design]
     temporal_scope: timeless
     boundary_context: null
     constraints: []
-    examples:
-      - id: VectorDatabase-hosts-VectorIndex-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: 托管索引正例
-          en: "Positive case: hosts index"
-          ja: indexをhostする正例
-        scenario_id: null
-        descriptions:
-          zh: vectordb-prod 的管理接口列出 vector-index-17。
-          en: vectordb-prod's management interface lists vector-index-17.
-          ja: vectordb-prod の管理interfaceが vector-index-17を列挙します。
-        field_values: {}
-        related_node_ids:
-          - VectorDatabase
-          - VectorIndex
-        related_relation_ids:
-          - VectorDatabase-hosts-VectorIndex
-        expected_result:
-          zh: 建立 vectordb-prod hosts vector-index-17 的跨域部署事实。
-          en: Assert the cross-domain deployment fact that vectordb-prod hosts vector-index-17.
-          ja: vectordb-prod hosts vector-index-17 という cross-domain deployment fact を確立します。
-        why_valid_or_invalid:
-          zh: 管理端点在该服务身份下列出索引，并允许其创建、更新、查询与删除生命周期操作。
-          en: The management endpoint lists the index under this service identity and exposes its create, update, query, and delete lifecycle operations.
-          ja: management endpoint がこの service identity 配下に index を列挙し、create・update・query・delete lifecycle operation を提供します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-vector-database-008
-      - id: VectorDatabase-hosts-VectorIndex-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: 托管索引边界例
-          en: "Boundary case: hosts index"
-          ja: indexをhostする境界例
-        scenario_id: null
-        descriptions:
-          zh: 另一个集群只缓存查询结果，不能被认作托管 vector-index-17。
-          en: Another cluster that only caches query results does not host vector-index-17.
-          ja: query結果だけcacheする別clusterは vector-index-17をhostしません。
-        field_values: {}
-        related_node_ids:
-          - VectorDatabase
-          - VectorIndex
-        related_relation_ids:
-          - VectorDatabase-hosts-VectorIndex
-        expected_result:
-          zh: 不把只缓存查询结果的集群标注为 vector-index-17 的宿主。
-          en: Do not mark the result-cache cluster as the host of vector-index-17.
-          ja: query-result cache cluster を vector-index-17 の host として記録しません。
-        why_valid_or_invalid:
-          zh: 使用结果不等于拥有索引生命周期。
-          en: Using results is not ownership of index lifecycle.
-          ja: 結果利用はindex lifecycle所有ではありません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-vector-database-008
-    source_claims:
-      - claim-vector-database-008
+    examples: []
+    source_claims: [claim-vector-database-design]
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:VectorIndex
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-lifecycle-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 该节点仅完成了从现行候选数据到唯一 YAML 树的无损转录；尚未逐项完成人工语义核验，不得据此宣称已审定。
-    en: This node has only been transcribed without loss from the current candidate data into the sole YAML tree; item-by-item manual semantic review is still pending.
-    ja: このノードは現行候補データから唯一の YAML ツリーへ欠落なく転記した段階であり、項目別の手動意味審査は未完了です。
-  sections:
-    semantics: pending
-    hierarchy: pending
-    relations: pending
-    structure: pending
-    examples: pending
-    source_claims: []
+sources:
+  - id: src-pinecone-vdb
+    title: Pinecone Documentation
+    publisher: Pinecone
+    url: https://docs.pinecone.io
+    source_type: official-doc
+    relevance: Managed vector index upsert, query, namespaces.
+  - id: src-chroma-vdb
+    title: Chroma Documentation
+    publisher: Chroma
+    url: https://docs.trychroma.com
+    source_type: official-doc
+    relevance: HttpClient collections and vector query.
+  - id: src-qdrant-vdb
+    title: Qdrant Documentation
+    publisher: Qdrant
+    url: https://qdrant.tech/documentation/
+    source_type: official-doc
+    relevance: Collections, points, and vector search API.
+  - id: src-weaviate-vdb
+    title: Weaviate Documentation
+    publisher: Weaviate
+    url: https://weaviate.io/developers/weaviate
+    source_type: official-doc
+    relevance: Schema-backed vector collections and query.
+  - id: src-vector-database-design
+    title: Moonweave VectorDatabase design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: MemoryStore subtype hosting VectorIndex without owning index internals.
 source_claims:
-  - id: claim-vector-database-001
-    source: eng-vector-qdrant-data-model
-    supports: Qdrant documents the database service, collections, points, vectors, payload, storage, sharding, and query operations.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
+  - id: claim-vector-database-pinecone
+    source: src-pinecone-vdb
+    supports: Pinecone provides a managed vector index service with host endpoint, namespace upsert/query, and index lifecycle operations mappable to VectorDatabase.
+    locator: Indexes and namespaces guides
+    evidence_kind: primary-doc
+    confidence: high
+  - id: claim-vector-database-chroma
+    source: src-chroma-vdb
+    supports: Chroma HttpClient exposes collection-based vector persistence and similarity query as a deployable storage service.
+    locator: Collections and query API
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-vector-database-qdrant
+    source: src-qdrant-vdb
+    supports: Qdrant clusters expose collection and point APIs for vector persistence and search suitable for VectorDatabase mapping.
+    locator: Collections and points concepts
+    evidence_kind: primary-doc
+    confidence: high
+  - id: claim-vector-database-design
+    source: src-vector-database-design
+    supports: Moonweave VectorDatabase is a MemoryStore subtype that hosts VectorIndex logical structures without collapsing index configuration into the database type.
+    locator: VectorDatabase facility boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-vector-database-002
-    source: eng-vector-qdrant-data-model
-    supports: VectorDatabase.database_id records the hosted vector-store service identity; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-vector-database-003
-    source: eng-vector-qdrant-data-model
-    supports: VectorDatabase.endpoint records operational access to the database service; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-vector-database-004
-    source: eng-vector-qdrant-data-model
-    supports: VectorDatabase.engine_version records audit of engine capabilities and compatibility; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-vector-database-005
-    source: eng-vector-qdrant-data-model
-    supports: Qdrant exposes collections, storage, indexing, updates, and search through a database service.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-vector-database-006
-    source: eng-vector-qdrant-data-model
-    supports: Qdrant separates service deployment from named collections and their points.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-vector-database-007
-    source: eng-vector-qdrant-data-model
-    supports: Qdrant documents persistent collections, points, payload, storage, indexing, and search services.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-vector-database-008
-    source: eng-vector-qdrant-data-model
-    supports: Qdrant database services manage named collections, points, storage, and indexing.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

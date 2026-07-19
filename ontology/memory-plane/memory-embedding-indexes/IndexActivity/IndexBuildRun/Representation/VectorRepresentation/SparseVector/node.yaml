@@ -1,331 +1,261 @@
 schema: moonweave.ai/ontology-node/v1
 id: SparseVector
 kind: concept
-status: accepted
 labels:
   zh: 稀疏向量
   en: Sparse vector
-  ja: 疎ベクトル
+  ja: sparse vector
 semantics:
   short_definition:
-    zh: 只显式保存非零维度索引与权重的向量。
-    en: A vector explicitly storing only non-zero indices and weights.
-    ja: 非zero次元indexとweightだけを明示保存するvectorです。
+    zh: "indices+values 形式的 sparse VectorRepresentation。"
+    en: Sparse VectorRepresentation as indices and values pairs.
+    ja: "indices+values 形式の sparse VectorRepresentation。"
   definition:
-    zh: SparseVector 是用对齐 indices 与 values 表达少量非零特征、其余维度隐含为零的 VectorRepresentation；它不是倒排索引容器。
-    en: SparseVector is a VectorRepresentation using aligned indices and values for a small set of non-zero features while remaining dimensions are implicit zero; it is not an inverted-index container.
-    ja: SparseVector は少数非zero featureを整列indices/valuesで表し残り次元を暗黙zeroとする VectorRepresentation で、inverted-index containerではありません。
+    zh: "SparseVector 是 VectorRepresentation 子类，以 indices+values 对存储 BM25、SPLADE 或 Pinecone sparse_values 输出。TfIdfIndex 与 HybridIndex sparse 通道写入此格式；不是 float[] DenseVector。"
+    en: "SparseVector is a VectorRepresentation subtype storing BM25, SPLADE, or Pinecone sparse_values output as indices-and-values pairs. TfIdfIndex and HybridIndex sparse channels write this format—not float[] DenseVector."
+    ja: "SparseVector は BM25/SPLADE/Pinecone sparse_values を indices+values 対で存储する VectorRepresentation subtype。TfIdfIndex/HybridIndex sparse channel 用。float[] DenseVector ではない。"
   why_needed:
-    zh: 把单条稀疏表示与跨记录 TF-IDF 索引分开。
-    en: Separates a per-item sparse representation from a cross-record TF-IDF index.
-    ja: item単位sparse表現を記録横断TF-IDF indexから分離します。
+    zh: lexical 检索用词项 ID 与权重稀疏表示，维度语义是 vocabulary index 而非 fixed 1536 cosine space。
+    en: Lexical retrieval uses term IDs and weights sparsely; dimension semantics are vocabulary indices not fixed 1536 cosine space.
+    ja: lexical 检索は語 ID+weight 稀疏表現。次元意味は vocab index で fixed 1536 cosine space ではない。
   includes:
-    - zh: 纳入非零 indices/values、最大维数和编码版本。
-      en: Includes non-zero indices/values, maximum dimension, and encoder version.
-      ja: 非zero indices/values・最大次元・encoder版を含みます。
+    - zh: 纳入 BM25、SPLADE 与 Pinecone sparse_values upsert 格式。
+      en: Includes BM25, SPLADE, and Pinecone sparse_values upsert format.
+      ja: BM25/SPLADE/Pinecone sparse_values upsert 形式。
   excludes:
-    - zh: 排除完整 dense 数组和索引容器。
-      en: Excludes full dense arrays and index containers.
-      ja: 完全dense配列とindex containerを除外します。
+    - zh: 排除 DenseVector float[] 与 EmbeddingRun 产出的 semantic dense 向量。
+      en: Excludes DenseVector float[] and semantic dense vectors from EmbeddingRun.
+      ja: DenseVector float[]/EmbeddingRun semantic dense vector を除外。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: Pinecone upsert sparse_values={"indices":[...],"values":[...]} 映射 SparseVector；HybridIndex query 同时传 dense values 与 sparse_values；indices 长度必须等于 values 长度。
+    en: Pinecone upsert sparse_values={"indices":[...],"values":[...]} maps to SparseVector; HybridIndex query passes dense values and sparse_values together; indices length must equal values length.
+    ja: Pinecone sparse_values→SparseVector。Hybrid query で dense+sparse 同時。indices/values 長一致。
+  typical_input:
+    - description: BM25/SPLADE sparse output
+      format: |
+        {"indices": [10, 45, 892, 1204], "values": [0.82, 0.51, 0.33, 0.19]}
+      source_claims: [claim-sparse-vector-bm25]
+    - description: Pinecone sparse_values upsert
+      format: |
+        {"id": "chunk-17", "sparse_values": {"indices": [10, 45], "values": [0.8, 0.5]}}
+      source_claims: [claim-sparse-vector-pinecone]
+  typical_output:
+    - description: Sparse vector record
+      format: |
+        {
+          "representation_id": "repr-sparse-17",
+          "nonzero_count": 4,
+          "values_digest_sha256": "b2c3d4..."
+        }
+      source_claims: [claim-sparse-vector-design]
+  reference_implementations:
+    - name: Pinecone Sparse Vectors
+      url: https://docs.pinecone.io/guides/data/import-sparse-vectors
+      description: sparse_values indices and values.
+    - name: Pinecone Hybrid Search
+      url: https://docs.pinecone.io/guides/search/hybrid-search
+      description: Combined dense and sparse query.
 structure:
-  identity_keys:
-    - vector_id
+  identity_keys: [representation_id]
   fields:
-    - id: vector_id
-      labels:
-        zh: 向量标识
-        en: vector ID
-        ja: vector ID
+    - id: representation_id
+      labels: {zh: 表示标识, en: Representation identifier, ja: representation 識別子}
+      definitions:
+        zh: 继承 VectorRepresentation.representation_id。
+        en: Inherits VectorRepresentation.representation_id.
+        ja: VectorRepresentation.representation_id 継承。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 稳定标识稀疏向量。
-        en: Stable identifier for the sparse vector.
-        ja: sparse vectorの安定識別子です。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
-      example_value: sparse-17
-      source_claims:
-        - claim-sparse-vector-002
+      example_value: repr-sparse-17
+      allowed_values: []
+      source_claims: [claim-sparse-vector-id]
     - id: nonzero_count
-      labels:
-        zh: 非零项数
-        en: non-zero count
-        ja: 非zero項数
+      labels: {zh: 非零项数, en: Nonzero count, ja: 非零項数}
+      definitions:
+        zh: indices/values 对齐后的非零维度数量。
+        en: Count of nonzero dimensions after indices/values alignment.
+        ja: indices/values 整列後の非零次元数。
       datatype: integer
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 对齐 indices/values 的数量。
-        en: Number of aligned indices/values pairs.
-        ja: 整列indices/values対の数です。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
-      example_value: 42
-      source_claims:
-        - claim-sparse-vector-003
-    - id: maximum_dimension
-      labels:
-        zh: 最大维数
-        en: maximum dimension
-        ja: 最大次元
-      datatype: integer
+      example_value: 4
+      allowed_values: []
+      source_claims: [claim-sparse-vector-design]
+    - id: values_digest_sha256
+      labels: {zh: 稀疏值摘要, en: Sparse values digest, ja: sparse values digest}
+      definitions:
+        zh: 序列化 {indices, values} 的 SHA-256。
+        en: SHA-256 of serialized {indices, values}.
+        ja: シリアライズ {indices,values} SHA-256。
+      datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 声明坐标空间上界。
-        en: Declares the coordinate-space upper bound.
-        ja: 座標空間の上限を宣言します。
+      cardinality: {min: 1, max: 1}
+      pattern: '^[a-f0-9]{64}$'
+      example_value: b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef12345678
       allowed_values: []
-      pattern: null
-      example_value: 30522
-      source_claims:
-        - claim-sparse-vector-004
-  constraints: []
-  required_relation_constraints: []
+      source_claims: [claim-sparse-vector-design]
+  constraints:
+    - id: sparse-indices-values-aligned
+      severity: error
+      expression_language: plain
+      expression: indices.length must equal values.length.
+      explanation:
+        zh: 不对齐的稀疏向量无法 upsert。
+        en: Misaligned sparse vectors cannot upsert.
+        ja: 未整列 sparse vector は upsert 不可。
+      source_claims: [claim-sparse-vector-pinecone]
+  required_relations: []
 examples:
-  - id: SparseVector-example-positive-manual-001
-    kind: positive
+  - id: SparseVector-example-bm25
     labels:
-      zh: 稀疏向量正例
-      en: "Positive case: Sparse vector"
-      ja: 疎ベクトル正例
-    scenario_id: null
+      zh: BM25 稀疏向量
+      en: BM25 sparse vector
+      ja: BM25 sparse vector
     descriptions:
-      zh: sparse-17 保存 42 个对齐坐标对，最大维数 30522。
-      en: sparse-17 stores 42 aligned coordinate pairs with maximum dimension 30522.
-      ja: sparse-17 は42個の整列座標対と最大次元30522を保存します。
+      zh: chunk-17 经 BM25 编码 repr-sparse-17 {indices:[10,45,892], values:[0.8,0.5,0.3]}，写入 hybrid-index-17 sparse 通道。
+      en: chunk-17 BM25-encoded repr-sparse-17 {indices:[10,45,892], values:[0.8,0.5,0.3]} writes to hybrid-index-17 sparse channel.
+      ja: chunk-17 BM25→repr-sparse-17→hybrid-index-17 sparse channel。
+    example_source:
+      product: Pinecone
+      url: https://docs.pinecone.io/guides/data/import-sparse-vectors
+      version: sparse_values
     field_values:
-      vector_id: sparse-17
-      nonzero_count: 42
-      maximum_dimension: 30522
-      dimensions: 30522
-      encoding: sparse-index-value
       representation_id: repr-sparse-17
-      source_digest: sha256:source-sparse-17
-      method_profile: vocabulary-30522:v1
+      nonzero_count: 3
     related_node_ids:
       - SparseVector
+      - TfIdfIndex
+      - HybridIndex
     related_relation_ids: []
-    expected_result:
-      zh: 把该对象归入 SparseVector。
-      en: Classify the object as SparseVector.
-      ja: この対象を SparseVector に分類します。
-    why_valid_or_invalid:
-      zh: 非零坐标显式、隐含零值和范围均明确。
-      en: Explicit non-zero coordinates, implicit zeros, and bounds are all clear.
-      ja: 明示非zero座標・暗黙zero・範囲が明確です。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-sparse-vector-005
-  - id: SparseVector-example-boundary-manual-001
-    kind: boundary
+      - claim-sparse-vector-bm25
+      - claim-sparse-vector-design
+  - id: SparseVector-example-splade
     labels:
-      zh: 稀疏向量边界例
-      en: "Boundary case: Sparse vector"
-      ja: 疎ベクトル境界例
-    scenario_id: null
+      zh: SPLADE 学习稀疏向量
+      en: SPLADE learned sparse vector
+      ja: SPLADE learned sparse vector
     descriptions:
-      zh: tfidf-7 管理整套词表、IDF 与文档矩阵。
-      en: tfidf-7 manages a vocabulary, IDF values, and a document matrix.
-      ja: tfidf-7 は語彙・IDF値・document matrix全体を管理します。
+      zh: SPLADE 扩展词项产出 learned sparse {indices, values}，nonzero_count 通常大于 BM25 但仍是 SparseVector 非 dense。
+      en: SPLADE term expansion produces learned sparse {indices, values}; nonzero_count often exceeds BM25 but remains SparseVector not dense.
+      ja: SPLADE→learned sparse {indices,values}。nonzero_count>BM25 も SparseVector。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: SPLADE mapping
+    field_values:
+      representation_id: repr-splade-17
+      nonzero_count: 48
+    related_node_ids:
+      - SparseVector
+      - TfIdfIndex
+    related_relation_ids: []
+    source_claims:
+      - claim-sparse-vector-design
+  - id: SparseVector-example-not-dense
+    labels:
+      zh: sparse 非 dense float[]
+      en: Sparse is not dense float array
+      ja: sparse は dense float[] ではない
+    descriptions:
+      zh: emb-17 float[1536] 是 DenseVector；{indices,values} 才是 SparseVector，不可互替 upsert 字段。
+      en: emb-17 float[1536] is DenseVector; {indices,values} is SparseVector—upsert fields are not interchangeable.
+      ja: emb-17 float[1536]=DenseVector。{indices,values}=SparseVector。upsert field 置換不可。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
     field_values: {}
     related_node_ids:
       - SparseVector
+      - DenseVector
     related_relation_ids: []
-    expected_result:
-      zh: 不得把该对象归入 SparseVector。
-      en: Do not classify the object as SparseVector.
-      ja: この対象を SparseVector に分類しません。
-    why_valid_or_invalid:
-      zh: 跨文档检索结构不是单条输入的坐标产物。
-      en: A cross-document retrieval structure is not one input's coordinate artifact.
-      ja: 文書横断検索構造は一入力の座標成果物ではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-sparse-vector-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-sparse-vector-design
 parent_relation:
   id: SparseVector-is_a-VectorRepresentation
   predicate: is_a
   direction: target-to-source
   relation_kind: hierarchy
   labels:
-    zh: 是一种
-    en: is a
-    ja: の一種である
+    zh: 是一种向量表示
+    en: is a vector representation
+    ja: ベクトル表現の一種
   definitions:
-    zh: SparseVector 是 VectorRepresentation 的严格子类；种差为：仅显式存储对齐的非零 indices/values，其余维度隐含为零。
-    en: "SparseVector is a strict subtype of VectorRepresentation; its reviewed differentia is: only aligned non-zero indices/values are explicit while remaining dimensions are implicit zero."
-    ja: SparseVector は VectorRepresentation の厳密なsubtypeで、審査済み種差は「整列非zero indices/valuesだけを明示し残り次元は暗黙zeroです。」です。
+    zh: SparseVector —is_a→ VectorRepresentation 因为 vector_kind=sparse 且存储 {indices, values}。
+    en: SparseVector —is_a→ VectorRepresentation because vector_kind=sparse and stores {indices, values}.
+    ja: SparseVector —is_a→ VectorRepresentation は vector_kind=sparse+{indices,values} のため。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
-    en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
-    ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
+    zh: 该关系按单个可审计事实判定。
+    en: The relation is decided per auditable fact.
+    ja: audit 可能 fact 単位で判定。
   inverse_reading:
     predicate: part_of
-    labels:
-      zh: 反向读取
-      en: inverse reading
-      ja: 逆方向読取
+    labels: {zh: 反向读取, en: inverse is_a, ja: 逆方向読取}
   conditions:
-    - id: SparseVector-is_a-VectorRepresentation-condition-manual-001
+    - id: SparseVector-is_a-VectorRepresentation-condition-001
       severity: error
       expression_language: plain
-      expression: "Assert only when the object first satisfies VectorRepresentation and also satisfies the differentia: only aligned non-zero indices/values are explicit while remaining dimensions are implicit zero."
+      expression: Assert only when storage is aligned indices and values pairs.
       explanations:
-        zh: 仅当对象首先满足 VectorRepresentation 定义且满足种差“仅显式存储对齐的非零 indices/values，其余维度隐含为零。”时成立。
-        en: "Assert only when the object first satisfies VectorRepresentation and also satisfies the differentia: only aligned non-zero indices/values are explicit while remaining dimensions are implicit zero."
-        ja: 対象がまず VectorRepresentation を満たし、さらに種差「整列非zero indices/valuesだけを明示し残り次元は暗黙zeroです。」を満たす時だけ成立します。
-      source_claims:
-        - claim-sparse-vector-007
+        zh: 仅当稀疏对存储时成立。
+        en: Assert only for sparse pair storage.
+        ja: sparse pair 存储時のみ assert。
+      source_claims: [claim-sparse-vector-design]
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: SparseVector-is_a-VectorRepresentation-example-positive-manual-001
-      kind: positive
-      labels:
-        zh: 是一种正例
-        en: "Positive case: is a"
-        ja: の一種である正例
-      scenario_id: null
-      descriptions:
-        zh: sparse-17 在最大维数 30522 中只显式保存 42 个对齐的 index/value 非零对。
-        en: sparse-17 explicitly stores only 42 aligned non-zero index/value pairs within a maximum dimension of 30,522.
-        ja: sparse-17 は最大次元 30,522 のうち、42 個の整列した非zero index/value対だけを明示保存します。
-      field_values: {}
-      related_node_ids:
-        - SparseVector
-        - VectorRepresentation
-      related_relation_ids:
-        - SparseVector-is_a-VectorRepresentation
-      expected_result:
-        zh: 确认 sparse-17 是 SparseVector，并继承 VectorRepresentation 身份。
-        en: Confirm sparse-17 as a SparseVector and inherit VectorRepresentation identity.
-        ja: sparse-17 を SparseVector と確認し、VectorRepresentation 同一性を継承します。
-      why_valid_or_invalid:
-        zh: 它具有数值坐标表示身份，同时满足未列维度隐含为零的稀疏种差。
-        en: It is a numeric-coordinate representation and also satisfies the sparse differentia that omitted dimensions are implicitly zero.
-        ja: 数値座標表現であり、未記載次元を暗黙zeroとするsparse種差も満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-sparse-vector-007
-    - id: SparseVector-is_a-VectorRepresentation-example-boundary-manual-001
-      kind: boundary
-      labels:
-        zh: 是一种边界例
-        en: "Boundary case: is a"
-        ja: の一種である境界例
-      scenario_id: null
-      descriptions:
-        zh: 固定长度 dense-17 没有稀疏坐标种差。
-        en: fixed-length dense-17 lacks the sparse-coordinate differentia.
-        ja: 固定長 dense-17 はsparse座標種差を持ちません。
-      field_values: {}
-      related_node_ids:
-        - SparseVector
-        - VectorRepresentation
-      related_relation_ids:
-        - SparseVector-is_a-VectorRepresentation
-      expected_result:
-        zh: 将 dense-17 保持为 DenseVector，不赋予 SparseVector 子类成员身份。
-        en: Keep dense-17 as a DenseVector and do not assign SparseVector subtype membership.
-        ja: dense-17 を DenseVector に留め、SparseVector subtype membership を付与しません。
-      why_valid_or_invalid:
-        zh: dense-17 为每个维度保留固定位置，没有 indices/values 非零对或未列维度隐含为零的语义。
-        en: dense-17 reserves a fixed slot for every dimension and has neither non-zero indices/values pairs nor implicit-zero semantics for omitted dimensions.
-        ja: dense-17 は全次元に固定 slot を持ち、非 zero indices/values 対も省略次元の implicit-zero semantics もありません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-sparse-vector-007
-  source_claims:
-    - claim-sparse-vector-007
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: pending
+  examples: []
+  source_claims: [claim-sparse-vector-design]
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-pinecone-sparse
+    title: Pinecone Sparse Vectors
+    publisher: Pinecone
+    url: https://docs.pinecone.io/guides/data/import-sparse-vectors
+    source_type: official-doc
+    relevance: sparse_values indices and values format.
+  - id: src-pinecone-hybrid
+    title: Pinecone Hybrid Search
+    publisher: Pinecone
+    url: https://docs.pinecone.io/guides/search/hybrid-search
+    source_type: official-doc
+    relevance: Dense and sparse combined upsert and query.
+  - id: src-sparse-vector-design
+    title: Moonweave memory-embedding-indexes module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: SparseVector versus DenseVector boundary.
 source_claims:
-  - id: claim-sparse-vector-001
-    source: eng-vector-pinecone-indexing
-    supports: Pinecone defines sparse vectors as explicit non-zero indices and values produced by sparse encoders.
-    locator: Indexing overview > Indexes, dense and sparse vectors, namespaces, vector embedding, import, upsert, and metadata
+  - id: claim-sparse-vector-bm25
+    source: src-pinecone-sparse
+    supports: BM25-style lexical weights map to sparse indices and values arrays for Pinecone upsert.
+    locator: Sparse vector format
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-sparse-vector-002
-    source: eng-vector-pinecone-indexing
-    supports: SparseVector.vector_id records the addressable sparse vector; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: Indexing overview > Indexes, dense and sparse vectors, namespaces, vector embedding, import, upsert, and metadata
+  - id: claim-sparse-vector-pinecone
+    source: src-pinecone-sparse
+    supports: Pinecone sparse_values require aligned indices and values arrays.
+    locator: Import sparse vectors
+    evidence_kind: primary-doc
+    confidence: high
+  - id: claim-sparse-vector-design
+    source: src-sparse-vector-design
+    supports: SparseVector stores {indices, values} distinct from DenseVector float arrays.
+    locator: SparseVector boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-sparse-vector-003
-    source: eng-vector-pinecone-indexing
-    supports: SparseVector.nonzero_count records explicit sparse-coordinate count; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: Indexing overview > Indexes, dense and sparse vectors, namespaces, vector embedding, import, upsert, and metadata
+  - id: claim-sparse-vector-id
+    source: src-sparse-vector-design
+    supports: representation_id identifies sparse vector instance.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-sparse-vector-004
-    source: eng-vector-pinecone-indexing
-    supports: SparseVector.maximum_dimension records valid sparse index bounds; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: Indexing overview > Indexes, dense and sparse vectors, namespaces, vector embedding, import, upsert, and metadata
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-sparse-vector-005
-    source: eng-vector-pinecone-indexing
-    supports: Pinecone represents sparse vectors as indices and corresponding weights.
-    locator: Indexing overview > Indexes, dense and sparse vectors, namespaces, vector embedding, import, upsert, and metadata
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-sparse-vector-006
-    source: eng-vector-pinecone-indexing
-    supports: Pinecone separates per-record sparse vectors from the index storing records.
-    locator: Indexing overview > Indexes, dense and sparse vectors, namespaces, vector embedding, import, upsert, and metadata
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-sparse-vector-007
-    source: eng-vector-pinecone-indexing
-    supports: Pinecone explicitly distinguishes sparse index-weight pairs from dense fixed-length vectors.
-    locator: Indexing overview > Indexes, dense and sparse vectors, namespaces, vector embedding, import, upsert, and metadata
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

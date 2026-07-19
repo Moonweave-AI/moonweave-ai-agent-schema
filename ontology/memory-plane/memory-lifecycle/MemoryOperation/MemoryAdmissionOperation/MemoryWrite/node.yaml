@@ -1,222 +1,209 @@
 schema: moonweave.ai/ontology-node/v1
 id: MemoryWrite
 kind: concept
-status: accepted
 labels:
   zh: 记忆写入
   en: Memory write
   ja: 記憶書込
 semantics:
   short_definition:
-    zh: 接受一个候选项并创建其首个持久 MemoryRecord 的准入操作。
-    en: An admission operation accepting a candidate and creating its first persistent MemoryRecord.
-    ja: candidateを受入れ最初のpersistent MemoryRecordを作るadmission operationです。
+    zh: 接受候选项并创建首个持久记录的准入写入。
+    en: Admission write creating the first persistent record from a candidate.
+    ja: 候補から初回 persistent record を作る admission write。
   definition:
-    zh: MemoryWrite 是 MemoryAdmissionOperation：它消费一个尚无持久记录身份的 MemoryItem，并在策略允许时产生初始 MemoryRecord；对既有记录生成新版本属于 MemoryUpdate。
-    en: MemoryWrite is a MemoryAdmissionOperation that consumes a MemoryItem without a persistent-record identity and, when policy permits, produces an initial MemoryRecord. Producing a new version of an existing record is MemoryUpdate instead.
-    ja: MemoryWrite はpersistent-record identityをまだ持たない MemoryItemを消費しpolicy許可時にinitial MemoryRecordを生成する MemoryAdmissionOperationです。既存recordの新版生成はMemoryUpdateです。
+    zh: MemoryWrite 是 MemoryAdmissionOperation：消费尚无持久身份的 MemoryItem，在策略允许时产生初始 MemoryRecord。Mem0 POST /v1/memories/ 与 Letta archival_memory_insert 是典型映射；对既有记录生成新版本属于 MemoryUpdate。
+    en: MemoryWrite is a MemoryAdmissionOperation consuming a MemoryItem without persistent identity and, when policy permits, producing an initial MemoryRecord. Mem0 POST /v1/memories/ and Letta archival_memory_insert are typical mappings; producing a new version of an existing record is MemoryUpdate instead.
+    ja: MemoryWrite は persistent identity を持たない MemoryItem を consume し initial MemoryRecord を生成する MemoryAdmissionOperation。Mem0 POST /v1/memories/ と Letta archival_memory_insert が典型写像。既存 record の新版は MemoryUpdate。
   why_needed:
-    zh: 明确初始写入与后续修订的版本边界。
-    en: Makes the version boundary between initial persistence and later revision explicit.
-    ja: initial persistと後続revisionの版境界を明示します。
+    zh: 初始写入与后续修订若混用 upsert 语义，版本谱系与合规删除将无法审计。
+    en: If initial writes share upsert semantics with revisions, version lineage and compliant deletion become unauditable.
+    ja: initial write と revision が upsert 共有すると version lineage と compliant delete が監査不能。
   includes:
-    - zh: 纳入从消息、工具结果、偏好或经验候选项创建首条记录。
-      en: Includes creating the first record from a message, tool result, preference, or experience candidate.
-      ja: message・tool result・preference・experience候補からfirst recordを作ることを含みます。
+    - zh: 纳入从消息、工具结果或偏好候选项创建首条 MemoryRecord。
+      en: Includes creating the first MemoryRecord from message, tool-result, or preference candidates.
+      ja: message/tool result/preference 候補から初回 MemoryRecord 作成。
   excludes:
-    - zh: 排除覆盖既有记录、仅缓存临时值或只提出候选项而未提交。
-      en: Excludes overwriting an existing record, merely caching a transient value, or proposing without committing a candidate.
-      ja: 既存record上書き・一時valueのcacheのみ・commitなしの候補提案を除外します。
+    - zh: 排除覆盖既有记录、原地 upsert 与仅缓存未提交预览。
+      en: Excludes overwriting existing records, in-place upsert, and uncommitted preview cache.
+      ja: 既存 record 上書き・in-place upsert・未 commit preview cache を除外。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: 映射 Mem0 POST /v1/memories/（messages、user_id/agent_id、metadata）与 Letta archival_memory_insert；成功响应 memory_id/passage_id 写入 output_record_id，operation 本身保留 write_operation_id。
+    en: Map Mem0 POST /v1/memories/ (messages, user_id/agent_id, metadata) and Letta archival_memory_insert; successful memory_id/passage_id becomes output_record_id while write_operation_id identifies the activity.
+    ja: Mem0 POST /v1/memories/ と Letta archival_memory_insert を写像。memory_id/passage_id は output_record_id、activity は write_operation_id。
+  typical_input:
+    - description: Mem0 add memory
+      format: |
+        POST https://api.mem0.ai/v1/memories/
+        {
+          "messages": [{"role": "user", "content": "Prefers TypeScript."}],
+          "user_id": "alice",
+          "metadata": {"category": "preferences"}
+        }
+      source_claims: [claim-memory-write-mem0]
+    - description: Letta archival insert
+      format: |
+        archival_memory_insert(
+          content="JWT refresh tokens rotate every 15 minutes.",
+          tags=["security", "api"]
+        )
+      source_claims: [claim-memory-write-letta]
+  typical_output:
+    - description: Initial record identity
+      format: |
+        {
+          "write_operation_id": "write-310",
+          "output_record_id": "record-310-v1",
+          "external_memory_id": "mem0-8f3c2a1b"
+        }
+      source_claims: [claim-memory-write-design]
+  reference_implementations:
+    - name: Mem0 Memory API
+      url: https://docs.mem0.ai
+      description: POST /v1/memories/ adds memories from conversation messages.
+    - name: Letta Archival Memory
+      url: https://docs.letta.com/guides/core-concepts/memory/archival-memory
+      description: archival_memory_insert for out-of-window passages.
+    - name: LangGraph Store
+      url: https://langchain-ai.github.io/langgraph/reference/store/
+      description: BaseStore.put creates a new namespace-key Item.
 structure:
-  identity_keys:
-    - write_operation_id
+  identity_keys: [write_operation_id]
   fields:
     - id: write_operation_id
-      labels:
-        zh: 写入操作标识
-        en: write operation ID
-        ja: write operation ID
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
+      labels: {zh: 写入操作标识, en: Write operation identifier, ja: 書込操作識別子}
       definitions:
         zh: 标识一次初始持久化活动。
         en: Identifies one initial persistence activity.
-        ja: 一initial persistence activityを識別します。
-      allowed_values: []
-      pattern: null
-      example_value: write-310
-      source_claims:
-        - claim-memory-write-002
-    - id: output_record_id
-      labels:
-        zh: 输出记录标识
-        en: output record ID
-        ja: output record ID
+        ja: 一 initial persistence activity を識別。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 标识该写入产生的首个 MemoryRecord。
-        en: Identifies the initial MemoryRecord generated by this write.
-        ja: このwriteが生成したinitial MemoryRecordを識別します。
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: write-310
       allowed_values: []
+      source_claims: [claim-memory-write-id]
+    - id: output_record_id
+      labels: {zh: 输出记录标识, en: Output record identifier, ja: 出力 record 識別子}
+      definitions:
+        zh: 该写入产生的首个 MemoryRecord 身份。
+        en: Identity of the initial MemoryRecord produced by this write.
+        ja: この write が生成した initial MemoryRecord identity。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
       pattern: null
       example_value: record-310-v1
-      source_claims:
-        - claim-memory-write-003
+      allowed_values: []
+      source_claims: [claim-memory-write-output]
+    - id: external_memory_id
+      labels: {zh: 外部记忆标识, en: External memory identifier, ja: 外部記憶識別子}
+      definitions:
+        zh: Mem0 等 API 返回的 memory_id；必须映射到内部 record。
+        en: memory_id returned by Mem0 or similar APIs; must map to internal record.
+        ja: Mem0 等 API が返す memory_id。内部 record へ写像必須。
+      datatype: string
+      required: false
+      cardinality: {min: 0, max: 1}
+      pattern: null
+      example_value: mem0-8f3c2a1b
+      allowed_values: []
+      source_claims: [claim-memory-write-mem0]
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: MemoryWrite-example-positive-manual-001
-    kind: positive
+  - id: MemoryWrite-example-mem0-post
     labels:
-      zh: 记忆写入正例
-      en: "Positive case: Memory write"
-      ja: 記憶書込正例
-    scenario_id: null
+      zh: Mem0 POST 初始写入
+      en: Mem0 POST initial write
+      ja: Mem0 POST 初回書込
     descriptions:
-      zh: memory-op-write-001 消费尚无持久记录身份的 item-310，在策略允许后创建初始记录 record-310-v1，并把它登记到 prefs/theme 键。
-      en: memory-op-write-001 consumes item-310, which has no persistent-record identity, and after policy approval creates initial record-310-v1 under prefs/theme.
-      ja: memory-op-write-001 は永続記録同一性をまだ持たない item-310 を消費し、方針承認後に prefs/theme の初回 record-310-v1 を生成します。
+      zh: write-310 消费 item-310 并调用 Mem0 POST /v1/memories/；返回 mem0-8f3c2a1b，Moonweave 登记 output_record_id=record-310-v1 且无 predecessor。
+      en: write-310 consumes item-310 and calls Mem0 POST /v1/memories/; mem0-8f3c2a1b returns and Moonweave records output_record_id=record-310-v1 with no predecessor.
+      ja: write-310 が item-310 を consume し Mem0 POST。mem0-8f3c2a1b を record-310-v1 へ、predecessor なし。
+    example_source:
+      product: Mem0
+      url: https://docs.mem0.ai
+      version: POST /v1/memories/
     field_values:
-      write_operation_id: memory-op-write-001
+      write_operation_id: write-310
       output_record_id: record-310-v1
-      operation_id: memory-op-write-001
-      reason: an approved tool result is eligible for durable memory
-      admission_operation_id: memory-op-write-001
-      candidate_item_id: item-310
-      started_at: 2026-07-16T13:01:00Z
+      external_memory_id: mem0-8f3c2a1b
     related_node_ids:
       - MemoryWrite
       - MemoryAdmissionOperation
-    related_relation_ids:
-      - MemoryWrite-is_a-MemoryAdmissionOperation
-    expected_result:
-      zh: 归类为 MemoryWrite。
-      en: Classify as MemoryWrite.
-      ja: MemoryWriteに分類します。
-    why_valid_or_invalid:
-      zh: 输入尚无持久身份，输出是该键的初始记录。
-      en: The input has no persistent identity and the output is the initial record for that key.
-      ja: inputにpersistent identityがなくoutputはそのkeyのinitial recordです。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    related_relation_ids: []
     source_claims:
-      - claim-memory-write-004
-  - id: MemoryWrite-example-instance-manual-20260716
-    kind: instance
+      - claim-memory-write-mem0
+      - claim-memory-write-design
+  - id: MemoryWrite-example-letta-insert
     labels:
-      zh: 初始记忆写入实例
-      en: Initial memory-write instance
-      ja: 初回記憶書込みインスタンス
-    scenario_id: MemoryWrite:instance:memory-op-write-001
+      zh: Letta 归档插入
+      en: Letta archival insert
+      ja: Letta アーカイブ insert
     descriptions:
-      zh: memory-op-write-001 消费尚无持久记录身份的 item-310，在策略允许后创建初始记录 record-310-v1，并把它登记到 prefs/theme 键。
-      en: memory-op-write-001 consumes item-310, which has no persistent-record identity, and after policy approval creates initial record-310-v1 under prefs/theme.
-      ja: memory-op-write-001 は永続記録同一性をまだ持たない item-310 を消費し、方針承認後に prefs/theme の初回 record-310-v1 を生成します。
+      zh: write-311 调用 archival_memory_insert 将 API 摘要写入区外归档并登记 record-311-v1。
+      en: write-311 calls archival_memory_insert to store an API summary in archival memory and registers record-311-v1.
+      ja: write-311 が archival_memory_insert で API 要約を archival に保存し record-311-v1 を登録。
+    example_source:
+      product: Letta
+      url: https://docs.letta.com/guides/core-concepts/memory/archival-memory
+      version: archival_memory_insert
     field_values:
-      write_operation_id: memory-op-write-001
-      output_record_id: record-310-v1
-      operation_id: memory-op-write-001
-      reason: an approved tool result is eligible for durable memory
+      write_operation_id: write-311
+      output_record_id: record-311-v1
     related_node_ids:
       - MemoryWrite
-      - MemoryAdmissionOperation
-      - MemoryItem
-      - MemoryRecord
-    related_relation_ids:
-      - MemoryWrite-is_a-MemoryAdmissionOperation
-      - MemoryWrite-consumes-MemoryItem
-      - MemoryWrite-produces-MemoryRecord
-    expected_result:
-      zh: 返回候选、Write 活动和版本 1 的初始 MemoryRecord；不得声称它替代了既有版本。
-      en: Return the candidate, Write activity, and initial version-1 MemoryRecord without claiming that it supersedes an existing version.
-      ja: 候補、Write 活動、初回 version-1 MemoryRecord を返し、既存版の置換とは主張しません。
-    why_valid_or_invalid:
-      zh: 输入没有持久记录身份且输出是首个版本，因此是 Write；若从既有记录产生后继版本才是 Update。
-      en: The input lacks persistent-record identity and the output is the first version, so this is Write; a successor derived from an existing record would be Update.
-      ja: 入力に永続記録同一性がなく出力が初版なので Write であり、既存記録からの後継版なら Update です。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+      - memory-stores-scopes
+    related_relation_ids: []
     source_claims:
-      - claim-memory-write-004
-  - id: MemoryWrite-case-software-defect-repair-09
-    kind: case-fragment
+      - claim-memory-write-letta
+      - claim-memory-write-design
+  - id: MemoryWrite-example-langgraph-put
     labels:
-      zh: 软件缺陷修复结果写入记忆
-      en: Writing a software-defect repair outcome to memory
-      ja: ソフトウェア欠陥修復結果の記憶書込み
-    scenario_id: case-software-defect-repair-09
+      zh: LangGraph 新 Item 写入
+      en: LangGraph new Item write
+      ja: LangGraph 新 Item 書込
     descriptions:
-      zh: 回归评估 eval-defect-MWA-217-regression 验证补丁修复了缺陷且没有引入回归后，memory-op-defect-MWA-217-write 消费该获批候选并创建项目私有的初始记录 memory-defect-MWA-217。
-      en: After regression evaluation eval-defect-MWA-217-regression verifies that the patch repairs the defect without regression, memory-op-defect-MWA-217-write consumes the approved candidate and creates project-private initial record memory-defect-MWA-217.
-      ja: 回帰評価 eval-defect-MWA-217-regression がパッチによる欠陥修復と非回帰を確認した後、memory-op-defect-MWA-217-write は承認済み候補を消費し、プロジェクト非公開の初回記録 memory-defect-MWA-217 を生成します。
+      zh: write-312 对 ("tenant-7","user-42")/response-language 首次 store.put，产生新 record-312-v1。
+      en: write-312 first store.put on ("tenant-7","user-42")/response-language produces record-312-v1.
+      ja: write-312 が namespace key へ初回 store.put し record-312-v1 を生成。
+    example_source:
+      product: LangGraph
+      url: https://langchain-ai.github.io/langgraph/reference/store/
+      version: BaseStore.put
     field_values:
-      operation_id: memory-op-defect-MWA-217-write
-      reason: verified software-defect repair outcome is eligible for durable project memory
-      input_version: 0
-      output_version: 1
-      write_operation_id: memory-op-defect-MWA-217-write
-      output_record_id: memory-defect-MWA-217
+      write_operation_id: write-312
+      output_record_id: record-312-v1
     related_node_ids:
       - MemoryWrite
-      - MemoryAdmissionOperation
-      - MemoryItem
-      - MemoryRecord
-    related_relation_ids:
-      - MemoryWrite-is_a-MemoryAdmissionOperation
-      - MemoryWrite-consumes-MemoryItem
-      - MemoryWrite-produces-MemoryRecord
-    expected_result:
-      zh: 查询返回一次初始 MemoryWrite 和版本 1 的 MemoryRecord，并沿 provenance_ref 回查到通过的回归评估；不存在被覆盖的版本 0 记录。
-      en: The query returns one initial MemoryWrite and a version-1 MemoryRecord traceable through provenance_ref to the passing regression evaluation; no version-0 record was overwritten.
-      ja: 一つの初回 MemoryWrite と version-1 MemoryRecord を返し、provenance_ref から合格回帰評価へ追跡でき、上書きされた version-0 記録はありません。
-    why_valid_or_invalid:
-      zh: 输入是尚无持久身份的已验证候选，输出是首个持久版本，因此属于 Write；后续对该记录的修订才属于 Update。
-      en: The input is a verified candidate without persistent identity and the output is its first durable version, so this is Write; a later revision of that record would be Update.
-      ja: 入力は永続同一性を持たない検証済み候補で、出力は最初の永続版なので Write であり、後続修訂が Update です。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+      - MemoryStore
+    related_relation_ids: []
     source_claims:
-      - claim-memory-write-004
-  - id: MemoryWrite-example-boundary-manual-001
-    kind: boundary
+      - claim-memory-write-langgraph
+      - claim-memory-write-design
+  - id: MemoryWrite-example-not-update
     labels:
-      zh: 记忆写入边界例
-      en: "Boundary case: Memory write"
-      ja: 記憶書込境界例
-    scenario_id: null
+      zh: 写入非更新边界
+      en: Write is not update
+      ja: write は update ではない
     descriptions:
-      zh: write-311 以相同 record_id 原地改写 record-310-v1 的内容。
-      en: write-311 changes record-310-v1 in place under the same record ID.
-      ja: write-311 は同じrecord IDでrecord-310-v1をin-place変更します。
+      zh: upsert-310 读取 record-310-v1 并生成 record-310-v2 带 predecessor_id；这是 MemoryUpdate 而非 MemoryWrite。
+      en: upsert-310 reads record-310-v1 and emits record-310-v2 with predecessor_id; this is MemoryUpdate, not MemoryWrite.
+      ja: upsert-310 は record-310-v1 から v2 を predecessor 付きで生成。MemoryUpdate で MemoryWrite ではない。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
     field_values: {}
     related_node_ids:
       - MemoryWrite
+      - MemoryUpdate
     related_relation_ids: []
-    expected_result:
-      zh: 不得归类为合规 MemoryWrite；应拒绝原地覆盖并改建 MemoryUpdate 后继。
-      en: Do not classify as a conforming MemoryWrite; reject the in-place overwrite and model a MemoryUpdate successor.
-      ja: 適合MemoryWriteに分類せずin-place上書きを拒否しMemoryUpdate successorを作ります。
-    why_valid_or_invalid:
-      zh: 既有持久身份已存在，且原地覆盖破坏版本来历。
-      en: A persistent identity already exists and in-place overwrite destroys version provenance.
-      ja: persistent identityが既にありin-place上書きはversion provenanceを壊します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-memory-write-004
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-memory-write-design
 parent_relation:
   id: MemoryWrite-is_a-MemoryAdmissionOperation
   predicate: is_a
@@ -227,9 +214,9 @@ parent_relation:
     en: is a memory admission operation
     ja: 記憶受入操作の一種
   definitions:
-    zh: MemoryWrite —is_a→ MemoryAdmissionOperation 表示：候选项被接受，并产生该持久键的初始 MemoryRecord。
-    en: MemoryWrite —is_a→ MemoryAdmissionOperation holds because the candidate is accepted and the initial MemoryRecord for its persistent key is produced
-    ja: MemoryWrite —is_a→ MemoryAdmissionOperation は、candidateを受入れpersistent keyのinitial MemoryRecordを生成するため成立します。
+    zh: MemoryWrite —is_a→ MemoryAdmissionOperation 表示候选项被接受并产生该持久键的初始 MemoryRecord。
+    en: MemoryWrite —is_a→ MemoryAdmissionOperation holds because the candidate is accepted and the initial MemoryRecord for its persistent key is produced.
+    ja: MemoryWrite —is_a→ MemoryAdmissionOperation は候補 accept と initial MemoryRecord 生成のため成立。
   cardinality: null
   cardinality_not_applicable_reason:
     zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
@@ -239,436 +226,83 @@ parent_relation:
     predicate: part_of
     labels:
       zh: 反向读取
-      en: inverse is a memory admission operation
+      en: inverse is_a
       ja: 逆方向読取
   conditions:
-    - id: MemoryWrite-is_a-MemoryAdmissionOperation-condition-manual-001
+    - id: MemoryWrite-is_a-MemoryAdmissionOperation-condition-001
       severity: error
       expression_language: plain
-      expression: Assert only when the instance satisfies the child differentia—the candidate is accepted and the initial MemoryRecord for its persistent key is produced—and already meets the activity definition of MemoryAdmissionOperation.
+      expression: Assert only when the candidate is accepted and the initial MemoryRecord for its persistent key is produced.
       explanations:
-        zh: 仅当实例满足子类种差“候选项被接受，并产生该持久键的初始 MemoryRecord。”且已满足 MemoryAdmissionOperation 的活动定义时建立该边。
-        en: Assert only when the instance satisfies the child differentia—the candidate is accepted and the initial MemoryRecord for its persistent key is produced—and already meets the activity definition of MemoryAdmissionOperation.
-        ja: instanceがchild differentia「candidateを受入れpersistent keyのinitial MemoryRecordを生成するため成立します。」を満たし、かつ MemoryAdmissionOperation のactivity定義を満たす時だけassertします。
-      source_claims:
-        - claim-memory-write-004
+        zh: 仅当候选项被接受并产生初始 MemoryRecord 时建立该边。
+        en: Assert only when the candidate is accepted and the initial MemoryRecord is produced.
+        ja: 候補 accept と initial MemoryRecord 生成時のみ assert。
+      source_claims: [claim-memory-write-design]
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: MemoryWrite-is_a-MemoryAdmissionOperation-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 是一种记忆准入操作正例
-        en: "Positive case: is a memory admission operation"
-        ja: 記憶受入操作の一種正例
-      scenario_id: MemoryWrite-is_a-MemoryAdmissionOperation:positive:20260716
-      descriptions:
-        zh: write-310 接受候选 item-310，并为键 prefs/theme 创建没有有效前驱的首个持久记录 record-310-v1。
-        en: write-310 accepts candidate item-310 and creates record-310-v1, the first persistent record for key prefs/theme with no valid predecessor.
-        ja: write-310 は候補 item-310 を受け入れ、valid predecessor のない key prefs/theme の最初の永続 record-310-v1 を作ります。
-      field_values: {}
-      related_node_ids:
-        - MemoryWrite
-        - MemoryAdmissionOperation
-      related_relation_ids:
-        - MemoryWrite-is_a-MemoryAdmissionOperation
-      expected_result:
-        zh: 确认 write-310 是 MemoryWrite，并建立其对首个记录的生产事实，而不是把它解释为已有记录更新。
-        en: Recognize write-310 as MemoryWrite and establish production of the initial record rather than interpreting it as an update of existing state.
-        ja: write-310 を MemoryWrite と認定し、既存 state の update ではなく initial record の生成を確立します。
-      why_valid_or_invalid:
-        zh: 候选已通过准入，输出键此前没有有效版本，活动同时满足准入父类与“创建初始持久身份”的写入种差。
-        en: The candidate passed admission and the key had no valid version, so the activity meets the admission parent and the initial-persistent-identity differentia.
-        ja: 候補は admission を通過し key に valid version がないため、admission 親と initial persistent identity 作成という differentia を満たします。
-      synthetic: false
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-memory-write-004
-    - id: MemoryWrite-is_a-MemoryAdmissionOperation-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 是一种记忆准入操作边界例
-        en: "Boundary case: is a memory admission operation"
-        ja: 記憶受入操作の一種境界例
-      scenario_id: MemoryWrite-is_a-MemoryAdmissionOperation:boundary:20260716
-      descriptions:
-        zh: upsert-310 读取 record-310-v1 后把主题从 dark 改为 light，并生成带 predecessor_id 的 record-310-v2。
-        en: upsert-310 reads record-310-v1, changes the theme from dark to light, and emits record-310-v2 with predecessor_id populated.
-        ja: upsert-310 は record-310-v1 を読み theme を dark から light に変え、predecessor_id 付き record-310-v2 を生成します。
-      field_values: {}
-      related_node_ids:
-        - MemoryWrite
-        - MemoryAdmissionOperation
-      related_relation_ids:
-        - MemoryWrite-is_a-MemoryAdmissionOperation
-      expected_result:
-        zh: 拒绝将 upsert-310 标为 MemoryWrite；把它建模为 MemoryUpdate，并保留 v1 到 v2 的版本谱系。
-        en: Do not type upsert-310 as MemoryWrite; model it as MemoryUpdate and preserve the v1-to-v2 version lineage.
-        ja: upsert-310 を MemoryWrite とせず MemoryUpdate として扱い、v1 から v2 の version lineage を保持します。
-      why_valid_or_invalid:
-        zh: 键已有有效前驱且活动依赖其内容，因而这是修订而非首次持久化；使用 upsert API 不会改变本体语义。
-        en: A valid predecessor exists and supplies the input content, making this revision rather than first persistence; an upsert API name does not change that semantics.
-        ja: valid predecessor が存在し入力内容を供給するため revision であり、upsert API 名は ontology semantics を変えません。
-      synthetic: false
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-memory-write-004
-  source_claims:
-    - claim-memory-write-004
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: accepted
+  examples: []
+  source_claims: [claim-memory-write-design]
   endpoint_order: child-to-parent
-relations:
-  - id: MemoryWrite-consumes-MemoryItem
-    predicate: consumes
-    direction: source-to-target
-    relation_kind: causal
-    labels:
-      zh: 消费候选记忆项
-      en: consumes memory item
-      ja: memory itemを消費する
-    definitions:
-      zh: MemoryWrite —consumes→ MemoryItem 表示候选项是该初始写入实际评估并提交的输入，而不是已持久化记录。
-      en: MemoryWrite —consumes→ MemoryItem means the candidate item is the actual input evaluated and committed by the initial write, not an already persisted record.
-      ja: MemoryWrite —consumes→ MemoryItem はcandidate itemがinitial writeで実際に評価/commitされるinputで既persist recordでないことを表します。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
-      en: The relation is decided per auditable fact; no uniform runtime cardinality is imposed at ontology level.
-      ja: このrelationはaudit可能fact単位で判定しontology層で全runtime instanceへ一律cardinalityを課しません。
-    inverse_reading:
-      predicate: inverse_consumes
-      labels:
-        zh: 反向读取
-        en: inverse consumes memory item
-        ja: 逆方向読取
-    conditions:
-      - id: MemoryWrite-consumes-MemoryItem-condition-manual-001
-        severity: error
-        expression_language: plain
-        expression: Assert only when write.candidate_item_id equals the target MemoryItem and the admission decision is accept.
-        explanations:
-          zh: 仅当 write.candidate_item_id 等于目标 MemoryItem 且写入决策为接受时成立。
-          en: Assert only when write.candidate_item_id equals the target MemoryItem and the admission decision is accept.
-          ja: write.candidate_item_idがtarget MemoryItemと一致しadmission decisionがacceptの時だけassertします。
-        source_claims:
-          - claim-memory-write-004
-    temporal_scope: valid-time
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: MemoryWrite-consumes-MemoryItem-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 消费候选记忆项正例
-          en: "Positive case: consumes memory item"
-          ja: memory itemを消費する正例
-        scenario_id: MemoryWrite-consumes-MemoryItem:positive:20260716
-        descriptions:
-          zh: write-310 的 candidate_item_id=item-310，准入记录显示 accept，写入活动读取该候选的内容、来源和 consent_scope。
-          en: write-310 names candidate_item_id=item-310, has an accept admission outcome, and reads that candidate's content, provenance, and consent_scope.
-          ja: write-310 は candidate_item_id=item-310、admission outcome=accept で候補の content・provenance・consent_scope を読みます。
-        field_values: {}
-        related_node_ids:
-          - MemoryWrite
-          - MemoryItem
-        related_relation_ids:
-          - MemoryWrite-consumes-MemoryItem
-        expected_result:
-          zh: 建立 write-310 consumes item-310，把候选项固定为首次持久化活动的直接输入。
-          en: Assert write-310 consumes item-310, fixing the candidate item as the direct input to initial persistence.
-          ja: write-310 consumes item-310 を確立し candidate item を initial persistence の direct input として固定します。
-        why_valid_or_invalid:
-          zh: 候选身份与接受结果均在同一写入尝试中明确，且目标是未持久化 MemoryItem 而不是现有 MemoryRecord。
-          en: Candidate identity and acceptance are explicit in the same write attempt, and the target is an unpersisted MemoryItem rather than an existing MemoryRecord.
-          ja: candidate identity と acceptance は同 write attempt に明示され target は existing MemoryRecord でなく unpersisted MemoryItem です。
-        synthetic: false
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-memory-write-004
-      - id: MemoryWrite-consumes-MemoryItem-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 消费候选记忆项边界例
-          en: "Boundary case: consumes memory item"
-          ja: memory itemを消費する境界例
-        scenario_id: MemoryWrite-consumes-MemoryItem:boundary:20260716
-        descriptions:
-          zh: item-311 也来自同一会话，但 write-310 的 candidate_item_id 未引用它，且 item-311 的准入结果仍为 pending。
-          en: item-311 comes from the same session, but write-310 does not name it as candidate_item_id and its admission outcome remains pending.
-          ja: item-311 は同 session 由来ですが write-310 の candidate_item_id ではなく admission outcome も pending です。
-        field_values: {}
-        related_node_ids:
-          - MemoryWrite
-          - MemoryItem
-        related_relation_ids:
-          - MemoryWrite-consumes-MemoryItem
-        expected_result:
-          zh: 拒绝 write-310 consumes item-311；等 item-311 被明确接受并绑定到自己的写入后再建立消费边。
-          en: Reject write-310 consumes item-311; wait for explicit acceptance and binding to its own write before asserting consumption.
-          ja: write-310 consumes item-311 を拒否し explicit acceptance と own write binding 後に consumption を確立します。
-        why_valid_or_invalid:
-          zh: 会话共现不等于活动输入，缺少 candidate_item_id 与 accept 会把未决定候选错误算作已消费。
-          en: Session co-occurrence is not activity input; without candidate_item_id and accept, an undecided candidate would be falsely treated as consumed.
-          ja: session co-occurrence は activity input ではなく candidate_item_id/accept なしでは undecided candidate を誤って consumed とします。
-        synthetic: false
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-memory-write-004
-    source_claims:
-      - claim-memory-write-004
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:MemoryItem
-  - id: MemoryWrite-produces-MemoryRecord
-    predicate: produces
-    direction: source-to-target
-    relation_kind: causal
-    labels:
-      zh: 产生初始记忆记录
-      en: produces initial memory record
-      ja: initial memory recordを生成する
-    definitions:
-      zh: MemoryWrite —produces→ MemoryRecord 表示成功准入创建了该持久键的初始记录身份及其来源元数据。
-      en: MemoryWrite —produces→ MemoryRecord means successful admission created the initial record identity for the persistent key together with provenance metadata.
-      ja: MemoryWrite —produces→ MemoryRecord はsuccessful admissionがpersistent keyのinitial record identityとprovenance metadataを作ったことを表します。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
-      en: The relation is decided per auditable fact; no uniform runtime cardinality is imposed at ontology level.
-      ja: このrelationはaudit可能fact単位で判定しontology層で全runtime instanceへ一律cardinalityを課しません。
-    inverse_reading:
-      predicate: inverse_produces
-      labels:
-        zh: 反向读取
-        en: inverse produces initial memory record
-        ja: 逆方向読取
-    conditions:
-      - id: MemoryWrite-produces-MemoryRecord-condition-manual-001
-        severity: error
-        expression_language: plain
-        expression: Assert only when the write succeeds, result.output_record_ids contains the target record, and the key has no valid predecessor version.
-        explanations:
-          zh: 仅当写入成功、result.output_record_ids 包含目标记录且该键此前没有有效前驱版本时成立。
-          en: Assert only when the write succeeds, result.output_record_ids contains the target record, and the key has no valid predecessor version.
-          ja: write成功・result.output_record_idsがtarget recordを含み・keyにvalid predecessor versionがない時だけassertします。
-        source_claims:
-          - claim-memory-write-004
-    temporal_scope: valid-time
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: MemoryWrite-produces-MemoryRecord-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 产生初始记忆记录正例
-          en: "Positive case: produces initial memory record"
-          ja: initial memory recordを生成する正例
-        scenario_id: MemoryWrite-produces-MemoryRecord:positive:20260716
-        descriptions:
-          zh: write-310 成功提交后，result.output_record_ids 列出 record-310-v1；该键此前不存在有效版本，记录包含 item-310 的来源元数据。
-          en: After write-310 commits successfully, result.output_record_ids lists record-310-v1; the key had no valid version and the record carries item-310 provenance.
-          ja: write-310 の successful commit 後 result.output_record_ids は record-310-v1 を列挙し、key に valid version はなく item-310 provenance を保持します。
-        field_values: {}
-        related_node_ids:
-          - MemoryWrite
-          - MemoryRecord
-        related_relation_ids:
-          - MemoryWrite-produces-MemoryRecord
-        expected_result:
-          zh: 建立 write-310 produces record-310-v1，并把它标为该持久键的初始版本而非修订后继。
-          en: Assert write-310 produces record-310-v1 and mark it as the initial version of the persistent key rather than a revised successor.
-          ja: write-310 produces record-310-v1 を確立し persistent key の initial version として revised successor と区別します。
-        why_valid_or_invalid:
-          zh: 操作成功、输出列表含目标且没有有效前驱，三项共同证明首次记录身份由该写入生成。
-          en: Successful execution, explicit output identity, and absence of a valid predecessor jointly prove generation of the initial record.
-          ja: successful execution・explicit output identity・valid predecessor 不在が initial record generation を共同証明します。
-        synthetic: false
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-memory-write-004
-      - id: MemoryWrite-produces-MemoryRecord-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 产生初始记忆记录边界例
-          en: "Boundary case: produces initial memory record"
-          ja: initial memory recordを生成する境界例
-        scenario_id: MemoryWrite-produces-MemoryRecord:boundary:20260716
-        descriptions:
-          zh: write-312 返回 validation_error，output_record_ids 为空；界面预览对象 preview-312 从未提交到存储。
-          en: write-312 returns validation_error with no output_record_ids; preview-312 was only a UI preview and was never committed to storage.
-          ja: write-312 は validation_error、output_record_ids 空で preview-312 は UI preview のみで storage に commit されません。
-        field_values: {}
-        related_node_ids:
-          - MemoryWrite
-          - MemoryRecord
-        related_relation_ids:
-          - MemoryWrite-produces-MemoryRecord
-        expected_result:
-          zh: 拒绝 write-312 produces preview-312；记录失败结果，但不要为未持久化预览制造 MemoryRecord。
-          en: Reject write-312 produces preview-312; retain the failure result without fabricating a MemoryRecord for an uncommitted preview.
-          ja: write-312 produces preview-312 を拒否し failure result は保持しますが uncommitted preview の MemoryRecord は作りません。
-        why_valid_or_invalid:
-          zh: 对象出现在界面不证明生成完成，只有成功提交和输出记录身份才能建立持久生产事实。
-          en: Appearance in a preview does not prove completed generation; only successful commit plus output record identity establishes persistent production.
-          ja: preview 表示は completed generation を証明せず successful commit と output record identity のみ persistent production を確立します。
-        synthetic: false
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-memory-write-004
-    source_claims:
-      - claim-memory-write-004
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:MemoryRecord
-  - id: MemoryWrite-responds_to-Feedback
-    predicate: responds_to
-    direction: source-to-target
-    relation_kind: causal
-    labels:
-      zh: 响应反馈
-      en: responds to feedback
-      ja: feedbackへ応答する
-    definitions:
-      zh: MemoryWrite —responds_to→ Feedback 表示一条明确反馈触发或实质改变了候选记忆的写入决定。
-      en: MemoryWrite —responds_to→ Feedback means explicit feedback triggered or materially changed the candidate-memory write decision.
-      ja: MemoryWrite —responds_to→ Feedback はexplicit feedbackがcandidate-memory write decisionをtriggerまたは実質変更したことを表します。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
-      en: The relation is decided per auditable fact; no uniform runtime cardinality is imposed at ontology level.
-      ja: このrelationはaudit可能fact単位で判定しontology層で全runtime instanceへ一律cardinalityを課しません。
-    inverse_reading:
-      predicate: inverse_responds_to
-      labels:
-        zh: 反向读取
-        en: inverse responds to feedback
-        ja: 逆方向読取
-    conditions:
-      - id: MemoryWrite-responds_to-Feedback-condition-manual-001
-        severity: error
-        expression_language: plain
-        expression: Assert only when write.trigger_feedback_ids contains the Feedback and audit evidence states how it affected the write.
-        explanations:
-          zh: 仅当 write.trigger_feedback_ids 包含目标 Feedback，且审计记录说明该反馈如何影响写入时成立。
-          en: Assert only when write.trigger_feedback_ids contains the Feedback and audit evidence states how it affected the write.
-          ja: write.trigger_feedback_idsがFeedbackを含みaudit evidenceがwriteへの影響を示す時だけassertします。
-        source_claims:
-          - claim-memory-write-004
-    temporal_scope: valid-time
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: MemoryWrite-responds_to-Feedback-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 响应反馈正例
-          en: "Positive case: responds to feedback"
-          ja: feedbackへ応答する正例
-        scenario_id: MemoryWrite-responds_to-Feedback:positive:20260716
-        descriptions:
-          zh: feedback-91 明确要求“记住以后使用公制单位”；write-391 的 trigger_feedback_ids 包含它，并由此创建对应偏好候选。
-          en: feedback-91 explicitly asks to remember metric units; write-391 lists it in trigger_feedback_ids and creates the corresponding preference candidate because of it.
-          ja: feedback-91 は metric units を記憶するよう明示し write-391 は trigger_feedback_ids に含め、それにより preference candidate を作ります。
-        field_values: {}
-        related_node_ids:
-          - MemoryWrite
-          - Feedback
-        related_relation_ids:
-          - MemoryWrite-responds_to-Feedback
-        expected_result:
-          zh: 建立 write-391 responds_to feedback-91，并在审计说明中记录反馈如何改变写入决定和内容。
-          en: Assert write-391 responds_to feedback-91 and record in audit evidence how the feedback changed the write decision and content.
-          ja: write-391 responds_to feedback-91 を確立し feedback が write decision/content をどう変えたか audit evidence に記録します。
-        why_valid_or_invalid:
-          zh: 反馈身份被写入触发列表，内容与生成记忆直接对应，因果影响不仅是时间先后或主题相似。
-          en: The feedback identity is in the trigger list and its content directly determines the memory written, proving material influence beyond timing or topical similarity.
-          ja: feedback identity は trigger list にあり内容が written memory を直接決め、時間順や topic similarity を超える material influence を示します。
-        synthetic: false
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-memory-write-004
-      - id: MemoryWrite-responds_to-Feedback-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 响应反馈边界例
-          en: "Boundary case: responds to feedback"
-          ja: feedbackへ応答する境界例
-        scenario_id: MemoryWrite-responds_to-Feedback:boundary:20260716
-        descriptions:
-          zh: feedback-92 赞扬回答语气，但 write-391 的触发列表没有它，写入的公制偏好也不受该评价影响。
-          en: feedback-92 praises response tone, but write-391 does not list it as a trigger and the metric-unit preference is unaffected by that evaluation.
-          ja: feedback-92 は response tone を評価しますが write-391 の trigger ではなく metric-unit preference に影響しません。
-        field_values: {}
-        related_node_ids:
-          - MemoryWrite
-          - Feedback
-        related_relation_ids:
-          - MemoryWrite-responds_to-Feedback
-        expected_result:
-          zh: 拒绝 write-391 responds_to feedback-92；保留反馈与评估结果的关系，不扩张到无证据的写入因果。
-          en: Reject write-391 responds_to feedback-92; keep the feedback linked to evaluation without inventing write causality.
-          ja: write-391 responds_to feedback-92 を拒否し feedback は evaluation に接続したまま unsupported write causality を作りません。
-        why_valid_or_invalid:
-          zh: 同一运行中出现的反馈不必都触发记忆写入，必须有触发 ID 和内容影响的双重证据。
-          en: Not every feedback item in a run triggers memory writing; both trigger identity and content effect are required.
-          ja: 一 run の全 feedback が memory write を trigger するわけではなく trigger identity と content effect の両証拠が必要です。
-        synthetic: false
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-memory-write-004
-    source_claims:
-      - claim-memory-write-004
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:Feedback
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-lifecycle-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 该节点仅完成了从现行候选数据到唯一 YAML 树的无损转录；尚未逐项完成人工语义核验，不得据此宣称已审定。
-    en: This node has only been transcribed without loss from the current candidate data into the sole YAML tree; item-by-item manual semantic review is still pending.
-    ja: このノードは現行候補データから唯一の YAML ツリーへ欠落なく転記した段階であり、項目別の手動意味審査は未完了です。
-  sections:
-    semantics: pending
-    hierarchy: pending
-    relations: pending
-    structure: pending
-    examples: pending
-    source_claims: []
+relations: []
+sources:
+  - id: src-mem0-write
+    title: Mem0 Platform Documentation
+    publisher: Mem0
+    url: https://docs.mem0.ai
+    source_type: official-doc
+    relevance: POST /v1/memories/ adds memories from messages.
+  - id: src-letta-write
+    title: Letta Archival Memory Guide
+    publisher: Letta
+    url: https://docs.letta.com/guides/core-concepts/memory/archival-memory
+    source_type: official-doc
+    relevance: archival_memory_insert tool.
+  - id: src-langgraph-write
+    title: LangGraph Store Reference
+    publisher: LangChain
+    url: https://langchain-ai.github.io/langgraph/reference/store/
+    source_type: official-doc
+    relevance: BaseStore.put creates namespace-key Items.
+  - id: src-memory-write-design
+    title: Moonweave memory-lifecycle module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Separates initial write from update and discard.
 source_claims:
-  - id: claim-memory-write-001
-    source: eng-fw-langmem-memory-management
-    supports: LangMem exposes distinct insert, update, and delete controls and describes collection reconciliation and consolidation; Moonweave makes their lifecycle boundaries explicit.
-    locator: LangMem Core Concepts > Semantic Memory > Collection > insert versus delete/invalidate or update/consolidate
+  - id: claim-memory-write-mem0
+    source: src-mem0-write
+    supports: Mem0 POST /v1/memories/ creates a new memory from conversation messages.
+    locator: POST /v1/memories/
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-memory-write-letta
+    source: src-letta-write
+    supports: Letta archival_memory_insert adds out-of-window passages to archival storage.
+    locator: archival_memory_insert
+    evidence_kind: primary-doc
+    confidence: high
+  - id: claim-memory-write-langgraph
+    source: src-langgraph-write
+    supports: LangGraph BaseStore.put creates a new Item at namespace and key.
+    locator: BaseStore.put
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-memory-write-design
+    source: src-memory-write-design
+    supports: MemoryWrite produces the first persistent record without a predecessor version.
+    locator: MemoryWrite boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-write-002
-    source: eng-fw-langmem-memory-management
-    supports: MemoryWrite.write_operation_id records the stated operational datum so the concept instance can be identified or audited without changing the source model's own vocabulary.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
+  - id: claim-memory-write-id
+    source: src-memory-write-design
+    supports: write_operation_id identifies one initial persistence activity.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-write-003
-    source: eng-fw-langmem-memory-management
-    supports: MemoryWrite.output_record_id records the stated operational datum so the concept instance can be identified or audited without changing the source model's own vocabulary.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
+  - id: claim-memory-write-output
+    source: src-memory-write-design
+    supports: output_record_id references the initial MemoryRecord produced.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-write-004
-    source: eng-fw-langmem-memory-management
-    supports: LangMem exposes distinct insert, update, and delete controls and describes collection reconciliation and consolidation; Moonweave makes their lifecycle boundaries explicit.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

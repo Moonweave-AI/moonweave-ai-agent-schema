@@ -1,24 +1,23 @@
 schema: moonweave.ai/ontology-node/v1
 id: ToolApprovalGate
 kind: concept
-status: accepted
 labels:
   zh: 工具授权门
   en: tool authorization gate
   ja: ツール認可ゲート
 semantics:
   short_definition:
-    zh: 在工具调用控制点验证决定、请求快照和授权范围后释放、暂停或阻断尝试的 Gate 能力。
-    en: A Gate capability that releases, pauses, or blocks an attempt after validating its decision, request snapshot, and authority scope at a tool-call control point.
-    ja: ツール呼出制御点で判断・要求スナップショット・権限範囲を検証し、試行を解放・停止・阻断する Gate 能力です。
+    zh: 在工具调用控制点验证决定、grant 与请求一致后 release/pause/block 的门控能力。
+    en: A gate capability that release/pause/blocks at a tool-call control point after verifying decision, grant, and request alignment.
+    ja: tool call 制御点で decision/grant/request 整合検証後 release/pause/block する gate capability。
   definition:
-    zh: 工具授权门是 Gate 的领域专用能力，由 gate_id 与 version 识别并定义工具调用控制点的验证语义。每次应用把该能力绑定一个 ToolCallAttempt，验证尝试的主体、工具、参数摘要和动作与 PolicyDecision 及有效 AuthorizationGrant 完全匹配，再决定 release、pause 或 block。它执行授权结果但不生成 PolicyDecision，也不保证获准尝试最终成功。
-    en: A ToolApprovalGate is a domain-specific Gate capability identified by gate_id and version and defining validation semantics at a tool-call control point. Each application binds the capability to one ToolCallAttempt, verifies that the attempt's principal, tool, argument digest, and action exactly match its PolicyDecision and effective AuthorizationGrant, and then releases, pauses, or blocks it. It enforces authorization output but does not produce a PolicyDecision or guarantee that a released attempt succeeds.
-    ja: ToolApprovalGate は gate_id と version で識別されツール呼出制御点の検証意味を定める Gate の領域専用能力です。各適用は能力を一つの ToolCallAttempt へ束縛し、主体・ツール・引数ダイジェスト・操作が PolicyDecision と有効 AuthorizationGrant に一致するか検証して release・pause・block を決めます。判断を生成せず、解放試行の成功も保証しません。
+    zh: ToolApprovalGate 以 gate_id+version 定义工具尝试控制点语义，每次应用绑定 ToolCallAttempt，验证 PolicyDecision 与有效 AuthorizationGrant 及 argument_digest 完全匹配。它映射 Claude Code yesAllow/allowForSession 执行前检查、MCP requireApproval host 门控与 Cursor sandbox 命令 spawn 前验证；执行授权结果但不生成 PolicyDecision。
+    en: ToolApprovalGate defines tool-attempt control-point semantics via gate_id+version; each application binds a ToolCallAttempt and verifies PolicyDecision, effective AuthorizationGrant, and argument_digest exact match. It maps Claude Code yesAllow/allowForSession pre-execution checks, MCP requireApproval host gates, and Cursor sandbox pre-spawn command verification; it enforces authorization output but does not produce PolicyDecision.
+    ja: ToolApprovalGate は gate_id+version で tool attempt 制御点 semantics を定義。ToolCallAttempt 绑定し PolicyDecision/有効 AuthorizationGrant/argument_digest 完全一致を検証。Claude yesAllow/allowForSession、MCP requireApproval host gate、Cursor sandbox pre-spawn を写像。authorization 結果を enforce するが PolicyDecision 生成しない。
   why_needed:
-    zh: 该节点把策略决定与实际执行之间的最后检查显式化，修正旧 PolicyDecision-governs-Execution 对整个 Execution 的过宽关系。
-    en: It makes the final decision-to-execution check explicit and replaces the overbroad PolicyDecision-governs-Execution relation over an entire Execution.
-    ja: 判断から実行への最終検査を明示し、Execution 全体へ広すぎた PolicyDecision-governs-Execution を置換します。
+    zh: 决定与执行之间的最后检查必须显式；否则 defer 解除后无 grant 的 attempt 仍会运行。
+    en: The final check between decision and execution must be explicit or attempts run after defer clearance without grant.
+    ja: decision と execution 間の最終検査を明示しないと defer 解除後 grant なし attempt が実行されます。
   includes:
     - zh: 包含门标识、尝试引用、决定引用、授予引用、参数摘要、门状态、评估时间和原因。
       en: Includes gate identity, attempt, decision and grant references, argument digest, gate state, evaluation time, and reason.
@@ -29,6 +28,41 @@ semantics:
       ja: PolicyEvaluation、ツール定義、呼出実行、ツール結果、業務経路選択を含みません。
   semantic_kind: capability
   aliases: []
+engineering:
+  explanation:
+    zh: "gate state: release|pause|block；pause 对应 DeferDecision 或待 grant；block 对应 DenyDecision；release 需 AllowDecision+有效 grant+摘要匹配。MCP host 在 tools/call 前运行 gate；Claude 在 Bash spawn 前；Cursor 在 terminal spawn 前。"
+    en: Gate states release|pause|block; pause for DeferDecision or pending grant; block for DenyDecision; release requires AllowDecision+valid grant+digest match. MCP host runs gate before tools/call; Claude before Bash spawn; Cursor before terminal spawn.
+    ja: gate state release|pause|block。pause=DeferDecision/pending grant。block=DenyDecision。release=AllowDecision+valid grant+digest match。MCP tools/call 前、Claude Bash spawn 前、Cursor terminal spawn 前に gate。
+  typical_input:
+    - description: Claude yesAllow gate check.
+      format: verify HumanApproval + AllowDecision + grant scope before Bash spawn
+      source_claims:
+        - claim-tool-approval-gate-design
+    - description: MCP requireApproval host gate.
+      format: tools/call blocked until defer cleared and grant valid
+      source_claims:
+        - claim-tool-approval-gate-design
+  typical_output:
+    - description: Gate evaluation record.
+      format: '{"gate_id":"tool-gate-42","gate_state":"release","attempt_ref":"attempt-42","decision_ref":"decision-42","grant_ref":"grant-42"}'
+      source_claims:
+        - claim-tool-approval-gate-design
+  reference_implementations:
+    - name: MCP Authorization (2025-06-18)
+      url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+      description: OAuth 2.1 flows, scopes, and resource indicators.
+    - name: Open Policy Agent
+      url: https://www.openpolicyagent.org/docs/latest/policy-language/
+      description: Rego policies and decision queries.
+    - name: OASIS XACML 3.0
+      url: https://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-cos01-en.html
+      description: Permit/Deny/NotApplicable and combining algorithms.
+    - name: Cursor Agent Terminal
+      url: https://cursor.com/docs/agent/terminal
+      description: Command approval dialogs and sandbox modes.
+    - name: Claude Code permissions
+      url: https://docs.anthropic.com/en/docs/claude-code/permissions
+      description: yesAllow, allowForSession, and tool permission modes.
 structure:
   identity_keys:
     - gate_id
@@ -52,9 +86,9 @@ structure:
       pattern: null
       example_value: tool-gate-42
       source_claims:
-        - claim-tool-approval-gate-001
-        - claim-tool-approval-gate-002
-        - claim-tool-approval-gate-003
+        - claim-tool-approval-gate-design
+        - claim-tool-approval-gate-design
+        - claim-tool-approval-gate-design
     - id: version
       labels:
         zh: 门版本
@@ -73,9 +107,9 @@ structure:
       pattern: null
       example_value: "3"
       source_claims:
-        - claim-tool-approval-gate-001
-        - claim-tool-approval-gate-002
-        - claim-tool-approval-gate-003
+        - claim-tool-approval-gate-design
+        - claim-tool-approval-gate-design
+        - claim-tool-approval-gate-design
     - id: attempt_ref
       labels:
         zh: 调用尝试引用
@@ -94,9 +128,9 @@ structure:
       pattern: null
       example_value: tool-attempt-42
       source_claims:
-        - claim-tool-approval-gate-001
-        - claim-tool-approval-gate-002
-        - claim-tool-approval-gate-003
+        - claim-tool-approval-gate-design
+        - claim-tool-approval-gate-design
+        - claim-tool-approval-gate-design
     - id: decision_ref
       labels:
         zh: 决定引用
@@ -115,9 +149,9 @@ structure:
       pattern: null
       example_value: decision-42
       source_claims:
-        - claim-tool-approval-gate-001
-        - claim-tool-approval-gate-002
-        - claim-tool-approval-gate-003
+        - claim-tool-approval-gate-design
+        - claim-tool-approval-gate-design
+        - claim-tool-approval-gate-design
     - id: grant_ref
       labels:
         zh: 授予引用
@@ -136,9 +170,9 @@ structure:
       pattern: null
       example_value: grant-42
       source_claims:
-        - claim-tool-approval-gate-001
-        - claim-tool-approval-gate-002
-        - claim-tool-approval-gate-003
+        - claim-tool-approval-gate-design
+        - claim-tool-approval-gate-design
+        - claim-tool-approval-gate-design
     - id: argument_digest
       labels:
         zh: 参数摘要
@@ -157,9 +191,9 @@ structure:
       pattern: null
       example_value: sha256:args42
       source_claims:
-        - claim-tool-approval-gate-001
-        - claim-tool-approval-gate-002
-        - claim-tool-approval-gate-003
+        - claim-tool-approval-gate-design
+        - claim-tool-approval-gate-design
+        - claim-tool-approval-gate-design
     - id: state
       labels:
         zh: 门状态
@@ -178,9 +212,9 @@ structure:
       pattern: null
       example_value: released
       source_claims:
-        - claim-tool-approval-gate-001
-        - claim-tool-approval-gate-002
-        - claim-tool-approval-gate-003
+        - claim-tool-approval-gate-design
+        - claim-tool-approval-gate-design
+        - claim-tool-approval-gate-design
     - id: evaluated_at
       labels:
         zh: 门评估时间
@@ -199,9 +233,9 @@ structure:
       pattern: null
       example_value: 2026-07-16T01:21:05Z
       source_claims:
-        - claim-tool-approval-gate-001
-        - claim-tool-approval-gate-002
-        - claim-tool-approval-gate-003
+        - claim-tool-approval-gate-design
+        - claim-tool-approval-gate-design
+        - claim-tool-approval-gate-design
     - id: reason
       labels:
         zh: 门控原因
@@ -220,95 +254,99 @@ structure:
       pattern: null
       example_value: decision and grant match attempt
       source_claims:
-        - claim-tool-approval-gate-001
-        - claim-tool-approval-gate-002
-        - claim-tool-approval-gate-003
+        - claim-tool-approval-gate-design
+        - claim-tool-approval-gate-design
+        - claim-tool-approval-gate-design
   constraints: []
   required_relation_constraints: []
 examples:
-  - id: ToolApprovalGate-example-positive-manual-001
-    kind: positive
+  - id: ToolApprovalGate-claude-yesallow
     labels:
-      zh: 工具授权门正例
-      en: Positive tool authorization gate case
-      ja: ツール認可ゲートの正例
-    scenario_id: null
+      zh: Claude yesAllow 门控
+      en: Claude yesAllow gate
+      ja: Claude yesAllow gate
     descriptions:
-      zh: tool-gate-42 验证 tool-attempt-42 的主体、工具和参数摘要与 decision-42、grant-42 一致且未过期后，将状态置为 released。
-      en: tool-gate-42 releases tool-attempt-42 only after its principal, tool, and argument digest match decision-42 and unexpired grant-42.
-      ja: tool-gate-42 は tool-attempt-42 の主体、ツール、引数ダイジェストが decision-42 と未期限 grant-42 に一致した後だけ released にします。
+      zh: tool-gate-61 release：AllowDecision+grant+approval-claude-61 与 Bash digest 一致。
+      en: "tool-gate-61 release: AllowDecision+grant+approval-claude-61 matches Bash digest."
+      ja: tool-gate-61 release：AllowDecision+grant+approval-claude-61 Bash digest 一致。
+    example_source:
+      product: Claude Code
+      url: https://docs.anthropic.com/en/docs/claude-code/permissions
+      version: yesAllow gate
     field_values:
-      gate_id: tool-gate-42
-      gate_kind: capability-grant-check
-      decision_function_ref: tool-approval-evaluator@2
-      version: "2"
-      attempt_ref: tool-attempt-42
-      decision_ref: decision-42
-      grant_ref: grant-42
-      argument_digest: sha256:args42
-      state: released
-      evaluated_at: 2026-07-16T01:21:05Z
-      reason: decision and grant match attempt
+      gate_id: tool-gate-61
+      gate_state: release
     related_node_ids:
       - ToolApprovalGate
-      - PolicyDecision
+      - AllowDecision
       - AuthorizationGrant
-      - ToolCallAttempt
-    related_relation_ids:
-      - ToolApprovalGate-enforces-PolicyDecision
-      - ToolApprovalGate-gates-ToolCallAttempt
-    expected_result:
-      zh: 只有完全匹配且有效的授权证据释放该尝试；释放不预判工具结果。
-      en: Only exactly matching, effective authorization evidence releases the attempt; release does not predict the tool result.
-      ja: 完全一致する有効認可証拠だけが試行を解放し、解放はツール結果を予測しません。
-    why_valid_or_invalid:
-      zh: 门控绑定具体 attempt 和参数摘要，执行关系没有扩张到整个 Execution。
-      en: The gate binds one attempt and argument digest, and enforcement does not expand to the entire Execution.
-      ja: ゲートは具体 attempt と引数ダイジェストへ束縛され、執行関係を Execution 全体へ拡張しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    related_relation_ids: []
     source_claims:
-      - claim-tool-approval-gate-001
-      - claim-tool-approval-gate-002
-      - claim-tool-approval-gate-003
-  - id: ToolApprovalGate-example-boundary-manual-001
-    kind: boundary
+      - claim-tool-approval-gate-design
+  - id: ToolApprovalGate-mcp-defer-pause
     labels:
-      zh: 工具授权门边界反例
-      en: Boundary counterexample for tool authorization gate
-      ja: ツール認可ゲートの境界反例
-    scenario_id: null
+      zh: MCP defer 暂停门控
+      en: MCP defer pause gate
+      ja: MCP defer pause gate
     descriptions:
-      zh: decision-42 允许旧参数 sha256:args42，但 tool-attempt-43 使用 sha256:args43；即使动作名称相同，门也必须 block。
-      en: decision-42 allows old arguments sha256:args42, but tool-attempt-43 uses sha256:args43; the gate must block even though the action name is unchanged.
-      ja: decision-42 は旧引数 sha256:args42 を許可しますが tool-attempt-43 は sha256:args43 を使うため、操作名が同じでもゲートは block します。
+      zh: tool-gate-118 pause：DeferDecision 且无 grant，host 阻断 tools/call。
+      en: "tool-gate-118 pause: DeferDecision without grant; host blocks tools/call."
+      ja: tool-gate-118 pause：DeferDecision+grant なし、tools/call block。
+    example_source:
+      product: MCP Authorization
+      url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+      version: requireApproval gate
+    field_values:
+      gate_id: tool-gate-118
+      gate_state: pause
+    related_node_ids:
+      - ToolApprovalGate
+      - DeferDecision
+    related_relation_ids: []
+    source_claims:
+      - claim-tool-approval-gate-design
+  - id: ToolApprovalGate-cursor-deny-block
+    labels:
+      zh: Cursor deny 阻断门控
+      en: Cursor deny block gate
+      ja: Cursor deny block gate
+    descriptions:
+      zh: tool-gate-55 block：DenyDecision-55，curl 命令不 spawn。
+      en: "tool-gate-55 block: DenyDecision-55; curl command not spawned."
+      ja: tool-gate-55 block：DenyDecision-55、curl spawn なし。
+    example_source:
+      product: Cursor Agent Terminal
+      url: https://cursor.com/docs/agent/terminal
+      version: sandbox gate
+    field_values:
+      gate_id: tool-gate-55
+      gate_state: block
+    related_node_ids:
+      - ToolApprovalGate
+      - DenyDecision
+    related_relation_ids: []
+    source_claims:
+      - claim-tool-approval-gate-design
+  - id: ToolApprovalGate-boundary-allow-no-grant
+    labels:
+      zh: allow 无 grant 仍 pause
+      en: allow without grant still pauses
+      ja: allow+grant なしは pause
+    descriptions:
+      zh: AllowDecision 存在但 grant 未签发时 gate pause 而非 release。
+      en: Gate pauses rather than releases when AllowDecision exists but grant not yet issued.
+      ja: AllowDecision あっても grant 未発行なら gate release せず pause。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: gate release conditions
     field_values: {}
     related_node_ids:
       - ToolApprovalGate
-      - PolicyDecision
-      - ToolCallAttempt
-      - Gate
-    related_relation_ids:
-      - ToolApprovalGate-enforces-PolicyDecision
-      - ToolApprovalGate-gates-ToolCallAttempt
-    expected_result:
-      zh: 门控拒绝把旧决定复用于新参数，并要求形成新 AuthorizationRequest。
-      en: The gate refuses to reuse the stale decision for new arguments and requires a new AuthorizationRequest.
-      ja: ゲートは旧判断の新引数への再利用を拒否し、新 AuthorizationRequest を要求します。
-    why_valid_or_invalid:
-      zh: 授权对象由完整请求快照决定，而不是仅由工具名称决定。
-      en: Authorization is determined by the complete request snapshot, not tool name alone.
-      ja: 認可対象はツール名だけでなく完全要求スナップショットで決まります。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - AuthorizationGrant
+    related_relation_ids: []
     source_claims:
-      - claim-tool-approval-gate-001
-      - claim-tool-approval-gate-002
-      - claim-tool-approval-gate-003
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-tool-approval-gate-design
 parent_relation: null
 relations:
   - id: ToolApprovalGate-enforces-PolicyDecision
@@ -338,73 +376,11 @@ relations:
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
-    examples:
-      - id: ToolApprovalGate-enforces-PolicyDecision-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: 执行策略决定正例
-          en: Positive enforces policy decision case
-          ja: ポリシー判断を執行するの正例
-        scenario_id: null
-        descriptions:
-          zh: tool-gate-42 验证 decision-42 与 tool-attempt-42 快照一致后执行 allow 并 release。
-          en: tool-gate-42 enforces allow and releases only after decision-42 matches tool-attempt-42's snapshot.
-          ja: tool-gate-42 は decision-42 が tool-attempt-42 のスナップショットに一致した後だけ allow を執行し release します。
-        field_values: {}
-        related_node_ids:
-          - ToolApprovalGate
-          - PolicyDecision
-        related_relation_ids:
-          - ToolApprovalGate-enforces-PolicyDecision
-        expected_result:
-          zh: 决定与执行状态可分别查询且关系方向明确。
-          en: Decision and enforcement state remain separately queryable with explicit direction.
-          ja: 判断と執行状態を別々に照会でき方向が明確です。
-        why_valid_or_invalid:
-          zh: OPA 等权威模型明确分离决定与执行。
-          en: Authoritative models such as OPA separate decision from enforcement.
-          ja: OPA 等の権威モデルは判断と執行を分離します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-tool-approval-gate-002
-          - claim-tool-approval-gate-001
-      - id: ToolApprovalGate-enforces-PolicyDecision-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: 执行策略决定边界反例
-          en: Boundary counterexample for enforces policy decision
-          ja: ポリシー判断を執行するの境界反例
-        scenario_id: null
-        descriptions:
-          zh: decision-42 为 allow 但 gate 尚未验证参数时，不能声称门已 enforces 并释放。
-          en: decision-42 is allow, but before argument validation the gate cannot be claimed to have enforced and released it.
-          ja: decision-42 が allow でも引数検証前にゲートが執行・解放済みとは言えません。
-        field_values: {}
-        related_node_ids:
-          - ToolApprovalGate
-          - PolicyDecision
-        related_relation_ids:
-          - ToolApprovalGate-enforces-PolicyDecision
-        expected_result:
-          zh: 门保持 pending，决定保持 allow。
-          en: The gate remains pending while the decision remains allow.
-          ja: ゲートは pending、判断は allow のままです。
-        why_valid_or_invalid:
-          zh: 拥有决定与已执行决定是两个阶段。
-          en: Having a decision and enforcing it are separate stages.
-          ja: 判断保有と判断執行は別段階です。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-tool-approval-gate-002
-          - claim-tool-approval-gate-001
     source_claims:
-      - claim-tool-approval-gate-002
-      - claim-tool-approval-gate-001
+      - claim-tool-approval-gate-design
+      - claim-tool-approval-gate-design
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:PolicyDecision
   - id: ToolApprovalGate-gates-ToolCallAttempt
     predicate: gates
@@ -433,73 +409,11 @@ relations:
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
-    examples:
-      - id: ToolApprovalGate-gates-ToolCallAttempt-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: 门控工具调用尝试正例
-          en: Positive gates tool-call attempt case
-          ja: ツール呼出試行をゲートするの正例
-        scenario_id: null
-        descriptions:
-          zh: tool-gate-42 只门控 tool-attempt-42，gate 与 attempt 共享参数摘要 sha256:args42。
-          en: tool-gate-42 gates only tool-attempt-42 and both records share argument digest sha256:args42.
-          ja: tool-gate-42 は tool-attempt-42 だけをゲートし両記録は引数ダイジェスト sha256:args42 を共有します。
-        field_values: {}
-        related_node_ids:
-          - ToolApprovalGate
-          - ToolCallAttempt
-        related_relation_ids:
-          - ToolApprovalGate-gates-ToolCallAttempt
-        expected_result:
-          zh: 释放动作仅作用于该尝试。
-          en: Release applies only to that attempt.
-          ja: release はその試行だけに適用されます。
-        why_valid_or_invalid:
-          zh: 尝试身份和参数摘要共同限定门控对象。
-          en: Attempt identity and argument digest jointly delimit the gated object.
-          ja: 試行同一性と引数ダイジェストが共同でゲート対象を限定します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-tool-approval-gate-001
-          - claim-tool-approval-gate-003
-      - id: ToolApprovalGate-gates-ToolCallAttempt-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: 门控工具调用尝试边界反例
-          en: Boundary counterexample for gates tool-call attempt
-          ja: ツール呼出試行をゲートするの境界反例
-        scenario_id: null
-        descriptions:
-          zh: tool-attempt-43 与 tool-attempt-42 使用同一工具但参数摘要不同，不能复用 tool-gate-42。
-          en: tool-attempt-43 uses the same tool as tool-attempt-42 but a different argument digest and cannot reuse tool-gate-42.
-          ja: tool-attempt-43 は tool-attempt-42 と同じツールでも引数ダイジェストが異なり tool-gate-42 を再利用できません。
-        field_values: {}
-        related_node_ids:
-          - ToolApprovalGate
-          - ToolCallAttempt
-        related_relation_ids:
-          - ToolApprovalGate-gates-ToolCallAttempt
-        expected_result:
-          zh: 新尝试需要新的请求、决定和门控。
-          en: The new attempt requires a new request, decision, and gate.
-          ja: 新試行には新要求・判断・ゲートが必要です。
-        why_valid_or_invalid:
-          zh: 工具名称相同不等于尝试或授权对象相同。
-          en: The same tool name does not make attempt or authorization object identical.
-          ja: 同じツール名でも試行・認可対象は同一ではありません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-tool-approval-gate-001
-          - claim-tool-approval-gate-003
     source_claims:
-      - claim-tool-approval-gate-001
-      - claim-tool-approval-gate-003
+      - claim-tool-approval-gate-design
+      - claim-tool-approval-gate-design
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:ToolCallAttempt
   - id: ToolApprovalGate-is_a-Gate
     predicate: is_a
@@ -528,112 +442,76 @@ relations:
     temporal_scope: timeless
     boundary_context: null
     constraints: []
-    examples:
-      - id: ToolApprovalGate-is_a-Gate-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: 是一种门控能力正例
-          en: Positive is a gate capability case
-          ja: ゲート能力の一種であるの正例
-        scenario_id: null
-        descriptions:
-          zh: tool-gate@3 在工具调用控制点评估 decision、grant 与参数摘要，并对具体尝试给出 released。
-          en: tool-gate@3 evaluates decision, grant, and argument digest at a tool-call control point and returns released for the concrete attempt.
-          ja: tool-gate@3 はツール呼出制御点で decision・grant・引数ダイジェストを評価し具体試行へ released を返します。
-        field_values: {}
-        related_node_ids:
-          - ToolApprovalGate
-          - Gate
-        related_relation_ids:
-          - ToolApprovalGate-is_a-Gate
-        expected_result:
-          zh: 它保留 Gate 能力身份，并应用工具授权专属约束。
-          en: It retains Gate capability identity and applies tool-authorization-specific constraints.
-          ja: Gate 能力同一性を保ち、ツール認可固有制約を適用します。
-        why_valid_or_invalid:
-          zh: 该能力满足上位 Gate 的控制点语义并具备更窄的工具调用种差。
-          en: The capability satisfies the Gate control-point semantics and adds a narrower tool-call differentia.
-          ja: 能力は上位 Gate の制御点意味を満たし、より狭いツール呼出種差を加えます。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-tool-approval-gate-002
-          - claim-tool-approval-gate-001
-          - claim-tool-approval-gate-003
-      - id: ToolApprovalGate-is_a-Gate-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: 是一种门控能力边界反例
-          en: Boundary counterexample for is a gate capability
-          ja: ゲート能力の一種であるの境界反例
-        scenario_id: null
-        descriptions:
-          zh: PolicyDecision decision-42 是门控读取的授权结果，但它本身不评估控制点证据，因此不是 ToolApprovalGate。
-          en: PolicyDecision decision-42 is authorization output read by the gate but does not evaluate control-point evidence and is not a ToolApprovalGate.
-          ja: PolicyDecision decision-42 はゲートが読む認可結果ですが制御点証拠を評価せず ToolApprovalGate ではありません。
-        field_values: {}
-        related_node_ids:
-          - ToolApprovalGate
-          - Gate
-        related_relation_ids:
-          - ToolApprovalGate-is_a-Gate
-        expected_result:
-          zh: 决定保持信息对象，门保持可执行控制能力。
-          en: The decision remains information and the gate remains an executable control capability.
-          ja: 判断は情報対象、ゲートは実行可能制御能力のままです。
-        why_valid_or_invalid:
-          zh: 结果信息与执行该结果的能力具有不同身份和生命周期。
-          en: Result information and the capability enforcing it have different identities and lifecycles.
-          ja: 結果情報とそれを執行する能力は同一性・ライフサイクルが異なります。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-tool-approval-gate-002
-          - claim-tool-approval-gate-001
-          - claim-tool-approval-gate-003
     source_claims:
-      - claim-tool-approval-gate-002
-      - claim-tool-approval-gate-001
-      - claim-tool-approval-gate-003
+      - claim-tool-approval-gate-design
+      - claim-tool-approval-gate-design
+      - claim-tool-approval-gate-design
     distinct_fact_rationale: null
     layout_role: secondary-backbone
-    review_status: accepted
     target: concept:Gate
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-safety-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 XACML 3.0、NIST SP 800-162、OAuth/MCP 授权与 Cursor 工具批准模式逐项人工语义核验；三值策略决定与授权闭环成立。
-    en: Manually verified against XACML 3.0, NIST SP 800-162, OAuth/MCP authorization, and Cursor-style tool approval; three-valued policy decisions and authorization loop hold.
-    ja: XACML 3.0、NIST SP 800-162、OAuth/MCP authorization、Cursor-style tool approval に照らし手動意味審査を完了しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: mcp-authorization-2025
+    title: MCP Authorization Specification (2025-06-18)
+    url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+    source_type: standard
+    relevance: OAuth 2.1 authorization-code/PKCE, protected-resource metadata, resource indicators, and scopes.
+  - id: opa-rego
+    title: Open Policy Agent — Rego language
+    url: https://www.openpolicyagent.org/docs/latest/policy-language/
+    source_type: official-doc
+    relevance: Versioned policy rules, deny/allow effects, and combining evaluation for authorization.
+  - id: xacml-3-core
+    title: OASIS XACML 3.0 Core
+    url: https://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-cos01-en.html
+    source_type: standard
+    relevance: Permit/Deny/NotApplicable decisions, policy rules, conditions, and combining algorithms.
+  - id: nist-sp-800-162
+    title: NIST SP 800-162 — ABAC
+    url: https://csrc.nist.gov/publications/detail/sp/800-162/final
+    source_type: standard
+    relevance: Subject-object-operation-environment attribute evaluation for authorization.
+  - id: owasp-llm-top10-2025
+    title: OWASP Top 10 for LLM Applications 2025
+    url: https://owasp.org/www-project-top-10-for-large-language-model-applications/
+    source_type: standard
+    relevance: Excessive agency, insecure plugin design, and human-in-the-loop authorization patterns.
+  - id: cursor-terminal-sandbox
+    title: Cursor Agent Terminal
+    url: https://cursor.com/docs/agent/terminal
+    source_type: official-doc
+    relevance: Command allowlist/denylist and sandbox modes for tool approval.
+  - id: claude-code-permissions
+    title: Claude Code permissions
+    url: https://docs.anthropic.com/en/docs/claude-code/permissions
+    source_type: official-doc
+    relevance: yesAllow, allowForSession, Bash/edit/MCP permission modes.
+  - id: safety-permission-design
+    title: Moonweave permission-policy module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: "Authorization loop: request, evaluation, decision, grant, gate, and human approval separation."
 source_claims:
-  - id: claim-tool-approval-gate-001
-    source: eng-fw-langgraph-interrupts
-    supports: LangGraph interrupts persist execution state, expose a payload to an external reviewer, and resume with an explicit Command value rather than implying approval from a pause.
-    locator: LangGraph documentation > Interrupts > pause using interrupt and resume using Command with persisted state
-    evidence_kind: official
+  - id: claim-tool-approval-gate-design
+    source: safety-permission-design
+    supports: ToolApprovalGate enforces decision+grant+attempt alignment at execution control point.
+    locator: ToolApprovalGate boundary
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-tool-approval-gate-002
-    source: eng-policy-opa
-    supports: OPA documents structured input evaluated against policy and data to produce a policy decision, while enforcement remains the caller's responsibility.
-    locator: Open Policy Agent documentation > What is OPA? > policy input, evaluation, decision output, and separation from enforcement
-    evidence_kind: official
+  - id: claim-tool-approval-gate-design
+    source: claude-code-permissions
+    supports: Claude yesAllow/allowForSession pre-spawn checks map to ToolApprovalGate.
+    locator: Permission modes
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-tool-approval-gate-003
-    source: eng-proto-mcp-auth
-    supports: The MCP authorization specification binds protected resources, resource indicators, authorization-server metadata, and OAuth scopes in an authorization flow.
-    locator: MCP 2025-06-18 Authorization specification > authorization flow, protected-resource metadata, resource indicators, and scopes
-    evidence_kind: normative
+  - id: claim-tool-approval-gate-design
+    source: mcp-authorization-2025
+    supports: MCP requireApproval host enforcement maps to ToolApprovalGate pause/release.
+    locator: Host gate
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
+  - id: claim-tool-approval-gate-design
+    source: cursor-terminal-sandbox
+    supports: Cursor sandbox pre-spawn verification maps to ToolApprovalGate block/release.
+    locator: Terminal gate
+    evidence_kind: design-inference
+    confidence: high

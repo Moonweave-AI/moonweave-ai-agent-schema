@@ -1,614 +1,208 @@
 schema: moonweave.ai/ontology-node/v1
 id: MemoryCompaction
 kind: concept
-status: accepted
 labels:
   zh: 记忆压缩
   en: Memory compaction
   ja: 記憶圧縮
 semantics:
   short_definition:
-    zh: 在保持预定语义与证据锚点的前提下降低记录体积的综合操作。
-    en: A synthesis operation reducing record size while preserving intended semantics and evidence anchors.
-    ja: 意図semanticsとevidence anchorを保持しrecord sizeを減らすsynthesis operationです。
+    zh: 摘要长上下文以释放窗口空间的合成活动。
+    en: Synthesis activity summarizing long context to reclaim window space.
+    ja: 長 context を要約して window 空間を回収する synthesis activity。
   definition:
-    zh: MemoryCompaction 以减少存储、历史或上下文占用为首要目标，输出较小但语义等价范围明确的 MemoryRecord；若输出新增跨实例规律，则是 Consolidation，若输出行动教训，则是 Reflection。
-    en: MemoryCompaction primarily reduces storage, history, or context footprint and produces a smaller MemoryRecord with an explicit semantic-equivalence scope. New cross-instance patterns are Consolidation; derived action lessons are Reflection.
-    ja: MemoryCompaction はstorage/history/context footprint削減を主目的にsemantic-equivalence範囲を明示した小さい MemoryRecordを生成します。new cross-instance patternはConsolidation、action lessonはReflectionです。
+    zh: MemoryCompaction 是 MemorySynthesisOperation：消费一段超长对话或 context 历史，产生更短的 summary record 以替代或代表原内容供后续检索。Claude auto-compact 与通用 context summarization 是典型映射；不同于 MemoryMerge 的 deduplicate，压缩目标是 token/window 预算而非语义重复删除。
+    en: MemoryCompaction is a MemorySynthesisOperation consuming an overlong conversation or context history to produce a shorter summary record representing original content for later retrieval. Claude auto-compact and general context summarization are typical mappings; unlike MemoryMerge deduplication, compaction targets token/window budget rather than semantic duplicate removal.
+    ja: MemoryCompaction は超长 conversation/context history を consume し短い summary record を生成する MemorySynthesisOperation。Claude auto-compact/context summarization が典型。MemoryMerge dedup とは異なり token/window budget が目的。
   why_needed:
-    zh: 确保压缩不是无条件摘要，而有保真范围与可回查锚点。
-    en: Ensures compaction is not unconstrained summarization but has a fidelity scope and retrievable anchors.
-    ja: compactionを無制約summarizationでなくfidelity範囲とretrievable anchor付きにします。
+    zh: 若不单独建模压缩，Claude auto-compact 会被误记为 DELETE 或 UPDATE，丢失被摘要内容的 lineage。
+    en: Without modeling compaction separately, Claude auto-compact gets misrecorded as DELETE or UPDATE, losing lineage of summarized content.
+    ja: compaction を分離しないと Claude auto-compact が DELETE/UPDATE と誤記録され lineage 喪失。
   includes:
-    - zh: 纳入历史折叠、冗余字段消除和可验证摘要化。
-      en: Includes history folding, redundant-field removal, and verifiable summarization.
-      ja: history folding・redundant-field removal・verifiable summarizationを含みます。
+    - zh: 纳入 Claude auto-compact、会话滚动摘要与 context window 管理型 summarization。
+      en: Includes Claude auto-compact, rolling session summarization, and context-window management summarization.
+      ja: Claude auto-compact/rolling session summary/context window summarization。
   excludes:
-    - zh: 排除丢失关键约束的有损概括和把多次观测归纳成新规律。
-      en: Excludes lossy abstraction that drops critical constraints and induction of a new pattern from repeated observations.
-      ja: critical constraintを落とすlossy abstractionと反復observationからnew patternを導くことを除外します。
+    - zh: 排除 deduplicate 合并、反思 insight 生成与物理删除。
+      en: Excludes deduplicate merge, reflection insight generation, and physical deletion.
+      ja: deduplicate merge/reflection insight/物理 delete を除外。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: "映射 Claude Code auto-compact；当 context 接近上限时生成 summary 块替换早期消息；compact_operation_id 记录 pre_compact_token_count、post_compact_token_count 与 summary_record_id。"
+    en: "Map Claude Code auto-compact; when context nears limit, generate summary block replacing early messages; compact_operation_id records pre_compact_token_count, post_compact_token_count, and summary_record_id."
+    ja: Claude auto-compact を写像。pre/post token count と summary_record_id を記録。
+  typical_input:
+    - description: Context nearing window limit
+      format: |
+        {"compact_operation_id": "compact-700", "pre_compact_token_count": 180000, "trigger": "auto-compact"}
+      source_claims: [claim-compaction-claude]
+  typical_output:
+    - description: Compact summary record
+      format: |
+        {
+          "summary_record_id": "record-summary-700-v1",
+          "post_compact_token_count": 42000,
+          "compacted_message_range": [0, 840]
+        }
+      source_claims: [claim-compaction-design]
+  reference_implementations:
+    - name: Claude Code
+      url: https://docs.anthropic.com/en/docs/claude-code
+      description: Auto-compact summarizes prior conversation context.
+    - name: LangGraph Store
+      url: https://langchain-ai.github.io/langgraph/reference/store/
+      description: Optional summary Items for long-running threads.
 structure:
-  identity_keys:
-    - compaction_operation_id
+  identity_keys: [compact_operation_id]
   fields:
-    - id: compaction_operation_id
-      labels:
-        zh: 压缩操作标识
-        en: compaction operation ID
-        ja: compaction operation ID
+    - id: compact_operation_id
+      labels: {zh: 压缩操作标识, en: Compaction operation identifier, ja: 圧縮操作識別子}
+      definitions:
+        zh: 标识一次上下文压缩活动。
+        en: Identifies one context compaction activity.
+        ja: 一 context compaction activity を識別。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 标识一次保真压缩活动。
-        en: Identifies one fidelity-bounded compaction activity.
-        ja: 一fidelity-bounded compaction activityを識別します。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
-      example_value: compact-920
-      source_claims:
-        - claim-memory-compaction-002
-    - id: preserved_anchor_ids
-      labels:
-        zh: 保留锚点标识
-        en: preserved anchor IDs
-        ja: preserved anchor IDs
-      datatype: array[string]
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 列出压缩后仍可回查的证据或原始片段。
-        en: Lists evidence or original fragments still retrievable after compaction.
-        ja: compaction後もretrieveできるevidence/original fragmentを列挙します。
+      example_value: compact-700
       allowed_values: []
+      source_claims: [claim-compaction-id]
+    - id: pre_compact_token_count
+      labels: {zh: 压缩前 token 数, en: Pre-compact token count, ja: 圧縮前 token 数}
+      definitions:
+        zh: 压缩触发前的估计 token 数。
+        en: Estimated token count before compaction triggered.
+        ja: 圧縮 trigger 前の推定 token 数。
+      datatype: integer
+      required: false
+      cardinality: {min: 0, max: 1}
       pattern: null
-      example_value:
-        - turn-44
-        - tool-17
-      source_claims:
-        - claim-memory-compaction-003
+      example_value: 180000
+      allowed_values: []
+      source_claims: [claim-compaction-claude]
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: MemoryCompaction-example-positive-manual-20260716
-    kind: positive
-    labels:
-      zh: 记忆压缩正例
-      en: "Positive case: Memory compaction"
-      ja: 記憶圧縮正例
-    scenario_id: null
+  - id: MemoryCompaction-example-claude-auto
+    labels: {zh: Claude auto-compact, en: Claude auto-compact, ja: Claude auto-compact}
     descriptions:
-      zh: memory-op-compaction-001 将十二条重复工具失败日志压缩为一条较小的后继记录；它保留 error_code、do-not-export 约束和全部来源锚点，保真检查通过后才发布。
-      en: memory-op-compaction-001 compresses twelve repetitive tool-failure logs into one smaller successor record; it retains the error code, the do-not-export constraint, and every source anchor and publishes only after the fidelity check passes.
-      ja: memory-op-compaction-001 は十二件の反復ツール失敗ログを小さい後継記録へ圧縮し、error code・do-not-export 制約・全出典アンカーを保持して、忠実度検査の合格後にだけ公開します。
-    field_values:
-      operation_id: memory-op-compaction-001
-      reason: context budget requires provenance-preserving compaction
-      compaction_operation_id: memory-op-compaction-001
-      preserved_anchor_ids:
-        - error-code-E42
-        - constraint-do-not-export
-        - source-log-01
-        - source-log-02
-        - source-log-03
-        - source-log-04
-        - source-log-05
-        - source-log-06
-        - source-log-07
-        - source-log-08
-        - source-log-09
-        - source-log-10
-        - source-log-11
-        - source-log-12
-      synthesis_operation_id: memory-op-compaction-001
-      synthesis_goal: compression-with-fidelity
-      revision_operation_id: memory-op-compaction-001
-      predecessor_record_ids:
-        - source-log-01
-        - source-log-02
-        - source-log-03
-        - source-log-04
-        - source-log-05
-        - source-log-06
-        - source-log-07
-        - source-log-08
-        - source-log-09
-        - source-log-10
-        - source-log-11
-        - source-log-12
-      started_at: 2026-07-16T13:15:00Z
-    related_node_ids:
-      - MemoryCompaction
-      - MemorySynthesisOperation
-    related_relation_ids:
-      - MemoryCompaction-is_a-MemorySynthesisOperation
-    expected_result:
-      zh: 把 compact-920 认定为 MemoryCompaction，并仅在保真报告通过后发布较小记录及其受保护锚点清单。
-      en: Treat compact-920 as MemoryCompaction and publish the smaller record with its protected-anchor list only after the fidelity report succeeds.
-      ja: compact-920 を MemoryCompaction と認定し、fidelity report 成功後にのみ smaller record と protected-anchor list を公開します。
-    why_valid_or_invalid:
-      zh: 主要效果是降低持久化和上下文占用，输出拥有新身份且在声明范围内保持语义等价，没有额外归纳稳定偏好或行动教训。
-      en: Its primary effect is lower storage and context footprint; the new output preserves declared semantic equivalence without deriving a stable preference or action lesson.
-      ja: 主効果は storage/context footprint 削減で、新 output は declared semantic equivalence を保ち stable preference や action lesson を導出しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-compaction-001
-  - id: MemoryCompaction-example-instance-manual-20260716
-    kind: instance
-    labels:
-      zh: 保留证据锚点的记忆压缩实例
-      en: Memory-compaction instance preserving evidence anchors
-      ja: 証拠アンカーを保持する記憶圧縮インスタンス
-    scenario_id: MemoryCompaction:instance:memory-op-compaction-001
-    descriptions:
-      zh: 在一次模型调用前，memory-op-compaction-001 消费 memory-record-tool-failures-v12，将十二段重复失败日志压缩为 memory-record-tool-failures-v13，并保留错误码、安全约束及十二个原始日志锚点。
-      en: Before one model call, memory-op-compaction-001 consumes memory-record-tool-failures-v12, compacts twelve repetitive failure logs into memory-record-tool-failures-v13, and preserves the error code, safety constraint, and twelve original-log anchors.
-      ja: 一回のモデル呼出し前に、memory-op-compaction-001 は memory-record-tool-failures-v12 を消費し、十二件の反復失敗ログを memory-record-tool-failures-v13 へ圧縮し、error code・安全制約・十二の原ログアンカーを保持します。
-    field_values:
-      operation_id: memory-op-compaction-001
-      reason: context budget requires provenance-preserving compaction
-      compaction_operation_id: memory-op-compaction-001
-      preserved_anchor_ids:
-        - error-code-E42
-        - constraint-do-not-export
-        - source-log-01
-        - source-log-02
-        - source-log-03
-        - source-log-04
-        - source-log-05
-        - source-log-06
-        - source-log-07
-        - source-log-08
-        - source-log-09
-        - source-log-10
-        - source-log-11
-        - source-log-12
-    related_node_ids:
-      - MemoryCompaction
-      - MemorySynthesisOperation
-      - MemoryRecord
-    related_relation_ids:
-      - MemoryCompaction-is_a-MemorySynthesisOperation
-      - MemoryCompaction-consumes-MemoryRecord
-      - MemoryCompaction-produces-MemoryRecord
-    expected_result:
-      zh: 查询返回一次 MemoryCompaction 活动、其输入与后继 MemoryRecord，并证明每个受保护事实仍可沿 preserved_anchor_ids 回查到原始日志。
-      en: The query returns one MemoryCompaction activity, its input and successor MemoryRecord, and proves that every protected fact remains traceable to an original log through preserved_anchor_ids.
-      ja: 照会は一つの MemoryCompaction 活動、その入力と後継 MemoryRecord を返し、各保護事実が preserved_anchor_ids から原ログへ追跡できることを示します。
-    why_valid_or_invalid:
-      zh: 该实例的首要效果是降低上下文占用；输入、输出和保留锚点均被明确记录，且没有从多次观测推导新规律或行动教训，因此属于 Compaction 而不是 Consolidation 或 Reflection。
-      en: Its primary effect is reducing context footprint; input, output, and retained anchors are explicit, and it derives neither a new cross-observation pattern nor an action lesson, so it is Compaction rather than Consolidation or Reflection.
-      ja: 主効果は文脈量の削減で、入力・出力・保持アンカーが明示され、観測横断の新規則や行動教訓を導かないため、Consolidation や Reflection ではなく Compaction です。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
-    source_claims:
-      - claim-memory-compaction-001
-  - id: MemoryCompaction-example-boundary-manual-20260716
-    kind: boundary
-    labels:
-      zh: 记忆压缩边界例
-      en: "Boundary case: Memory compaction"
-      ja: 記憶圧縮境界例
-    scenario_id: MemoryCompaction:boundary:20260716
-    descriptions:
-      zh: compact-921 虽把摘要继续缩短，却删除用户明确的 do-not-export 约束；fidelity_report 的 safety_constraint 检查失败，输出仍被标为候选。
-      en: compact-921 shortens the summary further but removes the user's explicit do-not-export constraint; fidelity_report fails safety_constraint and leaves the output as a candidate.
-      ja: compact-921 は summary をさらに短くしますが user の explicit do-not-export constraint を削除し、fidelity_report は safety_constraint で fail して output は candidate のままです。
-    field_values: {}
-    related_node_ids:
-      - MemoryCompaction
+      zh: compact-700 在 context 接近上限时触发 Claude auto-compact，180k token 摘要为 42k，产生 record-summary-700-v1。
+      en: compact-700 triggers Claude auto-compact near context limit, summarizing 180k tokens to 42k, producing record-summary-700-v1.
+      ja: context 上限近くで compact-700 が auto-compact、180k→42k token。
+    example_source: {product: Claude Code, url: https://docs.anthropic.com/en/docs/claude-code, version: auto-compact}
+    field_values: {compact_operation_id: compact-700, pre_compact_token_count: 180000, post_compact_token_count: 42000}
+    related_node_ids: [MemoryCompaction, MemorySynthesisOperation]
     related_relation_ids: []
-    expected_result:
-      zh: 拒绝把 compact-921 记为成功的 MemoryCompaction；保存失败结果并继续使用原记录，直到新候选通过全部保真检查。
-      en: Do not record compact-921 as a successful MemoryCompaction; retain the failure result and original record until a new candidate passes every fidelity check.
-      ja: compact-921 を成功 MemoryCompaction とせず failure result と original record を保持し、new candidate が全 fidelity check を通るまで置換しません。
-    why_valid_or_invalid:
-      zh: 体积更小不能补偿安全语义丢失；缺少受保护约束会改变后续披露行为，所以该候选不满足声明的语义等价范围。
-      en: A smaller footprint cannot compensate for lost safety semantics; omitting the protected constraint changes later disclosure behavior and violates the declared equivalence scope.
-      ja: smaller footprint は lost safety semantics を補えず、protected constraint 欠落は後続 disclosure behavior を変えて declared equivalence scope に違反します。
-    synthetic: false
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-compaction-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: MemoryConsolidation
-    shared_parent_concept_id: MemorySynthesisOperation
-    differentia:
-      zh: 正向身份比较：父节点 MemorySynthesisOperation：MemoryCompaction（semantic kind=activity，骨架 MemoryCompaction-is_a-MemorySynthesisOperation）；MemoryConsolidation（semantic kind=activity，骨架 MemoryConsolidation-is_a-MemorySynthesisOperation）。双端条件：MemoryCompaction 条件：“在保持预定语义与证据锚点的前提下降低记录体积的综合操作”；MemoryConsolidation 条件：“从重复或相关观测形成更稳定、概括层次更高记录的综合操作”。仅依据各自定义与骨架逐端验证。
-      en: "Positive identity comparison: parent MemorySynthesisOperation: MemoryCompaction (semantic kind=activity, backbone MemoryCompaction-is_a-MemorySynthesisOperation); MemoryConsolidation (semantic kind=activity, backbone MemoryConsolidation-is_a-MemorySynthesisOperation). Endpoint conditions: MemoryCompaction condition: “A synthesis operation reducing record size while preserving intended semantics and evidence anchors”; MemoryConsolidation condition: “A synthesis operation forming a more stable, more generalized record from repeated or related observations”. Verify each endpoint from its own definition and backbone."
-      ja: 正の同一性比較：親 MemorySynthesisOperation：MemoryCompaction（semantic kind=activity、バックボーン MemoryCompaction-is_a-MemorySynthesisOperation）；MemoryConsolidation（semantic kind=activity、バックボーン MemoryConsolidation-is_a-MemorySynthesisOperation）。両端条件：MemoryCompaction の条件：「意図semanticsとevidence anchorを保持しrecord sizeを減らすsynthesis operationです」；MemoryConsolidation の条件：「反復/関連observationからよりstableで高抽象recordを形成するsynthesis operationです」。各端を固有の定義とバックボーンで検証します。
-    source_claims:
-      - claim-memory-compaction-004
-  - sibling_concept_id: MemoryMerge
-    shared_parent_concept_id: MemorySynthesisOperation
-    differentia:
-      zh: 正向身份比较：父节点 MemorySynthesisOperation：MemoryCompaction（semantic kind=activity，骨架 MemoryCompaction-is_a-MemorySynthesisOperation）；MemoryMerge（semantic kind=activity，骨架 MemoryMerge-is_a-MemorySynthesisOperation）。双端条件：MemoryCompaction 条件：“在保持预定语义与证据锚点的前提下降低记录体积的综合操作”；MemoryMerge 条件：“组合两个以上记录并尽量保留各自声明和证据的综合操作”。仅依据各自定义与骨架逐端验证。
-      en: "Positive identity comparison: parent MemorySynthesisOperation: MemoryCompaction (semantic kind=activity, backbone MemoryCompaction-is_a-MemorySynthesisOperation); MemoryMerge (semantic kind=activity, backbone MemoryMerge-is_a-MemorySynthesisOperation). Endpoint conditions: MemoryCompaction condition: “A synthesis operation reducing record size while preserving intended semantics and evidence anchors”; MemoryMerge condition: “A synthesis operation combining two or more records while preserving their claims and evidence as far as possible”. Verify each endpoint from its own definition and backbone."
-      ja: 正の同一性比較：親 MemorySynthesisOperation：MemoryCompaction（semantic kind=activity、バックボーン MemoryCompaction-is_a-MemorySynthesisOperation）；MemoryMerge（semantic kind=activity、バックボーン MemoryMerge-is_a-MemorySynthesisOperation）。両端条件：MemoryCompaction の条件：「意図semanticsとevidence anchorを保持しrecord sizeを減らすsynthesis operationです」；MemoryMerge の条件：「二つ以上のrecordを組合せ各claim/evidenceを可能な限り保持するsynthesis operationです」。各端を固有の定義とバックボーンで検証します。
-    source_claims:
-      - claim-memory-compaction-005
-  - sibling_concept_id: MemoryReflection
-    shared_parent_concept_id: MemorySynthesisOperation
-    differentia:
-      zh: 已审查兄弟区分：父节点 MemorySynthesisOperation：MemoryCompaction（semantic kind=activity，骨架 MemoryCompaction-is_a-MemorySynthesisOperation）；MemoryReflection（semantic kind=activity，骨架 MemoryReflection-is_a-MemorySynthesisOperation）。双端条件：MemoryCompaction 条件：“在保持预定语义与证据锚点的前提下降低记录体积的综合操作”；MemoryReflection 条件：“基于可观察结果与反馈形成可复用经验或行动教训的综合操作”。任一条件成立不推出另一端。
-      en: "Reviewed sibling distinction: parent MemorySynthesisOperation: MemoryCompaction (semantic kind=activity, backbone MemoryCompaction-is_a-MemorySynthesisOperation); MemoryReflection (semantic kind=activity, backbone MemoryReflection-is_a-MemorySynthesisOperation). Endpoint conditions: MemoryCompaction condition: “A synthesis operation reducing record size while preserving intended semantics and evidence anchors”; MemoryReflection condition: “A synthesis operation deriving a reusable lesson or procedure from observable outcomes and feedback”. Either condition leaves the other unproven."
-      ja: 審査済み兄弟区別：親 MemorySynthesisOperation：MemoryCompaction（semantic kind=activity、バックボーン MemoryCompaction-is_a-MemorySynthesisOperation）；MemoryReflection（semantic kind=activity、バックボーン MemoryReflection-is_a-MemorySynthesisOperation）。両端条件：MemoryCompaction の条件：「意図semanticsとevidence anchorを保持しrecord sizeを減らすsynthesis operationです」；MemoryReflection の条件：「観測可能outcomeとfeedbackから再利用lesson/procedureを導くsynthesis operationです」。一方の成立は他方を証明しません。
-    source_claims:
-      - claim-memory-compaction-006
+    source_claims: [claim-compaction-claude, claim-compaction-design]
+  - id: MemoryCompaction-example-rolling
+    labels: {zh: 滚动会话摘要, en: Rolling session summary, ja: ローリング session 要約}
+    descriptions:
+      zh: compact-701 每 N 轮对话生成 rolling summary 写入 LangGraph store 供跨 session 检索。
+      en: compact-701 generates rolling summary every N turns into LangGraph store for cross-session retrieval.
+      ja: N turn 毎 rolling summary を LangGraph store へ。
+    example_source: {product: LangGraph, url: https://langchain-ai.github.io/langgraph/reference/store/, version: summary Item}
+    field_values: {compact_operation_id: compact-701}
+    related_node_ids: [MemoryCompaction, memory-context]
+    related_relation_ids: []
+    source_claims: [claim-compaction-langgraph, claim-compaction-design]
+  - id: MemoryCompaction-example-not-delete
+    labels: {zh: 压缩非删除, en: Compaction is not delete, ja: compaction は delete ではない}
+    descriptions:
+      zh: compact-700 产生 summary record 代表早期消息；delete-310 产生 tombstone 且无 summary 替代。
+      en: compact-700 produces summary record representing early messages; delete-310 produces tombstone with no summary replacement.
+      ja: compaction は summary 代替、delete は tombstone。
+    example_source: {product: Moonweave, url: https://moonweave.ai/ontology/agent-system/2.0.0/, version: boundary}
+    field_values: {}
+    related_node_ids: [MemoryCompaction, MemoryDelete]
+    related_relation_ids: []
+    source_claims: [claim-compaction-design]
+  - id: MemoryCompaction-example-not-reflection
+    labels: {zh: 压缩非反思, en: Compaction is not reflection, ja: compaction は reflection ではない}
+    descriptions:
+      zh: reflect-600 生成 introspective insight；compact-700 生成 context window 摘要以节省 token。
+      en: reflect-600 generates introspective insight; compact-700 generates context window summary to save tokens.
+      ja: reflection は insight、compaction は token 節約 summary。
+    example_source: {product: Moonweave, url: https://moonweave.ai/ontology/agent-system/2.0.0/, version: boundary}
+    field_values: {}
+    related_node_ids: [MemoryCompaction, MemoryReflection]
+    related_relation_ids: []
+    source_claims: [claim-compaction-design]
 parent_relation:
   id: MemoryCompaction-is_a-MemorySynthesisOperation
   predicate: is_a
   direction: target-to-source
   relation_kind: hierarchy
-  labels:
-    zh: 是一种记忆综合操作
-    en: is a memory synthesis operation
-    ja: 記憶統合操作の一種
+  labels: {zh: 是一种记忆合成操作, en: is a memory synthesis operation, ja: 記憶合成操作の一種}
   definitions:
-    zh: MemoryCompaction —is_a→ MemorySynthesisOperation 表示：首要效果是降低存储或上下文体积，同时声明并满足语义保真范围。
-    en: MemoryCompaction —is_a→ MemorySynthesisOperation holds because the primary effect is lower storage or context footprint while an explicit semantic-fidelity scope is satisfied
-    ja: MemoryCompaction —is_a→ MemorySynthesisOperation は、主effectがstorage/context footprint削減で明示semantic-fidelity範囲を満たすため成立します。
+    zh: MemoryCompaction —is_a→ MemorySynthesisOperation 表示长 context 被摘要为更短 summary record。
+    en: MemoryCompaction —is_a→ MemorySynthesisOperation holds because long context is summarized into a shorter summary record.
+    ja: 長 context を短 summary record に要約するため成立。
   cardinality: null
   cardinality_not_applicable_reason:
     zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
     en: The relation is decided per auditable fact; no uniform runtime cardinality is imposed at ontology level.
-    ja: このrelationはaudit可能fact単位で判定しontology層で全runtime instanceへ一律cardinalityを課しません。
-  inverse_reading:
-    predicate: part_of
-    labels:
-      zh: 反向读取
-      en: inverse is a memory synthesis operation
-      ja: 逆方向読取
+    ja: このrelationはaudit可能fact単位で判定。
+  inverse_reading: {predicate: part_of, labels: {zh: 反向读取, en: inverse is_a, ja: 逆方向読取}}
   conditions:
-    - id: MemoryCompaction-is_a-MemorySynthesisOperation-condition-manual-001
+    - id: MemoryCompaction-is_a-MemorySynthesisOperation-condition-001
       severity: error
       expression_language: plain
-      expression: Assert only when the instance satisfies the child differentia—the primary effect is lower storage or context footprint while an explicit semantic-fidelity scope is satisfied—and already meets the activity definition of MemorySynthesisOperation.
+      expression: Assert only when compaction produces summary representing prior context for window management.
       explanations:
-        zh: 仅当实例满足子类种差“首要效果是降低存储或上下文体积，同时声明并满足语义保真范围。”且已满足 MemorySynthesisOperation 的活动定义时建立该边。
-        en: Assert only when the instance satisfies the child differentia—the primary effect is lower storage or context footprint while an explicit semantic-fidelity scope is satisfied—and already meets the activity definition of MemorySynthesisOperation.
-        ja: instanceがchild differentia「主effectがstorage/context footprint削減で明示semantic-fidelity範囲を満たすため成立します。」を満たし、かつ MemorySynthesisOperation のactivity定義を満たす時だけassertします。
-      source_claims:
-        - claim-memory-compaction-001
+        zh: 仅当压缩产生代表先前 context 的 summary 以管理窗口时成立。
+        en: Assert only when compaction produces summary representing prior context for window management.
+        ja: window 管理用 summary 生成時のみ。
+      source_claims: [claim-compaction-design]
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: MemoryCompaction-is_a-MemorySynthesisOperation-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 是一种记忆综合操作正例
-        en: "Positive case: is a memory synthesis operation"
-        ja: 記憶統合操作の一種正例
-      scenario_id: MemoryCompaction-is_a-MemorySynthesisOperation:positive:20260716
-      descriptions:
-        zh: compact-920 把十二条重复故障记录压成一条较小记录，同时保留 error_code、禁止导出约束和全部原始来源锚点。
-        en: compact-920 reduces twelve repetitive failure records to one smaller record while preserving error_code, the do-not-export constraint, and every source anchor.
-        ja: compact-920 は十二の反復 failure record を一つの小 record にし、error_code・do-not-export constraint・全 source anchor を保持します。
-      field_values: {}
-      related_node_ids:
-        - MemoryCompaction
-        - MemorySynthesisOperation
-      related_relation_ids:
-        - MemoryCompaction-is_a-MemorySynthesisOperation
-      expected_result:
-        zh: 将 compact-920 归为 MemoryCompaction，并记录体积降低比例与语义保真检查均已通过。
-        en: Classify compact-920 as MemoryCompaction and record both the footprint reduction and successful semantic-fidelity checks.
-        ja: compact-920 を MemoryCompaction に分類し、footprint reduction と semantic-fidelity check 成功を記録します。
-      why_valid_or_invalid:
-        zh: 主要效果是降低存储或上下文占用，且声明的保真范围逐项满足，因此区别于普通摘要或删除。
-        en: Its primary effect is lower storage or context footprint and every declared fidelity obligation passes, distinguishing compaction from summary or deletion.
-        ja: 主要 effect は storage/context footprint 削減で fidelity obligation を全て満たすため、summary や deletion と異なります。
-      synthetic: false
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-memory-compaction-001
-    - id: MemoryCompaction-is_a-MemorySynthesisOperation-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 是一种记忆综合操作边界例
-        en: "Boundary case: is a memory synthesis operation"
-        ja: 記憶統合操作の一種境界例
-      scenario_id: MemoryCompaction-is_a-MemorySynthesisOperation:boundary:20260716
-      descriptions:
-        zh: shorten-921 虽把文本缩短了 70%，却删掉“不得向外部工具发送”的安全约束，也没有保留来源锚点。
-        en: shorten-921 cuts the text by 70% but removes the do-not-send-to-external-tools constraint and drops the source anchors.
-        ja: shorten-921 は text を 70% 短縮しますが do-not-send-to-external-tools constraint と source anchor を失います。
-      field_values: {}
-      related_node_ids:
-        - MemoryCompaction
-        - MemorySynthesisOperation
-      related_relation_ids:
-        - MemoryCompaction-is_a-MemorySynthesisOperation
-      expected_result:
-        zh: 拒绝将 shorten-921 认定为 MemoryCompaction；标记保真失败，并禁止用其替代原记录。
-        en: Reject MemoryCompaction conformance for shorten-921, mark fidelity failure, and prevent it from replacing the source records.
-        ja: shorten-921 の MemoryCompaction 適合を拒否し fidelity failure を記録して source record の置換を禁止します。
-      why_valid_or_invalid:
-        zh: 尺寸变小不是充分条件；丢失强制约束改变了语义和安全边界，违反 compaction 的保真契约。
-        en: "Smaller size is insufficient: losing a mandatory constraint changes semantics and safety boundaries, violating the compaction fidelity contract."
-        ja: 小サイズだけでは不十分で、mandatory constraint 欠落は semantics と safety boundary を変え fidelity contract に違反します。
-      synthetic: false
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-memory-compaction-001
-  source_claims:
-    - claim-memory-compaction-001
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: accepted
+  examples: []
+  source_claims: [claim-compaction-design]
   endpoint_order: child-to-parent
-relations:
-  - id: MemoryCompaction-consumes-MemoryRecord
-    predicate: consumes
-    direction: source-to-target
-    relation_kind: causal
-    labels:
-      zh: 消费待压缩记录
-      en: consumes record for compaction
-      ja: compaction対象recordを消費する
-    definitions:
-      zh: MemoryCompaction —consumes→ MemoryRecord 表示该记录的内容或历史是压缩对象，并受声明的保真范围保护。
-      en: MemoryCompaction —consumes→ MemoryRecord means the record's content or history is the compaction input and is protected by the declared fidelity scope.
-      ja: MemoryCompaction —consumes→ MemoryRecord はrecord content/historyがcompaction inputでdeclared fidelity scopeにより保護されることを表します。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
-      en: The relation is decided per auditable fact; no uniform runtime cardinality is imposed at ontology level.
-      ja: このrelationはaudit可能fact単位で判定しontology層で全runtime instanceへ一律cardinalityを課しません。
-    inverse_reading:
-      predicate: inverse_consumes
-      labels:
-        zh: 反向读取
-        en: inverse consumes record for compaction
-        ja: 逆方向読取
-    conditions:
-      - id: MemoryCompaction-consumes-MemoryRecord-condition-manual-001
-        severity: error
-        expression_language: plain
-        expression: Assert only when the target is listed in input_record_ids and the compaction preservation contract explicitly applies to it.
-        explanations:
-          zh: 仅当目标列于 input_record_ids，且 compaction_preservation_contract 明确适用于它时成立。
-          en: Assert only when the target is listed in input_record_ids and the compaction preservation contract explicitly applies to it.
-          ja: targetがinput_record_idsにありcompaction preservation contractが明示適用される時だけassertします。
-        source_claims:
-          - claim-memory-compaction-001
-    temporal_scope: valid-time
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: MemoryCompaction-consumes-MemoryRecord-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 消费待压缩记录正例
-          en: "Positive case: consumes record for compaction"
-          ja: compaction対象recordを消費する正例
-        scenario_id: MemoryCompaction-consumes-MemoryRecord:positive:20260716
-        descriptions:
-          zh: compact-920 的 input_record_ids 包含 failure-log-1 至 failure-log-12，fidelity_scope 要求保留 error_code、安全约束和来源锚点。
-          en: compact-920 lists failure-log-1 through failure-log-12 in input_record_ids and protects error_code, a safety constraint, and source anchors in fidelity_scope.
-          ja: compact-920 は failure-log-1〜12 を input_record_ids に列挙し fidelity_scope で error_code・safety constraint・source anchor を保護します。
-        field_values: {}
-        related_node_ids:
-          - MemoryCompaction
-          - MemoryRecord
-        related_relation_ids:
-          - MemoryCompaction-consumes-MemoryRecord
-        expected_result:
-          zh: 为每个列明的日志记录建立 consumes，并将其受保护字段纳入压缩完成前的验证清单。
-          en: Assert consumes for each listed log record and include its protected fields in validation before compaction completes.
-          ja: 各 listed log record への consumes を確立し protected field を compaction completion 前 validation checklist に入れます。
-        why_valid_or_invalid:
-          zh: 输入身份与保真义务同时绑定，证明记录内容确实处于压缩作用域而不是偶然同会话出现。
-          en: Input identity and fidelity obligations are both bound, proving the record is within compaction scope rather than incidental session context.
-          ja: input identity と fidelity obligation が bind され record は incidental session context でなく compaction scope 内です。
-        synthetic: false
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-memory-compaction-001
-      - id: MemoryCompaction-consumes-MemoryRecord-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 消费待压缩记录边界例
-          en: "Boundary case: consumes record for compaction"
-          ja: compaction対象recordを消費する境界例
-        scenario_id: MemoryCompaction-consumes-MemoryRecord:boundary:20260716
-        descriptions:
-          zh: private-note-920 属于同一会话，但不在 input_record_ids，且访问策略禁止 background compactor 读取。
-          en: private-note-920 belongs to the same session but is absent from input_record_ids and its access policy forbids the background compactor from reading it.
-          ja: private-note-920 は同 session ですが input_record_ids に無く access policy は background compactor read を禁止します。
-        field_values: {}
-        related_node_ids:
-          - MemoryCompaction
-          - MemoryRecord
-        related_relation_ids:
-          - MemoryCompaction-consumes-MemoryRecord
-        expected_result:
-          zh: 拒绝 compact-920 consumes private-note-920，并确保输出不包含其内容或派生信息。
-          en: Reject compact-920 consumes private-note-920 and verify that output contains neither its content nor derived information.
-          ja: compact-920 consumes private-note-920 を拒否し output に content/derived information がないことを確認します。
-        why_valid_or_invalid:
-          zh: 会话范围不能扩张显式压缩与权限范围；否则后台合成会越权读取未授权记忆。
-          en: Session scope cannot expand explicit compaction and permission scope, or background synthesis would read unauthorized memory.
-          ja: session scope は explicit compaction/permission scope を拡張できず、そうすると background synthesis が unauthorized memory を読みます。
-        synthetic: false
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-memory-compaction-001
-    source_claims:
-      - claim-memory-compaction-001
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:MemoryRecord
-  - id: MemoryCompaction-produces-MemoryRecord
-    predicate: produces
-    direction: source-to-target
-    relation_kind: causal
-    labels:
-      zh: 产生压缩记录
-      en: produces compacted record
-      ja: compacted recordを生成する
-    definitions:
-      zh: MemoryCompaction —produces→ MemoryRecord 表示活动生成体积更小的新记录，并通过锚点和校验结果证明约定语义仍保留。
-      en: MemoryCompaction —produces→ MemoryRecord means the activity creates a smaller new record whose anchors and validation result demonstrate preservation of contracted semantics.
-      ja: MemoryCompaction —produces→ MemoryRecord は小さいnew recordを作りanchor/validation resultでcontracted semantics保持を示すことを表します。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
-      en: The relation is decided per auditable fact; no uniform runtime cardinality is imposed at ontology level.
-      ja: このrelationはaudit可能fact単位で判定しontology層で全runtime instanceへ一律cardinalityを課しません。
-    inverse_reading:
-      predicate: inverse_produces
-      labels:
-        zh: 反向读取
-        en: inverse produces compacted record
-        ja: 逆方向読取
-    conditions:
-      - id: MemoryCompaction-produces-MemoryRecord-condition-manual-001
-        severity: error
-        expression_language: plain
-        expression: Assert only when output identity differs, measured size decreases, all required anchors remain, and fidelity_check passes.
-        explanations:
-          zh: 仅当输出身份不同、测得体积下降、保留锚点齐全且 fidelity_check 通过时成立。
-          en: Assert only when output identity differs, measured size decreases, all required anchors remain, and fidelity_check passes.
-          ja: output identityが異なりsize低下・required anchor保持・fidelity_check pass時だけassertします。
-        source_claims:
-          - claim-memory-compaction-001
-    temporal_scope: valid-time
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: MemoryCompaction-produces-MemoryRecord-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 产生压缩记录正例
-          en: "Positive case: produces compacted record"
-          ja: compacted recordを生成する正例
-        scenario_id: MemoryCompaction-produces-MemoryRecord:positive:20260716
-        descriptions:
-          zh: compact-920 输出 failure-log-compact-v1，字节数降低 68%，且 validation_report 对 error_code、do-not-export 与十二个来源锚点全部通过。
-          en: compact-920 emits failure-log-compact-v1 with 68% fewer bytes, and validation_report passes error_code, do-not-export, and all twelve source anchors.
-          ja: compact-920 は 68% byte 削減の failure-log-compact-v1 を出力し validation_report は error_code・do-not-export・十二 source anchor を全て pass します。
-        field_values: {}
-        related_node_ids:
-          - MemoryCompaction
-          - MemoryRecord
-        related_relation_ids:
-          - MemoryCompaction-produces-MemoryRecord
-        expected_result:
-          zh: 建立 compact-920 produces failure-log-compact-v1，并记录尺寸指标与保真报告作为生成成立条件。
-          en: Assert compact-920 produces failure-log-compact-v1 and retain footprint metrics and the fidelity report as production conditions.
-          ja: compact-920 produces failure-log-compact-v1 を確立し footprint metric と fidelity report を production condition として保持します。
-        why_valid_or_invalid:
-          zh: 新记录同时满足更小占用、持久身份和声明语义不丢失，说明它是合格压缩产物而非任意摘要。
-          en: The new record simultaneously has smaller footprint, persistent identity, and preserved declared semantics, proving a conforming compaction output.
-          ja: new record は smaller footprint・persistent identity・declared semantics preservation を同時に満たし conforming compaction output です。
-        synthetic: false
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-memory-compaction-001
-      - id: MemoryCompaction-produces-MemoryRecord-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 产生压缩记录边界例
-          en: "Boundary case: produces compacted record"
-          ja: compacted recordを生成する境界例
-        scenario_id: MemoryCompaction-produces-MemoryRecord:boundary:20260716
-        descriptions:
-          zh: failure-log-short-v1 更短但漏掉 do-not-export，validation_report 在 safety_constraint 检查失败。
-          en: failure-log-short-v1 is shorter but omits do-not-export, and validation_report fails the safety_constraint check.
-          ja: failure-log-short-v1 は短いですが do-not-export を欠き validation_report は safety_constraint check failure です。
-        field_values: {}
-        related_node_ids:
-          - MemoryCompaction
-          - MemoryRecord
-        related_relation_ids:
-          - MemoryCompaction-produces-MemoryRecord
-        expected_result:
-          zh: 拒绝 compact-920 produces failure-log-short-v1；将其标为失败候选，不得替代输入记录。
-          en: Reject compact-920 produces failure-log-short-v1; mark it as a failed candidate and do not let it replace input records.
-          ja: compact-920 produces failure-log-short-v1 を拒否し failed candidate として input record 置換を禁止します。
-        why_valid_or_invalid:
-          zh: 压缩必须同时满足尺寸与保真，安全约束缺失使输出语义不同，不能只凭更短建立生成边。
-          en: Compaction requires both footprint reduction and fidelity; losing a safety constraint changes meaning, so shorter text alone cannot establish production.
-          ja: compaction は footprint reduction と fidelity の両方が必要で safety constraint 欠落は meaning を変え、短さだけでは production を確立できません。
-        synthetic: false
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-memory-compaction-001
-    source_claims:
-      - claim-memory-compaction-001
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:MemoryRecord
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-lifecycle-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 该节点仅完成了从现行候选数据到唯一 YAML 树的无损转录；尚未逐项完成人工语义核验，不得据此宣称已审定。
-    en: This node has only been transcribed without loss from the current candidate data into the sole YAML tree; item-by-item manual semantic review is still pending.
-    ja: このノードは現行候補データから唯一の YAML ツリーへ欠落なく転記した段階であり、項目別の手動意味審査は未完了です。
-  sections:
-    semantics: pending
-    hierarchy: pending
-    relations: pending
-    structure: pending
-    examples: pending
-    source_claims: []
+relations: []
+sources:
+  - id: src-claude-compaction
+    title: Claude Code Documentation
+    publisher: Anthropic
+    url: https://docs.anthropic.com/en/docs/claude-code
+    source_type: official-doc
+    relevance: Auto-compact context summarization.
+  - id: src-langgraph-compaction
+    title: LangGraph Store Reference
+    publisher: LangChain
+    url: https://langchain-ai.github.io/langgraph/reference/store/
+    source_type: official-doc
+    relevance: Summary Items for long threads.
+  - id: src-compaction-design
+    title: Moonweave memory-lifecycle module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Compaction summarizes context for window budget.
 source_claims:
-  - id: claim-memory-compaction-001
-    source: eng-fw-langmem-memory-management
-    supports: LangMem exposes distinct insert, update, and delete controls and describes collection reconciliation and consolidation; Moonweave makes their lifecycle boundaries explicit.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
+  - id: claim-compaction-claude
+    source: src-claude-compaction
+    supports: Claude auto-compact summarizes prior conversation when context nears limits.
+    locator: auto-compact
+    evidence_kind: primary-doc
+    confidence: high
+  - id: claim-compaction-langgraph
+    source: src-langgraph-compaction
+    supports: LangGraph store can hold summary Items for compacted thread history.
+    locator: BaseStore.put summary patterns
+    evidence_kind: design-inference
+    confidence: medium
+  - id: claim-compaction-design
+    source: src-compaction-design
+    supports: MemoryCompaction produces summary records to manage context window budget.
+    locator: MemoryCompaction boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-compaction-002
-    source: eng-fw-langmem-memory-management
-    supports: MemoryCompaction.compaction_operation_id records the stated operational datum so the concept instance can be identified or audited without changing the source model's own vocabulary.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
+  - id: claim-compaction-id
+    source: src-compaction-design
+    supports: compact_operation_id identifies one compaction activity.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-compaction-003
-    source: eng-fw-langmem-memory-management
-    supports: MemoryCompaction.preserved_anchor_ids records the stated operational datum so the concept instance can be identified or audited without changing the source model's own vocabulary.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-compaction-004
-    source: eng-fw-langmem-memory-management
-    supports: LangMem's memory-management model permits stored semantic memory to be updated rather than merely appended. Moonweave distinguishes MemoryCompaction by reduced representation size with intended meaning preserved, and MemoryConsolidation by increased stability or generality; LangMem does not define this pair.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-compaction-005
-    source: eng-fw-langmem-memory-management
-    supports: LangMem supports semantic-memory updates and collection-level management. Moonweave classifies MemoryCompaction by its size-reduction objective and MemoryMerge by its multi-record combination objective; a merge may occur without compaction, so their sibling distinction is a Moonweave ontology inference.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-compaction-006
-    source: eng-fw-langmem-memory-management
-    supports: LangMem's persistent-memory operations motivate treating memory transformation as an auditable operation. Moonweave separates MemoryCompaction, which preserves intended content while reducing size, from MemoryReflection, which creates a new lesson or procedure; LangMem does not assert these endpoint semantics.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

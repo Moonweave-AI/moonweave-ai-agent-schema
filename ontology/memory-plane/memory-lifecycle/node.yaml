@@ -1,1514 +1,447 @@
 schema: moonweave.ai/ontology-node/v1
 id: memory-lifecycle
 kind: module
-status: accepted
 labels:
   zh: 记忆生命周期
   en: Memory lifecycle
   ja: 記憶ライフサイクル
 semantics:
   short_definition:
-    zh: 记忆生命周期描述某个候选记忆或已存记录如何被准入、写入、修订、合并、评估、处置或解决冲突。MemoryOperation 是唯一活动根；操作结果、审计事件和冲突解决决定是活动产生的信息，而 MemoryItem、MemoryRecord、MemoryStore 与保留策略仅被引用。
-    en: Memory lifecycle is anchored by MemoryOperation and owns the activity tree for candidate admission, immutable version revision, multi-record synthesis, record disposition, pre-reuse assessment, and conflict resolution. Results, audit events, and resolution decisions attach as node information; MemoryItem, MemoryRecord, MemoryStore, MemoryTombstone, and retention policy are referenced rather than re-owned.
-    ja: Memory lifecycleはMemoryOperationをkey notionとしcandidate admission・immutable version revision・multi-record synthesis・record disposition・reuse前assessment・conflict resolutionのactivity treeを所有します。result・audit event・resolution decisionはnode informationとして付属し、MemoryItem・MemoryRecord・MemoryStore・MemoryTombstone・retention policyは再所有せず参照します。
+    zh: 描述记忆如何写入、更新、衰减与删除。
+    en: Describes how memories are written, updated, decayed, and deleted.
+    ja: 記憶の書込・更新・減衰・削除を記述します。
   definition:
-    zh: 记忆生命周期以 MemoryOperation 为关键概念，拥有候选准入、不可变版本修订、多记录综合、记录处置、复用前评估和冲突解决的活动树，并把结果、审计事件和解决决定作为节点信息挂接；它引用而不重新拥有 MemoryItem、MemoryRecord、MemoryStore、MemoryTombstone 与保留策略。
-    en: Memory lifecycle is anchored by MemoryOperation and owns the activity tree for candidate admission, immutable version revision, multi-record synthesis, record disposition, pre-reuse assessment, and conflict resolution. Results, audit events, and resolution decisions attach as node information; MemoryItem, MemoryRecord, MemoryStore, MemoryTombstone, and retention policy are referenced rather than re-owned.
-    ja: Memory lifecycleはMemoryOperationをkey notionとしcandidate admission・immutable version revision・multi-record synthesis・record disposition・reuse前assessment・conflict resolutionのactivity treeを所有します。result・audit event・resolution decisionはnode informationとして付属し、MemoryItem・MemoryRecord・MemoryStore・MemoryTombstone・retention policyは再所有せず参照します。
+    zh: 记忆生命周期以 MemoryOperation 为活动根，拥有候选准入、不可变版本修订、多记录合并、到期驱逐、删除与冲突解决等活动链。每次操作由 operation_id、发生时间、输入、原因与结果识别；MemoryOperationResult、MemoryAuditEvent 与 MemoryConflictResolutionDecision 作为活动产生的可审计信息挂接其上。MemoryItem、MemoryRecord、MemoryStore 与保留策略仅被引用而不重新拥有。摄取、分块、嵌入与检索可能触发生命周期活动，但不属于本模块子类。
+    en: Memory lifecycle anchors on MemoryOperation and owns activity chains for candidate admission, immutable version revision, multi-record merge, expiry eviction, deletion, and conflict resolution. Each operation is identified by operation_id, occurrence time, inputs, cause, and outcome; MemoryOperationResult, MemoryAuditEvent, and MemoryConflictResolutionDecision attach as auditable information. MemoryItem, MemoryRecord, MemoryStore, and retention policy are referenced, not re-owned. Ingestion, chunking, embedding, and retrieval may trigger lifecycle activities but are not subclasses here.
+    ja: 記憶ライフサイクルは MemoryOperation を activity root とし、候補受入、不変版改訂、複数レコードマージ、期限退避、削除、競合解決の activity chain を所有します。各操作は operation_id、発生時刻、入力、原因、結果で識別し、MemoryOperationResult・MemoryAuditEvent・MemoryConflictResolutionDecision を監査可能情報として付与します。MemoryItem・MemoryRecord・MemoryStore・保持方針は参照のみ。取込・chunking・embedding・検索は trigger し得ますが subtype ではありません。
   why_needed:
-    zh: 回答记忆候选或现有记录经历了哪种准入、修订、合成、处置、评估或冲突解决活动，为何触发，读取和产生了哪些版本，为何当前可用或不可用，以及失败与冲突如何被审计和恢复。
-    en: Answer which admission, revision, synthesis, disposition, assessment, or conflict-resolution activity a memory candidate or existing record underwent, why it was triggered, which versions it read and produced, why it is now available or unavailable, and how failures and conflicts were audited and recovered.
-    ja: 記憶候補または既存レコードがどの受入・改訂・合成・処置・評価・競合解決活動を受け、なぜ起動され、どの版を読み書きし、なぜ現在利用可能または不可能で、失敗と競合がどう監査・回復されたかを答えます。
+    zh: 没有生命周期审计，团队无法解释“这条记忆何时写入、被哪次更新替代、为何删除或降权”。同一业务键的多条记录会靠时间戳猜测替代关系，过期策略也无法证明是否真正执行，用户要求遗忘时也可能只删索引不删持久记录。
+    en: Without lifecycle audit, teams cannot explain when a memory was written, which update superseded it, or why it was deleted or downweighted. Multiple records for one business key get supersession guessed from timestamps, expiry policies cannot be proven executed, and user forget requests may delete indexes but not persistent records.
+    ja: ライフサイクル監査がなければ、いつ書込まれたか、どの更新が置換したか、なぜ削除・減重されたか説明できません。同一 business key の複数 record は時刻推測になり、期限方針の実行も証明できず、忘却要求で索引だけ消えることもあります。
   includes:
-    - zh: MemoryOperation 下的准入、修订、综合、处置、评估和解决活动层，以及各自可判定的具体操作。
-      en: Admission, revision, synthesis, disposition, assessment, and resolution activity levels under MemoryOperation and their testable concrete operations.
-      ja: MemoryOperation配下のadmission・revision・synthesis・disposition・assessment・resolution activity levelと検証可能concrete operation。
-    - zh: MemoryOperationResult、MemoryAuditEvent 和 MemoryConflictResolutionDecision 作为活动的组成信息，以及独立 MemoryConflict 状态。
-      en: MemoryOperationResult, MemoryAuditEvent, and MemoryConflictResolutionDecision as compositional information of activities, plus the independent MemoryConflict state.
-      ja: activityのcomposition informationとしてMemoryOperationResult・MemoryAuditEvent・MemoryConflictResolutionDecision、および独立MemoryConflict state。
+    - zh: MemoryWrite、MemoryUpdate、MemoryMerge、MemoryDelete、MemoryEvict、MemoryExpiration、MemoryDecay 等可判定操作及其结果。
+      en: Testable operations such as MemoryWrite, MemoryUpdate, MemoryMerge, MemoryDelete, MemoryEvict, MemoryExpiration, and MemoryDecay with their results.
+      ja: MemoryWrite・MemoryUpdate・MemoryMerge・MemoryDelete・MemoryEvict・MemoryExpiration・MemoryDecay 等の判定可能操作と結果。
+    - zh: MemoryOperationResult、MemoryAuditEvent、MemoryConflict 与 MemoryConflictResolutionDecision 等活动信息与冲突状态。
+      en: Activity information such as MemoryOperationResult, MemoryAuditEvent, MemoryConflict, and MemoryConflictResolutionDecision.
+      ja: MemoryOperationResult・MemoryAuditEvent・MemoryConflict・MemoryConflictResolutionDecision 等の activity 情報と競合状態。
   excludes:
-    - zh: MemoryItem、MemoryRecord、MemoryStore、MemoryTombstone、MemoryRetentionPolicy 的实体/信息身份与存储结构由 memory-stores-scopes 拥有；本模块只通过有向事实引用。
-      en: Entity or information identity and storage structure for MemoryItem, MemoryRecord, MemoryStore, MemoryTombstone, and MemoryRetentionPolicy belong to memory-stores-scopes; this module references them only through directed facts.
-      ja: MemoryItem・MemoryRecord・MemoryStore・MemoryTombstone・MemoryRetentionPolicyのentity/information identityとstorage structureはmemory-stores-scopesが所有し本moduleはdirected factでのみ参照します。
-    - zh: 摄取、分块、嵌入、索引、检索和提示组装属于相邻阶段；它们可能触发生命周期活动，但不是本模块的子类。
-      en: Ingestion, chunking, embedding, indexing, retrieval, and prompt assembly are adjacent stages; they may trigger lifecycle activities but are not this module's subclasses.
-      ja: ingestion・chunking・embedding・indexing・retrieval・prompt assemblyは隣接phaseでlifecycle activityをtriggerし得ますが本module subtypeではありません。
+    - zh: MemoryItem、MemoryRecord、MemoryStore、MemoryNamespace 的持久身份与存储结构；IndexBuildRun 与 RetrievalRun；ContextPackage 组装。
+      en: Persistent identity and storage structure of MemoryItem, MemoryRecord, MemoryStore, and MemoryNamespace; IndexBuildRun and RetrievalRun; ContextPackage assembly.
+      ja: MemoryItem・MemoryRecord・MemoryStore・MemoryNamespace の永続 identity と storage 構造、IndexBuildRun・RetrievalRun、ContextPackage 組み立て。
   semantic_kind: null
   aliases: []
-purpose:
-  zh: 回答记忆候选或现有记录经历了哪种准入、修订、合成、处置、评估或冲突解决活动，为何触发，读取和产生了哪些版本，为何当前可用或不可用，以及失败与冲突如何被审计和恢复。
-  en: Answer which admission, revision, synthesis, disposition, assessment, or conflict-resolution activity a memory candidate or existing record underwent, why it was triggered, which versions it read and produced, why it is now available or unavailable, and how failures and conflicts were audited and recovered.
-  ja: 記憶候補または既存レコードがどの受入・改訂・合成・処置・評価・競合解決活動を受け、なぜ起動され、どの版を読み書きし、なぜ現在利用可能または不可能で、失敗と競合がどう監査・回復されたかを答えます。
-structure: null
+engineering:
+  explanation:
+    zh: 集成时应分别映射 Mem0 PUT/DELETE /v1/memories/{id}、Letta archival/core block 更新与删除、LangGraph store.delete 与 TTLConfig、以及 Generative Agents 式 recency 衰减评分。规范（保留策略、合并规则）与一次操作发生事实（operation_id、消费/产出 record）必须分开；DELETE 成功必须产生可审计的 tombstone 或 invalidation 事实，不能只移除检索可见性。
+    en: Integrations should map Mem0 PUT/DELETE /v1/memories/{id}, Letta archival/core block updates and deletes, LangGraph store.delete with TTLConfig, and Generative Agents-style recency decay scoring separately. Specifications (retention policy, merge rules) must stay distinct from one operation occurrence (operation_id, consumed/produced records). Successful DELETE must yield an auditable tombstone or invalidation fact, not merely remove retrieval visibility.
+    ja: 統合では Mem0 PUT/DELETE /v1/memories/{id}、Letta archival/core block 更新・削除、LangGraph store.delete と TTLConfig、Generative Agents 型 recency 減衰を個別写像します。仕様と一回の operation 発生事実を分離し、DELETE 成功は tombstone/invalidate 事実を残し、検索不可だけでは不十分です。
+  typical_input:
+    - description: Mem0 update memory — PUT replaces text/metadata for an existing memory id.
+      format: |
+        PUT https://api.mem0.ai/v1/memories/{memory_id}/
+        {
+          "text": "Prefers TypeScript and strict null checks.",
+          "metadata": {"category": "preferences", "confidence": 0.92}
+        }
+      source_claims: [claim-memory-lifecycle-mem0]
+    - description: Mem0 delete memory — DELETE removes a memory by id with auditable API response.
+      format: |
+        DELETE https://api.mem0.ai/v1/memories/{memory_id}/
+        # => {"message": "Memory deleted successfully!"}
+      source_claims: [claim-memory-lifecycle-mem0]
+    - description: Letta archival delete — remove an out-of-window passage by search then delete tool.
+      format: |
+        # Search then delete by id/label returned from archival_memory_search
+        archival_memory_search(query="JWT refresh rotation")
+        archival_memory_delete(id="archival-passage-42")
+      source_claims: [claim-memory-lifecycle-letta]
+    - description: LangGraph store delete — remove a namespace-key Item from BaseStore.
+      format: |
+        await store.delete(
+          ("tenant-7", "user-42", "preferences"),
+          "response-language"
+        )
+        # Optional TTL on put:
+        await store.put(ns, key, value, ttl=86400)
+      source_claims: [claim-memory-lifecycle-langgraph]
+    - description: Generative Agents recency scoring — exponential decay reweights stale observations at retrieval time.
+      format: |
+        # recency(i) = 0.99 ** hours_since_last_access(i)
+        # combined with importance and relevance when ranking memory stream
+        recency_score = 0.99 ** hours_since(last_access_at, now)
+        retrieval_weight = alpha * recency_score + beta * importance + gamma * relevance
+      source_claims: [claim-memory-lifecycle-generative-agents]
+  typical_output:
+    - description: Moonweave-local lifecycle operation record — consumed/produced records with explicit invalidation or tombstone.
+      format: |
+        {
+          "schema_owner": "moonweave-local-design",
+          "operation_id": "delete-310",
+          "operation_type": "MemoryDelete",
+          "occurred_at": "2026-07-16T09:15:00Z",
+          "consumed_record_id": "record-310-v2",
+          "produced_tombstone_id": "tombstone-310",
+          "invalidation_reason": "user-forget-request",
+          "retention_policy_ref": "policy-user-memory@v5"
+        }
+      source_claims: [claim-memory-lifecycle-design]
+  reference_implementations:
+    - name: Mem0 Memory API
+      url: https://docs.mem0.ai
+      description: PUT and DELETE /v1/memories/{id}/ for update and deletion.
+    - name: Letta Archival Memory
+      url: https://docs.letta.com/guides/core-concepts/memory/archival-memory
+      description: archival_memory_delete and core block replacement lifecycle.
+    - name: LangGraph Store
+      url: https://langchain-ai.github.io/langgraph/reference/store/
+      description: BaseStore.delete and TTLConfig expiry behavior.
+    - name: Generative Agents Paper
+      url: https://arxiv.org/abs/2304.03442
+      description: Memory stream recency decay with 0.99 hourly factor at retrieval.
+structure:
+  identity_keys: [operation_id, operation_type, occurred_at]
+  fields:
+    - id: operation_id
+      labels: {zh: 操作标识, en: Operation identifier, ja: 操作識別子}
+      definitions:
+        zh: 唯一标识一次 MemoryOperation 发生，不同于 MemoryRecord 或外部 API memory_id，但可引用后者。
+        en: Uniquely identifies one MemoryOperation occurrence, distinct from MemoryRecord or external API memory_id though it may reference them.
+        ja: 一回の MemoryOperation 発生を一意識別。MemoryRecord や外部 API memory_id とは別ですが参照可。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: '^[A-Za-z0-9._:-]{3,128}$'
+      example_value: delete-310
+      allowed_values: []
+      source_claims: [claim-memory-lifecycle-design]
+    - id: operation_type
+      labels: {zh: 操作类型, en: Operation type, ja: 操作種別}
+      definitions:
+        zh: 可判定的生命周期活动种类，如 MemoryWrite、MemoryUpdate、MemoryDelete、MemoryEvict、MemoryDecay。
+        en: Adjudicable lifecycle activity kind such as MemoryWrite, MemoryUpdate, MemoryDelete, MemoryEvict, or MemoryDecay.
+        ja: MemoryWrite・MemoryUpdate・MemoryDelete・MemoryEvict・MemoryDecay 等の判定可能 lifecycle activity 種別。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: MemoryDelete
+      allowed_values: [MemoryWrite, MemoryUpdate, MemoryMerge, MemoryDelete, MemoryEvict, MemoryExpiration, MemoryDecay, MemoryDiscard, MemoryConsolidation]
+      source_claims: [claim-memory-lifecycle-design]
+    - id: occurred_at
+      labels: {zh: 发生时间, en: Occurrence time, ja: 発生時刻}
+      definitions:
+        zh: 操作完成或登记为完成的时间戳；不能单独证明版本替代，需配合 predecessor 或 invalidation 事实。
+        en: Timestamp when the operation completed or was recorded complete; alone does not prove supersession—requires predecessor or invalidation facts.
+        ja: 操作完了または完了登録の timestamp。単独では版置換を証明せず、predecessor/invalidate 事実が必要。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: 2026-07-16T09:15:00Z
+      allowed_values: []
+      source_claims: [claim-memory-lifecycle-design]
+    - id: external_memory_id
+      labels: {zh: 外部记忆标识, en: External memory identifier, ja: 外部記憶識別子}
+      definitions:
+        zh: Mem0 等托管 API 返回的 memory_id；Moonweave 操作必须映射到内部 record/tombstone，不能只保留外部 ID。
+        en: memory_id returned by hosted APIs such as Mem0; Moonweave operations must map to internal record/tombstone, not external ID alone.
+        ja: Mem0 等 API が返す memory_id。Moonweave 操作は内部 record/tombstone へ写像必須で、外部 ID のみ不可。
+      datatype: string
+      required: false
+      cardinality: {min: 0, max: 1}
+      pattern: null
+      example_value: mem0-8f3c2a1b
+      allowed_values: []
+      source_claims: [claim-memory-lifecycle-mem0]
+    - id: consumed_record_id
+      labels: {zh: 消费记录标识, en: Consumed record identifier, ja: 消費レコード識別子}
+      definitions:
+        zh: 本次操作读取或失效的 MemoryRecord 版本；Update/Merge/Delete 必须绑定至少一条 consumed record。
+        en: MemoryRecord version read or invalidated by this operation; Update/Merge/Delete must bind at least one consumed record.
+        ja: 今回操作が読取または無効化した MemoryRecord 版。Update/Merge/Delete は consumed record 必須。
+      datatype: string
+      required: false
+      cardinality: {min: 0, max: null}
+      pattern: null
+      example_value: record-310-v2
+      allowed_values: []
+      source_claims: [claim-memory-lifecycle-design]
+    - id: produced_record_id
+      labels: {zh: 产出记录标识, en: Produced record identifier, ja: 生成レコード識別子}
+      definitions:
+        zh: Write/Update/Merge 成功产生的新 MemoryRecord 版本；必须显式 predecessor_id 指向 consumed 版本。
+        en: New MemoryRecord version produced by successful Write/Update/Merge; must carry explicit predecessor_id to consumed version.
+        ja: Write/Update/Merge 成功で生成した新 MemoryRecord 版。consumed 版への明示 predecessor_id 必須。
+      datatype: string
+      required: false
+      cardinality: {min: 0, max: 1}
+      pattern: null
+      example_value: record-310-v3
+      allowed_values: []
+      source_claims: [claim-memory-lifecycle-design]
+    - id: tombstone_id
+      labels: {zh: 墓碑标识, en: Tombstone identifier, ja: 墓碑識別子}
+      definitions:
+        zh: Delete 成功产生的删除证据对象，证明记录不可再被当作当前有效版本使用。
+        en: Deletion-evidence object produced on successful Delete, proving the record must not be used as the current valid version.
+        ja: Delete 成功で生成する削除証拠。record を現行有効版として使えないことを示します。
+      datatype: string
+      required: false
+      cardinality: {min: 0, max: 1}
+      pattern: null
+      example_value: tombstone-310
+      allowed_values: []
+      source_claims: [claim-memory-lifecycle-design]
+    - id: ttl_seconds
+      labels: {zh: TTL 秒数, en: TTL seconds, ja: TTL 秒数}
+      definitions:
+        zh: LangGraph BaseStore 等后端在 put 时声明的存活秒数；到期触发 MemoryExpiration 而非静默丢失。
+        en: Survival seconds declared on put in backends such as LangGraph BaseStore; expiry triggers MemoryExpiration rather than silent loss.
+        ja: LangGraph BaseStore 等 put 時に宣言する存続秒数。期限切れは MemoryExpiration を trigger し、静默消失ではありません。
+      datatype: integer
+      required: false
+      cardinality: {min: 0, max: 1}
+      pattern: null
+      example_value: 86400
+      allowed_values: []
+      source_claims: [claim-memory-lifecycle-langgraph]
+    - id: recency_decay_factor
+      labels: {zh: 新近度衰减因子, en: Recency decay factor, ja: 新近度減衰係数}
+      definitions:
+        zh: Generative Agents 式每小时衰减底数，默认 0.99；用于 MemoryDecay 重加权而非物理删除。
+        en: Hourly decay base in Generative Agents style, default 0.99; used for MemoryDecay reweighting rather than physical deletion.
+        ja: Generative Agents 型の時間当たり減衰底、既定 0.99。物理削除ではなく MemoryDecay 再重み付け用。
+      datatype: number
+      required: false
+      cardinality: {min: 0, max: 1}
+      pattern: null
+      example_value: 0.99
+      allowed_values: []
+      source_claims: [claim-memory-lifecycle-generative-agents]
+  constraints:
+    - id: delete-requires-tombstone
+      severity: error
+      expression_language: plain
+      expression: A successful MemoryDelete must produce a tombstone or explicit invalidation fact referencing the consumed record; index-only removal is insufficient.
+      explanation:
+        zh: 只删向量索引会留下无法审计的“幽灵记忆”。
+        en: Deleting only the vector index leaves unauditable ghost memories.
+        ja: ベクトル索引だけ削除すると監査不能な ghost memory が残ります。
+      source_claims: [claim-memory-lifecycle-design]
+    - id: supersession-requires-predecessor
+      severity: error
+      expression_language: plain
+      expression: MemoryUpdate or MemoryMerge producing a new record must declare predecessor_id; later occurred_at alone cannot establish supersession.
+      explanation:
+        zh: 写入先后只说明时间顺序，不能证明同一业务记忆的替代。
+        en: Write order shows chronology only, not replacement within one business-memory lineage.
+        ja: 書込順は時系列のみで、同一業務記憶系列の置換を証明しません。
+      source_claims: [claim-memory-lifecycle-design]
+    - id: ttl-triggers-expiration-operation
+      severity: warning
+      expression_language: plain
+      expression: TTL expiry must be modeled as MemoryExpiration governed by retention policy, not as silent record disappearance.
+      explanation:
+        zh: 静默过期无法回答保留策略是否执行以及何时失效。
+        en: Silent expiry cannot answer whether retention policy ran or when invalidation occurred.
+        ja: 静默期限切れでは保持方針実行と失効時刻を答えられません。
+      source_claims: [claim-memory-lifecycle-langgraph, claim-memory-lifecycle-design]
+  required_relations: []
 examples:
-  - id: memory-lifecycle-cq-admission-positive
-    kind: positive
+  - id: memory-lifecycle-example-mem0-update
     labels:
-      zh: 准入闭环正例
-      en: Admission closure positive case
-      ja: admission closure正例
-    scenario_id: null
+      zh: Mem0 更新记忆
+      en: Mem0 memory update
+      ja: Mem0 記憶更新
     descriptions:
-      zh: item-310 尚未持久化；admit-310 在同一 attempt 中选择 write-310，write-310 消费 item-310 并产生首个 record-310-v1。
-      en: item-310 is not yet persistent; admit-310 selects write-310 in the same attempt, and write-310 consumes item-310 and produces initial record-310-v1.
-      ja: item-310は未persistでadmit-310が同attemptでwrite-310を選びwrite-310がitem-310を消費しinitial record-310-v1を生成します。
+      zh: Alice 的语言偏好从 “Prefers TypeScript” 更新为包含 strict null checks。应用调用 PUT /v1/memories/{memory_id}/ 提交新 text 与 metadata；Moonweave 将此外部更新映射为 MemoryUpdate，消费 record-310-v1 并产出 record-310-v2，且 predecessor_id 指向 v1。
+      en: Alice's language preference updates from "Prefers TypeScript" to include strict null checks. The app calls PUT /v1/memories/{memory_id}/ with new text and metadata; Moonweave maps this to MemoryUpdate consuming record-310-v1 and producing record-310-v2 with predecessor_id pointing to v1.
+      ja: Alice の言語選好が “Prefers TypeScript” から strict null checks 含みへ更新。PUT /v1/memories/{memory_id}/ を呼び、Moonweave は MemoryUpdate として record-310-v1 消費・record-310-v2 生成、predecessor_id=v1 を記録。
+    example_source:
+      product: Mem0
+      url: https://docs.mem0.ai
+      version: PUT /v1/memories/{memory_id}/
     field_values:
-      admission_attempt_id: attempt-310
-      candidate_memory_item_id: item-310
-      candidate_semantic_key: tenant-7/user-42/preference.response-language
-      selected_operation_id: write-310
-      selected_branch: write
-      discard_branch_selected: false
-      admission_reason_code: novel-user-preference-with-explicit-consent
-      initial_record:
-        record_id: record-310-v1
-        namespace: tenant-7/user-42/preferences
-        key: response-language
-        version: 1
-        predecessor_present: false
+      external_memory_id: mem0-8f3c2a1b
+      operation_type: MemoryUpdate
+      prior_text: Prefers TypeScript for code examples.
+      new_text: Prefers TypeScript and strict null checks.
+      consumed_record_id: record-310-v1
+      produced_record_id: record-310-v2
     related_node_ids:
-      - MemoryAdmissionOperation
-      - MemoryWrite
-      - MemoryItem
-      - MemoryRecord
-    related_relation_ids:
-      - MemoryWrite-is_a-MemoryAdmissionOperation
-      - MemoryWrite-consumes-MemoryItem
-      - MemoryWrite-produces-MemoryRecord
-    expected_result:
-      zh: 查询返回接受分支、候选输入和初始记录输出，且不报告前驱版本。
-      en: The query returns the accept branch, candidate input, and initial-record output with no predecessor version.
-      ja: queryはaccept branch・candidate input・initial-record outputを返しpredecessor版を報告しません。
-    why_valid_or_invalid:
-      zh: 所有事实属于同一 candidate 与 admission attempt，完整闭合准入链。
-      en: All facts belong to the same candidate and admission attempt, closing the admission chain.
-      ja: 全factが同一candidate/admission attemptに属しadmission chainを閉じます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - memory-lifecycle
+      - memory-stores-scopes
+    related_relation_ids: []
     source_claims:
-      - claim-memory-lifecycle-007
-  - id: memory-lifecycle-cq-admission-boundary
-    kind: boundary
+      - claim-memory-lifecycle-mem0
+      - claim-memory-lifecycle-design
+  - id: memory-lifecycle-example-mem0-delete
     labels:
-      zh: 准入闭环边界例
-      en: Admission closure boundary case
-      ja: admission closure境界例
-    scenario_id: null
+      zh: Mem0 删除记忆
+      en: Mem0 memory deletion
+      ja: Mem0 記憶削除
     descriptions:
-      zh: item-311 已由 discard-311 在 attempt-11 拒绝，但数据中又无条件生成同 attempt 的 write-311 与记录。
-      en: discard-311 rejects item-311 in attempt-11, yet the data also creates write-311 and a record unconditionally for the same attempt.
-      ja: discard-311がattempt-11でitem-311をrejectしたのに同attemptのwrite-311/recordも無条件生成されています。
+      zh: 用户请求遗忘某条偏好后，应用调用 DELETE /v1/memories/{memory_id}/。Mem0 返回删除成功；Moonweave 必须登记 MemoryDelete、消费 record-310-v2 并产生 tombstone-310，而不是仅让后续 search 返回空结果。
+      en: After a user forget request, the app calls DELETE /v1/memories/{memory_id}/. Mem0 returns success; Moonweave must record MemoryDelete, consume record-310-v2, and produce tombstone-310—not merely empty later search results.
+      ja: ユーザー忘却要求後、DELETE /v1/memories/{memory_id}/ を呼び Mem0 が成功返却。Moonweave は MemoryDelete を登録し record-310-v2 消費・tombstone-310 生成必須。後続 search 空だけでは不十分。
+    example_source:
+      product: Mem0
+      url: https://docs.mem0.ai
+      version: DELETE /v1/memories/{memory_id}/
     field_values:
-      admission_attempt_id: attempt-311
-      candidate_memory_item_id: item-311
-      discard_operation_id: discard-311
-      discard_reason_code: fails-retention-policy
-      competing_write_operation_id: write-311
-      competing_record_id: record-311-v1
-      discard_asserted: true
-      write_asserted: true
-      same_attempt: true
-      validation_decision: reject-mutually-exclusive-branches
+      external_memory_id: mem0-8f3c2a1b
+      operation_type: MemoryDelete
+      consumed_record_id: record-310-v2
+      tombstone_id: tombstone-310
+      invalidation_reason: user-forget-request
     related_node_ids:
-      - MemoryDiscard
-      - MemoryWrite
-      - MemoryItem
-    related_relation_ids:
-      - MemoryDiscard-consumes-MemoryItem
-      - MemoryDiscard-prevents-MemoryWrite
-      - MemoryWrite-consumes-MemoryItem
-    expected_result:
-      zh: 验证器拒绝该互相矛盾的准入链，并要求选择唯一分支或记录新 attempt。
-      en: Validation rejects the contradictory admission chain and requires one branch or a new attempt.
-      ja: validatorは矛盾admission chainを拒否し一branchまたはnew attemptを要求します。
-    why_valid_or_invalid:
-      zh: 同一候选与同一尝试中的 Discard 和 Write 是互斥结果。
-      en: Discard and Write are mutually exclusive outcomes for the same candidate and attempt.
-      ja: 同一candidate/attemptのDiscardとWriteは排他的outcomeです。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - memory-lifecycle
+      - memory-stores-scopes
+    related_relation_ids: []
     source_claims:
-      - claim-memory-lifecycle-008
-  - id: memory-lifecycle-cq-version-positive
-    kind: positive
+      - claim-memory-lifecycle-mem0
+      - claim-memory-lifecycle-design
+  - id: memory-lifecycle-example-letta-archival-delete
     labels:
-      zh: 不可变更新谱系正例
-      en: Immutable update lineage positive case
-      ja: immutable update lineage正例
-    scenario_id: null
+      zh: Letta 归档删除
+      en: Letta archival deletion
+      ja: Letta アーカイブ削除
     descriptions:
-      zh: update-512 消费 record-512-v1，产生独立身份 record-512-v2；v2 保存 predecessor_id=v1 并从 v2 指向 v1 建立 supersedes。
-      en: update-512 consumes record-512-v1 and produces independently identified record-512-v2; v2 stores predecessor_id=v1 and points to v1 through supersedes.
-      ja: update-512はrecord-512-v1を消費し独立identityのrecord-512-v2を生成しv2はpredecessor_id=v1を保存してv2からv1へsupersedesします。
+      zh: 智能体发现 archival 中过时的 API 摘要，先 archival_memory_search 定位 passage，再 archival_memory_delete 移除。该操作针对区外归档层，不影响 core human/persona 块；Moonweave 将其建模为 MemoryDelete 并绑定 archival record 身份。
+      en: The agent finds a stale API summary in archival, locates the passage via archival_memory_search, then removes it with archival_memory_delete. This targets out-of-window archival, not core human/persona blocks; Moonweave models it as MemoryDelete bound to the archival record identity.
+      ja: エージェントが archival の古い API 要約を archival_memory_search で特定し archival_memory_delete で削除。window 外 archival が対象で core human/persona block には非影響。Moonweave は MemoryDelete として archival record identity に binding。
+    example_source:
+      product: Letta
+      url: https://docs.letta.com/guides/core-concepts/memory/archival-memory
+      version: archival_memory_delete
     field_values:
-      memory_update_id: update-512
-      change_basis: user-corrected-timezone-from-UTC-to-Europe/Paris
-      predecessor_record:
-        record_id: record-512-v1
-        namespace: tenant-7/user-42/preferences
-        key: timezone
-        version: 1
-        sha256: 89f732296a24e404e235b9a131c17b91b05d6438e3b650226b099458068f175d
-      successor_record:
-        record_id: record-512-v2
-        namespace: tenant-7/user-42/preferences
-        key: timezone
-        version: 2
-        predecessor_id: record-512-v1
-        sha256: d38af781a76a9a88e4c44f150f28d540be0758c8c0dc05bc19823b4bdfcecb6a
-      supersession_direction: record-512-v2-to-record-512-v1
+      search_query: JWT refresh rotation
+      deleted_passage_id: archival-passage-42
+      storage_tier: archival
+      core_blocks_unchanged: true
     related_node_ids:
-      - MemoryUpdate
-      - MemoryRecord
-    related_relation_ids:
-      - MemoryUpdate-consumes-MemoryRecord
-      - MemoryUpdate-produces-MemoryRecord
-      - MemoryRecord-supersedes-MemoryRecord
-    expected_result:
-      zh: 可沿记录版本关系和产生活动回溯前驱、变更依据和结果。
-      en: The predecessor, change basis, and result are traceable through the record-version relation and generating activity.
-      ja: record-version relation/generating activityからpredecessor・change basis・resultをtraceできます。
-    why_valid_or_invalid:
-      zh: 更新活动的消费与生产边、记录自身的有向替代边各自回答不同问题，且都从新版本回到明确前序。
-      en: Activity edges and record-supersession edge are separate and correctly directed.
-      ja: update activity の消費・生成辺と record 自身の有向 supersession 辺は別の問いに答え、いずれも新 version から明示的 predecessor を追えます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - memory-lifecycle
+      - memory-stores-scopes
+    related_relation_ids: []
     source_claims:
-      - claim-memory-lifecycle-009
-  - id: memory-lifecycle-cq-version-boundary
-    kind: boundary
+      - claim-memory-lifecycle-letta
+      - claim-memory-lifecycle-design
+  - id: memory-lifecycle-example-langgraph-delete-ttl
     labels:
-      zh: 不可变更新谱系边界例
-      en: Immutable update lineage boundary case
-      ja: immutable update lineage境界例
-    scenario_id: null
+      zh: LangGraph 删除与 TTL
+      en: LangGraph delete and TTL
+      ja: LangGraph 削除と TTL
     descriptions:
-      zh: 更新直接覆盖 record-512-v1 的内容，没有新 record_id、前驱引用或结果输出。
-      en: An update overwrites record-512-v1 in place with no new record ID, predecessor reference, or result output.
-      ja: updateがrecord-512-v1をin-place上書きしnew record ID・predecessor reference・result outputがありません。
+      zh: 应用在 BaseStore 上对 ("tenant-7","user-42","preferences")/response-language 调用 delete 立即移除 Item；另一条记录 put 时设置 ttl=86400，到期后由存储后端标记不可读，Moonweave 将其登记为 MemoryExpiration 而非静默消失。
+      en: The app calls delete on ("tenant-7","user-42","preferences")/response-language in BaseStore to remove the Item immediately; another record is put with ttl=86400 and becomes unreadable on expiry—Moonweave records MemoryExpiration rather than silent disappearance.
+      ja: BaseStore で ("tenant-7","user-42","preferences")/response-language を delete 即時削除。別 record は ttl=86400 で put し期限後 unreadable—Moonweave は静默消失ではなく MemoryExpiration を記録。
+    example_source:
+      product: LangGraph
+      url: https://langchain-ai.github.io/langgraph/reference/store/
+      version: BaseStore.delete and TTLConfig
     field_values:
-      memory_update_id: update-512-bad
-      record_id_before: record-512-v1
-      record_id_after: record-512-v1
-      sha256_before: 89f732296a24e404e235b9a131c17b91b05d6438e3b650226b099458068f175d
-      sha256_after: d38af781a76a9a88e4c44f150f28d540be0758c8c0dc05bc19823b4bdfcecb6a
-      same_record_overwritten: true
-      successor_record_present: false
-      predecessor_reference_present: false
-      rollback_anchor_present: false
-      validation_decision: reject-in-place-update-lineage
+      namespace:
+        - tenant-7
+        - user-42
+        - preferences
+      key: response-language
+      delete_operation_id: delete-lang-17
+      ttl_seconds: 86400
+      expiration_operation_type: MemoryExpiration
     related_node_ids:
-      - MemoryUpdate
-      - MemoryRecord
-      - MemoryOperationResult
-    related_relation_ids:
-      - MemoryUpdate-consumes-MemoryRecord
-      - MemoryUpdate-produces-MemoryRecord
-      - MemoryOperation-has_result-MemoryOperationResult
-    expected_result:
-      zh: 拒绝把原地覆盖视为完整更新来历，并分别报告缺少后继记录、前序引用和可回滚锚点。
-      en: Validation rejects the overwrite as a complete update lineage.
-      ja: 上書きを完全な update lineage として拒否し、successor record・predecessor reference・rollback anchor の欠落を個別に報告します。
-    why_valid_or_invalid:
-      zh: 缺少独立后继身份时无法查询产生、替代与回滚事实。
-      en: Without an independent successor identity, production, supersession, and rollback facts are not queryable.
-      ja: independent successor identityなしではproduction・supersession・rollback factをqueryできません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - memory-lifecycle
+      - memory-stores-scopes
+    related_relation_ids: []
     source_claims:
-      - claim-memory-lifecycle-010
-  - id: memory-lifecycle-cq-disposition-positive
-    kind: positive
+      - claim-memory-lifecycle-langgraph
+      - claim-memory-lifecycle-design
+  - id: memory-lifecycle-example-generative-agents-decay
     labels:
-      zh: 处置区分正例
-      en: Disposition distinction positive case
-      ja: disposition distinction正例
-    scenario_id: null
+      zh: Generative Agents 新近度衰减
+      en: Generative Agents recency decay
+      ja: Generative Agents 新近度減衰
     descriptions:
-      zh: record-1506 到 TTL 后由 expire-1506 标为 ineligible 等待删除；另一可重载缓存记录因 maxmemory 由 evict-1405 驱逐；二者均未伪装为 Delete。
-      en: After TTL, expire-1506 marks record-1506 ineligible pending deletion; a different reloadable cache record is evicted by evict-1405 under maxmemory; neither is mislabeled Delete.
-      ja: record-1506はTTL後expire-1506でineligible/delete待ちとなり、別reloadable cache recordはmaxmemoryでevict-1405によりevictされ、どちらもDeleteと誤記しません。
+      zh: 模拟小镇智能体在检索记忆流时，对 48 小时未访问的观察应用 recency = 0.99^48 重加权，使其排名下降但仍保留记录。Moonweave 登记 MemoryDecay 操作与新的 retrieval weight，而不是直接删除或覆盖 MemoryRecord 内容。
+      en: In a simulated town agent retrieving the memory stream, an observation unused for 48 hours gets reweighted with recency = 0.99^48, lowering rank while retaining the record. Moonweave records a MemoryDecay operation and new retrieval weight without deleting or overwriting MemoryRecord content.
+      ja: 模拟 town エージェントが memory stream 検索時、48 時間未アクセス观察に recency=0.99^48 を適用し rank 低下させつつ record 保持。Moonweave は MemoryDecay と新 retrieval weight を記録し、MemoryRecord 内容の削除・上書きはしません。
+    example_source:
+      product: Generative Agents (Stanford)
+      url: https://arxiv.org/abs/2304.03442
+      version: Memory stream recency scoring
     field_values:
-      expiration:
-        operation_id: expire-1506
-        record_id: record-1506
-        retention_policy_id: ttl-policy-user-events@v3
-        expires_at_epoch_seconds: 1784160000
-        observed_at_epoch_seconds: 1784163600
-        state: ineligible-pending-physical-deletion
-        tombstone_present: false
-      eviction:
-        operation_id: evict-1405
-        record_id: cache-record-1405
-        maxmemory_bytes: 1073741824
-        policy: allkeys-lfu
-        durable_copy_id: record-1405
-        durable_copy_available: true
-      delete_operation_asserted: false
+      hours_since_last_access: 48
+      recency_decay_factor: 0.99
+      recency_score: 0.624
+      operation_type: MemoryDecay
+      record_retained: true
     related_node_ids:
-      - MemoryExpiration
-      - MemoryEviction
-      - MemoryRecord
-      - MemoryRetentionPolicy
-    related_relation_ids:
-      - MemoryExpiration-marks_ineligible-MemoryRecord
-      - MemoryExpiration-governed_by-MemoryRetentionPolicy
-      - MemoryEviction-evicts-MemoryRecord
-    expected_result:
-      zh: 查询分别返回时间到期与容量驻留两个原因，不推断墓碑。
-      en: The query returns temporal expiry and capacity residency as separate reasons and infers no tombstone.
-      ja: queryはtemporal expiry/capacity residencyを別reasonで返しtombstoneを推論しません。
-    why_valid_or_invalid:
-      zh: TTL 到时只改变检索资格并等待物理删除；容量驱逐只移除可重载缓存副本，两者都不自动证明显式删除或墓碑。
-      en: Trigger, effect, and durable-copy state are distinct.
-      ja: TTL 到達は検索適格性を変えて物理削除を待つだけで、容量 eviction は再読込可能 cache copy を除くため、どちらも明示 delete や tombstone を証明しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - memory-lifecycle
+      - memory-retrieval-ranking
+    related_relation_ids: []
     source_claims:
-      - claim-memory-lifecycle-011
-  - id: memory-lifecycle-cq-disposition-boundary
-    kind: boundary
-    labels:
-      zh: 处置区分边界例
-      en: Disposition distinction boundary case
-      ja: disposition distinction境界例
-    scenario_id: null
-    descriptions:
-      zh: 缓存驱逐仅因 allkeys-lfu 发生，却被标为 MemoryDelete 并自动生成删除墓碑。
-      en: A cache eviction caused only by allkeys-lfu is labeled MemoryDelete and automatically creates a deletion tombstone.
-      ja: allkeys-lfuだけによるcache evictionをMemoryDeleteとlabelしdelete tombstoneを自動生成しています。
-    field_values:
-      eviction_operation_id: evict-1406
-      evicted_cache_key: tenant-7:user-42:recent-searches
-      eviction_policy: allkeys-lfu
-      maxmemory_exceeded: true
-      durable_record_id: record-searches-44
-      durable_invalidation_evidence_present: false
-      incorrect_delete_operation_id: delete-1406
-      incorrect_tombstone_id: tombstone-1406
-      validation_decision: retain-eviction-reject-delete-and-tombstone
-    related_node_ids:
-      - MemoryEviction
-      - MemoryDelete
-      - MemoryTombstone
-    related_relation_ids:
-      - MemoryEviction-evicts-MemoryRecord
-      - MemoryDelete-invalidates-MemoryRecord
-      - MemoryDelete-produces-MemoryTombstone
-    expected_result:
-      zh: 验证器拒绝 Delete 与 Tombstone 断言，只保留 Eviction。
-      en: Validation rejects the Delete and Tombstone assertions and retains only Eviction.
-      ja: validatorはDelete/Tombstone assertionを拒否しEvictionだけ保持します。
-    why_valid_or_invalid:
-      zh: allkeys-lfu 只依据内存压力移除缓存键；没有持久记录失效证据时，不能构造 MemoryDelete 或 MemoryTombstone。
-      en: Capacity removal does not prove durable-record invalidation.
-      ja: allkeys-lfu は memory pressure により cache key を除くだけで、durable record の無効化証拠がなければ MemoryDelete や MemoryTombstone を生成できません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-lifecycle-012
-  - id: memory-lifecycle-cq-conflict-positive
-    kind: positive
-    labels:
-      zh: 冲突恢复闭环正例
-      en: Conflict recovery closure positive case
-      ja: conflict recovery closure正例
-    scenario_id: null
-    descriptions:
-      zh: validate-1708 检测 record-a 与 record-b 的时区冲突；conflict-resolve-1910 消费 conflict-2302，形成 decision-2403 并按需要产生 record-c。
-      en: validate-1708 detects a timezone conflict between record-a and record-b; conflict-resolve-1910 consumes conflict-2302, forms decision-2403, and produces record-c when required.
-      ja: validate-1708はrecord-a/record-bのtimezone conflictを検出しconflict-resolve-1910がconflict-2302を消費してdecision-2403を形成し必要時record-cを生成します。
-    field_values:
-      validation_operation_id: validate-1708
-      evaluated_records:
-        - record_id: record-a
-          timezone: America/New_York
-          effective_from: 2026-07-01
-        - record_id: record-b
-          timezone: Asia/Tokyo
-          effective_from: 2026-07-01
-      conflict_id: conflict-2302
-      conflict_dimension: user-timezone-at-overlapping-effective-interval
-      resolution_operation_id: conflict-resolve-1910
-      resolution_decision:
-        decision_id: decision-2403
-        decision_code: prefer-latest-explicit-user-confirmation
-        winning_record_id: record-b
-      reconciled_record_id: record-c
-    related_node_ids:
-      - MemoryValidation
-      - MemoryConflict
-      - MemoryConflictResolution
-      - MemoryConflictResolutionDecision
-      - MemoryRecord
-    related_relation_ids:
-      - MemoryValidation-detects-MemoryConflict
-      - MemoryConflictResolution-consumes-MemoryConflict
-      - MemoryConflictResolution-has_decision-MemoryConflictResolutionDecision
-      - MemoryConflictResolution-produces-MemoryRecord
-    expected_result:
-      zh: 查询依次返回检测、冲突状态、解决活动、决定和可选调和输出。
-      en: The query returns detection, conflict state, resolution activity, decision, and optional reconciled output in order.
-      ja: queryはdetection・conflict state・resolution activity・decision・optional reconciled outputを順に返します。
-    why_valid_or_invalid:
-      zh: 评估与解决没有折叠，所有交接由有向事实支持。
-      en: Assessment and resolution are not collapsed and every handoff is supported by a directed fact.
-      ja: assessment/resolutionを折り畳まず全handoffをdirected factで支持します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-lifecycle-013
-  - id: memory-lifecycle-cq-conflict-boundary
-    kind: boundary
-    labels:
-      zh: 冲突恢复闭环边界例
-      en: Conflict recovery closure boundary case
-      ja: conflict recovery closure境界例
-    scenario_id: null
-    descriptions:
-      zh: 两个记录值一致，只因来源不同就创建 Conflict，并让普通 Consolidation 直接“解决”它且没有决定信息。
-      en: Two records agree in value, yet source difference alone creates Conflict and an ordinary Consolidation directly 'resolves' it with no decision information.
-      ja: 二recordのvalueは一致するのにsource differenceだけでConflictを作りordinary Consolidationがdecision informationなしで直接「resolve」します。
-    field_values:
-      validation_operation_id: validate-1709
-      evaluated_records:
-        - record_id: record-catalog-a
-          value: dark
-          source_id: message-71
-        - record_id: record-catalog-b
-          value: dark
-          source_id: profile-import-9
-      values_logically_incompatible: false
-      incorrect_conflict_id: conflict-2303
-      ordinary_operation_id: consolidate-1911
-      ordinary_operation_type: MemoryConsolidation
-      dedicated_resolution_present: false
-      resolution_decision_present: false
-      validation_decision: reject-false-conflict-and-implicit-resolution
-    related_node_ids:
-      - MemoryValidation
-      - MemoryConflict
-      - MemoryConsolidation
-      - MemoryConflictResolutionDecision
-    related_relation_ids:
-      - MemoryValidation-detects-MemoryConflict
-      - MemoryConflictResolution-consumes-MemoryConflict
-      - MemoryConflictResolution-has_decision-MemoryConflictResolutionDecision
-    expected_result:
-      zh: 验证器拒绝无逻辑不兼容的 Conflict 和由 Consolidation 冒充的解决链。
-      en: Validation rejects the Conflict lacking logical incompatibility and the resolution chain impersonated by Consolidation.
-      ja: validatorはlogical incompatibilityのないConflictとConsolidationが偽装したresolution chainを拒否します。
-    why_valid_or_invalid:
-      zh: 来源差异不是冲突，解决必须由专门活动及决定信息承担。
-      en: Provenance difference is not conflict, and resolution requires its dedicated activity and decision information.
-      ja: provenance differenceはconflictでなくresolutionはdedicated activity/decision informationが必要です。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-lifecycle-014
+      - claim-memory-lifecycle-generative-agents
+      - claim-memory-lifecycle-design
 parent_relation: null
 relations: []
-module_contract:
-  interaction_contract:
-    applicability: operational
-    facets:
-      input:
-        applicable: true
-        description:
-          zh: 输入端只接收候选 MemoryItem、既有 MemoryRecord、显式 Feedback 与 PolicySpecification；写入消费候选项，其他活动作用于记录，反馈可触发写入，策略约束所有操作。
-          en: "Inputs are limited to candidate MemoryItem, existing MemoryRecord, explicit Feedback, and PolicySpecification: write consumes candidates, other operations act on records, feedback may trigger write, and policy governs every operation."
-          ja: inputはcandidate MemoryItem・既存MemoryRecord・explicit Feedback・PolicySpecificationに限り、writeはcandidateを消費し他operationはrecordへ作用しfeedbackはwriteをtriggerしpolicyは全operationをgovernします。
-        family_concept_ids:
-          - MemoryItem
-          - MemoryRecord
-          - Feedback
-          - PolicySpecification
-        relation_ids:
-          - MemoryWrite-consumes-MemoryItem
-          - MemoryOperation-acts_on-MemoryRecord
-          - MemoryWrite-responds_to-Feedback
-          - MemoryOperation-governed_by-PolicySpecification
-        not_applicable_reason: null
-      output:
-        applicable: true
-        description:
-          zh: 输出端区分持久记录、合规删除墓碑、操作结果、审计事件和冲突解决决定；MemoryConflictResolution-has_decision-MemoryConflictResolutionDecision 在本面以决定端点标识可执行的解决结果，而不是把解决活动或决定归成操作子类。
-          en: Outputs distinguish persistent records, compliant deletion tombstones, operation results, audit events, and conflict-resolution decisions; on this facet MemoryConflictResolution-has_decision-MemoryConflictResolutionDecision uses the decision endpoint to identify the actionable resolution result without classifying either the resolution activity or its decision as an operation subtype.
-          ja: 出力は永続記録・適合削除 tombstone・操作結果・監査 event・競合解決決定を区別します。この面の MemoryConflictResolution-has_decision-MemoryConflictResolutionDecision は決定端点で実行可能な解決結果を示し、解決活動や決定を操作の下位型にはしません。
-        family_concept_ids:
-          - MemoryRecord
-          - MemoryTombstone
-          - MemoryOperationResult
-          - MemoryAuditEvent
-          - MemoryConflictResolutionDecision
-        relation_ids:
-          - MemoryWrite-produces-MemoryRecord
-          - MemoryDelete-produces-MemoryTombstone
-          - MemoryOperation-has_result-MemoryOperationResult
-          - MemoryOperation-has_audit_event-MemoryAuditEvent
-          - MemoryConflictResolution-has_decision-MemoryConflictResolutionDecision
-        not_applicable_reason: null
-      failure:
-        applicable: true
-        description:
-          zh: 失败由 MemoryOperationResult 对 ErrorEvent 的显式引用表达；错误事件由其 canonical 模块拥有。
-          en: Failure is expressed by an explicit MemoryOperationResult reference to ErrorEvent, whose canonical module retains ownership.
-          ja: failureはMemoryOperationResultからErrorEventへのexplicit referenceで表しErrorEventのcanonical moduleが所有を保ちます。
-        family_concept_ids:
-          - ErrorEvent
-        relation_ids:
-          - MemoryOperationResult-records-ErrorEvent
-        not_applicable_reason: null
-      recovery:
-        applicable: true
-        description:
-          zh: 恢复端先消费已检测 MemoryConflict，再由专门解决活动附属一个可审计 MemoryConflictResolutionDecision；普通 Consolidation 不能替代该链。
-          en: Recovery first consumes a detected MemoryConflict and then attaches one auditable MemoryConflictResolutionDecision to a dedicated resolution activity; ordinary Consolidation cannot replace this chain.
-          ja: recoveryはdetected MemoryConflictを消費しdedicated resolution activityへaudit可能MemoryConflictResolutionDecisionを一つ付属しordinary Consolidationで代替しません。
-        family_concept_ids:
-          - MemoryConflict
-          - MemoryConflictResolution
-          - MemoryConflictResolutionDecision
-        relation_ids:
-          - MemoryConflictResolution-consumes-MemoryConflict
-          - MemoryConflictResolution-has_decision-MemoryConflictResolutionDecision
-        not_applicable_reason: null
-    review:
-      review_status: accepted
-      reviewers:
-        - reviewer_id: moonweave-memory-domain-reviewer
-          reviewer_role: domain
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 逐项确认本模块只拥有记忆准入、不可变修订、综合、处置、评估、冲突解决及其结果/审计组成信息；MemoryItem、MemoryRecord、MemoryStore、MemoryTombstone 与 RetentionPolicy 继续由记忆对象与存储模块拥有。
-            en: Point-by-point review confirms this module owns memory admission, immutable revision, synthesis, disposition, assessment, conflict resolution, and their result or audit composition; MemoryItem, MemoryRecord, MemoryStore, MemoryTombstone, and RetentionPolicy remain owned by memory objects and stores.
-            ja: 本moduleはmemory admission・immutable revision・synthesis・disposition・assessment・conflict resolutionとresult/audit compositionのみを所有し、MemoryItem・MemoryRecord・MemoryStore・MemoryTombstone・RetentionPolicyはmemory objects/storesが所有すると個別確認しました。
-        - reviewer_id: moonweave-ontology-structure-reviewer
-          reviewer_role: ontology
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 24 个保留节点按活动/状态/事件/信息分型；19 条 is_a 主骨架与 3 条组成主骨架构成可追踪层级，其他边仅表达有条件的输入、输出、治理和版本事实。
-            en: The 24 retained nodes are typed as activity, state, event, or information; nineteen is-a backbone edges and three composition backbone edges form the traceable hierarchy, while other edges express only conditional input, output, governance, and version facts.
-            ja: 保持24 nodeをactivity・state・event・informationに分け、19 is-a backbone edgeと3 composition backbone edgeで追跡可能階層を構成し、他edgeは条件付きinput・output・governance・version factだけを表します。
-        - reviewer_id: moonweave-trilingual-terminology-reviewer
-          reviewer_role: schema
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 模块、节点、字段、关系、能力问题、案例与边界的中英日文本已逐项人工复核；旧式 snake_case 边和与当前图矛盾的说明已退役。
-            en: Chinese, English, and Japanese text for the module, nodes, fields, relations, competency questions, cases, and boundaries was manually reviewed item by item; legacy snake_case edges and descriptions contradicting the current graph were deprecated.
-            ja: module・node・field・relation・competency question・case・boundaryの中英日textを個別手動審査し、legacy snake_case edgeと現graphに矛盾する説明をdeprecatedとしました。
-  taxonomy_contract:
-    applicability: mixed-backbone
-    not_applicable_reason: null
-    hierarchy_policy: arbitrary-depth-reviewed-backbone
-    key_root_concept_ids:
-      - MemoryOperation
-    allowed_backbone_predicates:
-      - detects
-      - is_a
-      - has_result
-      - has_audit_event
-      - has_decision
-    flat_root_exception_concept_ids: []
-    review:
-      review_status: accepted
-      reviewers:
-        - reviewer_id: moonweave-memory-domain-reviewer
-          reviewer_role: domain
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 逐项确认 MemoryOperation 是准入、修订、综合、处置、评估和冲突解决等有界活动的上位根；MemoryConflict 是被验证发现、可在检测前已存在且可由多次验证引用的独立状态根。MemoryItem、MemoryRecord、MemoryStore、MemoryTombstone 与 RetentionPolicy 继续由记忆对象与存储模块拥有。
-            en: Point-by-point review confirms MemoryOperation as the root genus for bounded admission, revision, synthesis, disposition, assessment, and conflict-resolution activities. MemoryConflict remains an independent state root because it may exist before detection and be referenced by multiple validations. MemoryItem, MemoryRecord, MemoryStore, MemoryTombstone, and RetentionPolicy remain owned by memory objects and stores.
-            ja: 個別審査により MemoryOperation は admission・revision・synthesis・disposition・assessment・conflict resolution の有界活動上位 root、MemoryConflict は検出前から存在し複数 validation が参照できる独立 state root と確認しました。MemoryItem・MemoryRecord・MemoryStore・MemoryTombstone・RetentionPolicy は memory objects/stores に残します。
-        - reviewer_id: moonweave-ontology-structure-reviewer
-          reviewer_role: ontology
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: MemoryOperation 是唯一根，通过 is_a 展开写入、更新、删除、验证与评估活动，并以 has_result、has_audit_event、has_decision 组织专属记录。MemoryValidation detects MemoryConflict 作为 Conflict 的类级主要阅读入口：检测揭示而非创造冲突，同一冲突可被复验，因此实例上仍是条件事实而非存在依赖。
-            en: "MemoryOperation is the sole root, specializing into write, update, delete, validation, and assessment activities and organizing their result, audit, and decision records through has_result, has_audit_event, and has_decision. MemoryValidation detects MemoryConflict is the class-level primary reading for Conflict: detection reveals rather than creates a conflict and the same conflict may be revalidated, so at instance level it remains conditional rather than existential dependence."
-            ja: MemoryOperation を唯一 root とし、is_a で write・update・delete・validation・assessment activity を展開し、has_result・has_audit_event・has_decision で専用 record を整理します。MemoryValidation detects MemoryConflict は Conflict の class-level primary reading ですが、detection は conflict を生成せず再検証可能なため instance level では条件 fact で存在依存ではありません。
-        - reviewer_id: moonweave-trilingual-terminology-reviewer
-          reviewer_role: schema
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 模块、节点、字段、关系、能力问题、案例与边界的中英日文本已逐项人工复核；旧式 snake_case 边和与当前图矛盾的说明已退役。
-            en: Chinese, English, and Japanese text for the module, nodes, fields, relations, competency questions, cases, and boundaries was manually reviewed item by item; legacy snake_case edges and descriptions contradicting the current graph were deprecated.
-            ja: module・node・field・relation・competency question・case・boundaryの中英日textを個別手動審査し、legacy snake_case edgeと現graphに矛盾する説明をdeprecatedとしました。
-  competency_questions:
-    - id: memory-lifecycle-cq-admission-v4
-      semantic_key: memory-lifecycle.admission-decision
-      primary_owner_module_id: memory-lifecycle
-      related_module_ids:
-        - memory-stores-scopes
-      questions:
-        zh: 一个候选记忆项在同一次准入尝试中为何被写入或被丢弃，产生了哪条初始记录？
-        en: Why was a candidate memory item written or discarded in one admission attempt, and which initial record was produced?
-        ja: 一candidate memory itemが同一admission attemptでwrite/discardされた理由と生成initial recordは何ですか。
-      query: Follow the candidate item through exactly one admission branch and, for Write, to its initial MemoryRecord.
-      expected_assertion: One candidate and admission attempt selects Write or Discard, never both; only Write produces an initial record.
-      evidence_binding:
-        applicability: relation-backed
-        owner_concept_ids:
-          - MemoryAdmissionOperation
-          - MemoryWrite
-          - MemoryDiscard
-        related_concept_ids:
-          - MemoryItem
-          - MemoryRecord
-        relation_ids:
-          - MemoryWrite-consumes-MemoryItem
-          - MemoryDiscard-consumes-MemoryItem
-          - MemoryWrite-produces-MemoryRecord
-        not_applicable_reason: null
-      positive_example_ids:
-        - memory-lifecycle-cq-admission-positive
-      counterexample_ids:
-        - memory-lifecycle-cq-admission-boundary
-      source_claims:
-        - claim-memory-lifecycle-015
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 逐项确认本模块只拥有记忆准入、不可变修订、综合、处置、评估、冲突解决及其结果/审计组成信息；MemoryItem、MemoryRecord、MemoryStore、MemoryTombstone 与 RetentionPolicy 继续由记忆对象与存储模块拥有。
-              en: Point-by-point review confirms this module owns memory admission, immutable revision, synthesis, disposition, assessment, conflict resolution, and their result or audit composition; MemoryItem, MemoryRecord, MemoryStore, MemoryTombstone, and RetentionPolicy remain owned by memory objects and stores.
-              ja: 本moduleはmemory admission・immutable revision・synthesis・disposition・assessment・conflict resolutionとresult/audit compositionのみを所有し、MemoryItem・MemoryRecord・MemoryStore・MemoryTombstone・RetentionPolicyはmemory objects/storesが所有すると個別確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 24 个保留节点按活动/状态/事件/信息分型；19 条 is_a 主骨架与 3 条组成主骨架构成可追踪层级，其他边仅表达有条件的输入、输出、治理和版本事实。
-              en: The 24 retained nodes are typed as activity, state, event, or information; nineteen is-a backbone edges and three composition backbone edges form the traceable hierarchy, while other edges express only conditional input, output, governance, and version facts.
-              ja: 保持24 nodeをactivity・state・event・informationに分け、19 is-a backbone edgeと3 composition backbone edgeで追跡可能階層を構成し、他edgeは条件付きinput・output・governance・version factだけを表します。
-          - reviewer_id: moonweave-trilingual-terminology-reviewer
-            reviewer_role: schema
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 模块、节点、字段、关系、能力问题、案例与边界的中英日文本已逐项人工复核；旧式 snake_case 边和与当前图矛盾的说明已退役。
-              en: Chinese, English, and Japanese text for the module, nodes, fields, relations, competency questions, cases, and boundaries was manually reviewed item by item; legacy snake_case edges and descriptions contradicting the current graph were deprecated.
-              ja: module・node・field・relation・competency question・case・boundaryの中英日textを個別手動審査し、legacy snake_case edgeと現graphに矛盾する説明をdeprecatedとしました。
-    - id: memory-lifecycle-cq-version-lineage-v4
-      semantic_key: memory-lifecycle.immutable-version-lineage
-      primary_owner_module_id: memory-lifecycle
-      related_module_ids:
-        - memory-stores-scopes
-      questions:
-        zh: 某条后继记录由哪次更新从哪个主要前驱产生，记录之间的替代方向是什么？
-        en: Which update produced a successor record from which principal predecessor, and what is the supersession direction between records?
-        ja: successor recordはどのupdateがどのprincipal predecessorから生成しrecord間supersession方向は何ですか。
-      query: Trace successor record to generating MemoryUpdate, consumed predecessor, and the successor-to-predecessor supersedes edge.
-      expected_assertion: The predecessor remains immutable; the update produces a separately identified successor that points back to the predecessor through supersedes.
-      evidence_binding:
-        applicability: relation-backed
-        owner_concept_ids:
-          - MemoryRevisionOperation
-          - MemoryUpdate
-        related_concept_ids:
-          - MemoryRecord
-        relation_ids:
-          - MemoryUpdate-consumes-MemoryRecord
-          - MemoryUpdate-produces-MemoryRecord
-          - MemoryRecord-supersedes-MemoryRecord
-        not_applicable_reason: null
-      positive_example_ids:
-        - memory-lifecycle-cq-version-positive
-      counterexample_ids:
-        - memory-lifecycle-cq-version-boundary
-      source_claims:
-        - claim-memory-lifecycle-016
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 逐项确认本模块只拥有记忆准入、不可变修订、综合、处置、评估、冲突解决及其结果/审计组成信息；MemoryItem、MemoryRecord、MemoryStore、MemoryTombstone 与 RetentionPolicy 继续由记忆对象与存储模块拥有。
-              en: Point-by-point review confirms this module owns memory admission, immutable revision, synthesis, disposition, assessment, conflict resolution, and their result or audit composition; MemoryItem, MemoryRecord, MemoryStore, MemoryTombstone, and RetentionPolicy remain owned by memory objects and stores.
-              ja: 本moduleはmemory admission・immutable revision・synthesis・disposition・assessment・conflict resolutionとresult/audit compositionのみを所有し、MemoryItem・MemoryRecord・MemoryStore・MemoryTombstone・RetentionPolicyはmemory objects/storesが所有すると個別確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 24 个保留节点按活动/状态/事件/信息分型；19 条 is_a 主骨架与 3 条组成主骨架构成可追踪层级，其他边仅表达有条件的输入、输出、治理和版本事实。
-              en: The 24 retained nodes are typed as activity, state, event, or information; nineteen is-a backbone edges and three composition backbone edges form the traceable hierarchy, while other edges express only conditional input, output, governance, and version facts.
-              ja: 保持24 nodeをactivity・state・event・informationに分け、19 is-a backbone edgeと3 composition backbone edgeで追跡可能階層を構成し、他edgeは条件付きinput・output・governance・version factだけを表します。
-          - reviewer_id: moonweave-trilingual-terminology-reviewer
-            reviewer_role: schema
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 模块、节点、字段、关系、能力问题、案例与边界的中英日文本已逐项人工复核；旧式 snake_case 边和与当前图矛盾的说明已退役。
-              en: Chinese, English, and Japanese text for the module, nodes, fields, relations, competency questions, cases, and boundaries was manually reviewed item by item; legacy snake_case edges and descriptions contradicting the current graph were deprecated.
-              ja: module・node・field・relation・competency question・case・boundaryの中英日textを個別手動審査し、legacy snake_case edgeと現graphに矛盾する説明をdeprecatedとしました。
-    - id: memory-lifecycle-cq-disposition-v4
-      semantic_key: memory-lifecycle.disposition-distinction
-      primary_owner_module_id: memory-lifecycle
-      related_module_ids:
-        - memory-stores-scopes
-      questions:
-        zh: 记录不可用或低优先级的原因是衰减、显式删除、容量驱逐还是到期，是否真的产生删除墓碑？
-        en: Is a record unavailable or low-priority because of decay, explicit deletion, capacity eviction, or expiration, and was a deletion tombstone actually produced?
-        ja: recordのunavailable/low-priority理由はdecay・explicit delete・capacity eviction・expirationのどれでdelete tombstoneは実際に生成されましたか。
-      query: Classify the disposition from its trigger and effect, then return only the facts supported for weight, invalidation, residency, expiry eligibility, and tombstone production.
-      expected_assertion: Decay reweights, Delete invalidates and creates a tombstone, Eviction removes active-tier residency, and Expiration marks policy-based ineligibility before possible later deletion.
-      evidence_binding:
-        applicability: relation-backed
-        owner_concept_ids:
-          - MemoryDispositionOperation
-          - MemoryDecay
-          - MemoryDelete
-          - MemoryEviction
-          - MemoryExpiration
-        related_concept_ids:
-          - MemoryRecord
-          - MemoryTombstone
-          - MemoryRetentionPolicy
-        relation_ids:
-          - MemoryDecay-reweights-MemoryRecord
-          - MemoryDelete-invalidates-MemoryRecord
-          - MemoryDelete-produces-MemoryTombstone
-          - MemoryEviction-evicts-MemoryRecord
-          - MemoryExpiration-marks_ineligible-MemoryRecord
-          - MemoryExpiration-governed_by-MemoryRetentionPolicy
-        not_applicable_reason: null
-      positive_example_ids:
-        - memory-lifecycle-cq-disposition-positive
-      counterexample_ids:
-        - memory-lifecycle-cq-disposition-boundary
-      source_claims:
-        - claim-memory-lifecycle-017
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 逐项确认本模块只拥有记忆准入、不可变修订、综合、处置、评估、冲突解决及其结果/审计组成信息；MemoryItem、MemoryRecord、MemoryStore、MemoryTombstone 与 RetentionPolicy 继续由记忆对象与存储模块拥有。
-              en: Point-by-point review confirms this module owns memory admission, immutable revision, synthesis, disposition, assessment, conflict resolution, and their result or audit composition; MemoryItem, MemoryRecord, MemoryStore, MemoryTombstone, and RetentionPolicy remain owned by memory objects and stores.
-              ja: 本moduleはmemory admission・immutable revision・synthesis・disposition・assessment・conflict resolutionとresult/audit compositionのみを所有し、MemoryItem・MemoryRecord・MemoryStore・MemoryTombstone・RetentionPolicyはmemory objects/storesが所有すると個別確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 24 个保留节点按活动/状态/事件/信息分型；19 条 is_a 主骨架与 3 条组成主骨架构成可追踪层级，其他边仅表达有条件的输入、输出、治理和版本事实。
-              en: The 24 retained nodes are typed as activity, state, event, or information; nineteen is-a backbone edges and three composition backbone edges form the traceable hierarchy, while other edges express only conditional input, output, governance, and version facts.
-              ja: 保持24 nodeをactivity・state・event・informationに分け、19 is-a backbone edgeと3 composition backbone edgeで追跡可能階層を構成し、他edgeは条件付きinput・output・governance・version factだけを表します。
-          - reviewer_id: moonweave-trilingual-terminology-reviewer
-            reviewer_role: schema
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 模块、节点、字段、关系、能力问题、案例与边界的中英日文本已逐项人工复核；旧式 snake_case 边和与当前图矛盾的说明已退役。
-              en: Chinese, English, and Japanese text for the module, nodes, fields, relations, competency questions, cases, and boundaries was manually reviewed item by item; legacy snake_case edges and descriptions contradicting the current graph were deprecated.
-              ja: module・node・field・relation・competency question・case・boundaryの中英日textを個別手動審査し、legacy snake_case edgeと現graphに矛盾する説明をdeprecatedとしました。
-    - id: memory-lifecycle-cq-conflict-recovery-v4
-      semantic_key: memory-lifecycle.conflict-recovery
-      primary_owner_module_id: memory-lifecycle
-      related_module_ids:
-        - memory-stores-scopes
-      questions:
-        zh: 哪次验证检测到哪些记录在哪个维度冲突，哪次解决活动消费该冲突、作出什么决定并产生何种调和输出？
-        en: Which validation detected which records conflicting on what dimension, and which resolution consumed that conflict, made what decision, and produced what reconciliation output?
-        ja: どのvalidationがどのrecordのどのdimension conflictを検出し、どのresolutionがそれを消費し何を決定しどのreconciliation outputを生成しましたか。
-      query: Traverse validation to conflict, involved records, conflict resolution, its decision, and any reconciled output without substituting consolidation for resolution.
-      expected_assertion: Detection and resolution are separate activities; every resolution consumes one explicit conflict and owns one auditable decision before an optional reconciled record.
-      evidence_binding:
-        applicability: relation-backed
-        owner_concept_ids:
-          - MemoryAssessmentOperation
-          - MemoryValidation
-          - MemoryResolutionOperation
-          - MemoryConflictResolution
-          - MemoryConflict
-          - MemoryConflictResolutionDecision
-        related_concept_ids:
-          - MemoryRecord
-        relation_ids:
-          - MemoryValidation-evaluates-MemoryRecord
-          - MemoryConflict-involves-MemoryRecord
-          - MemoryConflictResolution-produces-MemoryRecord
-        not_applicable_reason: null
-      positive_example_ids:
-        - memory-lifecycle-cq-conflict-positive
-      counterexample_ids:
-        - memory-lifecycle-cq-conflict-boundary
-      source_claims:
-        - claim-memory-lifecycle-015
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 逐项确认本模块只拥有记忆准入、不可变修订、综合、处置、评估、冲突解决及其结果/审计组成信息；MemoryItem、MemoryRecord、MemoryStore、MemoryTombstone 与 RetentionPolicy 继续由记忆对象与存储模块拥有。
-              en: Point-by-point review confirms this module owns memory admission, immutable revision, synthesis, disposition, assessment, conflict resolution, and their result or audit composition; MemoryItem, MemoryRecord, MemoryStore, MemoryTombstone, and RetentionPolicy remain owned by memory objects and stores.
-              ja: 本moduleはmemory admission・immutable revision・synthesis・disposition・assessment・conflict resolutionとresult/audit compositionのみを所有し、MemoryItem・MemoryRecord・MemoryStore・MemoryTombstone・RetentionPolicyはmemory objects/storesが所有すると個別確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 24 个保留节点按活动/状态/事件/信息分型；19 条 is_a 主骨架与 3 条组成主骨架构成可追踪层级，其他边仅表达有条件的输入、输出、治理和版本事实。
-              en: The 24 retained nodes are typed as activity, state, event, or information; nineteen is-a backbone edges and three composition backbone edges form the traceable hierarchy, while other edges express only conditional input, output, governance, and version facts.
-              ja: 保持24 nodeをactivity・state・event・informationに分け、19 is-a backbone edgeと3 composition backbone edgeで追跡可能階層を構成し、他edgeは条件付きinput・output・governance・version factだけを表します。
-          - reviewer_id: moonweave-trilingual-terminology-reviewer
-            reviewer_role: schema
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 模块、节点、字段、关系、能力问题、案例与边界的中英日文本已逐项人工复核；旧式 snake_case 边和与当前图矛盾的说明已退役。
-              en: Chinese, English, and Japanese text for the module, nodes, fields, relations, competency questions, cases, and boundaries was manually reviewed item by item; legacy snake_case edges and descriptions contradicting the current graph were deprecated.
-              ja: module・node・field・relation・competency question・case・boundaryの中英日textを個別手動審査し、legacy snake_case edgeと現graphに矛盾する説明をdeprecatedとしました。
-  key_notion:
-    zh: 记忆操作
-    en: Memory operation
-    ja: 記憶操作
-  owns_when:
-    zh: 当对象的身份取决于一次可观测的记忆操作、其输入与触发依据、执行时间、产生的新版本或冲突解决结果时，由本模块拥有；仅由 store_id、namespace、record_id、content 或 retention policy 确定身份的对象归存储模块。
-    en: Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.
-    ja: object identityがobservable memory activityとinput・trigger basis・execution time・output version・resolution outcomeで決まる時所有し、store ID・namespace・record ID・content・retention-policy identityで決まる時は所有しません。
-  references_when:
-    zh: 操作事实需要指明候选项、现有记录、删除墓碑、保留策略、反馈、参与者或错误时，只引用对应节点；不把“被操作对象”误作“操作类型”的下位节点。
-    en: Reference canonical owners when lifecycle facts identify candidate items, existing records, deletion tombstones, retention policies, feedback, actors, or error events; do not copy their schemas or create synonymous nodes.
-    ja: ライフサイクル事実が候補項目・既存レコード・削除墓標・保持方針・フィードバック・参加者・エラーイベントを識別する場合は canonical owner を参照し、schema の複製や同義ノードを作りません。
-  boundary_decisions:
-    - other_module_id: feedback-review-optimization
-      subject_concept_ids:
-        - MemoryWrite
-      decision: owns
-      owner_module_id: memory-lifecycle
-      rationale:
-        zh: MemoryWrite 的身份由一次候选记忆接纳及其结果决定；即使响应反馈，写入操作仍由记忆生命周期域拥有。
-        en: MemoryWrite is identified by one candidate-memory admission and its outcome; even when it responds to feedback, the write operation remains owned by memory lifecycle.
-        ja: MemoryWrite は一回の候補記憶受入と結果で識別され、Feedback に応答しても memory lifecycle が所有します。
-      relation_ids:
-        - MemoryWrite-responds_to-Feedback
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-lifecycle-015
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已核实 MemoryWrite 是记忆接纳操作，Feedback 是可能触发或实质改变该操作的持久反馈；causal cross-link 不改变两端所有权。
-              en: Verified that MemoryWrite is a memory-admission operation and Feedback is persistent feedback that may trigger or materially change it; the causal cross-link does not change endpoint ownership.
-              ja: MemoryWrite は記憶受入操作、Feedback はそれを開始または実質変更し得る永続的 feedback であり、causal cross-link は両端の所有権を変えません。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已核实 MemoryWrite 是记忆接纳操作，Feedback 是可能触发或实质改变该操作的持久反馈；causal cross-link 不改变两端所有权。
-              en: Verified that MemoryWrite is a memory-admission operation and Feedback is persistent feedback that may trigger or materially change it; the causal cross-link does not change endpoint ownership.
-              ja: MemoryWrite は記憶受入操作、Feedback はそれを開始または実質変更し得る永続的 feedback であり、causal cross-link は両端の所有権を変えません。
-    - other_module_id: feedback-review-optimization
-      subject_concept_ids:
-        - Feedback
-      decision: references
-      owner_module_id: feedback-review-optimization
-      rationale:
-        zh: Feedback 是审查发现转化出的可追踪行动信号；记忆生命周期只记录它是否实质影响一次写入，不接管其内容与关闭状态。
-        en: Feedback is a traceable action signal derived from review findings; memory lifecycle records only whether it materially affected a write and does not take over its content or closure state.
-        ja: Feedback は review finding から導く追跡可能な行動信号で、memory lifecycle は書込への実質的影響だけを記録し、内容や完了状態を引き取りません。
-      relation_ids:
-        - MemoryWrite-responds_to-Feedback
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-lifecycle-015
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已核实 MemoryWrite 是记忆接纳操作，Feedback 是可能触发或实质改变该操作的持久反馈；causal cross-link 不改变两端所有权。
-              en: Verified that MemoryWrite is a memory-admission operation and Feedback is persistent feedback that may trigger or materially change it; the causal cross-link does not change endpoint ownership.
-              ja: MemoryWrite は記憶受入操作、Feedback はそれを開始または実質変更し得る永続的 feedback であり、causal cross-link は両端の所有権を変えません。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已核实 MemoryWrite 是记忆接纳操作，Feedback 是可能触发或实质改变该操作的持久反馈；causal cross-link 不改变两端所有权。
-              en: Verified that MemoryWrite is a memory-admission operation and Feedback is persistent feedback that may trigger or materially change it; the causal cross-link does not change endpoint ownership.
-              ja: MemoryWrite は記憶受入操作、Feedback はそれを開始または実質変更し得る永続的 feedback であり、causal cross-link は両端の所有権を変えません。
-    - other_module_id: memory-stores-scopes
-      subject_concept_ids:
-        - MemoryCompaction
-        - MemoryConflict
-        - MemoryConflictResolution
-        - MemoryConsolidation
-        - MemoryDecay
-        - MemoryDelete
-        - MemoryDiscard
-        - MemoryEviction
-        - MemoryExpiration
-        - MemoryMerge
-        - MemoryOperation
-        - MemoryOperationResult
-        - MemoryReflection
-        - MemoryUpdate
-        - MemoryValidation
-        - MemoryWrite
-      decision: owns
-      owner_module_id: memory-lifecycle
-      rationale:
-        zh: 本条完整投影记忆生命周期侧的活动与结果端点：写入和丢弃消费 MemoryItem；更新、合并、整合、压缩与反思消费或生成 MemoryRecord；衰减、删除、驱逐、到期、校验与冲突处理对既有记录执行明确动作。每个节点由一次发生的时间、输入、原因与结果识别，不与 MemoryRecord、MemoryItem 或保留策略同层。
-        en: This row completely projects the lifecycle-side activity and result endpoints. Write and discard consume MemoryItem; update, merge, consolidation, compaction, and reflection consume or produce MemoryRecord; decay, delete, eviction, expiration, validation, and conflict handling perform explicit actions on existing records. Each node is identified by an occurrence time, inputs, cause, and outcome and is not a sibling type of MemoryRecord, MemoryItem, or a retention policy.
-        ja: この行は memory lifecycle 側の activity/result endpoint を完全に投影します。write/discard は MemoryItem を consume し、update・merge・consolidation・compaction・reflection は MemoryRecord を consume/produce し、decay・delete・eviction・expiration・validation・conflict handling は既存 record に明示 action を行います。各 node は occurrence time・input・cause・outcome で識別され、MemoryRecord・MemoryItem・retention policy と同階層の型ではありません。
-      relation_ids:
-        - MemoryCompaction-consumes-MemoryRecord
-        - MemoryCompaction-produces-MemoryRecord
-        - MemoryConflict-involves-MemoryRecord
-        - MemoryConflictResolution-produces-MemoryRecord
-        - MemoryConsolidation-consumes-MemoryRecord
-        - MemoryConsolidation-produces-MemoryRecord
-        - MemoryDecay-reweights-MemoryRecord
-        - MemoryDelete-invalidates-MemoryRecord
-        - MemoryDelete-produces-MemoryTombstone
-        - MemoryDiscard-consumes-MemoryItem
-        - MemoryEviction-evicts-MemoryRecord
-        - MemoryExpiration-governed_by-MemoryRetentionPolicy
-        - MemoryExpiration-marks_ineligible-MemoryRecord
-        - MemoryMerge-consumes-MemoryRecord
-        - MemoryMerge-produces-MemoryRecord
-        - MemoryOperation-acts_on-MemoryRecord
-        - MemoryOperationResult-references-MemoryRecord
-        - MemoryReflection-consumes-MemoryRecord
-        - MemoryReflection-produces-MemoryRecord
-        - MemoryUpdate-consumes-MemoryRecord
-        - MemoryUpdate-produces-MemoryRecord
-        - MemoryValidation-evaluates-MemoryRecord
-        - MemoryWrite-consumes-MemoryItem
-        - MemoryWrite-produces-MemoryRecord
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-lifecycle-018
-        - claim-memory-lifecycle-019
-        - claim-memory-lifecycle-020
-        - claim-memory-lifecycle-021
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-17
-            decision_note:
-              zh: 逐项复核 16 个生命周期端点及 24 条跨界事实，确认每项活动都有明确输入、输出或作用对象，且不再引用 10 条旧谓词。
-              en: Point-by-point review covered all 16 lifecycle endpoints and 24 cross-boundary facts, confirming an explicit input, output, or acted-on object for each activity and removing all ten retired shortcut predicates.
-              ja: 16 lifecycle endpoint と 24 module 横断 fact を項目別審査し、各 activity の input・output・acted-on object を明示し、十個の deprecated shortcut predicate を除外しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-17
-            decision_note:
-              zh: 结构复核确认生命周期端点均是活动或活动结果，存储端点均是信息对象或策略；跨界谓词不是 is_a，不制造平级伪概念。
-              en: Structural review confirms that lifecycle endpoints are activities or activity results and store endpoints are information objects or policy; no boundary predicate is is_a or creates false same-level concepts.
-              ja: 構造審査により lifecycle endpoint は activity/activity result、store endpoint は information object/policy で、境界 predicate は is_a ではなく偽の同階層概念を作らないと確認しました。
-    - other_module_id: memory-stores-scopes
-      subject_concept_ids:
-        - MemoryItem
-        - MemoryRecord
-        - MemoryTombstone
-        - MemoryRetentionPolicy
-      decision: references
-      owner_module_id: memory-stores-scopes
-      rationale:
-        zh: MemoryItem、MemoryRecord、MemoryTombstone 与 MemoryRetentionPolicy 都由存储身份、内容版本或保留规则识别并归 memory-stores-scopes；生命周期活动通过 consumes、produces、invalidates、evicts、marks_ineligible、reweights、evaluates 与 involves 等 accepted 边作用于它们。MemoryRecord-supersedes-MemoryRecord 是存储域内部记录谱系，不再冒充模块边界。
-        en: MemoryItem, MemoryRecord, MemoryTombstone, and MemoryRetentionPolicy are identified by storage identity, content version, or retention rules and belong to memory-stores-scopes. Lifecycle activities act on them through accepted consumes, produces, invalidates, evicts, marks_ineligible, reweights, evaluates, and involves edges. MemoryRecord-supersedes-MemoryRecord is internal record lineage in the store domain and is no longer presented as a module boundary.
-        ja: MemoryItem・MemoryRecord・MemoryTombstone・MemoryRetentionPolicy は storage identity・content version・retention rule で識別され memory-stores-scopes に属します。lifecycle activity は accepted な consumes・produces・invalidates・evicts・marks_ineligible・reweights・evaluates・involves edge でそれらへ作用します。MemoryRecord-supersedes-MemoryRecord は store domain 内部の record lineage で、module 境界として扱いません。
-      relation_ids:
-        - MemoryCompaction-consumes-MemoryRecord
-        - MemoryCompaction-produces-MemoryRecord
-        - MemoryConflict-involves-MemoryRecord
-        - MemoryConflictResolution-produces-MemoryRecord
-        - MemoryConsolidation-consumes-MemoryRecord
-        - MemoryConsolidation-produces-MemoryRecord
-        - MemoryDecay-reweights-MemoryRecord
-        - MemoryDelete-invalidates-MemoryRecord
-        - MemoryDelete-produces-MemoryTombstone
-        - MemoryDiscard-consumes-MemoryItem
-        - MemoryEviction-evicts-MemoryRecord
-        - MemoryExpiration-governed_by-MemoryRetentionPolicy
-        - MemoryExpiration-marks_ineligible-MemoryRecord
-        - MemoryMerge-consumes-MemoryRecord
-        - MemoryMerge-produces-MemoryRecord
-        - MemoryOperation-acts_on-MemoryRecord
-        - MemoryOperationResult-references-MemoryRecord
-        - MemoryReflection-consumes-MemoryRecord
-        - MemoryReflection-produces-MemoryRecord
-        - MemoryUpdate-consumes-MemoryRecord
-        - MemoryUpdate-produces-MemoryRecord
-        - MemoryValidation-evaluates-MemoryRecord
-        - MemoryWrite-consumes-MemoryItem
-        - MemoryWrite-produces-MemoryRecord
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-lifecycle-022
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 逐项复核确认 store 侧端点严格为 MemoryItem、MemoryRecord、MemoryTombstone 与 MemoryRetentionPolicy；24 条 accepted 跨界事实完整列出活动对它们的消费、生成、作用、无效化、驱逐、到期、重加权、校验与冲突关联，内部 supersedes 关系已排除。
-              en: Point-by-point review confirms that the store-side endpoints are exactly MemoryItem, MemoryRecord, MemoryTombstone, and MemoryRetentionPolicy. All 24 accepted boundary facts enumerate lifecycle consumption, production, action, invalidation, eviction, expiry, reweighting, validation, and conflict involvement, while internal supersedes lineage is excluded.
-              ja: 項目別審査により store 側 endpoint は MemoryItem・MemoryRecord・MemoryTombstone・MemoryRetentionPolicy のみと確認しました。24 accepted boundary fact は lifecycle の consume・produce・act・invalidate・evict・expire・reweight・validate・conflict involvement を完全列挙し、内部 supersedes lineage は除外します。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 逐项复核确认 store 侧端点严格为 MemoryItem、MemoryRecord、MemoryTombstone 与 MemoryRetentionPolicy；24 条 accepted 跨界事实完整列出活动对它们的消费、生成、作用、无效化、驱逐、到期、重加权、校验与冲突关联，内部 supersedes 关系已排除。
-              en: Point-by-point review confirms that the store-side endpoints are exactly MemoryItem, MemoryRecord, MemoryTombstone, and MemoryRetentionPolicy. All 24 accepted boundary facts enumerate lifecycle consumption, production, action, invalidation, eviction, expiry, reweighting, validation, and conflict involvement, while internal supersedes lineage is excluded.
-              ja: 項目別審査により store 側 endpoint は MemoryItem・MemoryRecord・MemoryTombstone・MemoryRetentionPolicy のみと確認しました。24 accepted boundary fact は lifecycle の consume・produce・act・invalidate・evict・expire・reweight・validate・conflict involvement を完全列挙し、内部 supersedes lineage は除外します。
-          - reviewer_id: moonweave-trilingual-terminology-reviewer
-            reviewer_role: schema
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 逐项复核确认 store 侧端点严格为 MemoryItem、MemoryRecord、MemoryTombstone 与 MemoryRetentionPolicy；24 条 accepted 跨界事实完整列出活动对它们的消费、生成、作用、无效化、驱逐、到期、重加权、校验与冲突关联，内部 supersedes 关系已排除。
-              en: Point-by-point review confirms that the store-side endpoints are exactly MemoryItem, MemoryRecord, MemoryTombstone, and MemoryRetentionPolicy. All 24 accepted boundary facts enumerate lifecycle consumption, production, action, invalidation, eviction, expiry, reweighting, validation, and conflict involvement, while internal supersedes lineage is excluded.
-              ja: 項目別審査により store 側 endpoint は MemoryItem・MemoryRecord・MemoryTombstone・MemoryRetentionPolicy のみと確認しました。24 accepted boundary fact は lifecycle の consume・produce・act・invalidate・evict・expire・reweight・validate・conflict involvement を完全列挙し、内部 supersedes lineage は除外します。
-  overlap_checks:
-    - other_module_id: memory-stores-scopes
-      semantic_area:
-        zh: 记忆状态与记忆操作
-        en: Memory state versus memory operations
-        ja: 記憶状態と記憶操作
-      candidate_concept_ids:
-        - MemoryCompaction
-      overlap_reason:
-        zh: 两者都可出现 retention 或 expiry，但对象 facet 描述适用规则，生命周期操作记录规则何时触发并产生何种版本变化。 本条仅记录 MemoryCompaction；其 canonical owner 是记忆生命周期（memory-lifecycle），因此 memory-lifecycle 在此拥有这些概念。
-        en: Both may mention retention or expiry, but object facets describe applicable rules while lifecycle operations record when a rule fired and what version change resulted. This record is limited to MemoryCompaction; their canonical owner is Memory lifecycle (memory-lifecycle), so memory-lifecycle owns these concepts here.
-        ja: どちらも retention や expiry を扱いますが、対象 facet は適用規則、ライフサイクル操作は規則の発火時点と版変更結果を記録します。 この記録は MemoryCompaction だけを対象とし、canonical owner は記憶ライフサイクル（memory-lifecycle）です。したがって memory-lifecycle はここでこれらを所有します。
-      disambiguation_test:
-        zh: 若事实可作为记忆对象的静态分类或存储属性存在，则归记忆对象与存储；若必须有 actor、时间、原因和前后版本，则归记忆生命周期。
-        en: If the fact exists as static classification or storage metadata of a memory object, it belongs to memory objects and stores; if it requires actor, time, reason, and before/after versions, it belongs to memory lifecycle.
-        ja: 事実が記憶対象の静的分類または保存属性として存在するなら記憶オブジェクトとストア、actor、時刻、理由、前後版が必要なら記憶ライフサイクルに属します。
-      result: distinct
-      owner_module_id: memory-lifecycle
-      source_claims:
-        - claim-memory-lifecycle-023
-        - claim-memory-lifecycle-024
-        - claim-memory-lifecycle-025
-        - claim-memory-lifecycle-026
-        - claim-memory-lifecycle-027
-        - claim-memory-lifecycle-028
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 逐项确认本模块只拥有记忆准入、不可变修订、综合、处置、评估、冲突解决及其结果/审计组成信息；MemoryItem、MemoryRecord、MemoryStore、MemoryTombstone 与 RetentionPolicy 继续由记忆对象与存储模块拥有。
-              en: Point-by-point review confirms this module owns memory admission, immutable revision, synthesis, disposition, assessment, conflict resolution, and their result or audit composition; MemoryItem, MemoryRecord, MemoryStore, MemoryTombstone, and RetentionPolicy remain owned by memory objects and stores.
-              ja: 本moduleはmemory admission・immutable revision・synthesis・disposition・assessment・conflict resolutionとresult/audit compositionのみを所有し、MemoryItem・MemoryRecord・MemoryStore・MemoryTombstone・RetentionPolicyはmemory objects/storesが所有すると個別確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 24 个保留节点按活动/状态/事件/信息分型；19 条 is_a 主骨架与 3 条组成主骨架构成可追踪层级，其他边仅表达有条件的输入、输出、治理和版本事实。
-              en: The 24 retained nodes are typed as activity, state, event, or information; nineteen is-a backbone edges and three composition backbone edges form the traceable hierarchy, while other edges express only conditional input, output, governance, and version facts.
-              ja: 保持24 nodeをactivity・state・event・informationに分け、19 is-a backbone edgeと3 composition backbone edgeで追跡可能階層を構成し、他edgeは条件付きinput・output・governance・version factだけを表します。
-          - reviewer_id: moonweave-trilingual-terminology-reviewer
-            reviewer_role: schema
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 模块、节点、字段、关系、能力问题、案例与边界的中英日文本已逐项人工复核；旧式 snake_case 边和与当前图矛盾的说明已退役。
-              en: Chinese, English, and Japanese text for the module, nodes, fields, relations, competency questions, cases, and boundaries was manually reviewed item by item; legacy snake_case edges and descriptions contradicting the current graph were deprecated.
-              ja: module・node・field・relation・competency question・case・boundaryの中英日textを個別手動審査し、legacy snake_case edgeと現graphに矛盾する説明をdeprecatedとしました。
-    - other_module_id: memory-stores-scopes
-      semantic_area:
-        zh: 记忆状态与记忆操作
-        en: Memory state versus memory operations
-        ja: 記憶状態と記憶操作
-      candidate_concept_ids:
-        - MemoryRecord
-      overlap_reason:
-        zh: 两者都可出现 retention 或 expiry，但对象 facet 描述适用规则，生命周期操作记录规则何时触发并产生何种版本变化。 本条仅记录 MemoryRecord；其 canonical owner 是记忆对象与存储（memory-stores-scopes），因此 memory-lifecycle 在此引用这些概念。
-        en: Both may mention retention or expiry, but object facets describe applicable rules while lifecycle operations record when a rule fired and what version change resulted. This record is limited to MemoryRecord; their canonical owner is Memory objects and stores (memory-stores-scopes), so memory-lifecycle references these concepts here.
-        ja: どちらも retention や expiry を扱いますが、対象 facet は適用規則、ライフサイクル操作は規則の発火時点と版変更結果を記録します。 この記録は MemoryRecord だけを対象とし、canonical owner は記憶オブジェクトとストア（memory-stores-scopes）です。したがって memory-lifecycle はここでこれらを参照します。
-      disambiguation_test:
-        zh: 若事实可作为记忆对象的静态分类或存储属性存在，则归记忆对象与存储；若必须有 actor、时间、原因和前后版本，则归记忆生命周期。
-        en: If the fact exists as static classification or storage metadata of a memory object, it belongs to memory objects and stores; if it requires actor, time, reason, and before/after versions, it belongs to memory lifecycle.
-        ja: 事実が記憶対象の静的分類または保存属性として存在するなら記憶オブジェクトとストア、actor、時刻、理由、前後版が必要なら記憶ライフサイクルに属します。
-      result: distinct
-      owner_module_id: memory-stores-scopes
-      source_claims:
-        - claim-memory-lifecycle-029
-        - claim-memory-lifecycle-030
-        - claim-memory-lifecycle-031
-        - claim-memory-lifecycle-032
-        - claim-memory-lifecycle-033
-        - claim-memory-lifecycle-034
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 逐项确认本模块只拥有记忆准入、不可变修订、综合、处置、评估、冲突解决及其结果/审计组成信息；MemoryItem、MemoryRecord、MemoryStore、MemoryTombstone 与 RetentionPolicy 继续由记忆对象与存储模块拥有。
-              en: Point-by-point review confirms this module owns memory admission, immutable revision, synthesis, disposition, assessment, conflict resolution, and their result or audit composition; MemoryItem, MemoryRecord, MemoryStore, MemoryTombstone, and RetentionPolicy remain owned by memory objects and stores.
-              ja: 本moduleはmemory admission・immutable revision・synthesis・disposition・assessment・conflict resolutionとresult/audit compositionのみを所有し、MemoryItem・MemoryRecord・MemoryStore・MemoryTombstone・RetentionPolicyはmemory objects/storesが所有すると個別確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 24 个保留节点按活动/状态/事件/信息分型；19 条 is_a 主骨架与 3 条组成主骨架构成可追踪层级，其他边仅表达有条件的输入、输出、治理和版本事实。
-              en: The 24 retained nodes are typed as activity, state, event, or information; nineteen is-a backbone edges and three composition backbone edges form the traceable hierarchy, while other edges express only conditional input, output, governance, and version facts.
-              ja: 保持24 nodeをactivity・state・event・informationに分け、19 is-a backbone edgeと3 composition backbone edgeで追跡可能階層を構成し、他edgeは条件付きinput・output・governance・version factだけを表します。
-          - reviewer_id: moonweave-trilingual-terminology-reviewer
-            reviewer_role: schema
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 模块、节点、字段、关系、能力问题、案例与边界的中英日文本已逐项人工复核；旧式 snake_case 边和与当前图矛盾的说明已退役。
-              en: Chinese, English, and Japanese text for the module, nodes, fields, relations, competency questions, cases, and boundaries was manually reviewed item by item; legacy snake_case edges and descriptions contradicting the current graph were deprecated.
-              ja: module・node・field・relation・competency question・case・boundaryの中英日textを個別手動審査し、legacy snake_case edgeと現graphに矛盾する説明をdeprecatedとしました。
-    - other_module_id: feedback-review-optimization
-      semantic_area:
-        zh: 记忆状态变更与内容质量修正
-        en: Memory-state change versus content-quality correction
-        ja: memory state change と content quality correction
-      candidate_concept_ids:
-        - MemoryWrite
-      overlap_reason:
-        zh: ReviewFinding 可触发 MemoryUpdate 或 Delete，但审查责任与验证证据不能由存储操作状态替代，反之亦然。 本条仅记录 MemoryWrite；其 canonical owner 是记忆生命周期（memory-lifecycle），因此 memory-lifecycle 在此拥有这些概念。
-        en: A ReviewFinding can trigger MemoryUpdate or Delete, but review responsibility and verification evidence cannot be replaced by storage-operation status, or vice versa. This record is limited to MemoryWrite; their canonical owner is Memory lifecycle (memory-lifecycle), so memory-lifecycle owns these concepts here.
-        ja: ReviewFinding は MemoryUpdate/Delete を trigger できますが、review responsibility/verification evidence と storage operation state は互いに代替できません。 この記録は MemoryWrite だけを対象とし、canonical owner は記憶ライフサイクル（memory-lifecycle）です。したがって memory-lifecycle はここでこれらを所有します。
-      disambiguation_test:
-        zh: 由 memory entity、prior/new version、operation type 和 effective time 识别的对象归记忆生命周期；由 review scope、finding、owner 和 closure evidence 识别的对象归评审与修正。
-        en: An object identified by memory entity, prior or new version, operation type, and effective time belongs to memory lifecycle; one identified by review scope, finding, owner, and closure evidence belongs to review and correction.
-        ja: memory entity・prior/new version・operation type・effective time で識別されれば memory lifecycle、review scope・finding・owner・closure evidence で識別されれば review/correction に属します。
-      result: distinct
-      owner_module_id: memory-lifecycle
-      source_claims:
-        - claim-memory-lifecycle-035
-        - claim-memory-lifecycle-036
-        - claim-memory-lifecycle-037
-        - claim-memory-lifecycle-038
-        - claim-memory-lifecycle-039
-        - claim-memory-lifecycle-040
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-lifecycle-overlap-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 逐项核实后确认，MemoryWrite 由候选 MemoryItem、operation_id、执行时刻和产生初始 MemoryRecord 的结果识别；ReviewFinding、整改责任或闭环证据均不构成其身份，因此由 memory-lifecycle 拥有。
-              en: Point-by-point review confirms that MemoryWrite is identified by its candidate MemoryItem, operation_id, execution time, and production of an initial MemoryRecord. Review findings, remediation ownership, and closure evidence do not define it, so memory-lifecycle remains the owner.
-              ja: 個別審査により、MemoryWriteはcandidate MemoryItem・operation_id・execution time・initial MemoryRecord生成で識別され、ReviewFinding・remediation owner・closure evidenceでは識別されないためmemory-lifecycleが所有すると確認しました。
-    - other_module_id: feedback-review-optimization
-      semantic_area:
-        zh: 记忆状态变更与内容质量修正
-        en: Memory-state change versus content-quality correction
-        ja: memory state change と content quality correction
-      candidate_concept_ids:
-        - Feedback
-      overlap_reason:
-        zh: ReviewFinding 可触发 MemoryUpdate 或 Delete，但审查责任与验证证据不能由存储操作状态替代，反之亦然。 本条仅记录 Feedback；其 canonical owner 是审查与纠正（feedback-review-optimization），因此 memory-lifecycle 在此引用这些概念。
-        en: A ReviewFinding can trigger MemoryUpdate or Delete, but review responsibility and verification evidence cannot be replaced by storage-operation status, or vice versa. This record is limited to Feedback; their canonical owner is review and correction (feedback-review-optimization), so memory-lifecycle references these concepts here.
-        ja: ReviewFinding は MemoryUpdate/Delete を trigger できますが、review responsibility/verification evidence と storage operation state は互いに代替できません。 この記録は Feedback だけを対象とし、canonical owner は審査と修正（feedback-review-optimization）です。したがって memory-lifecycle はここでこれらを参照します。
-      disambiguation_test:
-        zh: 由 memory entity、prior/new version、operation type 和 effective time 识别的对象归记忆生命周期；由 review scope、finding、owner 和 closure evidence 识别的对象归评审与修正。
-        en: An object identified by memory entity, prior or new version, operation type, and effective time belongs to memory lifecycle; one identified by review scope, finding, owner, and closure evidence belongs to review and correction.
-        ja: memory entity・prior/new version・operation type・effective time で識別されれば memory lifecycle、review scope・finding・owner・closure evidence で識別されれば review/correction に属します。
-      result: distinct
-      owner_module_id: feedback-review-optimization
-      source_claims:
-        - claim-memory-lifecycle-041
-        - claim-memory-lifecycle-042
-        - claim-memory-lifecycle-043
-        - claim-memory-lifecycle-044
-        - claim-memory-lifecycle-045
-        - claim-memory-lifecycle-046
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-feedback-boundary-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 逐项核实后确认，Feedback 由观察或评价来源、作者、时间、作用域与内容识别；它可以触发记忆操作但不是 MemoryOperation 或其结果，因此 canonical owner 仍是 feedback-review-optimization。
-              en: Point-by-point review confirms that Feedback is identified by its observation or evaluation source, author, time, scope, and content. It may trigger a memory operation but is neither that MemoryOperation nor its result, so feedback-review-optimization remains the canonical owner.
-              ja: 個別審査により、Feedbackはobservation/evaluation source・author・time・scope・contentで識別され、memory operationをtriggerし得てもMemoryOperationまたはresultではないためfeedback-review-optimizationがcanonical ownerであると確認しました。
-review:
-  status: pending
-  method: manual-semantic
-  reviewer: codex-manual-semantic
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已人工核验模块边界及直接根节点：本模块只描述对既有记忆实体发生的写入、更新、巩固、压缩、失效、遗忘、过期和淘汰等有时间性的操作；记忆实体、存储位置和静态保留策略不因操作而转移到本模块。
-    en: The module boundary and direct root were manually reviewed as time-bounded operations over existing memory entities, including write, update, consolidation, invalidation, forgetting, expiry, and eviction.
-    ja: 既存メモリエンティティに対する時点付き操作のみを所有する境界として、直下ルートを手動確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: pending
-    structure: pending
-    examples: pending
-    source_claims: []
+sources:
+  - id: src-mem0-lifecycle
+    title: Mem0 Platform Documentation
+    publisher: Mem0
+    url: https://docs.mem0.ai
+    source_type: official-doc
+    relevance: PUT and DELETE /v1/memories/{id}/ for update and deletion.
+  - id: src-letta-archival-lifecycle
+    title: Letta Archival Memory Guide
+    publisher: Letta
+    url: https://docs.letta.com/guides/core-concepts/memory/archival-memory
+    source_type: official-doc
+    relevance: archival_memory_delete and core block replacement.
+  - id: src-langgraph-store-lifecycle
+    title: LangGraph Store Reference
+    publisher: LangChain
+    url: https://langchain-ai.github.io/langgraph/reference/store/
+    source_type: official-doc
+    relevance: BaseStore.delete and TTLConfig expiry.
+  - id: src-generative-agents
+    title: Generative Agents — Interactive Simulacra of Human Behavior
+    publisher: arXiv
+    url: https://arxiv.org/abs/2304.03442
+    source_type: arXiv
+    relevance: Memory stream recency decay with 0.99 hourly factor.
+  - id: src-memory-lifecycle-design
+    title: Moonweave memory-lifecycle module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Separates lifecycle operations from store identity and index visibility.
 source_claims:
-  - id: claim-memory-lifecycle-001
-    source: eng-fw-langgraph-memory-store
-    supports: LangGraph BaseStore and Item operations support the boundary between persistent record identity and the lifecycle activities acting on it.
-    locator: BaseStore and Item API > namespaces, keys, values, metadata, timestamps, and TTL operations
+  - id: claim-memory-lifecycle-mem0
+    source: src-mem0-lifecycle
+    supports: Mem0 exposes PUT and DELETE on /v1/memories/{memory_id}/ to update text/metadata or remove a stored memory by id.
+    locator: Update memory and delete memory API routes
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-memory-lifecycle-letta
+    source: src-letta-archival-lifecycle
+    supports: Letta provides archival_memory_delete to remove out-of-window passages separately from in-context core block edits.
+    locator: Archival memory guide — delete and search tools
+    evidence_kind: primary-doc
+    confidence: high
+  - id: claim-memory-lifecycle-langgraph
+    source: src-langgraph-store-lifecycle
+    supports: LangGraph BaseStore supports delete for namespace-key Items and optional TTL on put for time-bounded retention.
+    locator: BaseStore.delete, PutOp, TTLConfig
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-memory-lifecycle-generative-agents
+    source: src-generative-agents
+    supports: Generative Agents combine recency, importance, and relevance when retrieving memory stream entries, using exponential recency decay.
+    locator: Section 3.1 memory stream and retrieval scoring
+    evidence_kind: academic
+    confidence: high
+  - id: claim-memory-lifecycle-design
+    source: src-memory-lifecycle-design
+    supports: Moonweave lifecycle operations are identified by operation_id and must bind consumed/produced records, tombstones, or decay weights rather than inferring change from timestamps alone.
+    locator: memory-lifecycle module boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-002
-    source: eng-fw-langmem-memory-management
-    supports: LangMem distinguishes insert, update, delete, collection reconciliation, consolidation, relevance, importance, and strength; Moonweave refines these into nonoverlapping activity levels.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-003
-    source: eng-cache-redis-eviction
-    supports: Redis maxmemory and eviction policies support a capacity-residency operation distinct from durable deletion.
-    locator: Key eviction > maxmemory configuration and eviction policies
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-004
-    source: eng-db-dynamodb-ttl
-    supports: DynamoDB TTL supports separating the instant an item becomes expired from its later asynchronous service deletion.
-    locator: Using time to live (TTL) > expired items pending deletion and TTL stream records
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-005
-    source: eng-ont-prov-o
-    supports: PROV-O supports separating activities, entities, agents, usage, generation, and invalidation in lifecycle provenance.
-    locator: PROV-O Recommendation > Starting Point Terms > Entity, Activity, Agent, used, wasGeneratedBy, and wasInvalidatedBy
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-006
-    source: eng-observe-opentelemetry-logs
-    supports: OpenTelemetry's stable log data model supports observable audit-event identity and fields without turning the event into the operation itself.
-    locator: Logs Data Model > Log and Event Record > field list and semantics
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-007
-    source: eng-fw-langmem-memory-management
-    supports: LangMem's collection flow can insert a newly extracted memory into the store; this case records that one selected write consumes item-310 and creates its first persistent record without a predecessor.
-    locator: LangMem Core Concepts > Semantic Memory > Collection; Integration Patterns > Core API memory managers
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-008
-    source: eng-fw-langmem-memory-management
-    supports: LangMem exposes insert and delete-or-invalidate as distinct collection-management choices; the case therefore rejects one admission attempt that asserts both discard and unconditional write outcomes.
-    locator: LangMem Core Concepts > Semantic Memory > Collection > insert versus delete/invalidate or update/consolidate
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-009
-    source: eng-ont-prov-o
-    supports: PROV-O separates the Entity used by an Activity from the Entity generated by it; this case applies that pattern to record-512-v1, update-512, and independently identified record-512-v2.
-    locator: PROV-O Recommendation §2.1 Starting Point Terms > prov:Entity, prov:Activity, prov:used, and prov:wasGeneratedBy
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-010
-    source: eng-ont-prov-o
-    supports: PROV-O generation requires an identified generated Entity; overwriting record-512-v1 under the same identity supplies no successor that can carry generation, supersession, or rollback lineage.
-    locator: PROV-O Recommendation §2.1 Starting Point Terms > prov:Entity identity and prov:wasGeneratedBy
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-011
-    source: eng-db-dynamodb-ttl
-    supports: DynamoDB TTL assigns a per-item expiry timestamp and distinguishes becoming expired from later service deletion.
-    locator: DynamoDB Developer Guide > Using time to live (TTL) > per-item epoch timestamp, pending deletion, and Streams service deletion
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-012
-    source: eng-cache-redis-eviction
-    supports: Redis documents capacity-driven eviction through maxmemory and specific LRU, LFU, random, TTL-aware, or no-eviction policies.
-    locator: Redis Key eviction > maxmemory configuration > Eviction policies > allkeys-lfu and noeviction semantics
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-013
-    source: eng-fw-langmem-memory-management
-    supports: LangMem describes reconciling new information with previous beliefs by update or consolidation; this case makes the detected incompatibility, chosen resolution, and reconciled output separately auditable.
-    locator: LangMem Core Concepts > Semantic Memory > Collection > reconcile previous beliefs by update or consolidation
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-014
-    source: eng-fw-langmem-memory-management
-    supports: LangMem invokes reconciliation when new information changes prior beliefs; two records that agree on value but differ only in provenance do not establish that conflict, and ordinary consolidation supplies no resolution decision.
-    locator: LangMem Core Concepts > Semantic Memory > Collection > reconciliation, consolidation, and relevance evidence
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-015
-    source: eng-fw-langmem-memory-management
-    supports: LangMem exposes distinct insert, update, and delete controls and describes collection reconciliation and consolidation; Moonweave makes their lifecycle boundaries explicit.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-016
-    source: eng-ont-prov-o
-    supports: PROV-O distinguishes an Activity from the Entity it uses or generates and the Agent associated with it; Moonweave applies that separation to memory operations.
-    locator: PROV-O Recommendation > Starting Point Terms > Entity, Activity, Agent, used, wasGeneratedBy, and wasInvalidatedBy
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-017
-    source: eng-db-dynamodb-ttl
-    supports: DynamoDB TTL assigns a per-item expiry timestamp and distinguishes becoming expired from later service deletion.
-    locator: Using time to live (TTL) > expired items pending deletion and TTL stream records
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-018
-    source: eng-ont-prov-o
-    supports: W3C PROV distinguishes activities from the entities they use, generate, or invalidate. Moonweave applies that premise to keep every memory operation occurrence separate from MemoryItem, MemoryRecord, and MemoryTombstone while retaining explicit cross-module facts.
-    locator: PROV-O Recommendation > Starting Point Terms > Entity, Activity, used, wasGeneratedBy, and wasInvalidatedBy
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-019
-    source: eng-fw-langmem-memory-management
-    supports: LangMem exposes distinct insertion, update, deletion, reconciliation, and consolidation operations over memory collections. Moonweave refines those operations into individually identified lifecycle activities and records their consumed or produced store objects with explicit edges.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-020
-    source: eng-cache-redis-eviction
-    supports: Redis distinguishes configured eviction policy from an eviction action on stored keys. Moonweave uses that distinction for MemoryEviction and the MemoryRecord it evicts without turning policy or record into an operation subtype.
-    locator: Key eviction > maxmemory configuration and eviction policies
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-021
-    source: eng-db-dynamodb-ttl
-    supports: DynamoDB TTL distinguishes an expiry configuration and timestamp from the later removal event. Moonweave uses that premise to separate MemoryRetentionPolicy, MemoryExpiration, ineligibility marking, and deletion or tombstone production.
-    locator: Using time to live (TTL) > expired items pending deletion and TTL stream records
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-022
-    source: eng-fw-langgraph-memory-store
-    supports: LangGraph BaseStore separates namespace/key Item identity and metadata from the operations that retrieve or put those items.
-    locator: BaseStore and Item API > namespaces, keys, values, metadata, timestamps, and TTL operations
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-023
-    source: eng-fw-langgraph-memory-store
-    supports: Source eng-fw-langgraph-memory-store at BaseStore and Item API > namespaces, keys, values, metadata, timestamps, and TTL operations supports operational notions used to compare memory-lifecycle with memory-stores-scopes, including MemoryCompaction. The source does not define Moonweave Modules memory-lifecycle or memory-stores-scopes, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "If the fact exists as static classification or storage metadata of a memory object, it belongs to memory objects and stores; if it requires actor, time, reason, and before/after versions, it belongs to memory lifecycle."; result=distinct and owner=memory-lifecycle are a Moonweave design inference over the registered evidence.
-    locator: BaseStore and Item API > namespaces, keys, values, metadata, timestamps, and TTL operations
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-024
-    source: eng-fw-langmem-memory-management
-    supports: Source eng-fw-langmem-memory-management at Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes supports operational notions used to compare memory-lifecycle with memory-stores-scopes, including MemoryCompaction. The source does not define Moonweave Modules memory-lifecycle or memory-stores-scopes, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "If the fact exists as static classification or storage metadata of a memory object, it belongs to memory objects and stores; if it requires actor, time, reason, and before/after versions, it belongs to memory lifecycle."; result=distinct and owner=memory-lifecycle are a Moonweave design inference over the registered evidence.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-025
-    source: eng-cache-redis-eviction
-    supports: Source eng-cache-redis-eviction at Key eviction > maxmemory configuration and eviction policies supports operational notions used to compare memory-lifecycle with memory-stores-scopes, including MemoryCompaction. The source does not define Moonweave Modules memory-lifecycle or memory-stores-scopes, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "If the fact exists as static classification or storage metadata of a memory object, it belongs to memory objects and stores; if it requires actor, time, reason, and before/after versions, it belongs to memory lifecycle."; result=distinct and owner=memory-lifecycle are a Moonweave design inference over the registered evidence.
-    locator: Key eviction > maxmemory configuration and eviction policies
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-026
-    source: eng-db-dynamodb-ttl
-    supports: Source eng-db-dynamodb-ttl at Using time to live (TTL) > expired items pending deletion and TTL stream records supports operational notions used to compare memory-lifecycle with memory-stores-scopes, including MemoryCompaction. The source does not define Moonweave Modules memory-lifecycle or memory-stores-scopes, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "If the fact exists as static classification or storage metadata of a memory object, it belongs to memory objects and stores; if it requires actor, time, reason, and before/after versions, it belongs to memory lifecycle."; result=distinct and owner=memory-lifecycle are a Moonweave design inference over the registered evidence.
-    locator: Using time to live (TTL) > expired items pending deletion and TTL stream records
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-027
-    source: eng-ont-prov-o
-    supports: Source eng-ont-prov-o at PROV-O Recommendation > Starting Point Terms > Entity, Activity, Agent, used, wasGeneratedBy, and wasInvalidatedBy supports operational notions used to compare memory-lifecycle with memory-stores-scopes, including MemoryCompaction. The source does not define Moonweave Modules memory-lifecycle or memory-stores-scopes, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "If the fact exists as static classification or storage metadata of a memory object, it belongs to memory objects and stores; if it requires actor, time, reason, and before/after versions, it belongs to memory lifecycle."; result=distinct and owner=memory-lifecycle are a Moonweave design inference over the registered evidence.
-    locator: PROV-O Recommendation > Starting Point Terms > Entity, Activity, Agent, used, wasGeneratedBy, and wasInvalidatedBy
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-028
-    source: eng-observe-opentelemetry-logs
-    supports: Source eng-observe-opentelemetry-logs at Logs Data Model > Log and Event Record > field list and semantics supports operational notions used to compare memory-lifecycle with memory-stores-scopes, including MemoryCompaction. The source does not define Moonweave Modules memory-lifecycle or memory-stores-scopes, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "If the fact exists as static classification or storage metadata of a memory object, it belongs to memory objects and stores; if it requires actor, time, reason, and before/after versions, it belongs to memory lifecycle."; result=distinct and owner=memory-lifecycle are a Moonweave design inference over the registered evidence.
-    locator: Logs Data Model > Log and Event Record > field list and semantics
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-029
-    source: eng-fw-langgraph-memory-store
-    supports: Source eng-fw-langgraph-memory-store at BaseStore and Item API > namespaces, keys, values, metadata, timestamps, and TTL operations supports operational notions used to compare memory-lifecycle with memory-stores-scopes, including MemoryRecord. The source does not define Moonweave Modules memory-lifecycle or memory-stores-scopes, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "If the fact exists as static classification or storage metadata of a memory object, it belongs to memory objects and stores; if it requires actor, time, reason, and before/after versions, it belongs to memory lifecycle."; result=distinct and owner=memory-stores-scopes are a Moonweave design inference over the registered evidence.
-    locator: BaseStore and Item API > namespaces, keys, values, metadata, timestamps, and TTL operations
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-030
-    source: eng-fw-langmem-memory-management
-    supports: Source eng-fw-langmem-memory-management at Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes supports operational notions used to compare memory-lifecycle with memory-stores-scopes, including MemoryRecord. The source does not define Moonweave Modules memory-lifecycle or memory-stores-scopes, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "If the fact exists as static classification or storage metadata of a memory object, it belongs to memory objects and stores; if it requires actor, time, reason, and before/after versions, it belongs to memory lifecycle."; result=distinct and owner=memory-stores-scopes are a Moonweave design inference over the registered evidence.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-031
-    source: eng-cache-redis-eviction
-    supports: Source eng-cache-redis-eviction at Key eviction > maxmemory configuration and eviction policies supports operational notions used to compare memory-lifecycle with memory-stores-scopes, including MemoryRecord. The source does not define Moonweave Modules memory-lifecycle or memory-stores-scopes, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "If the fact exists as static classification or storage metadata of a memory object, it belongs to memory objects and stores; if it requires actor, time, reason, and before/after versions, it belongs to memory lifecycle."; result=distinct and owner=memory-stores-scopes are a Moonweave design inference over the registered evidence.
-    locator: Key eviction > maxmemory configuration and eviction policies
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-032
-    source: eng-db-dynamodb-ttl
-    supports: Source eng-db-dynamodb-ttl at Using time to live (TTL) > expired items pending deletion and TTL stream records supports operational notions used to compare memory-lifecycle with memory-stores-scopes, including MemoryRecord. The source does not define Moonweave Modules memory-lifecycle or memory-stores-scopes, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "If the fact exists as static classification or storage metadata of a memory object, it belongs to memory objects and stores; if it requires actor, time, reason, and before/after versions, it belongs to memory lifecycle."; result=distinct and owner=memory-stores-scopes are a Moonweave design inference over the registered evidence.
-    locator: Using time to live (TTL) > expired items pending deletion and TTL stream records
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-033
-    source: eng-ont-prov-o
-    supports: Source eng-ont-prov-o at PROV-O Recommendation > Starting Point Terms > Entity, Activity, Agent, used, wasGeneratedBy, and wasInvalidatedBy supports operational notions used to compare memory-lifecycle with memory-stores-scopes, including MemoryRecord. The source does not define Moonweave Modules memory-lifecycle or memory-stores-scopes, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "If the fact exists as static classification or storage metadata of a memory object, it belongs to memory objects and stores; if it requires actor, time, reason, and before/after versions, it belongs to memory lifecycle."; result=distinct and owner=memory-stores-scopes are a Moonweave design inference over the registered evidence.
-    locator: PROV-O Recommendation > Starting Point Terms > Entity, Activity, Agent, used, wasGeneratedBy, and wasInvalidatedBy
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-034
-    source: eng-observe-opentelemetry-logs
-    supports: Source eng-observe-opentelemetry-logs at Logs Data Model > Log and Event Record > field list and semantics supports operational notions used to compare memory-lifecycle with memory-stores-scopes, including MemoryRecord. The source does not define Moonweave Modules memory-lifecycle or memory-stores-scopes, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "If the fact exists as static classification or storage metadata of a memory object, it belongs to memory objects and stores; if it requires actor, time, reason, and before/after versions, it belongs to memory lifecycle."; result=distinct and owner=memory-stores-scopes are a Moonweave design inference over the registered evidence.
-    locator: Logs Data Model > Log and Event Record > field list and semantics
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-035
-    source: eng-fw-langgraph-memory-store
-    supports: Source eng-fw-langgraph-memory-store at BaseStore and Item API > namespaces, keys, values, metadata, timestamps, and TTL operations supports operational notions used to compare memory-lifecycle with feedback-review-optimization, including MemoryWrite. The source does not define Moonweave Modules memory-lifecycle or feedback-review-optimization, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "An object identified by memory entity, prior or new version, operation type, and effective time belongs to memory lifecycle; one identified by review scope, finding, owner, and closure evidence belongs to review and correction."; result=distinct and owner=memory-lifecycle are a Moonweave design inference over the registered evidence.
-    locator: BaseStore and Item API > namespaces, keys, values, metadata, timestamps, and TTL operations
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-036
-    source: eng-fw-langmem-memory-management
-    supports: Source eng-fw-langmem-memory-management at Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes supports operational notions used to compare memory-lifecycle with feedback-review-optimization, including MemoryWrite. The source does not define Moonweave Modules memory-lifecycle or feedback-review-optimization, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "An object identified by memory entity, prior or new version, operation type, and effective time belongs to memory lifecycle; one identified by review scope, finding, owner, and closure evidence belongs to review and correction."; result=distinct and owner=memory-lifecycle are a Moonweave design inference over the registered evidence.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-037
-    source: eng-cache-redis-eviction
-    supports: Source eng-cache-redis-eviction at Key eviction > maxmemory configuration and eviction policies supports operational notions used to compare memory-lifecycle with feedback-review-optimization, including MemoryWrite. The source does not define Moonweave Modules memory-lifecycle or feedback-review-optimization, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "An object identified by memory entity, prior or new version, operation type, and effective time belongs to memory lifecycle; one identified by review scope, finding, owner, and closure evidence belongs to review and correction."; result=distinct and owner=memory-lifecycle are a Moonweave design inference over the registered evidence.
-    locator: Key eviction > maxmemory configuration and eviction policies
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-038
-    source: eng-db-dynamodb-ttl
-    supports: Source eng-db-dynamodb-ttl at Using time to live (TTL) > expired items pending deletion and TTL stream records supports operational notions used to compare memory-lifecycle with feedback-review-optimization, including MemoryWrite. The source does not define Moonweave Modules memory-lifecycle or feedback-review-optimization, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "An object identified by memory entity, prior or new version, operation type, and effective time belongs to memory lifecycle; one identified by review scope, finding, owner, and closure evidence belongs to review and correction."; result=distinct and owner=memory-lifecycle are a Moonweave design inference over the registered evidence.
-    locator: Using time to live (TTL) > expired items pending deletion and TTL stream records
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-039
-    source: eng-ont-prov-o
-    supports: Source eng-ont-prov-o at PROV-O Recommendation > Starting Point Terms > Entity, Activity, Agent, used, wasGeneratedBy, and wasInvalidatedBy supports operational notions used to compare memory-lifecycle with feedback-review-optimization, including MemoryWrite. The source does not define Moonweave Modules memory-lifecycle or feedback-review-optimization, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "An object identified by memory entity, prior or new version, operation type, and effective time belongs to memory lifecycle; one identified by review scope, finding, owner, and closure evidence belongs to review and correction."; result=distinct and owner=memory-lifecycle are a Moonweave design inference over the registered evidence.
-    locator: PROV-O Recommendation > Starting Point Terms > Entity, Activity, Agent, used, wasGeneratedBy, and wasInvalidatedBy
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-040
-    source: eng-observe-opentelemetry-logs
-    supports: Source eng-observe-opentelemetry-logs at Logs Data Model > Log and Event Record > field list and semantics supports operational notions used to compare memory-lifecycle with feedback-review-optimization, including MemoryWrite. The source does not define Moonweave Modules memory-lifecycle or feedback-review-optimization, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "An object identified by memory entity, prior or new version, operation type, and effective time belongs to memory lifecycle; one identified by review scope, finding, owner, and closure evidence belongs to review and correction."; result=distinct and owner=memory-lifecycle are a Moonweave design inference over the registered evidence.
-    locator: Logs Data Model > Log and Event Record > field list and semantics
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-041
-    source: eng-fw-langgraph-memory-store
-    supports: Source eng-fw-langgraph-memory-store at BaseStore and Item API > namespaces, keys, values, metadata, timestamps, and TTL operations supports operational notions used to compare memory-lifecycle with feedback-review-optimization, including Feedback. The source does not define Moonweave Modules memory-lifecycle or feedback-review-optimization, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "An object identified by memory entity, prior or new version, operation type, and effective time belongs to memory lifecycle; one identified by review scope, finding, owner, and closure evidence belongs to review and correction."; result=distinct and owner=feedback-review-optimization are a Moonweave design inference over the registered evidence.
-    locator: BaseStore and Item API > namespaces, keys, values, metadata, timestamps, and TTL operations
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-042
-    source: eng-fw-langmem-memory-management
-    supports: Source eng-fw-langmem-memory-management at Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes supports operational notions used to compare memory-lifecycle with feedback-review-optimization, including Feedback. The source does not define Moonweave Modules memory-lifecycle or feedback-review-optimization, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "An object identified by memory entity, prior or new version, operation type, and effective time belongs to memory lifecycle; one identified by review scope, finding, owner, and closure evidence belongs to review and correction."; result=distinct and owner=feedback-review-optimization are a Moonweave design inference over the registered evidence.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-043
-    source: eng-cache-redis-eviction
-    supports: Source eng-cache-redis-eviction at Key eviction > maxmemory configuration and eviction policies supports operational notions used to compare memory-lifecycle with feedback-review-optimization, including Feedback. The source does not define Moonweave Modules memory-lifecycle or feedback-review-optimization, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "An object identified by memory entity, prior or new version, operation type, and effective time belongs to memory lifecycle; one identified by review scope, finding, owner, and closure evidence belongs to review and correction."; result=distinct and owner=feedback-review-optimization are a Moonweave design inference over the registered evidence.
-    locator: Key eviction > maxmemory configuration and eviction policies
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-044
-    source: eng-db-dynamodb-ttl
-    supports: Source eng-db-dynamodb-ttl at Using time to live (TTL) > expired items pending deletion and TTL stream records supports operational notions used to compare memory-lifecycle with feedback-review-optimization, including Feedback. The source does not define Moonweave Modules memory-lifecycle or feedback-review-optimization, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "An object identified by memory entity, prior or new version, operation type, and effective time belongs to memory lifecycle; one identified by review scope, finding, owner, and closure evidence belongs to review and correction."; result=distinct and owner=feedback-review-optimization are a Moonweave design inference over the registered evidence.
-    locator: Using time to live (TTL) > expired items pending deletion and TTL stream records
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-045
-    source: eng-ont-prov-o
-    supports: Source eng-ont-prov-o at PROV-O Recommendation > Starting Point Terms > Entity, Activity, Agent, used, wasGeneratedBy, and wasInvalidatedBy supports operational notions used to compare memory-lifecycle with feedback-review-optimization, including Feedback. The source does not define Moonweave Modules memory-lifecycle or feedback-review-optimization, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "An object identified by memory entity, prior or new version, operation type, and effective time belongs to memory lifecycle; one identified by review scope, finding, owner, and closure evidence belongs to review and correction."; result=distinct and owner=feedback-review-optimization are a Moonweave design inference over the registered evidence.
-    locator: PROV-O Recommendation > Starting Point Terms > Entity, Activity, Agent, used, wasGeneratedBy, and wasInvalidatedBy
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-lifecycle-046
-    source: eng-observe-opentelemetry-logs
-    supports: Source eng-observe-opentelemetry-logs at Logs Data Model > Log and Event Record > field list and semantics supports operational notions used to compare memory-lifecycle with feedback-review-optimization, including Feedback. The source does not define Moonweave Modules memory-lifecycle or feedback-review-optimization, their class or relation placement, or their ownership split. Under memory-lifecycle's owns_when "Own an object when its identity is determined by an observable memory activity and its inputs, trigger basis, execution time, output versions, or resolution outcome; do not own it when identity is determined by store ID, namespace, record ID, content, or retention-policy identity.", Moonweave applies the disambiguation test "An object identified by memory entity, prior or new version, operation type, and effective time belongs to memory lifecycle; one identified by review scope, finding, owner, and closure evidence belongs to review and correction."; result=distinct and owner=feedback-review-optimization are a Moonweave design inference over the registered evidence.
-    locator: Logs Data Model > Log and Event Record > field list and semantics
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

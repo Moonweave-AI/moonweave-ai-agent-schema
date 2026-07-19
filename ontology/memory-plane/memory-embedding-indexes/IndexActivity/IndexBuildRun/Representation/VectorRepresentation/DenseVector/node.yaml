@@ -1,330 +1,265 @@
 schema: moonweave.ai/ontology-node/v1
 id: DenseVector
 kind: concept
-status: accepted
 labels:
   zh: 稠密向量
   en: Dense vector
-  ja: 密ベクトル
+  ja: dense vector
 semantics:
   short_definition:
-    zh: 每一维都按固定位置出现的数值向量。
-    en: A numeric vector with every dimension represented by a fixed position.
-    ja: 各次元を固定位置で表す数値vectorです。
+    zh: float[] 形式的 dense VectorRepresentation。
+    en: Dense VectorRepresentation as a float array.
+    ja: float[] 形式の dense VectorRepresentation。
   definition:
-    zh: DenseVector 是固定长度有序数值列表形式的 VectorRepresentation，零值仍占位置且维数须与索引一致；它不是稀疏 indices/values 对。
-    en: DenseVector is a VectorRepresentation represented by a fixed-length ordered numeric list where zero values still occupy positions and dimensionality must match the index; it is not a sparse indices/values pair.
-    ja: DenseVector はzeroも位置を占め次元がindexと一致する固定長順序付き数値listの VectorRepresentation で、sparse indices/values対ではありません。
+    zh: DenseVector 是 VectorRepresentation 子类，以 float[] 存储 embedding 模型输出。OpenAI data[].embedding（text-embedding-3-small, 1536 维）与 Voyage voyage-3-large 输出映射 DenseVector；Pinecone upsert values 字段写入此格式。
+    en: DenseVector is a VectorRepresentation subtype storing embedding model output as float[]. OpenAI data[].embedding (text-embedding-3-small, 1536 dims) and Voyage voyage-3-large output map to DenseVector; Pinecone upsert values field writes this format.
+    ja: DenseVector は embedding model 出力 float[] の VectorRepresentation subtype。OpenAI data[].embedding/Voyage voyage-3-large→DenseVector。Pinecone upsert values。
   why_needed:
-    zh: 校验固定维数坐标与 dense 索引兼容性。
-    en: Validates fixed-dimensional coordinates against dense-index configuration.
-    ja: 固定次元座標とdense index設定の互換性を検証します。
+    zh: cosine metric 与 HNSW ANN 要求固定长度 float[]；与 SparseVector {indices,values} 混型会导致 upsert 拒绝或检索 metric 错误。
+    en: Cosine metric and HNSW ANN require fixed-length float[]; mixing with SparseVector {indices,values} causes upsert rejection or wrong retrieval metric.
+    ja: cosine/HNSW は固定長 float[] 必須。SparseVector 混在は upsert 拒否/metric 誤り。
   includes:
-    - zh: 纳入固定长度 float 数组与归一化状态。
-      en: Includes fixed-length float arrays and normalization state.
-      ja: 固定長float配列と正規化状態を含みます。
+    - zh: 纳入 OpenAI/Voyage/Cohere 等 embedding API 返回的 float 数组。
+      en: Includes float arrays returned by OpenAI/Voyage/Cohere embedding APIs.
+      ja: OpenAI/Voyage/Cohere embedding API 返却 float 配列。
   excludes:
-    - zh: 排除稀疏坐标、标量分数和原文本。
-      en: Excludes sparse coordinates, scalar scores, and source text.
-      ja: sparse座標・scalar score・原文を除外します。
+    - zh: 排除 SparseVector、未绑定 EmbeddingRun 的匿名 float 数组缓存。
+      en: Excludes SparseVector and anonymous float array caches without EmbeddingRun binding.
+      ja: SparseVector/EmbeddingRun 未 binding 匿名 float cache を除外。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: OpenAI encoding_format=float 返回 data[].embedding float[]；Moonweave 登记 vector_dimensions 与 content_digest；VectorIndex upsert 时 values 字段必须长度匹配。
+    en: OpenAI encoding_format=float returns data[].embedding float[]; Moonweave records vector_dimensions and content_digest; VectorIndex upsert values length must match.
+    ja: OpenAI encoding_format=float→data[].embedding。vector_dimensions/content_digest 登録。upsert values 長一致。
+  typical_input:
+    - description: OpenAI embedding response vector
+      format: |
+        {
+          "data": [{"embedding": [0.012, -0.034, ...], "index": 0}],
+          "model": "text-embedding-3-small",
+          "usage": {"prompt_tokens": 8, "total_tokens": 8}
+        }
+      source_claims: [claim-dense-vector-openai]
+  typical_output:
+    - description: Dense vector record
+      format: |
+        {
+          "representation_id": "emb-17",
+          "vector_dimensions": 1536,
+          "values_digest_sha256": "a1b2c3..."
+        }
+      source_claims: [claim-dense-vector-design]
+  reference_implementations:
+    - name: OpenAI Embeddings API
+      url: https://platform.openai.com/docs/api-reference/embeddings
+      description: float embedding arrays with dimensions parameter.
+    - name: Voyage AI Embeddings
+      url: https://docs.voyageai.com/reference/embeddings-api
+      description: voyage-3-large dense embeddings.
+    - name: Pinecone Upsert
+      url: https://docs.pinecone.io/guides/data/upsert-data
+      description: values field for dense vectors.
 structure:
-  identity_keys:
-    - vector_id
+  identity_keys: [representation_id]
   fields:
-    - id: vector_id
-      labels:
-        zh: 向量标识
-        en: vector ID
-        ja: vector ID
+    - id: representation_id
+      labels: {zh: 表示标识, en: Representation identifier, ja: representation 識別子}
+      definitions:
+        zh: 继承 VectorRepresentation.representation_id；常等于 embedding_id。
+        en: Inherits VectorRepresentation.representation_id; often equals embedding_id.
+        ja: VectorRepresentation.representation_id 継承。embedding_id と同値 often。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 稳定标识稠密向量。
-        en: Stable identifier for the dense vector.
-        ja: dense vectorの安定識別子です。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
-      example_value: dense-17
-      source_claims:
-        - claim-dense-vector-002
-    - id: dimensions
-      labels:
-        zh: 固定维数
-        en: fixed dimensions
-        ja: 固定次元
+      example_value: emb-17
+      allowed_values: []
+      source_claims: [claim-dense-vector-id]
+    - id: vector_dimensions
+      labels: {zh: 向量维度, en: Vector dimensions, ja: ベクトル次元}
+      definitions:
+        zh: float[] 长度；必须与 Pinecone create_index dimension 一致。
+        en: Length of float[]; must match Pinecone create_index dimension.
+        ja: float[] 長。Pinecone create_index dimension 一致必須。
       datatype: integer
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 有序数组的必需长度。
-        en: Required length of the ordered array.
-        ja: 順序配列の必須長です。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
       example_value: 1536
-      source_claims:
-        - claim-dense-vector-003
-    - id: normalized
-      labels:
-        zh: 是否归一化
-        en: normalized
-        ja: 正規化済み
-      datatype: boolean
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 声明是否按配置归一化。
-        en: States whether coordinates were normalized under the profile.
-        ja: profileに従い座標を正規化済みか示します。
       allowed_values: []
-      pattern: null
-      example_value: true
-      source_claims:
-        - claim-dense-vector-004
-  constraints: []
-  required_relation_constraints: []
+      source_claims: [claim-dense-vector-openai]
+    - id: values_digest_sha256
+      labels: {zh: 数值摘要, en: Values digest, ja: values digest}
+      definitions:
+        zh: float[] 序列化后的 SHA-256；用于 IndexEntry representation_digest。
+        en: SHA-256 of serialized float[]; used for IndexEntry representation_digest.
+        ja: シリアライズ float[] SHA-256。IndexEntry representation_digest 用。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: '^[a-f0-9]{64}$'
+      example_value: a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456
+      allowed_values: []
+      source_claims: [claim-dense-vector-design]
+  constraints:
+    - id: dense-dimension-fixed
+      severity: error
+      expression_language: plain
+      expression: float array length must equal vector_dimensions.
+      explanation:
+        zh: 长度不一致无法写入 VectorIndex。
+        en: Length mismatch prevents VectorIndex write.
+        ja: 長不一致は VectorIndex write 不可。
+      source_claims: [claim-dense-vector-design]
+  required_relations: []
 examples:
-  - id: DenseVector-example-positive-manual-001
-    kind: positive
+  - id: DenseVector-example-openai-1536
     labels:
-      zh: 稠密向量正例
-      en: "Positive case: Dense vector"
-      ja: 密ベクトル正例
-    scenario_id: null
+      zh: OpenAI 1536 维 dense 向量
+      en: OpenAI 1536-dim dense vector
+      ja: OpenAI 1536 次元 dense vector
     descriptions:
-      zh: dense-17 含 1536 个 float32 值并与目标索引维数一致。
-      en: dense-17 contains 1536 float32 values and matches the target index dimension.
-      ja: dense-17 は1536個float32値を持ち対象index次元と一致します。
+      zh: embedding-run-17 返回 emb-17 float[1536]（text-embedding-3-small）；upsert 到 Pinecone hybrid-docs values 字段。
+      en: embedding-run-17 returns emb-17 float[1536] (text-embedding-3-small); upserts to Pinecone hybrid-docs values field.
+      ja: embedding-run-17→emb-17 float[1536]（text-embedding-3-small）→Pinecone values。
+    example_source:
+      product: OpenAI
+      url: https://platform.openai.com/docs/api-reference/embeddings
+      version: text-embedding-3-small dimensions=1536
     field_values:
-      vector_id: dense-17
-      dimensions: 1536
-      normalized: true
-      encoding: dense-float32
-      representation_id: repr-dense-17
-      source_digest: sha256:source-dense-17
-      method_profile: dense-float32/1536:v1
+      representation_id: emb-17
+      vector_dimensions: 1536
     related_node_ids:
       - DenseVector
+      - TextEmbedding
+      - VectorIndex
     related_relation_ids: []
-    expected_result:
-      zh: 把该对象归入 DenseVector。
-      en: Classify the object as DenseVector.
-      ja: この対象を DenseVector に分類します。
-    why_valid_or_invalid:
-      zh: 它具有完整固定位置和明确索引兼容性。
-      en: It has complete fixed positions and explicit index compatibility.
-      ja: 完全な固定位置と明示的index互換性があります。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-dense-vector-005
-  - id: DenseVector-example-boundary-manual-001
-    kind: boundary
+      - claim-dense-vector-openai
+      - claim-dense-vector-design
+  - id: DenseVector-example-voyage-large
     labels:
-      zh: 稠密向量边界例
-      en: "Boundary case: Dense vector"
-      ja: 密ベクトル境界例
-    scenario_id: null
+      zh: Voyage voyage-3-large 输出
+      en: Voyage voyage-3-large output
+      ja: Voyage voyage-3-large 出力
     descriptions:
-      zh: sparse-17 只保存 42 个非零 indices/values 对。
-      en: sparse-17 stores only 42 non-zero indices/values pairs.
-      ja: sparse-17 は42個の非zero indices/values対だけを保存します。
+      zh: embedding-run-22 使用 voyage-3-large 产出 emb-22 float[]；model_snapshot 与 OpenAI 向量区分存储。
+      en: embedding-run-22 uses voyage-3-large producing emb-22 float[]; model_snapshot stored separately from OpenAI vectors.
+      ja: embedding-run-22 voyage-3-large→emb-22 float[]。OpenAI と model_snapshot 区別。
+    example_source:
+      product: Voyage AI
+      url: https://docs.voyageai.com/reference/embeddings-api
+      version: voyage-3-large
+    field_values:
+      representation_id: emb-22
+      model_snapshot: voyage-3-large@2026-03
+    related_node_ids:
+      - DenseVector
+      - TextEmbedding
+    related_relation_ids: []
+    source_claims:
+      - claim-dense-vector-voyage
+      - claim-dense-vector-design
+  - id: DenseVector-example-not-sparse
+    labels:
+      zh: dense 非 sparse
+      en: Dense is not sparse
+      ja: dense は sparse ではない
+    descriptions:
+      zh: repr-sparse-17 使用 {indices,values} 是 SparseVector；float[] 全长数组才是 DenseVector。
+      en: repr-sparse-17 using {indices,values} is SparseVector; full-length float[] is DenseVector.
+      ja: "indices+values は SparseVector。全長 float[] が DenseVector。"
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
     field_values: {}
     related_node_ids:
       - DenseVector
+      - SparseVector
     related_relation_ids: []
-    expected_result:
-      zh: 不得把该对象归入 DenseVector。
-      en: Do not classify the object as DenseVector.
-      ja: この対象を DenseVector に分類しません。
-    why_valid_or_invalid:
-      zh: 隐含零值不构成完整固定长度列表。
-      en: Implicit zeros do not form a complete fixed-length list.
-      ja: 暗黙zeroは完全な固定長listを構成しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-dense-vector-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-dense-vector-design
 parent_relation:
   id: DenseVector-is_a-VectorRepresentation
   predicate: is_a
   direction: target-to-source
   relation_kind: hierarchy
   labels:
-    zh: 是一种
-    en: is a
-    ja: の一種である
+    zh: 是一种向量表示
+    en: is a vector representation
+    ja: ベクトル表現の一種
   definitions:
-    zh: DenseVector 是 VectorRepresentation 的严格子类；种差为：每个维度占据固定有序位置且总长度与索引维数一致。
-    en: "DenseVector is a strict subtype of VectorRepresentation; its reviewed differentia is: every dimension occupies a fixed ordered position and total length matches index dimensionality."
-    ja: DenseVector は VectorRepresentation の厳密なsubtypeで、審査済み種差は「各次元が固定順序位置を占め全長がindex次元と一致します。」です。
+    zh: DenseVector —is_a→ VectorRepresentation 因为 vector_kind=dense 且存储 float[]。
+    en: DenseVector —is_a→ VectorRepresentation because vector_kind=dense and stores float[].
+    ja: DenseVector —is_a→ VectorRepresentation は vector_kind=dense+float[] のため。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
-    en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
-    ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
+    zh: 该关系按单个可审计事实判定。
+    en: The relation is decided per auditable fact.
+    ja: audit 可能 fact 単位で判定。
   inverse_reading:
     predicate: part_of
-    labels:
-      zh: 反向读取
-      en: inverse reading
-      ja: 逆方向読取
+    labels: {zh: 反向读取, en: inverse is_a, ja: 逆方向読取}
   conditions:
-    - id: DenseVector-is_a-VectorRepresentation-condition-manual-001
+    - id: DenseVector-is_a-VectorRepresentation-condition-001
       severity: error
       expression_language: plain
-      expression: "Assert only when the object first satisfies VectorRepresentation and also satisfies the differentia: every dimension occupies a fixed ordered position and total length matches index dimensionality."
+      expression: Assert only when storage is fixed-length float array.
       explanations:
-        zh: 仅当对象首先满足 VectorRepresentation 定义且满足种差“每个维度占据固定有序位置且总长度与索引维数一致。”时成立。
-        en: "Assert only when the object first satisfies VectorRepresentation and also satisfies the differentia: every dimension occupies a fixed ordered position and total length matches index dimensionality."
-        ja: 対象がまず VectorRepresentation を満たし、さらに種差「各次元が固定順序位置を占め全長がindex次元と一致します。」を満たす時だけ成立します。
-      source_claims:
-        - claim-dense-vector-007
+        zh: 仅当 float[] 存储时成立。
+        en: Assert only for float array storage.
+        ja: float[] 存储時のみ assert。
+      source_claims: [claim-dense-vector-design]
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: DenseVector-is_a-VectorRepresentation-example-positive-manual-001
-      kind: positive
-      labels:
-        zh: 是一种正例
-        en: "Positive case: is a"
-        ja: の一種である正例
-      scenario_id: null
-      descriptions:
-        zh: dense-17 的 1536 个 float32 值逐位有序，长度与 vector-index-17 的维数完全一致。
-        en: dense-17 has 1,536 positionally ordered float32 values, exactly matching vector-index-17's dimensionality.
-        ja: dense-17 は位置順の 1,536 個の float32 値を持ち、vector-index-17 の次元数と完全に一致します。
-      field_values: {}
-      related_node_ids:
-        - DenseVector
-        - VectorRepresentation
-      related_relation_ids:
-        - DenseVector-is_a-VectorRepresentation
-      expected_result:
-        zh: 确认 dense-17 是 DenseVector，并沿该层级继承 VectorRepresentation 身份。
-        en: Confirm dense-17 as a DenseVector and inherit VectorRepresentation identity along this hierarchy edge.
-        ja: dense-17 を DenseVector と確認し、この階層辺に沿って VectorRepresentation 同一性を継承します。
-      why_valid_or_invalid:
-        zh: 固定长度与每维显式占位同时成立，因而不是稀疏坐标对。
-        en: Both fixed length and an explicit position for every dimension hold, distinguishing it from sparse coordinate pairs.
-        ja: 固定長と全次元の明示位置がともに成立するため、sparse座標対とは区別されます。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-dense-vector-007
-    - id: DenseVector-is_a-VectorRepresentation-example-boundary-manual-001
-      kind: boundary
-      labels:
-        zh: 是一种边界例
-        en: "Boundary case: is a"
-        ja: の一種である境界例
-      scenario_id: null
-      descriptions:
-        zh: 只保存非零 indices/values 的 sparse-17 不能归为 DenseVector。
-        en: sparse-17, which stores only non-zero indices/values, is not a DenseVector.
-        ja: 非zero indices/valuesだけを保存する sparse-17 は DenseVectorではありません。
-      field_values: {}
-      related_node_ids:
-        - DenseVector
-        - VectorRepresentation
-      related_relation_ids:
-        - DenseVector-is_a-VectorRepresentation
-      expected_result:
-        zh: 将 sparse-17 保持为 SparseVector，不建立 DenseVector 子类成员事实。
-        en: Keep sparse-17 as a SparseVector and do not assert DenseVector subtype membership.
-        ja: sparse-17 を SparseVector のまま保持し、DenseVector subtype membership を主張しません。
-      why_valid_or_invalid:
-        zh: sparse-17 只枚举非零坐标，没有为每个维度保留固定有序位置，因此不满足稠密向量种差。
-        en: sparse-17 enumerates only non-zero coordinates and reserves no fixed ordered slot for every dimension, so it fails the dense-vector differentia.
-        ja: sparse-17 は非 zero 座標だけを列挙し全次元の固定順序 slot を持たないため、dense-vector 種差を満たしません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-dense-vector-007
-  source_claims:
-    - claim-dense-vector-007
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: pending
+  examples: []
+  source_claims: [claim-dense-vector-design]
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-openai-embeddings
+    title: OpenAI Embeddings API
+    publisher: OpenAI
+    url: https://platform.openai.com/docs/api-reference/embeddings
+    source_type: official-doc
+    relevance: float embedding arrays and dimensions.
+  - id: src-voyage-embeddings
+    title: Voyage AI Embeddings API
+    publisher: Voyage AI
+    url: https://docs.voyageai.com/reference/embeddings-api
+    source_type: official-doc
+    relevance: voyage-3-large dense output.
+  - id: src-dense-vector-design
+    title: Moonweave memory-embedding-indexes module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: DenseVector float array versus SparseVector boundary.
 source_claims:
-  - id: claim-dense-vector-001
-    source: eng-vector-pinecone-indexing
-    supports: Pinecone defines dense vectors as fixed-length numerical lists and requires compatible index dimensions.
-    locator: Indexing overview > Indexes, dense and sparse vectors, namespaces, vector embedding, import, upsert, and metadata
+  - id: claim-dense-vector-openai
+    source: src-openai-embeddings
+    supports: OpenAI returns embedding as float array with configurable dimensions (e.g., 1536 for text-embedding-3-small).
+    locator: Response data.embedding
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-dense-vector-voyage
+    source: src-voyage-embeddings
+    supports: Voyage voyage-3-large returns dense float embedding arrays.
+    locator: Embeddings API response
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-dense-vector-design
+    source: src-dense-vector-design
+    supports: DenseVector stores fixed-length float[] distinct from sparse indices/values format.
+    locator: DenseVector boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-dense-vector-002
-    source: eng-vector-pinecone-indexing
-    supports: DenseVector.vector_id records the addressable dense vector; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: Indexing overview > Indexes, dense and sparse vectors, namespaces, vector embedding, import, upsert, and metadata
+  - id: claim-dense-vector-id
+    source: src-dense-vector-design
+    supports: representation_id identifies dense vector instance.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-dense-vector-003
-    source: eng-vector-pinecone-indexing
-    supports: DenseVector.dimensions records dense-index dimensional compatibility; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: Indexing overview > Indexes, dense and sparse vectors, namespaces, vector embedding, import, upsert, and metadata
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-dense-vector-004
-    source: eng-vector-pinecone-indexing
-    supports: DenseVector.normalized records distance interpretation under normalization; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: Indexing overview > Indexes, dense and sparse vectors, namespaces, vector embedding, import, upsert, and metadata
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-dense-vector-005
-    source: eng-vector-pinecone-indexing
-    supports: Pinecone defines dense vectors as fixed-length numerical lists.
-    locator: Indexing overview > Indexes, dense and sparse vectors, namespaces, vector embedding, import, upsert, and metadata
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-dense-vector-006
-    source: eng-vector-pinecone-indexing
-    supports: Pinecone explicitly distinguishes dense fixed-length vectors from sparse indices and weights.
-    locator: Indexing overview > Indexes, dense and sparse vectors, namespaces, vector embedding, import, upsert, and metadata
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-dense-vector-007
-    source: eng-vector-pinecone-indexing
-    supports: Pinecone defines dense vectors as fixed-length numerical lists and sparse vectors as indices with weights.
-    locator: Indexing overview > Indexes, dense and sparse vectors, namespaces, vector embedding, import, upsert, and metadata
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

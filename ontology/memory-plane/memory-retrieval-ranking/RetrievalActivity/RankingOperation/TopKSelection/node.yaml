@@ -1,34 +1,59 @@
 schema: moonweave.ai/ontology-node/v1
 id: TopKSelection
 kind: concept
-status: accepted
 labels:
   zh: 前 K 项选择
   en: Top-K selection
   ja: 上位K件選択
 semantics:
   short_definition:
-    zh: 从一个已排序候选集合中按声明的 K 和并列策略保留前项的排序活动。
-    en: A ranking activity that retains the first K items from an ordered candidate set under a declared tie policy.
-    ja: ordered candidate setから指定Kとtie policyで上位項目を保持するranking activityです。
+    zh: 按 top_k 从已排序集合截取候选的活动。
+    en: Activity truncating an ordered set to top_k candidates.
+    ja: ordered set から top_k で candidate を截取する activity。
   definition:
-    zh: TopKSelection 消费已有顺序的 CandidateSet，并依据 k、并列处理与稳定排序规则选出保留范围；它不计算相关性、不融合列表，也不决定候选是否进入最终上下文。
-    en: TopKSelection consumes an already ordered CandidateSet and determines the retained range from k, tie handling, and stable-order rules. It does not compute relevance, fuse lists, or decide admission to final context.
-    ja: TopKSelection は既にorderedなCandidateSetをconsumeしk・tie handling・stable order ruleから保持範囲を決めます。relevance計算・list fusion・final context admissionは行いません。
+    zh: TopKSelection 消费已有顺序的 CandidateSet，依据 k 与 tie_break_policy 确定保留范围；k 对应 Pinecone top_k、Chroma n_results、Mem0 top_k、Cohere top_n 与 LangGraph limit 的最终截断语义，但不计算相关性或决定 ContextPackage 采用。
+    en: TopKSelection consumes an ordered CandidateSet and determines the retained range from k and tie_break_policy. k maps to final truncation semantics of Pinecone top_k, Chroma n_results, Mem0 top_k, Cohere top_n, and LangGraph limit but does not compute relevance or decide ContextPackage admission.
+    ja: TopKSelection は ordered CandidateSet を consume し k/tie_break_policy で保持範囲を決定。k は Pinecone top_k/Chroma n_results/Mem0 top_k/Cohere top_n/LangGraph limit の最終 truncation に対応。relevance 計算/ContextPackage 採用は行いません。
   why_needed:
-    zh: 让候选截断策略可重放，并与分数计算、融合、重排和上下文预算明确分开。
-    en: Makes candidate truncation replayable and distinct from scoring, fusion, reranking, and context budgeting.
-    ja: candidate truncationを再生可能にしscoring・fusion・reranking・context budgetから分離します。
+    zh: Prefetch limit 可以是 40，最终返回却是 5；必须把 top_k 截断作为独立可重放阶段记录。
+    en: Prefetch limit may be 40 while five are returned; top_k truncation must be recorded as a separate replayable stage.
+    ja: prefetch limit 40 と最終 5 件の差を説明するため top_k truncation を独立 stage として記録必須。
   includes:
-    - zh: 纳入基于已确定顺序和显式 k 值的候选保留活动。
-      en: Includes candidate-retention activities based on an established order and explicit k value.
-      ja: 確定済み順序と明示kに基づくcandidate retention activityを含みます。
+    - zh: 纳入基于已确定顺序和显式 k 的候选保留活动。
+      en: Includes candidate retention based on established order and explicit k.
+      ja: 確定済み順序と明示 k による candidate retention。
   excludes:
-    - zh: 排除产生分数、改变相关性顺序、按 token 预算装配上下文或删除存储记录的操作。
-      en: Excludes producing scores, changing relevance order, assembling context under a token budget, and deleting stored records.
-      ja: score生成・relevance順序変更・token budgetによるcontext assembly・stored record削除を除外します。
+    - zh: 排除产生分数、RRF/Cohere 重排与 token 预算上下文裁剪。
+      en: Excludes score production, RRF/Cohere reranking, and token-budget context trimming.
+      ja: score 生成・RRF/Cohere rerank・token budget context trimming を除外。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: top_k 参数在 Pinecone index.query、Chroma n_results、Mem0 search、LangGraph limit 与 Cohere top_n 中均限制返回数量；TopKSelection 记录最终截断 k 与 tie_break_policy。
+    en: top_k in Pinecone index.query, Chroma n_results, Mem0 search, LangGraph limit, and Cohere top_n all limit returned count; TopKSelection records final k and tie_break_policy.
+    ja: Pinecone top_k/Chroma n_results/Mem0 top_k/LangGraph limit/Cohere top_n は返却数制限。TopKSelection は最終 k/tie_break_policy を記録。
+  typical_input: []
+  typical_output: []
+  reference_implementations:
+    - name: Mem0 Search API
+      url: https://docs.mem0.ai
+      description: POST /v1/memories/search/ with query, entity IDs, filters, and top_k.
+    - name: Pinecone Query
+      url: https://docs.pinecone.io/guides/search/query-data
+      description: index.query with vector, namespace, filter, and top_k.
+    - name: Chroma Query
+      url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+      description: collection.query with query_texts or query_embeddings and n_results.
+    - name: LangGraph Store Search
+      url: https://langchain-ai.github.io/langgraph/reference/store/
+      description: BaseStore.search with namespace prefix and semantic query.
+    - name: Cohere Rerank API
+      url: https://docs.cohere.com/reference/rerank
+      description: POST /v2/rerank with model rerank-v3.x, query, documents, top_n.
+    - name: ColBERT
+      url: https://arxiv.org/abs/2004.12832
+      description: Late interaction retrieval via token-level MaxSim scoring.
 structure:
   identity_keys:
     - selection_activity_id
@@ -36,128 +61,128 @@ structure:
     - id: selection_activity_id
       labels:
         zh: 选择活动标识
-        en: selection activity ID
-        ja: selection activity ID
+        en: Selection activity identifier
+        ja: 選択 activity 識別子
+      definitions:
+        zh: 稳定标识一次 Top-K 截断执行。
+        en: Stable identifier for one Top-K truncation execution.
+        ja: 一 Top-K truncation execution を安定識別。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 稳定标识一次 TopK 截断执行。
-        en: Stable identifier for one Top-K truncation execution.
-        ja: 一つのTop-K truncation executionを安定識別します。
-      allowed_values: []
       pattern: null
       example_value: topk-417
+      allowed_values: []
       source_claims:
-        - claim-top-k-selection-002
+        - claim-topk-id
     - id: k
       labels:
-        zh: 保留数量 K
-        en: retained K
-        ja: 保持K
+        zh: 保留数量 k
+        en: Retained count k
+        ja: 保持数 k
+      definitions:
+        zh: 最终保留候选上限；对应 API top_k/n_results/limit/top_n 的最终截断值。
+        en: Upper bound on retained candidates; final truncation value for API top_k/n_results/limit/top_n.
+        ja: 最終保持上限。API top_k/n_results/limit/top_n の truncation 値。
       datatype: integer
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 声明最多保留的候选数量。
-        en: Declares the maximum number of candidates retained.
-        ja: 保持する最大candidate数を宣言します。
-      allowed_values: []
       pattern: null
       example_value: 12
+      allowed_values: []
       source_claims:
-        - claim-top-k-selection-003
+        - claim-topk-k
     - id: tie_break_policy
       labels:
         zh: 并列策略
-        en: tie-break policy
+        en: Tie-break policy
         ja: 同順位処理
+      definitions:
+        zh: cutoff 分数并列时的确定顺序规则，如 stable-candidate-id。
+        en: Deterministic ordering when scores tie at cutoff, e.g., stable-candidate-id.
+        ja: cutoff 同点時の決定的順序（stable-candidate-id 等）。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 声明边界分数并列时如何保持确定顺序。
-        en: Declares how deterministic order is preserved when scores tie at the cutoff.
-        ja: cutoffでscore同値の場合の決定的順序を宣言します。
-      allowed_values: []
       pattern: null
       example_value: stable-candidate-id
+      allowed_values: []
       source_claims:
-        - claim-top-k-selection-004
+        - claim-topk-tie
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: TopKSelection-example-positive-manual-001
-    kind: positive
+  - id: TopKSelection-example-pinecone-topk
     labels:
-      zh: 前 K 项选择正例
-      en: "Positive case: Top-K selection"
-      ja: 上位K件選択正例
-    scenario_id: null
+      zh: Pinecone top_k=10
+      en: Pinecone top_k=10
+      ja: Pinecone top_k=10
     descriptions:
-      zh: topk-417 从已排序的 80 个候选中稳定保留前 12 个。
-      en: topk-417 stably retains the first 12 candidates from an ordered set of 80.
-      ja: topk-417 はordered 80 candidateから安定して上位12件を保持します。
+      zh: topk-417 从 rerank 后 80 候选稳定保留 k=12；API 层 Pinecone top_k=10 是 prefetch，最终 k=12 由 TopKSelection 记录。
+      en: topk-417 retains k=12 from 80 post-rerank candidates; Pinecone top_k=10 is prefetch while final k=12 is recorded by TopKSelection.
+      ja: topk-417 が k=12 を保持。Pinecone top_k=10 は prefetch、最終 k=12 は TopKSelection。
+    example_source:
+      product: Pinecone
+      url: https://docs.pinecone.io/guides/search/query-data
+      version: top_k parameter
     field_values:
       selection_activity_id: topk-417
       k: 12
       tie_break_policy: stable-candidate-id
-      ranking_operation_id: topk-417
-      input_candidate_set_id: candidate-set-reranked-416
-      activity_id: topk-417
-      started_at: 2026-07-16T12:05:00Z
     related_node_ids:
       - TopKSelection
     related_relation_ids: []
-    expected_result:
-      zh: 归类为 TopKSelection。
-      en: Classify the object as TopKSelection.
-      ja: TopKSelection として分類します。
-    why_valid_or_invalid:
-      zh: 输入顺序已存在，活动只决定保留边界及并列处理。
-      en: The input order already exists; the activity only determines the retained boundary and tie handling.
-      ja: input orderは既にありactivityは保持境界とtie handlingだけを決めます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-top-k-selection-005
-  - id: TopKSelection-example-boundary-manual-001
-    kind: boundary
+      - claim-topk-pinecone
+  - id: TopKSelection-example-mem0-topk
     labels:
-      zh: 前 K 项选择边界例
-      en: "Boundary case: Top-K selection"
-      ja: 上位K件選択境界例
-    scenario_id: null
+      zh: Mem0 top_k=5
+      en: Mem0 top_k=5
+      ja: Mem0 top_k=5
     descriptions:
-      zh: context-select-417 因 token 预算排除排名第 3 的长文档。
-      en: context-select-417 excludes the third-ranked long document because of a token budget.
-      ja: context-select-417 はtoken budgetでrank 3のlong documentを除外します。
-    field_values: {}
+      zh: Mem0 search top_k=5 直接限制返回记忆数；Moonweave 将其建模为 TopKSelection(k=5)。
+      en: Mem0 search top_k=5 directly limits returned memories; Moonweave models it as TopKSelection(k=5).
+      ja: Mem0 top_k=5 を TopKSelection(k=5) として建模。
+    example_source:
+      product: Mem0
+      url: https://docs.mem0.ai
+      version: top_k=5
+    field_values:
+      selection_activity_id: topk-418
+      k: 5
+      tie_break_policy: stable-candidate-id
     related_node_ids:
       - TopKSelection
     related_relation_ids: []
-    expected_result:
-      zh: 不得归类为 TopKSelection。
-      en: Do not classify the object as TopKSelection.
-      ja: TopKSelection として分類しません。
-    why_valid_or_invalid:
-      zh: 这是上下文采用决策，不是按检索顺序截取 TopK。
-      en: This is context admission, not Top-K truncation by retrieval order.
-      ja: context admissionでretrieval orderによるTop-K truncationではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-top-k-selection-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-topk-mem0
+  - id: TopKSelection-example-not-context
+    labels:
+      zh: Top-K 非上下文采用
+      en: Top-K is not context admission
+      ja: Top-K は context 採用ではない
+    descriptions:
+      zh: token 预算排除长文档属于 ContextPackage 决策，不是 TopKSelection。
+      en: Excluding long documents for token budget belongs to ContextPackage, not TopKSelection.
+      ja: token budget 除外は ContextPackage で TopKSelection ではない。
+    example_source:
+      product: https://moonweave.ai/ontology/agent-system/2.0.0/
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: design boundary
+    field_values:
+      k: 12
+    related_node_ids:
+      - TopKSelection
+      - memory-context
+    related_relation_ids: []
+    source_claims:
+      - claim-topk-not-context
 parent_relation:
   id: TopKSelection-is_a-RankingOperation
   predicate: is_a
@@ -192,18 +217,16 @@ parent_relation:
         en: "Assert only when the instance satisfies the complete RankingOperation definition and the child differentia: it determines the retained range from k and tie policy over an existing order."
         ja: instanceがRankingOperation完全定義とchild differentia「既存順序上でkとtie policyから保持範囲を決める」を共に満たす時だけassertします。
       source_claims:
-        - claim-top-k-selection-007
+        - claim-topk-id
   temporal_scope: timeless
   boundary_context: null
   constraints: []
   examples:
     - id: TopKSelection-is_a-RankingOperation-example-positive-manual-001
-      kind: positive
       labels:
         zh: 是一种RankingOperation正例
         en: "Positive case: is a RankingOperation"
         ja: RankingOperationの一種正例
-      scenario_id: null
       descriptions:
         zh: topk-417 稳定保留前 12 个候选。
         en: topk-417 stably retains the first 12 candidates.
@@ -214,25 +237,13 @@ parent_relation:
         - RankingOperation
       related_relation_ids:
         - TopKSelection-is_a-RankingOperation
-      expected_result:
-        zh: 建立该有向事实，并保留条件与证据。
-        en: Assert the directed fact with its condition and evidence retained.
-        ja: condition/evidenceを保持してdirected factをassertします。
-      why_valid_or_invalid:
-        zh: 实例满足端点定义、方向和该关系的显式成立条件。
-        en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-        ja: endpoint定義・direction・明示assertion conditionを満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-top-k-selection-007
+        - claim-topk-id
     - id: TopKSelection-is_a-RankingOperation-example-boundary-manual-001
-      kind: boundary
       labels:
         zh: 是一种RankingOperation边界例
         en: "Boundary case: is a RankingOperation"
         ja: RankingOperationの一種境界例
-      scenario_id: null
       descriptions:
         zh: context-select-417 因 token 预算排除候选。
         en: context-select-417 excludes a candidate because of token budget.
@@ -243,23 +254,12 @@ parent_relation:
         - RankingOperation
       related_relation_ids:
         - TopKSelection-is_a-RankingOperation
-      expected_result:
-        zh: 验证器不得建立该有向关系事实。
-        en: Do not assert the directed fact.
-        ja: directed factをassertしません。
-      why_valid_or_invalid:
-        zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-        en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-        ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-top-k-selection-007
+        - claim-topk-id
   source_claims:
-    - claim-top-k-selection-007
+    - claim-topk-id
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: pending
   endpoint_order: child-to-parent
 relations:
   - id: TopKSelection-selects_from-CandidateSet
@@ -295,18 +295,16 @@ relations:
           en: Assert only when the set already has deterministic order and selection.k matches the output membership boundary.
           ja: setがdeterministic orderを持ちselection.kがoutput membership boundaryと一致する時だけassertします。
         source_claims:
-          - claim-top-k-selection-008
+          - claim-topk-id
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
       - id: TopKSelection-selects_from-CandidateSet-example-positive-manual-001
-        kind: positive
         labels:
           zh: selects_from CandidateSet正例
           en: "Positive case: selects_from CandidateSet"
           ja: CandidateSetをselects_from正例
-        scenario_id: null
         descriptions:
           zh: topk-417 selects_from candidate-set-423。
           en: topk-417 selects from candidate-set-423.
@@ -317,25 +315,13 @@ relations:
           - CandidateSet
         related_relation_ids:
           - TopKSelection-selects_from-CandidateSet
-        expected_result:
-          zh: 建立该有向事实，并保留条件与证据。
-          en: Assert the directed fact with its condition and evidence retained.
-          ja: condition/evidenceを保持してdirected factをassertします。
-        why_valid_or_invalid:
-          zh: 实例满足端点定义、方向和该关系的显式成立条件。
-          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-          ja: endpoint定義・direction・明示assertion conditionを満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-top-k-selection-008
+          - claim-topk-id
       - id: TopKSelection-selects_from-CandidateSet-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: selects_from CandidateSet边界例
           en: "Boundary case: selects_from CandidateSet"
           ja: CandidateSetをselects_from境界例
-        scenario_id: null
         descriptions:
           zh: 按 token 预算跳过高排名候选不是 TopK。
           en: Skipping a high-ranked candidate for token budget is not Top-K selection.
@@ -346,94 +332,71 @@ relations:
           - CandidateSet
         related_relation_ids:
           - TopKSelection-selects_from-CandidateSet
-        expected_result:
-          zh: 验证器不得建立该有向关系事实。
-          en: Do not assert the directed fact.
-          ja: directed factをassertしません。
-        why_valid_or_invalid:
-          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-top-k-selection-008
+          - claim-topk-id
     source_claims:
-      - claim-top-k-selection-008
+      - claim-topk-id
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:CandidateSet
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-pinecone-query
+    title: Pinecone Query Guide
+    publisher: Pinecone
+    url: https://docs.pinecone.io/guides/search/query-data
+    source_type: official-doc
+    relevance: index.query with vector, namespace, filter, top_k.
+  - id: src-mem0-search
+    title: Mem0 Platform Documentation
+    publisher: Mem0
+    url: https://docs.mem0.ai
+    source_type: official-doc
+    relevance: POST /v1/memories/search/ with query, entity IDs, filters, top_k.
+  - id: src-chroma-query
+    title: Chroma Query Documentation
+    publisher: Chroma
+    url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+    source_type: official-doc
+    relevance: collection.query with query_texts, n_results, where filter.
+  - id: src-memory-retrieval-design
+    title: Moonweave memory-retrieval-ranking module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Separates retrieval stages, scores, results, and context admission.
 source_claims:
-  - id: claim-top-k-selection-001
-    source: eng-search-elastic-rrf
-    supports: Elasticsearch documents rank windows and final result-size truncation after fusion; Moonweave models the auditable truncation execution separately from rank fusion.
-    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
+  - id: claim-topk-pinecone
+    source: src-pinecone-query
+    supports: Pinecone top_k limits returned vector matches.
+    locator: top_k
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-topk-mem0
+    source: src-mem0-search
+    supports: Mem0 top_k limits search results.
+    locator: top_k
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-topk-not-context
+    source: src-memory-retrieval-design
+    supports: Top-K truncation is not context-package admission.
+    locator: boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-top-k-selection-002
-    source: eng-search-elastic-rrf
-    supports: "Elasticsearch documents rank windows and final result-size truncation after fusion; Moonweave models the auditable truncation execution separately from rank fusion. Moonweave records TopKSelection.selection_activity_id as the stated auditable datum: Stable identifier for one Top-K truncation execution."
-    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
+  - id: claim-topk-id
+    source: src-memory-retrieval-design
+    supports: selection_activity_id identifies truncation execution.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-top-k-selection-003
-    source: eng-search-elastic-rrf
-    supports: "Elasticsearch documents rank windows and final result-size truncation after fusion; Moonweave models the auditable truncation execution separately from rank fusion. Moonweave records TopKSelection.k as the stated auditable datum: Declares the maximum number of candidates retained."
-    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
+  - id: claim-topk-k
+    source: src-pinecone-query
+    supports: k is the final retained count.
+    locator: k
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-topk-tie
+    source: src-memory-retrieval-design
+    supports: tie_break_policy preserves deterministic order at cutoff.
+    locator: tie_break
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-top-k-selection-004
-    source: eng-search-elastic-rrf
-    supports: "Elasticsearch documents rank windows and final result-size truncation after fusion; Moonweave models the auditable truncation execution separately from rank fusion. Moonweave records TopKSelection.tie_break_policy as the stated auditable datum: Declares how deterministic order is preserved when scores tie at the cutoff."
-    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-top-k-selection-005
-    source: eng-search-elastic-rrf
-    supports: Elasticsearch documents rank windows and final result-size truncation after fusion; Moonweave models the auditable truncation execution separately from rank fusion. Elasticsearch documents result-set truncation after RRF using a configured result size and rank window.
-    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-top-k-selection-006
-    source: eng-search-elastic-rrf
-    supports: Elasticsearch documents rank windows and final result-size truncation after fusion; Moonweave models the auditable truncation execution separately from rank fusion. The retrieval source describes result truncation, not downstream context-budget admission.
-    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-top-k-selection-007
-    source: eng-search-elastic-rrf
-    supports: The official documentation supports the operational distinction used in this child differentia; Moonweave's TopKSelection-to-RankingOperation subclass placement is an explicit ontology design decision.
-    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-top-k-selection-008
-    source: eng-search-elastic-rrf
-    supports: The cited official documentation supports the endpoint roles and direction of this retrieval fact; the exact relation identifier and ownership boundary are Moonweave design decisions.
-    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

@@ -1,34 +1,59 @@
 schema: moonweave.ai/ontology-node/v1
 id: RerankActivity
 kind: concept
-status: accepted
 labels:
   zh: 候选重排
   en: Candidate reranking
   ja: 候補再順位付け
 semantics:
   short_definition:
-    zh: 用声明的重排模型重新评估初始候选并形成新顺序的第二阶段活动。
-    en: A second-stage activity that reassesses initial candidates with a declared reranker model and forms a new order.
-    ja: 指定reranker modelでinitial candidateを再評価しnew orderを作るsecond-stage activityです。
+    zh: 用重排模型重新评估候选的二阶段活动。
+    en: Second-stage activity reassessing candidates with a reranker model.
+    ja: reranker model で candidate を再評価する二段 activity。
   definition:
-    zh: RerankActivity 消费一个已有 CandidateSet，把查询与候选字段交给声明版本的重排模型，产生 RerankScore 并据此重排或截断候选；它不从索引生成初始候选，也不把多个独立排名仅按位置融合。
-    en: RerankActivity consumes an existing CandidateSet, sends the query and declared candidate fields to a versioned reranker model, and produces RerankScore values that reorder or truncate candidates. It neither retrieves initial candidates from an index nor fuses independent rankings only by position.
-    ja: RerankActivity は既存CandidateSetをconsumeしqueryと指定candidate fieldをversioned reranker modelへ渡しRerankScoreで再順序/切詰めします。initial recallやrank-positionだけのfusionではありません。
+    zh: RerankActivity 消费已有 CandidateSet，将 query 与候选文档交给 Cohere POST /v2/rerank（model=rerank-v3.x, top_n）或等效 cross-encoder，产生 RerankScore；不从索引召回，也不仅按排名位置做 RRF。
+    en: RerankActivity consumes an existing CandidateSet, sends query and documents to Cohere POST /v2/rerank (model=rerank-v3.x, top_n) or an equivalent cross-encoder, and produces RerankScore values. It neither recalls from an index nor fuses ranks by position alone.
+    ja: RerankActivity は CandidateSet を consume し Cohere POST /v2/rerank(model=rerank-v3.x, top_n) 等へ query/documents を渡し RerankScore を生成。index recall も rank-position だけの RRF も行いません。
   why_needed:
-    zh: 保留二阶段检索中重排模型、输入字段、top_n 与输出分数的独立可追溯性。
-    en: Preserves independent traceability for the second-stage reranker model, input fields, top_n, and output scores.
-    ja: second-stage reranker model・input field・top_n・output scoreの独立追跡性を保持します。
+    zh: Cohere rerank 会完全改写顺序，必须把模型版本、top_n 与 relevance_score 单独留痕，不能混进 Pinecone cosine 分数里。
+    en: Cohere rerank can fully rewrite order; model version, top_n, and relevance_score must be traced separately from Pinecone cosine scores.
+    ja: Cohere rerank は順序を全面変更するため model 版/top_n/relevance_score を Pinecone cosine と分離記録必須。
   includes:
-    - zh: 纳入交叉编码器或其他根据查询-候选联合内容重新评分的活动。
-      en: Includes cross-encoder and other activities that rescore joint query-candidate content.
-      ja: query-candidate joint contentを再採点するcross-encoder等activityを含みます。
+    - zh: 纳入 Cohere rerank 与 cross-encoder 等联合 query-candidate 重新评分的活动。
+      en: Includes Cohere rerank and cross-encoder activities rescoring joint query-candidate content.
+      ja: Cohere rerank/cross-encoder 等 joint query-candidate 再採点 activity。
   excludes:
-    - zh: 排除初始候选召回、RRF/DBSF 融合、仅按既有顺序截取 TopK 和上下文采用。
-      en: Excludes initial recall, RRF or DBSF fusion, truncation of an existing order alone, and context admission.
-      ja: initial recall・RRF/DBSF fusion・既存順序だけのTopK truncation・context admissionを除外します。
+    - zh: 排除初始召回、RRF 融合与仅截断 Top-K。
+      en: Excludes initial recall, RRF fusion, and truncation-only Top-K.
+      ja: initial recall・RRF fusion・truncation-only Top-K を除外。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: 映射 Cohere POST /v2/rerank 的 model、query、documents、top_n；响应 results[].relevance_score 写入 RerankScore，index 字段为 rerank 后序数。
+    en: Map Cohere POST /v2/rerank model, query, documents, top_n; response results[].relevance_score becomes RerankScore with rerank ordinals as index.
+    ja: Cohere POST /v2/rerank の model/query/documents/top_n を写像。results[].relevance_score を RerankScore へ。
+  typical_input: []
+  typical_output: []
+  reference_implementations:
+    - name: Mem0 Search API
+      url: https://docs.mem0.ai
+      description: POST /v1/memories/search/ with query, entity IDs, filters, and top_k.
+    - name: Pinecone Query
+      url: https://docs.pinecone.io/guides/search/query-data
+      description: index.query with vector, namespace, filter, and top_k.
+    - name: Chroma Query
+      url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+      description: collection.query with query_texts or query_embeddings and n_results.
+    - name: LangGraph Store Search
+      url: https://langchain-ai.github.io/langgraph/reference/store/
+      description: BaseStore.search with namespace prefix and semantic query.
+    - name: Cohere Rerank API
+      url: https://docs.cohere.com/reference/rerank
+      description: POST /v2/rerank with model rerank-v3.x, query, documents, top_n.
+    - name: ColBERT
+      url: https://arxiv.org/abs/2004.12832
+      description: Late interaction retrieval via token-level MaxSim scoring.
 structure:
   identity_keys:
     - rerank_activity_id
@@ -36,128 +61,128 @@ structure:
     - id: rerank_activity_id
       labels:
         zh: 重排活动标识
-        en: rerank activity ID
-        ja: rerank activity ID
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
+        en: Rerank activity identifier
+        ja: 再順位 activity 識別子
       definitions:
         zh: 稳定标识一次重排执行。
         en: Stable identifier for one reranking execution.
-        ja: 一つのreranking executionを安定識別します。
-      allowed_values: []
-      pattern: null
-      example_value: rerank-416
-      source_claims:
-        - claim-rerank-activity-002
-    - id: model_version
-      labels:
-        zh: 重排模型版本
-        en: reranker model version
-        ja: reranker model version
+        ja: 一 reranking execution を安定識別。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 记录实际执行重排的模型及不可替代版本。
-        en: Records the actual reranker model and non-substitutable version.
-        ja: 実際にrerankしたmodelと置換不能versionを記録します。
-      allowed_values: []
       pattern: null
-      example_value: bge-reranker-v3
+      example_value: rerank-416
+      allowed_values: []
       source_claims:
-        - claim-rerank-activity-003
+        - claim-rerank-activity-id
+    - id: model_version
+      labels:
+        zh: 重排模型版本
+        en: Rerank model version
+        ja: 再順位モデル版
+      definitions:
+        zh: 实际执行重排的模型，如 cohere rerank-v3.5。
+        en: Model performing reranking, e.g., cohere rerank-v3.5.
+        ja: cohere rerank-v3.5 等 rerank model。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      pattern: null
+      example_value: rerank-v3.5
+      allowed_values: []
+      source_claims:
+        - claim-rerank-activity-model
     - id: top_n
       labels:
-        zh: 返回数量
-        en: top N
-        ja: top N
+        zh: 返回数量 top_n
+        en: Returned count top_n
+        ja: 返却数 top_n
+      definitions:
+        zh: 对应 Cohere rerank API 的 top_n 参数。
+        en: Maps to the Cohere rerank API top_n parameter.
+        ja: Cohere rerank API top_n に対応。
       datatype: integer
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 记录重排调用请求返回的候选数量。
-        en: Number of reranked candidates requested from the operation.
-        ja: rerank operationに要求する返却candidate数です。
-      allowed_values: []
       pattern: null
-      example_value: 12
+      example_value: 10
+      allowed_values: []
       source_claims:
-        - claim-rerank-activity-004
+        - claim-rerank-activity-topn
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: RerankActivity-example-positive-manual-001
-    kind: positive
+  - id: RerankActivity-example-cohere-v35
     labels:
-      zh: 候选重排正例
-      en: "Positive case: Candidate reranking"
-      ja: 候補再順位付け正例
-    scenario_id: null
+      zh: Cohere rerank-v3.5
+      en: Cohere rerank-v3.5
+      ja: Cohere rerank-v3.5
     descriptions:
-      zh: rerank-416 用 bge-reranker-v3 对 80 个初始候选重评分并返回前 12 个。
-      en: rerank-416 uses bge-reranker-v3 to rescore 80 initial candidates and return 12.
-      ja: rerank-416 はbge-reranker-v3で80 initial candidateを再採点し12件を返します。
+      zh: rerank-416 对 20 条融合候选调用 Cohere POST /v2/rerank(model=rerank-v3.5, top_n=10)；candidate-424 relevance_score=0.917。
+      en: rerank-416 calls Cohere POST /v2/rerank on 20 fused candidates; candidate-424 relevance_score=0.917.
+      ja: rerank-416 が 20 candidate を Cohere rerank し relevance_score=0.917。
+    example_source:
+      product: Cohere
+      url: https://docs.cohere.com/reference/rerank
+      version: POST /v2/rerank rerank-v3.5
     field_values:
       rerank_activity_id: rerank-416
-      model_version: bge-reranker-v3
+      model_version: rerank-v3.5
+      top_n: 10
+    related_node_ids:
+      - RerankActivity
+      - RerankScore
+    related_relation_ids: []
+    source_claims:
+      - claim-rerank-activity-cohere
+  - id: RerankActivity-example-pinecone-hosted
+    labels:
+      zh: Pinecone 托管 rerank
+      en: Pinecone hosted rerank
+      ja: Pinecone ホスト rerank
+    descriptions:
+      zh: 应用经 Pinecone inference API 调用 cohere-rerank-3.5 对初始 search hits 重排。
+      en: The app reranks initial search hits via Pinecone inference API with cohere-rerank-3.5.
+      ja: Pinecone inference API で cohere-rerank-3.5 rerank。
+    example_source:
+      product: Pinecone
+      url: https://docs.pinecone.io/guides/search/rerank-results
+      version: hosted rerank
+    field_values:
+      rerank_activity_id: rerank-417
+      model_version: cohere-rerank-3.5
       top_n: 12
-      ranking_operation_id: rerank-416
-      input_candidate_set_id: candidate-set-fused-415
-      activity_id: rerank-416
-      started_at: 2026-07-16T12:04:00Z
     related_node_ids:
       - RerankActivity
     related_relation_ids: []
-    expected_result:
-      zh: 归类为 RerankActivity。
-      en: Classify the object as RerankActivity.
-      ja: RerankActivity として分類します。
-    why_valid_or_invalid:
-      zh: 已有候选被声明模型重新评分，且产生可区分的 RerankScore。
-      en: Existing candidates are rescored by a declared model and produce distinguishable RerankScore values.
-      ja: 既存candidateを指定modelが再採点し区別可能RerankScoreを生成します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-rerank-activity-005
-  - id: RerankActivity-example-boundary-manual-001
-    kind: boundary
+      - claim-rerank-activity-pinecone
+  - id: RerankActivity-example-not-rrf
     labels:
-      zh: 候选重排边界例
-      en: "Boundary case: Candidate reranking"
-      ja: 候補再順位付け境界例
-    scenario_id: null
+      zh: 重排非 RRF
+      en: Rerank is not RRF
+      ja: rerank は RRF ではない
     descriptions:
-      zh: fusion-416 按 RRF 只组合两个列表的排名位置，没有读取候选文本。
-      en: fusion-416 combines only rank positions from two lists using RRF and does not read candidate text.
-      ja: fusion-416 はRRFで二listのrank positionだけを結合しcandidate textを読みません。
+      zh: RRF 只组合排名位置不读文档正文；RerankActivity 必须读取 candidate 文本。
+      en: RRF combines rank positions without reading document text; RerankActivity must read candidate text.
+      ja: RRF は rank 位置のみ結合。RerankActivity は candidate 文本必須。
+    example_source:
+      product: Elasticsearch
+      url: https://www.elastic.co/guide/en/elasticsearch/reference/current/rrf.html
+      version: contrast
     field_values: {}
     related_node_ids:
       - RerankActivity
+      - RankFusion
     related_relation_ids: []
-    expected_result:
-      zh: 不得归类为 RerankActivity。
-      en: Do not classify the object as RerankActivity.
-      ja: RerankActivity として分類しません。
-    why_valid_or_invalid:
-      zh: 它是 RankFusion，不是模型重排。
-      en: It is RankFusion, not model reranking.
-      ja: RankFusionでmodel rerankingではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-rerank-activity-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-rerank-activity-not-rrf
 parent_relation:
   id: RerankActivity-is_a-RankingOperation
   predicate: is_a
@@ -192,18 +217,16 @@ parent_relation:
         en: "Assert only when the instance satisfies the complete RankingOperation definition and the child differentia: it uses a declared model version to reassess existing candidates and produce RerankScore values."
         ja: instanceがRankingOperation完全定義とchild differentia「指定model versionで既存candidateを再評価しRerankScoreを生成する」を共に満たす時だけassertします。
       source_claims:
-        - claim-rerank-activity-007
+        - claim-rerank-activity-id
   temporal_scope: timeless
   boundary_context: null
   constraints: []
   examples:
     - id: RerankActivity-is_a-RankingOperation-example-positive-manual-001
-      kind: positive
       labels:
         zh: 是一种RankingOperation正例
         en: "Positive case: is a RankingOperation"
         ja: RankingOperationの一種正例
-      scenario_id: null
       descriptions:
         zh: rerank-416 用 bge-reranker-v3 重排 80 个候选。
         en: rerank-416 reranks 80 candidates with bge-reranker-v3.
@@ -214,25 +237,13 @@ parent_relation:
         - RankingOperation
       related_relation_ids:
         - RerankActivity-is_a-RankingOperation
-      expected_result:
-        zh: 建立该有向事实，并保留条件与证据。
-        en: Assert the directed fact with its condition and evidence retained.
-        ja: condition/evidenceを保持してdirected factをassertします。
-      why_valid_or_invalid:
-        zh: 实例满足端点定义、方向和该关系的显式成立条件。
-        en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-        ja: endpoint定義・direction・明示assertion conditionを満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-rerank-activity-007
+        - claim-rerank-activity-id
     - id: RerankActivity-is_a-RankingOperation-example-boundary-manual-001
-      kind: boundary
       labels:
         zh: 是一种RankingOperation边界例
         en: "Boundary case: is a RankingOperation"
         ja: RankingOperationの一種境界例
-      scenario_id: null
       descriptions:
         zh: fusion-415 只按排名位置组合列表。
         en: fusion-415 only combines lists by rank position.
@@ -243,23 +254,12 @@ parent_relation:
         - RankingOperation
       related_relation_ids:
         - RerankActivity-is_a-RankingOperation
-      expected_result:
-        zh: 验证器不得建立该有向关系事实。
-        en: Do not assert the directed fact.
-        ja: directed factをassertしません。
-      why_valid_or_invalid:
-        zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-        en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-        ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-rerank-activity-007
+        - claim-rerank-activity-id
   source_claims:
-    - claim-rerank-activity-007
+    - claim-rerank-activity-id
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: pending
   endpoint_order: child-to-parent
 relations:
   - id: RerankActivity-consumes-CandidateSet
@@ -295,18 +295,16 @@ relations:
           en: Assert only when the documents in the rerank request correspond to this set's candidate members.
           ja: rerank request内documentsがこのsetのcandidate memberと対応する時だけassertします。
         source_claims:
-          - claim-rerank-activity-008
+          - claim-rerank-activity-id
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
       - id: RerankActivity-consumes-CandidateSet-example-positive-manual-001
-        kind: positive
         labels:
           zh: consumes CandidateSet正例
           en: "Positive case: consumes CandidateSet"
           ja: CandidateSetをconsumes正例
-        scenario_id: null
         descriptions:
           zh: rerank-416 consumes candidate-set-fused-415。
           en: rerank-416 consumes candidate-set-fused-415.
@@ -317,25 +315,13 @@ relations:
           - CandidateSet
         related_relation_ids:
           - RerankActivity-consumes-CandidateSet
-        expected_result:
-          zh: 建立该有向事实，并保留条件与证据。
-          en: Assert the directed fact with its condition and evidence retained.
-          ja: condition/evidenceを保持してdirected factをassertします。
-        why_valid_or_invalid:
-          zh: 实例满足端点定义、方向和该关系的显式成立条件。
-          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-          ja: endpoint定義・direction・明示assertion conditionを満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-rerank-activity-008
+          - claim-rerank-activity-id
       - id: RerankActivity-consumes-CandidateSet-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: consumes CandidateSet边界例
           en: "Boundary case: consumes CandidateSet"
           ja: CandidateSetをconsumes境界例
-        scenario_id: null
         descriptions:
           zh: 直接在索引上首次检索属于候选生成而非此关系。
           en: First-stage index retrieval belongs to candidate generation, not this relation.
@@ -346,23 +332,12 @@ relations:
           - CandidateSet
         related_relation_ids:
           - RerankActivity-consumes-CandidateSet
-        expected_result:
-          zh: 验证器不得建立该有向关系事实。
-          en: Do not assert the directed fact.
-          ja: directed factをassertしません。
-        why_valid_or_invalid:
-          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-rerank-activity-008
+          - claim-rerank-activity-id
     source_claims:
-      - claim-rerank-activity-008
+      - claim-rerank-activity-id
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:CandidateSet
   - id: RerankActivity-produces-RerankScore
     predicate: produces
@@ -397,18 +372,16 @@ relations:
           en: Assert only when score.model_version equals RerankActivity.model_version and candidate lineage is explicit.
           ja: score.model_versionがactivity.model_versionと一致しcandidate lineageが明示される時だけassertします。
         source_claims:
-          - claim-rerank-activity-008
+          - claim-rerank-activity-id
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
       - id: RerankActivity-produces-RerankScore-example-positive-manual-001
-        kind: positive
         labels:
           zh: produces RerankScore正例
           en: "Positive case: produces RerankScore"
           ja: RerankScoreをproduces正例
-        scenario_id: null
         descriptions:
           zh: rerank-416 produces rerank-score-430。
           en: rerank-416 produces rerank-score-430.
@@ -419,25 +392,13 @@ relations:
           - RerankScore
         related_relation_ids:
           - RerankActivity-produces-RerankScore
-        expected_result:
-          zh: 建立该有向事实，并保留条件与证据。
-          en: Assert the directed fact with its condition and evidence retained.
-          ja: condition/evidenceを保持してdirected factをassertします。
-        why_valid_or_invalid:
-          zh: 实例满足端点定义、方向和该关系的显式成立条件。
-          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-          ja: endpoint定義・direction・明示assertion conditionを満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-rerank-activity-008
+          - claim-rerank-activity-id
       - id: RerankActivity-produces-RerankScore-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: produces RerankScore边界例
           en: "Boundary case: produces RerankScore"
           ja: RerankScoreをproduces境界例
-        scenario_id: null
         descriptions:
           zh: 模型版本不同或仅复制旧分数时不得建立。
           en: Do not assert when model versions differ or the value merely copies an old score.
@@ -448,94 +409,71 @@ relations:
           - RerankScore
         related_relation_ids:
           - RerankActivity-produces-RerankScore
-        expected_result:
-          zh: 验证器不得建立该有向关系事实。
-          en: Do not assert the directed fact.
-          ja: directed factをassertしません。
-        why_valid_or_invalid:
-          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-rerank-activity-008
+          - claim-rerank-activity-id
     source_claims:
-      - claim-rerank-activity-008
+      - claim-rerank-activity-id
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:RerankScore
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-cohere-rerank
+    title: Cohere Rerank API
+    publisher: Cohere
+    url: https://docs.cohere.com/reference/rerank
+    source_type: official-doc
+    relevance: POST /v2/rerank with rerank-v3 models, query, documents, top_n.
+  - id: src-pinecone-query
+    title: Pinecone Query Guide
+    publisher: Pinecone
+    url: https://docs.pinecone.io/guides/search/query-data
+    source_type: official-doc
+    relevance: index.query with vector, namespace, filter, top_k.
+  - id: src-elastic-rrf
+    title: Elasticsearch Reciprocal Rank Fusion
+    publisher: Elastic
+    url: https://www.elastic.co/guide/en/elasticsearch/reference/current/rrf.html
+    source_type: official-doc
+    relevance: "RRF formula: score(d) = sum(1/(k+rank(d)))."
+  - id: src-memory-retrieval-design
+    title: Moonweave memory-retrieval-ranking module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Separates retrieval stages, scores, results, and context admission.
 source_claims:
-  - id: claim-rerank-activity-001
-    source: eng-vector-pinecone-reranking
-    supports: Pinecone documents a two-stage workflow in which initial search results are rescored by a selected reranker model using query, documents, rank_fields, top_n, and truncation settings.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
+  - id: claim-rerank-activity-cohere
+    source: src-cohere-rerank
+    supports: Cohere rerank returns relevance_score and reordered documents.
+    locator: POST /v2/rerank
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-rerank-activity-pinecone
+    source: src-pinecone-query
+    supports: Pinecone supports hosted reranking as a second stage.
+    locator: rerank results
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-rerank-activity-not-rrf
+    source: src-elastic-rrf
+    supports: RRF and model reranking are distinct ordering mechanisms.
+    locator: RRF
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-rerank-activity-id
+    source: src-memory-retrieval-design
+    supports: rerank_activity_id identifies one rerank execution.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-rerank-activity-002
-    source: eng-vector-pinecone-reranking
-    supports: "Pinecone documents a two-stage workflow in which initial search results are rescored by a selected reranker model using query, documents, rank_fields, top_n, and truncation settings. Moonweave records RerankActivity.rerank_activity_id as the stated auditable datum: Stable identifier for one reranking execution."
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
+  - id: claim-rerank-activity-model
+    source: src-cohere-rerank
+    supports: model_version pins the rerank model.
+    locator: model
+    evidence_kind: primary-api
     confidence: high
-    review_status: accepted
-  - id: claim-rerank-activity-003
-    source: eng-vector-pinecone-reranking
-    supports: "Pinecone documents a two-stage workflow in which initial search results are rescored by a selected reranker model using query, documents, rank_fields, top_n, and truncation settings. Moonweave records RerankActivity.model_version as the stated auditable datum: Records the actual reranker model and non-substitutable version."
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
+  - id: claim-rerank-activity-topn
+    source: src-cohere-rerank
+    supports: top_n maps to Cohere rerank top_n parameter.
+    locator: top_n
+    evidence_kind: primary-api
     confidence: high
-    review_status: accepted
-  - id: claim-rerank-activity-004
-    source: eng-vector-pinecone-reranking
-    supports: "Pinecone documents a two-stage workflow in which initial search results are rescored by a selected reranker model using query, documents, rank_fields, top_n, and truncation settings. Moonweave records RerankActivity.top_n as the stated auditable datum: Number of reranked candidates requested from the operation."
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-rerank-activity-005
-    source: eng-vector-pinecone-reranking
-    supports: Pinecone documents a two-stage workflow in which initial search results are rescored by a selected reranker model using query, documents, rank_fields, top_n, and truncation settings. Pinecone documents reranking as a second-stage rescore of initial search results with model and top_n parameters.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-rerank-activity-006
-    source: eng-vector-pinecone-reranking
-    supports: Pinecone documents a two-stage workflow in which initial search results are rescored by a selected reranker model using query, documents, rank_fields, top_n, and truncation settings. RRF and reranking are documented as different ordering mechanisms.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-rerank-activity-007
-    source: eng-vector-pinecone-reranking
-    supports: The official documentation supports the operational distinction used in this child differentia; Moonweave's RerankActivity-to-RankingOperation subclass placement is an explicit ontology design decision.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-rerank-activity-008
-    source: eng-vector-pinecone-reranking
-    supports: The cited official documentation supports the endpoint roles and direction of this retrieval fact; the exact relation identifier and ownership boundary are Moonweave design decisions.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

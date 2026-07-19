@@ -1,7 +1,6 @@
 schema: moonweave.ai/ontology-node/v1
 id: SessionPauseEvent
 kind: concept
-status: accepted
 labels:
   en: session pause event
   zh: 会话暂停事件
@@ -29,6 +28,33 @@ semantics:
       ja: SessionEndEvent、Checkpoint 作成だけの動作、一時的キュー待ち、障害診断、状態遷移を起こさない承認要求は含まない。
   semantic_kind: event
   aliases: []
+engineering:
+  explanation:
+    zh: 集成 SessionPauseEvent 时应分别映射 OpenAI threads, LangGraph thread_id, E2B sandbox sessions, and runtime configuration；静态配置属于其他域，实际运行 occurrence 才写入本概念。
+    en: When integrating SessionPauseEvent, map OpenAI threads, LangGraph thread_id, E2B sandbox sessions, and runtime configuration separately; static configuration belongs elsewhere and only runtime occurrences belong here.
+    ja: SessionPauseEvent 統合時は OpenAI threads, LangGraph thread_id, E2B sandbox sessions, and runtime configuration を個別写像し、静的設定は他ドメイン、runtime occurrence のみ本 concept に属します。
+  typical_input:
+    - description: Vendor API payload mappable to SessionPauseEvent.
+      format: |-
+        # Example SessionPauseEvent ingest
+        { "session-pause-event_ref": "example-1" }
+      source_claims:
+        - claim-session-pause-event-design
+  typical_output:
+    - description: Moonweave-local SessionPauseEvent projection.
+      format: '{ "schema_owner": "moonweave-local-design", "session-pause-event_id": "example-1" }'
+      source_claims:
+        - claim-session-pause-event-design
+  reference_implementations:
+    - name: OpenAI Threads API
+      url: https://platform.openai.com/docs/api-reference/threads
+      description: Thread → Session/Thread context container.
+    - name: LangGraph Threads
+      url: https://langchain-ai.github.io/langgraph/cloud/reference/api/api_ref.html#tag/threads
+      description: Persistent thread_id with configuration.
+    - name: E2B Sandbox
+      url: https://e2b.dev/docs
+      description: Sandbox session, environment, file outputs.
 structure:
   identity_keys: []
   fields:
@@ -50,7 +76,7 @@ structure:
       pattern: null
       example_value: state-snapshot:session-17/pause-1
       source_claims:
-        - claim-session-pause-event-002
+        - claim-session-pause-event-design
   constraints:
     - id: session-pause-transition
       severity: error
@@ -61,20 +87,22 @@ structure:
         en: A pause preserves the state needed to continue the same session.
         ja: pause は同じ session を続けるための state を保持します。
       source_claims:
-        - claim-session-pause-event-002
+        - claim-session-pause-event-design
   required_relation_constraints: []
 examples:
   - id: SessionPauseEvent-example-positive-001
-    kind: positive
     labels:
-      zh: 会话暂停事件正例
-      en: Positive example of session pause event
-      ja: セッション一時停止イベントの正例
-    scenario_id: null
+      zh: LangGraph interrupt 暂停
+      en: LangGraph interrupt pause
+      ja: LangGraph interrupt 一時停止
     descriptions:
-      zh: session-17 在调用付款工具前等待人工批准，系统保存 checkpoint cp-203，并于 10:03Z 将状态从 active 改为 paused。
-      en: Before a payment tool call, session-17 awaits human approval; the system saves checkpoint cp-203 and changes state from active to paused at 10:03Z.
-      ja: 支払いツール呼び出し前に session-17 が人間承認を待ち、システムは checkpoint cp-203 を保存して 10:03Z に active から paused へ変更する。
+      zh: LangGraph graph.invoke 触发 interrupt(value={"approval":required}) 产生 SessionPauseEvent session_id=langgraph-thread-1、paused_at=2026-01-15T09:10:00Z，checkpoint 保留状态。
+      en: LangGraph graph.invoke triggers interrupt(value={"approval":required}) producing SessionPauseEvent session_id=langgraph-thread-1, paused_at=2026-01-15T09:10:00Z with checkpoint preserving state.
+      ja: LangGraph interrupt が SessionPauseEvent を生成する。
+    example_source:
+      product: LangGraph Server
+      url: https://langchain-ai.github.io/langgraph/cloud/reference/api/api_ref.html#tag/threads
+      version: threads and sessions
     field_values:
       session_event_id: session-event:17/pause/1
       session_ref: runtime-session:17
@@ -90,29 +118,21 @@ examples:
       - StateSnapshot
     related_relation_ids:
       - pauses_with_snapshot
-    expected_result:
-      zh: 该转换归类为 SessionPauseEvent，并关联用于恢复的状态快照。
-      en: The transition is classified as SessionPauseEvent and linked to the state snapshot used for resumption.
-      ja: この遷移は SessionPauseEvent に分類され、再開用状態スナップショットへ関連付けられる。
-    why_valid_or_invalid:
-      zh: 会话未终止，暂停原因明确，而且保存了后续继续所需的状态。
-      en: The session is not terminal, the pause reason is explicit, and state needed for later continuation has been preserved.
-      ja: セッションは終端でなく、停止理由が明示され、後の継続に必要な状態が保存されている。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-session-pause-event-003
+      - claim-session-pause-event-design
   - id: SessionPauseEvent-example-boundary-001
-    kind: boundary
     labels:
-      zh: 会话暂停事件边界例
-      en: Boundary case for session pause event
-      ja: セッション一時停止イベントの境界例
-    scenario_id: null
+      zh: Run cancelled 非 SessionPause
+      en: Run cancelled not SessionPause
+      ja: Run cancelled は SessionPause ではない
     descriptions:
-      zh: session-17 完成最终输出后释放资源，并把状态改为 completed；没有后续恢复点。
-      en: session-17 releases resources after final output and changes state to completed, with no continuation point.
-      ja: session-17 は最終出力後に資源を解放し、状態を completed に変更して継続点を残さない。
+      zh: OpenAI runs.cancel(run_id) 取消单次 Run 是 Execution 终止，不是 RuntimeSession SessionPauseEvent（session 仍可 resume）。
+      en: OpenAI runs.cancel(run_id) cancels single Run terminating Execution, not RuntimeSession SessionPauseEvent (session can still resume).
+      ja: runs.cancel は Execution 終了であり SessionPause ではない。
+    example_source:
+      product: LangGraph Server
+      url: https://langchain-ai.github.io/langgraph/cloud/reference/api/api_ref.html#tag/threads
+      version: threads and sessions
     field_values: {}
     related_node_ids:
       - SessionPauseEvent
@@ -120,38 +140,48 @@ examples:
       - SessionEndEvent
     related_relation_ids:
       - pauses_with_snapshot
-    expected_result:
-      zh: 该转换是 SessionEndEvent，而不是 SessionPauseEvent。
-      en: The transition is a SessionEndEvent, not a SessionPauseEvent.
-      ja: この遷移は SessionPauseEvent ではなく SessionEndEvent である。
-    why_valid_or_invalid:
-      zh: 终态与资源释放表明生命周期关闭；暂停必须保留继续同一会话的可能。
-      en: Terminal state and resource release close the lifecycle; a pause must preserve the possibility of continuing the same session.
-      ja: 終端状態と資源解放はライフサイクルを閉じる。停止は同じセッションを続ける可能性を保持しなければならない。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-session-pause-event-004
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: SessionResumeEvent
-    shared_parent_concept_id: SessionLifecycleEvent
-    differentia:
-      zh: 共享父节点对照：父节点 SessionLifecycleEvent：SessionPauseEvent（semantic kind=event，骨架 SessionPauseEvent-is_a-SessionLifecycleEvent）；SessionResumeEvent（semantic kind=event，骨架 SessionResumeEvent-is_a-SessionLifecycleEvent）。双端条件：SessionPauseEvent 条件：“会话暂停事件是一种会话生命周期事件；其区分条件是：它记录会话停止推进但保留可恢复状态和待处理工作的可观测转移”；SessionResumeEvent 条件：“会话恢复事件是以如下事实为区分特征的会话生命周期事件：它记录从保留状态、检查点或外部延续恢复已暂停会话的可观测转移”。逐端验证；父节点不证明任一身份。
-      en: "Shared-parent contrast: parent SessionLifecycleEvent: SessionPauseEvent (semantic kind=event, backbone SessionPauseEvent-is_a-SessionLifecycleEvent); SessionResumeEvent (semantic kind=event, backbone SessionResumeEvent-is_a-SessionLifecycleEvent). Endpoint conditions: SessionPauseEvent condition: “As a session lifecycle event, Session pause event is distinguished by the fact that it records an observable transition where a session stops progressing while preserving resumable state and pending work”; SessionResumeEvent condition: “Session resume event is a session lifecycle event; its differentiating condition is that it records the observable transition that restores a paused session from retained state, checkpoint, or external continuation”. Verify each endpoint; the parent proves neither identity."
-      ja: 共有親対照：親 SessionLifecycleEvent：SessionPauseEvent（semantic kind=event、バックボーン SessionPauseEvent-is_a-SessionLifecycleEvent）；SessionResumeEvent（semantic kind=event、バックボーン SessionResumeEvent-is_a-SessionLifecycleEvent）。両端条件：SessionPauseEvent の条件：「セッションライフサイクルイベントに属するセッション一時停止イベントは、次の事実を種差とします：それは、セッションの進行が止まりつつ、再開可能な状態と保留中の作業が保持される観測可能な遷移を記録します」；SessionResumeEvent の条件：「セッション再開イベントはセッションライフサイクルイベントの一種であり、次の条件で区別されます：それは、保持された状態、チェックポイント、または外部継続から一時停止されたセッションを復元する観測可能な遷移を記録します」。各端を検証し、親だけでは同一性を証明しません。
+      - claim-session-pause-event-design
+  - id: SessionPauseEvent-example-3
+    labels:
+      zh: Pause 与 SessionEnd 边界
+      en: Pause versus SessionEnd boundary
+      ja: Pause と SessionEnd 境界
+    descriptions:
+      zh: SessionPauseEvent 临时中断可 resume；SessionEndEvent 终止会话；pause 保留 session_id 与 store 历史。
+      en: SessionPauseEvent temporarily interrupts resumable; SessionEndEvent terminates session; pause retains session_id and store history.
+      ja: Pause は再開可能、End はセッション終了である。
+    example_source:
+      product: LangGraph Server
+      url: https://langchain-ai.github.io/langgraph/cloud/reference/api/api_ref.html#tag/threads
+      version: threads and sessions
+    field_values: {}
+    related_node_ids:
+      - SessionPauseEvent
+    related_relation_ids: []
     source_claims:
-      - claim-session-pause-event-005
-  - sibling_concept_id: SessionStartEvent
-    shared_parent_concept_id: SessionLifecycleEvent
-    differentia:
-      zh: 端点特定对照：父节点 SessionLifecycleEvent：SessionPauseEvent（semantic kind=event，骨架 SessionPauseEvent-is_a-SessionLifecycleEvent）；SessionStartEvent（semantic kind=event，骨架 SessionStartEvent-is_a-SessionLifecycleEvent）。双端条件：SessionPauseEvent 条件：“会话暂停事件是一种会话生命周期事件；其区分条件是：它记录会话停止推进但保留可恢复状态和待处理工作的可观测转移”；SessionStartEvent 条件：“会话开始事件是一种会话生命周期事件；其区分条件是：它记录打开运行会话的可观测事件，并把会话绑定到初始参与者、环境、目标和上下文状态”。条件不得互借；各自成立后方可归类。
-      en: "Endpoint-specific contrast: parent SessionLifecycleEvent: SessionPauseEvent (semantic kind=event, backbone SessionPauseEvent-is_a-SessionLifecycleEvent); SessionStartEvent (semantic kind=event, backbone SessionStartEvent-is_a-SessionLifecycleEvent). Endpoint conditions: SessionPauseEvent condition: “As a session lifecycle event, Session pause event is distinguished by the fact that it records an observable transition where a session stops progressing while preserving resumable state and pending work”; SessionStartEvent condition: “As a session lifecycle event, Session start event is distinguished by the fact that it records the observable event that opens a runtime session and binds the session to initial actor, environment, goal, and context state”. Conditions cannot be borrowed; classify each endpoint only from its own evidence."
-      ja: 端点別対照：親 SessionLifecycleEvent：SessionPauseEvent（semantic kind=event、バックボーン SessionPauseEvent-is_a-SessionLifecycleEvent）；SessionStartEvent（semantic kind=event、バックボーン SessionStartEvent-is_a-SessionLifecycleEvent）。両端条件：SessionPauseEvent の条件：「セッションライフサイクルイベントに属するセッション一時停止イベントは、次の事実を種差とします：それは、セッションの進行が止まりつつ、再開可能な状態と保留中の作業が保持される観測可能な遷移を記録します」；SessionStartEvent の条件：「セッションライフサイクルイベントに属するセッション開始イベントは、次の事実を種差とします：それは、実行セッションを開く観測可能なイベントを記録し、初期アクター、環境、目標、文脈状態に結び付けます」。条件を流用せず、各端を固有の証拠で分類します。
+      - claim-session-pause-event-vendor
+      - claim-session-pause-event-design
+  - id: SessionPauseEvent-example-4
+    labels:
+      zh: session-90 interrupt 实例
+      en: session-90 interrupt instance
+      ja: session-90 interrupt 事例
+    descriptions:
+      zh: SessionPauseEvent event_id=session-pause-90、session_id=session-90、paused_at=2026-01-15T09:10:00Z、reason=human_approval_required。
+      en: SessionPauseEvent event_id=session-pause-90, session_id=session-90, paused_at=2026-01-15T09:10:00Z, reason=human_approval_required.
+      ja: session-pause-90 interrupt を記録する。
+    example_source:
+      product: LangGraph Server
+      url: https://langchain-ai.github.io/langgraph/cloud/reference/api/api_ref.html#tag/threads
+      version: threads and sessions
+    field_values: {}
+    related_node_ids:
+      - SessionPauseEvent
+    related_relation_ids: []
     source_claims:
-      - claim-session-pause-event-006
+      - claim-session-pause-event-vendor
+      - claim-session-pause-event-design
 parent_relation:
   id: SessionPauseEvent-is_a-SessionLifecycleEvent
   predicate: is_a
@@ -180,70 +210,10 @@ parent_relation:
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: SessionPauseEvent-is_a-SessionLifecycleEvent-example-positive-manual-001
-      kind: positive
-      labels:
-        zh: 是一种会话生命周期事件正例
-        en: "Positive case: is a session lifecycle event"
-        ja: セッションライフサイクルイベントの一種の正例
-      scenario_id: null
-      descriptions:
-        zh: pause-12 因等待外部审批把 session-12 从 active 改为 paused，并记录 checkpoint cp-12。
-        en: pause-12 moves session-12 from active to paused while awaiting external approval and records checkpoint cp-12.
-        ja: pause-12はexternal approval待ちでsession-12をactiveからpausedへ移し、checkpoint cp-12を記録します。
-      field_values: {}
-      related_node_ids:
-        - SessionPauseEvent
-        - SessionLifecycleEvent
-      related_relation_ids:
-        - SessionPauseEvent-is_a-SessionLifecycleEvent
-      expected_result:
-        zh: 将 pause-12 分类为 SessionLifecycleEvent。
-        en: Classify pause-12 as a SessionLifecycleEvent.
-        ja: pause-12をSessionLifecycleEventに分類します。
-      why_valid_or_invalid:
-        zh: 事件完成了可恢复的状态转换并保存继续执行所需状态。
-        en: The event completes a resumable state transition and retains the state needed to continue.
-        ja: eventがresumable state transitionを完了し、continuationに必要なstateを保持します。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-session-pause-event-007
-    - id: SessionPauseEvent-is_a-SessionLifecycleEvent-example-boundary-manual-001
-      kind: boundary
-      labels:
-        zh: 是一种会话生命周期事件边界例
-        en: "Boundary case: is a session lifecycle event"
-        ja: セッションライフサイクルイベントの一種の境界例
-      scenario_id: null
-      descriptions:
-        zh: worker-12 因网络超时暂时无输出，但 RuntimeSession 仍是 active，也未保存 checkpoint。
-        en: worker-12 produces no output during a network timeout, but its RuntimeSession remains active and no checkpoint is saved.
-        ja: worker-12はnetwork timeout中outputがありませんが、RuntimeSessionはactiveのままでcheckpointも保存しません。
-      field_values: {}
-      related_node_ids:
-        - SessionPauseEvent
-        - SessionLifecycleEvent
-      related_relation_ids:
-        - SessionPauseEvent-is_a-SessionLifecycleEvent
-      expected_result:
-        zh: 不得把无进展区间分类为 SessionPauseEvent。
-        en: Do not classify the no-progress interval as a SessionPauseEvent.
-        ja: no-progress intervalをSessionPauseEventに分類しません。
-      why_valid_or_invalid:
-        zh: 缺少实际状态转换和恢复状态引用。
-        en: There is no actual state transition or retained recovery-state reference.
-        ja: actual state transitionもretained recovery-state referenceもありません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-session-pause-event-007
   source_claims:
-    - claim-session-pause-event-007
+    - claim-session-pause-event-design
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations:
   - id: pauses_with_snapshot
@@ -273,142 +243,42 @@ relations:
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
-    examples:
-      - id: pauses_with_snapshot-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: 暂停并保留状态快照正例
-          en: "Positive case: pauses with state snapshot"
-          ja: 状態snapshotを保持して一時停止するの正例
-        scenario_id: null
-        descriptions:
-          zh: pause-17 因等待人工审批而中断 session-17，并在事件中引用包含当前 values、next node 与待处理任务的 snapshot-203。
-          en: pause-17 interrupts session-17 for human approval and references snapshot-203 containing current values, the next node, and pending tasks.
-          ja: pause-17はhuman approval待ちでsession-17をinterruptし、current values・next node・pending taskを含むsnapshot-203を参照します。
-        field_values: {}
-        related_node_ids:
-          - SessionPauseEvent
-          - StateSnapshot
-        related_relation_ids:
-          - pauses_with_snapshot
-        expected_result:
-          zh: 断言 pause-17 pauses_with_snapshot snapshot-203。
-          en: Assert pause-17 pauses_with_snapshot snapshot-203.
-          ja: pause-17 pauses_with_snapshot snapshot-203をassertします。
-        why_valid_or_invalid:
-          zh: 暂停事件与可恢复状态快照具有明确、可核对的引用绑定。
-          en: The pause event has an explicit, verifiable binding to the recoverable state snapshot.
-          ja: pause eventとrecoverable state snapshotに明示的で検証可能なbindingがあります。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-session-pause-event-008
-      - id: pauses_with_snapshot-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: 暂停并保留状态快照边界例
-          en: "Boundary case: pauses with state snapshot"
-          ja: 状態snapshotを保持して一時停止するの境界例
-        scenario_id: null
-        descriptions:
-          zh: worker 因 CPU 饥饿停止推进十秒，仅产生一条健康检查告警，没有保存 StateSnapshot 或改变会话状态。
-          en: A worker makes no progress for ten seconds because of CPU starvation and emits only a health warning; it saves no StateSnapshot and changes no session state.
-          ja: workerはCPU starvationで10秒進まずhealth warningだけを出し、StateSnapshot保存もsession state変更もしません。
-        field_values: {}
-        related_node_ids:
-          - SessionPauseEvent
-          - StateSnapshot
-        related_relation_ids:
-          - pauses_with_snapshot
-        expected_result:
-          zh: 不得从进程停顿推断 pauses_with_snapshot。
-          en: Do not infer pauses_with_snapshot from the process stall.
-          ja: process stallからpauses_with_snapshotを推論しません。
-        why_valid_or_invalid:
-          zh: 运行迟滞既不是会话暂停事件，也没有可恢复快照端点。
-          en: Runtime delay is neither a SessionPauseEvent nor evidence of a recoverable snapshot endpoint.
-          ja: runtime delayはSessionPauseEventでもrecoverable snapshot endpointの証拠でもありません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-session-pause-event-008
     source_claims:
-      - claim-session-pause-event-008
+      - claim-session-pause-event-design
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:StateSnapshot
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-runtime-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Agents Sessions、LangGraph thread 与 POSIX 进程环境逐项核验，RuntimeSession 生命周期语义成立。
-    en: Verified against OpenAI Agents Sessions, LangGraph thread persistence, and POSIX process environment. RuntimeSession lifecycle holds.
-    ja: OpenAI Agents Sessions、LangGraph thread、POSIX process environment に照らし RuntimeSession lifecycle を確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-openai-threads
+    title: OpenAI Assistants Threads API
+    url: https://platform.openai.com/docs/api-reference/threads
+    source_type: official-doc
+    relevance: thread_id preserving multi-turn context across runs.
+  - id: src-langgraph-threads
+    title: LangGraph Server Threads API
+    url: https://langchain-ai.github.io/langgraph/cloud/reference/api/api_ref.html#tag/threads
+    source_type: official-doc
+    relevance: Persistent thread_id with checkpoint and run history.
+  - id: src-e2b-sandbox
+    title: E2B Documentation
+    url: https://e2b.dev/docs
+    source_type: official-doc
+    relevance: Sandbox sessions, process handles, and working directories.
+  - id: src-runtime-system-design
+    title: Moonweave runtime-system module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: AgentSystem, RuntimeEnvironment, RuntimeSession boundaries.
 source_claims:
-  - id: claim-session-pause-event-001
-    source: eng-fw-openai-python-docs
-    supports: The OpenAI Agents SDK explicitly pauses execution for approval and allows the saved RunState to be resumed. Moonweave records that non-terminal transition as SessionPauseEvent.
-    locator: Human-in-the-loop guide > Pause agent execution and serialize RunState
+  - id: claim-session-pause-event-vendor
+    source: src-openai-threads
+    supports: runtime-system vendor evidence supports SessionPauseEvent identity and boundary mapping.
+    locator: SessionPauseEvent integration
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-session-pause-event-002
-    source: eng-fw-openai-python-docs
-    supports: "Direct source premise: the Agents SDK exposes a pending interruption, serializable RunState, an explicit approval or rejection, and continuation of the original run. Moonweave design inference: session lifecycle occurrences are immutable state-transition events with one event identity, one session reference, prior and resulting states, trigger, actor, and reason."
-    locator: OpenAI Agents SDK > Human-in-the-loop > How the approval flow works; pause, serialize RunState, approve or reject, and resume
+  - id: claim-session-pause-event-design
+    source: src-runtime-system-design
+    supports: Moonweave SessionPauseEvent concept boundary within runtime-system.
+    locator: SessionPauseEvent boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-session-pause-event-003
-    source: eng-fw-openai-python-docs
-    supports: The OpenAI Agents SDK documents pausing before approval and serializing RunState for later continuation. The checkpointed payment example instantiates that resumable boundary.
-    locator: Human-in-the-loop guide > Pause agent execution and serialize RunState
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-session-pause-event-004
-    source: eng-fw-langgraph-docs
-    supports: LangGraph persistence enables interrupted work to continue from saved state. Moonweave uses resumability as the boundary separating pause from terminal end.
-    locator: Persistence guide > Interrupts, replay, and fault tolerance
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-session-pause-event-005
-    source: eng-fw-langgraph-interrupts
-    supports: LangGraph interrupt() first suspends execution and persists its state, while a later invocation with Command(resume=...) supplies the value and continues that same checkpointed thread. Moonweave records those opposite transition directions as SessionPauseEvent and SessionResumeEvent rather than one generic lifecycle event.
-    locator: Interrupts > Pause using interrupt; Resuming interrupts
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-session-pause-event-006
-    source: eng-fw-langgraph-interrupts
-    supports: LangGraph states that reusing a thread_id resumes its saved checkpoint, whereas a new thread_id starts a new thread with empty state. Moonweave therefore distinguishes SessionPauseEvent on an existing active session from SessionStartEvent, which establishes the first active interval for a new session identity.
-    locator: Interrupts > thread_id as persistent cursor; Pause using interrupt
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-session-pause-event-007
-    source: eng-fw-langgraph-interrupts
-    supports: LangGraph documents a deliberate interrupt as suspension with persisted state while the graph waits for external input. Moonweave captures that occurred nonterminal transition as SessionPauseEvent within the lifecycle-event taxonomy.
-    locator: Interrupts > Pause using interrupt > suspension, saved state, and waiting
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-session-pause-event-008
-    source: eng-fw-langgraph-interrupts
-    supports: LangGraph documents that an interrupt suspends execution, saves exact graph state through a checkpointer, and waits for later input. Moonweave separates the occurred pause event from the retained StateSnapshot and links the two explicitly.
-    locator: Interrupts > Pause using interrupt > state is saved before waiting
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-

@@ -1,24 +1,23 @@
 schema: moonweave.ai/ontology-node/v1
 id: FilesystemPolicy
 kind: concept
-status: accepted
 labels:
   zh: 文件系统策略
   en: filesystem policy
   ja: ファイルシステム方針
 semantics:
   short_definition:
-    zh: 按路径、挂载与操作限定沙箱文件系统访问的隔离规范。
-    en: An isolation specification limiting sandbox filesystem access by path, mount, and operation.
-    ja: path・mount・operation で sandbox filesystem access を制限する isolation specification。
+    zh: IsolationSpecification 内对路径、挂载与读写执行权限的规范。
+    en: The specification within IsolationSpecification for paths, mounts, and read/write/execute permissions.
+    ja: IsolationSpecification 内の path/mount/rwx 権限 specification。
   definition:
-    zh: 文件系统策略是一种 IsolationSpecification，以规范化路径规则、挂载映射和读取/写入/执行/创建/删除权限为区分特征。它在沙箱路径空间内计算有效访问，并明确处理只读、遮蔽、符号链接、bind mount 与 OverlayFS 边界；它不是网络目的地策略或单次文件操作。
-    en: A FilesystemPolicy is an IsolationSpecification distinguished by normalized path rules, mount mappings, and read/write/execute/create/delete rights. It computes effective access in sandbox path space and explicitly handles read-only, masked, symbolic-link, bind-mount, and OverlayFS boundaries; it is not a network-destination policy or one file operation.
-    ja: FilesystemPolicy は normalized path rule・mount mapping・read/write/execute/create/delete right で区別する IsolationSpecification です。sandbox path 空間の effective access を計算し readonly・masked・symbolic link・bind mount・OverlayFS 境界を明示処理し、network destination policy や一 file operation ではありません。
+    zh: FilesystemPolicy 以 fs_policy_id+version 声明 allowed_paths、denied_paths、mounts（含 read-only bind）、masked_paths 与 Landlock/seccomp 文件层。它映射 Docker read-only bind mounts（--mount type=bind,readonly）、E2B filesystem restrictions 与 Cursor workspace-write 边界；有效权限是 mount∩Landlock∩seccomp 交集，宿主 DAC 不能单独覆盖。
+    en: FilesystemPolicy declares allowed_paths, denied_paths, mounts (including read-only binds), masked_paths, and Landlock/seccomp file layers via fs_policy_id+version. It maps Docker read-only bind mounts (--mount type=bind,readonly), E2B filesystem restrictions, and Cursor workspace-write boundaries; effective permissions are mount∩Landlock∩seccomp intersection; host DAC alone cannot override.
+    ja: FilesystemPolicy は fs_policy_id+version で allowed/denied paths/mounts(readonly bind)/masked_paths/Landlock/seccomp file layer を宣言。Docker readonly bind、E2B FS restriction、Cursor workspace-write を写像。effective=mount∩Landlock∩seccomp、host DAC 単独上書き不可。
   why_needed:
-    zh: 把路径可见性和挂载解析放在同一可执行规范中，才能回答一个沙箱实际能读写哪些本地资源。
-    en: It joins path visibility and mount resolution in one executable specification so effective local-resource access can be decided.
-    ja: path visibility と mount resolution を一 executable specification に統合し effective local-resource access を判定できます。
+    zh: Agent 路径权限查询必须 intersect 所有强制层；只查宿主 DAC 会误判沙箱内可写路径。
+    en: Agent path permission queries must intersect all enforcement layers; host DAC alone misjudges writable paths inside sandbox.
+    ja: path permission query は全 enforcement layer intersect 必須。host DAC のみでは sandbox 内 writable path 誤判定。
   includes:
     - zh: 绝对沙箱路径规则、操作权限、挂载源/目标、只读与遮蔽设置、链接解析策略。
       en: Absolute sandbox-path rules, operation rights, mount source/target, read-only and masked settings, and link-resolution policy.
@@ -29,6 +28,38 @@ semantics:
       ja: network host/port rule・process capability・business AuthorizationGrant・個別 file/SourceReference。
   semantic_kind: specification
   aliases: []
+engineering:
+  explanation:
+    zh: Docker `--read-only --mount type=bind,src=/repo,dst=/workspace,readonly`→FilesystemPolicy；E2B template path allowlist→allowed_paths；Cursor workspace-write→write allowed only under workspace root。查询返回 enforcement_layers 数组。
+    en: Docker --read-only with readonly bind mount→FilesystemPolicy; E2B template path allowlist→allowed_paths; Cursor workspace-write→write allowed only under workspace root. Queries return enforcement_layers array.
+    ja: Docker --read-only+readonly bind→FilesystemPolicy。E2B path allowlist→allowed_paths。Cursor workspace-write→workspace root 下のみ write。query は enforcement_layers 返却。
+  typical_input:
+    - description: Docker read-only bind.
+      format: docker run --read-only --mount type=bind,src=/repo,dst=/workspace,readonly
+      source_claims:
+        - claim-filesystem-policy-design
+    - description: E2B path restriction.
+      format: template disallows /etc write; allows /tmp
+      source_claims:
+        - claim-filesystem-policy-design
+  typical_output:
+    - description: Effective path permissions.
+      format: '{"path":"/workspace/app.py","read_allowed":true,"write_allowed":false,"enforcement_layers":["mount-readonly","landlock-fs-code-v4"]}'
+      source_claims:
+        - claim-filesystem-policy-design
+  reference_implementations:
+    - name: E2B Sandbox API
+      url: https://e2b.dev/docs
+      description: Cloud sandbox templates and lifecycle.
+    - name: OCI Linux runtime
+      url: https://github.com/opencontainers/runtime-spec/blob/main/config-linux.md
+      description: Docker --read-only, namespaces, seccomp.
+    - name: gVisor runsc
+      url: https://gvisor.dev/docs/
+      description: Application-kernel sandbox isolation.
+    - name: Cursor Agent Terminal
+      url: https://cursor.com/docs/agent/terminal
+      description: workspace-write and allowlist layering.
 structure:
   identity_keys:
     - isolation_spec_id
@@ -56,7 +87,7 @@ structure:
           - write
         /secrets: []
       source_claims:
-        - claim-filesystem-policy-002
+        - claim-filesystem-policy-design
     - id: mount_mapping_set
       labels:
         zh: 挂载映射集
@@ -78,8 +109,8 @@ structure:
           target: /workspace/repo
           mode: ro
       source_claims:
-        - claim-filesystem-policy-001
-        - claim-filesystem-policy-002
+        - claim-filesystem-policy-design
+        - claim-filesystem-policy-design
     - id: link_resolution_policy
       labels:
         zh: 链接解析策略
@@ -98,7 +129,7 @@ structure:
       pattern: null
       example_value: resolve-beneath-no-escape
       source_claims:
-        - claim-filesystem-policy-002
+        - claim-filesystem-policy-design
   constraints:
     - id: filesystem-policy-normalized-paths
       severity: error
@@ -109,92 +140,97 @@ structure:
         en: Normalize in sandbox path space before longest-match and mount resolution; traversal or links cannot escape the boundary.
         ja: sandbox path 空間で normalize 後 longest-match/mount resolution を行い traversal/link で境界外へ出ません。
       source_claims:
-        - claim-filesystem-policy-002
-        - claim-filesystem-policy-001
+        - claim-filesystem-policy-design
+        - claim-filesystem-policy-design
   required_relation_constraints: []
 examples:
-  - id: FilesystemPolicy-example-positive-manual-20260716
-    kind: positive
+  - id: FilesystemPolicy-docker-readonly
     labels:
-      zh: 只读仓库与遮蔽密钥
-      en: Read-only repository and masked secrets
-      ja: readonly repository と masked secrets
-    scenario_id: null
+      zh: Docker 只读挂载策略
+      en: Docker read-only mount policy
+      ja: Docker readonly mount policy
     descriptions:
-      zh: fs-code@4 将 /repo 只读挂载到 /workspace/repo，允许读取，拒绝写入，并遮蔽 /secrets；链接策略禁止越出挂载根。
-      en: fs-code@4 mounts /repo read-only at /workspace/repo, allows reads, denies writes, masks /secrets, and prevents links from escaping the mount root.
-      ja: fs-code@4 は /repo を /workspace/repo に readonly mount し read を許可、write を拒否、/secrets を mask し link escape を禁止します。
+      zh: fs-code@4 将 /workspace bind readonly，拒绝 /etc 写入。
+      en: fs-code@4 bind-mounts /workspace readonly and denies /etc writes.
+      ja: fs-code@4 /workspace readonly bind、/etc write 拒否。
+    example_source:
+      product: OCI Linux runtime
+      url: https://github.com/opencontainers/runtime-spec/blob/main/config-linux.md
+      version: readonly bind mount
     field_values:
-      isolation_spec_id: fs-code
+      fs_policy_id: fs-code
       version: "4"
-      applicable_environment_ref: sandbox/code-execution
-      enforcer: sandbox-filesystem-enforcer
-      path_rule_set:
-        /workspace/repo:
-          - read
-      mount_mapping_set:
-        - source: /repo
-          target: /workspace/repo
-          mode: ro
-      link_resolution_policy: resolve-beneath-no-escape
     related_node_ids:
       - FilesystemPolicy
       - IsolationSpecification
-    related_relation_ids:
-      - FilesystemPolicy-is_a-IsolationSpecification
-    expected_result:
-      zh: 分类为 FilesystemPolicy，并可判定目标路径只读。
-      en: Classify as FilesystemPolicy and decide that the destination path is read-only.
-      ja: FilesystemPolicy と分類し target path は readonly と判定します。
-    why_valid_or_invalid:
-      zh: 规则明确给出路径空间、操作、挂载方向和链接边界。
-      en: Rules explicitly give path space, operations, mount direction, and link boundary.
-      ja: path space・operation・mount direction・link boundary が明示されています。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - Sandbox
+    related_relation_ids: []
     source_claims:
-      - claim-filesystem-policy-001
-      - claim-filesystem-policy-002
-  - id: FilesystemPolicy-example-boundary-manual-20260716
-    kind: boundary
+      - claim-filesystem-policy-design
+  - id: FilesystemPolicy-e2b-restrictions
     labels:
-      zh: 仅列文件位置的清单
-      en: File-location inventory only
-      ja: file location inventory のみ
-    scenario_id: sandbox-review-filesystempolicy-boundary
+      zh: E2B 文件系统限制
+      en: E2B filesystem restrictions
+      ja: E2B filesystem restrictions
     descriptions:
-      zh: 清单列出 /repo 与 /secrets，但没有允许/拒绝操作、挂载映射、执行器或版本。
-      en: An inventory lists /repo and /secrets but has no allow/deny operations, mount mapping, enforcer, or version.
-      ja: inventory は /repo と /secrets を列挙しますが allow/deny operation・mount mapping・enforcer・version がありません。
+      zh: fs-e2b@1 允许 /home/user 与 /tmp，拒绝 host filesystem escape paths。
+      en: fs-e2b@1 allows /home/user and /tmp, denies host filesystem escape paths.
+      ja: fs-e2b@1 /home/user+/tmp 許可、escape path 拒否。
+    example_source:
+      product: E2B Sandbox API
+      url: https://e2b.dev/docs
+      version: filesystem limits
+    field_values:
+      fs_policy_id: fs-e2b
+      version: "1"
+    related_node_ids:
+      - FilesystemPolicy
+      - Sandbox
+    related_relation_ids: []
+    source_claims:
+      - claim-filesystem-policy-design
+  - id: FilesystemPolicy-cursor-workspace
+    labels:
+      zh: Cursor workspace-write 策略
+      en: Cursor workspace-write policy
+      ja: Cursor workspace-write policy
+    descriptions:
+      zh: fs-cursor@1 仅允许 workspace 根下写入，/etc 与 $HOME 外只读。
+      en: fs-cursor@1 allows writes only under workspace root; /etc and outside $HOME read-only.
+      ja: fs-cursor@1 workspace root 下のみ write。
+    example_source:
+      product: Cursor Agent Terminal
+      url: https://cursor.com/docs/agent/terminal
+      version: workspace-write
+    field_values:
+      fs_policy_id: fs-cursor
+      version: "1"
+    related_node_ids:
+      - FilesystemPolicy
+      - IsolationSpecification
+    related_relation_ids: []
+    source_claims:
+      - claim-filesystem-policy-design
+  - id: FilesystemPolicy-boundary-dac
+    labels:
+      zh: 宿主 DAC 不能单独决定
+      en: Host DAC alone insufficient
+      ja: host DAC 単独不十分
+    descriptions:
+      zh: 宿主对 /etc 可写但 sandbox mount readonly 时 effective write_allowed=false。
+      en: Host writable /etc but sandbox readonly mount yields effective write_allowed=false.
+      ja: host /etc writable でも sandbox readonly mount なら write_allowed=false。
+    example_source:
+      product: OWASP LLM01:2025
+      url: https://owasp.org/www-project-top-10-for-large-language-model-applications/
+      version: sandbox escape
     field_values: {}
     related_node_ids:
       - FilesystemPolicy
+      - SandboxEscapeRisk
     related_relation_ids: []
-    expected_result:
-      zh: 保留为资源清单，不建立 FilesystemPolicy。
-      en: Keep it as a resource inventory and do not assert FilesystemPolicy.
-      ja: resource inventory とし FilesystemPolicy を主張しません。
-    why_valid_or_invalid:
-      zh: 路径出现不等于具备可执行访问约束。
-      en: Mentioning paths is not an enforceable access constraint.
-      ja: path 言及は enforceable access constraint ではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-filesystem-policy-002
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: ProcessPolicy
-    shared_parent_concept_id: IsolationSpecification
-    differentia:
-      zh: FilesystemPolicy 决定路径和挂载上的文件操作；ProcessPolicy 决定可启动程序、命名空间、能力、系统调用与资源上限。同一沙箱通常同时应用二者，但任一不能替代另一方。
-      en: FilesystemPolicy decides file operations over paths and mounts; ProcessPolicy decides executable launch, namespaces, capabilities, syscalls, and resource limits. A sandbox normally applies both, but neither substitutes for the other.
-      ja: FilesystemPolicy は path/mount の file operation、ProcessPolicy は executable・namespace・capability・syscall・resource limit を決め、同一 sandbox に併用しても相互代替しません。
-    source_claims:
-      - claim-filesystem-policy-001
-      - claim-filesystem-policy-002
+      - claim-filesystem-policy-design
 parent_relation:
   id: FilesystemPolicy-is_a-IsolationSpecification
   predicate: is_a
@@ -223,109 +259,66 @@ parent_relation:
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: FilesystemPolicy-is_a-IsolationSpecification-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 可执行路径策略继承隔离规范
-        en: Enforceable path policy inherits isolation specification
-        ja: enforceable path policy の継承
-      scenario_id: sandbox-review-filesystempolicy-is_a-isolationspecification-positive
-      descriptions:
-        zh: fs-code@4 具有规范 ID、版本、环境和执行器，并增加路径与挂载规则。
-        en: fs-code@4 has specification ID, version, environment, and enforcer plus path and mount rules.
-        ja: fs-code@4 は specification ID・version・environment・enforcer と path/mount rule を持ちます。
-      field_values: {}
-      related_node_ids:
-        - FilesystemPolicy
-        - IsolationSpecification
-      related_relation_ids:
-        - FilesystemPolicy-is_a-IsolationSpecification
-      expected_result:
-        zh: 建立 FilesystemPolicy→IsolationSpecification 的 is_a 边。
-        en: Assert the FilesystemPolicy-to-IsolationSpecification is_a edge.
-        ja: FilesystemPolicy→IsolationSpecification is_a 辺を主張します。
-      why_valid_or_invalid:
-        zh: 对象完整满足父类条件并具有更窄文件系统种差。
-        en: The object satisfies the parent and adds narrower filesystem differentia.
-        ja: parent 条件を満たし narrower filesystem 種差を追加します。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-filesystem-policy-001
-        - claim-filesystem-policy-002
-    - id: FilesystemPolicy-is_a-IsolationSpecification-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 路径清单不是规范
-        en: Path inventory is not a specification
-        ja: path inventory は specification でない
-      scenario_id: sandbox-review-filesystempolicy-is_a-isolationspecification-boundary
-      descriptions:
-        zh: source-list 只有若干路径和校验和，没有版本化约束或执行器。
-        en: source-list has paths and checksums but no versioned constraints or enforcer.
-        ja: source-list は path/checksum だけで versioned constraint/enforcer がありません。
-      field_values: {}
-      related_node_ids:
-        - FilesystemPolicy
-        - IsolationSpecification
-      related_relation_ids:
-        - FilesystemPolicy-is_a-IsolationSpecification
-      expected_result:
-        zh: 不得把普通应用偏好通过该分类边认定为隔离规范。
-        en: Do not assert the classification edge.
-        ja: classification 辺を主張しません。
-      why_valid_or_invalid:
-        zh: 资源信息没有满足 IsolationSpecification 的强制条件。
-        en: Resource information does not satisfy IsolationSpecification enforcement conditions.
-        ja: resource information は IsolationSpecification enforcement 条件を満たしません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-filesystem-policy-002
   source_claims:
-    - claim-filesystem-policy-001
-    - claim-filesystem-policy-002
+    - claim-filesystem-policy-design
+    - claim-filesystem-policy-design
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-safety-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: Verified against OCI/Docker isolation, Linux namespaces, seccomp, AppArmor/LSM, and Landlock; specification vs Sandbox instance separation holds.
-    en: Verified against OCI/Docker isolation, Linux namespaces, seccomp, AppArmor/LSM, and Landlock; specification vs Sandbox instance separation holds.
-    ja: Verified against OCI/Docker isolation, Linux namespaces, seccomp, AppArmor/LSM, and Landlock; specification vs Sandbox instance separation holds.
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: e2b-sandbox-api
+    title: E2B Sandbox API
+    url: https://e2b.dev/docs
+    source_type: official-doc
+    relevance: Cloud sandbox lifecycle, filesystem, process, and network isolation templates.
+  - id: oci-linux-runtime
+    title: OCI Runtime Specification — Linux
+    url: https://github.com/opencontainers/runtime-spec/blob/main/config-linux.md
+    source_type: standard
+    relevance: Namespaces, cgroups, mounts, masked/readonly paths, and seccomp.
+  - id: gvisor-docs
+    title: gVisor documentation
+    url: https://gvisor.dev/docs/
+    source_type: official-doc
+    relevance: Application-kernel isolation with runsc runtime.
+  - id: owasp-llm-top10-2025
+    title: OWASP Top 10 for LLM Applications 2025
+    url: https://owasp.org/www-project-top-10-for-large-language-model-applications/
+    source_type: standard
+    relevance: Excessive agency and sandbox escape risks for agent tool execution.
+  - id: cursor-terminal-sandbox
+    title: Cursor Agent Terminal
+    url: https://cursor.com/docs/agent/terminal
+    source_type: official-doc
+    relevance: workspace-write sandbox and command allowlist layering.
+  - id: safety-sandbox-design
+    title: Moonweave sandbox-network module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: IsolationSpecification versus Sandbox instance and escape-risk separation.
 source_claims:
-  - id: claim-filesystem-policy-001
-    source: eng-runtime-oci-linux-config
-    supports: The OCI Linux runtime specification defines namespaces, devices, cgroups, mounts, masked paths, read-only paths, seccomp integration, and runtime errors that ground enforceable process and filesystem isolation settings.
-    locator: OCI Runtime Specification > Linux Container Configuration > Namespaces, Devices, Control groups, Masked Paths, Readonly Paths
+  - id: claim-filesystem-policy-design
+    source: safety-sandbox-design
+    supports: FilesystemPolicy effective permissions intersect mount, Landlock, and seccomp layers.
+    locator: Filesystem policy boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-filesystem-policy-002
-    source: eng-security-linux-landlock
-    supports: Linux Landlock defines stackable path-hierarchy access rules, read/write/execute rights, rule inheritance, bind-mount and OverlayFS behavior, and explicit limitations relevant to filesystem sandbox evaluation.
-    locator: Linux Kernel documentation > Landlock rules, Layers of file path access rights, Bind mounts and OverlayFS, Current limitations
+  - id: claim-filesystem-policy-design
+    source: oci-linux-runtime
+    supports: Docker/OCI readonly bind mounts and masked paths map to FilesystemPolicy.
+    locator: OCI mounts
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-filesystem-policy-003
-    source: eng-security-mcp-nsa-2026
-    supports: NSA's May 2026 MCP guidance recommends strict resource and permission boundaries, operating-system isolation such as seccomp/AppArmor/SELinux, sandboxing against lateral movement and privilege escalation, and explicit runtime denial of unneeded filesystem and network paths.
-    locator: NSA MCP Security Design Considerations > pp. 10-11 > Constrain and sandbox tool execution
+  - id: claim-filesystem-policy-design
+    source: e2b-sandbox-api
+    supports: E2B template filesystem restrictions map to FilesystemPolicy allowed/denied paths.
+    locator: E2B FS limits
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
+  - id: claim-filesystem-policy-design
+    source: cursor-terminal-sandbox
+    supports: Cursor workspace-write boundary maps to FilesystemPolicy write constraints.
+    locator: Workspace write
+    evidence_kind: design-inference
+    confidence: high

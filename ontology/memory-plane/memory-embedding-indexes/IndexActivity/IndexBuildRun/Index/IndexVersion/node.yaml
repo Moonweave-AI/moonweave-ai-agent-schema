@@ -1,354 +1,276 @@
 schema: moonweave.ai/ontology-node/v1
 id: IndexVersion
 kind: concept
-status: accepted
 labels:
   zh: 索引版本
   en: Index version
   ja: 索引版
 semantics:
   short_definition:
-    zh: 一次构建后可审计、不可变的索引快照。
-    en: An auditable immutable index snapshot produced by one build.
-    ja: 一回のbuildで生成した監査可能immutable index snapshotです。
+    zh: 一次成功构建后的不可变索引快照。
+    en: Immutable index snapshot after one successful build.
+    ja: 一回成功 build 後の不変 index snapshot。
   definition:
-    zh: IndexVersion 是某一 Index 在确定构建时间、配置摘要与源清单下形成的不可变快照，拥有复合身份 index_id+version；它不是长期 Index 身份或构建活动。
-    en: IndexVersion is an immutable snapshot of one Index under a fixed build time, configuration digest, and source manifest, identified by index_id plus version; it is not the long-lived Index identity or the build activity.
-    ja: IndexVersion は固定build時刻・設定digest・source manifest下の一 Index のimmutable snapshotで index_id+version により識別され、長期Index同一性やbuild activityではありません。
+    zh: IndexVersion 是 Index 在确定 built_at、configuration_digest 与 source manifest 下形成的不可变快照，身份为 index_id+version。IndexBuildRun 成功才发布；失败 run 不产生后继 version。不是长期 Index 身份或进行中的构建活动。
+    en: IndexVersion is an immutable snapshot of an Index under fixed built_at, configuration_digest, and source manifest, identified by index_id+version. Published only on successful IndexBuildRun; failed runs produce no successor version. Not the long-lived Index identity or an in-progress build.
+    ja: IndexVersion は built_at/configuration_digest/source manifest 固定下の Index 不変 snapshot（index_id+version）。IndexBuildRun 成功時のみ公開。長期 Index identity/進行中 build ではない。
   why_needed:
-    zh: 补上 Index 与 Shard 之间的版本层。
-    en: Adds the version layer between Index and Shard.
-    ja: IndexとShardの間に版階層を追加します。
+    zh: 检索必须 pin 到 index-17@42 而非“当前 index”，否则 RefreshRun 增量后旧 query 仍命中 stale entry。
+    en: Retrieval must pin to index-17@42 not “current index”; otherwise after RefreshRun increment old queries still hit stale entries.
+    ja: retrieval は index-17@42 を pin 必須。RefreshRun 後 stale entry hit を防ぐ。
   includes:
-    - zh: 纳入已完成构建且可定位其配置与来源清单的快照。
-      en: Includes completed snapshots with traceable configuration and source manifest.
-      ja: 設定とsource manifestを追跡できる完了snapshotを含みます。
+    - zh: 纳入已完成构建、可定位 configuration_digest 与 member manifest 的快照。
+      en: Includes completed snapshots with traceable configuration_digest and member manifest.
+      ja: configuration_digest/member manifest 追跡可能な完了 snapshot。
   excludes:
-    - zh: 排除逻辑 Index、运行中的构建和单个 Shard。
-      en: Excludes logical Index, an in-progress build, and an individual Shard.
-      ja: logical Index・進行中build・個別Shardを除外します。
+    - zh: 排除逻辑 Index、进行中 IndexBuildRun 与单个 IndexShard。
+      en: Excludes logical Index, in-progress IndexBuildRun, and individual IndexShard.
+      ja: 論理 Index/進行中 IndexBuildRun/個別 IndexShard を除外。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: Pinecone upsert/import 成功提交后登记 index-17@N；built_at 为 commit 时间，configuration_digest 含 metric/dimension/HNSW；RetrievalRun 必须引用 version 而非仅 index_id。
+    en: After successful Pinecone upsert/import, register index-17@N; built_at is commit time; configuration_digest includes metric/dimension/HNSW; RetrievalRun must reference version not index_id alone.
+    ja: Pinecone upsert/import 成功→index-17@N 登録。built_at=commit 時刻。RetrievalRun は version 参照必須。
+  typical_input: []
+  typical_output:
+    - description: Index version snapshot record
+      format: |
+        {
+          "index_id": "index-17",
+          "version": 42,
+          "built_at": "2026-07-16T09:00:00Z",
+          "configuration_digest": "sha256:cfg42",
+          "build_run_id": "build-run-42"
+        }
+      source_claims: [claim-index-version-design]
+  reference_implementations:
+    - name: Pinecone Index Data
+      url: https://docs.pinecone.io/guides/indexes/create-an-index
+      description: Committed vector records after upsert.
+    - name: Qdrant Collections
+      url: https://qdrant.tech/documentation/concepts/collections/
+      description: Collection snapshots and point storage.
 structure:
-  identity_keys:
-    - index_id
-    - version
+  identity_keys: [index_id, version]
   fields:
     - id: index_id
-      labels:
-        zh: 索引标识
-        en: index ID
-        ja: index ID
+      labels: {zh: 索引标识, en: Index identifier, ja: 索引識別子}
+      definitions:
+        zh: 指向长期 Index 身份。
+        en: References long-lived Index identity.
+        ja: 長期 Index identity 参照。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 指向长期索引身份。
-        en: References the long-lived index identity.
-        ja: 長期index同一性を参照します。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
       example_value: index-17
-      source_claims:
-        - claim-index-version-002
-    - id: version
-      labels:
-        zh: 版本
-        en: version
-        ja: 版
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 在索引内唯一标识快照。
-        en: Uniquely identifies the snapshot within its index.
-        ja: index内でsnapshotを一意識別します。
       allowed_values: []
+      source_claims: [claim-index-version-id]
+    - id: version
+      labels: {zh: 版本号, en: Version number, ja: 版番号}
+      definitions:
+        zh: 同一 index_id 内单调不可变版本整数。
+        en: Monotonic immutable version integer within one index_id.
+        ja: 同一 index_id 内単調不変版整数。
+      datatype: integer
+      required: true
+      cardinality: {min: 1, max: 1}
       pattern: null
-      example_value: "42"
-      source_claims:
-        - claim-index-version-003
+      example_value: 42
+      allowed_values: []
+      source_claims: [claim-index-version-num]
     - id: built_at
-      labels:
-        zh: 构建时间
-        en: built at
-        ja: build時刻
+      labels: {zh: 构建时间, en: Built at, ja: build 時刻}
+      definitions:
+        zh: 快照成功提交 UTC 时间。
+        en: UTC instant when snapshot was successfully committed.
+        ja: snapshot 成功 commit UTC 時刻。
       datatype: date-time
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 记录快照完成时间。
-        en: Records snapshot completion time.
-        ja: snapshot完了時刻を記録します。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
       example_value: 2026-07-16T09:00:00Z
-      source_claims:
-        - claim-index-version-004
+      allowed_values: []
+      source_claims: [claim-index-version-built]
     - id: configuration_digest
-      labels:
-        zh: 配置摘要
-        en: configuration digest
-        ja: 設定digest
+      labels: {zh: 配置摘要, en: Configuration digest, ja: 設定 digest}
+      definitions:
+        zh: 该版构建时冻结的 metric、dimension、HNSW 或 fusion 配置 SHA-256。
+        en: SHA-256 of metric, dimension, HNSW, or fusion config frozen at this version build.
+        ja: 当版 build 時凍結 metric/dimension/HNSW/fusion 設定 SHA-256。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 固定该版构建配置。
-        en: Fixes this version's build configuration.
-        ja: この版のbuild設定を固定します。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
       example_value: sha256:cfg42
-      source_claims:
-        - claim-index-version-005
-  constraints: []
-  required_relation_constraints: []
+      allowed_values: []
+      source_claims: [claim-index-version-config]
+  constraints:
+    - id: index-version-immutable
+      severity: error
+      expression_language: plain
+      expression: IndexEntry membership must belong to exactly one IndexVersion; cross-version attachment is invalid.
+      explanation:
+        zh: 跨版本拼接导致查询读到不一致快照。
+        en: Cross-version attachment makes queries read inconsistent snapshots.
+        ja: 版横断付与は不整合 snapshot read の原因。
+      source_claims: [claim-index-version-design]
+  required_relations: []
 examples:
-  - id: IndexVersion-example-positive-manual-001
-    kind: positive
+  - id: IndexVersion-example-pinecone-commit
     labels:
-      zh: 索引版本正例
-      en: "Positive case: Index version"
-      ja: 索引版正例
-    scenario_id: null
+      zh: Pinecone 提交版本
+      en: Pinecone committed version
+      ja: Pinecone commit 版
     descriptions:
-      zh: index-17@42 有完成时间、配置摘要与不可变成员。
-      en: index-17@42 has completion time, configuration digest, and immutable membership.
-      ja: index-17@42 は完了時刻・設定digest・immutable membershipを持ちます。
+      zh: build-run-42 完成 Pinecone upsert 后发布 index-17@42（built_at=2026-07-16T09:00:00Z, configuration_digest 含 cosine/1536）。
+      en: build-run-42 completes Pinecone upsert and publishes index-17@42 (built_at=2026-07-16T09:00:00Z, configuration_digest includes cosine/1536).
+      ja: build-run-42 完了→index-17@42 公開（built_at/configuration_digest 含 cosine/1536）。
+    example_source:
+      product: Pinecone
+      url: https://docs.pinecone.io/guides/indexes/create-an-index
+      version: upsert commit
     field_values:
       index_id: index-17
-      version: "42"
+      version: 42
       built_at: 2026-07-16T09:00:00Z
       configuration_digest: sha256:cfg42
     related_node_ids:
       - IndexVersion
+      - IndexBuildRun
     related_relation_ids: []
-    expected_result:
-      zh: 将 index-17@42 识别为 index-17 的已完成不可变 IndexVersion。
-      en: Recognize index-17@42 as a completed immutable IndexVersion of index-17.
-      ja: index-17@42 を index-17 の完了済み immutable IndexVersion と認定します。
-    why_valid_or_invalid:
-      zh: index_id+version、完成时间、配置摘要与冻结成员清单共同界定可审计快照。
-      en: index_id plus version, completion time, configuration digest, and frozen membership manifest jointly delimit an auditable snapshot.
-      ja: index_id+version・完了時刻・設定 digest・凍結 member manifest が監査可能 snapshot を共同で画定します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-index-version-006
-  - id: IndexVersion-example-boundary-manual-001
-    kind: boundary
+      - claim-index-version-pinecone
+      - claim-index-version-design
+  - id: IndexVersion-example-refresh-increment
     labels:
-      zh: 索引版本边界例
-      en: "Boundary case: Index version"
-      ja: 索引版境界例
-    scenario_id: null
+      zh: 增量刷新后继版本
+      en: Incremental refresh successor
+      ja: incremental refresh 後続版
     descriptions:
-      zh: build-42 仍在执行并持续写入分片。
-      en: build-42 is still executing and continuously writing shards.
-      ja: build-42 は実行中でshardを書き続けています。
+      zh: refresh-run-43 从 index-17@42 增量 upsert 新 chunk 成功后发布 index-17@43；@42 成员冻结不可变。
+      en: refresh-run-43 incrementally upserts new chunks from index-17@42 and publishes index-17@43 on success; @42 membership remains frozen.
+      ja: refresh-run-43 が @42 から incremental→@43 公開。@42 membership 凍結。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: refresh lineage
+    field_values:
+      index_id: index-17
+      version: 43
+      predecessor_version: 42
+    related_node_ids:
+      - IndexVersion
+      - IndexRefreshRun
+    related_relation_ids: []
+    source_claims:
+      - claim-index-version-design
+  - id: IndexVersion-example-not-build-run
+    labels:
+      zh: 版本非构建活动
+      en: Version is not build run
+      ja: version は build run ではない
+    descriptions:
+      zh: build-run-42 仍在 running 时不能存在 index-17@42；失败 run 也不产生 @44。
+      en: index-17@42 cannot exist while build-run-42 is running; failed runs do not produce @44.
+      ja: build-run-42 running 中 @42 不可。failed run は @44 生成しない。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
     field_values: {}
     related_node_ids:
       - IndexVersion
+      - IndexBuildRun
     related_relation_ids: []
-    expected_result:
-      zh: 将 build-42 保持为进行中的 IndexBuildRun，直到成功提交版本后再创建 IndexVersion。
-      en: Keep build-42 as an in-progress IndexBuildRun and create an IndexVersion only after a successful commit.
-      ja: build-42 を進行中 IndexBuildRun として保持し、成功 commit 後にだけ IndexVersion を作成します。
-    why_valid_or_invalid:
-      zh: 未完成活动不是已发布不可变快照。
-      en: An unfinished activity is not a published immutable snapshot.
-      ja: 未完了activityは公開済みimmutable snapshotではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-index-version-007
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-index-version-design
 parent_relation:
   id: IndexVersion-version_of-Index
   predicate: part_of
   direction: target-to-source
   relation_kind: composition
   labels:
-    zh: 是版本
-    en: version of
-    ja: の版である
+    zh: 是索引的版本
+    en: is a version of index
+    ja: 索引の版
   definitions:
-    zh: IndexVersion —version_of→ Index 表示不可变快照由该长期逻辑索引拥有；方向从快照指向其版本系列。
-    en: IndexVersion —version_of→ Index means that the immutable snapshot is owned by that long-lived logical index; direction runs from snapshot to its version series.
-    ja: IndexVersion —version_of→ Index はimmutable snapshotが長期logical indexに所有され、方向がsnapshotから版系列へ向くことを表します。
+    zh: IndexVersion —version_of→ Index 表示不可变快照由该长期逻辑索引拥有。
+    en: IndexVersion —version_of→ Index means the immutable snapshot is owned by that long-lived logical index.
+    ja: IndexVersion —version_of→ Index は不変 snapshot が長期 logical Index に属する。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
-    en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
-    ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
+    zh: 该关系按单个可审计事实判定。
+    en: The relation is decided per auditable fact.
+    ja: audit 可能 fact 単位で判定。
   inverse_reading:
     predicate: part_of
-    labels:
-      zh: 反向读取
-      en: inverse reading
-      ja: 逆方向読取
+    labels: {zh: 反向读取, en: inverse version_of, ja: 逆方向読取}
   conditions:
-    - id: IndexVersion-version_of-Index-condition-manual-001
+    - id: IndexVersion-version_of-Index-condition-001
       severity: error
       expression_language: plain
-      expression: Assert only when index_id is identical and the target Index's configuration family is compatible with the snapshot configuration.
+      expression: Assert only when index_id matches and configuration family is compatible with the target Index.
       explanations:
-        zh: 仅当 index_id 相同且目标 Index 的配置族与快照配置兼容时成立。
-        en: Assert only when index_id is identical and the target Index's configuration family is compatible with the snapshot configuration.
-        ja: index_idが同一でtarget Indexの設定familyがsnapshot設定と互換な時だけ成立します。
-      source_claims:
-        - claim-index-version-008
+        zh: 仅当 index_id 一致且配置兼容时成立。
+        en: Assert only when index_id matches and configuration is compatible.
+        ja: index_id 一致+設定互換時のみ assert。
+      source_claims: [claim-index-version-design]
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: IndexVersion-version_of-Index-example-positive-manual-001
-      kind: positive
-      labels:
-        zh: 是版本正例
-        en: "Positive case: version of"
-        ja: の版である正例
-      scenario_id: null
-      descriptions:
-        zh: index-17@42 的 index_id 为 index-17，配置摘要属于 index-17 的版本系列。
-        en: index-17@42 has index_id index-17 and a configuration digest belonging to index-17's version series.
-        ja: index-17@42 は index_id=index-17で設定digestが index-17版系列に属します。
-      field_values: {}
-      related_node_ids:
-        - IndexVersion
-        - Index
-      related_relation_ids:
-        - IndexVersion-version_of-Index
-      expected_result:
-        zh: 建立 index-17@42 version_of index-17 的版本系列事实。
-        en: Assert the version-series fact that index-17@42 is version_of index-17.
-        ja: index-17@42 version_of index-17 という version-series fact を確立します。
-      why_valid_or_invalid:
-        zh: 复合键中的 index_id 精确等于 index-17，配置摘要又属于该索引允许的版本演进链。
-        en: The composite key's index_id exactly equals index-17, and the configuration digest belongs to that index's permitted version evolution.
-        ja: 複合 key の index_id が index-17 と完全一致し、設定 digest もその index の許可された version evolution に属します。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-index-version-008
-    - id: IndexVersion-version_of-Index-example-boundary-manual-001
-      kind: boundary
-      labels:
-        zh: 是版本边界例
-        en: "Boundary case: version of"
-        ja: の版である境界例
-      scenario_id: null
-      descriptions:
-        zh: index-17@42 不能指向名称相似但 index_id 为 index-18 的索引。
-        en: index-17@42 must not point to a similarly named index whose index_id is index-18.
-        ja: index-17@42 は名称が似ても index_id=index-18 のindexを指せません。
-      field_values: {}
-      related_node_ids:
-        - IndexVersion
-        - Index
-      related_relation_ids:
-        - IndexVersion-version_of-Index
-      expected_result:
-        zh: 拒绝 index-17@42 version_of index-18，并保持其指向 index-17。
-        en: Reject index-17@42 version_of index-18 and keep the version linked to index-17.
-        ja: index-17@42 version_of index-18 を拒否し、index-17 への link を維持します。
-      why_valid_or_invalid:
-        zh: 显示名相似不改变复合键；index_id 不一致意味着属于不同长期索引身份与版本系列。
-        en: A similar display name does not alter the composite key; mismatched index_id means a different long-lived index identity and version series.
-        ja: 似た display name は複合 key を変えず、index_id 不一致は別の長期 index identity と version series を意味します。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-index-version-008
-  source_claims:
-    - claim-index-version-008
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: pending
+  examples: []
+  source_claims: [claim-index-version-design]
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-pinecone-index
+    title: Pinecone Indexing Overview
+    publisher: Pinecone
+    url: https://docs.pinecone.io/guides/indexes/create-an-index
+    source_type: official-doc
+    relevance: Committed index state after upsert.
+  - id: src-index-version-design
+    title: Moonweave memory-embedding-indexes module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Immutable IndexVersion versus Index and build runs.
 source_claims:
-  - id: claim-index-version-001
-    source: eng-vector-qdrant-data-model
-    supports: Qdrant defines collection configuration, shard organization, and stored points; Moonweave adds immutable version identity for reproducible retrieval and refresh audit.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
+  - id: claim-index-version-pinecone
+    source: src-pinecone-index
+    supports: Pinecone separates index configuration from committed vector records after upsert.
+    locator: Upsert vectors
+    evidence_kind: primary-doc
+    confidence: high
+  - id: claim-index-version-design
+    source: src-index-version-design
+    supports: IndexVersion is immutable snapshot published only on successful build or refresh; failed runs must not publish successors.
+    locator: IndexVersion boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-index-version-002
-    source: eng-vector-qdrant-data-model
-    supports: IndexVersion.index_id records the logical index owning this version; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
+  - id: claim-index-version-id
+    source: src-index-version-design
+    supports: index_id references owning Index identity.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-index-version-003
-    source: eng-vector-qdrant-data-model
-    supports: IndexVersion.version records snapshot identity within the index; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
+  - id: claim-index-version-num
+    source: src-index-version-design
+    supports: version is monotonic within index_id.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-index-version-004
-    source: eng-vector-qdrant-data-model
-    supports: IndexVersion.built_at records temporal audit of immutable publication; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
+  - id: claim-index-version-built
+    source: src-index-version-design
+    supports: built_at records snapshot commit time.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-index-version-005
-    source: eng-vector-qdrant-data-model
-    supports: IndexVersion.configuration_digest records reproducible index-version configuration; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
+  - id: claim-index-version-config
+    source: src-index-version-design
+    supports: configuration_digest freezes build configuration for the version.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-index-version-006
-    source: eng-vector-qdrant-data-model
-    supports: Qdrant collections and configurations provide a concrete basis for versioned snapshots; immutability is Moonweave's audit design decision.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-index-version-007
-    source: eng-vector-qdrant-data-model
-    supports: Qdrant separates bulk-upload procedures from the stored collection, point, vector, and index state; Moonweave publishes an immutable IndexVersion only after the build completes.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-index-version-008
-    source: eng-vector-qdrant-data-model
-    supports: Qdrant provides collection configuration and shard membership; Moonweave adds explicit immutable version-series identity for audit.
-    locator: Manage Data > Points, vectors, collections, storage, sharding, payload, and indexing
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

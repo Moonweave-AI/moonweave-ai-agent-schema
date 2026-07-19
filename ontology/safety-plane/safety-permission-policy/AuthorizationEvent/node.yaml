@@ -1,24 +1,23 @@
 schema: moonweave.ai/ontology-node/v1
 id: AuthorizationEvent
 kind: concept
-status: accepted
 labels:
   zh: 授权生命周期事件
   en: authorization lifecycle event
   ja: 認可ライフサイクルイベント
 semantics:
   short_definition:
-    zh: 在明确时刻由可识别行动者改变某个授权请求或授予状态的事件上位概念。
-    en: The event genus for an identified actor changing the state of an authorization request or grant at a stated instant.
-    ja: 識別可能な行為者が明示時刻に認可要求または付与の状態を変えるイベント上位概念です。
+    zh: 一次可审计的授权域状态变化事件，含行动者、时刻与受影响对象。
+    en: One auditable authorization-domain state-change event with actor, instant, and affected object.
+    ja: 行為者・時刻・影響対象を持つ一回の監査可能な認可 domain 状態変化イベント。
   definition:
-    zh: 授权生命周期事件是 HumanApproval 与 AuthorizationRevocation 的共同上位概念。每个事件具有稳定 event_id、事件种类、发生时间、行动者和被影响的授权对象；它只记录已经发生的授权领域状态变化，不表示长期权限、策略规范、用户界面消息或策略评估活动。
-    en: AuthorizationEvent is the shared genus of HumanApproval and AuthorizationRevocation. Each occurrence has a stable event_id, event kind, occurrence time, actor, and affected authorization object. It records an authorization-domain state change that actually occurred; it is not standing authority, a policy specification, a UI message, or a policy-evaluation activity.
-    ja: AuthorizationEvent は HumanApproval と AuthorizationRevocation の共通上位概念です。各発生は安定 event_id、種別、発生時刻、行為者、影響対象を持ちます。実際に起きた認可領域の状態変化だけを記録し、継続権限、方針仕様、UI メッセージ、方針評価活動ではありません。
+    zh: AuthorizationEvent 是 HumanApproval 与 AuthorizationRevocation 的上位概念：以 event_id、event_kind、occurred_at、actor_ref、authorization_object_ref 与 authority_basis 记录已经发生的授权状态变化。MCP OAuth consent 完成、RFC 7009 token revocation、Cursor 用户点击 Allow 后产生的批准事实、Claude Code allowForSession 会话级授权事件，都应投影为此 genus 而非 PolicyEvaluation 或 PermissionPrompt。它不包含长期 grant、策略规范或 UI 消息本体。
+    en: "AuthorizationEvent is the genus of HumanApproval and AuthorizationRevocation: it records an occurred authorization state change with event_id, event_kind, occurred_at, actor_ref, authorization_object_ref, and authority_basis. MCP OAuth consent completion, RFC 7009 token revocation, Cursor user Allow clicks, and Claude Code allowForSession session events should project here rather than as PolicyEvaluation or PermissionPrompt. It excludes standing grants, policy specifications, and UI message bodies."
+    ja: AuthorizationEvent は HumanApproval/AuthorizationRevocation の上位概念で、event_id/event_kind/occurred_at/actor_ref/authorization_object_ref/authority_basis で発生済み認可状態変化を記録します。MCP OAuth consent、RFC 7009 token revocation、Cursor Allow クリック、Claude allowForSession は PolicyEvaluation/PermissionPrompt ではなくここへ投影します。standing grant/policy specification/UI message body は含みません。
   why_needed:
-    zh: 批准与撤销都是真实发生且需要行动者、时间和对象的授权事件；共享上位概念保留共同身份规则，同时让批准和撤销的相反业务效果留在各自子类。
-    en: Approval and revocation are both authorization occurrences requiring an actor, time, and object. The shared genus preserves those identity invariants while leaving their opposite business effects in the concrete subtypes.
-    ja: 承認と取消はいずれも行為者・時刻・対象を要する認可発生です。共通上位概念は同一性不変条件を保ち、反対の業務効果は各下位型に残します。
+    zh: 批准与撤销都需要同一套事件身份规则；缺少上位概念会把 OAuth consent 与策略评估混为同一记录。
+    en: Approval and revocation share event identity rules; without this genus OAuth consent and policy evaluation merge into one record.
+    ja: 承認/取消は同一 event identity rule を共有し、上位概念がないと OAuth consent と policy evaluation が一記録に混ざります。
   includes:
     - zh: 包含事件标识、事件种类、发生时间、行动者、受影响授权对象和权限依据。
       en: Includes event identity, event kind, occurrence time, actor, affected authorization object, and authority basis.
@@ -29,6 +28,41 @@ semantics:
       ja: 提示・応答メッセージ、方針評価実行、方針判断、付与自体、一般監査ログを含みません。
   semantic_kind: event
   aliases: []
+engineering:
+  explanation:
+    zh: 把 MCP authorization server 回调、OAuth token revocation webhook、Cursor/Claude 人工 Allow 点击与 LangGraph Command resume 映射为 AuthorizationEvent；保留 event_id 与 authority_basis 供 PolicyEvaluation 引用，但不把 interrupt 暂停本身当作批准。
+    en: Map MCP authorization-server callbacks, OAuth token-revocation webhooks, Cursor/Claude Allow clicks, and LangGraph Command resume to AuthorizationEvent; retain event_id and authority_basis for PolicyEvaluation citation without treating interrupt pause as approval.
+    ja: MCP authorization server callback、OAuth revocation webhook、Cursor/Claude Allow クリック、LangGraph Command resume を AuthorizationEvent に写像。interrupt pause 自体を approval としない。
+  typical_input:
+    - description: MCP OAuth consent completed.
+      format: authorization_code exchanged; actor=human:user-7; object=request-mcp-42
+      source_claims:
+        - claim-authorization-event-design
+    - description: OAuth token revocation (RFC 7009).
+      format: POST /revoke token=...; actor=authorization-service
+      source_claims:
+        - claim-authorization-event-design
+  typical_output:
+    - description: Moonweave AuthorizationEvent record.
+      format: '{"event_id":"authorization-event-42","event_kind":"human_approval","occurred_at":"2026-07-16T01:21:00Z"}'
+      source_claims:
+        - claim-authorization-event-design
+  reference_implementations:
+    - name: MCP Authorization (2025-06-18)
+      url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+      description: OAuth 2.1 flows, scopes, and resource indicators.
+    - name: Open Policy Agent
+      url: https://www.openpolicyagent.org/docs/latest/policy-language/
+      description: Rego policies and decision queries.
+    - name: OASIS XACML 3.0
+      url: https://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-cos01-en.html
+      description: Permit/Deny/NotApplicable and combining algorithms.
+    - name: Cursor Agent Terminal
+      url: https://cursor.com/docs/agent/terminal
+      description: Command approval dialogs and sandbox modes.
+    - name: Claude Code permissions
+      url: https://docs.anthropic.com/en/docs/claude-code/permissions
+      description: yesAllow, allowForSession, and tool permission modes.
 structure:
   identity_keys:
     - event_id
@@ -51,9 +85,9 @@ structure:
       pattern: null
       example_value: authorization-event-42
       source_claims:
-        - claim-authorization-event-001
-        - claim-authorization-event-002
-        - claim-authorization-event-003
+        - claim-authorization-event-design
+        - claim-authorization-event-design
+        - claim-authorization-event-design
     - id: event_kind
       labels:
         zh: 事件种类
@@ -72,9 +106,9 @@ structure:
       pattern: null
       example_value: human_approval
       source_claims:
-        - claim-authorization-event-001
-        - claim-authorization-event-002
-        - claim-authorization-event-003
+        - claim-authorization-event-design
+        - claim-authorization-event-design
+        - claim-authorization-event-design
     - id: occurred_at
       labels:
         zh: 发生时间
@@ -93,9 +127,9 @@ structure:
       pattern: null
       example_value: 2026-07-16T01:21:00Z
       source_claims:
-        - claim-authorization-event-001
-        - claim-authorization-event-002
-        - claim-authorization-event-003
+        - claim-authorization-event-design
+        - claim-authorization-event-design
+        - claim-authorization-event-design
     - id: actor_ref
       labels:
         zh: 行动者引用
@@ -114,9 +148,9 @@ structure:
       pattern: null
       example_value: human:owner-7
       source_claims:
-        - claim-authorization-event-001
-        - claim-authorization-event-002
-        - claim-authorization-event-003
+        - claim-authorization-event-design
+        - claim-authorization-event-design
+        - claim-authorization-event-design
     - id: authorization_object_ref
       labels:
         zh: 授权对象引用
@@ -135,9 +169,9 @@ structure:
       pattern: null
       example_value: request-42
       source_claims:
-        - claim-authorization-event-001
-        - claim-authorization-event-002
-        - claim-authorization-event-003
+        - claim-authorization-event-design
+        - claim-authorization-event-design
+        - claim-authorization-event-design
     - id: authority_basis
       labels:
         zh: 权限依据
@@ -156,125 +190,168 @@ structure:
       pattern: null
       example_value: project-owner-policy@3
       source_claims:
-        - claim-authorization-event-001
-        - claim-authorization-event-002
-        - claim-authorization-event-003
+        - claim-authorization-event-design
+        - claim-authorization-event-design
+        - claim-authorization-event-design
   constraints: []
   required_relation_constraints: []
 examples:
-  - id: AuthorizationEvent-example-positive-manual-001
-    kind: positive
+  - id: AuthorizationEvent-mcp-oauth-consent
     labels:
-      zh: 授权生命周期事件正例
-      en: Positive authorization lifecycle event case
-      ja: 認可ライフサイクルイベントの正例
-    scenario_id: null
+      zh: MCP OAuth 同意事件
+      en: MCP OAuth consent event
+      ja: MCP OAuth consent イベント
     descriptions:
-      zh: authorization-event-42 记录 human:owner-7 在 01:21 依据 project-owner-policy@3 批准 request-42；它满足共同事件身份，并由 HumanApproval 子类补充批准范围。
-      en: authorization-event-42 records human:owner-7 approving request-42 at 01:21 under project-owner-policy@3. It satisfies the shared event identity, while the HumanApproval subtype supplies approval scope.
-      ja: authorization-event-42 は human:owner-7 が 01:21 に project-owner-policy@3 に基づき request-42 を承認したことを記録し、共通イベント同一性を満たし HumanApproval 下位型が承認範囲を補います。
+      zh: 用户在 MCP OAuth consent 页点击 Allow 后 authorization-event-mcp-42 记录 human:user-7 与 scope tools:read tools:call。
+      en: After Allow on MCP OAuth consent, authorization-event-mcp-42 records human:user-7 and scopes tools:read tools:call.
+      ja: MCP OAuth consent で Allow 後 authorization-event-mcp-42 が human:user-7 と tools:read tools:call を記録。
+    example_source:
+      product: MCP Authorization
+      url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+      version: OAuth 2.1 consent
     field_values:
-      event_id: authorization-event-42
+      event_id: authorization-event-mcp-42
       event_kind: human_approval
-      occurred_at: 2026-07-16T01:21:00Z
-      actor_ref: human:owner-7
-      authorization_object_ref: request-42
-      authority_basis: project-owner-policy@3
+      actor_ref: human:user-7
+      authorization_object_ref: request-mcp-42
     related_node_ids:
       - AuthorizationEvent
       - HumanApproval
-      - AuthorizationRequest
-    related_relation_ids:
-      - HumanApproval-is_a-AuthorizationEvent
-      - HumanApproval-approves-AuthorizationRequest
-    expected_result:
-      zh: 查询可先按授权事件共同字段定位，再按 HumanApproval 读取批准专属事实。
-      en: A query first locates the occurrence by shared authorization-event fields and then reads approval-specific facts from HumanApproval.
-      ja: 照会は共通認可イベント項目で発生を特定し、HumanApproval から承認固有事実を読みます。
-    why_valid_or_invalid:
-      zh: 行动者、时间、对象和权限依据均明确，且批准效果由正确子类表达。
-      en: Actor, time, object, and authority basis are explicit, with the approval effect expressed by the proper subtype.
-      ja: 行為者、時刻、対象、権限根拠が明示され、承認効果は正しい下位型で表されます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    related_relation_ids: []
     source_claims:
-      - claim-authorization-event-001
-      - claim-authorization-event-002
-      - claim-authorization-event-003
-  - id: AuthorizationEvent-example-boundary-manual-001
-    kind: boundary
+      - claim-authorization-event-design
+  - id: AuthorizationEvent-cursor-allow-click
     labels:
-      zh: 授权生命周期事件边界反例
-      en: Boundary counterexample for authorization lifecycle event
-      ja: 認可ライフサイクルイベントの境界反例
-    scenario_id: null
+      zh: Cursor Allow 点击事件
+      en: Cursor Allow click event
+      ja: Cursor Allow クリックイベント
     descriptions:
-      zh: 系统在 01:21 读取 request-42 并开始 PolicyEvaluation；这是一项评估活动，没有行动者改变请求或授予状态，因此不是 AuthorizationEvent。
-      en: The system reads request-42 and starts a PolicyEvaluation at 01:21. That is an evaluation activity, with no actor changing request or grant state, so it is not an AuthorizationEvent.
-      ja: システムが 01:21 に request-42 を読み PolicyEvaluation を開始しても、要求・付与状態を変える行為者がない評価活動であり AuthorizationEvent ではありません。
+      zh: 用户在 Cursor "Cursor wants to run npm test" 对话框点击 Run 后记录 authorization-event-55。
+      en: User clicking Run on Cursor "Cursor wants to run npm test" records authorization-event-55.
+      ja: Cursor wants to run npm test で Run クリック後 authorization-event-55 を記録。
+    example_source:
+      product: Cursor Agent Terminal
+      url: https://cursor.com/docs/agent/terminal
+      version: tool approval dialog
+    field_values:
+      event_id: authorization-event-55
+      event_kind: human_approval
+      actor_ref: human:owner-7
+    related_node_ids:
+      - AuthorizationEvent
+      - HumanApproval
+      - PermissionPrompt
+    related_relation_ids: []
+    source_claims:
+      - claim-authorization-event-design
+  - id: AuthorizationEvent-oauth-revoke
+    labels:
+      zh: OAuth 撤销事件
+      en: OAuth revocation event
+      ja: OAuth 取消イベント
+    descriptions:
+      zh: authorization-service 依据 RFC 7009 撤销 access token 时 authorization-event-rev-9 终止 grant-mcp-9 未来有效性。
+      en: authorization-service revoking an access token under RFC 7009 creates authorization-event-rev-9 terminating grant-mcp-9 future validity.
+      ja: RFC 7009 で access token 取消時 authorization-event-rev-9 が grant-mcp-9 将来有効性を終了。
+    example_source:
+      product: MCP Authorization
+      url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+      version: token revocation
+    field_values:
+      event_id: authorization-event-rev-9
+      event_kind: authorization_revocation
+      actor_ref: authorization-service
+    related_node_ids:
+      - AuthorizationEvent
+      - AuthorizationRevocation
+    related_relation_ids: []
+    source_claims:
+      - claim-authorization-event-design
+  - id: AuthorizationEvent-boundary-evaluation
+    labels:
+      zh: 评估不是授权事件
+      en: Evaluation is not authorization event
+      ja: evaluation は認可イベントではない
+    descriptions:
+      zh: PolicyEvaluation evaluation-42 读取 request-42 但不改变 grant 状态，因此不是 AuthorizationEvent。
+      en: PolicyEvaluation evaluation-42 reads request-42 without changing grant state, so it is not an AuthorizationEvent.
+      ja: PolicyEvaluation evaluation-42 は request-42 を読むだけで grant 状態を変えないため AuthorizationEvent ではない。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: activity versus event
     field_values: {}
     related_node_ids:
       - AuthorizationEvent
       - PolicyEvaluation
-      - AuthorizationRequest
-      - PolicySpecification
-    related_relation_ids:
-      - PolicyEvaluation-consumes-AuthorizationRequest
-    expected_result:
-      zh: 该记录只进入评估活动链，不被分类为授权生命周期事件。
-      en: The record enters only the evaluation-activity chain and is not classified as an authorization lifecycle event.
-      ja: 記録は評価活動連鎖だけに入り、認可ライフサイクルイベントへ分類されません。
-    why_valid_or_invalid:
-      zh: 读取输入与产生授权状态变化回答不同问题。
-      en: Reading an input and causing an authorization-state change answer different questions.
-      ja: 入力読取と認可状態変化の発生は別の問いに答えます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    related_relation_ids: []
     source_claims:
-      - claim-authorization-event-001
-      - claim-authorization-event-002
-      - claim-authorization-event-003
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-authorization-event-design
 parent_relation: null
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-safety-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 XACML 3.0、NIST SP 800-162、OAuth/MCP 授权与 Cursor 工具批准模式逐项人工语义核验；三值策略决定与授权闭环成立。
-    en: Manually verified against XACML 3.0, NIST SP 800-162, OAuth/MCP authorization, and Cursor-style tool approval; three-valued policy decisions and authorization loop hold.
-    ja: XACML 3.0、NIST SP 800-162、OAuth/MCP authorization、Cursor-style tool approval に照らし手動意味審査を完了しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: mcp-authorization-2025
+    title: MCP Authorization Specification (2025-06-18)
+    url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+    source_type: standard
+    relevance: OAuth 2.1 authorization-code/PKCE, protected-resource metadata, resource indicators, and scopes.
+  - id: opa-rego
+    title: Open Policy Agent — Rego language
+    url: https://www.openpolicyagent.org/docs/latest/policy-language/
+    source_type: official-doc
+    relevance: Versioned policy rules, deny/allow effects, and combining evaluation for authorization.
+  - id: xacml-3-core
+    title: OASIS XACML 3.0 Core
+    url: https://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-cos01-en.html
+    source_type: standard
+    relevance: Permit/Deny/NotApplicable decisions, policy rules, conditions, and combining algorithms.
+  - id: nist-sp-800-162
+    title: NIST SP 800-162 — ABAC
+    url: https://csrc.nist.gov/publications/detail/sp/800-162/final
+    source_type: standard
+    relevance: Subject-object-operation-environment attribute evaluation for authorization.
+  - id: owasp-llm-top10-2025
+    title: OWASP Top 10 for LLM Applications 2025
+    url: https://owasp.org/www-project-top-10-for-large-language-model-applications/
+    source_type: standard
+    relevance: Excessive agency, insecure plugin design, and human-in-the-loop authorization patterns.
+  - id: cursor-terminal-sandbox
+    title: Cursor Agent Terminal
+    url: https://cursor.com/docs/agent/terminal
+    source_type: official-doc
+    relevance: Command allowlist/denylist and sandbox modes for tool approval.
+  - id: claude-code-permissions
+    title: Claude Code permissions
+    url: https://docs.anthropic.com/en/docs/claude-code/permissions
+    source_type: official-doc
+    relevance: yesAllow, allowForSession, Bash/edit/MCP permission modes.
+  - id: safety-permission-design
+    title: Moonweave permission-policy module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: "Authorization loop: request, evaluation, decision, grant, gate, and human approval separation."
 source_claims:
-  - id: claim-authorization-event-001
-    source: eng-fw-langgraph-interrupts
-    supports: LangGraph interrupts persist execution state, expose a payload to an external reviewer, and resume with an explicit Command value rather than implying approval from a pause.
-    locator: LangGraph documentation > Interrupts > pause using interrupt and resume using Command with persisted state
-    evidence_kind: official
+  - id: claim-authorization-event-design
+    source: safety-permission-design
+    supports: AuthorizationEvent separates occurred authorization state changes from evaluation activities and UI messages.
+    locator: AuthorizationEvent genus
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-authorization-event-002
-    source: eng-proto-oauth-rfc7009
-    supports: RFC 7009 specifies an explicit revocation request and permits invalidation of related authorization credentials while requiring clients to tolerate unexpected invalidation.
-    locator: "RFC 7009, Sections 2.1-2.3: token revocation request, response, and authorization-server invalidation behavior"
-    evidence_kind: normative
+  - id: claim-authorization-event-design
+    source: mcp-authorization-2025
+    supports: MCP OAuth consent completion is an AuthorizationEvent with actor and scope object.
+    locator: OAuth consent flow
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-authorization-event-003
-    source: eng-policy-aws-verified-permissions
-    supports: Verified Permissions defines an authorization request over principal, action, resource, and context, and a response containing allow or deny plus determining-policy identifiers.
-    locator: Amazon Verified Permissions User Guide > Terms and concepts > authorization request, authorization response, determining policies, and enforcement
-    evidence_kind: official
+  - id: claim-authorization-event-design
+    source: cursor-terminal-sandbox
+    supports: Cursor Allow/Run clicks produce AuthorizationEvent evidence bound to tool requests.
+    locator: Tool approval dialog
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
+  - id: claim-authorization-event-design
+    source: mcp-authorization-2025
+    supports: OAuth token revocation maps to AuthorizationRevocation subtype events.
+    locator: Token invalidation
+    evidence_kind: design-inference
+    confidence: high

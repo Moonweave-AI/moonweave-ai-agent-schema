@@ -1,326 +1,276 @@
 schema: moonweave.ai/ontology-node/v1
 id: IndexRefreshEvent
 kind: concept
-status: accepted
 labels:
-  zh: 索引刷新触发事件
+  zh: 索引刷新事件
   en: Index refresh event
-  ja: 索引refresh event
+  ja: 索引 refresh event
 semantics:
   short_definition:
-    zh: 在确定时刻记录“应启动一次刷新”的触发事实。
-    en: A time-point fact recording that an index refresh should start.
-    ja: index refresh開始要求を確定時刻に記録するtrigger事実です。
+    zh: 触发 IndexRefreshRun 的调度或变更信号。
+    en: Scheduling or change signal that triggers an IndexRefreshRun.
+    ja: IndexRefreshRun を trigger する schedule/変更 signal。
   definition:
-    zh: IndexRefreshEvent 是在一个观测时刻记录来源变更、计划到期或人工请求并触发 IndexRefreshRun 的事件；它不执行构建、也不直接产生或 supersede IndexVersion。
-    en: IndexRefreshEvent is an event observed at one time point that records a source change, schedule expiry, or manual request and triggers an IndexRefreshRun; it does not execute the build or directly produce or supersede IndexVersion.
-    ja: IndexRefreshEvent は一観測時点でsource change・schedule expiry・manual requestを記録し IndexRefreshRun をtriggerするeventで、build実行や IndexVersion の直接生成/supersedeはしません。
+    zh: IndexRefreshEvent 是记录为何启动 IndexRefreshRun 的信息事件，含 event_id、trigger_reason（新 chunk 到达、配置变更、定时刷新）与 affected index_id。它不是 RefreshRun 本身，也不是 IndexVersion 快照；Webhook、cron 或 ingestion pipeline 完成信号映射到此节点。
+    en: IndexRefreshEvent records why an IndexRefreshRun started, with event_id, trigger_reason (new chunks arrived, config change, scheduled refresh), and affected index_id. It is not the RefreshRun itself or an IndexVersion snapshot; webhooks, cron, or ingestion pipeline completion signals map here.
+    ja: IndexRefreshEvent は IndexRefreshRun 開始理由（event_id/trigger_reason/affected index_id）を記録する information event。RefreshRun/IndexVersion ではない。Webhook/cron/ingestion 完了 signal が写像先。
   why_needed:
-    zh: 把触发事实与持续运行活动、版本结果分开。
-    en: Separates trigger fact from durative run and version result.
-    ja: trigger事実を継続run・版結果から分離します。
+    zh: 没有触发事件，团队无法回答 index-17@43 是因新文档入库还是 nightly cron 而刷新。
+    en: Without trigger events, teams cannot tell whether index-17@43 refreshed due to new documents or nightly cron.
+    ja: trigger event なしでは index-17@43 が新 document/cron どちら起因か答えられない。
   includes:
-    - zh: 纳入 CDC 通知、定时触发与人工刷新请求的发生记录。
-      en: Includes occurrence records for CDC notifications, schedules, and manual refresh requests.
-      ja: CDC通知・schedule・manual refresh requestの発生記録を含みます。
+    - zh: 纳入 ingestion 完成、chunk delta 检测与定时 schedule 触发的刷新信号。
+      en: Includes refresh signals from ingestion completion, chunk delta detection, and scheduled triggers.
+      ja: ingestion 完了/chunk delta 検出/schedule trigger による refresh signal。
   excludes:
-    - zh: 排除 IndexRefreshRun、IndexVersion 和一般错误事件。
-      en: Excludes IndexRefreshRun, IndexVersion, and generic error events.
-      ja: IndexRefreshRun・IndexVersion・一般error eventを除外します。
-  semantic_kind: event
+    - zh: 排除 IndexRefreshRun 活动、IndexVersion 与 EmbeddingRun。
+      en: Excludes IndexRefreshRun activity, IndexVersion, and EmbeddingRun.
+      ja: IndexRefreshRun activity/IndexVersion/EmbeddingRun を除外。
+  semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: LlamaIndex ingestion pipeline 完成 callback、Pinecone 无直接 event 时 Moonweave 在 chunk delta 检测后 emit refresh-event-43→trigger IndexRefreshRun；event 记录 trigger_reason 与 observed_at，不携带 vector 数据。
+    en: LlamaIndex ingestion pipeline completion callback; when Pinecone has no direct event, Moonweave emits refresh-event-43 after chunk delta detection to trigger IndexRefreshRun; event records trigger_reason and observed_at without vector data.
+    ja: LlamaIndex ingestion 完了 callback/chunk delta 後 refresh-event-43 emit→IndexRefreshRun trigger。trigger_reason/observed_at のみ。
+  typical_input:
+    - description: Ingestion pipeline completion signal
+      format: |
+        {
+          "event": "ingestion_complete",
+          "document_id": "doc-policy",
+          "document_version": "v8",
+          "new_chunks": 12
+        }
+      source_claims: [claim-index-refresh-event-llamaindex]
+  typical_output:
+    - description: Refresh event record
+      format: |
+        {
+          "event_id": "refresh-event-43",
+          "trigger_reason": "chunk_delta",
+          "affected_index_id": "index-17",
+          "observed_at": "2026-07-16T12:00:00Z"
+        }
+      source_claims: [claim-index-refresh-event-design]
+  reference_implementations:
+    - name: LlamaIndex Ingestion Pipeline
+      url: https://docs.llamaindex.ai/en/stable/module_guides/indexing/lpips/
+      description: Pipeline completion and document updates.
+    - name: Pinecone Upsert
+      url: https://docs.pinecone.io/guides/data/upsert-data
+      description: Downstream refresh often follows upsert triggers.
 structure:
-  identity_keys:
-    - event_id
+  identity_keys: [event_id]
   fields:
     - id: event_id
-      labels:
-        zh: 事件标识
-        en: event ID
-        ja: event ID
+      labels: {zh: 事件标识, en: Event identifier, ja: event 識別子}
+      definitions:
+        zh: 唯一标识一次 IndexRefreshEvent。
+        en: Uniquely identifies one IndexRefreshEvent.
+        ja: 一回 IndexRefreshEvent を一意識別。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 稳定标识触发事件。
-        en: Stable identifier for the trigger event.
-        ja: trigger eventの安定識別子です。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
       example_value: refresh-event-43
-      source_claims:
-        - claim-index-refresh-event-002
-    - id: observed_at
-      labels:
-        zh: 观测时间
-        en: observed at
-        ja: 観測時刻
-      datatype: date-time
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 记录触发事实发生时刻。
-        en: Records when the trigger fact occurred.
-        ja: trigger事実の発生時刻を記録します。
       allowed_values: []
-      pattern: null
-      example_value: 2026-07-16T09:30:00Z
-      source_claims:
-        - claim-index-refresh-event-003
+      source_claims: [claim-index-refresh-event-id]
     - id: trigger_reason
-      labels:
-        zh: 触发原因
-        en: trigger reason
-        ja: trigger理由
+      labels: {zh: 触发原因, en: Trigger reason, ja: trigger reason}
+      definitions:
+        zh: chunk_delta、config_change、scheduled 或 manual 等枚举原因。
+        en: Enumerated reason such as chunk_delta, config_change, scheduled, or manual.
+        ja: chunk_delta/config_change/scheduled/manual 等。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 区分 source-change、schedule 或 manual。
-        en: Distinguishes source-change, schedule, or manual trigger.
-        ja: source-change・schedule・manual triggerを区別します。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
-      example_value: source-change
-      source_claims:
-        - claim-index-refresh-event-004
+      example_value: chunk_delta
+      allowed_values: [chunk_delta, config_change, scheduled, manual]
+      source_claims: [claim-index-refresh-event-reason]
+    - id: affected_index_id
+      labels: {zh: 受影响索引, en: Affected index, ja: 影響 index}
+      definitions:
+        zh: 该事件意图刷新的 Index index_id。
+        en: Index index_id this event intends to refresh.
+        ja: この event が refresh 意図する Index index_id。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: index-17
+      allowed_values: []
+      source_claims: [claim-index-refresh-event-index]
+    - id: observed_at
+      labels: {zh: 观测时间, en: Observed at, ja: 観測時刻}
+      definitions:
+        zh: 系统观测到触发条件的 UTC 时间。
+        en: UTC instant when the trigger condition was observed.
+        ja: trigger 条件観測 UTC 時刻。
+      datatype: date-time
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: 2026-07-16T12:00:00Z
+      allowed_values: []
+      source_claims: [claim-index-refresh-event-observed]
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: IndexRefreshEvent-example-positive-manual-001
-    kind: positive
+  - id: IndexRefreshEvent-example-chunk-delta
     labels:
-      zh: 索引刷新触发事件正例
-      en: "Positive case: Index refresh event"
-      ja: 索引refresh event正例
-    scenario_id: null
+      zh: 新 chunk 触发刷新
+      en: New chunk triggers refresh
+      ja: 新 chunk が refresh trigger
     descriptions:
-      zh: refresh-event-43 在变更被观测时记录原因并触发 refresh-run-43。
-      en: refresh-event-43 records a reason when a change is observed and triggers refresh-run-43.
-      ja: refresh-event-43 はchange観測時に理由を記録し refresh-run-43をtriggerします。
+      zh: doc-policy v8 入库产生 12 个新 chunk 后 emit refresh-event-43（trigger_reason=chunk_delta），随后启动 refresh-run-43 增量 upsert index-17。
+      en: After doc-policy v8 ingests 12 new chunks, emit refresh-event-43 (trigger_reason=chunk_delta), then start refresh-run-43 to incrementally upsert index-17.
+      ja: doc-policy v8 で 12 新 chunk→refresh-event-43（chunk_delta）→refresh-run-43 起動。
+    example_source:
+      product: LlamaIndex
+      url: https://docs.llamaindex.ai/en/stable/module_guides/indexing/lpips/
+      version: ingestion pipeline
     field_values:
       event_id: refresh-event-43
-      observed_at: 2026-07-16T09:30:00Z
-      trigger_reason: source-change
+      trigger_reason: chunk_delta
+      affected_index_id: index-17
+      observed_at: 2026-07-16T12:00:00Z
     related_node_ids:
       - IndexRefreshEvent
+      - IndexRefreshRun
+      - memory-chunking-situating
     related_relation_ids: []
-    expected_result:
-      zh: 把该对象归入 IndexRefreshEvent。
-      en: Classify the object as IndexRefreshEvent.
-      ja: この対象を IndexRefreshEvent に分類します。
-    why_valid_or_invalid:
-      zh: 事件时点与后续持续活动身份分开。
-      en: The event time point is distinct from the subsequent durative activity identity.
-      ja: event時点を後続継続activity同一性から分離しています。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-index-refresh-event-005
-  - id: IndexRefreshEvent-example-boundary-manual-001
-    kind: boundary
+      - claim-index-refresh-event-llamaindex
+      - claim-index-refresh-event-design
+  - id: IndexRefreshEvent-example-scheduled
     labels:
-      zh: 索引刷新触发事件边界例
-      en: "Boundary case: Index refresh event"
-      ja: 索引refresh event境界例
-    scenario_id: null
+      zh: 定时刷新事件
+      en: Scheduled refresh event
+      ja: scheduled refresh event
     descriptions:
-      zh: refresh-run-43 从 09:30 到 09:42 执行增量构建。
-      en: refresh-run-43 executes incremental construction from 09:30 to 09:42.
-      ja: refresh-run-43 は09:30から09:42までincremental buildを実行します。
+      zh: nightly cron 在 02:00 UTC emit refresh-event-44（trigger_reason=scheduled）对 index-17 执行增量一致性检查并可能启动 IndexRefreshRun。
+      en: Nightly cron at 02:00 UTC emits refresh-event-44 (trigger_reason=scheduled) for index-17 consistency check and possible IndexRefreshRun.
+      ja: nightly cron 02:00 UTC→refresh-event-44（scheduled）→index-17 整合チェック。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: scheduled trigger
+    field_values:
+      event_id: refresh-event-44
+      trigger_reason: scheduled
+      affected_index_id: index-17
+    related_node_ids:
+      - IndexRefreshEvent
+      - IndexRefreshRun
+    related_relation_ids: []
+    source_claims:
+      - claim-index-refresh-event-design
+  - id: IndexRefreshEvent-example-not-run
+    labels:
+      zh: 事件非刷新运行
+      en: Event is not refresh run
+      ja: event は refresh run ではない
+    descriptions:
+      zh: refresh-run-43 是 IndexRefreshRun 含 started_at 与 outcome；refresh-event-43 只是触发信号，无 upsert 行为。
+      en: refresh-run-43 is IndexRefreshRun with started_at and outcome; refresh-event-43 is only a trigger signal with no upsert behavior.
+      ja: refresh-run-43 は IndexRefreshRun（started_at/outcome）。refresh-event-43 は trigger signal のみ。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
     field_values: {}
     related_node_ids:
       - IndexRefreshEvent
+      - IndexRefreshRun
     related_relation_ids: []
-    expected_result:
-      zh: 不得把该对象归入 IndexRefreshEvent。
-      en: Do not classify the object as IndexRefreshEvent.
-      ja: この対象を IndexRefreshEvent に分類しません。
-    why_valid_or_invalid:
-      zh: 有持续时间、输入与输出的是活动而非触发事件。
-      en: Something with duration, inputs, and outputs is an activity, not the trigger event.
-      ja: 継続時間・入力・出力を持つものはactivityでtrigger eventではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-index-refresh-event-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-index-refresh-event-design
 parent_relation:
   id: IndexRefreshEvent-triggers-IndexRefreshRun
-  predicate: part_of
-  direction: target-to-source
-  relation_kind: composition
+  predicate: triggers
+  direction: source-to-target
+  relation_kind: causal
   labels:
-    zh: 触发刷新运行
-    en: triggers refresh run
-    ja: refresh runをtriggerする
+    zh: 触发索引刷新运行
+    en: triggers index refresh run
+    ja: 索引 refresh run を trigger
   definitions:
-    zh: IndexRefreshEvent —triggers→ IndexRefreshRun 表示观测到的变更/计划/人工请求导致创建并启动一个刷新运行。
-    en: IndexRefreshEvent —triggers→ IndexRefreshRun means that the observed change, schedule, or manual request causes one refresh run to be created and started.
-    ja: IndexRefreshEvent —triggers→ IndexRefreshRun は観測change・schedule・manual requestが一refresh runの作成/開始を引き起こすことを表します。
+    zh: IndexRefreshEvent triggers IndexRefreshRun 表示观测到触发条件后启动具名增量刷新活动。
+    en: IndexRefreshEvent triggers IndexRefreshRun means a named incremental refresh activity starts after the trigger condition is observed.
+    ja: IndexRefreshEvent triggers IndexRefreshRun は trigger 条件観測後 named incremental refresh activity 開始。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
-    en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
-    ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
+    zh: 一个事件可触发零次或一次 RefreshRun（去重后）。
+    en: One event may trigger zero or one RefreshRun after deduplication.
+    ja: 一 event は dedupe 後 0/1 RefreshRun trigger 可。
   inverse_reading:
-    predicate: part_of
-    labels:
-      zh: 反向读取
-      en: inverse reading
-      ja: 逆方向読取
+    predicate: triggered_by
+    labels: {zh: 反向读取, en: inverse triggers, ja: 逆方向読取}
   conditions:
-    - id: IndexRefreshEvent-triggers-IndexRefreshRun-condition-manual-001
+    - id: IndexRefreshEvent-triggers-IndexRefreshRun-condition-001
       severity: error
       expression_language: plain
-      expression: Assert only when run.trigger_event_id equals the event ID and run start is not earlier than the event.
+      expression: Assert only when a RefreshRun starts in response to this event with matching affected_index_id.
       explanations:
-        zh: 仅当 run.trigger_event_id 等于事件 ID 且开始时间不早于事件时成立。
-        en: Assert only when run.trigger_event_id equals the event ID and run start is not earlier than the event.
-        ja: run.trigger_event_idがevent IDと同じでrun開始がeventより前でない時だけ成立します。
-      source_claims:
-        - claim-index-refresh-event-007
-  temporal_scope: timeless
+        zh: 仅当 RefreshRun 响应此事件且 index_id 一致时成立。
+        en: Assert only when RefreshRun responds to this event with matching index_id.
+        ja: RefreshRun が event 応答かつ index_id 一致時のみ assert。
+      source_claims: [claim-index-refresh-event-design]
+  temporal_scope: valid-time
   boundary_context: null
   constraints: []
-  examples:
-    - id: IndexRefreshEvent-triggers-IndexRefreshRun-example-positive-manual-001
-      kind: positive
-      labels:
-        zh: 触发刷新运行正例
-        en: "Positive case: triggers refresh run"
-        ja: refresh runをtriggerする正例
-      scenario_id: null
-      descriptions:
-        zh: refresh-event-43 记录 source-change 并启动 refresh-run-43。
-        en: refresh-event-43 records a source change and starts refresh-run-43.
-        ja: refresh-event-43 はsource-changeを記録し refresh-run-43を開始します。
-      field_values: {}
-      related_node_ids:
-        - IndexRefreshEvent
-        - IndexRefreshRun
-      related_relation_ids:
-        - IndexRefreshEvent-triggers-IndexRefreshRun
-      expected_result:
-        zh: 建立 refresh-event-43 triggers refresh-run-43 的显式因果事实。
-        en: Assert the explicit causal fact that refresh-event-43 triggers refresh-run-43.
-        ja: refresh-event-43 triggers refresh-run-43 という明示的 causal fact を確立します。
-      why_valid_or_invalid:
-        zh: 运行的 trigger_event_id 精确引用该事件，且运行开始晚于事件记录时间，身份与时序均一致。
-        en: The run's trigger_event_id exactly references this event, and the run starts after the event timestamp, aligning identity and temporal order.
-        ja: run の trigger_event_id がこの event を exact 参照し、run 開始が event 記録時刻より後なので identity と時系列が一致します。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-index-refresh-event-007
-    - id: IndexRefreshEvent-triggers-IndexRefreshRun-example-boundary-manual-001
-      kind: boundary
-      labels:
-        zh: 触发刷新运行边界例
-        en: "Boundary case: triggers refresh run"
-        ja: refresh runをtriggerする境界例
-      scenario_id: null
-      descriptions:
-        zh: 同日发生但 trigger_event_id 不同的 refresh-run-44 不能连到该事件。
-        en: refresh-run-44 occurring the same day but with another trigger ID cannot be linked to this event.
-        ja: 同日発生でも別trigger IDの refresh-run-44 をこのeventへ結びません。
-      field_values: {}
-      related_node_ids:
-        - IndexRefreshEvent
-        - IndexRefreshRun
-      related_relation_ids:
-        - IndexRefreshEvent-triggers-IndexRefreshRun
-      expected_result:
-        zh: 不把 refresh-run-44 连接为 refresh-event-43 的触发结果。
-        en: Do not connect refresh-run-44 as an effect triggered by refresh-event-43.
-        ja: refresh-run-44 を refresh-event-43 が trigger した結果として接続しません。
-      why_valid_or_invalid:
-        zh: 同日发生只提供时间相关性；不同 trigger_event_id 明确指向另一原因，不能反向猜测因果。
-        en: Same-day occurrence provides temporal correlation only; a different trigger_event_id names another cause and blocks causal guesswork.
-        ja: 同日発生は時間相関だけで、異なる trigger_event_id が別原因を示すため causal 推測はできません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-index-refresh-event-007
-  source_claims:
-    - claim-index-refresh-event-007
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: pending
-  endpoint_order: child-to-parent
+  examples: []
+  source_claims: [claim-index-refresh-event-design]
+  endpoint_order: parent-to-child
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-llamaindex-ingestion
+    title: LlamaIndex Ingestion Pipeline
+    publisher: LlamaIndex
+    url: https://docs.llamaindex.ai/en/stable/module_guides/indexing/lpips/
+    source_type: official-doc
+    relevance: Pipeline completion as refresh trigger.
+  - id: src-index-refresh-event-design
+    title: Moonweave memory-embedding-indexes module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Trigger event versus refresh run separation.
 source_claims:
-  - id: claim-index-refresh-event-001
-    source: eng-fw-llamaindex-ingestion-code
-    supports: LlamaIndex provides concrete source-change/upsert triggers; PROV-O supports keeping the ensuing activity and generated entities distinct.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
+  - id: claim-index-refresh-event-llamaindex
+    source: src-llamaindex-ingestion
+    supports: LlamaIndex ingestion pipelines emit completion signals when documents are indexed.
+    locator: Ingestion pipeline
+    evidence_kind: primary-doc
+    confidence: high
+  - id: claim-index-refresh-event-design
+    source: src-index-refresh-event-design
+    supports: IndexRefreshEvent records trigger reason separately from IndexRefreshRun execution and IndexVersion publication.
+    locator: IndexRefreshEvent boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-index-refresh-event-002
-    source: eng-fw-llamaindex-ingestion-code
-    supports: IndexRefreshEvent.event_id records the deduplicated trigger occurrence; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
+  - id: claim-index-refresh-event-id
+    source: src-index-refresh-event-design
+    supports: event_id identifies one refresh trigger event.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-index-refresh-event-003
-    source: eng-fw-llamaindex-ingestion-code
-    supports: IndexRefreshEvent.observed_at records event time distinct from run duration; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
+  - id: claim-index-refresh-event-reason
+    source: src-index-refresh-event-design
+    supports: trigger_reason classifies why refresh was requested.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-index-refresh-event-004
-    source: eng-fw-llamaindex-ingestion-code
-    supports: IndexRefreshEvent.trigger_reason records the cause for starting refresh evaluation; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
+  - id: claim-index-refresh-event-index
+    source: src-index-refresh-event-design
+    supports: affected_index_id names the target Index.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-index-refresh-event-005
-    source: eng-fw-llamaindex-ingestion-code
-    supports: LlamaIndex's pipeline responds to changed document hashes by performing upsert/delete work; Moonweave models the observed trigger separately.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
+  - id: claim-index-refresh-event-observed
+    source: src-index-refresh-event-design
+    supports: observed_at records when the trigger condition was detected.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-index-refresh-event-006
-    source: eng-fw-llamaindex-ingestion-code
-    supports: PROV-O distinguishes durative Activity from instantaneous occurrence records used by Moonweave as events.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-index-refresh-event-007
-    source: eng-fw-llamaindex-ingestion-code
-    supports: LlamaIndex performs update work in response to changed document identity or hash; Moonweave requires explicit trigger identity.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

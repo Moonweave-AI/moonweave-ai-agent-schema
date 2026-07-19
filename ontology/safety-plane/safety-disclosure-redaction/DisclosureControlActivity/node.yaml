@@ -1,511 +1,262 @@
 schema: moonweave.ai/ontology-node/v1
 id: DisclosureControlActivity
 kind: concept
-status: accepted
 labels:
   zh: 披露控制活动
-  en: disclosure-control activity
+  en: disclosure control activity
   ja: 開示制御活動
 semantics:
   short_definition:
-    zh: 在信息跨越接收者或信任边界前决定并实施释放范围的活动。
-    en: An activity deciding and enforcing what information may cross a recipient or trust boundary.
-    ja: 情報が受信者または信頼境界を越える前に開示範囲を判断し実施する活動。
+    zh: 一次有执行者、受检内容与规则版本的可审计披露求值运行。
+    en: One auditable disclosure-evaluation run with actor, inspected content, and rule version.
+    ja: 実行者・検査 content・rule version を持つ一回の監査可能な開示評価 run。
   definition:
-    zh: 披露控制活动是一类活动，接收候选输出及其目标主体或边界，依据 DisclosureRule 和当前授权选择释放、脱敏、分阶段披露、完全抑制或升级审核，并产生可审计决定；它不是规则规范、敏感内容本身或最终输出记录。
-    en: DisclosureControlActivity is an activity that receives candidate output plus its intended actor or boundary, applies DisclosureRule and current authority, and chooses release, redaction, staged disclosure, full suppression, or escalation with an auditable decision; it is not the rule, the sensitive content, or the final output record.
-    ja: DisclosureControlActivity は候補出力と対象主体または境界を受け取り、DisclosureRule と現在の権限に基づき release、redaction、段階開示、完全抑制、審査 escalation を選び監査可能な判断を生成する活動です。規則、機密内容、最終出力記録ではありません。
+    zh: DisclosureControlActivity 是 safety-disclosure-redaction 的执行上位概念：记录谁在何时以哪版 DisclosureRule 对哪一内容块做了何种披露变换（mask/replace/suppress/staged release），并产出独立 SensitiveSpan 与 transform 记录。Presidio `anonymize()`、Anthropic output filtering 事件与 DLP `deidentify` 的每次边界 adjudication 应投影为 DisclosureControlActivity，而不是与 DisclosureFilter、Redaction 或 SensitiveSpan 混为同一身份。
+    en: "DisclosureControlActivity is the execution genus in disclosure-redaction: it records who performed which disclosure transform on which content block under which DisclosureRule version and when, emitting separate SensitiveSpan and transform records. Each boundary adjudication from Presidio anonymize(), Anthropic output filtering events, or DLP deidentify should project to DisclosureControlActivity rather than sharing identity with DisclosureFilter, Redaction, or SensitiveSpan."
+    ja: DisclosureControlActivity は disclosure-redaction domain の実行上位概念で、誰がいつどの DisclosureRule version でどの content block にどの開示 transform（mask/replace/suppress/staged release）を行い独立 SensitiveSpan/transform record を出力したかを記録。Presidio anonymize()/Anthropic output filtering/DLP deidentify の各 boundary adjudication は DisclosureFilter/Redaction/SensitiveSpan と同一 identity にせず DisclosureControlActivity へ投影。
   why_needed:
-    zh: 把披露控制作为独立活动，可在发送、显示、日志导出或工具结果注入上下文之前统一执行最小披露与授权检查，并清楚区分“做控制”与“描述控制规则”。
-    en: Modeling disclosure control as an activity enables consistent least-disclosure and authorization checks before sending, display, log export, or tool-result context insertion, and separates performing control from specifying its rule.
-    ja: 開示制御を独立活動とすることで、送信、表示、ログ export、ツール結果の文脈投入前に最小開示と認可を一貫適用し、制御実施と規則記述を区別できます。
+    zh: 若只保留脱敏后文本而不记录执行身份，Agent 无法回答依据哪版 DisclosureRule、对谁允许到何种程度，也无法在 Presidio 升级后复检历史输出。
+    en: Without execution identity alongside transformed text, agents cannot explain which DisclosureRule revision applied to whom and to what degree, or rescan historical output after Presidio upgrades.
+    ja: transform 後 text だけ残し execution identity を欠くと、どの DisclosureRule revision が誰にどこまで適用されたか説明できず Presidio upgrade 後 historical output rescan もできません。
   includes:
-    - zh: 针对模型输出、工具结果、追踪数据、日志或检索内容，在明确接收者与边界下执行释放、遮蔽、替换、概括、抑制或升级的活动。
-      en: Activities that release, mask, replace, summarize, suppress, or escalate model output, tool results, traces, logs, or retrieved content for an explicit recipient and boundary.
-      ja: 明示された受信者と境界に対し、モデル出力、ツール結果、trace、log、検索内容を release、mask、replace、summarize、suppress、escalate する活動。
+    - zh: 包含有可追踪受检内容、DisclosureRule 版本、执行时间和输出引用的披露检查运行。
+      en: Includes disclosure check runs with traceable content, DisclosureRule version, execution time, and output reference.
+      ja: 追跡可能 content/DisclosureRule version/実行時刻/出力参照を持つ開示検査 run を含む。
   excludes:
-    - zh: 静态 DisclosureRule、敏感分类结果、由 info-output-disclosure 拥有的 SuppressedContext 结果记录、普通文本生成，以及没有边界或接收者判断的格式化。
-      en: Static DisclosureRule specifications, sensitivity classifications, SuppressedContext result records owned by info-output-disclosure, ordinary text generation, and formatting with no boundary or recipient decision.
-      ja: 静的 DisclosureRule、機密分類結果、info-output-disclosure が所有する SuppressedContext 結果記録、通常の文章生成、境界・受信者判断を伴わない整形。
+    - zh: 不包含静态 DisclosureSpecification、SensitiveSpan 检测规范、最终输出窗口布局或未实际执行的策略声明。
+      en: Excludes static DisclosureSpecification, SensitiveSpan detection specs, final output-window layout, and policies not executed.
+      ja: 静的 DisclosureSpecification/SensitiveSpan detection spec/最終 output window layout/未実行 policy 宣言は含まない。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: 分层：ingress DisclosureFilter（Anthropic/Moderation）→ SensitiveSpan 检测 → Redaction/ProgressiveDisclosure transform。每次运行保留 disclosure_activity_id、actor_ref、disclosure_rule_ref 与 source_block_ref。
+    en: "Layer: ingress DisclosureFilter (Anthropic/Moderation) → SensitiveSpan detection → Redaction/ProgressiveDisclosure transform. Each run retains disclosure_activity_id, actor_ref, disclosure_rule_ref, and source_block_ref."
+    ja: 層：ingress DisclosureFilter（Anthropic/Moderation）→ SensitiveSpan detection → Redaction/ProgressiveDisclosure transform。各 run で disclosure_activity_id/actor_ref/disclosure_rule_ref/source_block_ref 保持。
+  typical_input:
+    - description: Content block at disclosure boundary.
+      format: tool-result | user-reply draft | audit-log excerpt
+      source_claims:
+        - claim-disclosure-activity-design
+  typical_output:
+    - description: DisclosureControlActivity with transform evidence.
+      format: |
+        disclosure_activity_id: da_91
+        disclosure_rule_ref: dr_cred_external@4
+        changed_range: 128..171
+      source_claims:
+        - claim-disclosure-activity-design
+  reference_implementations:
+    - name: Microsoft Presidio
+      url: https://microsoft.github.io/presidio/
+      description: AnalyzerEngine plus AnonymizerEngine pipeline.
+    - name: Anthropic API
+      url: https://docs.anthropic.com/en/api/messages
+      description: Output filtering and sensitive content handling.
+    - name: Google Cloud DLP
+      url: https://cloud.google.com/sensitive-data-protection/docs/deidentify-sensitive-data
+      description: De-identification API transformations.
 structure:
   identity_keys:
-    - disclosure_control_activity_id
+    - disclosure_activity_id
   fields:
-    - id: disclosure_control_activity_id
+    - id: disclosure_activity_id
       labels:
-        zh: 披露控制活动标识
-        en: disclosure-control activity ID
-        ja: 開示制御活動 ID
+        zh: 披露活动标识
+        en: disclosure activity ID
+        ja: 開示活動 ID
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
       definitions:
-        zh: 稳定标识一次针对特定候选内容、接收边界和有效规则作出的披露控制活动；重新评估同一内容会形成新的活动记录。
-        en: Stably identifies one disclosure-control activity over particular candidate content, receiving boundary, and effective rule; reevaluating the same content creates a new activity record.
-        ja: 特定の候補内容、受信境界、有効規則に対する一回の開示制御活動を安定識別し、同じ内容の再評価は新しい活動記録になります。
+        zh: 稳定标识一次已经实际运行的披露控制活动。
+        en: Stably identifies one disclosure control activity that actually ran.
+        ja: 実際に実行された一回の開示制御活動を安定識別。
       allowed_values: []
       pattern: null
-      example_value: disclosure-control:support-reply-18
+      example_value: da_91
       source_claims:
-        - claim-disclosure-control-activity-002
-    - id: candidate_content_ref
-      labels:
-        zh: 候选披露内容引用
-        en: candidate content reference
-        ja: 候補開示内容参照
-      datatype: reference
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 引用进入边界判定前的确切内容版本，例如候选模型答复或工具结果；不得引用已经脱敏后的派生内容来替代判定输入。
-        en: References the exact content version before boundary adjudication, such as a candidate model reply or tool result; transformed content cannot replace the decision input.
-        ja: 境界判定前の候補応答や tool result の正確な版を参照し、処理後の派生内容で判定入力を代用しません。
-      allowed_values: []
-      pattern: null
-      example_value: candidate-output:support-reply-18
-      source_claims:
-        - claim-disclosure-control-activity-003
-    - id: disclosure_boundary_ref
-      labels:
-        zh: 披露边界引用
-        en: disclosure boundary reference
-        ja: 開示境界参照
-      datatype: reference
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 引用这次披露所面向的接收者、受众和信任边界组合；相同内容面向不同接收者时必须分别判定。
-        en: References the recipient, audience, and trust-boundary context for this disclosure; the same content requires separate decisions for different recipients.
-        ja: この開示の受信者、audience、trust boundary の組合せを参照し、同じ内容でも受信者が異なれば別に判定します。
-      allowed_values: []
-      pattern: null
-      example_value: disclosure-boundary:external-support/customer-913
-      source_claims:
-        - claim-disclosure-control-activity-004
+        - claim-disclosure-activity-design
     - id: disclosure_rule_ref
       labels:
-        zh: 适用披露规则引用
-        en: applicable disclosure-rule reference
-        ja: 適用開示規則参照
+        zh: 披露规则引用
+        en: disclosure rule reference
+        ja: 開示 rule 参照
       datatype: reference
       required: true
       cardinality:
         min: 1
         max: 1
       definitions:
-        zh: 引用本次判定实际采用、可追溯到具体修订版的 DisclosureRule；不能只写笼统策略名称。
-        en: References the exact revision of DisclosureRule applied by this decision; a generic policy name is insufficient.
-        ja: この判断で実際に適用した DisclosureRule の具体的 revision を参照し、一般的な policy 名だけでは不十分です。
+        zh: 本次活动实际应用的 DisclosureRule 版本。
+        en: DisclosureRule revision actually applied by this activity.
+        ja: 本 activity が実際 apply した DisclosureRule revision。
       allowed_values: []
       pattern: null
-      example_value: external-support-policy@5
+      example_value: dr_cred_external@4
       source_claims:
-        - claim-disclosure-control-activity-005
-    - id: authority_snapshot_ref
+        - claim-disclosure-activity-design
+    - id: source_block_ref
       labels:
-        zh: 决策时授权快照引用
-        en: decision-time authority snapshot reference
-        ja: 判断時権限スナップショット参照
+        zh: 源内容块引用
+        en: source block reference
+        ja: 元 content block 参照
       datatype: reference
       required: true
       cardinality:
         min: 1
         max: 1
       definitions:
-        zh: 引用判定发生时有效的主体权限、委派和同意状态快照，用于解释为何某接收者当时可以或不可以获得内容。
-        en: References the subject permissions, delegation, and consent state effective when the decision occurred, explaining why the recipient could or could not receive the content then.
-        ja: 判断時点で有効な主体権限、委任、同意状態の snapshot を参照し、その時点で受信者へ開示できた理由を説明します。
+        zh: 引用被本次运行读取的确切内容块版本。
+        en: References the exact content-block version read by this run.
+        ja: 本 run が読み取った exact content block version を参照。
       allowed_values: []
       pattern: null
-      example_value: authority-snapshot:support-agent-7@2026-07-16T10:20:00Z
+      example_value: fab_17
       source_claims:
-        - claim-disclosure-control-activity-006
-    - id: selected_actions
-      labels:
-        zh: 选定披露动作
-        en: selected disclosure actions
-        ja: 選択開示動作
-      datatype: array[string]
-      required: true
-      cardinality:
-        min: 1
-        max: null
-      definitions:
-        zh: 记录对候选内容各可判定部分实际选定的处置集合；每个动作必须能追溯到互不混淆的内容范围或披露阶段。
-        en: Records the dispositions actually selected for adjudicated portions of candidate content; every action must be traceable to a distinct content scope or disclosure stage.
-        ja: 候補内容の判定対象部分に実際に選択した処置集合を記録し、各動作を明確な content scope または disclosure stage に追跡可能にします。
-      allowed_values:
-        - id: DisclosureActionRelease
-          value: release
-          labels:
-            zh: 按原内容释放
-            en: release
-            ja: そのまま開示
-          definitions:
-            zh: 该内容范围在当前边界和授权下可以不经安全变换直接披露。
-            en: The content scope may cross the current boundary without a safety transformation under the effective authority.
-            ja: 有効権限の下で当該 content scope を安全変換せず現在の境界へ開示できます。
-          status: accepted
-          source_claims:
-            - claim-disclosure-control-activity-007
-        - id: DisclosureActionRedact
-          value: redact
-          labels:
-            zh: 局部脱敏后释放
-            en: redact
-            ja: 部分秘匿化
-          definitions:
-            zh: 只变换已识别的敏感片段，保留规则允许披露的周边信息。
-            en: Transforms identified sensitive spans while retaining surrounding information permitted by the rule.
-            ja: 識別済み sensitive span だけを変換し、規則が許可する周辺情報を保持します。
-          status: accepted
-          source_claims:
-            - claim-disclosure-control-activity-008
-        - id: DisclosureActionStage
-          value: stage
-          labels:
-            zh: 暂缓至条件满足
-            en: stage
-            ja: 条件付き保留
-          definitions:
-            zh: 当前不释放该信息层，待新的任务阶段、授权证据或人工决定满足规则后再重新判定。
-            en: Withholds an information layer for now and re-adjudicates it only after a task stage, authority fact, or human decision satisfies the rule.
-            ja: 現在は情報 layer を開示せず、task stage、権限証拠、人手判断が規則を満たした後だけ再判定します。
-          status: accepted
-          source_claims:
-            - claim-disclosure-control-activity-009
-        - id: DisclosureActionSuppress
-          value: suppress
-          labels:
-            zh: 完全扣留
-            en: suppress
-            ja: 完全抑止
-          definitions:
-            zh: 在当前披露活动中不向接收者提供该内容范围，且不以占位摘要暗示原值。
-            en: Provides none of the content scope to the recipient in this activity and does not expose the original value through a revealing placeholder.
-            ja: この活動では当該 content scope を受信者へ一切提供せず、原値を示唆する placeholder も使いません。
-          status: accepted
-          source_claims:
-            - claim-disclosure-control-activity-010
-        - id: DisclosureActionEscalate
-          value: escalate
-          labels:
-            zh: 升级人工或更高权限判定
-            en: escalate
-            ja: 上位判断へエスカレート
-          definitions:
-            zh: 现有规则或权限证据不足以安全决定时，不自动披露，并把明确范围送交具备权限的决策者。
-            en: When current rule or authority evidence is insufficient, discloses nothing automatically and sends the explicit scope to an authorized decision maker.
-            ja: 現行規則または権限証拠が不十分な場合は自動開示せず、明確な範囲を権限ある判断者へ送ります。
-          status: accepted
-          source_claims:
-            - claim-disclosure-control-activity-011
-      pattern: null
-      example_value:
-        - release
-        - redact
-        - suppress
-      source_claims:
-        - claim-disclosure-control-activity-012
-    - id: decision_record_ref
-      labels:
-        zh: 披露决定记录引用
-        en: disclosure decision-record reference
-        ja: 開示判断記録参照
-      datatype: reference
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 引用保存逐范围处置、理由、规则和证据的规范决定记录；该字段不复制由其他模块拥有的审计对象。
-        en: References the canonical decision record preserving per-scope dispositions, reasons, rules, and evidence; it does not duplicate an audit object owned elsewhere.
-        ja: scope ごとの処置、理由、規則、証拠を保存する canonical decision record を参照し、他 module 所有の audit object を複製しません。
-      allowed_values: []
-      pattern: null
-      example_value: disclosure-decision:18
-      source_claims:
-        - claim-disclosure-control-activity-013
-    - id: decided_at
-      labels:
-        zh: 披露判定时间
-        en: disclosure decision time
-        ja: 開示判断時刻
-      datatype: datetime
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 记录选定动作成为有效决定的时间，用于把决定与当时生效的规则和授权快照对齐。
-        en: Records when the selected actions became an effective decision, aligning them with the rule and authority snapshot in force then.
-        ja: 選択動作が有効な判断となった時刻を記録し、その時点の規則と権限 snapshot に対応付けます。
-      allowed_values: []
-      pattern: null
-      example_value: 2026-07-16T10:20:02Z
-      source_claims:
-        - claim-disclosure-control-activity-014
+        - claim-disclosure-activity-design
   constraints:
-    - id: disclosure-actions-require-scope-and-authority-evidence
+    - id: disclosure-activity-applies-one-rule
       severity: error
       expression_language: plain
-      expression: selected_actions IS NON-EMPTY AND every selected action is traceable in decision_record_ref to a content scope, disclosure_rule_ref, disclosure_boundary_ref, and authority_snapshot_ref effective at decided_at
+      expression: Each DisclosureControlActivity MUST apply exactly one applicable DisclosureRule revision
       explanations:
-        zh: 披露活动不能只给出笼统的允许或拒绝；每个处置都必须说明处理了哪部分内容、依据哪条规则、面向哪个边界以及使用了何时的权限事实。
-        en: A disclosure activity cannot state only a generic allow or deny; every disposition must identify its content scope, rule, boundary, and decision-time authority facts.
-        ja: 開示活動は一般的な allow/deny だけでは足りず、各処置の content scope、規則、境界、判断時権限事実を示す必要があります。
+        zh: 每次披露活动必须 applies 恰好一条适用规则版本。
+        en: Each disclosure activity must apply exactly one applicable rule revision.
+        ja: 各開示 activity は applicable rule revision を exactly 一つ applies 必須。
       source_claims:
-        - claim-disclosure-control-activity-015
+        - claim-disclosure-activity-design
   required_relation_constraints: []
 examples:
-  - id: DisclosureControlActivity-example-positive-001
-    kind: positive
+  - id: DisclosureControlActivity-presidio-redact
     labels:
-      zh: 外部答复披露控制
-      en: External-response disclosure control
-      ja: 外部応答開示制御
-    scenario_id: null
+      zh: Presidio 脱敏活动
+      en: Presidio redaction activity
+      ja: Presidio 墨消し activity
     descriptions:
-      zh: 候选客服答复包含客户邮箱与内部 case note；控制活动根据 external-support-policy 释放订单状态、遮蔽邮箱并抑制内部备注，然后记录决定。
-      en: A candidate support reply contains a customer email and internal case note; under external-support-policy the control releases order status, masks the email, suppresses the internal note, and records the decision.
-      ja: 候補サポート応答には顧客メールと内部 case note が含まれます。制御活動は external-support-policy により注文状態を公開し、メールを mask、内部注記を suppress して判断を記録します。
+      zh: da_91 对 fab_17 应用 dr_cred_external，Presidio anonymize 替换 128..171 为 [REDACTED_CREDENTIAL]，prefix/suffix digest 不变。
+      en: da_91 applies dr_cred_external to fab_17; Presidio anonymize replaces 128..171 with [REDACTED_CREDENTIAL] while prefix/suffix digests unchanged.
+      ja: da_91 が fab_17 に dr_cred_external apply。Presidio anonymize が 128..171 を [REDACTED_CREDENTIAL] に置換、prefix/suffix digest 不変。
+    example_source:
+      product: Microsoft Presidio
+      url: https://microsoft.github.io/presidio/anonymizer/
+      version: AnonymizerEngine
     field_values:
-      disclosure_control_activity_id: disclosure-control:support-reply-18
-      candidate_content_ref: candidate-output:support-reply-18
-      disclosure_boundary_ref: disclosure-boundary:external-support/customer-913
-      disclosure_rule_ref: external-support-policy@5
-      authority_snapshot_ref: authority-snapshot:support-agent-7@2026-07-16T10:20:00Z
-      selected_actions:
-        - release
-        - redact
-        - suppress
-      decision_record_ref: disclosure-decision:18
-      decided_at: 2026-07-16T10:20:02Z
+      disclosure_activity_id: da_91
+      disclosure_rule_ref: dr_cred_external@4
     related_node_ids:
       - DisclosureControlActivity
-      - DisclosureRule
+      - Redaction
       - SensitiveSpan
     related_relation_ids: []
-    expected_result:
-      zh: 接收者只获得授权信息，审计记录可说明每一类处理动作。
-      en: The recipient receives only authorized information and audit evidence explains each handling action.
-      ja: 受信者は認可済み情報だけを受け取り、監査証拠が各処理動作を説明します。
-    why_valid_or_invalid:
-      zh: 活动具有候选内容、明确接收者、规则、多个控制动作和审计结果，完整体现披露控制责任。
-      en: The activity has candidate content, explicit recipient, rule, multiple control actions, and audit outcome, fully expressing disclosure-control responsibility.
-      ja: 候補内容、明示受信者、規則、複数制御動作、監査結果を持ち、開示制御責任を満たします。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-disclosure-control-activity-016
-  - id: DisclosureControlActivity-example-boundary-001
-    kind: boundary
+      - claim-disclosure-activity-presidio
+  - id: DisclosureControlActivity-anthropic-filter
     labels:
-      zh: 单纯格式化边界
-      en: Formatting-only boundary
-      ja: 単純整形の境界
-    scenario_id: null
+      zh: Anthropic 输出过滤活动
+      en: Anthropic output filter activity
+      ja: Anthropic output filter activity
     descriptions:
-      zh: 渲染器把同一段已批准文本从 Markdown 转为 HTML，没有检查接收者、敏感性或释放范围；该转换不是披露控制活动。
-      en: A renderer converts the same approved text from Markdown to HTML without checking recipient, sensitivity, or release scope; the transformation is not a disclosure-control activity.
-      ja: renderer は承認済み同一テキストを Markdown から HTML へ変換しますが、受信者、機密性、開示範囲を検査しません。この変換は開示制御活動ではありません。
-    field_values: {}
+      zh: da-anthropic-3 记录 Claude 回复中 runbook credential 段落被 suppress，含 policy 引用与 span 坐标。
+      en: da-anthropic-3 records suppress disposition on runbook credential paragraph in Claude reply with policy reference and span coordinates.
+      ja: da-anthropic-3 が Claude 応答 runbook credential 段落 suppress を記録。policy 参照と span 座標含む。
+    example_source:
+      product: Anthropic
+      url: https://docs.anthropic.com/en/api/messages
+      version: output filtering
+    field_values:
+      disclosure_activity_id: da-anthropic-3
+      disposition: suppress
     related_node_ids:
       - DisclosureControlActivity
+      - DisclosureFilter
     related_relation_ids: []
-    expected_result:
-      zh: 该步骤归普通渲染或格式化；披露决定仍由前置控制活动承担。
-      en: The step remains ordinary rendering or formatting; the preceding control activity retains the disclosure decision.
-      ja: この手順は通常の rendering/formatting に属し、開示判断は前段制御活動が担います。
-    why_valid_or_invalid:
-      zh: 活动类型由是否裁决信息跨边界决定，而不是由是否改变字符串表示决定。
-      en: The type depends on adjudicating information across a boundary, not merely changing string representation.
-      ja: 型は文字列表現変更ではなく、境界を越える情報を裁定するかで決まります。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-disclosure-control-activity-017
-  - id: DisclosureControlActivity-example-instance-001
-    kind: instance
+      - claim-disclosure-activity-anthropic
+  - id: DisclosureControlActivity-progressive-stage
     labels:
-      zh: 披露控制运行记录
-      en: Disclosure-control run record
-      ja: 開示制御実行記録
-    scenario_id: null
+      zh: 分阶段披露活动
+      en: Progressive disclosure stage activity
+      ja: 段階的開示 activity
     descriptions:
-      zh: control dc_31 保存 candidate=reply_88、recipient=customer_913、boundary=external-support、rule=external-support-policy@6、actions=[release_order_status,mask_email,suppress_internal_note]。
-      en: Control dc_31 stores candidate=reply_88, recipient=customer_913, boundary=external-support, rule=external-support-policy@6, and actions=[release_order_status,mask_email,suppress_internal_note].
-      ja: control dc_31 は candidate=reply_88、recipient=customer_913、boundary=external-support、rule=external-support-policy@6、actions=[release_order_status,mask_email,suppress_internal_note] を保存します。
-    field_values: {}
+      zh: internal-operator 先看 summary（无 SSN）；ProgressiveDisclosure stage two 经批准后释放 detail 段，每阶段独立 DisclosureControlActivity。
+      en: internal-operator first sees summary without SSN; ProgressiveDisclosure stage two releases detail after approval; each stage is independent DisclosureControlActivity.
+      ja: internal-operator が summary（SSN なし）を先に閲覧。ProgressiveDisclosure stage two が承認後 detail release。各 stage 独立 DisclosureControlActivity。
+    example_source:
+      product: Moonweave design
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: progressive disclosure
+    field_values:
+      disclosure_activity_id: da_pd_stage2
+      stage: 2
     related_node_ids:
       - DisclosureControlActivity
+      - ProgressiveDisclosure
     related_relation_ids: []
-    expected_result:
-      zh: 执行器按动作生成受控输出，并把 dc_31 交给审计记录引用。
-      en: The executor produces controlled output from the actions and exposes dc_31 for audit reference.
-      ja: 実行器は動作に従って制御済み出力を生成し、dc_31 を監査参照へ渡します。
-    why_valid_or_invalid:
-      zh: 实例同时固定候选、接收者、边界、规则和处理动作，具备活动身份与决策上下文。
-      en: The instance fixes candidate, recipient, boundary, rule, and handling actions, providing activity identity and decision context.
-      ja: 候補、受信者、境界、規則、処理動作を固定し、活動同一性と判断文脈を備えます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-disclosure-control-activity-018
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-disclosure-activity-design
+  - id: DisclosureControlActivity-reject-no-evidence
+    labels:
+      zh: 拒绝无证据候选跨度
+      en: Reject candidate span without evidence
+      ja: 証拠なし候補 span 拒否
+    descriptions:
+      zh: 候选 ss_18 仅因 sk-example 字符串标为 credential，无 detector evidence；DisclosureControlActivity 不得创建 transform。
+      en: Candidate ss_18 labeled credential only from sk-example string with no detector evidence; DisclosureControlActivity must not create transform.
+      ja: 候補 ss_18 が sk-example 文字列のみで credential label、detector evidence なし。DisclosureControlActivity transform 作成不可。
+    example_source:
+      product: Moonweave design
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: evidence requirements
+    field_values:
+      accepted: false
+    related_node_ids:
+      - DisclosureControlActivity
+      - SensitiveSpan
+    related_relation_ids: []
+    source_claims:
+      - claim-disclosure-activity-design
 parent_relation: null
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-safety-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: Verified against OWASP LLM02 disclosure mitigations and DLP/redaction patterns; specification vs activity and span-level SensitiveSpan targeting hold.
-    en: Verified against OWASP LLM02 disclosure mitigations and DLP/redaction patterns; specification vs activity and span-level SensitiveSpan targeting hold.
-    ja: Verified against OWASP LLM02 disclosure mitigations and DLP/redaction patterns; specification vs activity and span-level SensitiveSpan targeting hold.
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: presidio-docs
+    title: Microsoft Presidio
+    url: https://microsoft.github.io/presidio/
+    source_type: official-doc
+    relevance: Analyzer plus Anonymizer pipeline as disclosure control runs.
+  - id: anthropic-messages-api
+    title: Anthropic Messages API
+    url: https://docs.anthropic.com/en/api/messages
+    source_type: official-doc
+    relevance: Output filtering events as disclosure activities.
+  - id: google-cloud-dlp
+    title: Google Cloud Sensitive Data Protection
+    url: https://cloud.google.com/sensitive-data-protection/docs/deidentify-sensitive-data
+    source_type: official-doc
+    relevance: De-identification API as disclosure control execution.
+  - id: safety-disclosure-design
+    title: Moonweave safety-disclosure-redaction module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: DisclosureControlActivity execution boundary separate from rules and spans.
 source_claims:
-  - id: claim-disclosure-control-activity-001
-    source: eng-security-owasp-llm02-2025
-    supports: OWASP identifies sensitive output disclosure and recommends sanitization plus strict access control. Moonweave models the runtime act of applying those decisions as DisclosureControlActivity.
-    locator: LLM02:2025 > Prevention and Mitigation Strategies > Sanitization and Access Controls
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-disclosure-control-activity-002
-    source: eng-security-owasp-llm02-2025
-    supports: OWASP recommends applying and auditing output sanitization and access controls. Moonweave gives each concrete application of those controls an activity identity.
-    locator: LLM02:2025 > Prevention and Mitigation Strategies > Sanitization and Access Controls
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-disclosure-control-activity-003
-    source: eng-security-owasp-llm02-2025
-    supports: OWASP calls for validating and sanitizing model output before disclosure. Moonweave therefore records the exact pre-disclosure content being evaluated.
-    locator: LLM02:2025 > Prevention and Mitigation Strategies > Output validation and sanitization
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-disclosure-control-activity-004
-    source: eng-security-owasp-llm02-2025
-    supports: OWASP recommends least privilege and restricting access according to user or process needs. Moonweave makes that disclosure boundary explicit per activity.
-    locator: LLM02:2025 > Prevention and Mitigation Strategies > Access Controls and Least Privilege
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-disclosure-control-activity-005
-    source: eng-security-owasp-llm02-2025
-    supports: OWASP recommends enforceable data-handling and sanitization controls. Moonweave records the precise rule revision that governed a runtime decision.
-    locator: LLM02:2025 > Prevention and Mitigation Strategies
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-disclosure-control-activity-006
-    source: eng-security-owasp-llm02-2025
-    supports: OWASP ties disclosure prevention to access controls and least privilege. Moonweave freezes the authority facts used by each decision for later audit.
-    locator: LLM02:2025 > Prevention and Mitigation Strategies > Access Controls and Least Privilege
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-disclosure-control-activity-007
-    source: eng-security-owasp-llm02-2025
-    supports: OWASP's least-privilege guidance permits only information required by the authorized recipient. Moonweave names the affirmative disposition release.
-    locator: LLM02:2025 > Prevention and Mitigation Strategies > Least Privilege
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-disclosure-control-activity-008
-    source: eng-security-owasp-llm02-2025
-    supports: OWASP recommends data sanitization and masking before output. Moonweave represents that selected disposition as redact.
-    locator: LLM02:2025 > Prevention and Mitigation Strategies > Sanitization
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-disclosure-control-activity-009
-    source: eng-security-owasp-llm02-2025
-    supports: OWASP recommends limiting access to need-to-know information. Moonweave models conditional later release as a staged disposition.
-    locator: LLM02:2025 > Prevention and Mitigation Strategies > Access Controls and Least Privilege
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-disclosure-control-activity-010
-    source: eng-security-owasp-llm02-2025
-    supports: OWASP recommends restricting access to sensitive information. Moonweave represents full withholding as suppress.
-    locator: LLM02:2025 > Prevention and Mitigation Strategies > Access Controls
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-disclosure-control-activity-011
-    source: eng-security-owasp-llm02-2025
-    supports: OWASP recommends governance and access controls for sensitive output. Moonweave models abstention pending an authorized decision as escalation.
-    locator: LLM02:2025 > Prevention and Mitigation Strategies
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-disclosure-control-activity-012
-    source: eng-security-owasp-llm02-2025
-    supports: OWASP distinguishes access restriction from sanitization and masking. Moonweave turns those control choices into an explicit, auditable action vocabulary.
-    locator: LLM02:2025 > Prevention and Mitigation Strategies > Sanitization and Access Controls
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-disclosure-control-activity-013
-    source: eng-security-owasp-llm02-2025
-    supports: OWASP recommends governance and logging around sensitive-data controls. Moonweave links each activity to its canonical auditable decision record.
-    locator: LLM02:2025 > Prevention and Mitigation Strategies
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-disclosure-control-activity-014
-    source: eng-security-owasp-llm02-2025
-    supports: OWASP recommends enforceable and auditable access controls. Moonweave timestamps each runtime decision so its governing authority can be reconstructed.
-    locator: LLM02:2025 > Prevention and Mitigation Strategies > Access Controls
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-disclosure-control-activity-015
-    source: eng-security-owasp-llm02-2025
-    supports: OWASP recommends sanitization together with least privilege and access controls. Moonweave requires every runtime disposition to retain the evidence connecting these controls.
-    locator: LLM02:2025 > Prevention and Mitigation Strategies > Sanitization and Access Controls
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-disclosure-control-activity-016
-    source: eng-security-owasp-llm02-2025
-    supports: OWASP recommends sanitization, masking, least privilege, and restricted data access to prevent sensitive-information disclosure; Moonweave groups their runtime application as DisclosureControlActivity.
-    locator: LLM02:2025 > Prevention and Mitigation Strategies > Sanitization and Access Controls
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-disclosure-control-activity-017
-    source: eng-security-owasp-llm02-2025
-    supports: OWASP's mitigations concern sensitive-data sanitization and access control, supporting the boundary from presentation-only formatting.
-    locator: LLM02:2025 > Prevention and Mitigation Strategies > Sanitization and Access Controls
+  - id: claim-disclosure-activity-presidio
+    source: presidio-docs
+    supports: Presidio anonymize execution maps to DisclosureControlActivity with rule and span transform evidence.
+    locator: AnonymizerEngine usage
     evidence_kind: official
     confidence: high
-    review_status: accepted
-  - id: claim-disclosure-control-activity-018
-    source: eng-security-mcp-nsa-2026
-    supports: NSA recommends least privilege, validation, and monitoring for data handled through MCP; the concrete control-run record is Moonweave's execution representation.
-    locator: MCP Security Design Considerations > Recommendations for data validation, least privilege, logging, and monitoring
+  - id: claim-disclosure-activity-anthropic
+    source: anthropic-messages-api
+    supports: Anthropic output filtering events map to DisclosureControlActivity suppress disposition records.
+    locator: Messages API safety
+    evidence_kind: official
+    confidence: medium
+  - id: claim-disclosure-activity-design
+    source: safety-disclosure-design
+    supports: Moonweave separates executed DisclosureControlActivity from DisclosureRule, SensitiveSpan, and transform subtypes.
+    locator: DisclosureControlActivity execution boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted

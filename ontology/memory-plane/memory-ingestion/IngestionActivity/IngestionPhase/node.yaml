@@ -1,344 +1,228 @@
 schema: moonweave.ai/ontology-node/v1
 id: IngestionPhase
 kind: concept
-status: accepted
 labels:
   zh: 摄入阶段
   en: Ingestion phase
-  ja: 取込phase
+  ja: 取込フェーズ
 semantics:
   short_definition:
-    zh: 一次 IngestionRun 内具有顺序和局部输入输出的活动。
-    en: An activity within an IngestionRun with sequence and local input/output.
-    ja: 一 IngestionRun 内で順序とlocal入出力を持つactivityです。
+    zh: 属于一次摄入运行的局部可组合处理步骤。
+    en: Local composable processing step belonging to one ingestion run.
+    ja: 一 ingestion run に属する local composable 処理 step。
   definition:
-    zh: IngestionPhase 是 IngestionRun 中可单独审计的局部 IngestionActivity，拥有 phase_id、所属 run 与顺序号并只负责一个转换职责；它不是完整运行或输出文档。
-    en: IngestionPhase is a separately auditable local IngestionActivity within an IngestionRun, owning phase_id, run membership, and sequence while carrying one transformation responsibility; it is not the complete run or output document.
-    ja: IngestionPhase は IngestionRun 内で個別監査でき phase_id・run所属・順序を持ち一変換責務だけを担うlocal IngestionActivityで、完全runやoutput documentではありません。
+    zh: IngestionPhase 是具有 phase_id、ingestion_run_id 与 sequence 的 IngestionActivity 子类，表示运行内单一阶段（如 normalize 或 dedup）；LlamaIndex pipeline 内 transformation 步骤与 LangChain transform 链各段均映射为阶段；不是完整 IngestionRun。
+    en: IngestionPhase is an IngestionActivity subtype with phase_id, ingestion_run_id, and sequence representing one in-run stage (e.g., normalize or dedup); LlamaIndex pipeline transformation steps and LangChain transform chain segments map to phases; not a complete IngestionRun.
+    ja: IngestionPhase は phase_id/ingestion_run_id/sequence を持つ IngestionActivity subtype。run 内単一 stage（normalize/dedup 等）。LlamaIndex pipeline transformation step/LangChain transform chain segment に対応。complete IngestionRun ではない。
   why_needed:
-    zh: 显式补上运行与规范化/去重活动之间的阶段层。
-    en: Explicitly adds the phase layer between a run and normalization/deduplication activities.
-    ja: runとnormalization/deduplication activityの間にphase階層を明示追加します。
+    zh: 把 normalize 与 dedup 等步骤从完整运行中分离，支持阶段级失败隔离与顺序审计。
+    en: Separates steps like normalize and dedup from complete runs, supporting phase-level failure isolation and ordering audit.
+    ja: normalize/dedup 等 step を complete run から分離し phase 級 failure isolation/順序 audit を支援。
   includes:
-    - zh: 纳入规范化、去重等有局部输入输出的阶段。
-      en: Includes normalization, deduplication, and other phases with local inputs/outputs.
-      ja: normalization・deduplication等local入出力を持つphaseを含みます。
+    - zh: 纳入 NormalizationActivity 与 DeduplicationActivity。
+      en: Includes NormalizationActivity and DeduplicationActivity.
+      ja: NormalizationActivity・DeduplicationActivity。
   excludes:
-    - zh: 排除完整 IngestionRun、触发事件和产出信息。
-      en: Excludes complete IngestionRun, trigger events, and produced information.
-      ja: 完全IngestionRun・trigger event・生成informationを除外します。
+    - zh: 排除 IngestionRun、Document 与 DeduplicationDecision。
+      en: Excludes IngestionRun, Document, and DeduplicationDecision.
+      ja: IngestionRun・Document・DeduplicationDecision を除外。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: IngestionPipeline 内 transformations 列表顺序即 phase sequence；Moonweave 要求 dedup phase sequence 位于 normalize 之后；阶段产物（Document、DeduplicationDecision）不提升为 run 本身。
+    en: IngestionPipeline transformations list order defines phase sequence; Moonweave requires dedup phase sequence after normalize; phase artifacts (Document, DeduplicationDecision) are not promoted to the run itself.
+    ja: IngestionPipeline transformations 列表順=phase sequence。Moonweave は dedup phase を normalize 後に要求。phase artifact（Document/DeduplicationDecision）は run 自体に昇格しない。
+  typical_input:
+    - description: Phase binding within ingestion run
+      format: |
+        {
+          "phase_id": "normalize-17",
+          "ingestion_run_id": "ingest-run-17",
+          "sequence": 1
+        }
+      source_claims: [claim-ingestion-phase-design]
+  typical_output:
+    - description: Phase completion with output artifact refs
+      format: |
+        {
+          "phase_id": "dedup-17",
+          "sequence": 2,
+          "output_refs": ["decision-17"]
+        }
+      source_claims: [claim-ingestion-phase-design]
+  reference_implementations:
+    - name: LlamaIndex IngestionPipeline
+      url: https://docs.llamaindex.ai/en/stable/module_guides/indexing/ingestion_pipeline/
+      description: Ordered transformation steps within pipeline.run.
 structure:
-  identity_keys:
-    - phase_id
+  identity_keys: [phase_id]
   fields:
     - id: phase_id
-      labels:
-        zh: 阶段标识
-        en: phase ID
-        ja: phase ID
+      labels: {zh: 阶段标识, en: Phase identifier, ja: phase 識別子}
+      definitions:
+        zh: 在 ingestion_run_id 范围内稳定标识阶段。
+        en: Stable phase identifier scoped to ingestion_run_id.
+        ja: ingestion_run_id スコープ内で phase を安定識別。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 稳定标识局部阶段。
-        en: Stable identifier for the local phase.
-        ja: local phaseの安定識別子です。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
-      example_value: phase-17-01
-      source_claims:
-        - claim-ingestion-phase-002
+      example_value: normalize-17
+      allowed_values: []
+      source_claims: [claim-ingestion-phase-id]
     - id: ingestion_run_id
-      labels:
-        zh: 所属运行
-        en: ingestion run ID
-        ja: 所属run ID
+      labels: {zh: 所属运行标识, en: Containing run identifier, ja: 所属 run 識別子}
+      definitions:
+        zh: 包含该阶段的 IngestionRun ingestion_run_id。
+        en: IngestionRun ingestion_run_id containing this phase.
+        ja: 当該 phase を含む IngestionRun ingestion_run_id。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 记录阶段所属完整运行。
-        en: Records the complete run containing this phase.
-        ja: phaseを含む完全runを記録します。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
       example_value: ingest-run-17
-      source_claims:
-        - claim-ingestion-phase-003
+      allowed_values: []
+      source_claims: [claim-ingestion-phase-run]
     - id: sequence
-      labels:
-        zh: 顺序号
-        en: sequence
-        ja: 順序
+      labels: {zh: 顺序号, en: Sequence number, ja: 順序番号}
+      definitions:
+        zh: 在运行计划内的唯一顺序整数；normalize 通常 precedes dedup。
+        en: Unique ordering integer within run plan; normalize typically precedes dedup.
+        ja: run plan 内一意順序整数。normalize は通常 dedup 先行。
       datatype: integer
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 记录运行内执行顺序。
-        en: Records execution order within the run.
-        ja: run内実行順序を記録します。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
       example_value: 1
-      source_claims:
-        - claim-ingestion-phase-004
+      allowed_values: []
+      source_claims: [claim-ingestion-phase-sequence]
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: IngestionPhase-example-positive-manual-20260716
-    kind: positive
+  - id: IngestionPhase-example-normalize-then-dedup
     labels:
-      zh: 摄入阶段正例
-      en: "Positive case: Ingestion phase"
-      ja: 取込phase正例
-    scenario_id: null
+      zh: 规范化后去重
+      en: Normalize then dedup
+      ja: normalize 後 dedup
     descriptions:
-      zh: phase-17-01 以 ingest-run-17、phase_id=normalize、sequence=1、局部 start/end、输入 info-17 与输出 document-17 识别。
-      en: phase-17-01 is identified by ingest-run-17, phase ID normalize, sequence 1, local start and end times, input info-17, and output document-17.
-      ja: phase-17-01 は ingest-run-17、phase ID、sequence 1、local start/end、input info-17、output document-17 で識別されます。
+      zh: ingest-run-17 含 sequence=1 的 normalize-17 与 sequence=2 的 dedup-17；dedup 消费 normalize 产出的 document-policy-v7。
+      en: ingest-run-17 includes normalize-17 at sequence=1 and dedup-17 at sequence=2; dedup consumes document-policy-v7 from normalize.
+      ja: ingest-run-17 に sequence=1 normalize-17、sequence=2 dedup-17。dedup が normalize 成果 document-policy-v7 を consume。
+    example_source:
+      product: LlamaIndex
+      url: https://docs.llamaindex.ai/en/stable/module_guides/indexing/ingestion_pipeline/
+      version: ordered transformations
     field_values:
-      phase_id: phase-17-01
       ingestion_run_id: ingest-run-17
-      sequence: 1
-      activity_id: phase-17-01
-      started_at: 2026-07-16T10:01:00Z
-      status: completed
-    related_node_ids:
-      - IngestionPhase
+      phases:
+        - {phase_id: normalize-17, sequence: 1}
+        - {phase_id: dedup-17, sequence: 2}
+    related_node_ids: [IngestionPhase, NormalizationActivity, DeduplicationActivity]
     related_relation_ids: []
-    expected_result:
-      zh: 将该运行内部的局部处理单元表示为 IngestionPhase，并保留完整 run 归属。
-      en: Represent the run-local processing unit as IngestionPhase while retaining its complete-run membership.
-      ja: 当該 run-local processing unit を IngestionPhase とし complete-run membership を保持します。
-    why_valid_or_invalid:
-      zh: 阶段拥有运行内唯一序号、局部时间和局部输入输出，但不覆盖读取到交接的全部执行范围。
-      en: The phase has a run-unique sequence, local time, and local inputs and outputs but does not cover the full execution from reading through handoff.
-      ja: phase は run-unique sequence、local time、local input/output を持つが reading-to-handoff 全範囲を覆いません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-ingestion-phase-005
-  - id: IngestionPhase-example-boundary-manual-20260716
-    kind: boundary
+    source_claims: [claim-ingestion-phase-llamaindex]
+  - id: IngestionPhase-example-offline-dedup
     labels:
-      zh: 摄入阶段边界例
-      en: "Boundary case: Ingestion phase"
-      ja: 取込phase境界例
-    scenario_id: null
+      zh: 离线去重非阶段
+      en: Offline dedup is not phase
+      ja: offline dedup は phase ではない
     descriptions:
-      zh: ingest-run-17 包含加载、规范化、去重与最终交接的整体时间和状态；它不是其中 sequence=1 的单一阶段。
-      en: ingest-run-17 spans loading, normalization, deduplication, and final handoff with overall time and state and is not the single phase at sequence 1.
-      ja: ingest-run-17 は loading、normalization、deduplication、handoff 全体を覆い sequence=1 の単一 phase ではありません。
+      zh: offline-dedup-9 处理同一 document 但 ingestion_run_id=maintenance-9，不在 ingest-run-17 清单中——共享输入不构成 phase 成员关系。
+      en: offline-dedup-9 processes the same document but ingestion_run_id=maintenance-9, absent from ingest-run-17 manifest—shared input does not establish phase membership.
+      ja: offline-dedup-9 は同一 document 処理だが ingestion_run_id=maintenance-9 で ingest-run-17 manifest 外。shared input は phase membership 構成しない。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
     field_values: {}
-    related_node_ids:
-      - IngestionPhase
+    related_node_ids: [IngestionPhase, DeduplicationActivity]
     related_relation_ids: []
-    expected_result:
-      zh: 把 ingest-run-17 保持为 IngestionRun，而不是 IngestionPhase。
-      en: Keep ingest-run-17 as IngestionRun rather than IngestionPhase.
-      ja: ingest-run-17 は IngestionRun とし IngestionPhase にしません。
-    why_valid_or_invalid:
-      zh: 完整运行编排多个阶段并拥有端到端结果；阶段只在该运行内拥有局部责任和顺序。
-      en: A complete run orchestrates several phases and owns end-to-end outcomes, while a phase has only local responsibility and order inside that run.
-      ja: complete run は複数 phase を編成し end-to-end outcome を持ち phase は local responsibility・order だけを持ちます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-ingestion-phase-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: IngestionRun
-    shared_parent_concept_id: IngestionActivity
-    differentia:
-      zh: 正向身份比较：父节点 IngestionActivity：IngestionPhase（semantic kind=activity，骨架 IngestionPhase-is_a-IngestionActivity）；IngestionRun（semantic kind=activity，骨架 IngestionRun-is_a-IngestionActivity）。双端条件：IngestionPhase 条件：“一次 IngestionRun 内具有顺序和局部输入输出的活动”；IngestionRun 条件：“按一份政策协调来源读取与有序阶段的完整摄入活动”。仅依据各自定义与骨架逐端验证。
-      en: "Positive identity comparison: parent IngestionActivity: IngestionPhase (semantic kind=activity, backbone IngestionPhase-is_a-IngestionActivity); IngestionRun (semantic kind=activity, backbone IngestionRun-is_a-IngestionActivity). Endpoint conditions: IngestionPhase condition: “An activity within an IngestionRun with sequence and local input/output”; IngestionRun condition: “A complete ingestion activity coordinating source reading and ordered phases under one policy”. Verify each endpoint from its own definition and backbone."
-      ja: 正の同一性比較：親 IngestionActivity：IngestionPhase（semantic kind=activity、バックボーン IngestionPhase-is_a-IngestionActivity）；IngestionRun（semantic kind=activity、バックボーン IngestionRun-is_a-IngestionActivity）。両端条件：IngestionPhase の条件：「一 IngestionRun 内で順序とlocal入出力を持つactivityです」；IngestionRun の条件：「一policy下でsource読込と順序phaseを調整する完全取込activityです」。各端を固有の定義とバックボーンで検証します。
-    source_claims:
-      - claim-ingestion-phase-007
+    source_claims: [claim-ingestion-phase-design]
+  - id: IngestionPhase-example-not-run
+    labels:
+      zh: 阶段非完整运行
+      en: Phase is not complete run
+      ja: phase は complete run ではない
+    descriptions:
+      zh: normalize-17 无 loader 选择、无跨阶段协调与端到端 policy 执行责任——不能因属于 ingest-run-17 而等同 IngestionRun。
+      en: normalize-17 lacks loader selection, cross-phase coordination, and end-to-end policy execution—membership in ingest-run-17 does not make it IngestionRun.
+      ja: normalize-17 は loader 選択/cross-phase coordination/end-to-end policy execution 欠如。ingest-run-17 所属でも IngestionRun 同等にならない。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
+    field_values: {}
+    related_node_ids: [IngestionPhase, IngestionRun]
+    related_relation_ids: []
+    source_claims: [claim-ingestion-phase-design]
 parent_relation:
   id: IngestionPhase-is_a-IngestionActivity
   predicate: is_a
   direction: target-to-source
   relation_kind: hierarchy
-  labels:
-    zh: 是一种
-    en: is a
-    ja: の一種である
+  labels: {zh: 是一种摄入活动, en: is an ingestion activity, ja: 取込アクティビティの一種}
   definitions:
-    zh: IngestionPhase 是 IngestionActivity 的严格子类；种差为：属于一个 IngestionRun、具有顺序号并只负责一个局部转换。
-    en: "IngestionPhase is a strict subtype of IngestionActivity; its reviewed differentia is: it belongs to one IngestionRun, has a sequence number, and owns one local transformation responsibility."
-    ja: IngestionPhase は IngestionActivity の厳密なsubtypeで、審査済み種差は「一 IngestionRun に属しsequence番号を持ち一local変換責務だけを担います。」です。
+    zh: IngestionPhase 种差为 run 内 phase_id、ingestion_run_id 与 sequence 限定的局部步骤。
+    en: IngestionPhase differentia is run-local step scoped by phase_id, ingestion_run_id, and sequence.
+    ja: IngestionPhase 種差は run 内 phase_id/ingestion_run_id/sequence で限定された local step。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
-    en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
-    ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
+    zh: 分类继承不使用实例关系基数。
+    en: Taxonomic inheritance does not use instance-relation cardinality.
+    ja: 分類継承にはインスタンス関係基数を用いない。
   inverse_reading:
     predicate: part_of
-    labels:
-      zh: 反向读取
-      en: inverse reading
-      ja: 逆方向読取
-  conditions:
-    - id: IngestionPhase-is_a-IngestionActivity-condition-manual-001
-      severity: error
-      expression_language: plain
-      expression: "Assert only when the object first satisfies IngestionActivity and also satisfies the differentia: it belongs to one IngestionRun, has a sequence number, and owns one local transformation responsibility."
-      explanations:
-        zh: 仅当对象首先满足 IngestionActivity 定义且满足种差“属于一个 IngestionRun、具有顺序号并只负责一个局部转换。”时成立。
-        en: "Assert only when the object first satisfies IngestionActivity and also satisfies the differentia: it belongs to one IngestionRun, has a sequence number, and owns one local transformation responsibility."
-        ja: 対象がまず IngestionActivity を満たし、さらに種差「一 IngestionRun に属しsequence番号を持ち一local変換責務だけを担います。」を満たす時だけ成立します。
-      source_claims:
-        - claim-ingestion-phase-008
+    labels: {zh: 反向：是一种, en: has subtype, ja: 逆方向：の一種である}
+  conditions: []
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: IngestionPhase-is_a-IngestionActivity-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 是一种正例
-        en: "Positive case: is a"
-        ja: の一種である正例
-      scenario_id: null
-      descriptions:
-        zh: phase-17-01 具有独立 start/end、输入 info-17、输出 document-17 与状态变化，并由 run_id 和 sequence=1 限定为 ingest-run-17 内的局部活动。
-        en: phase-17-01 has independent start and end times, input info-17, output document-17, and a state change and is scoped as a local activity in ingest-run-17 by run ID and sequence 1.
-        ja: phase-17-01 は start/end、input、output、state change を持ち run ID・sequence で local activity に限定されます。
-      field_values: {}
-      related_node_ids:
-        - IngestionPhase
-        - IngestionActivity
-      related_relation_ids:
-        - IngestionPhase-is_a-IngestionActivity
-      expected_result:
-        zh: 确认 phase-17-01 是 IngestionActivity 的 IngestionPhase 特化。
-        en: Confirm phase-17-01 as an IngestionPhase specialization of IngestionActivity.
-        ja: phase-17-01 を IngestionActivity の IngestionPhase specialization とします。
-      why_valid_or_invalid:
-        zh: 它满足有持续时间和输入输出的活动上位条件，并以运行成员资格和局部序号形成阶段种差。
-        en: It satisfies the parent activity conditions of duration, input, and output and adds run membership and local sequence as phase differentia.
-        ja: duration・input/output parent activity 条件を満たし run membership・local sequence を differentia とします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-ingestion-phase-008
-    - id: IngestionPhase-is_a-IngestionActivity-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 是一种边界例
-        en: "Boundary case: is a"
-        ja: の一種である境界例
-      scenario_id: null
-      descriptions:
-        zh: ingest-run-17 拥有从加载到最终交接的整体时间和多阶段协调，不是其内部一个局部 sequence。
-        en: ingest-run-17 owns the overall time and multi-phase coordination from loading through final handoff and is not one local sequence inside itself.
-        ja: ingest-run-17 は overall time・multi-phase coordination を持ち一 local sequence ではありません。
-      field_values: {}
-      related_node_ids:
-        - IngestionPhase
-        - IngestionActivity
-      related_relation_ids:
-        - IngestionPhase-is_a-IngestionActivity
-      expected_result:
-        zh: 不要通过该子类边把完整 IngestionRun 归为 IngestionPhase。
-        en: Do not use this subtype edge to classify the complete IngestionRun as IngestionPhase.
-        ja: この subtype edge で complete IngestionRun を IngestionPhase に分類しません。
-      why_valid_or_invalid:
-        zh: 上位活动成员资格不能抹去完整运行与局部阶段的范围差异；阶段还必须有运行内局部身份。
-        en: Shared membership in Activity does not erase the scope difference between a complete run and local phase; a phase additionally requires run-local identity.
-        ja: Activity membership 共通でも complete run と local phase の scope 差は消えず run-local identity が必要です。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-ingestion-phase-008
-  source_claims:
-    - claim-ingestion-phase-008
+  examples: []
+  source_claims: [claim-ingestion-phase-design]
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-ingestion-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 Anthropic Contextual Retrieval、LangChain text splitters/document loaders、LlamaIndex node parsers/ingestion pipeline、Unstructured 解析模式与 ETL 去重策略逐项人工语义核验通过。
-    en: Manually verified against Anthropic Contextual Retrieval, LangChain text splitters and document loaders, LlamaIndex node parsers and ingestion pipeline, Unstructured parsing patterns, and ETL deduplication strategies.
-    ja: Anthropic Contextual Retrieval、LangChain text splitters/document loaders、LlamaIndex node parsers/ingestion pipeline、Unstructured 解析パターン、ETL 重複排除戦略に照らし手動意味審査を完了しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-llamaindex-pipeline
+    title: LlamaIndex Ingestion Pipeline
+    publisher: LlamaIndex
+    url: https://docs.llamaindex.ai/en/stable/module_guides/indexing/ingestion_pipeline/
+    source_type: official-doc
+    relevance: Ordered transformation phases.
+  - id: src-ingestion-phase-design
+    title: Moonweave ingestion phase boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Phase versus complete run.
 source_claims:
-  - id: claim-ingestion-phase-001
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured's ordered ingest flow provides the operational basis for separately identified phases.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
+  - id: claim-ingestion-phase-llamaindex
+    source: src-llamaindex-pipeline
+    supports: IngestionPipeline applies transformations in ordered sequence within one run.
+    locator: transformations
+    evidence_kind: official
+    confidence: high
+  - id: claim-ingestion-phase-design
+    source: src-ingestion-phase-design
+    supports: Phases are run-local activities distinct from complete IngestionRun.
+    locator: boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-ingestion-phase-002
-    source: eng-fw-unstructured-ingestion
-    supports: IngestionPhase.phase_id records the separately auditable phase identity; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
+  - id: claim-ingestion-phase-id
+    source: src-ingestion-phase-design
+    supports: phase_id identifies phase within run scope.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-ingestion-phase-003
-    source: eng-fw-unstructured-ingestion
-    supports: IngestionPhase.ingestion_run_id records phase-to-run membership; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
+  - id: claim-ingestion-phase-run
+    source: src-ingestion-phase-design
+    supports: ingestion_run_id binds phase to parent run.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-ingestion-phase-004
-    source: eng-fw-unstructured-ingestion
-    supports: IngestionPhase.sequence records deterministic phase ordering; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
+  - id: claim-ingestion-phase-sequence
+    source: src-llamaindex-pipeline
+    supports: transformation order defines phase sequence within pipeline.run.
+    locator: IngestionPipeline
+    evidence_kind: official
     confidence: high
-    review_status: accepted
-  - id: claim-ingestion-phase-005
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured presents ingestion as ordered steps, each with distinct transformation behavior.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-ingestion-phase-006
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured distinguishes the overall ingest flow from each ordered step.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-ingestion-phase-007
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured documents an ordered ingestion flow composed of distinct steps from indexing and download through partitioning, chunking, embedding, staging, and upload. Moonweave models IngestionRun as the complete coordinated execution and IngestionPhase as one ordered step with local inputs and outputs; the class names and sibling placement are Moonweave design inferences.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-ingestion-phase-008
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured enumerates distinct ordered ingest steps inside the overall flow.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

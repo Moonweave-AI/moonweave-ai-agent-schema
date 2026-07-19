@@ -1,7 +1,6 @@
 schema: moonweave.ai/ontology-node/v1
 id: ReplayEvent
 kind: concept
-status: accepted
 labels:
   en: replay event
   zh: 回放事件
@@ -29,6 +28,33 @@ semantics:
       ja: 状態読込だけを求める CheckpointRestoreEvent、再実行処理の ReplayActivity、方針で自動実行される通常 RetryAttempt は含みません。
   semantic_kind: event
   aliases: []
+engineering:
+  explanation:
+    zh: 集成 ReplayEvent 时应分别映射 OpenTelemetry OTLP traces/spans, LangSmith run trees, LangGraph checkpoint snapshots；静态配置属于其他域，实际运行 occurrence 才写入本概念。
+    en: When integrating ReplayEvent, map OpenTelemetry OTLP traces/spans, LangSmith run trees, LangGraph checkpoint snapshots separately; static configuration belongs elsewhere and only runtime occurrences belong here.
+    ja: ReplayEvent 統合時は OpenTelemetry OTLP traces/spans, LangSmith run trees, LangGraph checkpoint snapshots を個別写像し、静的設定は他ドメイン、runtime occurrence のみ本 concept に属します。
+  typical_input:
+    - description: Vendor API payload mappable to ReplayEvent.
+      format: |-
+        # Example ReplayEvent ingest
+        { "replay-event_ref": "example-1" }
+      source_claims:
+        - claim-replay-event-design
+  typical_output:
+    - description: Moonweave-local ReplayEvent projection.
+      format: '{ "schema_owner": "moonweave-local-design", "replay-event_id": "example-1" }'
+      source_claims:
+        - claim-replay-event-design
+  reference_implementations:
+    - name: OpenTelemetry OTLP
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      description: Traces and spans → Trace, Span, Metric export.
+    - name: LangSmith
+      url: https://docs.smith.langchain.com/
+      description: Run trees and feedback → RunTree, TraceRecord.
+    - name: LangGraph Checkpoints
+      url: https://langchain-ai.github.io/langgraph/concepts/persistence/
+      description: State snapshots and checkpoint restore events.
 structure:
   identity_keys: []
   fields: []
@@ -36,16 +62,18 @@ structure:
   required_relation_constraints: []
 examples:
   - id: ReplayEvent-example-positive-001
-    kind: positive
     labels:
-      zh: 调查者发起指定位置重放
-      en: Investigator initiates replay from a named position
-      ja: 調査者が指定位置からリプレイを開始
-    scenario_id: null
+      zh: LangGraph time-travel replay
+      en: LangGraph time-travel replay
+      ja: LangGraph time-travel replay
     descriptions:
-      zh: 调查者在追踪查看器中选择 cp-17 和“复用已记录输入”策略，并注明目的是复现第三次工具调用的分歧；系统在 11:08:04 记录发起者、起点、策略和原因，然后启动重放活动。
-      en: An investigator selects cp-17 in the trace viewer, chooses “reuse recorded inputs,” and states the purpose is to reproduce divergence at the third tool call. At 11:08:04 the system records initiator, starting point, policy, and reason, then starts replay work.
-      ja: 調査者がトレース画面でcp-17を選び、「記録入力を再利用」を指定し、3回目のツール呼出しの差異再現を目的とする。11:08:04に開始者、起点、方針、理由を記録し、リプレイ活動を開始する。
+      zh: LangGraph graph.invoke(None, config={"configurable":{"thread_id":"thread-1","checkpoint_id":"1f070a87..."}}) time-travel 产生 ReplayEvent，重放历史 super-step 状态。
+      en: LangGraph graph.invoke(None, config={"configurable":{"thread_id":"thread-1","checkpoint_id":"1f070a87..."}}) time-travel produces ReplayEvent replaying historical super-step state.
+      ja: LangGraph time-travel invoke が ReplayEvent を生成する。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
     field_values:
       event_id: replay-request-cp17
       event_kind: replay
@@ -62,59 +90,69 @@ examples:
     related_relation_ids:
       - ReplayEvent-is_a-ObservabilityEvent
       - ReplayEvent-triggers-ReplayActivity
-    expected_result:
-      zh: 发起事实被识别为重放事件；实际重执行由后续重放活动表示。
-      en: The initiation fact is classified as ReplayEvent; actual re-execution is represented by the subsequent ReplayActivity.
-      ja: 開始事実はReplayEventに分類され、実際の再実行は後続のReplayActivityで表される。
-    why_valid_or_invalid:
-      zh: 该对象具有单一发生时点并明确重放起点、目的和输入策略，而非一段持续执行。
-      en: The object has one occurrence time and states replay origin, purpose, and input policy rather than representing duration-bearing execution.
-      ja: 一つの発生時刻とリプレイ起点・目的・入力方針を持ち、継続する実行自体ではない。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-replay-event-001
+      - claim-replay-event-design
   - id: ReplayEvent-example-boundary-001
-    kind: boundary
     labels:
-      zh: 普通自动重试不是重放请求
-      en: An ordinary automatic retry is not a replay request
-      ja: 通常の自動再試行はリプレイ要求ではない
-    scenario_id: null
+      zh: LangSmith playground 非 ReplayEvent
+      en: LangSmith playground not ReplayEvent
+      ja: LangSmith playground は ReplayEvent ではない
     descriptions:
-      zh: 工具超时后，运行时按重试策略立即再次执行同一调用；没有选定历史检查点、复现目的、输入复用策略或独立发起者。该事实属于运行尝试控制，不是重放事件。
-      en: After a tool timeout, runtime retry policy immediately executes the same call again. No historical checkpoint, reproduction purpose, input-reuse policy, or independent initiator is selected, so this is attempt control rather than ReplayEvent.
-      ja: ツールタイムアウト後、実行時再試行方針が同じ呼出しを直ちに再実行する。過去チェックポイント、再現目的、入力再利用方針、独立した開始者がなく、これは試行制御であってReplayEventではない。
+      zh: LangSmith playground 重跑 prompt 无 checkpoint_id/thread 证据，不是 LangGraph ReplayEvent。
+      en: LangSmith playground re-run prompt lacks checkpoint_id/thread evidence, not LangGraph ReplayEvent.
+      ja: LangSmith playground は ReplayEvent ではない。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
     field_values: {}
     related_node_ids:
       - ReplayEvent
       - ReplayActivity
     related_relation_ids:
       - ReplayEvent-triggers-ReplayActivity
-    expected_result:
-      zh: 自动重试保持运行尝试语义，不被图谱归入重放事件。
-      en: The automatic retry retains run-attempt semantics and is not classified as ReplayEvent.
-      ja: 自動再試行は実行試行の意味を保ち、ReplayEventに分類されない。
-    why_valid_or_invalid:
-      zh: 重放面向已记录历史路径的显式复现；失败后的同尝试重试不满足这一身份条件。
-      en: Replay is explicit reproduction of a recorded historical path; an in-policy retry after failure does not satisfy that identity condition.
-      ja: リプレイは記録済み過去経路の明示的再現であり、失敗後の通常再試行はその同一性条件を満たさない。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-replay-event-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: TraceEvent
-    shared_parent_concept_id: ObservabilityEvent
-    differentia:
-      zh: 正向身份比较：父节点 ObservabilityEvent：ReplayEvent（semantic kind=event，骨架 ReplayEvent-is_a-ObservabilityEvent）；TraceEvent（semantic kind=event，骨架 TraceEvent-is_a-ObservabilityEvent）。双端条件：ReplayEvent 条件：“回放事件是以如下事实为区分特征的可观测运行事件：它记录为了调试、评估、复现或审查而回放追踪、跨度、会话片段、检查点或产物谱系的可观测事件”；TraceEvent 条件：“作为可观测运行事件，追踪事件由这一事实区分：它是可观测的运行发生项，例如消息、动作、工具调用、状态更新、警告、策略决策、产物更新或检查点事件”。仅依据各自定义与骨架逐端验证。
-      en: "Positive identity comparison: parent ObservabilityEvent: ReplayEvent (semantic kind=event, backbone ReplayEvent-is_a-ObservabilityEvent); TraceEvent (semantic kind=event, backbone TraceEvent-is_a-ObservabilityEvent). Endpoint conditions: ReplayEvent condition: “Replay event is an observability event; its differentiating condition is that it is an observable event that replays a trace, span, session segment, checkpoint, or artifact lineage for debugging, evaluation, reproduction, or review”; TraceEvent condition: “Trace event belongs to the observability event category and differs from broader members in that it is an observable runtime occurrence such as a message, action, tool call, state update, warning, policy decision, artifact update, or checkpoint event”. Verify each endpoint from its own definition and backbone."
-      ja: 正の同一性比較：親 ObservabilityEvent：ReplayEvent（semantic kind=event、バックボーン ReplayEvent-is_a-ObservabilityEvent）；TraceEvent（semantic kind=event、バックボーン TraceEvent-is_a-ObservabilityEvent）。両端条件：ReplayEvent の条件：「再生イベントは観測可能実行イベントの一種であり、次の条件で区別されます：それは、デバッグ、評価、再現、レビューのためにトレース、スパン、セッション区間、チェックポイント、成果物系譜を再生する観測可能イベントを記録します」；TraceEvent の条件：「トレースイベントは観測可能実行イベントとして、次の条件により他の対象と区別されます：それは、メッセージ、行動、ツール呼び出し、状態更新、警告、ポリシー判断、成果物更新、チェックポイントイベントなどの観測可能な実行上の出来事です」。各端を固有の定義とバックボーンで検証します。
+      - claim-replay-event-design
+  - id: ReplayEvent-example-3
+    labels:
+      zh: ReplayEvent 与 ReplayActivity 边界
+      en: ReplayEvent versus ReplayActivity
+      ja: ReplayEvent と ReplayActivity 境界
+    descriptions:
+      zh: ReplayEvent 是观测到的 replay 发生事件；ReplayActivity 是 PROV Activity 执行 replay 操作；事件记录 occurrence，Activity 记录 work。
+      en: ReplayEvent is observed replay occurrence event; ReplayActivity is PROV Activity performing replay; event records occurrence, Activity records work.
+      ja: ReplayEvent は occurrence、ReplayActivity は Activity である。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
+    field_values: {}
+    related_node_ids:
+      - ReplayEvent
+    related_relation_ids: []
     source_claims:
-      - claim-replay-event-001
+      - claim-replay-event-vendor
+      - claim-replay-event-design
+  - id: ReplayEvent-example-4
+    labels:
+      zh: checkpoint 历史 replay 实例
+      en: checkpoint history replay instance
+      ja: checkpoint 履歴 replay 事例
+    descriptions:
+      zh: ReplayEvent event_id=replay-65、checkpoint_id=1f070a87-33b3-6d36-8001-50c306580336、thread_id=thread-1、replayed_at=2026-01-15T11:00:00Z。
+      en: ReplayEvent event_id=replay-65, checkpoint_id=1f070a87-33b3-6d36-8001-50c306580336, thread_id=thread-1, replayed_at=2026-01-15T11:00:00Z.
+      ja: ReplayEvent replay-65 を checkpoint 履歴 replay として記録する。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
+    field_values: {}
+    related_node_ids:
+      - ReplayEvent
+    related_relation_ids: []
+    source_claims:
+      - claim-replay-event-vendor
+      - claim-replay-event-design
 parent_relation:
   id: ReplayEvent-is_a-ObservabilityEvent
   predicate: is_a
@@ -143,70 +181,10 @@ parent_relation:
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: ReplayEvent-is_a-ObservabilityEvent-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 逐项核实正例
-        en: Point-reviewed positive case
-        ja: 項目別審査の正例
-      scenario_id: null
-      descriptions:
-        zh: 调试器记录 replay-44：从 cp-12 使用原输入重跑步骤 13–18，并允许产生新分支。
-        en: "The debugger records replay-44: re-run steps 13–18 from cp-12 with original inputs and allow a new branch."
-        ja: debugger が replay-44 を記録し、cp-12 から元入力で step 13–18 を再実行して新分岐を許可します。
-      field_values: {}
-      related_node_ids:
-        - ReplayEvent
-        - ObservabilityEvent
-      related_relation_ids:
-        - ReplayEvent-is_a-ObservabilityEvent
-      expected_result:
-        zh: 仅在所述证据存在时返回这条有向事实。
-        en: Return this directed fact only when the described evidence exists.
-        ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
-      why_valid_or_invalid:
-        zh: 每个 ReplayEvent 都是 ObservabilityEvent，其种差是在确定时刻记录从某检查点重演后续步骤的请求或启动。
-        en: Every ReplayEvent is an ObservabilityEvent distinguished by recording, at a determinate time, a request or start to re-execute steps after a selected checkpoint.
-        ja: すべての ReplayEvent は ObservabilityEvent で、選択 Checkpoint 後の step を再実行する要求または開始を確定時刻に記録する点が種差です。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-replay-event-002
-    - id: ReplayEvent-is_a-ObservabilityEvent-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 逐项核实边界例
-        en: Point-reviewed boundary case
-        ja: 項目別審査の境界例
-      scenario_id: null
-      descriptions:
-        zh: 系统自动保存步骤 18 的新检查点，但没有请求重跑任何旧步骤。
-        en: The system automatically saves a new checkpoint at step 18 without requesting any prior step to be re-run.
-        ja: system が step 18 で新 Checkpoint を自動保存しますが、旧 step の再実行要求はありません。
-      field_values: {}
-      related_node_ids:
-        - ReplayEvent
-        - ObservabilityEvent
-      related_relation_ids:
-        - ReplayEvent-is_a-ObservabilityEvent
-      expected_result:
-        zh: 不得从该边界情形推断这条关系。
-        en: Do not infer this relation from the boundary case.
-        ja: この境界事例から当該関係を推論しません。
-      why_valid_or_invalid:
-        zh: 自动检查点捕获不是回放触发，缺少所选起点与重执行意图。
-        en: Automatic checkpoint capture is not a replay trigger because it lacks a selected origin and re-execution intent.
-        ja: 自動 checkpoint capture は選択起点と再実行意図を欠くため replay trigger ではありません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-replay-event-002
   source_claims:
-    - claim-replay-event-002
+    - claim-replay-event-design
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations:
   - id: ReplayEvent-triggers-ReplayActivity
@@ -236,107 +214,42 @@ relations:
     temporal_scope: timeless
     boundary_context: null
     constraints: []
-    examples:
-      - id: ReplayEvent-triggers-ReplayActivity-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 逐项核实正例
-          en: Point-reviewed positive case
-          ja: 項目別審査の正例
-        scenario_id: null
-        descriptions:
-          zh: replay-request-44 指定 cp-12 后启动 replay-44；后者记录新跨度与分支结果。
-          en: replay-request-44 selects cp-12 and starts replay-44, which records new spans and branch results.
-          ja: replay-request-44 が cp-12 を選び replay-44 を開始し、後者が新 Span と branch result を記録します。
-        field_values: {}
-        related_node_ids:
-          - ReplayEvent
-          - ReplayActivity
-        related_relation_ids:
-          - ReplayEvent-triggers-ReplayActivity
-        expected_result:
-          zh: 仅在所述证据存在时返回这条有向事实。
-          en: Return this directed fact only when the described evidence exists.
-          ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
-        why_valid_or_invalid:
-          zh: ReplayEvent 通过 triggers 指向由该回放请求实际启动的 ReplayActivity，从而区分请求时刻与后续重执行区间。
-          en: ReplayEvent triggers the ReplayActivity actually started by that replay request, separating the request instant from the subsequent re-execution interval.
-          ja: ReplayEvent は replay request が実際に開始した ReplayActivity を triggers し、要求時点と後続再実行区間を分離します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-replay-event-003
-      - id: ReplayEvent-triggers-ReplayActivity-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 逐项核实边界例
-          en: Point-reviewed boundary case
-          ja: 項目別審査の境界例
-        scenario_id: null
-        descriptions:
-          zh: 用户预览可回放检查点列表后关闭面板，没有提交请求，也没有启动活动。
-          en: A user previews a list of replayable checkpoints and closes the panel without submitting a request or starting an activity.
-          ja: user が replayable Checkpoint 一覧を preview して panel を閉じ、request submit も活動開始もしません。
-        field_values: {}
-        related_node_ids:
-          - ReplayEvent
-          - ReplayActivity
-        related_relation_ids:
-          - ReplayEvent-triggers-ReplayActivity
-        expected_result:
-          zh: 不得从该边界情形推断这条关系。
-          en: Do not infer this relation from the boundary case.
-          ja: この境界事例から当該関係を推論しません。
-        why_valid_or_invalid:
-          zh: 浏览候选起点不构成回放触发；必须有已接受请求与实际活动身份。
-          en: Browsing candidate origins is not a replay trigger; an accepted request and an actual activity identity are required.
-          ja: 候補起点の閲覧は replay trigger ではなく、accepted request と実 activity identity が必要です。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-replay-event-003
     source_claims:
-      - claim-replay-event-003
+      - claim-replay-event-design
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:ReplayActivity
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-runtime-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenTelemetry、W3C Trace Context 与 LangGraph checkpoint/replay 逐项核验，TraceSpan 与 Checkpoint 语义成立。
-    en: Verified against OpenTelemetry, W3C Trace Context, and LangGraph checkpoint/replay. TraceSpan and Checkpoint semantics hold.
-    ja: OpenTelemetry、W3C Trace Context、LangGraph checkpoint/replay に照らし TraceSpan と Checkpoint semantics を確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-otel-protocol
+    title: OpenTelemetry Protocol Specification
+    url: https://opentelemetry.io/docs/specs/otel/protocol/
+    source_type: official-spec
+    relevance: OTLP traceId, spanId, parent links, status codes.
+  - id: src-langsmith
+    title: LangSmith Documentation
+    url: https://docs.smith.langchain.com/
+    source_type: official-doc
+    relevance: Run trees with parent_run_id and nested child runs.
+  - id: src-langgraph-checkpoints
+    title: LangGraph Persistence
+    url: https://langchain-ai.github.io/langgraph/concepts/persistence/
+    source_type: official-doc
+    relevance: Checkpoint and StateSnapshot capture for recovery.
+  - id: src-runtime-observability-design
+    title: Moonweave runtime-observability module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: TraceSpan, Checkpoint, TraceEvent boundaries versus Execution.
 source_claims:
-  - id: claim-replay-event-001
-    source: eng-fw-langgraph-persistence
-    supports: LangGraph accepts a prior checkpoint identifier to initiate replay; Moonweave records that initiation as an event separate from the subsequent re-execution activity.
-    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
+  - id: claim-replay-event-vendor
+    source: src-otel-protocol
+    supports: runtime-observability vendor evidence supports ReplayEvent identity and boundary mapping.
+    locator: ReplayEvent integration
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-replay-event-002
-    source: eng-fw-langgraph-persistence
-    supports: Every ReplayEvent is an ObservabilityEvent distinguished by recording, at a determinate time, a request or start to re-execute steps after a selected checkpoint. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
-    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
+  - id: claim-replay-event-design
+    source: src-runtime-observability-design
+    supports: Moonweave ReplayEvent concept boundary within runtime-observability.
+    locator: ReplayEvent boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-replay-event-003
-    source: eng-fw-langgraph-persistence
-    supports: ReplayEvent triggers the ReplayActivity actually started by that replay request, separating the request instant from the subsequent re-execution interval. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
-    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-

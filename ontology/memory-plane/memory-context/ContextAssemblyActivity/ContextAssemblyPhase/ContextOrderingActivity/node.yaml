@@ -1,395 +1,296 @@
 schema: moonweave.ai/ontology-node/v1
 id: ContextOrderingActivity
 kind: concept
-status: accepted
 labels:
   zh: 上下文排序活动
   en: Context ordering activity
-  ja: コンテキスト順序付け活動
+  ja: コンテキスト整列活動
 semantics:
   short_definition:
-    zh: 为已选上下文项确定稳定序列位置和邻接关系的组装阶段。
-    en: An assembly phase that assigns stable sequence positions and adjacency to selected context items.
-    ja: 選択済みコンテキスト項目へ安定した列位置と隣接関係を割り当てる組立段階です。
+    zh: 为已选候选项确定最终窗口内顺序的组装阶段。
+    en: Assembly phase assigning final in-window order to already-selected items.
+    ja: 選択済み item の final in-window 順序を決める assembly phase。
   definition:
-    zh: 上下文排序活动是一种 ContextAssembly 组成阶段；其种差是：它接收已经完成纳入判定的项目，依据 ContextOrderingRule 生成确定性序列位置与邻接关系，但不新增候选，也不因容量删除项目。
-    en: A context ordering activity is a component phase of ContextAssembly. It receives items whose inclusion has already been decided and applies ContextOrderingRules to produce deterministic positions and adjacency, without adding candidates or deleting items for capacity.
-    ja: コンテキスト順序付け活動は ContextAssembly の構成段階です。採用判定済み項目を受け、ContextOrderingRule により決定的な位置と隣接を生成しますが、候補追加や容量理由の削除は行いません。
+    zh: ContextOrderingActivity 是 ContextAssemblyPhase；对已选候选项应用 ContextOrderingRule，确定 system→user→assistant 角色顺序、recency priority（最近消息/文件优先）与 authority tie-break。它不改变成员资格或总 token 长度，只改变相对位置。
+    en: ContextOrderingActivity is a ContextAssemblyPhase applying ContextOrderingRule to selected items, determining system→user→assistant role order, recency priority (recent messages/files first), and authority tie-breaks. It changes relative position only—not membership or total token length.
+    ja: ContextOrderingActivity は ContextOrderingRule を選択済み item に適用し system→user→assistant role order/recency priority（recent message/file 優先）/authority tie-break を決める ContextAssemblyPhase。membership/total token length は変えず相対位置のみ変更。
   why_needed:
-    zh: 单独记录排序阶段可解释系统指令、最近消息和检索证据为何处于特定位置，并复核裁剪后相对顺序是否保持。
-    en: Recording this phase explains why system instructions, recent messages, and retrieved evidence occupy particular positions and verifies that trimming preserved relative order.
-    ja: この段階を記録すると、システム指示・最近メッセージ・検索証拠が特定位置にある理由と、裁剪後に相対順序が保たれたかを検証できます。
+    zh: 排序独立后可解释为何 system prompt 在 slot 1、tool results 紧随 assistant、Cursor recent files 靠近用户消息——这些影响模型注意力分布。
+    en: Separate ordering explains why system prompt sits in slot 1, tool results follow assistant, and Cursor recent files sit near user messages—affecting model attention distribution.
+    ja: ordering 独立で system prompt slot 1/tool results が assistant 直後/Cursor recent files が user message 近傍の理由説明可能。model attention 分布に影響。
   includes:
-    - zh: 纳入记录输入集合、所用排序规则版本、每项序位和平局处理结果的排序阶段。
-      en: Includes ordering phases that record the input set, ordering-rule version, position of every item, and tie-breaking outcome.
-      ja: 入力集合、順序規則版、各項目の順位、同順位処理結果を記録する順序付け段階を含みます。
+    - zh: 纳入对已选集合应用排序规则并输出 ordinal 分配的选择后阶段。
+      en: Includes post-selection phases applying ordering rules and emitting ordinal assignments.
+      ja: ordering rule 適用と ordinal 割当を出力する post-selection phase。
   excludes:
-    - zh: 排除决定是否纳入候选的 ContextSelectionActivity，以及为满足容量而删除或缩短内容的 ContextTrimmingActivity。
-      en: Excludes ContextSelectionActivity, which decides inclusion, and ContextTrimmingActivity, which removes or shortens content to meet capacity.
-      ja: 採用を決める ContextSelectionActivity と、容量を満たすため内容を削除・短縮する ContextTrimmingActivity を除外します。
+    - zh: 排除候选选择（ContextSelectionActivity）与容量裁剪（ContextTrimmingActivity）。
+      en: Excludes candidate selection (ContextSelectionActivity) and capacity trimming (ContextTrimmingActivity).
+      ja: candidate selection（ContextSelectionActivity）/capacity trimming（ContextTrimmingActivity）を除外。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: Anthropic Messages API 要求 system 在前、tool_result 作为 user content 跟随 assistant；Cursor 典型顺序 system rules → user message → @ referenced files → recent files → semantic hits；Manus 将 todo.md 复述注入 context tail 以保持 recency；ContextOrderingRule 声明可复用顺序策略。
+    en: Anthropic Messages API requires system first, tool_result as user content after assistant; Cursor typical order system rules → user message → @ referenced files → recent files → semantic hits; Manus injects todo.md recitation at context tail for recency; ContextOrderingRule declares reusable ordering policies.
+    ja: Anthropic Messages API は system 先、tool_result は assistant 後 user content。Cursor 典型順序 system rules→user message→@ files→recent files→semantic hits。Manus は todo.md 復唱を context tail 注入。ContextOrderingRule は reusable ordering policy 宣言。
+  typical_input:
+    - description: Selected items before ordering
+      format: |
+        {
+          "selected": [
+            {"source_ref": "chunk-42@v7", "role": "retrieved_evidence"},
+            {"source_ref": "middleware.ts@vabc", "role": "referenced_file"},
+            {"source_ref": "message-v41", "role": "user_message"}
+          ]
+        }
+      source_claims: [claim-context-ordering-input]
+  typical_output:
+    - description: Ordered slot ordinals
+      format: |
+        {
+          "ordered_slots": [
+            {"ordinal": 1, "role": "system_instruction"},
+            {"ordinal": 2, "role": "user_message"},
+            {"ordinal": 3, "role": "referenced_file"},
+            {"ordinal": 4, "role": "retrieved_evidence"}
+          ]
+        }
+      source_claims: [claim-context-ordering-design]
+  reference_implementations:
+    - name: Anthropic Messages API
+      url: https://docs.anthropic.com/en/api/messages
+      description: Role-ordered message slots.
+    - name: Cursor Agent Context
+      url: https://cursor.com/docs/agent/tools/search
+      description: system → user → @ refs → recent ordering.
 structure:
-  identity_keys: []
-  fields: []
+  identity_keys:
+    - phase_id
+  fields:
+    - id: phase_id
+      labels:
+        zh: 阶段标识
+        en: Phase identifier
+        ja: phase 識別子
+      definitions:
+        zh: 稳定标识一次排序阶段运行。
+        en: Stable identifier for one ordering phase run.
+        ja: 一 ordering phase run を安定識別。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      pattern: null
+      example_value: phase-order-204
+      allowed_values: []
+      source_claims:
+        - claim-context-ordering-id
+    - id: ordering_rule_ref
+      labels:
+        zh: 排序规则引用
+        en: Ordering rule reference
+        ja: ordering rule ref
+      definitions:
+        zh: 引用本次阶段应用的 ContextOrderingRule 修订版。
+        en: References the ContextOrderingRule revision applied in this phase.
+        ja: この phase で適用した ContextOrderingRule revision を参照。
+      datatype: reference
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      pattern: null
+      example_value: rule-recency@v3
+      allowed_values: []
+      source_claims:
+        - claim-context-ordering-rule
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: ContextOrderingActivity-example-positive-001
-    kind: positive
+  - id: ContextOrderingActivity-example-claude-roles
     labels:
-      zh: 上下文排序活动正例
-      en: Positive example of Context ordering activity
-      ja: コンテキスト順序付け活動の正例
-    scenario_id: null
+      zh: Claude 角色排序
+      en: Claude role ordering
+      ja: Claude role ordering
     descriptions:
-      zh: 排序阶段 order-17 接收六个已选项目，依据角色优先、因果依赖和同组内新鲜度，产出固定序列 instruction→task-state→tool-result→evidence-1→evidence-2→summary。
-      en: Ordering phase order-17 receives six selected items and, using role precedence, causal dependencies, and freshness within peer groups, emits the stable sequence instruction→task-state→tool-result→evidence-1→evidence-2→summary.
-      ja: 順序付け段階 order-17 は選択済み六項目を受け取り、役割優先、因果依存、同群内新鮮度により instruction→task-state→tool-result→evidence-1→evidence-2→summary の安定列を出力します。
+      zh: phase-order-88 按 API 约定：slot 1 system，slot 2–5 user/assistant 交替，slot 6–7 tool_result blocks；不改变已选成员集合。
+      en: phase-order-88 per API convention slot 1 system, slots 2–5 user/assistant alternation, slots 6–7 tool_result blocks; selected membership unchanged.
+      ja: phase-order-88 は API 規約で slot 1 system、slot 2–5 user/assistant 交替、slot 6–7 tool_result。選択 membership 不変。
+    example_source:
+      product: Anthropic
+      url: https://docs.anthropic.com/en/api/messages
+      version: message ordering
     field_values:
-      assembly_id: order-17
-      target_call_ref: call-88
-      candidate_set_ref: selected-context-candidates-88@1
-      context_specification_ref: context-policy-production@12
-      started_at: 2026-07-16T04:00:00.070Z
-      ended_at: 2026-07-16T04:00:00.110Z
-      outcome: success
+      phase_id: phase-order-88
     related_node_ids:
       - ContextOrderingActivity
-      - ContextTrimmingActivity
-    related_relation_ids:
-      - ContextOrderingActivity-precedes-ContextTrimmingActivity
-    expected_result:
-      zh: 该运行可查询 ContextOrderingActivity 以及方向保持不变的事实 ContextOrderingActivity-precedes-ContextTrimmingActivity。
-      en: The run can query ContextOrderingActivity together with direction-preserving fact ContextOrderingActivity-precedes-ContextTrimmingActivity.
-      ja: この実行では ContextOrderingActivity と方向を保持した事実 ContextOrderingActivity-precedes-ContextTrimmingActivity を共に照会できます。
-    why_valid_or_invalid:
-      zh: 该场景同时给出真实运行语境、ContextOrderingActivity-precedes-ContextTrimmingActivity 的 canonical 方向、概念定义和可用字段值。
-      en: This is an executed phase that changes order and adjacency without adding or removing members; capacity trimming occurs only after this ordered result exists.
-      ja: このシナリオは実際の運用文脈、ContextOrderingActivity-precedes-ContextTrimmingActivity の canonical 方向、概念定義、利用可能な項目値を組み合わせます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - ContextSlot
+    related_relation_ids: []
     source_claims:
-      - claim-context-ordering-activity-003
-      - claim-context-ordering-activity-004
-  - id: ContextOrderingActivity-example-boundary-001
-    kind: boundary
+      - claim-context-ordering-anthropic
+  - id: ContextOrderingActivity-example-cursor
     labels:
-      zh: 上下文排序活动边界例
-      en: Boundary case for Context ordering activity
-      ja: コンテキスト順序付け活動の境界例
-    scenario_id: null
+      zh: Cursor 组装顺序
+      en: Cursor assembly order
+      ja: Cursor assembly order
     descriptions:
-      zh: 随后执行的 trim-17 删除 evidence-2 并把 summary 缩短到 300 tokens；它改变成员或范围而不重新计算剩余项顺序，因此属于 ContextTrimmingActivity 而非 ContextOrderingActivity。
-      en: The following trim-17 removes evidence-2 and shortens summary to 300 tokens. It changes membership or extent without recomputing the remaining order, so it is ContextTrimmingActivity rather than ContextOrderingActivity.
-      ja: 後続 trim-17 は evidence-2 を除き summary を300 tokensへ短縮します。残存順序を再計算せず構成員または範囲を変えるため、ContextOrderingActivity ではなく ContextTrimmingActivity です。
+      zh: phase-order-204 顺序：system rules → user message → @ referenced files（高 authority 先）→ recent files（按 mtime desc）→ semantic hits（按 score desc）。
+      en: phase-order-204 order system rules → user message → @ referenced files (high authority first) → recent files (mtime desc) → semantic hits (score desc).
+      ja: phase-order-204 順序：system rules→user message→@ files（高 authority 先）→recent files（mtime desc）→semantic hits（score desc）。
+    example_source:
+      product: Cursor
+      url: https://cursor.com/docs/agent/tools/search
+      version: assembly order
+    field_values:
+      phase_id: phase-order-204
+      ordering_rule_ref: rule-cursor-default@v2
+    related_node_ids:
+      - ContextOrderingActivity
+      - ContextOrderingRule
+    related_relation_ids: []
+    source_claims:
+      - claim-context-ordering-cursor
+  - id: ContextOrderingActivity-example-recency-tail
+    labels:
+      zh: 近期优先尾部注入
+      en: Recency-priority tail injection
+      ja: recency priority tail injection
+    descriptions:
+      zh: Manus 风格 rule-recency 将 todo.md 当前目标复述放在 context tail（最高 recency ordinal），使 global plan 保持在近期注意力区。
+      en: Manus-style rule-recency places todo.md current objective recitation at context tail (highest recency ordinal) keeping global plan in recent attention zone.
+      ja: Manus 風 rule-recency が todo.md 現目標復唱を context tail（最高 recency ordinal）配置。global plan を recent attention 域に保持。
+    example_source:
+      product: LangChain
+      url: https://www.langchain.com/blog/context-engineering-for-agents
+      version: recency patterns
+    field_values:
+      ordering_rule_ref: rule-recency@v3
+    related_node_ids:
+      - ContextOrderingActivity
+      - ContextOrderingRule
+    related_relation_ids: []
+    source_claims:
+      - claim-context-ordering-recency
+  - id: ContextOrderingActivity-example-not-selection
+    labels:
+      zh: 排序非选择
+      en: Ordering is not selection
+      ja: ordering は selection ではない
+    descriptions:
+      zh: phase-order-204 接收 phase-select-204 已采纳六项，只重排 ordinal，不新增 ContextExclusion；成员变更属于 ContextSelectionActivity。
+      en: phase-order-204 receives six items from phase-select-204, reorders ordinals only, adds no ContextExclusions; membership changes belong to ContextSelectionActivity.
+      ja: phase-order-204 は phase-select-204 採用 6 item 受取、ordinal 再配置のみ。ContextExclusion 追加なし。membership 変更は ContextSelectionActivity。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
     field_values: {}
     related_node_ids:
       - ContextOrderingActivity
-      - ContextTrimmingActivity
-    related_relation_ids:
-      - ContextOrderingActivity-precedes-ContextTrimmingActivity
-    expected_result:
-      zh: ContextTrimmingActivity 保持其原有类型，验证器不得凭关系共现把它提升为 ContextOrderingActivity。
-      en: ContextTrimmingActivity retains its own type; validation must not promote it to ContextOrderingActivity from relation co-occurrence.
-      ja: ContextTrimmingActivity は元の型を維持し、関係の共起だけで ContextOrderingActivity へ昇格してはなりません。
-    why_valid_or_invalid:
-      zh: 边界例点名实际对照节点，并保留 ContextOrderingActivity-precedes-ContextTrimmingActivity 的方向；只有显式 is_a 或完整种差才支持成员资格。
-      en: Ordering determines relative position over a fixed selected set; trimming changes membership or extent to satisfy capacity. Temporal adjacency does not collapse those different effects.
-      ja: 境界例は実在する対照ノードを示し、ContextOrderingActivity-precedes-ContextTrimmingActivity の方向を保持します。明示的 is_a または完全な種差だけが所属を支持します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - ContextSelectionActivity
+    related_relation_ids: []
     source_claims:
-      - claim-context-ordering-activity-005
-      - claim-context-ordering-activity-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-context-ordering-design
 parent_relation:
   id: ContextOrderingActivity-is_a-ContextAssemblyPhase
   predicate: is_a
   direction: target-to-source
   relation_kind: hierarchy
   labels:
-    zh: 排序活动是一种组装阶段
-    en: ordering activity is an assembly phase
-    ja: 整列活動は組立段階の一種
+    zh: 是一种组装阶段
+    en: is an assembly phase
+    ja: 組立段階の一種
   definitions:
-    zh: 每个 ContextOrderingActivity 都是 ContextAssemblyPhase；其种差是依据版本化比较规则为已选项分配稳定序位，且不改变纳入集合。
-    en: Every ContextOrderingActivity is a ContextAssemblyPhase distinguished by assigning stable positions to already selected items under versioned comparison rules without changing membership.
-    ja: すべての ContextOrderingActivity は ContextAssemblyPhase で、版管理比較規則により選択済み項目へ安定位置を割当て包含集合を変えない種差を持ちます。
+    zh: 每个 ContextOrderingActivity 都是 ContextAssemblyPhase；其种差是分配已选候选项的最终顺序，不决定纳入或裁剪。
+    en: Every ContextOrderingActivity is a ContextAssemblyPhase distinguished by assigning final order to selected items without deciding admission or trimming.
+    ja: すべての ContextOrderingActivity は ContextAssemblyPhase で選択済み item の final order 割当（admission/trim 決定なし）という種差。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 该关系的实例基数由调用、版本或部署约束决定，不在类级关系上统一封闭。
-    en: Instance cardinality depends on the call, version, or deployment and is not globally closed on the class-level relation.
-    ja: インスタンス基数は呼出し・版・配置制約に依存し、クラス関係上で一律に閉じません。
+    zh: 分类继承不使用实例关系基数。
+    en: Taxonomic inheritance does not use instance-relation cardinality.
+    ja: 分類継承にはインスタンス関係基数を用いない。
   inverse_reading:
     predicate: part_of
     labels:
-      zh: 以上下文排序活动为下位类型
-      en: has ContextOrderingActivity subtype
-      ja: ContextOrderingActivity を下位型に持つ
+      zh: 反向：是一种
+      en: has subtype
+      ja: 逆方向：の一種である
   conditions: []
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: ContextOrderingActivity-is_a-ContextAssemblyPhase-example-positive-001
-      kind: positive
-      labels:
-        zh: 排序活动是一种组装阶段正例
-        en: "Positive case: ordering activity is an assembly phase"
-        ja: 整列活動は組立段階の一種の正例
-      scenario_id: null
-      descriptions:
-        zh: order-88 按 system→user→tool、时间与稳定 ID 排出 7 项。
-        en: order-88 positions seven items by system→user→tool, timestamp, and stable ID.
-        ja: order-88 は system→user→tool、時刻、安定IDで7項目を整列します。
-      field_values: {}
-      related_node_ids:
-        - ContextOrderingActivity
-        - ContextAssemblyPhase
-      related_relation_ids:
-        - ContextOrderingActivity-is_a-ContextAssemblyPhase
-      expected_result:
-        zh: 输出中的每个位置都唯一确定，并能够按规则版本重放。
-        en: Output positions are unique and replayable.
-        ja: 出力位置は一意で再現可能です。
-      why_valid_or_invalid:
-        zh: 输入候选集合保持不变，只有相对顺序由已绑定规则版本决定。
-        en: Membership is unchanged and order follows the rule.
-        ja: 包含集合は不変で順序は規則に従います。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-context-ordering-activity-007
-    - id: ContextOrderingActivity-is_a-ContextAssemblyPhase-example-boundary-001
-      kind: boundary
-      labels:
-        zh: 排序活动是一种组装阶段边界例
-        en: "Boundary case: ordering activity is an assembly phase"
-        ja: 整列活動は組立段階の一種の境界例
-      scenario_id: null
-      descriptions:
-        zh: trim-88 删除低优先级项以满足 32k 上限。
-        en: trim-88 removes low-priority items to satisfy a 32k ceiling.
-        ja: trim-88 は32k上限のため低優先項目を削除します。
-      field_values: {}
-      related_node_ids:
-        - ContextOrderingActivity
-        - ContextAssemblyPhase
-      related_relation_ids:
-        - ContextOrderingActivity-is_a-ContextAssemblyPhase
-      expected_result:
-        zh: 裁剪活动不归入排序活动。
-        en: The trimming activity is not classified as ordering.
-        ja: 裁断活動を整列活動に分類しません。
-      why_valid_or_invalid:
-        zh: 删除候选会改变集合成员，而排序阶段只能为既有成员分配序位。
-        en: Removing items changes membership rather than only assigning positions.
-        ja: 項目削除は順序割当てだけでなく集合を変えます。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-context-ordering-activity-008
+  examples: []
   source_claims:
-    - claim-context-ordering-activity-009
+    - claim-context-ordering-design
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
-relations:
-  - id: ContextOrderingActivity-precedes-ContextTrimmingActivity
-    predicate: precedes
-    direction: source-to-target
-    relation_kind: temporal
-    labels:
-      zh: precedes
-      en: precedes
-      ja: precedes
-    definitions:
-      zh: ContextOrderingActivity-precedes-ContextTrimmingActivity 表示同一组装中排序输出成为裁剪输入，排序阶段完成时间不晚于裁剪开始；它不是跨运行的类型级固定时序。
-      en: ContextOrderingActivity-precedes-ContextTrimmingActivity states that, within one assembly, ordering output becomes trimming input and ordering completes no later than trimming starts. It is not a global type-level order across runs.
-      ja: ContextOrderingActivity-precedes-ContextTrimmingActivity は同一組立で整列出力が裁断入力となり整列完了が裁断開始以前であることを表し、実行横断の型級固定順序ではありません。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该语义事实不对所有运行实例施加统一基数。
-      en: This semantic fact does not impose one universal cardinality on every runtime instance.
-      ja: この意味事実はすべての実行インスタンスに一律の基数を課しません。
-    inverse_reading:
-      predicate: inverse_of_precedes
-      labels:
-        zh: 反向 precedes
-        en: inverse precedes
-        ja: 逆 precedes
-    conditions: []
-    temporal_scope: timeless
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: ContextOrderingActivity-precedes-ContextTrimmingActivity-example-positive-001
-        kind: positive
-        labels:
-          zh: precedes正例
-          en: "Positive case: precedes"
-          ja: precedesの正例
-        scenario_id: null
-        descriptions:
-          zh: order-2 在 10:00:03 输出序列，trim-3 于 10:00:04 读取该序列。
-          en: order-2 emits the sequence at 10:00:03 and trim-3 reads it at 10:00:04.
-          ja: order-2 は10:00:03に列を出力し trim-3 は10:00:04に読みます。
-        field_values: {}
-        related_node_ids:
-          - ContextOrderingActivity
-          - ContextTrimmingActivity
-        related_relation_ids:
-          - ContextOrderingActivity-precedes-ContextTrimmingActivity
-        expected_result:
-          zh: 时序查询返回相邻阶段和传递产物。
-          en: The temporal query returns adjacent phases and the transferred artifact.
-          ja: 時系列照会は隣接段階と受渡成果物を返します。
-        why_valid_or_invalid:
-          zh: 同一 assembly_id、时间和输入输出均吻合。
-          en: Assembly ID, times, and input/output all agree.
-          ja: assembly_id・時刻・入出力が一致します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-context-ordering-activity-010
-      - id: ContextOrderingActivity-precedes-ContextTrimmingActivity-example-boundary-001
-        kind: boundary
-        labels:
-          zh: precedes边界例
-          en: "Boundary case: precedes"
-          ja: precedesの境界例
-        scenario_id: null
-        descriptions:
-          zh: order-9 属于另一组装，虽时间更早也不 precede trim-3。
-          en: order-9 belongs to another assembly and does not precede trim-3 merely because its timestamp is earlier.
-          ja: order-9 は別組立で時刻が早くても trim-3 に precede しません。
-        field_values: {}
-        related_node_ids:
-          - ContextOrderingActivity
-          - ContextTrimmingActivity
-        related_relation_ids:
-          - ContextOrderingActivity-precedes-ContextTrimmingActivity
-        expected_result:
-          zh: 跨运行时间比较不形成该边。
-          en: Cross-run timestamp comparison does not create this edge.
-          ja: 実行横断時刻比較でこの辺を作りません。
-        why_valid_or_invalid:
-          zh: 该时序要求同一工作流和产物传递。
-          en: The ordering requires one workflow and artifact handoff.
-          ja: 同一workflowと成果物受渡しが必要です。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-context-ordering-activity-011
-    source_claims:
-      - claim-context-ordering-activity-012
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:ContextTrimmingActivity
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-lifecycle-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 该节点仅完成了从现行候选数据到唯一 YAML 树的无损转录；尚未逐项完成人工语义核验，不得据此宣称已审定。
-    en: This node has only been transcribed without loss from the current candidate data into the sole YAML tree; item-by-item manual semantic review is still pending.
-    ja: このノードは現行候補データから唯一の YAML ツリーへ欠落なく転記した段階であり、項目別の手動意味審査は未完了です。
-  sections:
-    semantics: pending
-    hierarchy: pending
-    relations: pending
-    structure: pending
-    examples: pending
-    source_claims: []
+relations: []
+sources:
+  - id: src-anthropic-messages
+    title: Messages API
+    publisher: Anthropic
+    url: https://docs.anthropic.com/en/api/messages
+    source_type: official-doc
+    relevance: system→user→assistant→tool_result ordering.
+  - id: src-cursor-context
+    title: Cursor Agent Search and Context
+    publisher: Cursor
+    url: https://cursor.com/docs/agent/tools/search
+    source_type: official-doc
+    relevance: Assembly slot ordering conventions.
+  - id: src-langchain-context-blog
+    title: Context Engineering for Agents
+    publisher: LangChain
+    url: https://www.langchain.com/blog/context-engineering-for-agents
+    source_type: official-doc
+    relevance: Recency and role ordering patterns.
+  - id: src-memory-context-design
+    title: Moonweave memory-context module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Ordering versus selection boundary.
 source_claims:
-  - id: claim-context-ordering-activity-001
-    source: eng-fw-deepagents-js-docs
-    supports: Deep Agents documents structured model context containing instructions, messages, memory, and compressed material, all of which must be presented to a model call in a concrete sequence. Moonweave reifies the run-specific determination of that sequence as ContextOrderingActivity; the class and its phase placement are design inferences.
-    locator: Context engineering in Deep Agents > Summarization > recent messages retained beside compressed history
-    evidence_kind: design-inference
+  - id: claim-context-ordering-anthropic
+    source: src-anthropic-messages
+    supports: Messages API enforces role-based slot ordering.
+    locator: Message format
+    evidence_kind: official
+    confidence: high
+  - id: claim-context-ordering-cursor
+    source: src-cursor-context
+    supports: Cursor orders system rules, user, @ refs, recent, search hits.
+    locator: Assembly
+    evidence_kind: official
+    confidence: high
+  - id: claim-context-ordering-recency
+    source: src-langchain-context-blog
+    supports: Recency priority places recent content near tail for attention.
+    locator: Ordering patterns
+    evidence_kind: official
     confidence: medium
-    review_status: accepted
-  - id: claim-context-ordering-activity-002
-    source: lit-agent-memory-as-action
-    supports: Memory as Action frames memory management as explicit operations chosen during agent execution. ContextOrderingActivity is Moonweave's run-level operation for fixing relative position and adjacency among already selected items, kept separate from selection and trimming.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-ordering-activity-003
-    source: eng-fw-deepagents-js-docs
-    supports: Deep Agents documents a deterministic context-preparation lifecycle before model calls, including keeping recent messages while compressing older content. Moonweave makes the ordering step observable so the final sequence can be audited independently of trimming.
-    locator: Context engineering in Deep Agents > Summarization > recent messages retained beside compressed history
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-ordering-activity-004
-    source: lit-agent-memory-as-action
-    supports: Memory as Action motivates agent-controlled memory operations under limited context. The concrete role/dependency/freshness ordering phase is Moonweave's auditable preparation activity, not an operation name asserted by the paper.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-ordering-activity-005
-    source: eng-fw-deepagents-js-docs
-    supports: Deep Agents distinguishes summarization and offloading, which change active content, from the resulting prompt order. Moonweave uses effect on membership/extent versus effect on order as the boundary test here.
-    locator: Context engineering in Deep Agents > Summarization > recent messages retained beside compressed history
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-ordering-activity-006
-    source: lit-agent-memory-as-action
-    supports: Memory as Action distinguishes operations by the memory transformation they perform. Moonweave accordingly separates a permutation of selected items from deletion, shortening, or summary replacement.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-ordering-activity-007
-    source: eng-fw-langchain-context-engineering
-    supports: Role, timestamp, and stable-ID comparison keys make the selected model-context order replayable.
-    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
+  - id: claim-context-ordering-design
+    source: src-memory-context-design
+    supports: Ordering assigns ordinals without changing membership.
+    locator: boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-context-ordering-activity-008
-    source: eng-fw-langchain-context-engineering
-    supports: Capacity-driven removal changes which context is present and therefore belongs to trimming rather than ordering.
-    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
+  - id: claim-context-ordering-id
+    source: src-memory-context-design
+    supports: phase_id identifies ordering phase runs.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-context-ordering-activity-009
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain describes controlling the messages and tools supplied to a model call; Moonweave separates deterministic ordering of the selected components into its own traceable phase.
-    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
+  - id: claim-context-ordering-rule
+    source: src-memory-context-design
+    supports: ordering_rule_ref links phase to ContextOrderingRule.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-context-ordering-activity-010
-    source: eng-fw-langchain-context-engineering
-    supports: Matching assembly identity, non-overlapping intervals, and explicit handoff establish execution-level precedence.
-    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
+  - id: claim-context-ordering-input
+    source: src-memory-context-design
+    supports: Ordering consumes output of selection phase.
+    locator: pipeline
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-context-ordering-activity-011
-    source: eng-fw-langchain-context-engineering
-    supports: An earlier timestamp in an unrelated run has no workflow or data dependency with trim-3.
-    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-context-ordering-activity-012
-    source: eng-fw-langchain-context-engineering
-    supports: Context construction controls both which components enter a call and their final form; Moonweave orders the concrete ordering and capacity phases when one phase's output feeds the next.
-    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

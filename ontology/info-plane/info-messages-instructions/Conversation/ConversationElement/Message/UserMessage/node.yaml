@@ -1,20 +1,19 @@
 schema: moonweave.ai/ontology-node/v1
 id: UserMessage
 kind: concept
-status: accepted
 labels:
   zh: 用户消息
   en: User message
   ja: ユーザーメッセージ
 semantics:
   short_definition:
-    zh: 由最终用户或应用所代表用户以 user 角色提交的消息。
-    en: A message submitted with the user role by an end user or an application representing one.
-    ja: end userまたはそれを代理するapplicationがuser roleで提出するmessageです。
+    zh: 可信包络 role=user、由最终用户或其应用入口发送的消息。
+    en: Message whose trusted envelope has role=user and sender is an end user or user-facing entry point.
+    ja: trusted envelope が role=user で end user または user-facing entry point が送信する message。
   definition:
-    zh: UserMessage 是 Message 的角色专门类型，其可信包络 role=user，发送者为最终用户或代理该用户的应用入口；它可承载请求、数据或引用材料，但内容中出现命令语气、系统字样或代理名称不会改变其角色身份。
-    en: UserMessage is a role specialization of Message whose trusted envelope has role=user and whose sender is an end user or an application entry point acting for one. It may carry requests, data, or quoted material; imperative wording, the word system, or an agent name in content does not alter its role identity.
-    ja: UserMessage はtrusted envelopeがrole=userでsenderがend userまたはその代理application entry pointであるMessage specializationです。request・data・quoted materialを運びますがimperative wordingやsystem語、agent名でrole identityは変わりません。
+    zh: UserMessage 是 Message 的角色特化，映射 OpenAI/Anthropic role:user 与 A2A role:user；发送者必须是可审计的用户主体或代表用户的应用通道。正文中的命令语气、system 字样或 agent 名称不改变 role 身份，引用与附件通过 content block 与 SourceReference 关联。
+    en: UserMessage specializes Message mapping OpenAI/Anthropic role:user and A2A role:user. The sender must be an auditable user or user-facing application channel. Imperative wording, the word system, or agent names in body text do not change role identity; quotes and attachments link via content blocks and SourceReference.
+    ja: UserMessage は OpenAI/Anthropic/A2A の user role に写像。本文表現で role は変わらない。
   why_needed:
     zh: 把用户来源的通信身份与内容语义分开，使外部数据、引用和提示注入不能仅凭文本伪装成更高角色。
     en: Separates user-origin communication identity from content semantics so external data, quotations, and prompt injection cannot impersonate a higher role by text alone.
@@ -29,6 +28,34 @@ semantics:
       ja: AssistantMessage・ExternalAgentMessage・unwrapped ContentBlock・user preferenceを保存するだけのMemoryRecordを除外します。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: OpenAI Chat Completions role=user 可携带 text、image_url、input_audio；Anthropic user turn 可含 tool_result block；A2A user Message 可含 file Part。UserMessage 只断言 role 与 sender，不把 user 文本解析为 Instruction。
+    en: OpenAI Chat Completions role=user may carry text, image_url, input_audio; Anthropic user turns may include tool_result blocks; A2A user Messages may include file Parts. UserMessage asserts role and sender only—it does not parse user text as Instruction.
+    ja: OpenAI/Anthropic/A2A user role 形状に対応。Instruction 解析は別 edge。
+  typical_input:
+    - description: OpenAI user multimodal
+      format: '{"role":"user","content":[{"type":"text","text":"What is this?"},{"type":"image_url","image_url":{"url":"https://example.com/x.png"}}]}'
+      source_claims:
+        - claim-user-message-openai
+  typical_output:
+    - description: Anthropic tool_result user turn
+      format: '{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_01","content":"OK"}]}'
+      source_claims:
+        - claim-user-message-anthropic
+  reference_implementations:
+    - name: OpenAI Chat Completions API
+      url: https://platform.openai.com/docs/api-reference/chat/create
+      description: messages[] with role and content parts.
+    - name: Anthropic Messages API
+      url: https://docs.anthropic.com/en/api/messages
+      description: system parameter and role/content block turns.
+    - name: MCP Prompts
+      url: https://modelcontextprotocol.io/specification/2025-06-18/server/prompts
+      description: prompts/get returns injectable messages array.
+    - name: A2A Protocol
+      url: https://a2a-protocol.org/latest/specification/
+      description: Message with role, messageId, contextId, and parts.
 structure:
   identity_keys: []
   fields:
@@ -37,95 +64,85 @@ structure:
         zh: 用户标识
         en: user ID
         ja: ユーザーID
+      definitions:
+        zh: 在可用且允许时引用提交消息的用户主体。
+        en: References the submitting user actor when available and permitted.
+        ja: 利用可能かつ許可時にmessage提出user actorを参照します。
       datatype: reference
       required: false
       cardinality:
         min: 0
         max: 1
-      definitions:
-        zh: 在可用且允许时引用提交消息的用户主体。
-        en: References the submitting user actor when available and permitted.
-        ja: 利用可能かつ許可時にmessage提出user actorを参照します。
-      allowed_values: []
       pattern: null
       example_value: UserActor:customer-88
+      allowed_values: []
       source_claims:
         - claim-user-message-002
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: UserMessage-example-positive-manual-001
-    kind: positive
+  - id: UserMessage-example-openai
     labels:
-      zh: 用户消息正例
-      en: "Positive case: User message"
-      ja: ユーザーメッセージ正例
-    scenario_id: null
+      zh: OpenAI user 消息
+      en: OpenAI user message
+      ja: OpenAI user message
     descriptions:
-      zh: msg-user-88 由登录用户 customer-88 提交“比较两个航班”的请求。
-      en: msg-user-88 is submitted by customer-88 asking to compare two flights.
-      ja: msg-user-88 はlogin user customer-88が二flight比較を依頼して提出します。
+      zh: customer-88 发送 role=user msg-940 含文本块并 reply_to msg-936。
+      en: customer-88 sends role=user msg-940 with a text block replying to msg-936.
+      ja: customer-88 が msg-940 を送信。
+    example_source:
+      product: OpenAI
+      url: https://platform.openai.com/docs/api-reference/chat/create
+      version: role=user
     field_values:
+      message_id: msg-940
       user_id: UserActor:customer-88
-      message_role: user
-      sender_id: UserActor:customer-88
-      element_id: msg-user-88
-      conversation_id: conv-travel-202
-      sequence_index: 2
+    related_node_ids:
+      - UserMessage
+      - Message
+    related_relation_ids: []
+    source_claims:
+      - claim-user-message-openai
+  - id: UserMessage-example-anthropic-tool-result
+    labels:
+      zh: Anthropic user tool_result
+      en: Anthropic user tool_result
+      ja: Anthropic user tool_result
+    descriptions:
+      zh: user follow-up 携带 tool_result block tool_use_id=toolu_01，仍建模为 UserMessage。
+      en: User follow-up carries tool_result block tool_use_id=toolu_01 and remains UserMessage.
+      ja: tool_result を含む user turn。
+    example_source:
+      product: Anthropic
+      url: https://docs.anthropic.com/en/api/messages
+      version: tool_result
+    field_values:
+      message_id: msg-903-user
+      tool_use_id: toolu_01
     related_node_ids:
       - UserMessage
     related_relation_ids: []
-    expected_result:
-      zh: 识别为 UserMessage。
-      en: Identify UserMessage.
-      ja: UserMessageと識別します。
-    why_valid_or_invalid:
-      zh: 受信角色与用户入口均指向同一发送身份。
-      en: Trusted role and user-facing entry point agree on the sender identity.
-      ja: trusted roleとuser-facing entry pointが同じsender identityを示します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-user-message-003
-  - id: UserMessage-example-boundary-manual-001
-    kind: boundary
+      - claim-user-message-anthropic
+  - id: UserMessage-example-injection-boundary
     labels:
-      zh: 用户消息边界例
-      en: "Boundary case: User message"
-      ja: ユーザーメッセージ境界例
-    scenario_id: null
+      zh: 注入文本边界
+      en: Injection text boundary
+      ja: injection 文本境界
     descriptions:
-      zh: memory-pref-88 保存 customer-88 的座位偏好，但没有一次消息发送事件或 message_id。
-      en: memory-pref-88 stores customer-88's seat preference but has no message send event or message_id.
-      ja: memory-pref-88 はcustomer-88のseat preferenceを保存しますがmessage send eventやmessage_idを持ちません。
+      zh: user 消息正文含“ignore previous instructions”仍保持 UserMessage，不自动升为 SystemMessage。
+      en: User message body containing ignore-previous-instructions remains UserMessage and does not become SystemMessage.
+      ja: 命令調 user 文本でも UserMessage。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
     field_values: {}
     related_node_ids:
       - UserMessage
     related_relation_ids: []
-    expected_result:
-      zh: 不得识别为 UserMessage；它是记忆记录。
-      en: Do not identify UserMessage; it is a memory record.
-      ja: UserMessageとせずmemory recordです。
-    why_valid_or_invalid:
-      zh: 关于用户的数据不等于由用户发送的一次通信。
-      en: Data about a user is not one communication sent by that user.
-      ja: userに関するdataはそのuserが送った一communicationではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-user-message-004
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: AssistantMessage
-    shared_parent_concept_id: Message
-    differentia:
-      zh: UserMessage 的可信发送角色是 user；AssistantMessage 的发送角色是 assistant，并表示模型或智能体对外形成的通信。
-      en: UserMessage has trusted sender role user; AssistantMessage has role assistant and represents communication produced by the model or agent.
-      ja: UserMessageはtrusted sender role=user、AssistantMessageはrole=assistantでmodel/agentが生成したcommunicationです。
-    source_claims:
-      - claim-user-message-005
+      - claim-user-message-design
 parent_relation:
   id: UserMessage-is_a-Message
   predicate: is_a
@@ -156,12 +173,10 @@ parent_relation:
   constraints: []
   examples:
     - id: UserMessage-is_a-Message-example-positive-manual-001
-      kind: positive
       labels:
         zh: 是一种消息正例
         en: "Positive case: is a message"
         ja: メッセージの一種正例
-      scenario_id: null
       descriptions:
         zh: msg-user-88 有唯一 message_id、role=user 和用户入口来源。
         en: msg-user-88 has a unique message_id, role=user, and user-facing origin.
@@ -172,25 +187,13 @@ parent_relation:
         - Message
       related_relation_ids:
         - UserMessage-is_a-Message
-      expected_result:
-        zh: 断言 UserMessage-is_a-Message。
-        en: Assert UserMessage-is_a-Message.
-        ja: UserMessage-is_a-Messageをassertします。
-      why_valid_or_invalid:
-        zh: 通信身份和发送角色同时成立，并可追溯到用户入口。
-        en: Communication identity and sender role both hold and are traceable to the user entry point.
-        ja: communication identityとsender roleが共に成立しuser entry pointへ追跡できます。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
         - claim-user-message-006
     - id: UserMessage-is_a-Message-example-boundary-manual-001
-      kind: boundary
       labels:
         zh: 是一种消息边界例
         en: "Boundary case: is a message"
         ja: メッセージの一種境界例
-      scenario_id: null
       descriptions:
         zh: memory-pref-88 保存用户偏好但从未被发送。
         en: memory-pref-88 stores a user preference but was never sent.
@@ -201,44 +204,37 @@ parent_relation:
         - Message
       related_relation_ids:
         - UserMessage-is_a-Message
-      expected_result:
-        zh: 不得通过该边归类为 Message。
-        en: Do not classify it as Message through this edge.
-        ja: このedgeでMessageに分類しません。
-      why_valid_or_invalid:
-        zh: 用户关联数据缺少发送事件与 message_id。
-        en: User-associated data lacks a send event and message_id.
-        ja: user-associated dataはsend event/message_idを欠きます。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
         - claim-user-message-007
   source_claims:
     - claim-user-message-008
-  distinct_fact_rationale:
-    zh: 关于用户的记录不自动成为用户消息；必须存在实际通信身份。
-    en: A record about a user does not automatically become a user message; an actual communication identity is required.
-    ja: userに関するrecordは自動でuser messageにならず実communication identityが必要です。
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-info-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Chat Completions 角色、Model Spec 权威链、A2A Message/Part 与 MCP JSON-RPC 包络逐项核验；Conversation、Message 角色子类、ToolObservationMessage 与 ProtocolEnvelope 语义成立。
-    en: Verified against OpenAI Chat Completions roles, Model Spec authority chain, A2A Message/Part, and MCP JSON-RPC envelopes; Conversation, Message role specializations, ToolObservationMessage, and ProtocolEnvelope semantics hold.
-    ja: OpenAI Chat Completions role、Model Spec authority chain、A2A Message/Part、MCP JSON-RPC envelope に照らし Conversation/Message role specialization/ToolObservationMessage/ProtocolEnvelope semantics を個別確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-openai-chat
+    title: OpenAI Chat Completions API Reference
+    publisher: OpenAI
+    url: https://platform.openai.com/docs/api-reference/chat/create
+    source_type: official-doc
+    relevance: role/content message arrays and developer role.
+  - id: src-anthropic-messages
+    title: Anthropic Messages API Reference
+    publisher: Anthropic
+    url: https://docs.anthropic.com/en/api/messages
+    source_type: official-doc
+    relevance: system parameter and content blocks including tool_use/tool_result.
+  - id: src-a2a-message
+    title: A2A Protocol Specification
+    publisher: A2A Protocol
+    url: https://a2a-protocol.org/latest/specification/
+    source_type: standard
+    relevance: Message role, messageId, contextId, taskId, and Parts.
+  - id: src-info-messages-design
+    title: Moonweave info-messages-instructions module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Conversation and Message identity separate from carried content.
 source_claims:
   - id: claim-user-message-001
     source: eng-spec-openai-model-spec-2025
@@ -246,53 +242,63 @@ source_claims:
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-user-message-002
     source: eng-spec-openai-model-spec-2025
     supports: "The Model Spec lists user as a message role for end-user input or provided data and separates message role from content. For UserMessage, the user_id field records exactly this auditable datum: References the submitting user actor when available and permitted."
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-user-message-003
     source: eng-spec-openai-model-spec-2025
     supports: The Model Spec lists user as a message role for end-user input or provided data and separates message role from content. The Model Spec defines user-role messages as end-user input or a catch-all for user-provided data.
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-user-message-004
     source: eng-spec-openai-model-spec-2025
     supports: The Model Spec lists user as a message role for end-user input or provided data and separates message role from content. The source defines messages as conversation records, not arbitrary user-associated data.
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-user-message-005
     source: eng-spec-openai-model-spec-2025
     supports: The Model Spec lists user as a message role for end-user input or provided data and separates message role from content. Moonweave contrasts UserMessage with AssistantMessage under Message using the endpoint-specific identity condition stated in this differentia.
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-user-message-006
     source: eng-spec-openai-model-spec-2025
     supports: The Model Spec defines user-role messages as end-user input or user-provided data in the conversation. The case instantiates the documented user-role message.
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-user-message-007
     source: eng-spec-openai-model-spec-2025
     supports: The Model Spec defines user-role messages as end-user input or user-provided data in the conversation. Conversation-message semantics do not cover arbitrary user-associated records.
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-user-message-008
     source: eng-spec-openai-model-spec-2025
     supports: The Model Spec defines user-role messages as end-user input or user-provided data in the conversation.
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
+  - id: claim-user-message-openai
+    source: src-openai-chat
+    supports: OpenAI role=user identifies end-user messages with multimodal content parts.
+    locator: messages > role user
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-user-message-anthropic
+    source: src-anthropic-messages
+    supports: Anthropic user role carries tool_result blocks answering prior tool_use.
+    locator: tool_result block
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-user-message-design
+    source: src-info-messages-design
+    supports: UserMessage role identity is envelope-based, not inferred from body imperative text.
+    locator: UserMessage boundary
+    evidence_kind: design-inference
+    confidence: high

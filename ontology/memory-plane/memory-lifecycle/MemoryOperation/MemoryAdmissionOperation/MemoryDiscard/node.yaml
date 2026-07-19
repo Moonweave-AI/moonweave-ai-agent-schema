@@ -1,533 +1,198 @@
 schema: moonweave.ai/ontology-node/v1
 id: MemoryDiscard
 kind: concept
-status: accepted
 labels:
   zh: 记忆丢弃
   en: Memory discard
   ja: 記憶破棄
 semantics:
   short_definition:
-    zh: 在产生持久记录前拒绝候选 MemoryItem 的准入操作。
-    en: An admission operation rejecting a candidate MemoryItem before any persistent record is created.
-    ja: persistent record生成前にcandidate MemoryItemを拒否するadmission operationです。
+    zh: 准入阶段拒绝候选项且不产生持久记录。
+    en: Admission rejection of a candidate without creating a persistent record.
+    ja: admission 段階で候補を reject し persistent record を作らない。
   definition:
-    zh: MemoryDiscard 是 MemoryAdmissionOperation：它对特定候选项形成可审计的拒绝决定并阻止该候选的 MemoryWrite；它不是删除已持久化记录。
-    en: MemoryDiscard is a MemoryAdmissionOperation that records an auditable rejection for a specific candidate and prevents that candidate's MemoryWrite. It is not deletion of an already persisted record.
-    ja: MemoryDiscard は特定candidateの監査可能reject判断を記録しそのcandidateのMemoryWriteを防ぐ MemoryAdmissionOperationで、既存persistent recordの削除ではありません。
+    zh: MemoryDiscard 是 MemoryAdmissionOperation：在策略、同意或质量检查失败时拒绝 MemoryItem，不产生 MemoryRecord。与 MemoryDelete 不同，丢弃针对尚无持久身份的候选项，而非撤销既有记录。
+    en: MemoryDiscard is a MemoryAdmissionOperation that rejects a MemoryItem when policy, consent, or quality checks fail, producing no MemoryRecord. Unlike MemoryDelete, discard targets candidates without persistent identity rather than revoking existing records.
+    ja: MemoryDiscard は policy/consent/quality 失敗で MemoryItem を reject し MemoryRecord を作らない MemoryAdmissionOperation。MemoryDelete と異なり未 persist 候補が対象。
   why_needed:
-    zh: 区分“从未写入”与“写入后删除”。
-    en: Separates never admitted from admitted and later deleted.
-    ja: never admittedとadmitted後deleteを区別します。
+    zh: 若把拒绝与删除混同，审计无法区分“从未写入”与“已删除的有效记忆”。
+    en: Conflating rejection with deletion makes audit unable to distinguish never persisted from deleted valid memory.
+    ja: reject と delete を混同すると「未書込」と「削除済有効記憶」を監査で区別できない。
   includes:
-    - zh: 纳入因重复、低价值、不安全、越权或缺少同意而拒绝候选项。
-      en: Includes rejecting a candidate as duplicate, low-value, unsafe, unauthorized, or lacking consent.
-      ja: duplicate・low-value・unsafe・unauthorized・consent不足によるcandidate拒否を含みます。
+    - zh: 纳入策略拒绝、同意不足、质量不达标与重复候选项的丢弃。
+      en: Includes discard for policy rejection, insufficient consent, quality failure, and duplicate candidates.
+      ja: policy reject/consent 不足/quality 不合格/重複候補の discard。
   excludes:
-    - zh: 排除删除、过期、驱逐和衰减等针对 MemoryRecord 的处置。
-      en: Excludes delete, expiration, eviction, and decay dispositions over MemoryRecord.
-      ja: MemoryRecordへのdelete・expiration・eviction・decay dispositionを除外します。
+    - zh: 排除删除既有 record、TTL 到期与容量驱逐。
+      en: Excludes deleting existing records, TTL expiry, and capacity eviction.
+      ja: 既存 record 削除/TTL/capacity eviction を除外。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: Mem0 POST /v1/memories/ 在策略层被拦截或 deduplicate 判定为重复时不应产生 record；Moonweave 登记 discard_operation_id、reject_reason 与 candidate_item_id，不创建 tombstone。
+    en: When Mem0 POST /v1/memories/ is blocked by policy or deduplication marks a duplicate, no record should be created; Moonweave records discard_operation_id, reject_reason, and candidate_item_id without a tombstone.
+    ja: Mem0 POST が policy/dedup で阻止された場合 record なし。discard_operation_id/reject_reason/candidate_item_id を記録、tombstone なし。
+  typical_input:
+    - description: Rejected candidate
+      format: |
+        {"discard_operation_id": "discard-89", "candidate_item_id": "item-89", "reject_reason": "insufficient_consent"}
+      source_claims: [claim-memory-discard-design]
+  typical_output:
+    - description: Discard outcome without record
+      format: |
+        {"admission_decision": "reject", "output_record_id": null}
+      source_claims: [claim-memory-discard-design]
+  reference_implementations:
+    - name: Mem0 Memory API
+      url: https://docs.mem0.ai
+      description: Admission may reject or skip duplicate candidates before persistence.
+    - name: Letta Archival Memory
+      url: https://docs.letta.com/guides/core-concepts/memory/archival-memory
+      description: Agent may decline to insert low-value passages.
 structure:
-  identity_keys:
-    - discard_operation_id
+  identity_keys: [discard_operation_id]
   fields:
     - id: discard_operation_id
-      labels:
-        zh: 丢弃操作标识
-        en: discard operation ID
-        ja: discard operation ID
+      labels: {zh: 丢弃操作标识, en: Discard operation identifier, ja: 破棄操作識別子}
+      definitions:
+        zh: 标识一次准入拒绝活动。
+        en: Identifies one admission-rejection activity.
+        ja: 一 admission reject activity を識別。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 标识一次候选拒绝活动。
-        en: Identifies one candidate-rejection activity.
-        ja: 一candidate rejection activityを識別します。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
-      example_value: discard-72
-      source_claims:
-        - claim-memory-discard-002
-    - id: rejection_reason
-      labels:
-        zh: 拒绝理由
-        en: rejection reason
-        ja: 拒否理由
+      example_value: discard-89
+      allowed_values: []
+      source_claims: [claim-memory-discard-id]
+    - id: reject_reason
+      labels: {zh: 拒绝原因, en: Reject reason, ja: 拒否理由}
+      definitions:
+        zh: 结构化拒绝依据，如 insufficient_consent、policy_block、quality_fail。
+        en: Structured rejection basis such as insufficient_consent, policy_block, quality_fail.
+        ja: insufficient_consent/policy_block/quality_fail 等 structured reject basis。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 记录阻止该候选写入的可复核理由。
-        en: Records the reviewable reason that blocked writing the candidate.
-        ja: candidate writeを阻止したreview可能理由を記録します。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
-      example_value: duplicate-without-new-evidence
-      source_claims:
-        - claim-memory-discard-003
+      example_value: insufficient_consent
+      allowed_values: []
+      source_claims: [claim-memory-discard-reason]
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: MemoryDiscard-example-positive-manual-001
-    kind: positive
-    labels:
-      zh: 记忆丢弃正例
-      en: "Positive case: Memory discard"
-      ja: 記憶破棄正例
-    scenario_id: null
+  - id: MemoryDiscard-example-consent
+    labels: {zh: 同意不足丢弃, en: Insufficient consent discard, ja: consent 不足 discard}
     descriptions:
-      zh: memory-op-discard-001 审查 item-72 后发现其与现有记录重复且没有可验证的新来源，因此记录拒绝原因并阻止对应 MemoryWrite。
-      en: memory-op-discard-001 reviews item-72, finds it duplicates an existing record without verifiable new provenance, records the rejection reason, and prevents the corresponding MemoryWrite.
-      ja: memory-op-discard-001 は item-72 が既存記録と重複し検証可能な新出典を持たないと確認し、拒否理由を記録して対応する MemoryWrite を防ぎます。
-    field_values:
-      discard_operation_id: memory-op-discard-001
-      rejection_reason: duplicate-without-new-evidence
-      operation_id: memory-op-discard-001
-      reason: the candidate is rejected before persistence because provenance is insufficient
-      admission_operation_id: memory-op-discard-001
-      candidate_item_id: item-72
-      started_at: 2026-07-16T13:02:00Z
-    related_node_ids:
-      - MemoryDiscard
-      - MemoryAdmissionOperation
-    related_relation_ids:
-      - MemoryDiscard-is_a-MemoryAdmissionOperation
-    expected_result:
-      zh: 归类为 MemoryDiscard，并不得为 item-72 建立 MemoryWrite。
-      en: Classify as MemoryDiscard and do not create a MemoryWrite for item-72.
-      ja: MemoryDiscardに分類しitem-72のMemoryWriteを作りません。
-    why_valid_or_invalid:
-      zh: 拒绝发生在持久记录生成之前且理由可审计。
-      en: Rejection occurs before persistent-record creation and the reason is auditable.
-      ja: rejectはpersistent-record生成前で理由がaudit可能です。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-discard-004
-  - id: MemoryDiscard-example-instance-manual-20260716
-    kind: instance
-    labels:
-      zh: 写入前候选丢弃实例
-      en: Pre-write candidate-discard instance
-      ja: 書込み前候補破棄インスタンス
-    scenario_id: MemoryDiscard:instance:memory-op-discard-001
-    descriptions:
-      zh: memory-op-discard-001 审查 item-72 后发现其与现有记录重复且没有可验证的新来源，因此记录拒绝原因并阻止对应 MemoryWrite。
-      en: memory-op-discard-001 reviews item-72, finds it duplicates an existing record without verifiable new provenance, records the rejection reason, and prevents the corresponding MemoryWrite.
-      ja: memory-op-discard-001 は item-72 が既存記録と重複し検証可能な新出典を持たないと確認し、拒否理由を記録して対応する MemoryWrite を防ぎます。
-    field_values:
-      discard_operation_id: memory-op-discard-001
-      rejection_reason: duplicate-without-new-evidence
-      operation_id: memory-op-discard-001
-      reason: the candidate is rejected before persistence because provenance is insufficient
-    related_node_ids:
-      - MemoryDiscard
-      - MemoryAdmissionOperation
-      - MemoryItem
-      - MemoryWrite
-    related_relation_ids:
-      - MemoryDiscard-is_a-MemoryAdmissionOperation
-      - MemoryDiscard-consumes-MemoryItem
-      - MemoryDiscard-prevents-MemoryWrite
-    expected_result:
-      zh: 候选仍没有 MemoryRecord 身份，查询返回 Discard 及其原因，并确认未发生初始写入。
-      en: The candidate receives no MemoryRecord identity; the query returns the Discard and reason and confirms that no initial write occurred.
-      ja: 候補に MemoryRecord 同一性は付与されず、Discard と理由を返し、初回書込みがないことを確認します。
-    why_valid_or_invalid:
-      zh: 对象在持久化前被拒绝，因此不是对既有记录执行 Delete。
-      en: The object is rejected before persistence and is therefore not a Delete of an existing record.
-      ja: 永続化前の拒否であり、既存記録への Delete ではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
-    source_claims:
-      - claim-memory-discard-004
-  - id: MemoryDiscard-example-boundary-manual-001
-    kind: boundary
-    labels:
-      zh: 记忆丢弃边界例
-      en: "Boundary case: Memory discard"
-      ja: 記憶破棄境界例
-    scenario_id: null
-    descriptions:
-      zh: record-72 已持久化两周，现在按用户请求被移除。
-      en: record-72 has been persistent for two weeks and is now removed at the user's request.
-      ja: record-72 は二週間persistentで現在user requestにより除去されます。
-    field_values: {}
-    related_node_ids:
-      - MemoryDiscard
+      zh: discard-89 因 consent_scope 不含 durable_memory 拒绝 item-89，无 output_record_id。
+      en: discard-89 rejects item-89 because consent_scope excludes durable_memory; no output_record_id.
+      ja: consent_scope 不足で item-89 reject。output_record_id なし。
+    example_source: {product: Moonweave, url: https://moonweave.ai/ontology/agent-system/2.0.0/, version: policy}
+    field_values: {discard_operation_id: discard-89, reject_reason: insufficient_consent}
+    related_node_ids: [MemoryDiscard, MemoryAdmissionOperation]
     related_relation_ids: []
-    expected_result:
-      zh: 不得归类为 MemoryDiscard；应归入 MemoryDelete。
-      en: Do not classify as MemoryDiscard; classify as MemoryDelete.
-      ja: MemoryDiscardでなくMemoryDeleteに分類します。
-    why_valid_or_invalid:
-      zh: 对象已有 MemoryRecord 身份，处置发生在写入后。
-      en: The object already has MemoryRecord identity and disposition occurs after admission.
-      ja: 対象は既にMemoryRecord identityを持ちdispositionはadmission後です。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-discard-004
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+    source_claims: [claim-memory-discard-design]
+  - id: MemoryDiscard-example-policy
+    labels: {zh: 策略拦截, en: Policy block, ja: 方針 block}
+    descriptions:
+      zh: discard-90 因 PII 检测命中 policy_block 拒绝写入，Mem0 POST 未调用。
+      en: discard-90 rejects write due to PII policy_block; Mem0 POST is never called.
+      ja: PII policy_block で discard-90。Mem0 POST 未呼出。
+    example_source: {product: Mem0, url: https://docs.mem0.ai, version: admission gate}
+    field_values: {discard_operation_id: discard-90, reject_reason: policy_block}
+    related_node_ids: [MemoryDiscard]
+    related_relation_ids: []
+    source_claims: [claim-memory-discard-mem0, claim-memory-discard-design]
+  - id: MemoryDiscard-example-not-delete
+    labels: {zh: 丢弃非删除, en: Discard is not delete, ja: discard は delete ではない}
+    descriptions:
+      zh: delete-310 消费 record-310-v2 并产生 tombstone；discard-89 从未产生 record。
+      en: delete-310 consumes record-310-v2 and produces tombstone; discard-89 never created a record.
+      ja: delete は tombstone、discard は record 未生成。
+    example_source: {product: Moonweave, url: https://moonweave.ai/ontology/agent-system/2.0.0/, version: boundary}
+    field_values: {}
+    related_node_ids: [MemoryDiscard, MemoryDelete]
+    related_relation_ids: []
+    source_claims: [claim-memory-discard-design]
+  - id: MemoryDiscard-example-quality
+    labels: {zh: 质量不达标, en: Quality failure, ja: quality 不合格}
+    descriptions:
+      zh: discard-91 因 embedding 置信度低于阈值拒绝 item-91。
+      en: discard-91 rejects item-91 because embedding confidence is below threshold.
+      ja: embedding 信頼度不足で discard-91。
+    example_source: {product: Moonweave, url: https://moonweave.ai/ontology/agent-system/2.0.0/, version: quality gate}
+    field_values: {discard_operation_id: discard-91, reject_reason: quality_fail}
+    related_node_ids: [MemoryDiscard, MemoryValidation]
+    related_relation_ids: []
+    source_claims: [claim-memory-discard-design]
 parent_relation:
   id: MemoryDiscard-is_a-MemoryAdmissionOperation
   predicate: is_a
   direction: target-to-source
   relation_kind: hierarchy
-  labels:
-    zh: 是一种记忆准入操作
-    en: is a memory admission operation
-    ja: 記憶受入操作の一種
+  labels: {zh: 是一种记忆准入操作, en: is a memory admission operation, ja: 記憶受入操作の一種}
   definitions:
-    zh: MemoryDiscard —is_a→ MemoryAdmissionOperation 表示：候选项在任何 MemoryRecord 产生前被明确拒绝，并记录拒绝依据。
-    en: MemoryDiscard —is_a→ MemoryAdmissionOperation holds because the candidate is explicitly rejected before any MemoryRecord is produced and the rejection basis is recorded
-    ja: MemoryDiscard —is_a→ MemoryAdmissionOperation は、MemoryRecord生成前にcandidateを明示rejectしrejection basisを記録するため成立します。
+    zh: MemoryDiscard —is_a→ MemoryAdmissionOperation 表示候选项被拒绝且未产生初始 MemoryRecord。
+    en: MemoryDiscard —is_a→ MemoryAdmissionOperation holds because the candidate is rejected and no initial MemoryRecord is produced.
+    ja: 候補 reject で initial MemoryRecord 未生成のため成立。
   cardinality: null
   cardinality_not_applicable_reason:
     zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
     en: The relation is decided per auditable fact; no uniform runtime cardinality is imposed at ontology level.
-    ja: このrelationはaudit可能fact単位で判定しontology層で全runtime instanceへ一律cardinalityを課しません。
-  inverse_reading:
-    predicate: part_of
-    labels:
-      zh: 反向读取
-      en: inverse is a memory admission operation
-      ja: 逆方向読取
+    ja: このrelationはaudit可能fact単位で判定。
+  inverse_reading: {predicate: part_of, labels: {zh: 反向读取, en: inverse is_a, ja: 逆方向読取}}
   conditions:
-    - id: MemoryDiscard-is_a-MemoryAdmissionOperation-condition-manual-001
+    - id: MemoryDiscard-is_a-MemoryAdmissionOperation-condition-001
       severity: error
       expression_language: plain
-      expression: Assert only when the instance satisfies the child differentia—the candidate is explicitly rejected before any MemoryRecord is produced and the rejection basis is recorded—and already meets the activity definition of MemoryAdmissionOperation.
+      expression: Assert only when admission decision is reject and no MemoryRecord is produced.
       explanations:
-        zh: 仅当实例满足子类种差“候选项在任何 MemoryRecord 产生前被明确拒绝，并记录拒绝依据。”且已满足 MemoryAdmissionOperation 的活动定义时建立该边。
-        en: Assert only when the instance satisfies the child differentia—the candidate is explicitly rejected before any MemoryRecord is produced and the rejection basis is recorded—and already meets the activity definition of MemoryAdmissionOperation.
-        ja: instanceがchild differentia「MemoryRecord生成前にcandidateを明示rejectしrejection basisを記録するため成立します。」を満たし、かつ MemoryAdmissionOperation のactivity定義を満たす時だけassertします。
-      source_claims:
-        - claim-memory-discard-004
+        zh: 仅当准入决策为拒绝且未产生 MemoryRecord 时成立。
+        en: Assert only when admission decision is reject and no MemoryRecord is produced.
+        ja: admission reject で MemoryRecord 未生成の時のみ。
+      source_claims: [claim-memory-discard-design]
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: MemoryDiscard-is_a-MemoryAdmissionOperation-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 是一种记忆准入操作正例
-        en: "Positive case: is a memory admission operation"
-        ja: 記憶受入操作の一種正例
-      scenario_id: MemoryDiscard-is_a-MemoryAdmissionOperation:positive:20260716
-      descriptions:
-        zh: discard-72 发现 item-72 与同一命名空间中的现有事实完全重复，记录 duplicate 原因并在持久化前拒绝候选。
-        en: discard-72 finds item-72 duplicates an existing fact in the namespace, records the duplicate reason, and rejects the candidate before persistence.
-        ja: discard-72 は item-72 が namespace 内の既存 fact と重複すると判定し、duplicate 理由を記録して永続化前に拒否します。
-      field_values: {}
-      related_node_ids:
-        - MemoryDiscard
-        - MemoryAdmissionOperation
-      related_relation_ids:
-        - MemoryDiscard-is_a-MemoryAdmissionOperation
-      expected_result:
-        zh: 将 discard-72 归为 MemoryDiscard，并确认该准入尝试不创建任何 MemoryRecord。
-        en: Classify discard-72 as MemoryDiscard and confirm that this admission attempt creates no MemoryRecord.
-        ja: discard-72 を MemoryDiscard に分類し、この admission attempt が MemoryRecord を作らないことを確認します。
-      why_valid_or_invalid:
-        zh: 对象仍是未持久化候选，结果是有理由的 reject 且没有输出记录，精确满足丢弃而非删除的边界。
-        en: The object is still an unpersisted candidate, the outcome is a reasoned reject, and no record is emitted, exactly matching discard rather than deletion.
-        ja: object は未永続化候補のままで、結果は理由付き reject、出力 record なしのため delete ではなく discard に一致します。
-      synthetic: false
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-memory-discard-004
-    - id: MemoryDiscard-is_a-MemoryAdmissionOperation-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 是一种记忆准入操作边界例
-        en: "Boundary case: is a memory admission operation"
-        ja: 記憶受入操作の一種境界例
-      scenario_id: MemoryDiscard-is_a-MemoryAdmissionOperation:boundary:20260716
-      descriptions:
-        zh: delete-72 根据用户遗忘请求使已经持久化的 record-72 失效，并留下最小化 tombstone。
-        en: delete-72 invalidates persisted record-72 under a user-forget request and leaves a minimized tombstone.
-        ja: delete-72 は user-forget request により永続済み record-72 を invalidation し、最小化 tombstone を残します。
-      field_values: {}
-      related_node_ids:
-        - MemoryDiscard
-        - MemoryAdmissionOperation
-      related_relation_ids:
-        - MemoryDiscard-is_a-MemoryAdmissionOperation
-      expected_result:
-        zh: 拒绝把 delete-72 放入 MemoryDiscard；它属于现有记录的 MemoryDelete 处置活动。
-        en: Reject MemoryDiscard classification for delete-72; it is a MemoryDelete disposition over an existing record.
-        ja: delete-72 の MemoryDiscard 分類を拒否し、既存 record への MemoryDelete disposition とします。
-      why_valid_or_invalid:
-        zh: 删除发生在持久化之后并改变记录有效性，丢弃发生在持久化之前；两者不能因最终都减少可用记忆而混同。
-        en: Deletion occurs after persistence and changes record validity, whereas discard occurs before persistence; reduced available memory does not make them equivalent.
-        ja: delete は永続化後に record validity を変え、discard は永続化前に起きるため、利用可能 memory が減る点だけでは同一化できません。
-      synthetic: false
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-memory-discard-004
-  source_claims:
-    - claim-memory-discard-004
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: accepted
+  examples: []
+  source_claims: [claim-memory-discard-design]
   endpoint_order: child-to-parent
-relations:
-  - id: MemoryDiscard-consumes-MemoryItem
-    predicate: consumes
-    direction: source-to-target
-    relation_kind: causal
-    labels:
-      zh: 消费被拒候选项
-      en: consumes rejected memory item
-      ja: rejectされたmemory itemを消費する
-    definitions:
-      zh: MemoryDiscard —consumes→ MemoryItem 表示该候选项是拒绝判断的直接对象，且不会产生持久记录。
-      en: MemoryDiscard —consumes→ MemoryItem means the candidate is the direct object of the rejection decision and produces no persistent record.
-      ja: MemoryDiscard —consumes→ MemoryItem はcandidateがrejection decisionのdirect objectでpersistent recordを生成しないことを表します。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
-      en: The relation is decided per auditable fact; no uniform runtime cardinality is imposed at ontology level.
-      ja: このrelationはaudit可能fact単位で判定しontology層で全runtime instanceへ一律cardinalityを課しません。
-    inverse_reading:
-      predicate: inverse_consumes
-      labels:
-        zh: 反向读取
-        en: inverse consumes rejected memory item
-        ja: 逆方向読取
-    conditions:
-      - id: MemoryDiscard-consumes-MemoryItem-condition-manual-001
-        severity: error
-        expression_language: plain
-        expression: Assert only when discard.candidate_item_id points to the target and outcome is reject.
-        explanations:
-          zh: 仅当 discard.candidate_item_id 指向目标且 outcome 为 reject 时成立。
-          en: Assert only when discard.candidate_item_id points to the target and outcome is reject.
-          ja: discard.candidate_item_idがtargetを指しoutcomeがrejectの時だけassertします。
-        source_claims:
-          - claim-memory-discard-004
-    temporal_scope: valid-time
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: MemoryDiscard-consumes-MemoryItem-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 消费被拒候选项正例
-          en: "Positive case: consumes rejected memory item"
-          ja: rejectされたmemory itemを消費する正例
-        scenario_id: MemoryDiscard-consumes-MemoryItem:positive:20260716
-        descriptions:
-          zh: discard-72 的 candidate_item_id=item-72，outcome=reject，reason=duplicate-of-record-18，且没有生成输出记录。
-          en: discard-72 names candidate_item_id=item-72, outcome=reject, reason=duplicate-of-record-18, and generates no output record.
-          ja: discard-72 は candidate_item_id=item-72、outcome=reject、reason=duplicate-of-record-18 で output record を生成しません。
-        field_values: {}
-        related_node_ids:
-          - MemoryDiscard
-          - MemoryItem
-        related_relation_ids:
-          - MemoryDiscard-consumes-MemoryItem
-        expected_result:
-          zh: 建立 discard-72 consumes item-72，把它标为此次拒绝决定实际评估并终止的候选项。
-          en: Assert discard-72 consumes item-72, identifying it as the candidate actually evaluated and terminated by this rejection decision.
-          ja: discard-72 consumes item-72 を確立し rejection decision が実際に評価・終了した candidate とします。
-        why_valid_or_invalid:
-          zh: 候选身份、reject 结果和拒绝原因都绑定同一准入尝试，证明 item-72 是丢弃活动的直接对象。
-          en: Candidate identity, reject outcome, and reason bind the same admission attempt, proving item-72 is the direct object of discard.
-          ja: candidate identity・reject outcome・reason は同 admission attempt を bind し item-72 が discard の direct object と証明します。
-        synthetic: false
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-memory-discard-004
-      - id: MemoryDiscard-consumes-MemoryItem-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 消费被拒候选项边界例
-          en: "Boundary case: consumes rejected memory item"
-          ja: rejectされたmemory itemを消費する境界例
-        scenario_id: MemoryDiscard-consumes-MemoryItem:boundary:20260716
-        descriptions:
-          zh: item-73 由同一批次采集，但 discard-72 未引用它；item-73 随后由 write-73 接受并持久化。
-          en: item-73 was collected in the same batch but is not referenced by discard-72; write-73 later accepts and persists it.
-          ja: item-73 は同 batch 由来ですが discard-72 は参照せず、後に write-73 が accept し persist します。
-        field_values: {}
-        related_node_ids:
-          - MemoryDiscard
-          - MemoryItem
-        related_relation_ids:
-          - MemoryDiscard-consumes-MemoryItem
-        expected_result:
-          zh: 拒绝 discard-72 consumes item-73；把 item-73 保留为 write-73 的候选输入。
-          en: Reject discard-72 consumes item-73 and keep item-73 as the candidate input of write-73.
-          ja: discard-72 consumes item-73 を拒否し item-73 を write-73 の candidate input として保持します。
-        why_valid_or_invalid:
-          zh: 同批处理不是同一活动输入；错误连接会让已接受候选同时表现为被拒绝。
-          en: Batch co-membership is not activity input identity; the false edge would make an accepted candidate appear simultaneously rejected.
-          ja: batch co-membership は activity input identity ではなく、false edge は accepted candidate を同時 rejected に見せます。
-        synthetic: false
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-memory-discard-004
-    source_claims:
-      - claim-memory-discard-004
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:MemoryItem
-  - id: MemoryDiscard-prevents-MemoryWrite
-    predicate: prevents
-    direction: source-to-target
-    relation_kind: governance
-    labels:
-      zh: 阻止候选写入
-      en: prevents candidate write
-      ja: candidate writeを防ぐ
-    definitions:
-      zh: MemoryDiscard —prevents→ MemoryWrite 表示对同一候选和同一准入尝试的拒绝决定使对应写入不得执行。
-      en: MemoryDiscard —prevents→ MemoryWrite means a rejection for the same candidate and admission attempt makes the corresponding write ineligible to execute.
-      ja: MemoryDiscard —prevents→ MemoryWrite は同一candidate/admission attemptへのrejectが対応writeを実行不可にすることを表します。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
-      en: The relation is decided per auditable fact; no uniform runtime cardinality is imposed at ontology level.
-      ja: このrelationはaudit可能fact単位で判定しontology層で全runtime instanceへ一律cardinalityを課しません。
-    inverse_reading:
-      predicate: inverse_prevents
-      labels:
-        zh: 反向读取
-        en: inverse prevents candidate write
-        ja: 逆方向読取
-    conditions:
-      - id: MemoryDiscard-prevents-MemoryWrite-condition-manual-001
-        severity: error
-        expression_language: plain
-        expression: Assert only when both activities share candidate_item_id and admission_attempt_id and the discard precedes or replaces the write.
-        explanations:
-          zh: 仅当两活动共享 candidate_item_id 与 admission_attempt_id，且丢弃决定先于或取代写入时成立。
-          en: Assert only when both activities share candidate_item_id and admission_attempt_id and the discard precedes or replaces the write.
-          ja: 両activityがcandidate_item_id/admission_attempt_idを共有しdiscardがwriteに先行/置換する時だけassertします。
-        source_claims:
-          - claim-memory-discard-004
-    temporal_scope: valid-time
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: MemoryDiscard-prevents-MemoryWrite-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 阻止候选写入正例
-          en: "Positive case: prevents candidate write"
-          ja: candidate writeを防ぐ正例
-        scenario_id: MemoryDiscard-prevents-MemoryWrite:positive:20260716
-        descriptions:
-          zh: discard-72 与 planned-write-72 共享 candidate_item_id=item-72 和 admission_attempt_id=attempt-9，拒绝决定先于提交并使计划写入取消。
-          en: discard-72 and planned-write-72 share candidate_item_id=item-72 and admission_attempt_id=attempt-9; the reject decision precedes commit and cancels the planned write.
-          ja: discard-72 と planned-write-72 は candidate_item_id=item-72、admission_attempt_id=attempt-9 を共有し reject decision が commit 前に planned write を cancel します。
-        field_values: {}
-        related_node_ids:
-          - MemoryDiscard
-          - MemoryWrite
-        related_relation_ids:
-          - MemoryDiscard-prevents-MemoryWrite
-        expected_result:
-          zh: 建立 discard-72 prevents planned-write-72，并确认 attempt-9 不产生任何持久记录或成功写入结果。
-          en: Assert discard-72 prevents planned-write-72 and confirm that attempt-9 emits neither a persistent record nor a successful write result.
-          ja: discard-72 prevents planned-write-72 を確立し attempt-9 が persistent record/success result を出さないことを確認します。
-        why_valid_or_invalid:
-          zh: 候选、尝试和时序完全一致，丢弃是该计划写入不再具备执行资格的直接原因。
-          en: Candidate, attempt, and ordering all match, so discard directly explains why that planned write is no longer executable.
-          ja: candidate・attempt・ordering が一致し discard が planned write の execution ineligibility を直接説明します。
-        synthetic: false
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-memory-discard-004
-      - id: MemoryDiscard-prevents-MemoryWrite-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 阻止候选写入边界例
-          en: "Boundary case: prevents candidate write"
-          ja: candidate writeを防ぐ境界例
-        scenario_id: MemoryDiscard-prevents-MemoryWrite:boundary:20260716
-        descriptions:
-          zh: discard-72 属于昨天的 attempt-9，而 write-72b 属于今天获得新同意的 attempt-10，二者仅复用相同候选内容摘要。
-          en: discard-72 belongs to yesterday's attempt-9, whereas write-72b belongs to today's newly consented attempt-10; only the content digest is reused.
-          ja: discard-72 は昨日の attempt-9、write-72b は今日 new consent の attempt-10 で content digest だけを再利用します。
-        field_values: {}
-        related_node_ids:
-          - MemoryDiscard
-          - MemoryWrite
-        related_relation_ids:
-          - MemoryDiscard-prevents-MemoryWrite
-        expected_result:
-          zh: 拒绝 discard-72 prevents write-72b；新尝试必须依据自己的准入与同意证据独立决定。
-          en: Reject discard-72 prevents write-72b; the new attempt must be decided independently from its own admission and consent evidence.
-          ja: discard-72 prevents write-72b を拒否し new attempt は own admission/consent evidence で独立決定します。
-        why_valid_or_invalid:
-          zh: 拒绝决定的作用域是具体 admission_attempt，不可跨尝试永久封禁同一内容，否则会忽略更新后的同意和策略。
-          en: A rejection is scoped to one admission_attempt and cannot permanently ban the content across attempts without considering renewed consent and policy.
-          ja: rejection は specific admission_attempt に scoped され renewed consent/policy を無視して content を永久禁止できません。
-        synthetic: false
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-memory-discard-004
-    source_claims:
-      - claim-memory-discard-004
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:MemoryWrite
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-lifecycle-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 该节点仅完成了从现行候选数据到唯一 YAML 树的无损转录；尚未逐项完成人工语义核验，不得据此宣称已审定。
-    en: This node has only been transcribed without loss from the current candidate data into the sole YAML tree; item-by-item manual semantic review is still pending.
-    ja: このノードは現行候補データから唯一の YAML ツリーへ欠落なく転記した段階であり、項目別の手動意味審査は未完了です。
-  sections:
-    semantics: pending
-    hierarchy: pending
-    relations: pending
-    structure: pending
-    examples: pending
-    source_claims: []
+relations: []
+sources:
+  - id: src-mem0-discard
+    title: Mem0 Platform Documentation
+    publisher: Mem0
+    url: https://docs.mem0.ai
+    source_type: official-doc
+    relevance: Admission may skip persistence for rejected candidates.
+  - id: src-discard-design
+    title: Moonweave memory-lifecycle module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Discard distinct from delete and write.
 source_claims:
-  - id: claim-memory-discard-001
-    source: eng-fw-langmem-memory-management
-    supports: LangMem exposes distinct insert, update, and delete controls and describes collection reconciliation and consolidation; Moonweave makes their lifecycle boundaries explicit.
-    locator: LangMem Core Concepts > Semantic Memory > Collection > reconcile previous beliefs by update or consolidation
+  - id: claim-memory-discard-mem0
+    source: src-mem0-discard
+    supports: Mem0 admission may reject candidates before creating memories.
+    locator: Add memory flow
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-memory-discard-design
+    source: src-discard-design
+    supports: MemoryDiscard rejects candidates without producing records or tombstones.
+    locator: MemoryDiscard boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-discard-002
-    source: eng-fw-langmem-memory-management
-    supports: MemoryDiscard.discard_operation_id records the stated operational datum so the concept instance can be identified or audited without changing the source model's own vocabulary.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
+  - id: claim-memory-discard-id
+    source: src-discard-design
+    supports: discard_operation_id identifies one rejection activity.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-discard-003
-    source: eng-fw-langmem-memory-management
-    supports: MemoryDiscard.rejection_reason records the stated operational datum so the concept instance can be identified or audited without changing the source model's own vocabulary.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
+  - id: claim-memory-discard-reason
+    source: src-discard-design
+    supports: reject_reason records structured admission rejection basis.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-discard-004
-    source: eng-fw-langmem-memory-management
-    supports: LangMem exposes distinct insert, update, and delete controls and describes collection reconciliation and consolidation; Moonweave makes their lifecycle boundaries explicit.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

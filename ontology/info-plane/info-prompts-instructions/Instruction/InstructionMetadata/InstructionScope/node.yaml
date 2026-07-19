@@ -1,34 +1,53 @@
 schema: moonweave.ai/ontology-node/v1
 id: InstructionScope
 kind: concept
-status: accepted
 labels:
   zh: 指令作用域
   en: Instruction scope
   ja: 指示スコープ
 semantics:
   short_definition:
-    zh: 限定一项指令约束哪些对象、时段或操作的信息。
-    en: Information limiting which objects, times, or actions an instruction governs.
-    ja: 指示が拘束する対象・期間・操作を限定する情報です。
+    zh: 记录 Instruction 实际约束对象或任务边界的元数据。
+    en: Metadata recording the object or task boundary an Instruction actually constrains.
+    ja: Instruction が実際に拘束する object/task boundary を記録する metadata。
   definition:
-    zh: 指令作用域是一类 InstructionMetadata，明确 Instruction 的对象边界、任务边界、时间窗口或资源范围；解析只在交叠范围内比较指令，不把局部约束外推到无关对象。
-    en: InstructionScope is InstructionMetadata defining the object, task, time-window, or resource boundary of an Instruction. Resolution compares instructions only where scopes overlap and does not project local constraints onto unrelated objects.
-    ja: InstructionScope は Instruction の object・task・time-window・resource boundary を定義する InstructionMetadata です。resolution は scope が重なる範囲だけ比較し、local constraint を無関係な object へ外挿しません。
+    zh: InstructionScope 取值 session、task、tool-call、message、resource；决定哪些 Instruction 可进入同一冲突比较（scope 交叠）。
+    en: InstructionScope values session, task, tool-call, message, resource; determines which Instructions enter the same conflict comparison via scope overlap.
+    ja: session/task/tool-call/message/resource scope。
   why_needed:
-    zh: 显式作用域能解释两条文字冲突的指令为何可以同时有效，也防止把会话局部约束错误提升为全局规则。
-    en: Explicit scope explains why textually conflicting instructions may both be valid and prevents a conversation-local constraint from becoming global.
-    ja: explicit scope により文面上 conflict する instruction が同時に有効な理由を説明し、conversation-local constraint の global 化を防ぎます。
+    zh: 没有 scope，相反措辞但不同资源的指令会被误标冲突。
+    en: Without scope, textually opposing directives on different resources would be mislabeled as conflicting.
+    ja: scope なし→false conflict。
   includes:
-    - zh: 纳入会话、任务、文件、工具、受众、时间窗口或资源集合的边界引用。
-      en: Includes boundary references for conversations, tasks, files, tools, audiences, time windows, or resource sets.
-      ja: conversation・task・file・tool・audience・time window・resource set の boundary reference を含みます。
+    - zh: scope_kind 与可选 scope_target 资源引用。
+      en: scope_kind and optional scope_target resource reference.
+      ja: scope_kind/scope_target。
   excludes:
-    - zh: 排除来源权威、同级排序和当前条件是否满足的适用性判断。
-      en: Excludes source authority, same-level ordering, and the applicability judgment that current conditions are met.
-      ja: source authority・same-level ordering・current condition 成立の applicability judgment を除外します。
+    - zh: applicability 条件表达式、directive_text 全文。
+      en: Applicability condition expressions and full directive_text.
+      ja: applicability/directive_text。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: '"不得修改" has_scope file:/reports/q2.md 与 edit q2.md 请求 scope 交叠→冲突检测。'
+    en: '"Do not modify" has_scope file:/reports/q2.md overlaps edit q2.md request scope→conflict detection.'
+    ja: scope overlap 检测。
+  typical_input: []
+  typical_output: []
+  reference_implementations:
+    - name: OpenAI Chat Completions API
+      url: https://platform.openai.com/docs/api-reference/chat/create
+      description: developer/system roles and message instructions.
+    - name: Anthropic Messages API
+      url: https://docs.anthropic.com/en/api/messages
+      description: Top-level system parameter for session instructions.
+    - name: MCP Prompts
+      url: https://modelcontextprotocol.io/specification/2025-06-18/server/prompts
+      description: prompts/list discovery and prompts/get template instantiation.
+    - name: Cursor Rules
+      url: https://cursor.com/docs/context/rules
+      description: Versioned project rules as persistent instructions.
 structure:
   identity_keys: []
   fields:
@@ -37,18 +56,18 @@ structure:
         zh: 作用域引用
         en: Scope reference
         ja: scope 参照
+      definitions:
+        zh: 指向受该指令约束的对象或资源集合。
+        en: References the object or resource set governed by the instruction.
+        ja: instruction が拘束する object/resource set を参照します。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 指向受该指令约束的对象或资源集合。
-        en: References the object or resource set governed by the instruction.
-        ja: instruction が拘束する object/resource set を参照します。
-      allowed_values: []
       pattern: null
       example_value: file:/reports/q2.md
+      allowed_values: []
       source_claims:
         - claim-instruction-scope-001
     - id: valid_from
@@ -56,18 +75,18 @@ structure:
         zh: 生效时间
         en: Valid from
         ja: 有効開始
+      definitions:
+        zh: 记录时间作用域开始；没有时间限制时可为空。
+        en: Records the start of temporal scope and may be absent when the scope is not time-bounded.
+        ja: temporal scope の開始を記録し時間制限がなければ省略できます。
       datatype: date-time
       required: false
       cardinality:
         min: 0
         max: 1
-      definitions:
-        zh: 记录时间作用域开始；没有时间限制时可为空。
-        en: Records the start of temporal scope and may be absent when the scope is not time-bounded.
-        ja: temporal scope の開始を記録し時間制限がなければ省略できます。
-      allowed_values: []
       pattern: null
       example_value: 2026-07-16T08:00:00Z
+      allowed_values: []
       source_claims:
         - claim-instruction-scope-001
     - id: valid_until
@@ -75,88 +94,84 @@ structure:
         zh: 失效时间
         en: Valid until
         ja: 有効終了
+      definitions:
+        zh: 记录时间作用域结束，不得被解释为来源权威变化。
+        en: Records the end of temporal scope and must not be interpreted as a change in source authority.
+        ja: temporal scope の終了を記録し source authority 変更とは解釈しません。
       datatype: date-time
       required: false
       cardinality:
         min: 0
         max: 1
-      definitions:
-        zh: 记录时间作用域结束，不得被解释为来源权威变化。
-        en: Records the end of temporal scope and must not be interpreted as a change in source authority.
-        ja: temporal scope の終了を記録し source authority 変更とは解釈しません。
-      allowed_values: []
       pattern: null
       example_value: 2026-07-17T08:00:00Z
+      allowed_values: []
       source_claims:
         - claim-instruction-scope-001
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: InstructionScope-manual-positive-20260716
-    kind: positive
+  - id: InstructionScope-example-file
     labels:
-      zh: 指令作用域正例
-      en: Instruction scope positive case
-      ja: 指示スコープ正例
-    scenario_id: null
+      zh: 文件作用域
+      en: File scope
+      ja: file scope
     descriptions:
-      zh: “不得修改”只绑定 file:/reports/q2.md；对另一份草稿文件的编辑请求不与其发生作用域交叠。
-      en: “Do not modify” is bound only to file:/reports/q2.md; an edit request for another draft does not overlap that scope.
-      ja: 「変更禁止」は file:/reports/q2.md のみに binding され、別 draft file の edit request とは scope が重なりません。
+      zh: inst-no-edit-q2 has_scope file:/reports/q2.md。
+      en: inst-no-edit-q2 has_scope file:/reports/q2.md.
+      ja: file scope。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: file scope
     field_values:
-      scope_ref: file:/reports/q2.md
-      metadata_id: metadata-inst-do-not-modify-report
-      instruction_ref: inst-do-not-modify-report
+      scope_kind: resource
+      scope_target: file:/reports/q2.md
     related_node_ids:
       - InstructionScope
-      - Instruction
-      - FileResourceReference
-    related_relation_ids:
-      - Instruction-has_scope-InstructionScope
-    expected_result:
-      zh: 保护约束仅对 q2.md 生效，其他文件按各自指令处理。
-      en: The protective constraint applies only to q2.md; other files follow their own instructions.
-      ja: protective constraint は q2.md のみに適用され、他 file は各 instruction に従います。
-    why_valid_or_invalid:
-      zh: 对象引用明确且解析没有把局部边界外推。
-      en: The object reference is explicit and resolution does not extrapolate the local boundary.
-      ja: object reference が明示され、resolution は local boundary を外挿していません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    related_relation_ids: []
     source_claims:
-      - claim-instruction-scope-001
-  - id: InstructionScope-manual-boundary-20260716
-    kind: boundary
+      - claim-iscope-design
+  - id: InstructionScope-example-session
     labels:
-      zh: 指令作用域边界例
-      en: Instruction scope boundary case
-      ja: 指示スコープ境界例
-    scenario_id: null
+      zh: 会话作用域
+      en: Session scope
+      ja: session scope
     descriptions:
-      zh: 一项 system 约束具有更高权威，但其作用域只覆盖外部发布；内部草稿编辑不因此自动禁止。
-      en: A system constraint has higher authority but covers only external publication; it does not automatically prohibit internal draft editing.
-      ja: system constraint は higher authority でも external publication のみを scope とし、internal draft editing を自動禁止しません。
+      zh: inst-system-v12 scope_kind=session 约束整个调用。
+      en: inst-system-v12 scope_kind=session constrains entire call.
+      ja: session scope。
+    example_source:
+      product: Anthropic
+      url: https://docs.anthropic.com/en/api/messages
+      version: system
+    field_values:
+      scope_kind: session
+    related_node_ids:
+      - InstructionScope
+      - SystemInstruction
+    related_relation_ids: []
+    source_claims:
+      - claim-iscope-anthropic
+  - id: InstructionScope-example-no-text-conflict
+    labels:
+      zh: 无 scope 交叠
+      en: No scope overlap
+      ja: scope overlap なし
+    descriptions:
+      zh: q2.md 约束与 draft.md 编辑无 scope 交叠，不得仅凭文字冲突。
+      en: q2.md constraint and draft.md edit have no scope overlap; textual opposition alone insufficient.
+      ja: different resource→no conflict。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
     field_values: {}
     related_node_ids:
       - InstructionScope
-      - InstructionAuthority
     related_relation_ids: []
-    expected_result:
-      zh: 权威信息保持不变，但无作用域交叠时不建立冲突。
-      en: Authority remains unchanged, but no conflict is created without scope overlap.
-      ja: authority は不変ですが scope overlap がなければ conflict を作りません。
-    why_valid_or_invalid:
-      zh: 高权威并不取消对其自身作用域边界的检查。
-      en: Higher authority does not remove the need to test its own scope boundary.
-      ja: higher authority でも自身の scope boundary 検査は必要です。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-instruction-scope-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-iscope-design
 parent_relation:
   id: InstructionScope-is_a-InstructionMetadata
   predicate: is_a
@@ -187,12 +202,10 @@ parent_relation:
   constraints: []
   examples:
     - id: InstructionScope-is_a-InstructionMetadata-manual-positive-20260716
-      kind: positive
       labels:
         zh: is_a 正例
         en: is_a positive case
         ja: is_a 正例
-      scenario_id: null
       descriptions:
         zh: scope-file-report 将“不得修改”限定到 q2.md，因此是 InstructionScope 并作为该指令的 Metadata。
         en: scope-file-report limits “do not modify” to q2.md, making it InstructionScope and metadata of that directive.
@@ -203,25 +216,13 @@ parent_relation:
         - InstructionMetadata
       related_relation_ids:
         - InstructionScope-is_a-InstructionMetadata
-      expected_result:
-        zh: 类型查询保留 Scope 到 Metadata 的路径，并允许独立比较范围交叠。
-        en: Type traversal preserves Scope under Metadata and allows independent overlap comparison.
-        ja: type traversal は Scope→Metadata を保持し scope overlap を独立比較できます。
-      why_valid_or_invalid:
-        zh: 对象边界限定同一指令何处生效，符合父类限定信息条件。
-        en: The object boundary qualifies where the same instruction applies, satisfying the parent information condition.
-        ja: object boundary は同一 instruction の適用範囲を限定し parent information 条件を満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
         - claim-instruction-scope-002
     - id: InstructionScope-is_a-InstructionMetadata-manual-boundary-20260716
-      kind: boundary
       labels:
         zh: is_a 边界例
         en: is_a boundary case
         ja: is_a 境界例
-      scenario_id: null
       descriptions:
         zh: InstructionApplicability 的 task.type 条件决定是否进入解析，不直接列出受约束资源边界。
         en: An InstructionApplicability task.type condition decides entry into resolution but does not itself enumerate governed resources.
@@ -232,41 +233,25 @@ parent_relation:
         - InstructionMetadata
       related_relation_ids:
         - InstructionScope-is_a-InstructionMetadata
-      expected_result:
-        zh: 适用条件保持 Applicability，不因相关而归为 Scope。
-        en: The condition remains Applicability and is not classified as Scope merely because related.
-        ja: condition は Applicability のままで関連だけで Scope に分類しません。
-      why_valid_or_invalid:
-        zh: 适用性是条件求值，作用域是规范效力的对象边界。
-        en: Applicability is condition evaluation; scope is the object boundary of normative effect.
-        ja: applicability は condition evaluation、scope は規範効力の object boundary です。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
         - claim-instruction-scope-002
   source_claims:
     - claim-instruction-scope-002
-  distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-info-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Model Spec 指令权威链、Agents SDK instructions 与 MCP prompts 逐项核验；Instruction 元数据层级、PromptTemplate 实例化与 InstructionProcessing 解析-冲突-解决语义成立。
-    en: Verified against OpenAI Model Spec instruction authority chain, Agents SDK instructions, and MCP prompts; Instruction metadata tiers, PromptTemplate instantiation, and InstructionProcessing parse-conflict-resolve semantics hold.
-    ja: OpenAI Model Spec instruction authority chain、Agents SDK instructions、MCP prompts に照らし Instruction metadata tier/PromptTemplate instantiation/InstructionProcessing parse-conflict-resolve semantics を個別確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-anthropic-messages
+    title: Anthropic Messages API Reference
+    publisher: Anthropic
+    url: https://docs.anthropic.com/en/api/messages
+    source_type: official-doc
+    relevance: Top-level system string separate from turn messages.
+  - id: src-info-prompts-design
+    title: Moonweave info-prompts-instructions module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Instruction normative identity separate from Message carriage.
 source_claims:
   - id: claim-instruction-scope-001
     source: eng-spec-openai-model-2025-10-27
@@ -274,11 +259,21 @@ source_claims:
     locator: Model Spec 2025-10-27 > The chain of command > Act within an agreed-upon scope of autonomy; Follow all applicable instructions
     evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-instruction-scope-002
     source: eng-spec-openai-model-2025-10-27
     supports: The Model Spec requires adherence to explicit scope boundaries. Moonweave classifies the boundary qualifying a directive as InstructionScope under InstructionMetadata.
     locator: Model Spec 2025-10-27 > The chain of command > Act within an agreed-upon scope of autonomy
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
+  - id: claim-iscope-anthropic
+    source: src-anthropic-messages
+    supports: Anthropic system parameter applies session-scoped behavioral constraints.
+    locator: system parameter
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-iscope-design
+    source: src-info-prompts-design
+    supports: InstructionScope determines conflict comparison sets via object boundaries.
+    locator: InstructionScope
+    evidence_kind: design-inference
+    confidence: high

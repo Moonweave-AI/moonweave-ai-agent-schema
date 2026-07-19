@@ -1,7 +1,6 @@
 schema: moonweave.ai/ontology-node/v1
 id: StateSnapshot
 kind: concept
-status: accepted
 labels:
   en: state snapshot
   zh: 状态快照
@@ -29,6 +28,33 @@ semantics:
       ja: 復元指定用 Checkpoint、快照間 StateDiff、取得動作、異なる論理時点を混在させた不整合値集合は含みません。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: 集成 StateSnapshot 时应分别映射 OpenTelemetry OTLP traces/spans, LangSmith run trees, LangGraph checkpoint snapshots；静态配置属于其他域，实际运行 occurrence 才写入本概念。
+    en: When integrating StateSnapshot, map OpenTelemetry OTLP traces/spans, LangSmith run trees, LangGraph checkpoint snapshots separately; static configuration belongs elsewhere and only runtime occurrences belong here.
+    ja: StateSnapshot 統合時は OpenTelemetry OTLP traces/spans, LangSmith run trees, LangGraph checkpoint snapshots を個別写像し、静的設定は他ドメイン、runtime occurrence のみ本 concept に属します。
+  typical_input:
+    - description: Vendor API payload mappable to StateSnapshot.
+      format: |-
+        # Example StateSnapshot ingest
+        { "state-snapshot_ref": "example-1" }
+      source_claims:
+        - claim-state-snapshot-design
+  typical_output:
+    - description: Moonweave-local StateSnapshot projection.
+      format: '{ "schema_owner": "moonweave-local-design", "state-snapshot_id": "example-1" }'
+      source_claims:
+        - claim-state-snapshot-design
+  reference_implementations:
+    - name: OpenTelemetry OTLP
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      description: Traces and spans → Trace, Span, Metric export.
+    - name: LangSmith
+      url: https://docs.smith.langchain.com/
+      description: Run trees and feedback → RunTree, TraceRecord.
+    - name: LangGraph Checkpoints
+      url: https://langchain-ai.github.io/langgraph/concepts/persistence/
+      description: State snapshots and checkpoint restore events.
 structure:
   identity_keys: []
   fields: []
@@ -36,16 +62,18 @@ structure:
   required_relation_constraints: []
 examples:
   - id: StateSnapshot-example-positive-001
-    kind: positive
     labels:
-      zh: 单一逻辑时点的一致状态集
-      en: Consistent state set at one logical time
-      ja: 一つの論理時点における一貫状態集合
-    scenario_id: null
+      zh: LangGraph graph.get_state
+      en: LangGraph graph.get_state
+      ja: LangGraph graph.get_state
     descriptions:
-      zh: 审批节点提交后，snapshot-v19 同时保存 session-8 的 messages、approval、artifacts、next_node 和逻辑版本；所有值来自同一提交边界，可与 snapshot-v18 比较。
-      en: After the approval node commits, snapshot-v19 captures session-8 messages, approval, artifacts, next_node, and logical version from the same commit boundary, making it comparable with snapshot-v18.
-      ja: 承認ノードのコミット後、snapshot-v19は同じコミット境界からsession-8のmessages、approval、artifacts、next_node、論理版を取得し、snapshot-v18と比較可能にする。
+      zh: LangGraph graph.get_state(config={configurable:{thread_id:thread-1}}) 返回 StateSnapshot：values={messages:[...]}, next=("agent",), checkpoint_id=1f070a87-33b3-6d36-8001-50c306580336。
+      en: 'LangGraph graph.get_state(config={configurable:{thread_id:thread-1}}) returns StateSnapshot: values={messages:[...]}, next=("agent",), checkpoint_id=1f070a87-33b3-6d36-8001-50c306580336.'
+      ja: graph.get_state は values/next/checkpoint_id を返す StateSnapshot である。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
     field_values:
       record_id: state-snapshot-v19
       record_kind: state-snapshot
@@ -60,29 +88,21 @@ examples:
       - StateSnapshot-is_a-StateRecord
       - state_diff_from_snapshot
       - state_diff_to_snapshot
-    expected_result:
-      zh: 该对象被识别为状态快照，并可作为状态差异的明确端点。
-      en: The object is classified as StateSnapshot and can serve as an explicit endpoint of a StateDiff.
-      ja: 対象はStateSnapshotに分類され、StateDiffの明示的端点として使用できる。
-    why_valid_or_invalid:
-      zh: 它完整描述一个对象在同一逻辑版本的状态值，不表达相邻版本发生了哪些变化。
-      en: It describes the subject's state values at one consistent logical version without asserting which changes occurred from another version.
-      ja: 一つの一貫した論理版の状態値を記述し、別版から何が変わったかは主張しない。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-state-snapshot-001
+      - claim-state-snapshot-design
   - id: StateSnapshot-example-boundary-001
-    kind: boundary
     labels:
-      zh: 变更列表不是完整状态快照
-      en: A change list is not a complete state snapshot
-      ja: 変更一覧は完全状態スナップショットではない
-    scenario_id: null
+      zh: Run.status 非 StateSnapshot
+      en: Run.status not StateSnapshot
+      ja: Run.status は StateSnapshot ではない
     descriptions:
-      zh: 记录仅写明 approval 从 pending 改为 granted、messages 新增一项，并引用 v18 与 v19；它没有给出 v19 的其他当前值，因此是 StateDiff 而非 StateSnapshot。
-      en: A record only states that approval changed from pending to granted and one message was added, referencing v18 and v19. It omits all other current v19 values, so it is StateDiff rather than StateSnapshot.
-      ja: 記録はapprovalがpendingからgrantedへ変わりmessagesが1件増えたこととv18・v19だけを示す。他のv19現在値を欠くためStateSnapshotではなくStateDiffである。
+      zh: OpenAI runs.retrieve 返回 Run.status=in_progress 是 Execution 生命周期字段，不是 LangGraph StateSnapshot values/next。
+      en: OpenAI runs.retrieve returning Run.status=in_progress is Execution lifecycle field, not LangGraph StateSnapshot values/next.
+      ja: Run.status は Execution ライフサイクルであり StateSnapshot ではない。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
     field_values: {}
     related_node_ids:
       - StateSnapshot
@@ -90,30 +110,48 @@ examples:
       - StateRecord
     related_relation_ids:
       - StateSnapshot-is_a-StateRecord
-    expected_result:
-      zh: 该对象归入状态差异；不得用变化集合回答完整当前状态查询。
-      en: The object is classified as StateDiff and cannot answer a complete-current-state query.
-      ja: 対象はStateDiffに分類され、完全な現在状態照会には使えない。
-    why_valid_or_invalid:
-      zh: 快照保存某时点的一致状态集合，差异只保存两个版本之间的变化。
-      en: A snapshot preserves a consistent state set at one time, whereas a diff preserves only changes between versions.
-      ja: スナップショットは一時点の一貫状態集合、差分は版間の変更だけを保存する。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-state-snapshot-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: Checkpoint
-    shared_parent_concept_id: StateRecord
-    differentia:
-      zh: 正向身份比较：父节点 StateRecord：StateSnapshot（semantic kind=information，骨架 StateSnapshot-is_a-StateRecord）；Checkpoint（semantic kind=information，骨架 Checkpoint-is_a-StateRecord）。双端条件：StateSnapshot 条件：“作为状态记录，状态快照由这一事实区分：它捕获会话、参与者、图、工具或状态图步骤的运行状态，用于检查、恢复、回放或生命周期转移”；Checkpoint 条件：“检查点是一种状态记录（StateRecord），保存会话、版本、创建活动、状态摘要和所引用的 StateSnapshot；捕获动作由 CheckpointActivity 执行，而该记录本身不修改或生成状态”。仅依据各自定义与骨架逐端验证。
-      en: "Positive identity comparison: parent StateRecord: StateSnapshot (semantic kind=information, backbone StateSnapshot-is_a-StateRecord); Checkpoint (semantic kind=information, backbone Checkpoint-is_a-StateRecord). Endpoint conditions: StateSnapshot condition: “State snapshot belongs to the state record category and differs from broader members in that it is a captured runtime state for a session, actor, graph, tool, or statechart step, used for inspection, recovery, replay, or lifecycle transition”; Checkpoint condition: “A Checkpoint is a StateRecord that stores session, version, creating activity, state digest, and referenced StateSnapshot; CheckpointActivity performs capture, while the record itself neither mutates nor generates state”. Verify each endpoint from its own definition and backbone."
-      ja: 正の同一性比較：親 StateRecord：StateSnapshot（semantic kind=information、バックボーン StateSnapshot-is_a-StateRecord）；Checkpoint（semantic kind=information、バックボーン Checkpoint-is_a-StateRecord）。両端条件：StateSnapshot の条件：「状態スナップショットは状態記録として、次の条件により他の対象と区別されます：それは、セッション、アクター、グラフ、ツール、状態図ステップの実行状態を捕捉し、検査、復旧、再生、ライフサイクル遷移に用います」；Checkpoint の条件：「状態記録に属するチェックポイントは、次の事実を種差とします：それはセッション、版、作成活動、状態要約、参照 StateSnapshot を記録します」。各端を固有の定義とバックボーンで検証します。
+      - claim-state-snapshot-design
+  - id: StateSnapshot-example-3
+    labels:
+      zh: StateSnapshot 与 Checkpoint 边界
+      en: StateSnapshot versus Checkpoint
+      ja: StateSnapshot と Checkpoint 境界
+    descriptions:
+      zh: StateSnapshot 是查询投影；Checkpoint tuple 是持久化存储；同一 checkpoint_id 可对应 Snapshot 视图与存储记录。
+      en: StateSnapshot is query projection; Checkpoint tuple is persistent storage; same checkpoint_id can have Snapshot view and storage record.
+      ja: StateSnapshot はクエリ投影、Checkpoint は永続 tuple である。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
+    field_values: {}
+    related_node_ids:
+      - StateSnapshot
+    related_relation_ids: []
     source_claims:
-      - claim-state-snapshot-001
+      - claim-state-snapshot-vendor
+      - claim-state-snapshot-design
+  - id: StateSnapshot-example-4
+    labels:
+      zh: thread-1 StateSnapshot 实例
+      en: thread-1 StateSnapshot instance
+      ja: thread-1 StateSnapshot 事例
+    descriptions:
+      zh: LangGraph time-travel：get_state(config, checkpoint_id=1f070a87...) 读取历史 super-step 的 values 与 next 指针用于 replay。
+      en: "LangGraph time-travel: get_state(config, checkpoint_id=1f070a87...) reads historical super-step values and next pointer for replay."
+      ja: time-travel get_state で歴史 super-step の values/next を読む。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
+    field_values: {}
+    related_node_ids:
+      - StateSnapshot
+    related_relation_ids: []
+    source_claims:
+      - claim-state-snapshot-vendor
+      - claim-state-snapshot-design
 parent_relation:
   id: StateSnapshot-is_a-StateRecord
   predicate: is_a
@@ -142,101 +180,43 @@ parent_relation:
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: StateSnapshot-is_a-StateRecord-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 逐项核实正例
-        en: Point-reviewed positive case
-        ja: 項目別審査の正例
-      scenario_id: null
-      descriptions:
-        zh: s-12 保存 values、next、config、metadata、created_at 与 tasks，完整描述 thread t-7 的 step 12 状态。
-        en: s-12 preserves values, next, config, metadata, created_at, and tasks for thread t-7 at step 12.
-        ja: s-12 が thread t-7 の step 12 の values・next・config・metadata・created_at・tasks を保存します。
-      field_values: {}
-      related_node_ids:
-        - StateSnapshot
-        - StateRecord
-      related_relation_ids:
-        - StateSnapshot-is_a-StateRecord
-      expected_result:
-        zh: 仅在所述证据存在时返回这条有向事实。
-        en: Return this directed fact only when the described evidence exists.
-        ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
-      why_valid_or_invalid:
-        zh: 每个 StateSnapshot 都是 StateRecord，其种差是在一个逻辑时点完整呈现目标对象的一致状态值集合。
-        en: Every StateSnapshot is a StateRecord distinguished by presenting a consistent set of the target object's state values at one logical time.
-        ja: すべての StateSnapshot は StateRecord で、一つの論理時点における対象の整合した状態値集合を示す点が種差です。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-state-snapshot-002
-    - id: StateSnapshot-is_a-StateRecord-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 逐项核实边界例
-        en: Point-reviewed boundary case
-        ja: 項目別審査の境界例
-      scenario_id: null
-      descriptions:
-        zh: 变更记录只列出 balance 从 20 变为 25，并没有列出其他 channel 当前值。
-        en: A change record lists only balance changing from 20 to 25 and omits all other current channel values.
-        ja: change record は balance が 20 から 25 へ変わったことだけを示し、他 channel の現在値を含みません。
-      field_values: {}
-      related_node_ids:
-        - StateSnapshot
-        - StateRecord
-      related_relation_ids:
-        - StateSnapshot-is_a-StateRecord
-      expected_result:
-        zh: 不得从该边界情形推断这条关系。
-        en: Do not infer this relation from the boundary case.
-        ja: この境界事例から当該関係を推論しません。
-      why_valid_or_invalid:
-        zh: 只记录变化的是 StateDiff；不具备完整时点状态，不能归为 StateSnapshot。
-        en: A change-only record is StateDiff; without complete point-in-time state it is not StateSnapshot.
-        ja: 変化だけを記録するのは StateDiff で、時点状態全体がなければ StateSnapshot ではありません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-state-snapshot-002
   source_claims:
-    - claim-state-snapshot-002
+    - claim-state-snapshot-design
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-runtime-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenTelemetry、W3C Trace Context 与 LangGraph checkpoint/replay 逐项核验，TraceSpan 与 Checkpoint 语义成立。
-    en: Verified against OpenTelemetry, W3C Trace Context, and LangGraph checkpoint/replay. TraceSpan and Checkpoint semantics hold.
-    ja: OpenTelemetry、W3C Trace Context、LangGraph checkpoint/replay に照らし TraceSpan と Checkpoint semantics を確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-otel-protocol
+    title: OpenTelemetry Protocol Specification
+    url: https://opentelemetry.io/docs/specs/otel/protocol/
+    source_type: official-spec
+    relevance: OTLP traceId, spanId, parent links, status codes.
+  - id: src-langsmith
+    title: LangSmith Documentation
+    url: https://docs.smith.langchain.com/
+    source_type: official-doc
+    relevance: Run trees with parent_run_id and nested child runs.
+  - id: src-langgraph-checkpoints
+    title: LangGraph Persistence
+    url: https://langchain-ai.github.io/langgraph/concepts/persistence/
+    source_type: official-doc
+    relevance: Checkpoint and StateSnapshot capture for recovery.
+  - id: src-runtime-observability-design
+    title: Moonweave runtime-observability module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: TraceSpan, Checkpoint, TraceEvent boundaries versus Execution.
 source_claims:
-  - id: claim-state-snapshot-001
-    source: eng-fw-langgraph-persistence
-    supports: LangGraph StateSnapshot exposes values, next nodes, configuration, metadata, creation time, parent configuration, and tasks at one checkpoint; Moonweave keeps it distinct from a change set and from a checkpoint identity.
-    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
+  - id: claim-state-snapshot-vendor
+    source: src-otel-protocol
+    supports: runtime-observability vendor evidence supports StateSnapshot identity and boundary mapping.
+    locator: StateSnapshot integration
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-state-snapshot-002
-    source: eng-fw-langgraph-persistence
-    supports: Every StateSnapshot is a StateRecord distinguished by presenting a consistent set of the target object's state values at one logical time. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
-    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
+  - id: claim-state-snapshot-design
+    source: src-runtime-observability-design
+    supports: Moonweave StateSnapshot concept boundary within runtime-observability.
+    locator: StateSnapshot boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-

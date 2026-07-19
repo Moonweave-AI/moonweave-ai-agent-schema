@@ -1,7 +1,6 @@
 schema: moonweave.ai/ontology-node/v1
 id: Execution
 kind: concept
-status: accepted
 labels:
   zh: 执行
   en: Execution
@@ -12,19 +11,9 @@ semantics:
     en: One bounded run that occurs to carry out identified work.
     ja: 特定された作業を遂行するために生じる一回の境界付き実行。
   definition:
-    zh: >-
-      Execution 是代理系统中可寻址的活动发生：它从某一生命周期状态开始，承接一个明确的
-      Task 或 WorkItem，并在完成、失败、取消或拒绝时结束。它可以包含多个 RunAttempt，
-      但不是 Task 规范、调用日志、结果记录或框架的 runner 对象。
-    en: >-
-      An Execution is an addressable activity occurrence in an agent system. It begins when work
-      actually starts, carries an identified Task or WorkItem, and ends by completion, failure,
-      cancellation, or rejection. It may contain several RunAttempts, but it is not the Task
-      specification, a log entry, a result record, or a framework runner object.
-    ja: >-
-      Execution はエージェントシステム内の識別可能な activity occurrence です。明示された
-      Task または WorkItem を担い、完了・失敗・取消・拒否で終了します。複数の RunAttempt
-      を含み得ますが、Task 仕様、ログ、結果記録、framework runner object ではありません。
+    zh: Execution 是代理系统中可寻址的活动发生：它从某一生命周期状态开始，承接一个明确的 Task 或 WorkItem，并在完成、失败、取消或拒绝时结束。它可以包含多个 RunAttempt， 但不是 Task 规范、调用日志、结果记录或框架的 runner 对象。
+    en: An Execution is an addressable activity occurrence in an agent system. It begins when work actually starts, carries an identified Task or WorkItem, and ends by completion, failure, cancellation, or rejection. It may contain several RunAttempts, but it is not the Task specification, a log entry, a result record, or a framework runner object.
+    ja: Execution はエージェントシステム内の識別可能な activity occurrence です。明示された Task または WorkItem を担い、完了・失敗・取消・拒否で終了します。複数の RunAttempt を含み得ますが、Task 仕様、ログ、結果記録、framework runner object ではありません。
   why_needed:
     zh: 将一次逻辑运行与其内部尝试、工具调用、产物和终态记录分开，才能稳定追踪生命周期和责任。
     en: Separating a logical run from its attempts, tool calls, artifacts, and terminal records makes lifecycle and responsibility traceable.
@@ -42,9 +31,35 @@ semantics:
       ja: 単一 model call・command execution・result payload。これらは内部 activity または information object です。
   semantic_kind: activity
   aliases: []
-applicability: [core]
+engineering:
+  explanation:
+    zh: Execution（Run）映射 OpenAI Responses response.id 生命周期、OpenAI Assistants thread run、LangGraph run_id 与 Anthropic message 会话边界；TaskPlan 或编译图不是 Execution。
+    en: Execution (Run) maps OpenAI Responses response.id lifecycle, OpenAI Assistants thread run, LangGraph run_id, and Anthropic message session boundaries; TaskPlan or compiled graph is not Execution.
+    ja: Execution（Run）は OpenAI response/run、LangGraph run_id、Anthropic message 境界を写像し TaskPlan/compiled graph は Execution ではありません。
+  typical_input:
+    - description: OpenAI Responses, LangGraph run, or Anthropic stream lifecycle.
+      format: POST /v1/responses => {"id":"resp_abc","status":"in_progress"}
+      source_claims:
+        - claim-openai-responses-execution
+        - claim-execution-design
+  typical_output:
+    - description: Moonweave Execution/RunAttempt projection.
+      format: '{"execution_id":"execution-openai-abc","lifecycle_state":"running","started_at":"2026-07-17T05:00:00Z"}'
+      source_claims:
+        - claim-execution-design
+  reference_implementations:
+    - name: OpenAI Responses API
+      url: https://platform.openai.com/docs/api-reference/responses
+      description: Response lifecycle → Run/Execution; stream events → StreamEvent.
+    - name: LangGraph Runs API
+      url: https://langchain-ai.github.io/langgraph/cloud/reference/api/api_ref/
+      description: Thread runs, checkpoints, retry lineage → Run, Attempt, Checkpoint.
+    - name: Anthropic Messages Streaming
+      url: https://docs.anthropic.com/en/api/messages-streaming
+      description: message_start/delta/stop → Step and StreamEvent evidence.
 structure:
-  identity_keys: [execution_id]
+  identity_keys:
+    - execution_id
   fields:
     - id: execution_id
       labels:
@@ -57,11 +72,15 @@ structure:
         ja: execution lifecycle 全体で変化しない安定識別子。
       datatype: string
       required: true
-      cardinality: {min: 1, max: 1}
-      pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$'
+      cardinality:
+        min: 1
+        max: 1
+      pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]*$
       example_value: execution-build-42
       allowed_values: []
-      source_claims: [claim-execution-activity, claim-execution-lifecycle]
+      source_claims:
+        - claim-execution-design
+        - claim-execution-design
     - id: lifecycle_state
       labels:
         zh: 生命周期状态
@@ -73,85 +92,212 @@ structure:
         ja: execution の現在の running/terminal state。終端から非終端へ戻りません。
       datatype: string
       required: true
-      cardinality: {min: 1, max: 1}
+      cardinality:
+        min: 1
+        max: 1
       pattern: null
       example_value: running
       allowed_values:
         - id: execution-state-running
           value: running
-          labels: {zh: 运行中, en: running, ja: 実行中}
-          definitions: {zh: 正在开展工作。, en: Work is actively occurring., ja: 作業が進行中。}
-          status: accepted
-          source_claims: [claim-execution-lifecycle]
+          labels:
+            zh: 运行中
+            en: running
+            ja: 実行中
+          definitions:
+            zh: 正在开展工作。
+            en: Work is actively occurring.
+            ja: 作業が進行中。
+          source_claims:
+            - claim-execution-design
         - id: execution-state-interrupted
           value: interrupted
-          labels: {zh: 中断待续, en: interrupted, ja: 中断中}
-          definitions: {zh: 等待输入、授权或外部恢复条件，尚非终态。, en: Waiting for input, authorization, or another recovery condition; not terminal., ja: 入力・認可・回復条件待ちで、終端ではない。}
-          status: accepted
-          source_claims: [claim-execution-lifecycle]
+          labels:
+            zh: 中断待续
+            en: interrupted
+            ja: 中断中
+          definitions:
+            zh: 等待输入、授权或外部恢复条件，尚非终态。
+            en: Waiting for input
+            authorization: null
+            or another recovery condition; not terminal.: null
+            ja: 入力・認可・回復条件待ちで、終端ではない。
+          source_claims:
+            - claim-execution-design
         - id: execution-state-completed
           value: completed
-          labels: {zh: 已完成, en: completed, ja: 完了}
-          definitions: {zh: 逻辑工作已满足适用完成条件。, en: The logical work satisfied its applicable completion criteria., ja: logical work が適用 completion criteria を満たしました。}
-          status: accepted
-          source_claims: [claim-execution-lifecycle]
+          labels:
+            zh: 已完成
+            en: completed
+            ja: 完了
+          definitions:
+            zh: 逻辑工作已满足适用完成条件。
+            en: The logical work satisfied its applicable completion criteria.
+            ja: logical work が適用 completion criteria を満たしました。
+          source_claims:
+            - claim-execution-design
         - id: execution-state-failed
           value: failed
-          labels: {zh: 已失败, en: failed, ja: 失敗}
-          definitions: {zh: 执行结束且没有完成工作。, en: The execution ended without completing the work., ja: work を完了せず execution が終了。}
-          status: accepted
-          source_claims: [claim-execution-lifecycle]
+          labels:
+            zh: 已失败
+            en: failed
+            ja: 失敗
+          definitions:
+            zh: 执行结束且没有完成工作。
+            en: The execution ended without completing the work.
+            ja: work を完了せず execution が終了。
+          source_claims:
+            - claim-execution-design
         - id: execution-state-canceled
           value: canceled
-          labels: {zh: 已取消, en: canceled, ja: 取消}
-          definitions: {zh: 执行开始后被授权主体取消。, en: The execution was canceled by an authorized actor after it began., ja: 開始後に authorized actor が execution を取消。}
-          status: accepted
-          source_claims: [claim-execution-lifecycle]
-      source_claims: [claim-execution-lifecycle]
+          labels:
+            zh: 已取消
+            en: canceled
+            ja: 取消
+          definitions:
+            zh: 执行开始后被授权主体取消。
+            en: The execution was canceled by an authorized actor after it began.
+            ja: 開始後に authorized actor が execution を取消。
+          source_claims:
+            - claim-execution-design
+      source_claims:
+        - claim-execution-design
     - id: started_at
-      labels: {zh: 开始时间, en: Started at, ja: 開始時刻}
-      definitions: {zh: 第一个运行活动实际开始的时间。, en: Time at which the first run activity actually began., ja: 最初の実行 activity が実際に開始した時刻。}
+      labels:
+        zh: 开始时间
+        en: Started at
+        ja: 開始時刻
+      definitions:
+        zh: 第一个运行活动实际开始的时间。
+        en: Time at which the first run activity actually began.
+        ja: 最初の実行 activity が実際に開始した時刻。
       datatype: date-time
       required: true
-      cardinality: {min: 1, max: 1}
+      cardinality:
+        min: 1
+        max: 1
       pattern: null
-      example_value: '2026-07-17T05:00:00Z'
+      example_value: 2026-07-17T05:00:00Z
       allowed_values: []
-      source_claims: [claim-execution-activity]
+      source_claims:
+        - claim-execution-design
     - id: ended_at
-      labels: {zh: 结束时间, en: Ended at, ja: 終了時刻}
-      definitions: {zh: 执行进入终态的时间。, en: Time at which the execution entered a terminal state., ja: execution が終端状態に入った時刻。}
+      labels:
+        zh: 结束时间
+        en: Ended at
+        ja: 終了時刻
+      definitions:
+        zh: 执行进入终态的时间。
+        en: Time at which the execution entered a terminal state.
+        ja: execution が終端状態に入った時刻。
       datatype: date-time
       required: false
-      cardinality: {min: 0, max: 1}
+      cardinality:
+        min: 0
+        max: 1
       pattern: null
-      example_value: '2026-07-17T05:03:00Z'
+      example_value: 2026-07-17T05:03:00Z
       allowed_values: []
-      source_claims: [claim-execution-activity]
+      source_claims:
+        - claim-execution-design
   constraints:
     - id: execution-time-order
       severity: error
       expression_language: plain
       expression: ended_at is absent or started_at is present and ended_at >= started_at
-      explanations: {zh: 结束不能早于开始。, en: An execution cannot end before it starts., ja: execution は開始前に終了できません。}
-      source_claims: [claim-execution-activity]
+      explanations:
+        zh: 结束不能早于开始。
+        en: An execution cannot end before it starts.
+        ja: execution は開始前に終了できません。
+      source_claims:
+        - claim-execution-design
   required_relations: []
 examples:
   - id: execution-example-build-42
-    kind: positive
-    labels: {zh: 一次构建执行, en: One build execution, ja: 一回の build execution}
-    scenario_id: null
+    labels:
+      zh: OpenAI Assistants Run 生命周期
+      en: OpenAI Assistants Run lifecycle
+      ja: OpenAI Assistants Run ライフサイクル
     descriptions:
-      zh: execution-build-42 承接构建 WorkItem，内部第一次尝试失败，第二次尝试完成；执行标识始终不变。
-      en: execution-build-42 carries a build WorkItem, contains a failed first attempt and a successful second attempt, and keeps one execution identity.
-      ja: execution-build-42 は build WorkItem を担い、失敗した第一試行と成功した第二試行を含み、同一 identity を保ちます。
-    field_values: {execution_id: execution-build-42, lifecycle_state: completed}
-    related_node_ids: [Execution, RunAttempt, WorkItem]
-    related_relation_ids: [Execution-carries_out-WorkItem, RunAttempt-part_of-Execution]
-    expected_result: {zh: 两次尝试归属于同一执行。, en: Both attempts belong to one execution., ja: 二つの attempt が一つの execution に属します。}
-    why_valid_or_invalid: {zh: 逻辑运行身份没有因重试而改变。, en: Retry did not replace the logical run identity., ja: retry によって論理実行 identity は置換されません。}
-    synthetic: true
-    source_claims: [claim-execution-runner-loop]
+      zh: OpenAI Assistants API 中，通过 client.beta.threads.runs.create(thread_id=thread_id, assistant_id=assistant_id) 创建 Run。Run 对象包含 id、status、started_at、completed_at 等字段。状态流转为 queued → in_progress → requires_action（如需工具调用）→ completed/failed/cancelled/expired。每个 Run 产生 Run Steps，步骤类型为 message_creation 或 tool_calls。可通过 client.beta.threads.runs.steps.list(thread_id, run_id) 查询所有步骤。
+      en: In OpenAI Assistants API, create a Run via client.beta.threads.runs.create(thread_id, assistant_id). Run object contains id, status, started_at, completed_at fields. Status flow is queued → in_progress → requires_action → completed/failed/cancelled/expired. Each Run produces Run Steps of type message_creation or tool_calls.
+      ja: OpenAI Assistants API で runs.create により Run を作成。status は queued→in_progress→requires_action→completed 等。Run Steps は message_creation または tool_calls。
+    example_source:
+      product: OpenAI Responses API
+      url: https://platform.openai.com/docs/api-reference/responses
+      version: response lifecycle
+    field_values:
+      execution_id: execution-build-42
+      lifecycle_state: completed
+    related_node_ids:
+      - Execution
+      - RunAttempt
+      - WorkItem
+    related_relation_ids:
+      - Execution-carries_out-WorkItem
+      - RunAttempt-part_of-Execution
+    source_claims:
+      - claim-execution-design
+  - id: Execution-example-2
+    labels:
+      zh: LangGraph 编译图非 Execution
+      en: LangGraph compiled graph not Execution
+      ja: LangGraph コンパイル済みグラフは Execution ではない
+    descriptions:
+      zh: LangGraph StateGraph.compile() 后仅有节点/边定义；graph.invoke 调用前 planner 输出的 TaskStep 列表是 PROV prov:Plan，缺少 execution_id、started_at 与 RunAttempt 证据。
+      en: After LangGraph StateGraph.compile(), only node/edge definitions exist; before graph.invoke, planner TaskStep list is PROV prov:Plan without execution_id, started_at, or RunAttempt evidence.
+      ja: graph.invoke 前の TaskStep 一覧は prov:Plan であり execution_id も started_at もない。
+    example_source:
+      product: OpenAI Responses API
+      url: https://platform.openai.com/docs/api-reference/responses
+      version: response lifecycle
+    field_values: {}
+    related_node_ids:
+      - Execution
+    related_relation_ids: []
+    source_claims:
+      - claim-execution-design
+      - claim-execution-design
+  - id: Execution-example-3
+    labels:
+      zh: LangSmith 子 run 与 Execution 边界
+      en: LangSmith child run versus Execution
+      ja: LangSmith 子 run と Execution 境界
+    descriptions:
+      zh: LangSmith RunTree 中 llm.generate（parent_run_id=agent.run）与 tool.execute 是 TraceSpan 子操作；agent.run 根 run 才对应一次完整 agent Execution，子 run 不得提升为 Execution。
+      en: In LangSmith RunTree, llm.generate (parent_run_id=agent.run) and tool.execute are TraceSpan child operations; only agent.run root maps to one full agent Execution.
+      ja: LangSmith 子 run（llm.generate）は TraceSpan であり、根 run のみが Execution に対応する。
+    example_source:
+      product: OpenAI Responses API
+      url: https://platform.openai.com/docs/api-reference/responses
+      version: response lifecycle
+    field_values: {}
+    related_node_ids:
+      - Execution
+    related_relation_ids: []
+    source_claims:
+      - claim-execution-design
+      - claim-execution-design
+  - id: Execution-example-4
+    labels:
+      zh: LangGraph graph.invoke 执行
+      en: LangGraph graph.invoke execution
+      ja: LangGraph graph.invoke 実行
+    descriptions:
+      zh: LangGraph graph.invoke(input, config={configurable:{thread_id:thread-1}}) 在 2026-08-03T20:28:43Z 开始、20:28:46Z 结束；每个 super-step 调用 checkpointer.put；LangSmith 导出 trace_id 与 Execution 关联。
+      en: LangGraph graph.invoke(input, config={configurable:{thread_id:thread-1}}) starts 2026-08-03T20:28:43Z and ends 20:28:46Z; each super-step calls checkpointer.put; LangSmith exports trace_id correlated to Execution.
+      ja: LangGraph graph.invoke は super-step ごとに checkpoint を書き、LangSmith trace と相関する。
+    example_source:
+      product: OpenAI Responses API
+      url: https://platform.openai.com/docs/api-reference/responses
+      version: response lifecycle
+    field_values: {}
+    related_node_ids:
+      - Execution
+    related_relation_ids: []
+    source_claims:
+      - claim-execution-design
+      - claim-execution-design
 parent_relation: null
 relations:
   - id: Execution-realizes-Task
@@ -159,89 +305,120 @@ relations:
     target: concept:Task
     direction: source-to-target
     relation_kind: mapping
-    labels: {zh: 实现任务, en: realizes task, ja: task を実現する}
+    labels:
+      zh: 实现任务
+      en: realizes task
+      ja: task を実現する
     definitions:
       zh: 将一次执行发生连接到它试图满足的 Task 规范；Task 本身不是运行发生。
       en: Links an execution occurrence to the Task specification it attempts to satisfy; the Task is not the occurrence.
       ja: execution occurrence を満たそうとする Task 仕様へ結びます。Task 自体は occurrence ではありません。
-    cardinality: {source: {min: 0, max: null}, target: {min: 1, max: 1}}
+    cardinality:
+      source:
+        min: 0
+        max: null
+      target:
+        min: 1
+        max: 1
     cardinality_not_applicable_reason: null
     inverse_reading:
       predicate: realized_by
-      labels: {zh: 由执行实现, en: realized by execution, ja: execution により実現される}
+      labels:
+        zh: 由执行实现
+        en: realized by execution
+        ja: execution により実現される
     conditions: []
     temporal_scope: timeless
     boundary_context: null
     constraints: []
-    examples: []
-    source_claims: [claim-execution-plan-separation]
-    distinct_fact_rationale: {zh: 规范与发生具有不同身份。, en: Specification and occurrence have different identities., ja: 仕様と occurrence は異なる identity を持ちます。}
+    source_claims:
+      - claim-execution-design
+    distinct_fact_rationale:
+      zh: 规范与发生具有不同身份。
+      en: Specification and occurrence have different identities.
+      ja: 仕様と occurrence は異なる identity を持ちます。
     layout_role: cross-link
-    review_status: accepted
   - id: Execution-carries_out-WorkItem
     predicate: carries_out
     target: concept:WorkItem
     direction: source-to-target
     relation_kind: mapping
-    labels: {zh: 承接工作项, en: carries out work item, ja: work item を遂行する}
-    definitions: {zh: 指明本次执行实际接受的具体工作分配。, en: Identifies the concrete work allocation accepted by this execution., ja: この execution が受け入れた具体的 work allocation を示します。}
-    cardinality: {source: {min: 0, max: null}, target: {min: 0, max: 1}}
+    labels:
+      zh: 承接工作项
+      en: carries out work item
+      ja: work item を遂行する
+    definitions:
+      zh: 指明本次执行实际接受的具体工作分配。
+      en: Identifies the concrete work allocation accepted by this execution.
+      ja: この execution が受け入れた具体的 work allocation を示します。
+    cardinality:
+      source:
+        min: 0
+        max: null
+      target:
+        min: 0
+        max: 1
     cardinality_not_applicable_reason: null
     inverse_reading:
       predicate: carried_out_by
-      labels: {zh: 由执行承接, en: carried out by execution, ja: execution により遂行される}
+      labels:
+        zh: 由执行承接
+        en: carried out by execution
+        ja: execution により遂行される
     conditions: []
     temporal_scope: timeless
     boundary_context: null
     constraints: []
-    examples: []
-    source_claims: [claim-execution-plan-separation]
-    distinct_fact_rationale: {zh: 工作分配与抽象任务规范可以不同。, en: A concrete allocation is distinct from an abstract Task specification., ja: 具体 allocation は抽象 Task 仕様と区別されます。}
+    source_claims:
+      - claim-execution-design
+    distinct_fact_rationale:
+      zh: 工作分配与抽象任务规范可以不同。
+      en: A concrete allocation is distinct from an abstract Task specification.
+      ja: 具体 allocation は抽象 Task 仕様と区別されます。
     layout_role: cross-link
-    review_status: accepted
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-runtime-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 PROV-O Activity、OpenAI Agents runner 与 LangGraph RetryPolicy 逐项核验，Execution/RunAttempt 语义成立。
-    en: Verified against PROV-O Activity, OpenAI Agents runner, and LangGraph RetryPolicy. Execution and RunAttempt semantics hold.
-    ja: PROV-O Activity、OpenAI Agents runner、LangGraph RetryPolicy に照らし Execution/RunAttempt semantics を確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-openai-responses
+    title: OpenAI Responses API
+    url: https://platform.openai.com/docs/api-reference/responses
+    source_type: official-doc
+    relevance: Response lifecycle and streaming events for Execution and RunAttempt.
+  - id: src-langgraph-runs
+    title: LangGraph Server API Reference
+    url: https://langchain-ai.github.io/langgraph/cloud/reference/api/api_ref/
+    source_type: official-doc
+    relevance: POST /threads/{thread_id}/runs, checkpoint resume, attempt lineage.
+  - id: src-anthropic-messages
+    title: Anthropic Messages API
+    url: https://docs.anthropic.com/en/api/messages
+    source_type: official-doc
+    relevance: message_start through message_stop streaming for RunAttempt terminal evidence.
+  - id: src-runtime-execution-design
+    title: Moonweave execution-attempts module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Execution, RunAttempt, RetryActivity, RuntimeBudget boundaries.
 source_claims:
-  - id: claim-execution-activity
-    source: eng-ont-prov-o
-    supports: PROV-O defines an Activity as something that occurs over time and may use or generate entities, with explicit start and end times.
-    locator: PROV-O > Activity, startedAtTime, endedAtTime
-    evidence_kind: normative
-    confidence: high
-    review_status: accepted
-  - id: claim-execution-runner-loop
-    source: eng-fw-openai-python-docs
-    supports: The Agents SDK Runner operates a loop across model output, handoffs, and tool calls until final output or a configured limit; Moonweave uses this only as evidence for a run scope wider than one call.
-    locator: Running agents > The agent loop; Exceptions > MaxTurnsExceeded
-    evidence_kind: official
-    confidence: high
-    review_status: accepted
-  - id: claim-execution-lifecycle
-    source: eng-proto-a2a-spec
-    supports: A2A separates working and interrupted states from terminal completed, failed, canceled, and rejected states; Moonweave maps only states applicable after an Execution activity actually begins and leaves pre-start rejection on the Task side.
-    locator: Definitions > Task; TaskState
-    evidence_kind: normative
-    confidence: high
-    review_status: accepted
-  - id: claim-execution-plan-separation
-    source: eng-ont-prov-o
-    supports: PROV-O distinguishes an occurring Activity from an Entity or Plan associated with it; Moonweave applies that distinction to Execution, Task, and WorkItem.
-    locator: PROV-O > Activity; Plan; Association
+  - id: claim-openai-responses-execution
+    source: src-openai-responses
+    supports: OpenAI Responses API lifecycle events mark Execution and RunAttempt boundaries.
+    locator: Responses > status and streaming
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-
+  - id: claim-langgraph-run-execution
+    source: src-langgraph-runs
+    supports: LangGraph POST /threads/{thread_id}/runs creates persisted runs with resumable attempts.
+    locator: Create run > Run object
+    evidence_kind: design-inference
+    confidence: high
+  - id: claim-anthropic-stream-execution
+    source: src-anthropic-messages
+    supports: Anthropic message_start through message_stop provides RunAttempt terminal evidence.
+    locator: Messages streaming
+    evidence_kind: design-inference
+    confidence: high
+  - id: claim-execution-design
+    source: src-runtime-execution-design
+    supports: Execution is bounded logical run containing immutable RunAttempts.
+    locator: Execution boundary
+    evidence_kind: design-inference
+    confidence: high

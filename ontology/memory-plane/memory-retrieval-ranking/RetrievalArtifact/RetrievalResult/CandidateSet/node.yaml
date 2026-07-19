@@ -1,34 +1,56 @@
 schema: moonweave.ai/ontology-node/v1
 id: CandidateSet
 kind: concept
-status: accepted
 labels:
   zh: 候选集合
   en: Candidate set
   ja: 候補集合
 semantics:
   short_definition:
-    zh: 在一个声明阶段保留候选成员及其当时顺序状态的结果组成信息。
-    en: A result component that preserves candidate membership and ordering state at a declared stage.
-    ja: 指定stageでcandidate membershipとその時点のordering stateを保持するresult componentです。
+    zh: 某一阶段的候选成员集合快照。
+    en: Stage-local snapshot of candidate membership.
+    ja: 一 stage の candidate membership snapshot。
   definition:
-    zh: CandidateSet 是 RetrievalResult 中用于承载一组 RetrievedCandidate 的组成信息，以 candidate_set_id 和 stage_name 区分初始召回、融合后、重排后或 TopK 状态；它不是泛化“集合”上位类，也不是单个候选。
-    en: CandidateSet is the RetrievalResult component that holds a group of RetrievedCandidate records. Its candidate_set_id and stage_name distinguish initial, fused, reranked, or Top-K state. It is not a generic collection superclass and not an individual candidate.
-    ja: CandidateSet はRetrievedCandidate群を保持するRetrievalResult componentでcandidate_set_idとstage_nameによりinitial・fused・reranked・Top-K stateを区別します。generic collection superclassでもindividual candidateでもありません。
+    zh: CandidateSet 记录某一检索阶段的候选 id 列表、顺序与 stage_name（initial-recall、post-rrf、post-rerank 等）；Pinecone matches 列表、RRF 输出与 Cohere rerank 输出均可建模为不同 stage 的 CandidateSet。
+    en: CandidateSet records candidate ids, order, and stage_name (initial-recall, post-rrf, post-rerank, etc.) for one retrieval stage. Pinecone matches lists, RRF output, and Cohere rerank output can each model as CandidateSet at different stages.
+    ja: CandidateSet は stage ごとの candidate id 列表・顺序・stage_name を記録。Pinecone matches/RRF output/Cohere rerank output を各 stage CandidateSet として建模。
   why_needed:
-    zh: 保留每个检索阶段的成员和顺序快照，避免把中间列表与最终结果或候选身份混淆。
-    en: Preserves stage-specific membership and order snapshots without conflating intermediate lists, final results, or candidate identity.
-    ja: stage別membership/order snapshotを保持しintermediate list・final result・candidate identityを混同しません。
+    zh: 同一 run 中候选集合会在 RRF 与 rerank 后变化；必须保留每个阶段的成员与顺序才能 debug。
+    en: Candidate membership changes after RRF and rerank within one run; each stage membership and order must be preserved for debugging.
+    ja: RRF/rerank 後に membership が変わるため各 stage snapshot が debug に必要。
   includes:
-    - zh: 纳入由候选生成、融合、重排或 TopK 阶段明确产生或消费的候选成员集合。
-      en: Includes candidate-member sets explicitly produced or consumed by generation, fusion, reranking, or Top-K stages.
-      ja: generation・fusion・reranking・Top-K stageが明示生成/consumeするcandidate member setを含みます。
+    - zh: 纳入含 stage_name 与有序 candidate_id 列表的集合快照。
+      en: Includes snapshots with stage_name and ordered candidate_id lists.
+      ja: stage_name と ordered candidate_id list を含む snapshot。
   excludes:
-    - zh: 排除任意 RetrievalCollection 抽象、单个候选、索引分片和上下文包。
-      en: Excludes a generic RetrievalCollection abstraction, individual candidates, index shards, and context packages.
-      ja: generic RetrievalCollection abstraction・individual candidate・index shard・context packageを除外します。
-  semantic_kind: collection
+    - zh: 排除单个 RetrievedCandidate、RetrievalScore 与 ContextPackage。
+      en: Excludes individual RetrievedCandidate, RetrievalScore, and ContextPackage.
+      ja: 単 RetrievedCandidate/RetrievalScore/ContextPackage を除外。
+  semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: initial-recall←Pinecone matches/Chroma ids；post-rrf←RRF 输出 ordered ids；post-rerank←Cohere rerank results index 顺序。
+    en: initial-recall from Pinecone matches/Chroma ids; post-rrf from RRF ordered ids; post-rerank from Cohere rerank result index order.
+    ja: stage_name ごとの API 输出映射。
+  typical_input: []
+  typical_output: []
+  reference_implementations:
+    - name: Mem0 Search API
+      url: https://docs.mem0.ai
+      description: POST /v1/memories/search/
+    - name: Pinecone Query
+      url: https://docs.pinecone.io/guides/search/query-data
+      description: index.query / QueryResponse
+    - name: Chroma Query
+      url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+      description: collection.query / QueryResult
+    - name: Cohere Rerank API
+      url: https://docs.cohere.com/reference/rerank
+      description: POST /v2/rerank
+    - name: ColBERT
+      url: https://arxiv.org/abs/2004.12832
+      description: MaxSim scoring
 structure:
   identity_keys:
     - candidate_set_id
@@ -36,124 +58,132 @@ structure:
     - id: candidate_set_id
       labels:
         zh: 候选集合标识
-        en: candidate set ID
-        ja: candidate set ID
+        en: Candidate set identifier
+        ja: candidate set 識別子
+      definitions:
+        zh: 稳定标识一个阶段候选集合。
+        en: Stable identifier for one stage candidate set.
+        ja: 一 stage candidate set を安定識別。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 稳定标识一个阶段性的候选集合快照。
-        en: Stable identifier for one stage-specific candidate-set snapshot.
-        ja: 一つのstage-specific candidate-set snapshotを安定識別します。
-      allowed_values: []
       pattern: null
-      example_value: candidate-set-423
+      example_value: candidate-set-422
+      allowed_values: []
       source_claims:
-        - claim-candidate-set-002
+        - claim-candidate-set-id
     - id: stage_name
       labels:
         zh: 阶段名称
-        en: stage name
-        ja: stage name
+        en: Stage name
+        ja: stage 名
+      definitions:
+        zh: 声明集合所处阶段：initial-recall、post-rrf、post-rerank、final。
+        en: "Declares stage: initial-recall, post-rrf, post-rerank, final."
+        ja: initial-recall/post-rrf/post-rerank/final。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 声明该集合处于初始、融合、重排或 TopK 哪个阶段。
-        en: Declares whether the set represents initial, fused, reranked, or Top-K state.
-        ja: setがinitial・fused・reranked・Top-Kどのstateか宣言します。
-      allowed_values: []
       pattern: null
-      example_value: post-rerank
+      example_value: post-rrf
+      allowed_values: []
       source_claims:
-        - claim-candidate-set-003
-    - id: ordered
+        - claim-candidate-set-stage
+    - id: member_count
       labels:
-        zh: 是否有序
-        en: ordered
-        ja: 順序あり
-      datatype: boolean
+        zh: 成员数量
+        en: Member count
+        ja: メンバー数
+      definitions:
+        zh: 集合中有序候选数量。
+        en: Ordered candidate count in the set.
+        ja: 有序 candidate 数。
+      datatype: integer
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 声明成员顺序是否具有检索语义。
-        en: Declares whether member order carries retrieval semantics.
-        ja: member orderがretrieval semanticsを持つか宣言します。
-      allowed_values: []
       pattern: null
-      example_value: true
+      example_value: 20
+      allowed_values: []
       source_claims:
-        - claim-candidate-set-004
+        - claim-candidate-set-count
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: CandidateSet-example-positive-manual-001
-    kind: positive
+  - id: CandidateSet-example-initial-pinecone
     labels:
-      zh: 候选集合正例
-      en: "Positive case: Candidate set"
-      ja: 候補集合正例
-    scenario_id: null
+      zh: Pinecone 初始集合
+      en: Pinecone initial set
+      ja: Pinecone initial set
     descriptions:
-      zh: candidate-set-423 保存重排后 80 个候选的成员与确定顺序。
-      en: candidate-set-423 preserves the members and deterministic order of 80 reranked candidates.
-      ja: candidate-set-423 はrerank後80 candidateのmemberと決定的orderを保持します。
+      zh: candidate-set-initial-412 stage_name=initial-recall member_count=40 来自 index.query top_k=40。
+      en: candidate-set-initial-412 stage_name=initial-recall member_count=40 from index.query top_k=40.
+      ja: initial-recall 40 candidates from Pinecone。
+    example_source:
+      product: Pinecone
+      url: https://docs.pinecone.io/guides/search/query-data
+      version: matches list
     field_values:
-      candidate_set_id: candidate-set-423
-      stage_name: post-rerank
-      ordered: true
+      candidate_set_id: candidate-set-initial-412
+      stage_name: initial-recall
+      member_count: 40
     related_node_ids:
       - CandidateSet
+      - CandidateGenerationActivity
     related_relation_ids: []
-    expected_result:
-      zh: 归类为 CandidateSet。
-      en: Classify the object as CandidateSet.
-      ja: CandidateSet として分類します。
-    why_valid_or_invalid:
-      zh: 集合身份、阶段与顺序状态都明确。
-      en: Set identity, stage, and ordering state are all explicit.
-      ja: set identity・stage・ordering stateがすべて明示されています。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-candidate-set-005
-  - id: CandidateSet-example-boundary-manual-001
-    kind: boundary
+      - claim-candidate-set-pinecone
+  - id: CandidateSet-example-post-rrf
     labels:
-      zh: 候选集合边界例
-      en: "Boundary case: Candidate set"
-      ja: 候補集合境界例
-    scenario_id: null
+      zh: RRF 后集合
+      en: Post-RRF set
+      ja: Post-RRF set
     descriptions:
-      zh: candidate-423 只表示一个 chunk 的检索命中与排名。
-      en: candidate-423 represents one retrieved chunk and its rank.
-      ja: candidate-423 は一chunkのretrieval hitとrankを表します。
-    field_values: {}
+      zh: candidate-set-fused-415 stage_name=post-rrf 合并 dense+lexical 后 20 成员。
+      en: candidate-set-fused-415 stage_name=post-rrf with 20 members after merging dense+lexical.
+      ja: post-rrf 20 members after RRF。
+    example_source:
+      product: Elasticsearch
+      url: https://www.elastic.co/guide/en/elasticsearch/reference/current/rrf.html
+      version: RRF output
+    field_values:
+      candidate_set_id: candidate-set-fused-415
+      stage_name: post-rrf
+      member_count: 20
     related_node_ids:
       - CandidateSet
+      - RankFusion
     related_relation_ids: []
-    expected_result:
-      zh: 不得归类为 CandidateSet。
-      en: Do not classify the object as CandidateSet.
-      ja: CandidateSet として分類しません。
-    why_valid_or_invalid:
-      zh: 它是 RetrievedCandidate 成员，不是 CandidateSet。
-      en: It is a RetrievedCandidate member, not CandidateSet.
-      ja: RetrievedCandidate memberでCandidateSetではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-candidate-set-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-candidate-set-rrf
+  - id: CandidateSet-example-post-rerank
+    labels:
+      zh: Cohere rerank 后集合
+      en: Post-Cohere rerank set
+      ja: Post-Cohere rerank set
+    descriptions:
+      zh: candidate-set-reranked-416 stage_name=post-rerank member_count=10 来自 Cohere top_n=10。
+      en: candidate-set-reranked-416 stage_name=post-rerank member_count=10 from Cohere top_n=10.
+      ja: post-rerank from Cohere top_n=10。
+    example_source:
+      product: Cohere
+      url: https://docs.cohere.com/reference/rerank
+      version: rerank output order
+    field_values:
+      candidate_set_id: candidate-set-reranked-416
+      stage_name: post-rerank
+      member_count: 10
+    related_node_ids:
+      - CandidateSet
+      - RerankActivity
+    related_relation_ids: []
+    source_claims:
+      - claim-candidate-set-cohere
 parent_relation:
   id: RetrievalResult-has_candidate_set-CandidateSet
   predicate: part_of
@@ -188,18 +218,16 @@ parent_relation:
         en: Assert only when the CandidateSet is a non-substitutable information component within this RetrievalResult's identity boundary and activity identity is not conflated with artifact identity.
         ja: CandidateSetがこのRetrievalResult identity boundary内の置換不能information componentでactivity/artifact identityを混同しない場合だけassertします。
       source_claims:
-        - claim-candidate-set-007
+        - claim-candidate-set-id
   temporal_scope: valid-time
   boundary_context: null
   constraints: []
   examples:
     - id: RetrievalResult-has_candidate_set-CandidateSet-example-positive-manual-001
-      kind: positive
       labels:
         zh: has_candidate_set CandidateSet正例
         en: "Positive case: has_candidate_set CandidateSet"
         ja: CandidateSetをhas_candidate_set正例
-      scenario_id: null
       descriptions:
         zh: result-422 拥有 candidate-set-423 的最终阶段快照。
         en: result-422 owns the final-stage snapshot candidate-set-423.
@@ -210,25 +238,13 @@ parent_relation:
         - CandidateSet
       related_relation_ids:
         - RetrievalResult-has_candidate_set-CandidateSet
-      expected_result:
-        zh: 建立该有向事实，并保留条件与证据。
-        en: Assert the directed fact with its condition and evidence retained.
-        ja: condition/evidenceを保持してdirected factをassertします。
-      why_valid_or_invalid:
-        zh: 实例满足端点定义、方向和该关系的显式成立条件。
-        en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-        ja: endpoint定義・direction・明示assertion conditionを満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-candidate-set-007
+        - claim-candidate-set-id
     - id: RetrievalResult-has_candidate_set-CandidateSet-example-boundary-manual-001
-      kind: boundary
       labels:
         zh: has_candidate_set CandidateSet边界例
         en: "Boundary case: has_candidate_set CandidateSet"
         ja: CandidateSetをhas_candidate_set境界例
-      scenario_id: null
       descriptions:
         zh: 同一候选在日志中的临时列表不自动成为结果组成。
         en: A temporary list in a log does not automatically become a result component.
@@ -239,23 +255,12 @@ parent_relation:
         - CandidateSet
       related_relation_ids:
         - RetrievalResult-has_candidate_set-CandidateSet
-      expected_result:
-        zh: 验证器不得建立该有向关系事实。
-        en: Do not assert the directed fact.
-        ja: directed factをassertしません。
-      why_valid_or_invalid:
-        zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-        en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-        ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-candidate-set-007
+        - claim-candidate-set-id
   source_claims:
-    - claim-candidate-set-007
+    - claim-candidate-set-id
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: pending
   endpoint_order: parent-to-child
 relations:
   - id: CandidateSet-contains-RetrievedCandidate
@@ -291,18 +296,16 @@ relations:
           en: Assert only when membership data records both candidate_id and this candidate_set_id.
           ja: membership dataがcandidate_idとcandidate_set_idを共に記録する時だけassertします。
         source_claims:
-          - claim-candidate-set-008
+          - claim-candidate-set-id
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
       - id: CandidateSet-contains-RetrievedCandidate-example-positive-manual-001
-        kind: positive
         labels:
           zh: contains RetrievedCandidate正例
           en: "Positive case: contains RetrievedCandidate"
           ja: RetrievedCandidateをcontains正例
-        scenario_id: null
         descriptions:
           zh: candidate-set-423 contains candidate-424 at position 3。
           en: candidate-set-423 contains candidate-424 at position 3.
@@ -313,25 +316,13 @@ relations:
           - RetrievedCandidate
         related_relation_ids:
           - CandidateSet-contains-RetrievedCandidate
-        expected_result:
-          zh: 建立该有向事实，并保留条件与证据。
-          en: Assert the directed fact with its condition and evidence retained.
-          ja: condition/evidenceを保持してdirected factをassertします。
-        why_valid_or_invalid:
-          zh: 实例满足端点定义、方向和该关系的显式成立条件。
-          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-          ja: endpoint定義・direction・明示assertion conditionを満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-candidate-set-008
+          - claim-candidate-set-id
       - id: CandidateSet-contains-RetrievedCandidate-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: contains RetrievedCandidate边界例
           en: "Boundary case: contains RetrievedCandidate"
           ja: RetrievedCandidateをcontains境界例
-        scenario_id: null
         descriptions:
           zh: 候选仅在另一阶段集合中出现不能建立此边。
           en: Appearance only in another stage's set does not establish this edge.
@@ -342,94 +333,65 @@ relations:
           - RetrievedCandidate
         related_relation_ids:
           - CandidateSet-contains-RetrievedCandidate
-        expected_result:
-          zh: 验证器不得建立该有向关系事实。
-          en: Do not assert the directed fact.
-          ja: directed factをassertしません。
-        why_valid_or_invalid:
-          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-candidate-set-008
+          - claim-candidate-set-id
     source_claims:
-      - claim-candidate-set-008
+      - claim-candidate-set-id
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:RetrievedCandidate
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-pinecone-query
+    title: Pinecone Query Guide
+    publisher: Pinecone
+    url: https://docs.pinecone.io/guides/search/query-data
+    source_type: official-doc
+    relevance: QueryResponse.
+  - id: src-cohere-rerank
+    title: Cohere Rerank API
+    publisher: Cohere
+    url: https://docs.cohere.com/reference/rerank
+    source_type: official-doc
+    relevance: relevance_score.
+  - id: src-memory-retrieval-design
+    title: Moonweave design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Module boundary.
 source_claims:
-  - id: claim-candidate-set-001
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents candidate lists passed from prefetch stages into fusion and main queries; Moonweave makes each stage snapshot an identified CandidateSet rather than a generic collection type.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+  - id: claim-candidate-set-pinecone
+    source: src-pinecone-query
+    supports: Initial matches form initial-recall CandidateSet.
+    locator: matches
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-candidate-set-rrf
+    source: src-memory-retrieval-design
+    supports: RRF output forms post-rrf CandidateSet.
+    locator: post-rrf
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-candidate-set-002
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents candidate lists passed from prefetch stages into fusion and main queries; Moonweave makes each stage snapshot an identified CandidateSet rather than a generic collection type. Moonweave records CandidateSet.candidate_set_id as the stated auditable datum: Stable identifier for one stage-specific candidate-set snapshot."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+  - id: claim-candidate-set-cohere
+    source: src-cohere-rerank
+    supports: Rerank output forms post-rerank CandidateSet.
+    locator: rerank
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-candidate-set-id
+    source: src-memory-retrieval-design
+    supports: candidate_set_id identifies set.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-candidate-set-003
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents candidate lists passed from prefetch stages into fusion and main queries; Moonweave makes each stage snapshot an identified CandidateSet rather than a generic collection type. Moonweave records CandidateSet.stage_name as the stated auditable datum: Declares whether the set represents initial, fused, reranked, or Top-K state."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+  - id: claim-candidate-set-stage
+    source: src-memory-retrieval-design
+    supports: stage_name records pipeline position.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-candidate-set-004
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents candidate lists passed from prefetch stages into fusion and main queries; Moonweave makes each stage snapshot an identified CandidateSet rather than a generic collection type. Moonweave records CandidateSet.ordered as the stated auditable datum: Declares whether member order carries retrieval semantics."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+  - id: claim-candidate-set-count
+    source: src-memory-retrieval-design
+    supports: member_count records set size.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-candidate-set-005
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents candidate lists passed from prefetch stages into fusion and main queries; Moonweave makes each stage snapshot an identified CandidateSet rather than a generic collection type. Multi-stage query documentation carries candidate lists from prefetch into later refinement.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-candidate-set-006
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents candidate lists passed from prefetch stages into fusion and main queries; Moonweave makes each stage snapshot an identified CandidateSet rather than a generic collection type. A result list and each scored point in that list have different identities.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-candidate-set-007
-    source: eng-vector-qdrant-hybrid-query
-    supports: The cited official retrieval documentation supports the component roles of these endpoints; Moonweave makes the ownership direction explicit for a non-duplicative graph.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-candidate-set-008
-    source: eng-vector-qdrant-hybrid-query
-    supports: The cited official documentation supports the endpoint roles and direction of this retrieval fact; the exact relation identifier and ownership boundary are Moonweave design decisions.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

@@ -1,34 +1,59 @@
 schema: moonweave.ai/ontology-node/v1
 id: RetrievalRun
 kind: concept
-status: accepted
 labels:
   zh: 检索运行
   en: Retrieval run
   ja: 検索実行
 semantics:
   short_definition:
-    zh: 履行一个检索请求并贯穿候选生成到结果形成的端到端执行。
-    en: An end-to-end execution that fulfills one retrieval request from candidate generation through result formation.
-    ja: 一つのretrieval requestをcandidate generationからresult形成まで履行するend-to-end実行です。
+    zh: 履行一次检索请求的端到端运行。
+    en: End-to-end run fulfilling one retrieval request.
+    ja: 一 retrieval request を履行する end-to-end run。
   definition:
-    zh: RetrievalRun 是绑定一个 RetrievalRequest 与实际读取的 IndexVersion 的端到端活动实例；其身份跨越各检索阶段，并最终产生 RetrievalResult 与 RetrievalTrace。
-    en: RetrievalRun is an end-to-end activity instance bound to one RetrievalRequest and the IndexVersion actually read. Its identity spans retrieval stages and culminates in a RetrievalResult and RetrievalTrace.
-    ja: RetrievalRun は一つのRetrievalRequestと実際に読んだIndexVersionに結び付くend-to-end activity instanceで、各stageを跨ぎRetrievalResultとRetrievalTraceを生成します。
+    zh: RetrievalRun 绑定 RetrievalRequest 与实际读取的 IndexVersion，以 run_id 贯穿候选生成、排序阶段直至 RetrievalResult 与 RetrievalTrace；对应一次 Mem0 search、Pinecone query 流水线或 LangGraph store.search 的完整执行，但不是单个阶段或结果记录。
+    en: RetrievalRun binds a RetrievalRequest and the IndexVersion actually read, spanning candidate generation and ranking stages through RetrievalResult and RetrievalTrace under one run_id. It models a complete Mem0 search, Pinecone query pipeline, or LangGraph store.search execution, not a single stage or result record.
+    ja: RetrievalRun は RetrievalRequest と actual IndexVersion に結合し run_id で candidate generation/ranking から RetrievalResult/RetrievalTrace まで跨ぎます。Mem0 search/Pinecone pipeline/LangGraph store.search の完全実行に対応。
   why_needed:
-    zh: 把请求履行、索引版本、阶段链、结果和追踪记录连成可重放的运行单位。
-    en: Connects request fulfillment, index version, stage chain, result, and trace into one replayable run unit.
-    ja: request履行・index version・stage chain・result・traceを一つの再生可能run単位へ結びます。
+    zh: 同一 query 换索引版本结果会变；必须把 run 与 request 分开，并记录 actual_index_version_id 才能重放。
+    en: The same query yields different results after an index swap; run must stay separate from request with actual_index_version_id for replay.
+    ja: 同一 query でも index 版変更で結果が変わるため run/request 分離と actual_index_version_id 記録が replay に必要。
   includes:
-    - zh: 纳入已经开始、具有稳定 run_id 且能指向请求与实际索引版本的运行。
-      en: Includes started executions with a stable run_id and explicit request and actual index-version references.
-      ja: stable run_idとrequest・実際index versionへの明示参照を持つ開始済み実行を含みます。
+    - zh: 纳入已开始、有 run_id 并指向 request 与实际 index 版本的运行。
+      en: Includes started executions with run_id and explicit request and index-version references.
+      ja: run_id と request/actual index version 参照を持つ開始済み実行。
   excludes:
-    - zh: 排除尚未执行的请求、单独阶段、结果记录和日志条目。
-      en: Excludes unexecuted requests, individual stages, result records, and log entries.
-      ja: 未実行request・単独stage・result record・log entryを除外します。
+    - zh: 排除未执行请求、单阶段与结果/日志条目。
+      en: Excludes unexecuted requests, single stages, and result/log entries.
+      ja: 未実行 request・単 stage・result/log entry を除外。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: run_id 对应 Moonweave retrieval_run_id；request_id 与 actual_index_version_id 必须写入 trace 以支持重放。
+    en: run_id maps to Moonweave retrieval_run_id; request_id and actual_index_version_id must appear in trace for replay.
+    ja: run_id は retrieval_run_id。request_id/actual_index_version_id を trace に記録して replay。
+  typical_input: []
+  typical_output: []
+  reference_implementations:
+    - name: Mem0 Search API
+      url: https://docs.mem0.ai
+      description: POST /v1/memories/search/
+    - name: Pinecone Query
+      url: https://docs.pinecone.io/guides/search/query-data
+      description: index.query
+    - name: Chroma Query
+      url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+      description: collection.query
+    - name: LangGraph Store Search
+      url: https://langchain-ai.github.io/langgraph/reference/store/
+      description: BaseStore.search
+    - name: Cohere Rerank API
+      url: https://docs.cohere.com/reference/rerank
+      description: POST /v2/rerank
+    - name: ColBERT
+      url: https://arxiv.org/abs/2004.12832
+      description: MaxSim scoring
 structure:
   identity_keys:
     - run_id
@@ -36,126 +61,129 @@ structure:
     - id: run_id
       labels:
         zh: 运行标识
-        en: run ID
-        ja: run ID
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
+        en: Run identifier
+        ja: run 識別子
       definitions:
         zh: 稳定标识一次端到端检索运行。
         en: Stable identifier for one end-to-end retrieval run.
-        ja: 一つのend-to-end retrieval runを安定識別します。
-      allowed_values: []
+        ja: end-to-end retrieval run を安定識別。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
       pattern: null
-      example_value: retrieval-run-411
+      example_value: run-411
+      allowed_values: []
       source_claims:
-        - claim-retrieval-run-002
+        - claim-retrieval-run-id
     - id: request_id
       labels:
         zh: 请求标识
-        en: request ID
-        ja: request ID
+        en: Request identifier
+        ja: request 識別子
+      definitions:
+        zh: 该运行履行的 RetrievalRequest。
+        en: RetrievalRequest fulfilled by this run.
+        ja: 履行する RetrievalRequest。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 标识该运行所履行的检索请求。
-        en: Identifies the retrieval request fulfilled by the run.
-        ja: runが履行するretrieval requestを識別します。
-      allowed_values: []
       pattern: null
-      example_value: retrieval-request-411
+      example_value: request-419
+      allowed_values: []
       source_claims:
-        - claim-retrieval-run-003
-    - id: index_version_id
+        - claim-retrieval-run-request
+    - id: actual_index_version_id
       labels:
-        zh: 索引版本标识
-        en: index version ID
-        ja: index version ID
+        zh: 实际索引版本
+        en: Actual index version
+        ja: 実際 index 版
+      definitions:
+        zh: 本次 run 实际读取的 IndexVersion。
+        en: IndexVersion actually read by this run.
+        ja: 今回 actual read した IndexVersion。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 标识运行实际读取而非仅计划读取的索引版本。
-        en: Identifies the index version actually read, not merely planned.
-        ja: 予定ではなく実際に読んだindex versionを識別します。
-      allowed_values: []
       pattern: null
       example_value: index-v19
+      allowed_values: []
       source_claims:
-        - claim-retrieval-run-004
+        - claim-retrieval-run-index
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: RetrievalRun-example-positive-manual-001
-    kind: positive
+  - id: RetrievalRun-example-mem0
     labels:
-      zh: 检索运行正例
-      en: "Positive case: Retrieval run"
-      ja: 検索実行正例
-    scenario_id: null
+      zh: Mem0 检索运行
+      en: Mem0 retrieval run
+      ja: Mem0 retrieval run
     descriptions:
-      zh: run-411 履行 request-411，读取 index-v19，并形成结果与追踪记录。
-      en: run-411 fulfills request-411, reads index-v19, and produces a result and trace.
-      ja: run-411 はrequest-411を履行しindex-v19を読みresultとtraceを生成します。
+      zh: run-411 履行 request-419，调用 Mem0 search(user_id=alice, top_k=5) 并读取 index-v19。
+      en: run-411 fulfills request-419 via Mem0 search(user_id=alice, top_k=5) reading index-v19.
+      ja: run-411 が request-419 を Mem0 search で履行。
+    example_source:
+      product: Mem0
+      url: https://docs.mem0.ai
+      version: search run
     field_values:
-      run_id: retrieval-run-411
-      request_id: retrieval-request-411
-      index_version_id: index-v19
-      activity_id: retrieval-run-411
-      started_at: 2026-07-16T12:00:00Z
+      run_id: run-411
+      request_id: request-419
+      actual_index_version_id: index-v19
     related_node_ids:
       - RetrievalRun
+      - RetrievalRequest
     related_relation_ids: []
-    expected_result:
-      zh: 归类为 RetrievalRun。
-      en: Classify the object as RetrievalRun.
-      ja: RetrievalRun として分類します。
-    why_valid_or_invalid:
-      zh: 同一活动身份贯穿完整管线且明确记录请求和实际索引版本。
-      en: One activity identity spans the pipeline and explicitly records the request and actual index version.
-      ja: 一つのactivity identityがpipeline全体を跨ぎrequestと実際index versionを記録します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-retrieval-run-005
-  - id: RetrievalRun-example-boundary-manual-001
-    kind: boundary
+      - claim-retrieval-run-mem0
+  - id: RetrievalRun-example-pinecone-pipeline
     labels:
-      zh: 检索运行边界例
-      en: "Boundary case: Retrieval run"
-      ja: 検索実行境界例
-    scenario_id: null
+      zh: Pinecone 流水线运行
+      en: Pinecone pipeline run
+      ja: Pinecone pipeline run
     descriptions:
-      zh: fusion-411 只对一个候选集合执行 RRF，没有履行请求或形成最终结果。
-      en: fusion-411 performs RRF on one candidate set but does not fulfill the request or form the final result.
-      ja: fusion-411 はcandidate setにRRFを行うだけでrequest履行やfinal result形成はしません。
+      zh: run-412 并行 Pinecone query 与 BM25，经 RRF 与 Cohere rerank 形成 result-422。
+      en: run-412 runs parallel Pinecone query and BM25, then RRF and Cohere rerank to result-422.
+      ja: run-412 が Pinecone/BM25→RRF→Cohere rerank で result-422。
+    example_source:
+      product: Pinecone
+      url: https://docs.pinecone.io/guides/search/query-data
+      version: multi-stage run
+    field_values:
+      run_id: run-412
+      request_id: request-420
+      actual_index_version_id: index-v19
+    related_node_ids:
+      - RetrievalRun
+      - RetrievalResult
+    related_relation_ids: []
+    source_claims:
+      - claim-retrieval-run-pinecone
+  - id: RetrievalRun-example-stage-not-run
+    labels:
+      zh: 单阶段非运行
+      en: Stage is not run
+      ja: stage は run ではない
+    descriptions:
+      zh: rerank-416 只是 run-412 中的一个 RankingOperation 阶段，不是 RetrievalRun。
+      en: rerank-416 is one RankingOperation stage inside run-412, not a RetrievalRun.
+      ja: rerank-416 は run 内 stage で RetrievalRun ではない。
+    example_source:
+      product: https://moonweave.ai/ontology/agent-system/2.0.0/
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
     field_values: {}
     related_node_ids:
       - RetrievalRun
+      - RerankActivity
     related_relation_ids: []
-    expected_result:
-      zh: 不得归类为 RetrievalRun。
-      en: Do not classify the object as RetrievalRun.
-      ja: RetrievalRun として分類しません。
-    why_valid_or_invalid:
-      zh: 它是运行中的排序阶段，而非端到端 RetrievalRun。
-      en: It is a ranking stage within a run, not the end-to-end RetrievalRun.
-      ja: run内のranking stageでend-to-end RetrievalRunではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-retrieval-run-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-retrieval-run-boundary
 parent_relation:
   id: RetrievalRun-is_a-RetrievalActivity
   predicate: is_a
@@ -190,18 +218,16 @@ parent_relation:
         en: "Assert only when the instance satisfies the complete RetrievalActivity definition and the child differentia: it uses one run_id across request fulfillment, actual index reading, the stage chain, result, and trace."
         ja: instanceがRetrievalActivity完全定義とchild differentia「一run_idがrequest履行・actual index reading・stage chain・result・traceを跨ぐ」を共に満たす時だけassertします。
       source_claims:
-        - claim-retrieval-run-007
+        - claim-retrieval-run-id
   temporal_scope: timeless
   boundary_context: null
   constraints: []
   examples:
     - id: RetrievalRun-is_a-RetrievalActivity-example-positive-manual-001
-      kind: positive
       labels:
         zh: 是一种RetrievalActivity正例
         en: "Positive case: is a RetrievalActivity"
         ja: RetrievalActivityの一種正例
-      scenario_id: null
       descriptions:
         zh: run-411 履行 request-419 并产生 result-422 与 trace-426。
         en: run-411 fulfills request-419 and produces result-422 and trace-426.
@@ -212,25 +238,13 @@ parent_relation:
         - RetrievalActivity
       related_relation_ids:
         - RetrievalRun-is_a-RetrievalActivity
-      expected_result:
-        zh: 建立该有向事实，并保留条件与证据。
-        en: Assert the directed fact with its condition and evidence retained.
-        ja: condition/evidenceを保持してdirected factをassertします。
-      why_valid_or_invalid:
-        zh: 实例满足端点定义、方向和该关系的显式成立条件。
-        en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-        ja: endpoint定義・direction・明示assertion conditionを満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-retrieval-run-007
+        - claim-retrieval-run-id
     - id: RetrievalRun-is_a-RetrievalActivity-example-boundary-manual-001
-      kind: boundary
       labels:
         zh: 是一种RetrievalActivity边界例
         en: "Boundary case: is a RetrievalActivity"
         ja: RetrievalActivityの一種境界例
-      scenario_id: null
       descriptions:
         zh: rerank-416 只是运行中的一个阶段。
         en: rerank-416 is only one stage within a run.
@@ -241,23 +255,12 @@ parent_relation:
         - RetrievalActivity
       related_relation_ids:
         - RetrievalRun-is_a-RetrievalActivity
-      expected_result:
-        zh: 验证器不得建立该有向关系事实。
-        en: Do not assert the directed fact.
-        ja: directed factをassertしません。
-      why_valid_or_invalid:
-        zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-        en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-        ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-retrieval-run-007
+        - claim-retrieval-run-id
   source_claims:
-    - claim-retrieval-run-007
+    - claim-retrieval-run-id
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: pending
   endpoint_order: child-to-parent
 relations:
   - id: RetrievalRun-fulfills-RetrievalRequest
@@ -293,18 +296,16 @@ relations:
           en: Assert only when run.request_id identifies the request and the run's stages belong to that fulfillment chain.
           ja: run.request_idがrequestを識別し全stageがそのfulfillment chainに属す時だけassertします。
         source_claims:
-          - claim-retrieval-run-008
+          - claim-retrieval-run-id
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
       - id: RetrievalRun-fulfills-RetrievalRequest-example-positive-manual-001
-        kind: positive
         labels:
           zh: fulfills RetrievalRequest正例
           en: "Positive case: fulfills RetrievalRequest"
           ja: RetrievalRequestをfulfills正例
-        scenario_id: null
         descriptions:
           zh: run-411 fulfills request-419。
           en: run-411 fulfills request-419.
@@ -315,25 +316,13 @@ relations:
           - RetrievalRequest
         related_relation_ids:
           - RetrievalRun-fulfills-RetrievalRequest
-        expected_result:
-          zh: 建立该有向事实，并保留条件与证据。
-          en: Assert the directed fact with its condition and evidence retained.
-          ja: condition/evidenceを保持してdirected factをassertします。
-        why_valid_or_invalid:
-          zh: 实例满足端点定义、方向和该关系的显式成立条件。
-          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-          ja: endpoint定義・direction・明示assertion conditionを満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-retrieval-run-008
+          - claim-retrieval-run-id
       - id: RetrievalRun-fulfills-RetrievalRequest-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: fulfills RetrievalRequest边界例
           en: "Boundary case: fulfills RetrievalRequest"
           ja: RetrievalRequestをfulfills境界例
-        scenario_id: null
         descriptions:
           zh: 重试运行具有新 run_id，不能与原运行混为一个履行事实。
           en: A retry with a new run_id must not be conflated with the original fulfillment fact.
@@ -344,23 +333,12 @@ relations:
           - RetrievalRequest
         related_relation_ids:
           - RetrievalRun-fulfills-RetrievalRequest
-        expected_result:
-          zh: 验证器不得建立该有向关系事实。
-          en: Do not assert the directed fact.
-          ja: directed factをassertしません。
-        why_valid_or_invalid:
-          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-retrieval-run-008
+          - claim-retrieval-run-id
     source_claims:
-      - claim-retrieval-run-008
+      - claim-retrieval-run-id
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:RetrievalRequest
   - id: RetrievalRun-has_phase-CandidateGenerationActivity
     predicate: has_phase
@@ -395,18 +373,16 @@ relations:
           en: Assert only when both the stage's run association and trace order identify this RetrievalRun.
           ja: stageのrun associationとtrace orderが共にこのRetrievalRunを指す時だけassertします。
         source_claims:
-          - claim-retrieval-run-009
+          - claim-retrieval-run-id
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
       - id: RetrievalRun-has_phase-CandidateGenerationActivity-example-positive-manual-001
-        kind: positive
         labels:
           zh: has_phase CandidateGenerationActivity正例
           en: "Positive case: has_phase CandidateGenerationActivity"
           ja: CandidateGenerationActivityをhas_phase正例
-        scenario_id: null
         descriptions:
           zh: run-411 has phase generation-412。
           en: run-411 has phase generation-412.
@@ -417,25 +393,13 @@ relations:
           - CandidateGenerationActivity
         related_relation_ids:
           - RetrievalRun-has_phase-CandidateGenerationActivity
-        expected_result:
-          zh: 建立该有向事实，并保留条件与证据。
-          en: Assert the directed fact with its condition and evidence retained.
-          ja: condition/evidenceを保持してdirected factをassertします。
-        why_valid_or_invalid:
-          zh: 实例满足端点定义、方向和该关系的显式成立条件。
-          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-          ja: endpoint定義・direction・明示assertion conditionを満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-retrieval-run-009
+          - claim-retrieval-run-id
       - id: RetrievalRun-has_phase-CandidateGenerationActivity-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: has_phase CandidateGenerationActivity边界例
           en: "Boundary case: has_phase CandidateGenerationActivity"
           ja: CandidateGenerationActivityをhas_phase境界例
-        scenario_id: null
         descriptions:
           zh: 同配置的离线基准生成不属于 run-411。
           en: An offline benchmark generation with the same configuration is not a phase of run-411.
@@ -446,23 +410,12 @@ relations:
           - CandidateGenerationActivity
         related_relation_ids:
           - RetrievalRun-has_phase-CandidateGenerationActivity
-        expected_result:
-          zh: 验证器不得建立该有向关系事实。
-          en: Do not assert the directed fact.
-          ja: directed factをassertしません。
-        why_valid_or_invalid:
-          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-retrieval-run-009
+          - claim-retrieval-run-id
     source_claims:
-      - claim-retrieval-run-009
+      - claim-retrieval-run-id
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:CandidateGenerationActivity
   - id: RetrievalRun-has_phase-RankingOperation
     predicate: has_phase
@@ -497,18 +450,16 @@ relations:
           en: Assert only when the operation consumes this run's candidate set and the trace records its stage identifier.
           ja: operationがこのrunのcandidate setをconsumeしtraceがstage IDを記録する時だけassertします。
         source_claims:
-          - claim-retrieval-run-009
+          - claim-retrieval-run-id
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
       - id: RetrievalRun-has_phase-RankingOperation-example-positive-manual-001
-        kind: positive
         labels:
           zh: has_phase RankingOperation正例
           en: "Positive case: has_phase RankingOperation"
           ja: RankingOperationをhas_phase正例
-        scenario_id: null
         descriptions:
           zh: run-411 has phase ranking-413。
           en: run-411 has phase ranking-413.
@@ -519,25 +470,13 @@ relations:
           - RankingOperation
         related_relation_ids:
           - RetrievalRun-has_phase-RankingOperation
-        expected_result:
-          zh: 建立该有向事实，并保留条件与证据。
-          en: Assert the directed fact with its condition and evidence retained.
-          ja: condition/evidenceを保持してdirected factをassertします。
-        why_valid_or_invalid:
-          zh: 实例满足端点定义、方向和该关系的显式成立条件。
-          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-          ja: endpoint定義・direction・明示assertion conditionを満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-retrieval-run-009
+          - claim-retrieval-run-id
       - id: RetrievalRun-has_phase-RankingOperation-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: has_phase RankingOperation边界例
           en: "Boundary case: has_phase RankingOperation"
           ja: RankingOperationをhas_phase境界例
-        scenario_id: null
         descriptions:
           zh: 共享同一模型的另一运行排序阶段不属于 run-411。
           en: A ranking stage in another run does not become part of run-411 merely by sharing a model.
@@ -548,23 +487,12 @@ relations:
           - RankingOperation
         related_relation_ids:
           - RetrievalRun-has_phase-RankingOperation
-        expected_result:
-          zh: 验证器不得建立该有向关系事实。
-          en: Do not assert the directed fact.
-          ja: directed factをassertしません。
-        why_valid_or_invalid:
-          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-retrieval-run-009
+          - claim-retrieval-run-id
     source_claims:
-      - claim-retrieval-run-009
+      - claim-retrieval-run-id
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:RankingOperation
   - id: RetrievalRun-produces-RetrievalResult
     predicate: produces
@@ -599,18 +527,16 @@ relations:
           en: Assert only when the result's run lineage uniquely identifies this run_id.
           ja: resultのrun lineageがこのrun_idだけを指す時にassertします。
         source_claims:
-          - claim-retrieval-run-008
+          - claim-retrieval-run-id
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
       - id: RetrievalRun-produces-RetrievalResult-example-positive-manual-001
-        kind: positive
         labels:
           zh: produces RetrievalResult正例
           en: "Positive case: produces RetrievalResult"
           ja: RetrievalResultをproduces正例
-        scenario_id: null
         descriptions:
           zh: run-411 produces result-422。
           en: run-411 produces result-422.
@@ -621,25 +547,13 @@ relations:
           - RetrievalResult
         related_relation_ids:
           - RetrievalRun-produces-RetrievalResult
-        expected_result:
-          zh: 建立该有向事实，并保留条件与证据。
-          en: Assert the directed fact with its condition and evidence retained.
-          ja: condition/evidenceを保持してdirected factをassertします。
-        why_valid_or_invalid:
-          zh: 实例满足端点定义、方向和该关系的显式成立条件。
-          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-          ja: endpoint定義・direction・明示assertion conditionを満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-retrieval-run-008
+          - claim-retrieval-run-id
       - id: RetrievalRun-produces-RetrievalResult-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: produces RetrievalResult边界例
           en: "Boundary case: produces RetrievalResult"
           ja: RetrievalResultをproduces境界例
-        scenario_id: null
         descriptions:
           zh: 同查询的另一运行结果不能归给 run-411。
           en: A result from another run of the same query does not belong to run-411.
@@ -650,23 +564,12 @@ relations:
           - RetrievalResult
         related_relation_ids:
           - RetrievalRun-produces-RetrievalResult
-        expected_result:
-          zh: 验证器不得建立该有向关系事实。
-          en: Do not assert the directed fact.
-          ja: directed factをassertしません。
-        why_valid_or_invalid:
-          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-retrieval-run-008
+          - claim-retrieval-run-id
     source_claims:
-      - claim-retrieval-run-008
+      - claim-retrieval-run-id
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:RetrievalResult
   - id: RetrievalRun-reads-IndexVersion
     predicate: reads
@@ -701,18 +604,16 @@ relations:
           en: Assert only when execution evidence confirms this version was read and the trace records the same version.
           ja: execution evidenceがversion読取を確認しtraceも同versionを記録する時だけassertします。
         source_claims:
-          - claim-retrieval-run-009
+          - claim-retrieval-run-id
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
       - id: RetrievalRun-reads-IndexVersion-example-positive-manual-001
-        kind: positive
         labels:
           zh: reads IndexVersion正例
           en: "Positive case: reads IndexVersion"
           ja: IndexVersionをreads正例
-        scenario_id: null
         descriptions:
           zh: run-411 actually reads index-v19。
           en: run-411 actually reads index-v19.
@@ -723,25 +624,13 @@ relations:
           - IndexVersion
         related_relation_ids:
           - RetrievalRun-reads-IndexVersion
-        expected_result:
-          zh: 建立该有向事实，并保留条件与证据。
-          en: Assert the directed fact with its condition and evidence retained.
-          ja: condition/evidenceを保持してdirected factをassertします。
-        why_valid_or_invalid:
-          zh: 实例满足端点定义、方向和该关系的显式成立条件。
-          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-          ja: endpoint定義・direction・明示assertion conditionを満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-retrieval-run-009
+          - claim-retrieval-run-id
       - id: RetrievalRun-reads-IndexVersion-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: reads IndexVersion边界例
           en: "Boundary case: reads IndexVersion"
           ja: IndexVersionをreads境界例
-        scenario_id: null
         descriptions:
           zh: request targets index-v19 但运行改读 index-v20 时不得建立此边。
           en: Do not assert this edge if the request targets index-v19 but the run reads index-v20.
@@ -752,101 +641,65 @@ relations:
           - IndexVersion
         related_relation_ids:
           - RetrievalRun-reads-IndexVersion
-        expected_result:
-          zh: 验证器不得建立该有向关系事实。
-          en: Do not assert the directed fact.
-          ja: directed factをassertしません。
-        why_valid_or_invalid:
-          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-retrieval-run-009
+          - claim-retrieval-run-id
     source_claims:
-      - claim-retrieval-run-009
+      - claim-retrieval-run-id
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:IndexVersion
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-mem0-search
+    title: Mem0 Platform Documentation
+    publisher: Mem0
+    url: https://docs.mem0.ai
+    source_type: official-doc
+    relevance: Mem0 search API.
+  - id: src-pinecone-query
+    title: Pinecone Query Guide
+    publisher: Pinecone
+    url: https://docs.pinecone.io/guides/search/query-data
+    source_type: official-doc
+    relevance: index.query.
+  - id: src-memory-retrieval-design
+    title: Moonweave design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Module boundary.
 source_claims:
-  - id: claim-retrieval-run-001
-    source: eng-fw-langchain-retrieval
-    supports: LangChain presents retrieval as a query-driven execution returning documents and supports multi-step retrieval architectures; Moonweave gives each end-to-end execution a replay identity.
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
+  - id: claim-retrieval-run-mem0
+    source: src-mem0-search
+    supports: Mem0 search is executed under a retrieval run.
+    locator: search
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-retrieval-run-pinecone
+    source: src-pinecone-query
+    supports: Multi-stage Pinecone pipelines map to one RetrievalRun.
+    locator: pipeline
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-retrieval-run-boundary
+    source: src-memory-retrieval-design
+    supports: Single stages are not end-to-end runs.
+    locator: boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieval-run-002
-    source: eng-fw-langchain-retrieval
-    supports: "LangChain presents retrieval as a query-driven execution returning documents and supports multi-step retrieval architectures; Moonweave gives each end-to-end execution a replay identity. Moonweave records RetrievalRun.run_id as the stated auditable datum: Stable identifier for one end-to-end retrieval run."
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
+  - id: claim-retrieval-run-id
+    source: src-memory-retrieval-design
+    supports: run_id identifies the run.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieval-run-003
-    source: eng-fw-langchain-retrieval
-    supports: "LangChain presents retrieval as a query-driven execution returning documents and supports multi-step retrieval architectures; Moonweave gives each end-to-end execution a replay identity. Moonweave records RetrievalRun.request_id as the stated auditable datum: Identifies the retrieval request fulfilled by the run."
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
+  - id: claim-retrieval-run-request
+    source: src-memory-retrieval-design
+    supports: request_id links run to request.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieval-run-004
-    source: eng-fw-langchain-retrieval
-    supports: "LangChain presents retrieval as a query-driven execution returning documents and supports multi-step retrieval architectures; Moonweave gives each end-to-end execution a replay identity. Moonweave records RetrievalRun.index_version_id as the stated auditable datum: Identifies the index version actually read, not merely planned."
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
+  - id: claim-retrieval-run-index
+    source: src-memory-retrieval-design
+    supports: actual_index_version_id pins the index read.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-retrieval-run-005
-    source: eng-fw-langchain-retrieval
-    supports: LangChain presents retrieval as a query-driven execution returning documents and supports multi-step retrieval architectures; Moonweave gives each end-to-end execution a replay identity. The case instantiates the documented query-to-documents retrieval flow as one auditable run.
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-retrieval-run-006
-    source: eng-fw-langchain-retrieval
-    supports: LangChain presents retrieval as a query-driven execution returning documents and supports multi-step retrieval architectures; Moonweave gives each end-to-end execution a replay identity. Multi-stage retrieval documentation separates a stage operation from the complete request execution.
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-retrieval-run-007
-    source: eng-fw-langchain-retrieval
-    supports: The official documentation supports the operational distinction used in this child differentia; Moonweave's RetrievalRun-to-RetrievalActivity subclass placement is an explicit ontology design decision.
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-retrieval-run-008
-    source: eng-fw-langchain-retrieval
-    supports: The cited official documentation supports the endpoint roles and direction of this retrieval fact; the exact relation identifier and ownership boundary are Moonweave design decisions.
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-retrieval-run-009
-    source: eng-vector-qdrant-hybrid-query
-    supports: The cited official documentation supports the endpoint roles and direction of this retrieval fact; the exact relation identifier and ownership boundary are Moonweave design decisions.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

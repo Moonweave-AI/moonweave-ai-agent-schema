@@ -1,34 +1,69 @@
 schema: moonweave.ai/ontology-node/v1
 id: BranchCondition
 kind: concept
-status: accepted
 labels:
   zh: 分支条件
   en: branch condition
-  ja: branch condition
+  ja: 分岐条件
 semantics:
   short_definition:
-    zh: 将一种求值结果映射到候选路由并规定优先级的路由条件。
-    en: A routing condition that maps an evaluation result to candidate routes with precedence.
-    ja: evaluation result を candidate route と precedence に対応付ける routing condition。
+    zh: 将匹配结果映射到候选 Route 并规定优先级的路由条件。
+    en: A routing condition that maps a match result to candidate routes with precedence.
+    ja: match result を candidate route と precedence に mapping する routing condition です。
   definition:
-    zh: 分支条件是 RoutingCondition 的子类，其种差是把判定结果与一个或多个候选 Route、优先级和冲突消解方式关联起来。它适用于互斥或有序分支；它不是 Route 本身，也不是选择某条分支的 RoutingDecision。
-    en: A BranchCondition is a RoutingCondition distinguished by associating a predicate outcome with one or more candidate Routes, precedence, and conflict resolution. It governs exclusive or ordered branching; it is neither a Route nor the RoutingDecision that selects one branch.
-    ja: BranchCondition は predicate outcome を candidate Route・precedence・conflict resolution に関連付ける RoutingCondition subtype です。exclusive/ordered branch を規定しますが Route 自体でも selection decision でもありません。
+    zh: BranchCondition 是 RoutingCondition 的子类，种差为把 predicate 结果与 candidate_route_refs、precedence 关联。它对应 LangGraph route function 中的 if/else 分支（should_continue 式逻辑）：匹配 billing 则返回 "billing" 键并启用 route-billing-primary 等候选。它不是 Route 本身，也不是选择某条分支的 RoutingDecision。
+    en: "A BranchCondition is a RoutingCondition distinguished by associating a predicate outcome with candidate_route_refs and precedence. It corresponds to if/else branches in LangGraph route functions (should_continue-style logic) where matching billing returns the billing key and enables candidate routes such as route-billing-primary. It is neither a Route nor the RoutingDecision that selects one branch."
+    ja: BranchCondition は predicate outcome を candidate Route/precedence に関連付ける subtype で LangGraph route function の if/else（should_continue 型）に対応します。
   why_needed:
-    zh: 分支语义单列后，普通停止条件和门控条件不会被误画成同级候选路径。
-    en: Making branch semantics explicit prevents stop and gate conditions from being misdrawn as peer candidate paths.
+    zh: 分支语义单列后，StopCondition 与 GateCondition 不会被误画成同级候选路径。
+    en: Explicit branch semantics prevent StopCondition and GateCondition from being misdrawn as peer candidate paths.
     ja: branch semantics を明示し stop/gate condition を peer candidate path と誤表示しません。
   includes:
     - zh: 意图分类、置信度区间、业务状态和策略结果到候选 Route 的映射条件。
       en: Conditions mapping intent classes, confidence bands, business states, or policy outcomes to candidate Routes.
-      ja: intent class・confidence band・business state・policy outcome から candidate Route への mapping condition。
+      ja: intent class・confidence band・business state・policy outcome→candidate Route mapping。
   excludes:
-    - zh: 路由边、一次分支选择、停止条件、门阈值和编程语言 if 语句文本。
-      en: A route edge, one branch selection, stop condition, gate threshold, and raw programming-language if statement.
+    - zh: 路由边、一次分支选择、停止条件、门阈值和原始 if 语句文本。
+      en: A route edge, one branch selection, stop condition, gate threshold, and raw if-statement text.
       ja: route edge・branch selection occurrence・stop condition・gate threshold・raw if statement。
   semantic_kind: specification
   aliases: []
+engineering:
+  explanation:
+    zh: LangGraph should_continue(state) 返回 "continue"/END 的模式投影为 BranchCondition：match_value 对应返回值，candidate_route_refs 对应 path map 目标。OpenAI/ReAct 循环中 next-action 选择也可建模为 BranchCondition，但应存为版本化表达式而非一次 action 文本。
+    en: LangGraph should_continue(state) returning "continue"/END projects to BranchCondition where match_value is the return and candidate_route_refs are path-map targets. OpenAI/ReAct next-action selection can also model as BranchCondition but must be stored as versioned expressions, not one action string.
+    ja: LangGraph should_continue の "continue"/END 返却を BranchCondition に写像します。match_value は戻り値、candidate_route_refs は path map target です。
+  typical_input:
+    - description: LangGraph should_continue branch function.
+      format: |
+        def should_continue(state):
+            if state.get("step_count", 0) >= 10:
+                return END
+            if state.get("last_tool_error"):
+                return "repair"
+            return "continue"
+      source_claims: [claim-branch-condition-langgraph]
+  typical_output:
+    - description: Branch condition with route mapping.
+      format: |
+        {
+          "routing_specification_id": "branch-condition-billing",
+          "version": "3",
+          "match_value": "billing",
+          "candidate_route_refs": ["route-billing-primary", "route-billing-fallback"],
+          "precedence": 20
+        }
+      source_claims: [claim-branch-condition-design]
+  reference_implementations:
+    - name: LangGraph
+      url: https://langchain-ai.github.io/langgraph/
+      description: should_continue and conditional_edges if/else routing.
+    - name: CrewAI
+      url: https://docs.crewai.com
+      description: Intent-based branch routing in hierarchical crews.
+    - name: OpenAI Agents SDK
+      url: https://openai.github.io/openai-agents-python/
+      description: Next-agent selection branches in multi-agent loops.
 structure:
   identity_keys: []
   fields:
@@ -43,14 +78,14 @@ structure:
         min: 1
         max: 1
       definitions:
-        zh: 声明条件结果必须匹配的受控值。
-        en: Declares the controlled value that the evaluated result must match.
-        ja: evaluated result が一致すべき controlled value を宣言します。
+        zh: 声明条件结果或 route function 返回值必须匹配的受控值。
+        en: Declares the controlled value the evaluated result or route-function return must match.
+        ja: evaluated result/route function return が一致すべき controlled value。
       allowed_values: []
       pattern: null
       example_value: billing
       source_claims:
-        - claim-branch-condition-001
+        - claim-branch-condition-langgraph
     - id: candidate_route_refs
       labels:
         zh: 候选路径引用
@@ -64,14 +99,14 @@ structure:
       definitions:
         zh: 引用匹配时可被选择的一组 Route。
         en: References Routes eligible when the condition matches.
-        ja: condition match 時に eligible な Route を参照します。
+        ja: condition match 時 eligible な Route。
       allowed_values: []
       pattern: null
       example_value:
         - route-billing-primary
         - route-billing-fallback
       source_claims:
-        - claim-branch-condition-001
+        - claim-branch-condition-langgraph
     - id: precedence
       labels:
         zh: 分支优先级
@@ -83,28 +118,30 @@ structure:
         min: 1
         max: 1
       definitions:
-        zh: 在多个条件同时为真时规定比较顺序。
-        en: Defines ordering when multiple conditions are true.
-        ja: multiple condition true 時の ordering を定義します。
+        zh: 多个条件同时为真时的比较顺序。
+        en: Ordering when multiple conditions are true.
+        ja: multiple condition true 時 ordering。
       allowed_values: []
       pattern: null
       example_value: 20
       source_claims:
-        - claim-branch-condition-001
+        - claim-branch-condition-design
   constraints: []
   required_relation_constraints: []
 examples:
-  - id: BranchCondition-example-positive-manual-20260716
-    kind: positive
+  - id: BranchCondition-example-langgraph-if-else
     labels:
-      zh: 账单意图分支
-      en: Billing-intent branch
-      ja: billing-intent branch
-    scenario_id: null
+      zh: LangGraph if/else 账单分支
+      en: LangGraph if/else billing branch
+      ja: LangGraph if/else billing branch
     descriptions:
-      zh: branch-billing@3 在 intent=billing 时提供主账单 worker 与人工后备两条 Route，并以 20 的优先级参与冲突消解。
-      en: branch-billing@3 offers primary billing-worker and human-fallback Routes when intent=billing and participates in conflict resolution at precedence 20.
-      ja: branch-billing@3 は intent=billing で primary worker/human fallback Route を候補にし precedence 20 で競合解消します。
+      zh: branch-billing@3 在 intent=billing 时映射 route-billing-primary 与 route-billing-fallback，precedence=20；对应 route function 返回 "billing"。
+      en: branch-billing@3 maps route-billing-primary and route-billing-fallback when intent=billing at precedence 20, matching route function return "billing".
+      ja: branch-billing@3 は intent=billing で "billing" 返却に対応します。
+    example_source:
+      product: LangGraph
+      url: https://langchain-ai.github.io/langgraph/
+      version: conditional_edges if/else
     field_values:
       routing_specification_id: branch-condition-billing
       version: "3"
@@ -123,63 +160,85 @@ examples:
       precedence: 20
     related_node_ids:
       - BranchCondition
-      - RoutingPolicy
       - Route
+      - RoutingPolicy
     related_relation_ids:
       - RoutingPolicy-has_condition-BranchCondition
-    expected_result:
-      zh: 归入 RoutingCondition 下，并由 RoutingPolicy 组合。
-      en: Place it under RoutingCondition and compose it through RoutingPolicy.
-      ja: RoutingCondition 下に置き RoutingPolicy が compose します。
-    why_valid_or_invalid:
-      zh: 它描述匹配结果与候选路径的可复用映射。
-      en: It describes a reusable mapping from match result to candidate paths.
-      ja: match result から candidate path への reusable mapping です。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-branch-condition-001
-  - id: BranchCondition-example-boundary-manual-20260716
-    kind: boundary
+      - claim-branch-condition-langgraph
+  - id: BranchCondition-example-should-continue
     labels:
-      zh: 已走账单分支
-      en: Billing branch was taken
-      ja: billing branch taken
-    scenario_id: routing-review-branchcondition-boundary
+      zh: should_continue 继续/停止分支
+      en: should_continue continue/stop branch
+      ja: should_continue continue/stop branch
     descriptions:
-      zh: decision-884 记录最终选择 route-billing-primary 和 billing-worker-2；它是发生事实，不是 branch-billing 的定义。
-      en: decision-884 records selecting route-billing-primary and billing-worker-2; it is an occurrence fact, not the definition of branch-billing.
-      ja: decision-884 の route-billing-primary/billing-worker-2 selection は occurrence fact で branch-billing definition ではありません。
+      zh: branch-continue@1 match_value=continue 映射 route-agent-loop；match_value=END 由 StopCondition 处理，不在此 BranchCondition 候选内。
+      en: branch-continue@1 match_value=continue maps route-agent-loop; match_value=END is handled by StopCondition, not this BranchCondition's candidates.
+      ja: branch-continue@1 は continue→route-agent-loop を mapping します。
+    example_source:
+      product: LangGraph
+      url: https://langchain-ai.github.io/langgraph/
+      version: should_continue pattern
+    field_values:
+      routing_specification_id: branch-continue
+      version: "1"
+      match_value: continue
+      candidate_route_refs:
+        - route-agent-loop
+      precedence: 10
+    related_node_ids:
+      - BranchCondition
+      - StopCondition
+    related_relation_ids: []
+    source_claims:
+      - claim-branch-condition-langgraph
+  - id: BranchCondition-example-crewai-intent
+    labels:
+      zh: CrewAI 意图分支
+      en: CrewAI intent branch
+      ja: CrewAI intent branch
+    descriptions:
+      zh: branch-research@2 在 unresolved_sources>0 时提供 researcher/writer 候选 Route，manager 层级 crew 使用。
+      en: branch-research@2 offers researcher/writer candidate Routes when unresolved_sources>0 in hierarchical crew manager routing.
+      ja: branch-research@2 は hierarchical crew manager routing の intent branch です。
+    example_source:
+      product: CrewAI
+      url: https://docs.crewai.com
+      version: Process.hierarchical
+    field_values:
+      routing_specification_id: branch-research
+      version: "2"
+      match_value: research
+      candidate_route_refs:
+        - route-researcher
+        - route-writer
+      precedence: 15
+    related_node_ids:
+      - BranchCondition
+      - RoutingPolicy
+    related_relation_ids: []
+    source_claims:
+      - claim-branch-condition-crewai
+  - id: BranchCondition-example-boundary-decision
+    labels:
+      zh: 已走账单分支不是条件定义
+      en: Taken billing branch is not condition definition
+      ja: taken billing branch は condition 定義ではない
+    descriptions:
+      zh: decision-884 记录选择 route-billing-primary 和 billing-worker-2；是 RoutingDecision 发生事实。
+      en: decision-884 records selecting route-billing-primary and billing-worker-2; it is a RoutingDecision occurrence.
+      ja: decision-884 は RoutingDecision occurrence です。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: branch versus decision
     field_values: {}
     related_node_ids:
       - RoutingDecision
       - BranchCondition
     related_relation_ids: []
-    expected_result:
-      zh: 保存为 RoutingDecision，不创建新的 BranchCondition。
-      en: Store it as RoutingDecision, not a new BranchCondition.
-      ja: RoutingDecision として保存し BranchCondition を新設しません。
-    why_valid_or_invalid:
-      zh: 最终选择与可复用映射具有不同身份和生命周期。
-      en: Final selection and reusable mapping have different identity and lifecycle.
-      ja: final selection と reusable mapping は identity/lifecycle が異なります。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-branch-condition-001
-      - claim-branch-condition-003
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: GateCondition
-    shared_parent_concept_id: RoutingCondition
-    differentia:
-      zh: BranchCondition 把匹配值映射到候选 Route 与优先级；GateCondition 为 ControlGate 规定证据、阈值和缺失处理。
-      en: BranchCondition maps match values to candidate Routes and precedence; GateCondition sets evidence, threshold, and missing-evidence handling for ControlGate.
-      ja: BranchCondition は match value→candidate Route/precedence、GateCondition は ControlGate evidence/threshold/missing handling を規定します。
-    source_claims:
-      - claim-branch-condition-001
+      - claim-branch-condition-design
 parent_relation:
   id: BranchCondition-is_a-RoutingCondition
   predicate: is_a
@@ -192,7 +251,7 @@ parent_relation:
   definitions:
     zh: BranchCondition 是一种 RoutingCondition；其种差是把匹配结果映射为候选 Route 并规定冲突优先级。
     en: A BranchCondition is a RoutingCondition distinguished by mapping a match result to candidate Routes and conflict precedence.
-    ja: BranchCondition は match result を candidate Route と conflict precedence に mapping する RoutingCondition subtype です。
+    ja: BranchCondition は match result→candidate Route/precedence mapping subtype です。
   cardinality: null
   cardinality_not_applicable_reason:
     zh: 该关系表达类型级语义，不在此规定实例基数。
@@ -209,109 +268,60 @@ parent_relation:
   boundary_context: null
   constraints: []
   examples:
-    - id: BranchCondition-is_a-RoutingCondition-example-positive-manual-20260716
+    - id: BranchCondition-is_a-RoutingCondition-example-positive
       kind: positive
       labels:
         zh: 账单意图分支条件
         en: Billing-intent branch condition
         ja: billing-intent branch condition
-      scenario_id: routing-relation-branchcondition-is_a-routingcondition-positive
       descriptions:
         zh: branch-billing 把 billing 匹配到主路径与人工后备路径。
         en: branch-billing maps billing to primary and human-fallback Routes.
-        ja: branch-billing は billing を primary/human-fallback Route に mapping します。
+        ja: branch-billing は primary/human-fallback Route を mapping します。
       field_values: {}
       related_node_ids:
         - BranchCondition
         - RoutingCondition
       related_relation_ids:
         - BranchCondition-is_a-RoutingCondition
-      expected_result:
-        zh: 断言 BranchCondition → RoutingCondition。
-        en: Assert BranchCondition → RoutingCondition.
-        ja: BranchCondition → RoutingCondition を assert します。
-      why_valid_or_invalid:
-        zh: 它满足一般条件身份和分支映射种差。
-        en: It satisfies condition identity and branch-mapping differentia.
-        ja: condition identity と branch-mapping differentia を満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-branch-condition-001
-        - claim-branch-condition-002
-    - id: BranchCondition-is_a-RoutingCondition-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 停止条件不是分支条件
-        en: Stop condition is not a branch condition
-        ja: stop condition は branch condition ではない
-      scenario_id: routing-relation-branchcondition-is_a-routingcondition-boundary
-      descriptions:
-        zh: stop-budget 声明预算耗尽标准，但不映射候选 Route 或优先级。
-        en: stop-budget declares a budget-exhaustion criterion but maps no candidate Route or precedence.
-        ja: stop-budget は budget exhaustion を宣言しますが candidate Route/precedence を mapping しません。
-      field_values: {}
-      related_node_ids:
-        - BranchCondition
-        - RoutingCondition
-      related_relation_ids:
-        - BranchCondition-is_a-RoutingCondition
-      expected_result:
-        zh: 仅归 StopCondition。
-        en: Classify only as StopCondition.
-        ja: StopCondition のみとします。
-      why_valid_or_invalid:
-        zh: 共享上位类只说明同属一类，不能证明两个概念共享相同种差。
-        en: A shared parent does not imply a shared differentia.
-        ja: shared parent は shared differentia を意味しません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-branch-condition-001
-        - claim-branch-condition-002
+        - claim-branch-condition-design
   source_claims:
-    - claim-branch-condition-001
-    - claim-branch-condition-002
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: accepted
+    - claim-branch-condition-design
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-orchestration-tool-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照权威来源逐项完成人工语义核验；概念定义、层级、关系、结构与来源主张成立。
-    en: Manual semantic verification against authoritative sources completed; concept definitions, hierarchy, relations, structure, and source claims hold.
-    ja: 権威ソースに照らし手動意味検証を完了し、概念定義・階層・関係・構造・出典主張が成立。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: langgraph-branch-condition
+    title: LangGraph
+    url: https://langchain-ai.github.io/langgraph/
+    source_type: official-doc
+    relevance: should_continue and conditional_edges if/else branch routing.
+  - id: crewai-branch-condition
+    title: CrewAI documentation
+    url: https://docs.crewai.com
+    source_type: official-doc
+    relevance: Hierarchical manager intent branch routing.
+  - id: branch-condition-design
+    title: Moonweave routing and gates design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: BranchCondition maps match values to candidate routes.
 source_claims:
-  - id: claim-branch-condition-001
-    source: eng-fw-langgraph-graph-api
-    supports: LangGraph's Graph API distinguishes workflow state, executable nodes, static edges, conditional routing functions, termination targets, and Command values that combine state updates with a selected destination. Moonweave uses this to separate reusable routing specifications and targets from one RoutingDecision occurrence.
-    locator: LangGraph Graph API documentation, Graphs, Edges, Conditional edges, and Command sections
+  - id: claim-branch-condition-langgraph
+    source: langgraph-branch-condition
+    supports: LangGraph route functions implement if/else branches returning path-map keys mappable to BranchCondition match_value and candidate_route_refs.
+    locator: Graph API — Conditional edges, should_continue patterns
+    evidence_kind: official
+    confidence: high
+  - id: claim-branch-condition-crewai
+    source: crewai-branch-condition
+    supports: CrewAI hierarchical manager routing selects among worker routes based on intent-like predicates.
+    locator: Process.hierarchical — manager delegation
+    evidence_kind: official
+    confidence: high
+  - id: claim-branch-condition-design
+    source: branch-condition-design
+    supports: BranchCondition is RoutingCondition subtype mapping match results to candidate Routes with precedence.
+    locator: BranchCondition concept boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-branch-condition-002
-    source: eng-fw-autogen-agentchat
-    supports: AutoGen SelectorGroupChat selects a next participant from described candidates using current conversation context and stops when an explicit termination condition is satisfied. Moonweave uses this as evidence for typed routing targets, selection decisions, and separately evaluated stop conditions.
-    locator: AutoGen AgentChat documentation, Selector Group Chat workflow and Termination Conditions
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-branch-condition-003
-    source: eng-ont-prov-o
-    supports: W3C PROV-O distinguishes plans and other Entities from time-bounded Activities that use or generate Entities. Moonweave therefore treats routing policy and conditions as reusable specifications, RoutingDecision as an occurrence, and GateOutcome as information produced by gate evaluation.
-    locator: W3C PROV-O Recommendation Sections 3.1 and 3.2, Entity, Activity, generation, and Plan
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

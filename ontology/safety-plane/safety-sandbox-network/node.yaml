@@ -1,1041 +1,383 @@
 schema: moonweave.ai/ontology-node/v1
 id: safety-sandbox-network
 kind: module
-status: accepted
 labels:
   zh: 执行环境隔离
   en: Execution-environment isolation
   ja: 実行環境の隔離
 semantics:
   short_definition:
-    zh: 执行环境隔离描述可复用的文件系统和进程隔离规范、实际加载这些规范的具体沙箱，以及针对该沙箱且有证据支持的逃逸风险。它回答本地执行能看见和操作什么，不回答远端网络能访问什么，也不把容器、进程句柄或授权决定复制进隔离层级。
-    en: Execution-environment isolation describes reusable filesystem and process isolation specifications, concrete sandboxes that actually load them, and evidence-backed escape risks tied to those sandboxes. It answers what local execution can see and operate, not what remote network destinations are reachable, and it does not copy containers, process handles, or authorization decisions into the isolation hierarchy.
-    ja: 実行環境の隔離は、再利用可能なファイルシステム・プロセス隔離仕様、それらを実際に読み込んだ具体的なサンドボックス、そのサンドボックスに結び付く証拠付き逃避リスクを記述します。ローカル実行が何を見て操作できるかを扱い、遠隔ネットワークの到達性は扱わず、コンテナ、プロセスハンドル、認可判断を隔離階層へ複製しません。
+    zh: 执行环境隔离描述本地进程能看见什么、能操作哪些路径与能力，以及沙箱是否存在可证实的逃逸风险。
+    en: Execution-environment isolation describes what a local process can see, which paths and capabilities it may use, and whether a sandbox has evidence-backed escape risk.
+    ja: 実行環境隔離は、ローカル process が何を見え、どの path/capability を使え、sandbox に証拠付き escape risk があるかを記述します。
   definition:
-    zh: 执行环境隔离描述可复用的文件系统和进程隔离规范、实际加载这些规范的具体沙箱，以及针对该沙箱且有证据支持的逃逸风险。它回答本地执行能看见和操作什么，不回答远端网络能访问什么，也不把容器、进程句柄或授权决定复制进隔离层级。
-    en: Execution-environment isolation describes reusable filesystem and process isolation specifications, concrete sandboxes that actually load them, and evidence-backed escape risks tied to those sandboxes. It answers what local execution can see and operate, not what remote network destinations are reachable, and it does not copy containers, process handles, or authorization decisions into the isolation hierarchy.
-    ja: 実行環境の隔離は、再利用可能なファイルシステム・プロセス隔離仕様、それらを実際に読み込んだ具体的なサンドボックス、そのサンドボックスに結び付く証拠付き逃避リスクを記述します。ローカル実行が何を見て操作できるかを扱い、遠隔ネットワークの到達性は扱わず、コンテナ、プロセスハンドル、認可判断を隔離階層へ複製しません。
+    zh: 本模块拥有可版本化的 IsolationSpecification（含 FilesystemPolicy 与 ProcessPolicy）、实际加载这些规范的具体 Sandbox，以及绑定该实例与逃逸向量证据的 SandboxEscapeRisk。它映射 E2B Sandbox API 的 cloud sandbox 生命周期与 file/process/network 限制；Docker-in-Docker 与 OCI Linux runtime 的 namespaces、cgroups、masked/readonly paths、seccomp；gVisor 的 sentry/application kernel 隔离；Firecracker microVM 的 KVM 轻量虚拟化边界；以及 Cursor Agent Terminal 的 sandbox 模式（如 workspace-write）与命令 allowlist 叠加的本地执行边界。本模块回答“本地执行边界内可见与可操作什么”，不回答远端网络目的地可达性（归 safety-network-control），也不把 Container、ProcessHandle 或 AuthorizationGrant 复制进隔离层级。
+    en: "This module owns versioned IsolationSpecification (including FilesystemPolicy and ProcessPolicy), concrete Sandbox instances that load those specifications, and SandboxEscapeRisk tied to instance and vector evidence. It maps E2B Sandbox API cloud sandbox lifecycle with file, process, and network limits; Docker-in-Docker and OCI Linux runtime namespaces, cgroups, masked/readonly paths, and seccomp; gVisor sentry/application-kernel isolation; Firecracker microVM KVM lightweight virtualization boundaries; and Cursor Agent Terminal sandbox modes (e.g., workspace-write) with command allowlists as layered local execution boundaries. It answers what is visible and operable within the local execution boundary, not remote network reachability (safety-network-control), and does not copy Container, ProcessHandle, or AuthorizationGrant into the isolation hierarchy."
+    ja: 本モジュールは versioned IsolationSpecification（FilesystemPolicy/ProcessPolicy 含む）、それを load する concrete Sandbox、instance/vector 証拠付き SandboxEscapeRisk を所有します。E2B Sandbox API cloud sandbox lifecycle/file/process/network 制限、Docker-in-Docker と OCI Linux runtime namespace/cgroup/masked-readonly path/seccomp、gVisor sentry/application kernel 隔離、Firecracker microVM KVM 軽量仮想化境界、Cursor Agent Terminal sandbox mode（workspace-write 等）と command allowlist 叠加 local execution boundary を写像します。「local execution boundary 内で visible/operable なもの」を答え、remote network reachability（safety-network-control）は答えず Container/ProcessHandle/AuthorizationGrant を隔離階層へ複製しません。
   why_needed:
-    zh: 让每次本地执行都能核实实际加载了哪版隔离规范、哪些路径和进程能力可见，以及逃逸判断基于什么实例证据。
-    en: Make every local execution verifiable as to which isolation revision was loaded, which paths and process capabilities were visible, and what instance evidence supports any escape judgment.
-    ja: 各ローカル実行について、どの隔離仕様版を読み込み、どの経路とプロセス能力が見え、逃避判断がどの実例証拠に基づくかを検証できるようにします。
+    zh: 若只检查宿主 DAC 权限而忽略沙箱只读 mount 与 Landlock 层，Agent 会误判可写路径并在容器逃逸或 capability 泄露时无法追溯实际加载的隔离版与缓解是否生效。
+    en: If systems check only host DAC while ignoring sandbox read-only mounts and Landlock layers, agents misjudge writable paths and cannot trace which isolation revision loaded or whether mitigation worked after container escape or capability leakage.
+    ja: host DAC のみ確認し sandbox ro mount/Landlock layer を無視すると、writable path を誤判定し container escape/capability leak 後に loaded isolation revision や mitigation 有効性を追跡できません。
   includes:
-    - zh: 可版本化的 IsolationSpecification，以及描述路径、挂载、读写权限、进程创建、系统调用或能力限制的 FilesystemPolicy 与 ProcessPolicy。
-      en: Versioned IsolationSpecifications plus FilesystemPolicy and ProcessPolicy constraints over paths, mounts, read/write rights, process creation, system calls, or capabilities.
-      ja: 版管理された IsolationSpecification と、経路、マウント、読書権限、プロセス生成、システムコール、能力を制約する FilesystemPolicy／ProcessPolicy を含みます。
-    - zh: 具体 Sandbox 身份、它实际加载并强制的规范版本，以及绑定该实例、逃逸向量和证据的 SandboxEscapeRisk。
-      en: Concrete Sandbox identity, the specification revisions actually loaded and enforced, and SandboxEscapeRisk tied to that instance, escape vector, and evidence.
-      ja: 具体的な Sandbox の同一性、実際に読み込んで強制した仕様版、その実例・逃避経路・証拠に結び付く SandboxEscapeRisk を含みます。
+    - zh: IsolationSpecification、FilesystemPolicy、ProcessPolicy 及路径、挂载、读写执行权限、能力、seccomp、cgroup 约束。
+      en: IsolationSpecification, FilesystemPolicy, ProcessPolicy, and constraints over paths, mounts, read/write/execute rights, capabilities, seccomp, and cgroups.
+      ja: IsolationSpecification、FilesystemPolicy、ProcessPolicy と path/mount/rwx/capability/seccomp/cgroup 制約。
+    - zh: Sandbox 实例、constrained_by 加载的规范版本，以及 threatens 关系绑定的 SandboxEscapeRisk 与缓解复核证据。
+      en: Sandbox instance, constrained_by loaded specification revisions, and SandboxEscapeRisk with mitigation re-check evidence bound through threatens.
+      ja: Sandbox instance、constrained_by loaded spec revision、threatens 绑定 SandboxEscapeRisk と mitigation re-check 証拠。
   excludes:
-    - zh: NetworkCall、ProxyRoute、NetworkPolicy 和远端目的地归网络通信控制；“允许联网”与“本地文件/进程隔离”是可并存但不同的控制。
-      en: NetworkCall, ProxyRoute, NetworkPolicy, and remote destinations belong to network communication control; network permission and local filesystem/process isolation are distinct controls that may coexist.
-      ja: NetworkCall、ProxyRoute、NetworkPolicy、遠隔宛先はネットワーク通信制御に属します。ネットワーク許可とローカルのファイル／プロセス隔離は、併存し得る別の制御です。
-    - zh: Container、RuntimeEnvironment 和 ProcessHandle 是运行时实体；AuthorizationGrant 与 PolicyDecision 是授权事实；一次访问拒绝是执行或审计事件，而不是隔离规范类型。
-      en: Container, RuntimeEnvironment, and ProcessHandle are Runtime entities; AuthorizationGrant and PolicyDecision are authorization facts; one access denial is an execution or audit event, not an isolation-specification type.
-      ja: Container、RuntimeEnvironment、ProcessHandle は実行時の実体、AuthorizationGrant と PolicyDecision は認可事実、一回のアクセス拒否は実行・監査イベントであり隔離仕様型ではありません。
+    - zh: NetworkCall、ProxyRoute、NetworkPolicy 与远端目的地归 safety-network-control。
+      en: NetworkCall, ProxyRoute, NetworkPolicy, and remote destinations belong to safety-network-control.
+      ja: NetworkCall、ProxyRoute、NetworkPolicy、remote destination は safety-network-control。
+    - zh: Container、RuntimeEnvironment、ProcessHandle 归 runtime-system；AuthorizationGrant 归 safety-permission-policy。
+      en: Container, RuntimeEnvironment, and ProcessHandle belong to runtime-system; AuthorizationGrant belongs to safety-permission-policy.
+      ja: Container、RuntimeEnvironment、ProcessHandle は runtime-system；AuthorizationGrant は safety-permission-policy。
+    - zh: 声明性策略文件变更不等于运行实例已加载新约束；未重启/未复核不得标记缓解有效。
+      en: Declarative policy file changes do not mean a running instance loaded new constraints; mitigation is not effective without restart or re-check.
+      ja: 宣言 policy 変更は running instance の新 constraint load を意味せず、restart/re-check なしに mitigation effective とできません。
   semantic_kind: null
   aliases: []
-purpose:
-  zh: 把隔离规范、实际沙箱、有效本地边界和逃逸证据连接成可审计闭环。
-  en: Connect isolation specifications, concrete sandboxes, effective local boundaries, and escape evidence into an auditable loop.
-  ja: 隔離仕様、具体的サンドボックス、有効なローカル境界、逃避証拠を監査可能な閉路として接続します。
-structure: null
+engineering:
+  explanation:
+    zh: 集成时应把 E2B `Sandbox.create()` 返回的 sandbox ID 与模板限制映射为 Sandbox + IsolationSpecification；Docker `docker run --read-only --cap-drop=ALL` 与 OCI maskedPaths/readonlyPaths 映射为 FilesystemPolicy；gVisor `runsc` 与 Firecracker `firecracker-containerd` 映射为 ProcessPolicy 的 isolation backend 字段；Cursor terminal sandbox 映射为 workspace 写入边界与 allowlist 叠加层。路径权限查询必须 intersect 所有强制层（mount、Landlock、seccomp），不得以宿主 DAC 覆盖。缓解必须绑定 post-change loaded_policy_ref 与独立复核。
+    en: "Integrations should map E2B Sandbox.create() sandbox ID and template limits to Sandbox plus IsolationSpecification; Docker docker run --read-only --cap-drop=ALL and OCI maskedPaths/readonlyPaths to FilesystemPolicy; gVisor runsc and Firecracker firecracker-containerd to ProcessPolicy isolation backend fields; Cursor terminal sandbox to workspace write boundary with allowlist overlay. Path permission queries must intersect all enforced layers (mount, Landlock, seccomp) and cannot be overridden by host DAC. Mitigation must bind post-change loaded_policy_ref and independent re-check."
+    ja: E2B Sandbox.create() の sandbox ID/template limit を Sandbox+IsolationSpecification に、Docker --read-only/--cap-drop=ALL と OCI masked/readonly path を FilesystemPolicy に、gVisor runsc/Firecracker firecracker-containerd を ProcessPolicy backend に、Cursor terminal sandbox を workspace write boundary+allowlist overlay に写像。path permission query は mount/Landlock/seccomp 全 layer intersect 必須で host DAC 上書き不可。mitigation は post-change loaded_policy_ref と独立 re-check 绑定。
+  typical_input:
+    - description: E2B cloud sandbox creation with template constraints.
+      format: |
+        from e2b import Sandbox
+        sandbox = Sandbox.create(template="code-interpreter-v1")
+        sandbox.filesystem.write("/tmp/out.txt", "hello")
+        # template defines CPU, memory, network, filesystem boundaries
+      source_claims: [claim-safety-sandbox-e2b]
+    - description: OCI/Docker read-only root with dropped capabilities.
+      format: |
+        docker run --read-only --cap-drop=ALL \
+          --mount type=bind,src=/repo,dst=/workspace,readonly \
+          agent-runner npm test
+      source_claims: [claim-safety-sandbox-oci]
+    - description: Cursor Agent terminal sandbox mode.
+      format: |
+        {"sandbox_mode": "workspace-write",
+         "command_allowlist": ["npm test", "git status", "pnpm lint"]}
+        // commands outside list blocked before spawn
+      source_claims: [claim-safety-sandbox-cursor]
+  typical_output:
+    - description: Effective path permissions from loaded specification layers.
+      format: |
+        sandbox_id: sandbox-run-884
+        isolation_spec_ref: fs-code@4
+        path: /workspace/repo/app.py
+        read_allowed: true
+        write_allowed: false
+        execute_allowed: false
+        enforcement_layers: [mount-readonly, landlock-fs-code-v4]
+      source_claims: [claim-safety-sandbox-design]
+    - description: Escape risk with verified post-change mitigation.
+      format: |
+        escape_risk_id: escape-risk-884-1
+        vector: writable-host-bind-mount-with-cap-sys-admin
+        post_change_mount_mode: ro
+        mitigation_verification_ref: sandbox-recheck-884-2
+        boundary_write_denials: 12
+        mitigation_effective: true
+      source_claims: [claim-safety-sandbox-design]
+  reference_implementations:
+    - name: E2B Sandbox API
+      url: https://e2b.dev/docs
+      description: Cloud sandbox lifecycle, filesystem, process, and network isolation templates.
+    - name: OCI Runtime Specification — Linux
+      url: https://github.com/opencontainers/runtime-spec/blob/main/config-linux.md
+      description: Namespaces, cgroups, mounts, masked/readonly paths, seccomp.
+    - name: gVisor Documentation
+      url: https://gvisor.dev/docs/
+      description: Application kernel isolation with runsc runtime.
+    - name: Firecracker microVM
+      url: https://firecracker-microvm.github.io/
+      description: Lightweight KVM microVM boundaries for multi-tenant isolation.
+    - name: Cursor Agent Terminal Sandbox
+      url: https://cursor.com/docs/agent/terminal
+      description: workspace-write sandbox and command allowlist layering.
+structure:
+  identity_keys: [sandbox_id, isolation_spec_ref]
+  fields:
+    - id: sandbox_id
+      labels: {zh: 沙箱标识, en: Sandbox identifier, ja: サンドボックス識別子}
+      definitions:
+        zh: 一次具体 Sandbox 运行实例的唯一 ID；规范版本变更但实例未 reload 时 identity 不变。
+        en: Unique ID of one concrete Sandbox runtime instance; identity unchanged when spec changes but instance has not reloaded.
+        ja: 一回の concrete Sandbox runtime instance の一意 ID。spec 変更でも instance 未 reload なら identity 不変。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: '^sandbox-[A-Za-z0-9._-]+$'
+      example_value: sandbox-run-884
+      allowed_values: []
+      source_claims: [claim-safety-sandbox-design]
+    - id: isolation_spec_ref
+      labels: {zh: 隔离规范版本引用, en: Isolation specification revision reference, ja: 隔離仕様版参照}
+      definitions:
+        zh: Sandbox-constrained_by 实际加载并强制的 IsolationSpecification 版本。
+        en: IsolationSpecification revision actually loaded and enforced per Sandbox-constrained_by.
+        ja: Sandbox-constrained_by で実際 load/enforce された IsolationSpecification revision。
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: null}
+      pattern: null
+      example_value: fs-code@4
+      allowed_values: []
+      source_claims: [claim-safety-sandbox-oci]
+    - id: mount_mode
+      labels: {zh: 挂载模式, en: Mount mode, ja: マウントモード}
+      definitions:
+        zh: 匹配 mount 规则的 ro/rw 模式；与宿主路径权限 intersect 决定最终 write_allowed。
+        en: ro/rw mode of matched mount rule; intersected with host path rights for final write_allowed.
+        ja: 一致 mount rule の ro/rw mode。host path 権限と intersect して final write_allowed を決定。
+      datatype: string
+      required: false
+      cardinality: {min: 0, max: 1}
+      pattern: null
+      example_value: ro
+      allowed_values: [ro, rw]
+      source_claims: [claim-safety-sandbox-landlock]
+  constraints:
+    - id: sandbox-intersect-enforcement-layers
+      severity: error
+      expression_language: plain
+      expression: Effective read/write/execute for a normalized path must be the intersection of all enforced layers including mount mode, Landlock, seccomp, and capability drops; host DAC alone cannot grant access denied by sandbox layers.
+      explanation:
+        zh: 宿主 DAC 不能覆盖沙箱中额外的只读与 Landlock 约束。
+        en: Host DAC cannot override additional read-only and Landlock restrictions in the sandbox.
+        ja: host DAC は sandbox 内 ro mount/Landlock 等の追加制約を上書きできません。
+      source_claims: [claim-safety-sandbox-landlock]
+    - id: sandbox-normalize-before-map
+      severity: error
+      expression_language: plain
+      expression: Path normalization in sandbox namespace must precede host mapping; traversal escaping the matched mount target root must deny with no resolved host path.
+      explanation:
+        zh: 路径规范化必须先于映射，结果必须留在匹配 target 根内。
+        en: Normalization precedes mapping and the result must remain under the matched target root.
+        ja: mapping 前正規化し、結果は matched target root 内に留まる必要があります。
+      source_claims: [claim-safety-sandbox-landlock]
+    - id: sandbox-mitigation-requires-loaded-evidence
+      severity: error
+      expression_language: plain
+      expression: SandboxEscapeRisk mitigation_effective=true requires loaded_policy_ref matching declared post-change spec and a passing independent re-check; declared config change alone is insufficient.
+      explanation:
+        zh: 声明性配置变化不等于运行实例已加载新约束。
+        en: A declarative configuration change does not mean the running instance loaded the new constraint.
+        ja: 宣言 config 変更は running instance の新 constraint load を意味しません。
+      source_claims: [claim-safety-sandbox-design]
+  required_relations:
+    - id: sandbox-constrained-by-spec
+      direction: outgoing
+      predicate: constrained_by
+      target_concept_id: IsolationSpecification
+      cardinality: {min: 1, max: null}
+      explanations:
+        zh: Sandbox 必须 constrained_by 至少一条实际加载的 IsolationSpecification 版本。
+        en: Sandbox must be constrained_by at least one actually loaded IsolationSpecification revision.
+        ja: Sandbox は少なくとも一 loaded IsolationSpecification revision に constrained_by される必要があります。
+      source_claims: [claim-safety-sandbox-design]
 examples:
-  - id: safety-sandbox-network-cq-resource-visibility-v3-example-positive-manual-20260716
-    kind: positive
+  - id: safety-sandbox-network-example-e2b-cloud
     labels:
-      zh: 计算有效路径权限
-      en: Compute effective path permissions
-      ja: 有効な経路権限の算出
-    scenario_id: sandbox-review-safety-sandbox-network-cq-resource-visibility-v3-positive
+      zh: E2B 云沙箱模板隔离
+      en: E2B cloud sandbox template isolation
+      ja: E2B cloud sandbox template 隔離
     descriptions:
-      zh: sandbox-run-884 加载 fs-code@4；查询 /workspace/repo/app.py 得到 read=true、write=false、execute=false，/secrets/token 三项均 false。
-      en: sandbox-run-884 loads fs-code@4; querying /workspace/repo/app.py yields read=true, write=false, execute=false, while all three are false for /secrets/token.
-      ja: sandbox-run-884 は fs-code@4 を読み込み、/workspace/repo/app.py には read=true、write=false、execute=false を、/secrets/token には三操作すべて false を返します。
+      zh: E2B Sandbox.create(template="code-interpreter-v1") 返回 sandbox-e2b-17；模板限制 CPU/内存/网络，FilesystemPolicy fs-e2b@1 仅允许 /home/user 写入。Agent 在沙箱内执行 Python，宿主 /etc 不可见。
+      en: E2B Sandbox.create(template="code-interpreter-v1") returns sandbox-e2b-17; the template limits CPU, memory, and network while FilesystemPolicy fs-e2b@1 allows writes only under /home/user. The agent runs Python inside the sandbox and cannot see host /etc.
+      ja: E2B Sandbox.create(template="code-interpreter-v1") が sandbox-e2b-17 を返し、template が CPU/メモリ/ネットワークを制限、FilesystemPolicy fs-e2b@1 は /home/user 下のみ書込可。Agent は sandbox 内 Python を実行し host /etc は不可視。
+    example_source:
+      product: E2B
+      url: https://e2b.dev/docs
+      version: Sandbox API templates
     field_values:
-      sandbox_id: sandbox-run-884
-      isolation_spec_ref: fs-code@4
-      normalized_path: /workspace/repo/app.py
-      matched_mount_target: /workspace/repo
-      matched_path_rule: repo-source-readonly@4
-      mount_mode: ro
-      read_allowed: true
-      write_allowed: false
-      execute_allowed: false
-      denied_control_path: /secrets/token
-      denied_control_path_rights:
-        read: false
-        write: false
-        execute: false
-      enforcement_layers:
-        - mount-readonly
-        - landlock-fs-code-v4
+      sandbox_id: sandbox-e2b-17
+      template: code-interpreter-v1
+      isolation_spec_ref: fs-e2b@1
+      host_etc_visible: false
     related_node_ids:
       - Sandbox
+      - IsolationSpecification
       - FilesystemPolicy
     related_relation_ids:
       - Sandbox-constrained_by-IsolationSpecification
-    expected_result:
-      zh: 返回规范化路径、匹配规则、挂载模式和最终读写执行布尔值。
-      en: Return normalized path, matched rule, mount mode, and final read/write/execute booleans.
-      ja: 正規化済み経路、適合した mount と規則、読取専用モード、最終的な read/write/execute の真偽値を返します。
-    why_valid_or_invalid:
-      zh: 查询由实际加载关系和文件系统字段完整回答。
-      en: The loaded-specification relation and filesystem fields fully answer the query.
-      ja: 実際に読み込まれた fs-code@4 と強制レイヤーの積集合を使うため、宿主権限や計画設定だけでは得られない有効権限を再現できます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-safety-sandbox-network-002
-      - claim-safety-sandbox-network-003
-  - id: safety-sandbox-network-cq-resource-visibility-v3-example-boundary-manual-20260716
-    kind: boundary
+      - claim-safety-sandbox-e2b
+  - id: safety-sandbox-network-example-docker-readonly
     labels:
-      zh: 只看宿主权限的错误判定
-      en: Host-permission-only error
-      ja: 宿主権限だけに基づく誤判定
-    scenario_id: sandbox-review-safety-sandbox-network-cq-resource-visibility-v3-boundary
+      zh: Docker 只读根与 capability 丢弃
+      en: Docker read-only root with capability drop
+      ja: Docker 読取専用 root と capability drop
     descriptions:
-      zh: 宿主用户可写 /repo，但查询忽略 sandbox 的只读 mount 与 Landlock 层，错误返回 write=true。
-      en: The host user can write /repo, but the query ignores the sandbox read-only mount and Landlock layer and incorrectly returns write=true.
-      ja: 宿主ユーザーは /repo に書込可能ですが、sandbox の読取専用 mount と Landlock レイヤーを無視して write=true と誤判定しています。
+      zh: docker run --read-only --cap-drop=ALL 启动 sandbox-run-884，加载 fs-code@4 与 process-code@4；查询 /workspace/repo/app.py 可读不可写，/secrets/token 三项均 false。OCI maskedPaths 与 seccomp 共同强制。
+      en: docker run --read-only --cap-drop=ALL starts sandbox-run-884 loading fs-code@4 and process-code@4; /workspace/repo/app.py is readable but not writable and /secrets/token denies all three operations, enforced jointly by OCI maskedPaths and seccomp.
+      ja: docker run --read-only --cap-drop=ALL で sandbox-run-884 起動、fs-code@4/process-code@4 load。/workspace/repo/app.py は read-only、/secrets/token は三操作すべて deny。OCI maskedPaths と seccomp が共同 enforce。
+    example_source:
+      product: OCI / Docker
+      url: https://github.com/opencontainers/runtime-spec/blob/main/config-linux.md
+      version: Linux container configuration
     field_values:
       sandbox_id: sandbox-run-884
-      queried_path: /workspace/repo/app.py
-      host_path: /repo/app.py
-      host_dac_write_allowed: true
-      sandbox_mount_mode: ro
-      landlock_rule_ref: repo-source-readonly@4
-      landlock_write_allowed: false
-      incorrect_reported_write_allowed: true
-      effective_write_allowed: false
-      failed_layer_intersection: true
-    related_node_ids:
-      - Sandbox
-      - FilesystemPolicy
-    related_relation_ids:
-      - Sandbox-constrained_by-IsolationSpecification
-    expected_result:
-      zh: 拒绝该结果，并按所有强制层的交集返回 write=false。
-      en: Reject the result and return write=false from the intersection of all enforced layers.
-      ja: 宿主 DAC だけの結果を拒否し、読取専用 mount と Landlock を含む全強制レイヤーの積集合から write=false を返します。
-    why_valid_or_invalid:
-      zh: 宿主 DAC 权限不能覆盖沙箱中额外的只读与 Landlock 约束。
-      en: Host DAC permission cannot override additional read-only and Landlock restrictions.
-      ja: Landlock では全ポリシーレイヤーと他のアクセス制御が同時に許可する必要があり、宿主 DAC の許可は sandbox の追加制約を上書きできません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-safety-sandbox-network-003
-      - claim-safety-sandbox-network-002
-  - id: safety-sandbox-network-cq-mount-resolution-v3-example-positive-manual-20260716
-    kind: positive
-    labels:
-      zh: 解析只读 bind mount
-      en: Resolve read-only bind mount
-      ja: 読取専用 bind mount の解決
-    scenario_id: sandbox-review-safety-sandbox-network-cq-mount-resolution-v3-positive
-    descriptions:
-      zh: 对 /workspace/repo/src/a.ts 最长匹配到 target=/workspace/repo、source=/repo、mode=ro；去除 target 前缀后规范宿主路径为 /repo/src/a.ts。
-      en: For /workspace/repo/src/a.ts, longest match selects target=/workspace/repo, source=/repo, mode=ro; removing the target prefix resolves normalized host path /repo/src/a.ts.
-      ja: /workspace/repo/src/a.ts は最長一致により target=/workspace/repo、source=/repo、mode=ro を選び、target 接頭辞を除いて宿主経路 /repo/src/a.ts へ解決します。
-    field_values:
-      sandbox_id: sandbox-run-884
-      filesystem_policy_ref: fs-code@4
-      requested_sandbox_path: /workspace/repo/src/a.ts
-      normalized_sandbox_path: /workspace/repo/src/a.ts
-      matched_mount_target: /workspace/repo
-      matched_mount_source: /repo
       mount_mode: ro
-      relative_path_after_match: src/a.ts
-      resolved_host_path: /repo/src/a.ts
+      capabilities: []
+      read_path: /workspace/repo/app.py
       write_allowed: false
     related_node_ids:
       - Sandbox
       - FilesystemPolicy
-    related_relation_ids:
-      - Sandbox-constrained_by-IsolationSpecification
-    expected_result:
-      zh: 返回唯一宿主路径与只读模式，并拒绝写入。
-      en: Return one host path with read-only mode and deny writing.
-      ja: 一意な宿主経路 /repo/src/a.ts と mode=ro を返し、書込みを拒否します。
-    why_valid_or_invalid:
-      zh: 挂载映射、路径规范化和最长匹配均由具名策略版本给出。
-      en: Mount mapping, path normalization, and longest match come from the named policy revision.
-      ja: 正規化、最長 target 一致、相対接尾辞の再結合が fs-code@4 の同じ mount mapping から追跡できるため、文字列の偶然一致ではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - ProcessPolicy
+    related_relation_ids: []
     source_claims:
-      - claim-safety-sandbox-network-002
-      - claim-safety-sandbox-network-003
-  - id: safety-sandbox-network-cq-mount-resolution-v3-example-boundary-manual-20260716
-    kind: boundary
+      - claim-safety-sandbox-oci
+  - id: safety-sandbox-network-example-gvisor-firecracker
     labels:
-      zh: 路径遍历越出挂载根
-      en: Traversal escapes mount root
-      ja: 経路 traversal による mount root 逸脱
-    scenario_id: sandbox-review-safety-sandbox-network-cq-mount-resolution-v3-boundary
+      zh: gVisor 与 Firecracker 隔离后端
+      en: gVisor and Firecracker isolation backends
+      ja: gVisor と Firecracker 隔離 backend
     descriptions:
-      zh: 请求 /workspace/repo/../../secrets/token 若先字符串拼接会解析到宿主 /secrets/token，但策略要求先在沙箱空间规范化并阻止越根。
-      en: Request /workspace/repo/../../secrets/token would string-concatenate to host /secrets/token, but policy requires sandbox-space normalization and blocks root escape.
-      ja: /workspace/repo/../../secrets/token を単純連結すると宿主 /secrets/token になりますが、ポリシーは sandbox 名前空間で先に正規化し、mount root からの逸脱を拒否します。
+      zh: 多租户平台对不可信代码使用 gVisor runsc（application kernel）或 Firecracker microVM；ProcessPolicy process-tenant@2 记录 isolation_backend=gvisor|firecracker。逃逸向量若涉及 KVM 侧信道，SandboxEscapeRisk 须绑定具体实例证据而非通用 CVE 名称。
+      en: A multi-tenant platform runs untrusted code with gVisor runsc (application kernel) or Firecracker microVM; ProcessPolicy process-tenant@2 records isolation_backend=gvisor|firecracker. Escape vectors involving KVM side channels require SandboxEscapeRisk bound to instance evidence, not a generic CVE name alone.
+      ja: マルチテナント platform が untrusted code を gVisor runsc または Firecracker microVM で実行。ProcessPolicy process-tenant@2 が isolation_backend=gvisor|firecracker を記録。KVM side channel 逃逸 vector には generic CVE 名だけでなく instance 証拠绑定 SandboxEscapeRisk が必要。
+    example_source:
+      product: gVisor / Firecracker
+      url: https://gvisor.dev/docs/
+      version: runsc and microVM isolation
     field_values:
-      filesystem_policy_ref: fs-code@4
-      requested_sandbox_path: /workspace/repo/../../secrets/token
-      matched_mount_target_before_normalization: /workspace/repo
-      unsafe_string_concatenation_result: /secrets/token
-      normalized_path_within_mount: null
-      path_escape_detected: true
-      resolved_host_path: null
-      decision: deny-path-traversal
+      isolation_backend: gvisor
+      alternative_backend: firecracker
+      process_policy_ref: process-tenant@2
     related_node_ids:
+      - ProcessPolicy
+      - Sandbox
+      - SandboxEscapeRisk
+    related_relation_ids: []
+    source_claims:
+      - claim-safety-sandbox-gvisor
+  - id: safety-sandbox-network-example-cursor-terminal
+    labels:
+      zh: Cursor 终端 sandbox 与 allowlist 叠加
+      en: Cursor terminal sandbox with allowlist overlay
+      ja: Cursor terminal sandbox と allowlist 叠加
+    descriptions:
+      zh: Cursor Agent 在 workspace-write sandbox 中运行；allowlist 仅 permit npm test 与 git status。请求 curl 在 spawn 前被 Cursor sandbox 层拒绝，即使宿主用户对该 URL 有网络权限；本地隔离与网络控制仍须分别满足。
+      en: Cursor Agent runs in workspace-write sandbox; allowlist permits only npm test and git status. A requested curl is rejected by the Cursor sandbox layer before spawn even if the host user has network access to that URL; local isolation and network control must both hold separately.
+      ja: Cursor Agent が workspace-write sandbox で実行。allowlist は npm test/git status のみ許可。curl 要求は host user に network 権限があっても spawn 前に Cursor sandbox layer で拒否。local isolation と network control は別々に満たす必要があります。
+    example_source:
+      product: Cursor
+      url: https://cursor.com/docs/agent/terminal
+      version: terminal sandbox and allowlist
+    field_values:
+      sandbox_mode: workspace-write
+      allowed_commands: [npm test, git status]
+      blocked_command: curl
+      spawn_blocked: true
+    related_node_ids:
+      - Sandbox
       - FilesystemPolicy
     related_relation_ids: []
-    expected_result:
-      zh: 返回路径越界拒绝，不产生宿主目标。
-      en: Return a traversal denial and no host target.
-      ja: deny-path-traversal を返し、宿主側の解決先を生成しません。
-    why_valid_or_invalid:
-      zh: 路径规范化必须先于映射，且结果必须留在匹配目标根内。
-      en: Normalization precedes mapping and the result must remain under the matched target root.
-      ja: mapping 前の正規化結果が適合 target root 内に残ることを検証しなければ、相対成分が隔離外の宿主経路を参照できてしまいます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-safety-sandbox-network-003
-  - id: safety-sandbox-network-cq-escape-risk-v3-example-positive-manual-20260716
-    kind: positive
+      - claim-safety-sandbox-cursor
+  - id: safety-sandbox-network-example-escape-mitigation
     labels:
-      zh: 逃逸风险与缓解复核
-      en: Escape risk and mitigation re-check
-      ja: 逃逸リスクと緩和後の再検証
-    scenario_id: sandbox-review-safety-sandbox-network-cq-escape-risk-v3-positive
+      zh: 逃逸风险与修复后独立复核
+      en: Escape risk with independent post-fix re-check
+      ja: 逃逸リスクと修正後独立 re-check
     descriptions:
-      zh: escape-risk-884-1 由可写宿主挂载与 CAP_SYS_ADMIN 证据支持；修复为 ro mount 并删除 capability 后，独立复核记录所有越界写入均被拒绝。
-      en: escape-risk-884-1 is supported by writable host mount and CAP_SYS_ADMIN evidence; after changing to ro and dropping the capability, an independent re-check records all crossing writes denied.
-      ja: escape-risk-884-1 は書込可能な宿主 mount と CAP_SYS_ADMIN の証拠に基づきます。mount を ro に変更し capability を削除した後、独立再検証が境界外への全書込み拒否を記録します。
+      zh: escape-risk-884-1 由 rw mount 与 CAP_SYS_ADMIN 证据支持；改为 ro mount 并 drop capability 后 sandbox-recheck-884-2 记录 12 次越界写入均被拒绝，mitigation_effective=true。仅改策略文件而未 reload 则保持 open。
+      en: escape-risk-884-1 is supported by rw mount and CAP_SYS_ADMIN evidence; after switching to ro mount and dropping the capability, sandbox-recheck-884-2 records 12 boundary write attempts denied and mitigation_effective=true. Policy file change without reload stays open.
+      ja: escape-risk-884-1 は rw mount/CAP_SYS_ADMIN 証拠。ro mount+capability drop 後 sandbox-recheck-884-2 が 12 boundary write deny を記録し mitigation_effective=true。policy file 変更のみで reload なしは open 維持。
+    example_source:
+      product: Moonweave design
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: escape risk mitigation verification
     field_values:
       escape_risk_id: escape-risk-884-1
-      sandbox_id: sandbox-run-884
-      pre_change_isolation_spec_ref: process-code@4+fs-code@4
-      escape_vector: writable-host-bind-mount-with-cap-sys-admin
       pre_change_mount_mode: rw
-      pre_change_capabilities:
-        - CAP_SYS_ADMIN
-      severity: critical
-      post_change_isolation_spec_ref: process-code@5+fs-code@5
       post_change_mount_mode: ro
-      post_change_capabilities: []
       mitigation_verification_ref: sandbox-recheck-884-2
-      boundary_write_attempts: 12
-      boundary_write_denials: 12
       mitigation_effective: true
     related_node_ids:
       - SandboxEscapeRisk
       - Sandbox
     related_relation_ids:
       - SandboxEscapeRisk-threatens-Sandbox
-      - Sandbox-constrained_by-IsolationSpecification
-    expected_result:
-      zh: 先返回具证据的风险，再仅凭通过的修复后复核标记缓解有效。
-      en: Return the evidenced risk and mark mitigation effective only from a passing post-change re-check.
-      ja: 変更前の具体的なリスク証拠を返し、変更後の独立再検証が 12 件すべてを拒否した場合に限り mitigation_effective=true とします。
-    why_valid_or_invalid:
-      zh: 风险与缓解分别绑定修改前和修改后的实际配置证据。
-      en: Risk and mitigation bind actual pre-change and post-change configuration evidence separately.
-      ja: リスク判定と緩和判定を、それぞれ変更前と変更後に実際に読み込まれた仕様・実行証拠へ別々に結び付けているため、設定ファイルの差分だけで完了扱いしません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-safety-sandbox-network-001
-      - claim-safety-sandbox-network-002
-  - id: safety-sandbox-network-cq-escape-risk-v3-example-boundary-manual-20260716
-    kind: boundary
-    labels:
-      zh: 只有配置承诺的伪缓解
-      en: Configuration-only pseudo-mitigation
-      ja: 設定変更だけを根拠にした擬似緩和
-    scenario_id: sandbox-review-safety-sandbox-network-cq-escape-risk-v3-boundary
-    descriptions:
-      zh: 策略文件已改为 ro，但目标 sandbox 尚未重启且审计仍显示旧 rw mount；系统却把风险标为已缓解。
-      en: The policy file changed to ro, but the target sandbox has not restarted and audit still shows the old rw mount; the system nevertheless marks risk mitigated.
-      ja: ポリシーファイルは ro に変更済みですが、対象 sandbox は再起動されず、監査証拠も旧 rw mount を示しています。それにもかかわらずリスクを mitigated と記録しています。
-    field_values:
-      escape_risk_id: escape-risk-884-1
-      sandbox_id: sandbox-run-884
-      declared_policy_ref: fs-code@5
-      declared_mount_mode: ro
-      sandbox_restart_completed: false
-      loaded_policy_ref: fs-code@4
-      observed_mount_mode: rw
-      mitigation_verification_ref: null
-      incorrect_recorded_mitigation_state: mitigated
-      required_mitigation_state: open
-    related_node_ids:
-      - SandboxEscapeRisk
-      - Sandbox
-    related_relation_ids:
-      - SandboxEscapeRisk-threatens-Sandbox
-    expected_result:
-      zh: 拒绝缓解结论，风险保持开放直到有效配置复核通过。
-      en: Reject mitigation; keep risk open until effective-configuration re-check passes.
-      ja: 緩和済みという結論を拒否し、対象 sandbox が新仕様を読み込んだ証拠と再検証の成功が得られるまで risk を open に保ちます。
-    why_valid_or_invalid:
-      zh: 声明性配置变化不等于运行实例已加载新约束。
-      en: A declarative configuration change does not mean the running instance loaded the new constraint.
-      ja: 宣言ファイルの更新時点と実行中 sandbox の有効設定時点は異なり、loaded_policy_ref と検証証拠がなければ実際の制約変更を証明できません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-safety-sandbox-network-001
-      - claim-safety-sandbox-network-002
+      - claim-safety-sandbox-design
 parent_relation: null
 relations: []
-module_contract:
-  interaction_contract:
-    applicability: mixed
-    facets:
-      input:
-        applicable: true
-        description:
-          zh: Sandbox 的有效隔离输入是创建时实际加载的 IsolationSpecification 版本，由 constrained_by 记录。
-          en: A Sandbox's effective isolation inputs are the IsolationSpecification revisions actually loaded at creation, recorded by constrained_by.
-          ja: Sandbox の effective isolation input は creation 時に実 load した IsolationSpecification revision で constrained_by が記録します。
-        family_concept_ids:
-          - IsolationSpecification
-        relation_ids:
-          - Sandbox-constrained_by-IsolationSpecification
-        not_applicable_reason: null
-      output:
-        applicable: false
-        description: null
-        family_concept_ids: []
-        relation_ids: []
-        not_applicable_reason:
-          zh: 本域不产生工具结果或命令输出；它提供执行边界与判定证据。
-          en: This domain produces no tool result or command output; it supplies execution-boundary and decision evidence.
-          ja: tool result/command output は生成せず execution-boundary/decision evidence を提供します。
-      failure:
-        applicable: true
-        description:
-          zh: 具实例适用性证据的 SandboxEscapeRisk 通过 threatens 指向受威胁沙箱。
-          en: An instance-applicable SandboxEscapeRisk points to the threatened Sandbox through threatens.
-          ja: instance-applicable evidence 付き SandboxEscapeRisk は threatens で対象 Sandbox を指します。
-        family_concept_ids:
-          - SandboxEscapeRisk
-        relation_ids:
-          - SandboxEscapeRisk-threatens-Sandbox
-        not_applicable_reason: null
-      recovery:
-        applicable: false
-        description: null
-        family_concept_ids: []
-        relation_ids: []
-        not_applicable_reason:
-          zh: 本域记录修改后隔离复核证据，但缓解动作、重启和补偿执行由安全或运行域拥有。
-          en: This domain records post-change isolation re-check evidence, but security or runtime owns mitigation actions, restart, and compensation execution.
-          ja: post-change isolation re-check evidence は記録しますが mitigation action・restart・compensation execution は security/runtime が所有します。
-    review:
-      review_status: accepted
-      reviewers:
-        - reviewer_id: moonweave-isolation-domain-reviewer
-          reviewer_role: domain
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 逐节点核实规范、具体沙箱与逃逸风险三种语义；Sandbox 通过 constrained_by 接入 IsolationSpecification，SandboxEscapeRisk 通过 threatens 接入具体 Sandbox，文件与进程策略仍作为规范下位类。
-            en: Manually separated specification, concrete sandbox, and escape-risk semantics; Sandbox joins IsolationSpecification through constrained_by, SandboxEscapeRisk joins the concrete Sandbox through threatens, and filesystem/process policies remain specification subtypes.
-            ja: specification・concrete sandbox・escape risk を個別分離し、Sandbox は constrained_by で IsolationSpecification、SandboxEscapeRisk は threatens で具体 Sandbox へ接続し、filesystem/process policy は仕様下位型を維持します。
-        - reviewer_id: moonweave-isolation-ontology-reviewer
-          reviewer_role: ontology
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 逐节点核实规范、具体沙箱与逃逸风险三种语义；文件与进程策略下沉到 IsolationSpecification，网络路由、运行容器和业务授权仍由相邻域拥有。
-            en: Manually separated specifications, concrete sandboxes, and escape risks; filesystem and process policy specialize IsolationSpecification while network routes, runtime containers, and business authorization remain in adjacent domains.
-            ja: specification・concrete sandbox・escape risk を個別分離し filesystem/process policy は IsolationSpecification 下位、network route・runtime container・business authorization は隣接 domain に保持します。
-  taxonomy_contract:
-    applicability: mixed-backbone
-    not_applicable_reason: null
-    hierarchy_policy: arbitrary-depth-reviewed-backbone
-    key_root_concept_ids:
-      - IsolationSpecification
-    allowed_backbone_predicates:
-      - constrained_by
-      - is_a
-      - threatens
-    flat_root_exception_concept_ids: []
-    review:
-      review_status: accepted
-      reviewers:
-        - reviewer_id: moonweave-isolation-domain-reviewer
-          reviewer_role: domain
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 逐节点核实规范、具体沙箱与逃逸风险三种语义；文件与进程策略下沉到 IsolationSpecification，网络路由、运行容器和业务授权仍由相邻域拥有。
-            en: Manually separated specifications, concrete sandboxes, and escape risks; filesystem and process policy specialize IsolationSpecification while network routes, runtime containers, and business authorization remain in adjacent domains.
-            ja: specification・concrete sandbox・escape risk を個別分離し filesystem/process policy は IsolationSpecification 下位、network route・runtime container・business authorization は隣接 domain に保持します。
-        - reviewer_id: moonweave-isolation-ontology-reviewer
-          reviewer_role: ontology
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 逐节点核实规范、具体沙箱与逃逸风险三种语义；文件与进程策略下沉到 IsolationSpecification，网络路由、运行容器和业务授权仍由相邻域拥有。
-            en: Manually separated specifications, concrete sandboxes, and escape risks; filesystem and process policy specialize IsolationSpecification while network routes, runtime containers, and business authorization remain in adjacent domains.
-            ja: specification・concrete sandbox・escape risk を個別分離し filesystem/process policy は IsolationSpecification 下位、network route・runtime container・business authorization は隣接 domain に保持します。
-  competency_questions:
-    - id: safety-sandbox-network-cq-resource-visibility-v3
-      semantic_key: safety-sandbox-network.resource-visibility
-      primary_owner_module_id: safety-sandbox-network
-      related_module_ids: []
-      questions:
-        zh: 指定 Sandbox 中的进程对某个规范化路径最终可读、可写或可执行吗，哪些已加载规则共同决定结果？
-        en: May a process in a specified Sandbox ultimately read, write, or execute a normalized path, and which loaded rules jointly decide?
-        ja: 指定 Sandbox の process は normalized path を read/write/execute でき、どの loaded rule が共同決定しますか。
-      query: Resolve the Sandbox's actually loaded FilesystemPolicy revisions, normalize the sandbox path, resolve mounts and longest matching rules, and intersect all enforced layers.
-      expected_assertion: The answer names the normalized path, loaded policy revisions, matched mount and path rules, and final read/write/execute decisions; unmounted or escaping paths are denied.
-      evidence_binding:
-        applicability: owner-only
-        owner_concept_ids:
-          - Sandbox
-          - IsolationSpecification
-          - FilesystemPolicy
-        related_concept_ids: []
-        relation_ids: []
-        not_applicable_reason:
-          zh: 沙箱、实际加载的隔离规范及其文件系统策略均由本模块拥有；runtime_environment_ref 只是宿主引用，不是此路径权限查询所需的跨模块关系。内部解析仍沿 constrained_by 核对加载版本。
-          en: Sandbox, the actually loaded isolation specification, and its filesystem policy are all owned here. runtime_environment_ref is only a host reference, not a cross-module relation required by this path-permission query. Internal resolution still follows constrained_by to verify the loaded revision.
-          ja: Sandbox、実際に読み込まれた隔離仕様、そのファイルシステムポリシーはすべて本モジュールが所有します。runtime_environment_ref は宿主参照にすぎず、この経路権限問いに必要なモジュール間関係ではありません。内部解析では constrained_by により読込版を確認します。
-      positive_example_ids:
-        - safety-sandbox-network-cq-resource-visibility-v3-example-positive-manual-20260716
-      counterexample_ids:
-        - safety-sandbox-network-cq-resource-visibility-v3-example-boundary-manual-20260716
-      source_claims:
-        - claim-safety-sandbox-network-001
-        - claim-safety-sandbox-network-002
-        - claim-safety-sandbox-network-003
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-isolation-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 查询只依赖实际加载的规范与有效路径计算，不以宿主权限或计划配置替代。
-              en: The query depends on loaded specifications and effective path computation, never host permission or planned configuration alone.
-              ja: query は loaded specification/effective path 計算に依存し host permission/planned config で代替しません。
-          - reviewer_id: moonweave-isolation-ontology-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 查询只依赖实际加载的规范与有效路径计算，不以宿主权限或计划配置替代。
-              en: The query depends on loaded specifications and effective path computation, never host permission or planned configuration alone.
-              ja: query は loaded specification/effective path 計算に依存し host permission/planned config で代替しません。
-    - id: safety-sandbox-network-cq-mount-resolution-v3
-      semantic_key: safety-sandbox-network.mount-resolution
-      primary_owner_module_id: safety-sandbox-network
-      related_module_ids: []
-      questions:
-        zh: 某个沙箱路径经规范化后映射到哪个宿主路径，匹配哪条挂载规则，当前操作是否被挂载模式与路径规则共同允许？
-        en: After normalization, which host path does a sandbox path map to, which mount rule matches, and do mount mode and path rules jointly allow the operation?
-        ja: normalize 後 sandbox path はどの host path/mount rule に対応し mount mode/path rule が operation を許可しますか。
-      query: Normalize in sandbox path space, reject traversal, select the longest target-prefix mount mapping, resolve the host path, then intersect mount mode and path operation rights.
-      expected_assertion: Resolution yields at most one host target beneath the mapped source root; traversal is denied and an operation is allowed only when both mount and path rules permit it.
-      evidence_binding:
-        applicability: owner-only
-        owner_concept_ids:
-          - Sandbox
-          - IsolationSpecification
-          - FilesystemPolicy
-        related_concept_ids: []
-        relation_ids: []
-        not_applicable_reason:
-          zh: 挂载目标、源路径、只读模式、链接解析规则与实际加载的隔离规范均属于本模块；RuntimeEnvironment 不参与规范化路径到宿主路径的身份计算。
-          en: Mount target, source path, read-only mode, link-resolution rule, and the loaded isolation specification all belong here. RuntimeEnvironment does not participate in the identity computation from normalized sandbox path to host path.
-          ja: マウント先、元経路、読取専用モード、リンク解決規則、読込済み隔離仕様はいずれも本モジュールに属します。RuntimeEnvironment は正規化済み sandbox 経路から宿主経路への同一性計算に参加しません。
-      positive_example_ids:
-        - safety-sandbox-network-cq-mount-resolution-v3-example-positive-manual-20260716
-      counterexample_ids:
-        - safety-sandbox-network-cq-mount-resolution-v3-example-boundary-manual-20260716
-      source_claims:
-        - claim-safety-sandbox-network-002
-        - claim-safety-sandbox-network-003
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-isolation-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 先规范化再映射，显式区分宿主路径与沙箱路径，避免字符串拼接越界。
-              en: Normalize before mapping and keep host and sandbox path spaces explicit to prevent string-concatenation escapes.
-              ja: mapping 前 normalize し host/sandbox path 空間を明示分離して concat escape を防ぎます。
-          - reviewer_id: moonweave-isolation-ontology-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 先规范化再映射，显式区分宿主路径与沙箱路径，避免字符串拼接越界。
-              en: Normalize before mapping and keep host and sandbox path spaces explicit to prevent string-concatenation escapes.
-              ja: mapping 前 normalize し host/sandbox path 空間を明示分離して concat escape を防ぎます。
-    - id: safety-sandbox-network-cq-escape-risk-v3
-      semantic_key: safety-sandbox-network.escape-risk
-      primary_owner_module_id: safety-sandbox-network
-      related_module_ids: []
-      questions:
-        zh: 哪些有效配置或运行证据证明某个 Sandbox 存在文件系统、进程、设备或命名空间逃逸向量，缓解是否经过修改后复核？
-        en: Which effective configuration or runtime evidence proves a filesystem, process, device, or namespace escape vector for a Sandbox, and was mitigation verified after change?
-        ja: どの effective config/runtime evidence が Sandbox の filesystem/process/device/namespace escape vector を証明し mitigation は変更後 re-check 済みですか。
-      query: For each SandboxEscapeRisk, follow threatens to one Sandbox, inspect its loaded specification and effective enforcement evidence, and require independent post-change evidence before mitigation is considered effective.
-      expected_assertion: Every open risk has one target sandbox, one concrete vector, applicability evidence, and severity; mitigation is effective only when the running boundary passes a post-change re-check.
-      evidence_binding:
-        applicability: owner-only
-        owner_concept_ids:
-          - SandboxEscapeRisk
-          - Sandbox
-          - IsolationSpecification
-        related_concept_ids: []
-        relation_ids: []
-        not_applicable_reason:
-          zh: 逃逸风险、受威胁沙箱与实际加载的隔离规范均由本模块拥有；网络控制只处理远端传输路径，运行时系统只提供宿主身份。内部解析沿 threatens 与 constrained_by 比较修改前后有效配置。
-          en: Escape risk, threatened sandbox, and actually loaded isolation specification are all owned here. Network control handles remote transport paths, while runtime system only supplies host identity. Internal resolution follows threatens and constrained_by to compare effective pre-change and post-change configurations.
-          ja: 逃逸リスク、脅威を受ける sandbox、実際に読み込まれた隔離仕様はすべて本モジュールが所有します。ネットワーク制御は遠隔輸送経路を扱い、runtime system は宿主同一性だけを提供します。内部解析では threatens と constrained_by に沿って変更前後の有効設定を比較します。
-      positive_example_ids:
-        - safety-sandbox-network-cq-escape-risk-v3-example-positive-manual-20260716
-      counterexample_ids:
-        - safety-sandbox-network-cq-escape-risk-v3-example-boundary-manual-20260716
-      source_claims:
-        - claim-safety-sandbox-network-001
-        - claim-safety-sandbox-network-002
-        - claim-safety-sandbox-network-003
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-isolation-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 通用漏洞不自动威胁实例，缓解声明也不等于运行边界已更新；两端均要求实例证据。
-              en: A generic vulnerability does not automatically threaten an instance and a mitigation declaration does not update a running boundary; both require instance evidence.
-              ja: generic vulnerability は自動的に instance を脅かさず mitigation declaration も running boundary 更新を意味しないため双方 instance evidence を要求します。
-          - reviewer_id: moonweave-isolation-ontology-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 通用漏洞不自动威胁实例，缓解声明也不等于运行边界已更新；两端均要求实例证据。
-              en: A generic vulnerability does not automatically threaten an instance and a mitigation declaration does not update a running boundary; both require instance evidence.
-              ja: generic vulnerability は自動的に instance を脅かさず mitigation declaration も running boundary 更新を意味しないため双方 instance evidence を要求します。
-  key_notion:
-    zh: 隔离规范
-    en: isolation specification
-    ja: 隔離仕様
-  owns_when:
-    zh: 当对象必须由隔离规范版本、具体沙箱实例与其强制证据，或绑定该实例的逃逸向量和证据来识别时，由本模块拥有。
-    en: Own an object when it must be identified by an isolation-specification revision, a concrete sandbox and its enforcement evidence, or an escape vector and evidence tied to that instance.
-    ja: 隔離仕様版、具体的サンドボックスとその強制証拠、またはその実例に結び付く逃避経路と証拠によって識別される対象を所有します。
-  references_when:
-    zh: 本模块引用承载沙箱的运行环境、在沙箱中执行的调用、适用授权和并行生效的网络控制；这些引用不改变相邻模块对象的身份。
-    en: This module references the Runtime environment hosting the sandbox, invocations executed within it, applicable authorization, and concurrently effective network controls without changing the identity of those adjacent-module objects.
-    ja: 本モジュールはサンドボックスを収容する実行環境、内部で行う呼び出し、適用認可、並行して有効なネットワーク制御を参照しますが、隣接モジュールの対象の同一性は変えません。
-  boundary_decisions:
-    - other_module_id: safety-network-control
-      subject_concept_ids:
-        - ProxyRoute
-        - NetworkPolicy
-      decision: references
-      owner_module_id: safety-network-control
-      rationale:
-        zh: 网络域候选 ProxyRoute 与 NetworkPolicy 分别由有效代理路径和网络规则修订识别，决定流量从何处、按何种网络规则离开；隔离域只比较本地执行边界。两类控制可并存，但当前没有 accepted 端点关系。
-        en: The network-owned candidates ProxyRoute and NetworkPolicy are identified by an effective proxy path and a network-rule revision and determine how traffic may leave. Isolation compares the local execution boundary. Both controls may coexist, but no accepted endpoint relation currently joins them.
-        ja: network-owned candidate の ProxyRoute/NetworkPolicy は effective proxy path/network rule revision で識別され traffic の exit path/rule を決めます。isolation は local execution boundary を比較し、両 control が共存しても accepted endpoint relation はありません。
-      relation_ids: []
-      relation_not_applicable_reason:
-        zh: 相邻对象只用于归属边界比较；当前域不创建跨模块边，避免把运行环境、网络路由或业务授权误作隔离规范组成。
-        en: Adjacent objects are ownership-boundary comparisons only; this domain creates no cross-module edge that would misstate runtime environment, network route, or business authorization as part of an isolation specification.
-        ja: 隣接 object は ownership boundary 比較のみで runtime environment・network route・business authorization を isolation specification part と誤る cross-module 辺を作りません。
-      source_claims:
-        - claim-safety-sandbox-network-001
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-isolation-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 领域复核确认 ProxyRoute 是代理选择与路径事实，NetworkPolicy 是网络通信规则；二者均不由 Sandbox 的文件、进程、挂载或命名空间身份决定，因此只在此引用，不转归隔离域。
-              en: Domain review confirms ProxyRoute as a proxy-selection and path fact and NetworkPolicy as a network-communication rule. Neither is identified by Sandbox filesystem, process, mount, or namespace identity, so they are referenced here without transferring ownership to isolation.
-              ja: domain review は ProxyRoute が proxy-selection/path fact、NetworkPolicy が network communication rule で、Sandbox filesystem/process/mount/namespace identity に依存せず isolation へ ownership transfer しないと確認しました。
-          - reviewer_id: moonweave-isolation-ontology-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 结构复核确认 references 候选严格为 ProxyRoute、NetworkPolicy，relation_ids=N/A；没有把“沙箱内流量”误写成 ProxyRoute/NetworkPolicy 属于 Sandbox 的组成或下位关系。
-              en: Ontology review confirms the references candidates as exactly ProxyRoute and NetworkPolicy with relation_ids N/A. Traffic originating in a sandbox is not rewritten as a composition or subtype relation placing ProxyRoute or NetworkPolicy under Sandbox.
-              ja: ontology review は references candidate を ProxyRoute/NetworkPolicy、relation_ids=N/A と確認し、sandbox-origin traffic を ProxyRoute/NetworkPolicy が Sandbox の component/subtype になる関係へ書き換えません。
-    - other_module_id: safety-network-control
-      subject_concept_ids:
-        - Sandbox
-        - SandboxEscapeRisk
-      decision: owns
-      owner_module_id: safety-sandbox-network
-      rationale:
-        zh: Sandbox 由具体隔离实例、命名空间、挂载和能力边界识别，SandboxEscapeRisk 由逃逸向量、影响面和证据识别；即使风险涉及网络命名空间，二者也不是 NetworkCall、ProxyRoute 或 NetworkPolicy，且当前无 accepted 跨域边。
-        en: Sandbox is identified by a concrete isolation instance, namespaces, mounts, and capability boundary, while SandboxEscapeRisk is identified by escape vector, impact surface, and evidence. Even when the vector involves a network namespace, neither becomes NetworkCall, ProxyRoute, or NetworkPolicy, and no accepted cross-domain edge exists.
-        ja: Sandbox は concrete isolation instance/namespace/mount/capability boundary、SandboxEscapeRisk は escape vector/impact/evidence で識別され、network namespace vector でも NetworkCall/ProxyRoute/NetworkPolicy にはならず accepted cross-domain edge はありません。
-      relation_ids: []
-      relation_not_applicable_reason:
-        zh: 相邻对象只用于归属边界比较；当前域不创建跨模块边，避免把运行环境、网络路由或业务授权误作隔离规范组成。
-        en: Adjacent objects are ownership-boundary comparisons only; this domain creates no cross-module edge that would misstate runtime environment, network route, or business authorization as part of an isolation specification.
-        ja: 隣接 object は ownership boundary 比較のみで runtime environment・network route・business authorization を isolation specification part と誤る cross-module 辺を作りません。
-      source_claims:
-        - claim-safety-sandbox-network-001
-        - claim-safety-sandbox-network-002
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-isolation-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 领域复核确认 Sandbox 是运行隔离实例，SandboxEscapeRisk 是针对该边界失效可能性的安全风险；两者的身份条件与网络端点、路由或策略不同，网络只可能是逃逸向量之一。
-              en: Domain review confirms Sandbox as an execution-isolation instance and SandboxEscapeRisk as the security risk of that boundary failing. Their identity conditions differ from network endpoint, route, or policy identity; network is only one possible escape vector.
-              ja: domain review は Sandbox が execution-isolation instance、SandboxEscapeRisk が boundary failure risk で、network endpoint/route/policy と identity condition が異なり network は可能な escape vector の一つにすぎないと確認しました。
-          - reviewer_id: moonweave-isolation-ontology-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 结构复核确认 owns 候选为 Sandbox、SandboxEscapeRisk，relation_ids=N/A；风险可能提及网络不等于存在面向 NetworkPolicy/ProxyRoute 的稳定类边，避免把风险场景混入业务层级。
-              en: Ontology review confirms Sandbox and SandboxEscapeRisk as the owns candidates with relation_ids N/A. A risk mentioning network does not establish a stable class edge to NetworkPolicy or ProxyRoute, preventing a scenario from entering the business hierarchy.
-              ja: ontology review は owns candidate を Sandbox/SandboxEscapeRisk、relation_ids=N/A と確認しました。risk が network を含んでも NetworkPolicy/ProxyRoute への stable class edge にはならず scenario を business hierarchy に混入しません。
-    - other_module_id: runtime-system
-      subject_concept_ids:
-        - Container
-        - RuntimeEnvironment
-      decision: references
-      owner_module_id: runtime-system
-      rationale:
-        zh: Container 与 RuntimeEnvironment 描述承载执行的环境实体；本域引用它们定位 Sandbox，但不重新拥有环境生命周期。
-        en: Container and RuntimeEnvironment are hosting-environment Entities; this domain references them to locate Sandbox without owning environment lifecycle.
-        ja: Container/RuntimeEnvironment は hosting environment Entity で、本 domain は Sandbox 定位に参照し lifecycle を所有しません。
-      relation_ids: []
-      relation_not_applicable_reason:
-        zh: 相邻对象只用于归属边界比较；当前域不创建跨模块边，避免把运行环境、网络路由或业务授权误作隔离规范组成。
-        en: Adjacent objects are ownership-boundary comparisons only; this domain creates no cross-module edge that would misstate runtime environment, network route, or business authorization as part of an isolation specification.
-        ja: 隣接 object は ownership boundary 比較のみで runtime environment・network route・business authorization を isolation specification part と誤る cross-module 辺を作りません。
-      source_claims:
-        - claim-safety-sandbox-network-002
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-isolation-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: Container 与 RuntimeEnvironment 描述承载执行的环境实体；本域引用它们定位 Sandbox，但不重新拥有环境生命周期。
-              en: Container and RuntimeEnvironment are hosting-environment Entities; this domain references them to locate Sandbox without owning environment lifecycle.
-              ja: Container/RuntimeEnvironment は hosting environment Entity で、本 domain は Sandbox 定位に参照し lifecycle を所有しません。
-          - reviewer_id: moonweave-isolation-ontology-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: Container 与 RuntimeEnvironment 描述承载执行的环境实体；本域引用它们定位 Sandbox，但不重新拥有环境生命周期。
-              en: Container and RuntimeEnvironment are hosting-environment Entities; this domain references them to locate Sandbox without owning environment lifecycle.
-              ja: Container/RuntimeEnvironment は hosting environment Entity で、本 domain は Sandbox 定位に参照し lifecycle を所有しません。
-    - other_module_id: runtime-system
-      subject_concept_ids:
-        - ProcessPolicy
-        - Sandbox
-      decision: owns
-      owner_module_id: safety-sandbox-network
-      rationale:
-        zh: ProcessPolicy 是声明性安全规范，Sandbox 是受其强制的边界实例；二者不同于 RuntimeEnvironment 类型和普通 ProcessHandle。
-        en: ProcessPolicy is a declarative security specification and Sandbox its enforced boundary instance; both differ from RuntimeEnvironment type and ordinary ProcessHandle.
-        ja: ProcessPolicy は declarative security specification、Sandbox は enforced boundary instance で RuntimeEnvironment type/ProcessHandle と異なります。
-      relation_ids: []
-      relation_not_applicable_reason:
-        zh: 相邻对象只用于归属边界比较；当前域不创建跨模块边，避免把运行环境、网络路由或业务授权误作隔离规范组成。
-        en: Adjacent objects are ownership-boundary comparisons only; this domain creates no cross-module edge that would misstate runtime environment, network route, or business authorization as part of an isolation specification.
-        ja: 隣接 object は ownership boundary 比較のみで runtime environment・network route・business authorization を isolation specification part と誤る cross-module 辺を作りません。
-      source_claims:
-        - claim-safety-sandbox-network-001
-        - claim-safety-sandbox-network-002
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-isolation-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: ProcessPolicy 是声明性安全规范，Sandbox 是受其强制的边界实例；二者不同于 RuntimeEnvironment 类型和普通 ProcessHandle。
-              en: ProcessPolicy is a declarative security specification and Sandbox its enforced boundary instance; both differ from RuntimeEnvironment type and ordinary ProcessHandle.
-              ja: ProcessPolicy は declarative security specification、Sandbox は enforced boundary instance で RuntimeEnvironment type/ProcessHandle と異なります。
-          - reviewer_id: moonweave-isolation-ontology-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: ProcessPolicy 是声明性安全规范，Sandbox 是受其强制的边界实例；二者不同于 RuntimeEnvironment 类型和普通 ProcessHandle。
-              en: ProcessPolicy is a declarative security specification and Sandbox its enforced boundary instance; both differ from RuntimeEnvironment type and ordinary ProcessHandle.
-              ja: ProcessPolicy は declarative security specification、Sandbox は enforced boundary instance で RuntimeEnvironment type/ProcessHandle と異なります。
-    - other_module_id: safety-permission-policy
-      subject_concept_ids:
-        - AuthorizationRequest
-        - PolicyDecision
-      decision: references
-      owner_module_id: safety-permission-policy
-      rationale:
-        zh: 权限侧候选 AuthorizationRequest 表达主体对资源与操作的授权请求，PolicyDecision 表达规则评估结论；隔离规范决定进程在操作系统边界内实际可见和可执行的范围。两种控制需同时满足，但当前没有 accepted 直接关系。
-        en: The permission-side candidate AuthorizationRequest expresses a subject's request over resource and operation, and PolicyDecision the evaluated conclusion. Isolation determines what the process can see and execute at the operating-system boundary. Both controls may be required, but no accepted direct relation currently joins them.
-        ja: permission-side candidate の AuthorizationRequest は subject/resource/operation request、PolicyDecision は evaluation conclusion を表し、isolation は OS boundary の visible/executable range を決めます。両 control が必要でも accepted direct relation はありません。
-      relation_ids: []
-      relation_not_applicable_reason:
-        zh: 相邻对象只用于归属边界比较；当前域不创建跨模块边，避免把运行环境、网络路由或业务授权误作隔离规范组成。
-        en: Adjacent objects are ownership-boundary comparisons only; this domain creates no cross-module edge that would misstate runtime environment, network route, or business authorization as part of an isolation specification.
-        ja: 隣接 object は ownership boundary 比較のみで runtime environment・network route・business authorization を isolation specification part と誤る cross-module 辺を作りません。
-      source_claims:
-        - claim-safety-sandbox-network-001
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-isolation-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 领域复核确认 AuthorizationRequest 可在创建 Sandbox 前存在，PolicyDecision 可针对多个执行环境复用；路径可见性既不授予权限，获准操作也不能让隔离外资源自动可见。
-              en: Domain review confirms AuthorizationRequest can exist before a Sandbox is created and PolicyDecision may be reused across execution environments. Path visibility does not grant authority, and an allowed operation cannot make an out-of-sandbox resource visible.
-              ja: domain review は AuthorizationRequest が Sandbox 作成前に存在でき PolicyDecision が複数 environment で再利用可能で、path visibility は authority を付与せず allow operation も out-of-sandbox resource を visible にしないと確認しました。
-          - reviewer_id: moonweave-isolation-ontology-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 结构复核确认 references 候选为 AuthorizationRequest、PolicyDecision，relation_ids=N/A；“两种控制都必须允许”是合取约束，不是把权限对象组成到隔离规范中的本体边。
-              en: Ontology review confirms AuthorizationRequest and PolicyDecision as the references candidates with relation_ids N/A. Requiring both controls to allow is a conjunctive constraint, not an ontology edge composing permission objects into an isolation specification.
-              ja: ontology review は references candidate を AuthorizationRequest/PolicyDecision、relation_ids=N/A と確認しました。両 control の allow が必要という conjunctive constraint は permission object を isolation spec に構成する ontology edge ではありません。
-    - other_module_id: safety-permission-policy
-      subject_concept_ids:
-        - FilesystemPolicy
-        - ProcessPolicy
-      decision: owns
-      owner_module_id: safety-sandbox-network
-      rationale:
-        zh: FilesystemPolicy 以路径层级、访问权与挂载可见性识别，ProcessPolicy 以能力、系统调用、进程/命名空间约束识别；它们是环境执行规范，不是 AuthorizationRequest、AuthorizationGrant 或 PolicyDecision，且当前无 accepted 跨域边。
-        en: FilesystemPolicy is identified by path hierarchy, access rights, and mount visibility, and ProcessPolicy by capabilities, syscalls, and process or namespace constraints. They are environment-enforcement specifications rather than AuthorizationRequest, AuthorizationGrant, or PolicyDecision, and no accepted cross-domain edge exists.
-        ja: FilesystemPolicy は path hierarchy/access right/mount visibility、ProcessPolicy は capability/syscall/process/namespace constraint で識別される environment-enforcement spec で、AuthorizationRequest/AuthorizationGrant/PolicyDecision ではなく accepted cross-domain edge はありません。
-      relation_ids: []
-      relation_not_applicable_reason:
-        zh: 相邻对象只用于归属边界比较；当前域不创建跨模块边，避免把运行环境、网络路由或业务授权误作隔离规范组成。
-        en: Adjacent objects are ownership-boundary comparisons only; this domain creates no cross-module edge that would misstate runtime environment, network route, or business authorization as part of an isolation specification.
-        ja: 隣接 object は ownership boundary 比較のみで runtime environment・network route・business authorization を isolation specification part と誤る cross-module 辺を作りません。
-      source_claims:
-        - claim-safety-sandbox-network-001
-        - claim-safety-sandbox-network-003
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-isolation-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 领域复核确认 FilesystemPolicy 与 ProcessPolicy 直接规定运行环境可执行范围，权限域的请求与决定则规定某主体是否有权执行某动作；两类规范独立版本化，不能互作别名或下位类型。
-              en: Domain review confirms that FilesystemPolicy and ProcessPolicy directly constrain executable environment behavior, while permission requests and decisions state whether a subject is authorized for an action. The specification families version independently and are neither aliases nor subtypes of each other.
-              ja: domain review は FilesystemPolicy/ProcessPolicy が environment behavior を直接制約し permission request/decision は subject authority を述べ、両 spec family は独立 versioning され alias/subtype ではないと確認しました。
-          - reviewer_id: moonweave-isolation-ontology-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 结构复核确认 owns 候选为 FilesystemPolicy、ProcessPolicy，relation_ids=N/A；没有因同用“Policy”后缀就将隔离规范平铺到业务授权层级，避免词形相似制造伪关系。
-              en: Ontology review confirms FilesystemPolicy and ProcessPolicy as the owns candidates with relation_ids N/A. Sharing the Policy suffix does not flatten isolation specifications into the business-authorization hierarchy or manufacture a relation from lexical similarity.
-              ja: ontology review は owns candidate を FilesystemPolicy/ProcessPolicy、relation_ids=N/A と確認し、Policy suffix の共有だけで isolation spec を business authorization hierarchy に平級化せず lexical similarity から relation を作りません。
-  overlap_checks:
-    - other_module_id: safety-network-control
-      semantic_area:
-        zh: 本地资源隔离与网络目的地控制
-        en: Local-resource isolation versus network-destination control
-        ja: ローカル資源分離とネットワーク宛先制御
-      candidate_concept_ids:
-        - ProxyRoute
-        - NetworkPolicy
-      overlap_reason:
-        zh: 两者都约束执行可接触对象，但隔离回答进程内部能看到什么，网络控制回答流量能去哪里及经何路径。
-        en: Both constrain what execution may contact, but isolation answers what a process can see locally while network control answers where traffic may go and by which path.
-        ja: どちらも実行が接触できる対象を制約しますが、分離はプロセス内で見えるもの、ネットワーク制御は通信先と経路を答えます。
-      disambiguation_test:
-        zh: 若目标通过文件路径、mount 或进程能力识别，则归执行隔离；若目标通过 scheme、host、port、route 或 proxy 识别，则归网络访问控制。
-        en: If the target is identified by filesystem path, mount, or process capability, it belongs to execution isolation; if by scheme, host, port, route, or proxy, it belongs to network access control.
-        ja: 対象がファイルパス、mount、プロセス能力で識別されるなら実行分離、scheme、host、port、route、proxy ならネットワークアクセス制御に属します。
-      result: distinct
-      owner_module_id: safety-network-control
-      source_claims:
-        - claim-safety-sandbox-network-001
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-isolation-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 由网络端点、协议与路由决定身份则归网络控制；由本地环境与内核隔离设置决定身份则归执行隔离。
-              en: Network endpoint, protocol, and route identity means network control; local environment and kernel-isolation identity means execution isolation.
-              ja: network endpoint/protocol/route identity なら network control、local environment/kernel isolation identity なら execution isolation です。
-          - reviewer_id: moonweave-isolation-ontology-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 由网络端点、协议与路由决定身份则归网络控制；由本地环境与内核隔离设置决定身份则归执行隔离。
-              en: Network endpoint, protocol, and route identity means network control; local environment and kernel-isolation identity means execution isolation.
-              ja: network endpoint/protocol/route identity なら network control、local environment/kernel isolation identity なら execution isolation です。
-    - other_module_id: safety-network-control
-      semantic_area:
-        zh: 本地资源隔离与网络目的地控制
-        en: Local-resource isolation versus network-destination control
-        ja: ローカル資源分離とネットワーク宛先制御
-      candidate_concept_ids:
-        - Sandbox
-        - SandboxEscapeRisk
-      overlap_reason:
-        zh: 两者都约束执行可接触对象，但隔离回答进程内部能看到什么，网络控制回答流量能去哪里及经何路径。
-        en: Both constrain what execution may contact, but isolation answers what a process can see locally while network control answers where traffic may go and by which path.
-        ja: どちらも実行が接触できる対象を制約しますが、分離はプロセス内で見えるもの、ネットワーク制御は通信先と経路を答えます。
-      disambiguation_test:
-        zh: 若目标通过文件路径、mount 或进程能力识别，则归执行隔离；若目标通过 scheme、host、port、route 或 proxy 识别，则归网络访问控制。
-        en: If the target is identified by filesystem path, mount, or process capability, it belongs to execution isolation; if by scheme, host, port, route, or proxy, it belongs to network access control.
-        ja: 対象がファイルパス、mount、プロセス能力で識別されるなら実行分離、scheme、host、port、route、proxy ならネットワークアクセス制御に属します。
-      result: distinct
-      owner_module_id: safety-sandbox-network
-      source_claims:
-        - claim-safety-sandbox-network-002
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-isolation-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 能独立回答进程、文件系统、mount、device 或 namespace 约束者归执行隔离。
-              en: If it independently answers process, filesystem, mount, device, or namespace constraints, classify as execution isolation.
-              ja: process/filesystem/mount/device/namespace constraint を独立回答すれば execution isolation です。
-          - reviewer_id: moonweave-isolation-ontology-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 能独立回答进程、文件系统、mount、device 或 namespace 约束者归执行隔离。
-              en: If it independently answers process, filesystem, mount, device, or namespace constraints, classify as execution isolation.
-              ja: process/filesystem/mount/device/namespace constraint を独立回答すれば execution isolation です。
-    - other_module_id: runtime-system
-      semantic_area:
-        zh: 隔离控制规范与运行环境事实
-        en: Isolation control specification versus runtime environment fact
-        ja: isolation control specification と runtime environment fact
-      candidate_concept_ids:
-        - Container
-        - RuntimeEnvironment
-      overlap_reason:
-        zh: IsolationSpecification 可治理多个环境并版本化，实际 ProcessHandle 和路径只属于一次运行，不应成为规范子类。
-        en: An IsolationSpecification can govern several environments and be versioned; actual ProcessHandle and paths belong to one run and are not specification subtypes.
-        ja: IsolationSpecification は複数 environment を govern し versioning でき、実 ProcessHandle/path は一 run に属し specification subtype ではありません。
-      disambiguation_test:
-        zh: 由允许的文件/进程资源、隔离模式和风险判断识别的对象归执行隔离；由 environment/session/process id 和实际工作目录识别的对象归运行系统。
-        en: An object identified by allowed filesystem or process resources, isolation mode, and risk judgment belongs to execution isolation; one identified by environment, session, or process ID and actual working directory belongs to runtime system.
-        ja: allowed filesystem/process resource・isolation mode・risk judgment で識別されれば execution isolation、environment/session/process id と actual working directory で識別されれば runtime system に属します。
-      result: distinct
-      owner_module_id: runtime-system
-      source_claims:
-        - claim-safety-sandbox-network-002
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-isolation-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 由平台、镜像、工作目录与会话承载识别者归运行系统。
-              en: Platform, image, working directory, and session hosting identity means runtime system.
-              ja: platform・image・working directory・session hosting identity なら runtime system です。
-          - reviewer_id: moonweave-isolation-ontology-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 由平台、镜像、工作目录与会话承载识别者归运行系统。
-              en: Platform, image, working directory, and session hosting identity means runtime system.
-              ja: platform・image・working directory・session hosting identity なら runtime system です。
-    - other_module_id: runtime-system
-      semantic_area:
-        zh: 隔离控制规范与运行环境事实
-        en: Isolation control specification versus runtime environment fact
-        ja: isolation control specification と runtime environment fact
-      candidate_concept_ids:
-        - ProcessPolicy
-        - Sandbox
-      overlap_reason:
-        zh: IsolationSpecification 可治理多个环境并版本化，实际 ProcessHandle 和路径只属于一次运行，不应成为规范子类。
-        en: An IsolationSpecification can govern several environments and be versioned; actual ProcessHandle and paths belong to one run and are not specification subtypes.
-        ja: IsolationSpecification は複数 environment を govern し versioning でき、実 ProcessHandle/path は一 run に属し specification subtype ではありません。
-      disambiguation_test:
-        zh: 由允许的文件/进程资源、隔离模式和风险判断识别的对象归执行隔离；由 environment/session/process id 和实际工作目录识别的对象归运行系统。
-        en: An object identified by allowed filesystem or process resources, isolation mode, and risk judgment belongs to execution isolation; one identified by environment, session, or process ID and actual working directory belongs to runtime system.
-        ja: allowed filesystem/process resource・isolation mode・risk judgment で識別されれば execution isolation、environment/session/process id と actual working directory で識別されれば runtime system に属します。
-      result: distinct
-      owner_module_id: safety-sandbox-network
-      source_claims:
-        - claim-safety-sandbox-network-001
-        - claim-safety-sandbox-network-002
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-isolation-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 由规范版本、强制机制和边界证据识别者归执行隔离。
-              en: Specification revision, enforcement mechanism, and boundary evidence identity means execution isolation.
-              ja: specification revision・enforcement mechanism・boundary evidence identity なら execution isolation です。
-          - reviewer_id: moonweave-isolation-ontology-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 由规范版本、强制机制和边界证据识别者归执行隔离。
-              en: Specification revision, enforcement mechanism, and boundary evidence identity means execution isolation.
-              ja: specification revision・enforcement mechanism・boundary evidence identity なら execution isolation です。
-    - other_module_id: safety-permission-policy
-      semantic_area:
-        zh: 资源可见性边界与资源操作授权
-        en: Resource-visibility boundary versus resource-action authorization
-        ja: resource visibility boundary と resource action authorization
-      candidate_concept_ids:
-        - AuthorizationRequest
-        - PolicyDecision
-      overlap_reason:
-        zh: 路径可见不等于主体获准写入，策略允许写入也不能使隔离外路径突然可见；两种控制需要同时满足。
-        en: Path visibility does not authorize a subject to write, and policy permission cannot make an out-of-sandbox path visible; both controls must hold.
-        ja: path visible は subject write authorization ではなく、policy allow も sandbox 外 path を visible にできず、両 control が必要です。
-      disambiguation_test:
-        zh: 若事实由 mount、namespace、process capability 或 sandbox config 决定，归执行隔离；若由 subject、resource、action 和 policy condition 决定，归权限与策略。
-        en: If a fact is determined by mount, namespace, process capability, or sandbox configuration, it belongs to execution isolation; if by subject, resource, action, and policy condition, it belongs to permission and policy.
-        ja: mount・namespace・process capability・sandbox config で決まれば execution isolation、subject・resource・action・policy condition で決まれば permission/policy に属します。
-      result: distinct
-      owner_module_id: safety-permission-policy
-      source_claims:
-        - claim-safety-sandbox-network-001
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-isolation-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 具有请求、决策和授权主体语义者归权限策略。
-              en: Request, decision, and authorized-subject semantics mean permission policy.
-              ja: request・decision・authorized-subject 意味なら permission policy です。
-          - reviewer_id: moonweave-isolation-ontology-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 具有请求、决策和授权主体语义者归权限策略。
-              en: Request, decision, and authorized-subject semantics mean permission policy.
-              ja: request・decision・authorized-subject 意味なら permission policy です。
-    - other_module_id: safety-permission-policy
-      semantic_area:
-        zh: 资源可见性边界与资源操作授权
-        en: Resource-visibility boundary versus resource-action authorization
-        ja: resource visibility boundary と resource action authorization
-      candidate_concept_ids:
-        - FilesystemPolicy
-        - ProcessPolicy
-      overlap_reason:
-        zh: 路径可见不等于主体获准写入，策略允许写入也不能使隔离外路径突然可见；两种控制需要同时满足。
-        en: Path visibility does not authorize a subject to write, and policy permission cannot make an out-of-sandbox path visible; both controls must hold.
-        ja: path visible は subject write authorization ではなく、policy allow も sandbox 外 path を visible にできず、両 control が必要です。
-      disambiguation_test:
-        zh: 若事实由 mount、namespace、process capability 或 sandbox config 决定，归执行隔离；若由 subject、resource、action 和 policy condition 决定，归权限与策略。
-        en: If a fact is determined by mount, namespace, process capability, or sandbox configuration, it belongs to execution isolation; if by subject, resource, action, and policy condition, it belongs to permission and policy.
-        ja: mount・namespace・process capability・sandbox config で決まれば execution isolation、subject・resource・action・policy condition で決まれば permission/policy に属します。
-      result: distinct
-      owner_module_id: safety-sandbox-network
-      source_claims:
-        - claim-safety-sandbox-network-001
-        - claim-safety-sandbox-network-002
-        - claim-safety-sandbox-network-003
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-isolation-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 由 path/mount/namespace/capability/seccomp/cgroup 字段决定者归执行隔离。
-              en: Path, mount, namespace, capability, seccomp, and cgroup fields mean execution isolation.
-              ja: path・mount・namespace・capability・seccomp・cgroup field なら execution isolation です。
-          - reviewer_id: moonweave-isolation-ontology-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 由 path/mount/namespace/capability/seccomp/cgroup 字段决定者归执行隔离。
-              en: Path, mount, namespace, capability, seccomp, and cgroup fields mean execution isolation.
-              ja: path・mount・namespace・capability・seccomp・cgroup field なら execution isolation です。
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-safety-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: Verified against OCI/Docker isolation, Linux namespaces, seccomp, AppArmor/LSM, and Landlock; specification vs Sandbox instance separation holds.
-    en: Verified against OCI/Docker isolation, Linux namespaces, seccomp, AppArmor/LSM, and Landlock; specification vs Sandbox instance separation holds.
-    ja: Verified against OCI/Docker isolation, Linux namespaces, seccomp, AppArmor/LSM, and Landlock; specification vs Sandbox instance separation holds.
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: e2b-sandbox-docs
+    title: E2B Sandbox Documentation
+    url: https://e2b.dev/docs
+    source_type: official-doc
+    relevance: Cloud sandbox API, templates, filesystem and process isolation.
+  - id: oci-linux-runtime
+    title: OCI Runtime Specification — Linux Container Configuration
+    url: https://github.com/opencontainers/runtime-spec/blob/main/config-linux.md
+    source_type: standard
+    relevance: Namespaces, cgroups, mounts, masked/readonly paths, seccomp.
+  - id: gvisor-docs
+    title: gVisor Documentation
+    url: https://gvisor.dev/docs/
+    source_type: official-doc
+    relevance: Application kernel isolation with runsc runtime.
+  - id: firecracker-docs
+    title: Firecracker microVM Documentation
+    url: https://firecracker-microvm.github.io/
+    source_type: official-doc
+    relevance: Lightweight KVM microVM tenant isolation.
+  - id: cursor-terminal-sandbox
+    title: Cursor Agent Terminal Sandbox
+    url: https://cursor.com/docs/agent/terminal
+    source_type: official-doc
+    relevance: workspace-write sandbox and command allowlist layering.
+  - id: linux-landlock
+    title: Linux Landlock LSM Userspace API
+    url: https://docs.kernel.org/userspace-api/landlock.html
+    source_type: official-doc
+    relevance: Stackable filesystem access rules and layer intersection.
+  - id: safety-sandbox-design
+    title: Moonweave safety-sandbox-network module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Specification versus Sandbox instance and escape-risk evidence.
 source_claims:
-  - id: claim-safety-sandbox-network-001
-    source: eng-security-mcp-nsa-2026
-    supports: NSA's May 2026 MCP guidance recommends strict resource and permission boundaries, operating-system isolation such as seccomp/AppArmor/SELinux, sandboxing against lateral movement and privilege escalation, and explicit runtime denial of unneeded filesystem and network paths.
-    locator: NSA MCP Security Design Considerations > pp. 10-11 > Constrain and sandbox tool execution
+  - id: claim-safety-sandbox-e2b
+    source: e2b-sandbox-docs
+    supports: E2B Sandbox API provides isolated cloud execution environments with template-defined resource and filesystem boundaries mappable to Sandbox and IsolationSpecification.
+    locator: E2B docs > Sandbox create and templates
+    evidence_kind: official
+    confidence: high
+  - id: claim-safety-sandbox-oci
+    source: oci-linux-runtime
+    supports: OCI Linux runtime defines namespaces, cgroups, mounts, masked/readonly paths, and seccomp integration for enforceable process and filesystem isolation.
+    locator: OCI config-linux > Namespaces, Mounts, Readonly paths
+    evidence_kind: normative
+    confidence: high
+  - id: claim-safety-sandbox-gvisor
+    source: gvisor-docs
+    supports: gVisor runsc provides an application kernel boundary isolating untrusted workloads from the host kernel, mappable to ProcessPolicy isolation_backend.
+    locator: gVisor docs > Architecture and runsc
+    evidence_kind: official
+    confidence: high
+  - id: claim-safety-sandbox-cursor
+    source: cursor-terminal-sandbox
+    supports: Cursor terminal sandbox modes and command allowlists constrain local command execution before spawn, layering on workspace filesystem boundaries.
+    locator: Cursor docs > Agent terminal sandbox
+    evidence_kind: official
+    confidence: high
+  - id: claim-safety-sandbox-landlock
+    source: linux-landlock
+    supports: Landlock requires all policy layers and other access controls to allow an operation; host DAC cannot override sandbox Landlock denial.
+    locator: Landlock docs > Layers of file path access rights
+    evidence_kind: official
+    confidence: high
+  - id: claim-safety-sandbox-design
+    source: safety-sandbox-design
+    supports: Moonweave separates IsolationSpecification, concrete Sandbox, and instance-applicable SandboxEscapeRisk with post-change re-check evidence.
+    locator: safety-sandbox-network module boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-safety-sandbox-network-002
-    source: eng-runtime-oci-linux-config
-    supports: The OCI Linux runtime specification defines namespaces, devices, cgroups, mounts, masked paths, read-only paths, seccomp integration, and runtime errors that ground enforceable process and filesystem isolation settings.
-    locator: OCI Runtime Specification > Linux Container Configuration > Namespaces, Devices, Control groups, Masked Paths, Readonly Paths
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-safety-sandbox-network-003
-    source: eng-security-linux-landlock
-    supports: Linux Landlock defines stackable path-hierarchy access rules, read/write/execute rights, rule inheritance, bind-mount and OverlayFS behavior, and explicit limitations relevant to filesystem sandbox evaluation.
-    locator: Linux Kernel documentation > Landlock rules, Layers of file path access rights, Bind mounts and OverlayFS, Current limitations
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

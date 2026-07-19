@@ -1,575 +1,300 @@
 schema: moonweave.ai/ontology-node/v1
 id: ContextSelectionActivity
 kind: concept
-status: accepted
 labels:
   zh: 上下文选择活动
   en: Context selection activity
   ja: コンテキスト選択活動
 semantics:
   short_definition:
-    zh: 依据任务、权限、信任和相关性从候选中确定纳入集合的组装阶段。
-    en: An assembly phase determining the included set from candidates using task, authorization, trust, and relevance criteria.
-    ja: タスク・権限・信頼・関連性に基づき候補から採用集合を決める組立段階です。
+    zh: 从候选中按任务与相关性确定纳入集合的组装阶段。
+    en: Assembly phase determining admitted set from candidates by task and relevance.
+    ja: task/関連性に基づき candidate から採用集合を決める assembly phase。
   definition:
-    zh: 上下文选择活动是一种 ContextAssembly 组成阶段；其种差是：它评估候选相对于当前任务、受众权限、来源信任、安全约束和相关性的纳入资格，输出已选集合与 ContextExclusion。它不负责已选项的最终排序，也不执行长度裁剪。
-    en: A context selection activity is a component phase of ContextAssembly. It evaluates candidates against the current task, audience authorization, source trust, safety constraints, and relevance, producing a selected set and ContextExclusions. It does not perform final ordering or length trimming.
-    ja: ContextSelectionActivity は ContextAssembly の構成段階で、現在タスク、受信者権限、出典信頼、安全制約、関連性に対して候補資格を評価し、選択集合と ContextExclusion を出力します。最終順序や長さ裁剪は行いません。
+    zh: ContextSelectionActivity 是 ContextAssemblyPhase；评估候选相对任务、权限、信任、安全与相关性（RAG similarity score、Cursor semantic search score），输出已选集合与 ContextExclusion。它映射 LangChain select 策略与 Cursor codebase search + @ refs 采纳，不执行最终排序或长度裁剪。
+    en: ContextSelectionActivity is a ContextAssemblyPhase evaluating candidates against task, authorization, trust, safety, and relevance (RAG similarity score, Cursor semantic search score), producing admitted set and ContextExclusions. It maps LangChain select strategy and Cursor codebase search + @ ref admission—not final ordering or length trimming.
+    ja: ContextSelectionActivity は task/authorization/trust/safety/関連性（RAG similarity/Cursor semantic score）で candidate 評価し採用集合/ContextExclusion 出力する ContextAssemblyPhase。LangChain select/Cursor codebase search+@ ref 採用に写像。final ordering/length trimming 非実行。
   why_needed:
-    zh: 单独记录选择阶段可解释候选为何入选或落选，并防止把检索排名、最终排序和窗口裁剪混成一个步骤。
-    en: Recording selection separately explains why candidates entered or failed and prevents retrieval ranking, final ordering, and trimming from collapsing into one step.
-    ja: 選択段階を分けると採否理由を説明でき、検索順位・最終順序・裁剪を一処理へ混同しません。
+    zh: 单独记录选择可解释 Pinecone top_k 候选为何仅部分进入 prompt，避免与排序、裁剪混淆。
+    en: Recording selection separately explains why only part of Pinecone top_k candidates enter the prompt, avoiding confusion with ordering or trimming.
+    ja: selection 独立記録で Pinecone top_k 候補の一部のみ prompt 入り理由を説明。ordering/trimming 混同回避。
   includes:
-    - zh: 纳入逐项记录候选 ID、适用规则、权限结果、相关性判定和纳入结论的选择运行阶段。
-      en: Includes selection phases recording each candidate ID, applicable rules, authorization outcome, relevance judgment, and inclusion decision.
-      ja: 各候補 ID、適用規則、権限結果、関連性判断、採用結論を記録する選択段階を含みます。
+    - zh: 纳入逐项记录候选 ID、相关性得分、权限结果与纳入/排除结论的选择阶段。
+      en: Includes selection phases recording candidate IDs, relevance scores, authorization outcomes, and admit/reject decisions.
+      ja: candidate ID/関連性 score/authorization outcome/admit-reject 判断を item 記録する selection phase。
   excludes:
-    - zh: 排除检索候选生成、已选项排序和容量裁剪；三者分别发生在上游检索、后续排序和后续裁剪阶段。
-      en: Excludes candidate generation, ordering of selected items, and capacity trimming; these belong to upstream retrieval and later ordering or trimming phases.
-      ja: 候補生成、選択済み項目の順序付け、容量裁剪はそれぞれ上流検索・後続順序・後続裁剪なので除外します。
+    - zh: 排除候选生成（RetrievalActivity）、已选项排序与容量裁剪。
+      en: Excludes candidate generation (RetrievalActivity), ordering of selected items, and capacity trimming.
+      ja: candidate generation（RetrievalActivity）/選択済み ordering/capacity trimming を除外。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: Cursor semantic codebase search 返回 scored hits；@ 引用自动 high-priority 纳入；LangChain store.search/RAG retriever 按 query 选 chunk；Mem0/Pinecone top_k 结果在此阶段按 threshold 过滤，不等于自动全部进入 ContextPackage。
+    en: Cursor semantic codebase search returns scored hits; @ references auto-admit high priority; LangChain store.search/RAG retriever selects chunks by query; Mem0/Pinecone top_k filtered by threshold here—not automatic ContextPackage admission.
+    ja: Cursor semantic search は scored hits 返却。@ 参照は high priority 自動採用。LangChain store.search/RAG retriever は query で chunk 選択。Mem0/Pinecone top_k は threshold 过滤。ContextPackage 自動全採用ではない。
+  typical_input:
+    - description: RAG retrieval candidates with scores
+      format: |
+        {
+          "candidates": [
+            {"source_ref": "chunk-42@v7", "similarity_score": 0.91},
+            {"source_ref": "chunk-99@v3", "similarity_score": 0.42}
+          ],
+          "relevance_threshold": 0.65
+        }
+      source_claims: [claim-context-selection-rag]
+    - description: Cursor @ refs and search hits
+      format: |
+        {
+          "referenced_files": ["src/auth/middleware.ts"],
+          "semantic_hits": [{"path": "src/auth/session.ts", "score": 0.88}]
+        }
+      source_claims: [claim-context-selection-cursor]
+  typical_output:
+    - description: Admitted set and exclusions
+      format: |
+        {
+          "admitted": ["chunk-42@v7", "src/auth/middleware.ts"],
+          "exclusions": [{"source_ref": "chunk-99@v3", "reason": "relevance-below-threshold"}]
+        }
+      source_claims: [claim-context-selection-design]
+  reference_implementations:
+    - name: LangChain Context Engineering
+      url: https://docs.langchain.com/oss/python/langchain/context-engineering
+      description: Select strategy for relevant context.
+    - name: Cursor Semantic Search
+      url: https://cursor.com/docs/agent/tools/search
+      description: Codebase search with relevance scoring.
 structure:
-  identity_keys: []
-  fields: []
+  identity_keys:
+    - phase_id
+  fields:
+    - id: phase_id
+      labels:
+        zh: 阶段标识
+        en: Phase identifier
+        ja: phase 識別子
+      definitions:
+        zh: 稳定标识一次选择阶段运行。
+        en: Stable identifier for one selection phase run.
+        ja: 一 selection phase run を安定識別。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      pattern: null
+      example_value: phase-select-204
+      allowed_values: []
+      source_claims:
+        - claim-context-selection-id
+    - id: relevance_threshold
+      labels:
+        zh: 相关性阈值
+        en: Relevance threshold
+        ja: 関連性閾値
+      definitions:
+        zh: 可选的最低相关性得分，低于此值的 RAG/search 候选生成 ContextExclusion。
+        en: Optional minimum relevance score; sub-threshold RAG/search candidates become ContextExclusions.
+        ja: 任意 minimum 関連性 score。未満 RAG/search candidate は ContextExclusion。
+      datatype: number
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      pattern: null
+      example_value: 0.65
+      allowed_values: []
+      source_claims:
+        - claim-context-selection-threshold
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: ContextSelectionActivity-example-positive-001
-    kind: positive
+  - id: ContextSelectionActivity-example-cursor
     labels:
-      zh: 上下文选择活动正例
-      en: Positive example of Context selection activity
-      ja: コンテキスト選択活動の正例
-    scenario_id: null
+      zh: Cursor 选择阶段
+      en: Cursor selection phase
+      ja: Cursor selection phase
     descriptions:
-      zh: 选择阶段 select-17 对十个候选逐项检查任务相关性、调用方权限、来源信任和安全约束，采纳六项，并为其余四项生成带原因的 ContextExclusion。
-      en: Selection phase select-17 evaluates ten candidates for task relevance, caller authorization, source trust, and safety constraints, admits six, and produces reasoned ContextExclusions for the other four.
-      ja: 選択段階 select-17 は十候補をタスク関連度、呼出し元権限、出典信頼、安全制約で評価し、六項を採用し、残り四項へ理由付き ContextExclusion を生成します。
+      zh: phase-select-204 自动纳入 @middleware.ts（user_explicit_reference），semantic hit session.ts（score=0.88>0.65），排除 score=0.41 的 dist 文件命中。
+      en: phase-select-204 auto-admits @middleware.ts (user_explicit_reference), semantic hit session.ts (score=0.88>0.65), excludes dist file hit (score=0.41).
+      ja: phase-select-204 が @middleware.ts 自動採用、session.ts semantic hit（0.88>0.65）採用、dist file hit（0.41）排除。
+    example_source:
+      product: Cursor
+      url: https://cursor.com/docs/agent/tools/search
+      version: selection
     field_values:
-      assembly_id: select-17
-      target_call_ref: call-88
-      candidate_set_ref: context-candidates-88@4
-      context_specification_ref: context-policy-production@12
-      started_at: 2026-07-16T04:00:00.000Z
-      ended_at: 2026-07-16T04:00:00.065Z
-      outcome: success
+      phase_id: phase-select-204
+      relevance_threshold: 0.65
     related_node_ids:
       - ContextSelectionActivity
-      - ContextOrderingActivity
-    related_relation_ids:
-      - ContextSelectionActivity-precedes-ContextOrderingActivity
-    expected_result:
-      zh: 该运行可查询 ContextSelectionActivity 以及方向保持不变的事实 ContextSelectionActivity-precedes-ContextOrderingActivity。
-      en: The run can query ContextSelectionActivity together with direction-preserving fact ContextSelectionActivity-precedes-ContextOrderingActivity.
-      ja: この実行では ContextSelectionActivity と方向を保持した事実 ContextSelectionActivity-precedes-ContextOrderingActivity を共に照会できます。
-    why_valid_or_invalid:
-      zh: 该场景同时给出真实运行语境、ContextSelectionActivity-precedes-ContextOrderingActivity 的 canonical 方向、概念定义和可用字段值。
-      en: The phase changes candidate membership by explicit admission decisions and records each rejection; it does not yet determine the selected items' relative order or final length.
-      ja: このシナリオは実際の運用文脈、ContextSelectionActivity-precedes-ContextOrderingActivity の canonical 方向、概念定義、利用可能な項目値を組み合わせます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - ContextExclusion
+    related_relation_ids: []
     source_claims:
-      - claim-context-selection-activity-003
-      - claim-context-selection-activity-004
-  - id: ContextSelectionActivity-example-boundary-001
-    kind: boundary
+      - claim-context-selection-cursor
+  - id: ContextSelectionActivity-example-rag
     labels:
-      zh: 上下文选择活动边界例
-      en: Boundary case for Context selection activity
-      ja: コンテキスト選択活動の境界例
-    scenario_id: null
+      zh: RAG 相关性选择
+      en: RAG relevance selection
+      ja: RAG 関連性 selection
     descriptions:
-      zh: order-17 接收 select-17 已采纳的六项并只改变它们的相对位置，没有新增采纳或拒绝决定；因此它是 ContextOrderingActivity，而不是 ContextSelectionActivity。
-      en: order-17 receives the six items admitted by select-17 and changes only their relative positions, adding no admission or rejection decisions; it is ContextOrderingActivity, not ContextSelectionActivity.
-      ja: order-17 は select-17 が採用した六項を受け取り相対位置だけを変え、採用・拒否判断を追加しません。したがって ContextOrderingActivity で、ContextSelectionActivity ではありません。
+      zh: phase-select-88 对 Pinecone top_k=10 候选应用 threshold=0.65，采纳 6 项，chunk-99（0.42）生成 relevance-below-threshold exclusion。
+      en: phase-select-88 applies threshold=0.65 to Pinecone top_k=10, admits six, chunk-99 (0.42) gets relevance-below-threshold exclusion.
+      ja: phase-select-88 が Pinecone top_k=10 に threshold=0.65 適用。6 件採用。chunk-99（0.42）は relevance-below-threshold exclusion。
+    example_source:
+      product: LangChain
+      url: https://docs.langchain.com/oss/python/langchain/context-engineering
+      version: select
+    field_values:
+      relevance_threshold: 0.65
+      admitted_count: 6
+    related_node_ids:
+      - ContextSelectionActivity
+      - memory-retrieval-ranking
+    related_relation_ids: []
+    source_claims:
+      - claim-context-selection-rag
+  - id: ContextSelectionActivity-example-cursorignore
+    labels:
+      zh: .cursorignore 选择排除
+      en: .cursorignore selection exclusion
+      ja: .cursorignore selection exclusion
+    descriptions:
+      zh: phase-select-204 在纳入前检测 .cursorignore 匹配 node_modules/**，直接生成 cursorignore exclusion，不进入后续排序阶段。
+      en: phase-select-204 detects .cursorignore match node_modules/** before admission, emitting cursorignore exclusion without entering ordering.
+      ja: phase-select-204 が .cursorignore node_modules/** 一致を pre-admission 検出。cursorignore exclusion 出力。ordering 非進入。
+    example_source:
+      product: Cursor
+      url: https://cursor.com/docs/context/ignore-files
+      version: ignore
+    field_values:
+      exclusion_reason: cursorignore
+    related_node_ids:
+      - ContextSelectionActivity
+      - ContextExclusion
+    related_relation_ids: []
+    source_claims:
+      - claim-context-selection-cursorignore
+  - id: ContextSelectionActivity-example-not-ordering
+    labels:
+      zh: 选择非排序
+      en: Selection is not ordering
+      ja: selection は ordering ではない
+    descriptions:
+      zh: phase-order-204 只改变已选候选项相对位置，不新增采纳或拒绝；phase-select-204 才决定成员资格。
+      en: phase-order-204 only repositions admitted items without new admit/reject; phase-select-204 decides membership.
+      ja: phase-order-204 は採用済み item 位置変更のみ。phase-select-204 が membership 決定。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
     field_values: {}
     related_node_ids:
       - ContextSelectionActivity
       - ContextOrderingActivity
-    related_relation_ids:
-      - ContextSelectionActivity-precedes-ContextOrderingActivity
-    expected_result:
-      zh: ContextOrderingActivity 保持其原有类型，验证器不得凭关系共现把它提升为 ContextSelectionActivity。
-      en: ContextOrderingActivity retains its own type; validation must not promote it to ContextSelectionActivity from relation co-occurrence.
-      ja: ContextOrderingActivity は元の型を維持し、関係の共起だけで ContextSelectionActivity へ昇格してはなりません。
-    why_valid_or_invalid:
-      zh: 边界例点名实际对照节点，并保留 ContextSelectionActivity-precedes-ContextOrderingActivity 的方向；只有显式 is_a 或完整种差才支持成员资格。
-      en: Selection determines set membership and reasons for rejection; ordering assumes that membership and determines position. Consecutive phases remain semantically distinct.
-      ja: 境界例は実在する対照ノードを示し、ContextSelectionActivity-precedes-ContextOrderingActivity の方向を保持します。明示的 is_a または完全な種差だけが所属を支持します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    related_relation_ids: []
     source_claims:
-      - claim-context-selection-activity-005
-      - claim-context-selection-activity-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: ContextTrimmingActivity
-    shared_parent_concept_id: ContextAssemblyPhase
-    differentia:
-      zh: 共享父节点对照：父节点 ContextAssemblyPhase：ContextSelectionActivity（semantic kind=activity，骨架 ContextSelectionActivity-is_a-ContextAssemblyPhase）；ContextTrimmingActivity（semantic kind=activity，骨架 ContextTrimmingActivity-is_a-ContextAssemblyPhase）。双端条件：ContextSelectionActivity 条件：“依据任务、权限、信任和相关性从候选中确定纳入集合的组装阶段”；ContextTrimmingActivity 条件：“在保留来源身份和顺序的前提下，使已排序内容满足目标容量的组装阶段”。逐端验证；父节点不证明任一身份。
-      en: "Shared-parent contrast: parent ContextAssemblyPhase: ContextSelectionActivity (semantic kind=activity, backbone ContextSelectionActivity-is_a-ContextAssemblyPhase); ContextTrimmingActivity (semantic kind=activity, backbone ContextTrimmingActivity-is_a-ContextAssemblyPhase). Endpoint conditions: ContextSelectionActivity condition: “An assembly phase determining the included set from candidates using task, authorization, trust, and relevance criteria”; ContextTrimmingActivity condition: “An assembly phase making ordered content fit target capacity while preserving provenance and relative order”. Verify each endpoint; the parent proves neither identity."
-      ja: 共有親対照：親 ContextAssemblyPhase：ContextSelectionActivity（semantic kind=activity、バックボーン ContextSelectionActivity-is_a-ContextAssemblyPhase）；ContextTrimmingActivity（semantic kind=activity、バックボーン ContextTrimmingActivity-is_a-ContextAssemblyPhase）。両端条件：ContextSelectionActivity の条件：「タスク・権限・信頼・関連性に基づき候補から採用集合を決める組立段階です」；ContextTrimmingActivity の条件：「来歴と相対順序を保ちながら、順序済み内容を対象容量へ収める組立段階です」。各端を検証し、親だけでは同一性を証明しません。
-    source_claims:
-      - claim-context-selection-activity-007
+      - claim-context-selection-design
 parent_relation:
   id: ContextSelectionActivity-is_a-ContextAssemblyPhase
   predicate: is_a
   direction: target-to-source
   relation_kind: hierarchy
   labels:
-    zh: 选择活动是一种组装阶段
-    en: selection activity is an assembly phase
-    ja: 選択活動は組立段階の一種
+    zh: 是一种组装阶段
+    en: is an assembly phase
+    ja: 組立段階の一種
   definitions:
-    zh: 每个 ContextSelectionActivity 都是 ContextAssemblyPhase；其种差是对候选逐项作纳入或排除决定，而不确定最终顺序或容量裁剪。
-    en: Every ContextSelectionActivity is a ContextAssemblyPhase distinguished by deciding inclusion or exclusion for each candidate without assigning final order or capacity trimming.
-    ja: すべての ContextSelectionActivity は ContextAssemblyPhase で、各候補の包含・除外を決め最終順序や容量裁断を行わない種差を持ちます。
+    zh: 每个 ContextSelectionActivity 都是 ContextAssemblyPhase；其种差是决定候选纳入或排除，不分配最终顺序或裁剪长度。
+    en: Every ContextSelectionActivity is a ContextAssemblyPhase distinguished by deciding candidate admission or exclusion without final ordering or length trimming.
+    ja: すべての ContextSelectionActivity は ContextAssemblyPhase で candidate 採否決定（final ordering/length trim なし）という種差。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 该关系的实例基数由调用、版本或部署约束决定，不在类级关系上统一封闭。
-    en: Instance cardinality depends on the call, version, or deployment and is not globally closed on the class-level relation.
-    ja: インスタンス基数は呼出し・版・配置制約に依存し、クラス関係上で一律に閉じません。
+    zh: 分类继承不使用实例关系基数。
+    en: Taxonomic inheritance does not use instance-relation cardinality.
+    ja: 分類継承にはインスタンス関係基数を用いない。
   inverse_reading:
     predicate: part_of
     labels:
-      zh: 以上下文选择活动为下位类型
-      en: has ContextSelectionActivity subtype
-      ja: ContextSelectionActivity を下位型に持つ
+      zh: 反向：是一种
+      en: has subtype
+      ja: 逆方向：の一種である
   conditions: []
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: ContextSelectionActivity-is_a-ContextAssemblyPhase-example-positive-001
-      kind: positive
-      labels:
-        zh: 选择活动是一种组装阶段正例
-        en: "Positive case: selection activity is an assembly phase"
-        ja: 選択活動は組立段階の一種の正例
-      scenario_id: null
-      descriptions:
-        zh: select-88 根据授权和相关性接受 7 项、排除 3 项。
-        en: select-88 accepts seven candidates and excludes three using authorization and relevance.
-        ja: select-88 は認可と関連性で7候補を採用し3候補を除外します。
-      field_values: {}
-      related_node_ids:
-        - ContextSelectionActivity
-        - ContextAssemblyPhase
-      related_relation_ids:
-        - ContextSelectionActivity-is_a-ContextAssemblyPhase
-      expected_result:
-        zh: 阶段输出包含选中集合和排除记录。
-        en: The phase output contains the selected set and exclusion records.
-        ja: 段階出力は選択集合と除外記録を含みます。
-      why_valid_or_invalid:
-        zh: 该阶段的唯一职责是判定每个候选是否进入后续处理集合。
-        en: Its responsibility answers only whether an item enters.
-        ja: 責務は項目が入るかだけを答えます。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-context-selection-activity-008
-    - id: ContextSelectionActivity-is_a-ContextAssemblyPhase-example-boundary-001
-      kind: boundary
-      labels:
-        zh: 选择活动是一种组装阶段边界例
-        en: "Boundary case: selection activity is an assembly phase"
-        ja: 選択活動は組立段階の一種の境界例
-      scenario_id: null
-      descriptions:
-        zh: order-88 接收已选 7 项并只分配位置。
-        en: order-88 receives seven already selected items and only assigns positions.
-        ja: order-88 は選択済み7項目を受け位置だけを割当てます。
-      field_values: {}
-      related_node_ids:
-        - ContextSelectionActivity
-        - ContextAssemblyPhase
-      related_relation_ids:
-        - ContextSelectionActivity-is_a-ContextAssemblyPhase
-      expected_result:
-        zh: 排序活动不归入选择活动。
-        en: The ordering activity is not classified as selection.
-        ja: 整列活動を選択活動に分類しません。
-      why_valid_or_invalid:
-        zh: 排序只改变已选候选的序位，并不改变候选纳入集合。
-        en: Ordering does not change the included set.
-        ja: 整列は選択済み候補の順位だけを変え、候補包含集合そのものは変更しません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-context-selection-activity-009
+  examples: []
   source_claims:
-    - claim-context-selection-activity-010
+    - claim-context-selection-design
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
-relations:
-  - id: ContextSelectionActivity-selects-RetrievedCandidate
-    predicate: selects
-    direction: source-to-target
-    relation_kind: information
-    labels:
-      zh: 选择检索候选
-      en: selects retrieved candidate
-      ja: 検索候補を選択する
-    definitions:
-      zh: ContextSelectionActivity-selects-RetrievedCandidate 表示一次上下文选择阶段在同一 ContextAssembly 运行内，依据任务相关性、受众权限、来源信任和安全约束，明确将某个 RetrievedCandidate 纳入后续排序候选集。该事实不由检索分数、候选共现或 ContextAssembly 对候选的读取自动推出，也不等同于候选最终进入 ContextPackage。
-      en: ContextSelectionActivity-selects-RetrievedCandidate states that a context-selection phase in one ContextAssembly run explicitly admits a RetrievedCandidate to the set passed to ordering after evaluating task relevance, audience authority, source trust, and safety constraints. Retrieval score, co-occurrence, or assembly consumption alone does not entail this fact, and selection does not yet prove final ContextPackage membership.
-      ja: ContextSelectionActivity-selects-RetrievedCandidate は、同一 ContextAssembly 実行のコンテキスト選択段階が、タスク関連性、受領者権限、出典信頼性、安全制約を評価した後、ある RetrievedCandidate を後続の整列へ渡す候補集合に明示的に採用したことを表します。検索スコア、共起、または組立による読取りだけではこの事実を導けず、選択は最終 ContextPackage への包含もまだ証明しません。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 候选数量取决于一次组装的输入、策略和预算；本体只要求每条选择事实绑定一项明确候选，不对所有运行施加统一数量。
-      en: Candidate counts depend on one assembly's inputs, policy, and budget; the ontology requires each selection fact to identify its candidate but imposes no universal count across runs.
-      ja: 候補数は一回の組立の入力、方針、予算に依存します。本体は各選択事実が候補を特定することだけを要求し、全実行に共通の個数を課しません。
-    inverse_reading:
-      predicate: selected_by_context_activity
-      labels:
-        zh: 由上下文选择活动选中
-        en: selected by context activity
-        ja: コンテキスト選択活動により選択される
-    conditions:
-      - id: ContextSelectionActivity-selects-RetrievedCandidate-condition-001
-        severity: error
-        expression_language: plain
-        expression: Assert only when the same context assembly run records RetrievedCandidate.candidate_id as admitted by ContextSelectionActivity after eligibility evaluation; retrieval, scoring, or consumption alone is insufficient.
-        explanations:
-          zh: 仅当同一次上下文组装运行留下选择活动对该 candidate_id 完成资格评估并作出纳入结论的记录时建立；仅检索到、评分过或读取过候选均不足以建立。
-          en: Assert only when the same context assembly run records the selection activity's eligibility evaluation and admission of that candidate_id; retrieval, scoring, or consumption alone is insufficient.
-          ja: 同一コンテキスト組立実行が、選択活動による当該 candidate_id の適格性評価と採用結論を記録した場合にのみ成立させ、検索、採点、読取りだけでは成立させません。
-        source_claims:
-          - claim-context-selection-activity-011
-          - claim-context-selection-activity-012
-    temporal_scope: valid-time
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: ContextSelectionActivity-selects-RetrievedCandidate-example-positive-001
-        kind: positive
-        labels:
-          zh: 上下文选择活动选中检索候选正例
-          en: "Positive case: context activity selects retrieved candidate"
-          ja: コンテキスト選択活動が検索候補を選択する正例
-        scenario_id: null
-        descriptions:
-          zh: assembly-88 的 selection-17 读取 candidate-42 的查询、来源与评分，核验其适用于当前任务且受众有权接收后，记录 candidate-42 为 admitted；随后 ordering-17 接收该候选。
-          en: Within assembly-88, selection-17 reads candidate-42's query, provenance, and score, verifies task relevance and audience authority, records candidate-42 as admitted, and passes it to ordering-17.
-          ja: assembly-88 内で selection-17 が candidate-42 の query、来歴、score を読み、タスク関連性と受領者権限を確認して candidate-42 を admitted と記録し、ordering-17 へ渡します。
-        field_values: {}
-        related_node_ids:
-          - ContextSelectionActivity
-          - RetrievedCandidate
-        related_relation_ids:
-          - ContextSelectionActivity-selects-RetrievedCandidate
-        expected_result:
-          zh: 建立 selection-17 → candidate-42 的 selects 事实，并保留其组装运行、资格依据和有效时间。
-          en: Assert selection-17 → candidate-42 as a selects fact with its assembly run, eligibility basis, and valid time retained.
-          ja: selection-17 → candidate-42 の selects 事実を成立させ、組立実行、適格性根拠、有効時間を保持します。
-        why_valid_or_invalid:
-          zh: 该记录同时点名选择活动、候选身份、同一组装运行和明确纳入结论，满足方向与成立条件。
-          en: The record names the selection activity, candidate identity, same assembly run, and explicit admission outcome, satisfying both direction and assertion condition.
-          ja: 記録が選択活動、候補同一性、同一組立実行、明示的採用結果を示し、方向と成立条件を満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-context-selection-activity-013
-          - claim-context-selection-activity-014
-      - id: ContextSelectionActivity-selects-RetrievedCandidate-example-boundary-001
-        kind: boundary
-        labels:
-          zh: 上下文选择活动选中检索候选边界例
-          en: "Boundary case: retrieved candidate is not selected"
-          ja: 検索候補が選択されない境界例
-        scenario_id: null
-        descriptions:
-          zh: assembly-88 读取高分 candidate-43，但 selection-17 因受众无权访问其来源而记录 exclude-43；候选的高分与被读取事实均不能建立 selects 边。
-          en: assembly-88 reads high-scoring candidate-43, but selection-17 records exclude-43 because the audience lacks authority for its source. Neither the score nor consumption establishes a selects edge.
-          ja: assembly-88 は高得点の candidate-43 を読みますが、受領者に出典アクセス権がないため selection-17 は exclude-43 を記録します。得点や読取りだけでは selects 辺は成立しません。
-        field_values: {}
-        related_node_ids:
-          - ContextSelectionActivity
-          - RetrievedCandidate
-        related_relation_ids:
-          - ContextSelectionActivity-selects-RetrievedCandidate
-        expected_result:
-          zh: 不得建立 selection-17 → candidate-43 的 selects 事实；排除记录继续证明其未被纳入。
-          en: Do not assert selection-17 → candidate-43 as selects; the exclusion record continues to show non-admission.
-          ja: selection-17 → candidate-43 の selects 事実を成立させず、除外記録により非採用を示します。
-        why_valid_or_invalid:
-          zh: 检索域的候选身份与评分只证明可供评估；权限检查后的排除结论直接否定本次纳入。
-          en: Retrieval identity and score establish only eligibility for evaluation; the post-authorization exclusion directly refutes admission in this run.
-          ja: 検索候補の同一性と得点は評価対象であることだけを示し、権限確認後の除外結論が当該実行での採用を否定します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-context-selection-activity-015
-          - claim-context-selection-activity-016
-    source_claims:
-      - claim-context-selection-activity-017
-      - claim-context-selection-activity-018
-    distinct_fact_rationale:
-      zh: ContextAssembly-consumes-RetrievedChunk 只记录检索项作为 candidate input 被组装读取；本 selects 边记录选择阶段明确准入 RetrievedCandidate；final ContextPackage membership 仍由后续排序、裁剪和组装产出事实决定。
-      en: ContextAssembly-consumes-RetrievedChunk records a retrieved item only as candidate input; this selects edge records explicit admission by the selection phase; final ContextPackage membership remains a separate outcome of ordering, trimming, and assembly.
-      ja: ContextAssembly-consumes-RetrievedChunk は検索項目を candidate input として読んだ事実だけを記録し、この selects 辺は選択段階による明示的採用を記録します。final ContextPackage membership は後続の整列、裁断、組立結果として別に扱います。
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:RetrievedCandidate
-  - id: ContextSelectionActivity-precedes-ContextOrderingActivity
-    predicate: precedes
-    direction: source-to-target
-    relation_kind: temporal
-    labels:
-      zh: precedes
-      en: precedes
-      ja: precedes
-    definitions:
-      zh: ContextSelectionActivity-precedes-ContextOrderingActivity 表示同一组装中选择阶段的最终成员集合成为排序阶段输入，选择完成不晚于排序开始；跨运行早晚不构成该边。
-      en: ContextSelectionActivity-precedes-ContextOrderingActivity states that the final selected set in one assembly becomes ordering input and selection completes no later than ordering starts. Cross-run chronology does not create this edge.
-      ja: ContextSelectionActivity-precedes-ContextOrderingActivity は同一組立で最終選択集合が整列入力となり選択完了が整列開始以前であることを表し、実行横断の早遅では成立しません。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该语义事实不对所有运行实例施加统一基数。
-      en: This semantic fact does not impose one universal cardinality on every runtime instance.
-      ja: この意味事実はすべての実行インスタンスに一律の基数を課しません。
-    inverse_reading:
-      predicate: inverse_of_precedes
-      labels:
-        zh: 反向 precedes
-        en: inverse precedes
-        ja: 逆 precedes
-    conditions: []
-    temporal_scope: timeless
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: ContextSelectionActivity-precedes-ContextOrderingActivity-example-positive-001
-        kind: positive
-        labels:
-          zh: precedes正例
-          en: "Positive case: precedes"
-          ja: precedesの正例
-        scenario_id: null
-        descriptions:
-          zh: select-1 于 10:00:02 输出 7 项，order-2 于 10:00:03 读取同一集合。
-          en: select-1 emits seven items at 10:00:02 and order-2 reads the same set at 10:00:03.
-          ja: select-1 は10:00:02に7項目を出力し order-2 は10:00:03に同集合を読みます。
-        field_values: {}
-        related_node_ids:
-          - ContextSelectionActivity
-          - ContextOrderingActivity
-        related_relation_ids:
-          - ContextSelectionActivity-precedes-ContextOrderingActivity
-        expected_result:
-          zh: 时序查询返回相邻阶段和成员集合。
-          en: The temporal query returns adjacent phases and the member set.
-          ja: 時系列照会は隣接段階とmember集合を返します。
-        why_valid_or_invalid:
-          zh: 两个阶段属于同一运行，时间连续且选择结果被传入排序阶段。
-          en: Run identity, time, and artifact handoff agree.
-          ja: 実行同一性・時刻・成果物受渡しが一致します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-context-selection-activity-019
-      - id: ContextSelectionActivity-precedes-ContextOrderingActivity-example-boundary-001
-        kind: boundary
-        labels:
-          zh: precedes边界例
-          en: "Boundary case: precedes"
-          ja: precedesの境界例
-        scenario_id: null
-        descriptions:
-          zh: select-0 属于上一调用，虽更早但不向 order-2 传递集合。
-          en: select-0 belongs to the prior call and, though earlier, does not pass a set to order-2.
-          ja: select-0 は前呼出し所属で早くても order-2 へ集合を渡しません。
-        field_values: {}
-        related_node_ids:
-          - ContextSelectionActivity
-          - ContextOrderingActivity
-        related_relation_ids:
-          - ContextSelectionActivity-precedes-ContextOrderingActivity
-        expected_result:
-          zh: 不同调用之间的时间先后不得形成阶段 precedes 关系。
-          en: Cross-call timestamp comparison is rejected.
-          ja: 呼出し横断時刻比較を拒否します。
-        why_valid_or_invalid:
-          zh: 该边要求同一 assembly_id 与数据依赖。
-          en: The edge requires one assembly ID and data dependency.
-          ja: 同一assembly_idとdata依存が必要です。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-context-selection-activity-020
-    source_claims:
-      - claim-context-selection-activity-021
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:ContextOrderingActivity
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-lifecycle-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 该节点仅完成了从现行候选数据到唯一 YAML 树的无损转录；尚未逐项完成人工语义核验，不得据此宣称已审定。
-    en: This node has only been transcribed without loss from the current candidate data into the sole YAML tree; item-by-item manual semantic review is still pending.
-    ja: このノードは現行候補データから唯一の YAML ツリーへ欠落なく転記した段階であり、項目別の手動意味審査は未完了です。
-  sections:
-    semantics: pending
-    hierarchy: pending
-    relations: pending
-    structure: pending
-    examples: pending
-    source_claims: []
+relations: []
+sources:
+  - id: src-cursor-context
+    title: Cursor Agent Search and Context
+    publisher: Cursor
+    url: https://cursor.com/docs/agent/tools/search
+    source_type: official-doc
+    relevance: Semantic search and @ ref selection.
+  - id: src-cursor-ignore
+    title: Ignore files
+    publisher: Cursor
+    url: https://cursor.com/docs/context/ignore-files
+    source_type: official-doc
+    relevance: .cursorignore pre-selection filter.
+  - id: src-langchain-context-engineering
+    title: Context engineering in agents
+    publisher: LangChain
+    url: https://docs.langchain.com/oss/python/langchain/context-engineering
+    source_type: official-doc
+    relevance: Select strategy with relevance filtering.
+  - id: src-langchain-context-blog
+    title: Context Engineering for Agents
+    publisher: LangChain
+    url: https://www.langchain.com/blog/context-engineering-for-agents
+    source_type: official-doc
+    relevance: Select as first curation strategy.
+  - id: src-memory-context-design
+    title: Moonweave memory-context module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Selection versus ordering boundary.
 source_claims:
-  - id: claim-context-selection-activity-001
-    source: eng-fw-deepagents-js-docs
-    supports: Deep Agents documents focused input context, permission controls, context isolation, and on-demand retrieval rather than unconditional inclusion of all available material. ContextSelectionActivity is Moonweave's observable phase for deciding which candidates are admitted to one assembly.
-    locator: Context engineering in Deep Agents > Best practices > focused input context and on-demand filesystem retrieval
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-selection-activity-002
-    source: lit-agent-memory-as-action
-    supports: Memory as Action treats retrieval, update, summarization, and discard as actions selected by the agent. Moonweave reifies the run-specific admission evaluation over relevance, authorization, trust, and safety as ContextSelectionActivity, distinct from later ordering and trimming.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-selection-activity-003
-    source: eng-fw-deepagents-js-docs
-    supports: Deep Agents describes focused input context, context isolation through subagents, and on-demand retrieval from offloaded material. Moonweave makes the per-run admission of eligible items an explicit ContextSelectionActivity.
-    locator: Context engineering in Deep Agents > Best practices > focused input context and on-demand filesystem retrieval
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-selection-activity-004
-    source: lit-agent-memory-as-action
-    supports: Memory as Action exposes retrieval and discard as policy-controlled choices. The example specializes those choices into auditable admission and exclusion decisions for one context-assembly run.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-selection-activity-005
-    source: eng-fw-deepagents-js-docs
-    supports: Deep Agents distinguishes what context is included from how long context is compressed and presented. Moonweave uses membership change versus relative-position change as the boundary between selection and ordering.
-    locator: Context engineering in Deep Agents > Best practices > focused input context and on-demand filesystem retrieval
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-selection-activity-006
-    source: lit-agent-memory-as-action
-    supports: Memory as Action motivates distinguishing memory transformations by their action semantics. The boundary case applies that discipline to admission decisions versus permutation of an already admitted set.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-selection-activity-007
-    source: lit-agent-memory-as-action
-    supports: Memory-as-Action's Prune&Write policy can decide which history spans remain and can rewrite content to control working-memory size. Moonweave separates ContextSelectionActivity, which determines the admitted set, from ContextTrimmingActivity, which makes the ordered admitted content fit capacity while preserving provenance.
-    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-context-selection-activity-008
-    source: eng-fw-langchain-context-engineering
-    supports: Authorization and relevance decisions instantiate per-candidate model-context selection.
-    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
+  - id: claim-context-selection-cursor
+    source: src-cursor-context
+    supports: Cursor selects @ refs and scored semantic hits for admission.
+    locator: Agent search
+    evidence_kind: official
+    confidence: high
+  - id: claim-context-selection-cursorignore
+    source: src-cursor-ignore
+    supports: .cursorignore excludes paths during selection.
+    locator: Ignore patterns
+    evidence_kind: official
+    confidence: high
+  - id: claim-context-selection-rag
+    source: src-langchain-context-engineering
+    supports: Select strategy filters retrieved chunks by relevance threshold.
+    locator: Select
+    evidence_kind: official
+    confidence: high
+  - id: claim-context-selection-design
+    source: src-memory-context-design
+    supports: Selection decides membership, not order or trim.
+    locator: boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-context-selection-activity-009
-    source: eng-fw-langchain-context-engineering
-    supports: Assigning order after inclusion decisions is a separate transformation and lacks selection differentia.
-    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
+  - id: claim-context-selection-id
+    source: src-memory-context-design
+    supports: phase_id identifies selection phase runs.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-context-selection-activity-010
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain context engineering explicitly includes selecting messages, tools, and other model-context components; Moonweave isolates the observed inclusion-decision execution as ContextSelectionActivity.
-    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
+  - id: claim-context-selection-threshold
+    source: src-langchain-context-engineering
+    supports: relevance_threshold gates RAG admission.
+    locator: Select
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-context-selection-activity-011
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain distinguishes available state and store data from the transient model context actually supplied to one call. Moonweave therefore requires run-specific admission evidence before asserting that ContextSelectionActivity selected a RetrievedCandidate; LangChain does not define this ontology relation.
-    locator: Context engineering in agents > Overview > What you can control; Model context
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-context-selection-activity-012
-    source: lit-agent-memory-as-action
-    supports: Memory as Action models context curation as explicit policy actions that select, integrate, or prune information. Moonweave uses that action boundary to require an observed admission decision rather than inferring selection from candidate availability or score.
-    locator: Paper > §1 Introduction (Context Curation); §2.2 Formalizing Context Management as a Decision Process
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-context-selection-activity-013
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain documents that model context controls what enters one model call and can draw from state or long-term store. The example's explicit per-run admission record is Moonweave's auditable representation of choosing one retrieved item for that context.
-    locator: Context engineering in agents > Overview > What you can control; Model context
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-context-selection-activity-014
-    source: lit-agent-memory-as-action
-    supports: Memory as Action defines context curation as strategic selection, integration, and pruning carried out through explicit actions. The example instantiates one such admission action over an identified candidate without claiming the paper defines Moonweave IDs.
-    locator: Paper > §1 Introduction (Context Curation); §2.2 Formalizing Context Management as a Decision Process
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-context-selection-activity-015
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain separates available data sources from the model context passed to a call. A retrieved and scored item can therefore remain outside the call context; Moonweave requires the explicit admission record before asserting this edge.
-    locator: Context engineering in agents > Overview > What you can control; Model context
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-context-selection-activity-016
-    source: lit-agent-memory-as-action
-    supports: Memory as Action treats retention and pruning as explicit policy actions rather than consequences of mere presence. The exclusion outcome in this boundary case therefore blocks an inferred selection edge.
-    locator: Paper > §1 Introduction (Context Curation); §2.2 Formalizing Context Management as a Decision Process
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-context-selection-activity-017
-    source: eng-fw-langchain-context-engineering
-    supports: LangChain's official context-engineering guide distinguishes available state and store data from transient model context and states that model context controls what enters each model call. Moonweave infers an explicit ContextSelectionActivity → RetrievedCandidate admission fact so retrieval availability is not conflated with call-context membership; the documentation does not define this relation or its IDs.
-    locator: Context engineering in agents > Overview > What you can control; Model context
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-context-selection-activity-018
-    source: lit-agent-memory-as-action
-    supports: Memory as Action defines context curation as strategically selecting, integrating, and pruning information and formalizes memory management as explicit actions within a decision process. Moonweave infers this directed activity-to-candidate fact to record one admission outcome while keeping retrieval identity and final package membership separate.
-    locator: Paper > §1 Introduction (Context Curation); §2.2 Formalizing Context Management as a Decision Process
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-context-selection-activity-019
-    source: eng-fw-langchain-context-engineering
-    supports: Matching selected-set identity and non-overlapping phase times establish precedence in one assembly.
-    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-context-selection-activity-020
-    source: eng-fw-langchain-context-engineering
-    supports: An earlier selection in another call has no data handoff to the current ordering phase.
-    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-context-selection-activity-021
-    source: eng-fw-langchain-context-engineering
-    supports: Context engineering first determines what model context to supply and then controls its presentation; Moonweave records execution-level precedence when the selected set feeds ordering.
-    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

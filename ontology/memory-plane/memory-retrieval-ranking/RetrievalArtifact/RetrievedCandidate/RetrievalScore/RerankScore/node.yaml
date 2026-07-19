@@ -1,34 +1,56 @@
 schema: moonweave.ai/ontology-node/v1
 id: RerankScore
 kind: concept
-status: accepted
 labels:
   zh: 重排分数
   en: Rerank score
   ja: 再順位付けscore
 semantics:
   short_definition:
-    zh: 由声明版本的重排模型在二阶段检索中为候选重新产生的检索分数。
-    en: A retrieval score reassigned to a candidate by a declared reranker-model version in second-stage retrieval.
-    ja: second-stage retrievalで指定reranker-model versionがcandidateに再付与するretrieval scoreです。
+    zh: 重排模型产生的相关性分数。
+    en: Relevance score from reranker model.
+    ja: reranker model 生成 relevance score。
   definition:
-    zh: RerankScore 是 RetrievalScore 的严格子类，由 RerankActivity 的声明模型对查询与候选字段联合评估后产生；它保留 model_version 和数值，但不等同于初始相似度、RRF 累积分或最终 rank_position。
-    en: RerankScore is the strict RetrievalScore subtype produced when a RerankActivity's declared model jointly evaluates the query and candidate fields. It preserves model_version and value but is not initial similarity, accumulated RRF value, or final rank_position.
-    ja: RerankScore はRerankActivity指定modelがquery/candidate fieldをjointly評価して生成するstrict RetrievalScore subtypeです。model_version/valueを保持しますがinitial similarity・RRF aggregate・final rank_positionではありません。
+    zh: RerankScore 是 RetrievalScore 子类，记录 Cohere POST /v2/rerank 响应的 relevance_score 或等效 cross-encoder 输出；scoring_method=cohere-rerank 且 model_version 必填。与 BM25/cosine 不可直接比较。
+    en: RerankScore is a RetrievalScore subtype recording Cohere POST /v2/rerank relevance_score or equivalent cross-encoder output with scoring_method=cohere-rerank and required model_version. Not directly comparable to BM25/cosine.
+    ja: RerankScore は Cohere relevance_score の subtype。scoring_method=cohere-rerank, model_version 必須。BM25/cosine と比較不可。
   why_needed:
-    zh: 使二阶段模型分数可以解释、复算并与初始检索信号区分。
-    en: Makes second-stage model scores explainable and reproducible while distinguishing them from first-stage retrieval signals.
-    ja: second-stage model scoreを説明・再計算可能にしfirst-stage retrieval signalと区別します。
+    zh: Cohere relevance_score 决定最终顺序；必须绑定 rerank-v3.5 等 model_version 才能解释分数变化。
+    en: Cohere relevance_score drives final order; model_version such as rerank-v3.5 must be bound to explain score changes.
+    ja: relevance_score は model_version 绑定が必須。
   includes:
-    - zh: 纳入交叉编码器或专用 reranker 对候选产生的二阶段相关性数值。
-      en: Includes second-stage relevance values produced by cross-encoders or dedicated rerankers.
-      ja: cross-encoder/dedicated rerankerがcandidateに生成するsecond-stage relevance valueを含みます。
+    - zh: 纳入 Cohere rerank 与 cross-encoder 输出的 relevance 分数。
+      en: Includes relevance scores from Cohere rerank and cross-encoders.
+      ja: Cohere rerank/cross-encoder relevance score。
   excludes:
-    - zh: 排除向量相似度、词汇分数、融合排名贡献和最终排名字段。
-      en: Excludes vector similarity, lexical scores, fusion-rank contributions, and the final rank field.
-      ja: vector similarity・lexical score・fusion-rank contribution・final rank fieldを除外します。
+    - zh: 排除 BM25、cosine 与 rank_position。
+      en: Excludes BM25, cosine, and rank_position.
+      ja: BM25/cosine/rank_position を除外。
   semantic_kind: quality
   aliases: []
+engineering:
+  explanation:
+    zh: Cohere results[].relevance_score→numeric_value；model_version←request model；scoring_stage=rerank。
+    en: Cohere results[].relevance_score→numeric_value; model_version from request model; scoring_stage=rerank.
+    ja: Cohere relevance_score 映射。
+  typical_input: []
+  typical_output: []
+  reference_implementations:
+    - name: Mem0 Search API
+      url: https://docs.mem0.ai
+      description: POST /v1/memories/search/
+    - name: Pinecone Query
+      url: https://docs.pinecone.io/guides/search/query-data
+      description: index.query / QueryResponse
+    - name: Chroma Query
+      url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+      description: collection.query / QueryResult
+    - name: Cohere Rerank API
+      url: https://docs.cohere.com/reference/rerank
+      description: POST /v2/rerank
+    - name: ColBERT
+      url: https://arxiv.org/abs/2004.12832
+      description: MaxSim scoring
 structure:
   identity_keys:
     - score_id
@@ -36,125 +58,127 @@ structure:
     - id: score_id
       labels:
         zh: 分数标识
-        en: score ID
-        ja: score ID
+        en: Score identifier
+        ja: score 識別子
+      definitions:
+        zh: 继承 RetrievalScore.score_id。
+        en: Inherits RetrievalScore.score_id.
+        ja: RetrievalScore.score_id 継承。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 继承并标识一次重排评分记录。
-        en: Inherited identifier for one rerank-score record.
-        ja: 一rerank-score recordを継承識別します。
-      allowed_values: []
       pattern: null
       example_value: rerank-score-430
-      source_claims:
-        - claim-rerank-score-002
-    - id: model_version
-      labels:
-        zh: 重排模型版本
-        en: reranker model version
-        ja: reranker model version
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 记录产生该数值的确切重排模型版本。
-        en: Exact reranker model version that produced the value.
-        ja: valueを生成したexact reranker model versionです。
       allowed_values: []
-      pattern: null
-      example_value: bge-reranker-v3
       source_claims:
-        - claim-rerank-score-003
+        - claim-rerank-score-id
     - id: numeric_value
       labels:
-        zh: 重排分数值
-        en: rerank score value
-        ja: rerank score値
+        zh: 重排分数
+        en: Rerank value
+        ja: rerank 値
+      definitions:
+        zh: Cohere relevance_score 或 cross-encoder 输出。
+        en: Cohere relevance_score or cross-encoder output.
+        ja: Cohere relevance_score。
       datatype: number
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 保存该模型输出的候选相关性数值。
-        en: Candidate relevance value emitted by the reranker model.
-        ja: reranker modelが出力したcandidate relevance valueです。
-      allowed_values: []
       pattern: null
-      example_value: 0.82
+      example_value: 0.917
+      allowed_values: []
       source_claims:
-        - claim-rerank-score-004
+        - claim-rerank-score-value
+    - id: model_version
+      labels:
+        zh: 重排模型版本
+        en: Rerank model version
+        ja: rerank model 版
+      definitions:
+        zh: 如 rerank-v3.5；与 RerankActivity.model_version 一致。
+        en: E.g., rerank-v3.5; must match RerankActivity.model_version.
+        ja: rerank-v3.5 等。RerankActivity と一致。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      pattern: null
+      example_value: rerank-v3.5
+      allowed_values: []
+      source_claims:
+        - claim-rerank-score-model
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: RerankScore-example-positive-manual-001
-    kind: positive
+  - id: RerankScore-example-cohere
     labels:
-      zh: 重排分数正例
-      en: "Positive case: Rerank score"
-      ja: 再順位付けscore正例
-    scenario_id: null
+      zh: Cohere relevance_score
+      en: Cohere relevance_score
+      ja: Cohere relevance_score
     descriptions:
-      zh: rerank-score-430 记录 bge-reranker-v3 为 candidate-424 产生的 0.82。
-      en: rerank-score-430 records value 0.82 produced for candidate-424 by bge-reranker-v3.
-      ja: rerank-score-430 はbge-reranker-v3がcandidate-424に生成した0.82を記録します。
+      zh: rerank-score-430 numeric_value=0.917 model_version=rerank-v3.5 for candidate-424 from Cohere rerank-416。
+      en: rerank-score-430 numeric_value=0.917 model_version=rerank-v3.5 for candidate-424 from rerank-416.
+      ja: Cohere 0.917 for candidate-424。
+    example_source:
+      product: Cohere
+      url: https://docs.cohere.com/reference/rerank
+      version: relevance_score
     field_values:
       score_id: rerank-score-430
-      model_version: bge-reranker-v3
-      numeric_value: 0.82
-      scoring_stage: rerank
+      numeric_value: 0.917
+      model_version: rerank-v3.5
     related_node_ids:
       - RerankScore
+      - RerankActivity
     related_relation_ids: []
-    expected_result:
-      zh: 归类为 RerankScore。
-      en: Classify the object as RerankScore.
-      ja: RerankScore として分類します。
-    why_valid_or_invalid:
-      zh: 分数明确来自二阶段声明模型，可与初始检索分数区分。
-      en: The score explicitly comes from a declared second-stage model and is distinguishable from initial retrieval scores.
-      ja: 指定second-stage model由来でinitial retrieval scoreと区別できます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-rerank-score-005
-  - id: RerankScore-example-boundary-manual-001
-    kind: boundary
+      - claim-rerank-score-cohere
+  - id: RerankScore-example-not-cosine
     labels:
-      zh: 重排分数边界例
-      en: "Boundary case: Rerank score"
-      ja: 再順位付けscore境界例
-    scenario_id: null
+      zh: 非 cosine
+      en: Not cosine
+      ja: cosine ではない
     descriptions:
-      zh: rrf-contribution-430 仅由候选在两个列表中的 rank 代入公式得到。
-      en: rrf-contribution-430 is computed only from the candidate's ranks in two lists.
-      ja: rrf-contribution-430 は二list内rankだけを式へ代入して得ます。
+      zh: cosine 0.842 是 SimilarityScore；0.917 是 RerankScore，不可直接比大小。
+      en: Cosine 0.842 is SimilarityScore; 0.917 is RerankScore; not directly comparable.
+      ja: cosine と rerank は別 subtype。
+    example_source:
+      product: https://moonweave.ai/ontology/agent-system/2.0.0/
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: heterogeneous scores
     field_values: {}
     related_node_ids:
       - RerankScore
+      - SimilarityScore
     related_relation_ids: []
-    expected_result:
-      zh: 不得归类为 RerankScore。
-      en: Do not classify the object as RerankScore.
-      ja: RerankScore として分類しません。
-    why_valid_or_invalid:
-      zh: 它是排名融合贡献，不是模型产生的 RerankScore。
-      en: It is a rank-fusion contribution, not a model-produced RerankScore.
-      ja: rank-fusion contributionでmodel由来RerankScoreではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-rerank-score-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-rerank-score-not-cosine
+  - id: RerankScore-example-pinecone-hosted
+    labels:
+      zh: Pinecone 托管 rerank
+      en: Pinecone hosted rerank
+      ja: Pinecone hosted rerank
+    descriptions:
+      zh: Pinecone inference rerank 返回 relevance_score 同样映射 RerankScore。
+      en: Pinecone inference rerank relevance_score also maps to RerankScore.
+      ja: Pinecone hosted rerank→RerankScore。
+    example_source:
+      product: Pinecone
+      url: https://docs.pinecone.io/guides/search/rerank-results
+      version: hosted rerank
+    field_values:
+      numeric_value: 0.891
+      model_version: cohere-rerank-3.5
+    related_node_ids:
+      - RerankScore
+    related_relation_ids: []
+    source_claims:
+      - claim-rerank-score-pinecone
 parent_relation:
   id: RerankScore-is_a-RetrievalScore
   predicate: is_a
@@ -189,18 +213,16 @@ parent_relation:
         en: "Assert only when the instance satisfies the complete RetrievalScore definition and the child differentia: its value is produced by a declared reranker version jointly evaluating query and candidate fields."
         ja: instanceがRetrievalScore完全定義とchild differentia「valueが指定reranker versionによるquery/candidate field joint evaluationから生成される」を共に満たす時だけassertします。
       source_claims:
-        - claim-rerank-score-007
+        - claim-rerank-score-id
   temporal_scope: timeless
   boundary_context: null
   constraints: []
   examples:
     - id: RerankScore-is_a-RetrievalScore-example-positive-manual-001
-      kind: positive
       labels:
         zh: 是一种RetrievalScore正例
         en: "Positive case: is a RetrievalScore"
         ja: RetrievalScoreの一種正例
-      scenario_id: null
       descriptions:
         zh: rerank-score-430 记录 bge-reranker-v3=0.82。
         en: rerank-score-430 records bge-reranker-v3=0.82.
@@ -211,25 +233,13 @@ parent_relation:
         - RetrievalScore
       related_relation_ids:
         - RerankScore-is_a-RetrievalScore
-      expected_result:
-        zh: 建立该有向事实，并保留条件与证据。
-        en: Assert the directed fact with its condition and evidence retained.
-        ja: condition/evidenceを保持してdirected factをassertします。
-      why_valid_or_invalid:
-        zh: 实例满足端点定义、方向和该关系的显式成立条件。
-        en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-        ja: endpoint定義・direction・明示assertion conditionを満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-rerank-score-007
+        - claim-rerank-score-id
     - id: RerankScore-is_a-RetrievalScore-example-boundary-manual-001
-      kind: boundary
       labels:
         zh: 是一种RetrievalScore边界例
         en: "Boundary case: is a RetrievalScore"
         ja: RetrievalScoreの一種境界例
-      scenario_id: null
       descriptions:
         zh: RRF contribution 只依赖排名位置，不属于 RerankScore。
         en: An RRF contribution depends only on rank positions and is not RerankScore.
@@ -240,88 +250,66 @@ parent_relation:
         - RetrievalScore
       related_relation_ids:
         - RerankScore-is_a-RetrievalScore
-      expected_result:
-        zh: 验证器不得建立该有向关系事实。
-        en: Do not assert the directed fact.
-        ja: directed factをassertしません。
-      why_valid_or_invalid:
-        zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-        en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-        ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-rerank-score-007
+        - claim-rerank-score-id
   source_claims:
-    - claim-rerank-score-007
+    - claim-rerank-score-id
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: pending
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-cohere-rerank
+    title: Cohere Rerank API
+    publisher: Cohere
+    url: https://docs.cohere.com/reference/rerank
+    source_type: official-doc
+    relevance: relevance_score.
+  - id: src-pinecone-query
+    title: Pinecone Query Guide
+    publisher: Pinecone
+    url: https://docs.pinecone.io/guides/search/query-data
+    source_type: official-doc
+    relevance: QueryResponse.
+  - id: src-memory-retrieval-design
+    title: Moonweave design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Module boundary.
 source_claims:
-  - id: claim-rerank-score-001
-    source: eng-vector-pinecone-reranking
-    supports: Pinecone documents reranking initial results with a selected model and returns model-assigned relevance scores; Moonweave records model version with each RerankScore.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
+  - id: claim-rerank-score-cohere
+    source: src-cohere-rerank
+    supports: Cohere rerank returns relevance_score.
+    locator: relevance_score
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-rerank-score-not-cosine
+    source: src-memory-retrieval-design
+    supports: RerankScore is not comparable to SimilarityScore.
+    locator: heterogeneous
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-rerank-score-002
-    source: eng-vector-pinecone-reranking
-    supports: "Pinecone documents reranking initial results with a selected model and returns model-assigned relevance scores; Moonweave records model version with each RerankScore. Moonweave records RerankScore.score_id as the stated auditable datum: Inherited identifier for one rerank-score record."
-    locator: Rerank results > two-stage retrieval and rerank request parameters
+  - id: claim-rerank-score-pinecone
+    source: src-pinecone-query
+    supports: Pinecone hosted rerank returns relevance scores.
+    locator: hosted rerank
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-rerank-score-id
+    source: src-memory-retrieval-design
+    supports: score_id identifies rerank score.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-rerank-score-003
-    source: eng-vector-pinecone-reranking
-    supports: "Pinecone documents reranking initial results with a selected model and returns model-assigned relevance scores; Moonweave records model version with each RerankScore. Moonweave records RerankScore.model_version as the stated auditable datum: Exact reranker model version that produced the value."
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
+  - id: claim-rerank-score-value
+    source: src-cohere-rerank
+    supports: numeric_value stores relevance_score.
+    locator: value
+    evidence_kind: primary-api
     confidence: high
-    review_status: accepted
-  - id: claim-rerank-score-004
-    source: eng-vector-pinecone-reranking
-    supports: "Pinecone documents reranking initial results with a selected model and returns model-assigned relevance scores; Moonweave records model version with each RerankScore. Moonweave records RerankScore.numeric_value as the stated auditable datum: Candidate relevance value emitted by the reranker model."
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
+  - id: claim-rerank-score-model
+    source: src-cohere-rerank
+    supports: model_version pins rerank model.
+    locator: model
+    evidence_kind: primary-api
     confidence: high
-    review_status: accepted
-  - id: claim-rerank-score-005
-    source: eng-vector-pinecone-reranking
-    supports: Pinecone documents reranking initial results with a selected model and returns model-assigned relevance scores; Moonweave records model version with each RerankScore. Pinecone reranking returns rescored results from a named reranking model.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-rerank-score-006
-    source: eng-vector-pinecone-reranking
-    supports: Pinecone documents reranking initial results with a selected model and returns model-assigned relevance scores; Moonweave records model version with each RerankScore. RRF uses rank positions, whereas reranking uses a model to rescore documents.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-rerank-score-007
-    source: eng-vector-pinecone-reranking
-    supports: The official documentation supports the operational distinction used in this child differentia; Moonweave's RerankScore-to-RetrievalScore subclass placement is an explicit ontology design decision.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

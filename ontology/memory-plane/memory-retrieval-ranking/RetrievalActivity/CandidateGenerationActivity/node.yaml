@@ -1,34 +1,67 @@
 schema: moonweave.ai/ontology-node/v1
 id: CandidateGenerationActivity
 kind: concept
-status: accepted
 labels:
   zh: 候选生成
   en: Candidate generation
   ja: 候補生成
 semantics:
   short_definition:
-    zh: 从查询、过滤条件和索引版本产生初始候选集合的检索阶段。
-    en: A retrieval stage that produces an initial candidate set from a query, filter, and index version.
-    ja: query・filter・index versionからinitial candidate setを生成するretrieval stageです。
+    zh: 从索引召回初始候选的首阶段活动。
+    en: First-stage activity that recalls initial candidates from an index.
+    ja: 索引から initial candidate を recall する first-stage activity。
   definition:
-    zh: CandidateGenerationActivity 是读取一个已声明 IndexVersion，并按 RetrievalQuery 与可选 RetrievalFilter 生成 CandidateSet 的活动；它决定召回范围，不负责跨列表融合、语义重排或上下文采用。
-    en: CandidateGenerationActivity reads a declared IndexVersion and produces a CandidateSet for a RetrievalQuery and optional RetrievalFilter. It establishes recall scope but does not perform list fusion, semantic reranking, or context admission.
-    ja: CandidateGenerationActivity は指定IndexVersionを読みRetrievalQueryと任意RetrievalFilterからCandidateSetを生成します。recall範囲を決めますがlist fusion・semantic reranking・context admissionは行いません。
+    zh: CandidateGenerationActivity 读取声明的 IndexVersion，按 RetrievalQuery 与可选 RetrievalFilter 调用 Mem0 search、Pinecone index.query、Chroma collection.query 或 LangGraph store.search 生成 CandidateSet；职责止于召回，不做 RRF 融合、Cohere rerank 或 ContextPackage 采用。
+    en: CandidateGenerationActivity reads a declared IndexVersion and invokes Mem0 search, Pinecone index.query, Chroma collection.query, or LangGraph store.search for a RetrievalQuery and optional RetrievalFilter to produce a CandidateSet. It stops at recall and does not perform RRF fusion, Cohere rerank, or ContextPackage admission.
+    ja: CandidateGenerationActivity は IndexVersion を read し RetrievalQuery/任意 RetrievalFilter で Mem0 search・Pinecone index.query・Chroma collection.query・LangGraph store.search を呼び CandidateSet を生成。recall で終わり RRF/Cohere rerank/ContextPackage 採用は行いません。
   why_needed:
-    zh: 把“取得候选”与后续评分、融合、重排和 TopK 分开。
-    en: Separates obtaining candidates from later scoring, fusion, reranking, and TopK selection.
-    ja: candidate取得を後続scoring・fusion・reranking・TopK selectionから分離します。
+    zh: 需要把“从索引拿候选”与后面的打分、融合、重排和截断分开，否则无法解释 Pinecone top_k=40 与最终返回 5 条之间的阶段差异。
+    en: Recall must stay separate from later scoring, fusion, reranking, and truncation; otherwise the gap between Pinecone top_k=40 and five returned rows cannot be explained.
+    ja: 索引からの recall を後段 scoring/fusion/rerank/truncation と分離しないと Pinecone top_k=40 と最終 5 件の差を説明できません。
   includes:
-    - zh: 纳入向量、词汇或其他检索器对索引执行的首阶段召回。
-      en: Includes first-stage recall by vector, lexical, or other retrievers over an index.
-      ja: vector・lexical等retrieverによるindex上のfirst-stage recallを含みます。
+    - zh: 纳入向量、词汇或 hybrid 检索器对索引执行的首阶段召回。
+      en: Includes first-stage recall by vector, lexical, or hybrid retrievers over an index.
+      ja: vector/lexical/hybrid retriever による first-stage recall を含みます。
   excludes:
-    - zh: 排除仅计算分数、合并已排序列表、重排已有候选或选择上下文的活动。
-      en: Excludes activities that only score, fuse existing ranked lists, rerank candidates, or select context.
-      ja: score計算のみ・既存ranked list融合・candidate再順位付け・context選択を除外します。
+    - zh: 排除 RRF 融合、Cohere rerank、Top-K 截断与上下文采用。
+      en: Excludes RRF fusion, Cohere rerank, Top-K truncation, and context admission.
+      ja: RRF fusion・Cohere rerank・Top-K truncation・context admission を除外します。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: 映射 Pinecone index.query 的 top_k、Chroma collection.query 的 n_results、Mem0 search 的 top_k 与 LangGraph store.search 的 limit 到 requested_limit；retrieval_method 记录 dense/sparse/hybrid。
+    en: Map Pinecone index.query top_k, Chroma collection.query n_results, Mem0 search top_k, and LangGraph store.search limit to requested_limit; retrieval_method records dense/sparse/hybrid.
+    ja: Pinecone top_k、Chroma n_results、Mem0 top_k、LangGraph limit を requested_limit に写像。retrieval_method は dense/sparse/hybrid を記録。
+  typical_input:
+    - description: Pinecone dense recall
+      format: 'index.query(vector=[...], top_k=40, namespace="tenant-7-user-alice", filter={"category": {"$eq": "preferences"}})'
+      source_claims:
+        - claim-candidate-generation-pinecone
+  typical_output:
+    - description: Initial CandidateSet reference
+      format: '{ "generation_activity_id": "candidate-generation-412", "retrieval_method": "dense-vector", "requested_limit": 40 }'
+      source_claims:
+        - claim-candidate-generation-design
+  reference_implementations:
+    - name: Mem0 Search API
+      url: https://docs.mem0.ai
+      description: POST /v1/memories/search/ with query, entity IDs, filters, and top_k.
+    - name: Pinecone Query
+      url: https://docs.pinecone.io/guides/search/query-data
+      description: index.query with vector, namespace, filter, and top_k.
+    - name: Chroma Query
+      url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+      description: collection.query with query_texts or query_embeddings and n_results.
+    - name: LangGraph Store Search
+      url: https://langchain-ai.github.io/langgraph/reference/store/
+      description: BaseStore.search with namespace prefix and semantic query.
+    - name: Cohere Rerank API
+      url: https://docs.cohere.com/reference/rerank
+      description: POST /v2/rerank with model rerank-v3.x, query, documents, top_n.
+    - name: ColBERT
+      url: https://arxiv.org/abs/2004.12832
+      description: Late interaction retrieval via token-level MaxSim scoring.
 structure:
   identity_keys:
     - generation_activity_id
@@ -36,126 +69,236 @@ structure:
     - id: generation_activity_id
       labels:
         zh: 生成活动标识
-        en: generation activity ID
-        ja: generation activity ID
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
+        en: Generation activity identifier
+        ja: 生成 activity 識別子
       definitions:
         zh: 稳定标识一次候选生成阶段。
         en: Stable identifier for one candidate-generation stage.
-        ja: 一つのcandidate-generation stageを安定識別します。
-      allowed_values: []
-      pattern: null
-      example_value: candidate-generation-412
-      source_claims:
-        - claim-candidate-generation-activity-002
-    - id: retrieval_method
-      labels:
-        zh: 检索方法
-        en: retrieval method
-        ja: 検索方式
+        ja: 一 candidate-generation stage を安定識別。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 记录该阶段使用的检索器或方法类别。
-        en: Records the retriever or method family used by the stage.
-        ja: stageが使うretrieverまたはmethod familyを記録します。
+      pattern: null
+      example_value: candidate-generation-412
       allowed_values: []
+      source_claims:
+        - claim-candidate-generation-id
+    - id: retrieval_method
+      labels:
+        zh: 检索方法
+        en: Retrieval method
+        ja: 検索方式
+      definitions:
+        zh: 记录该阶段检索器类别：dense-vector、sparse-lexical、hybrid、mem0-semantic 等。
+        en: "Records retriever family: dense-vector, sparse-lexical, hybrid, mem0-semantic, etc."
+        ja: dense-vector/sparse-lexical/hybrid/mem0-semantic 等 retriever 类别。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
       pattern: null
       example_value: dense-vector
+      allowed_values: []
       source_claims:
-        - claim-candidate-generation-activity-003
+        - claim-candidate-generation-method
     - id: requested_limit
       labels:
         zh: 请求上限
-        en: requested limit
+        en: Requested limit
         ja: 要求上限
+      definitions:
+        zh: 对应 Pinecone top_k、Chroma n_results、Mem0 top_k、LangGraph limit。
+        en: Maps to Pinecone top_k, Chroma n_results, Mem0 top_k, or LangGraph limit.
+        ja: Pinecone top_k・Chroma n_results・Mem0 top_k・LangGraph limit に対応。
       datatype: integer
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 记录该候选生成阶段请求的最大候选数量。
-        en: Maximum number of candidates requested from this generation stage.
-        ja: このgeneration stageで要求する最大candidate数です。
-      allowed_values: []
       pattern: null
-      example_value: 80
+      example_value: 40
+      allowed_values: []
       source_claims:
-        - claim-candidate-generation-activity-004
+        - claim-candidate-generation-limit
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: CandidateGenerationActivity-example-positive-manual-001
-    kind: positive
+  - id: CandidateGenerationActivity-example-pinecone
     labels:
-      zh: 候选生成正例
-      en: "Positive case: Candidate generation"
-      ja: 候補生成正例
-    scenario_id: null
+      zh: Pinecone 稠密召回
+      en: Pinecone dense recall
+      ja: Pinecone dense recall
     descriptions:
-      zh: generation-412 对 index-v19 执行稠密向量召回并产生 80 个初始候选。
-      en: generation-412 performs dense-vector recall on index-v19 and produces 80 initial candidates.
-      ja: generation-412 はindex-v19でdense-vector recallを行い80件のinitial candidateを生成します。
+      zh: generation-412 对 index-v19 执行 index.query(top_k=40) 并产生 40 个 Pinecone ScoredVector 候选。
+      en: generation-412 runs index.query(top_k=40) on index-v19 and produces 40 Pinecone ScoredVector candidates.
+      ja: generation-412 が index-v19 で index.query(top_k=40) を実行し 40 ScoredVector 候補を生成。
+    example_source:
+      product: Pinecone
+      url: https://docs.pinecone.io/guides/search/query-data
+      version: index.query top_k=40
     field_values:
       generation_activity_id: candidate-generation-412
       retrieval_method: dense-vector
-      requested_limit: 80
-      activity_id: candidate-generation-412
-      started_at: 2026-07-16T12:00:00Z
+      requested_limit: 40
+      namespace: tenant-7-user-alice
     related_node_ids:
       - CandidateGenerationActivity
+      - CandidateSet
     related_relation_ids: []
-    expected_result:
-      zh: 归类为 CandidateGenerationActivity。
-      en: Classify the object as CandidateGenerationActivity.
-      ja: CandidateGenerationActivity として分類します。
-    why_valid_or_invalid:
-      zh: 输入是查询/索引，输出是首阶段候选集合，职责止于召回。
-      en: Its inputs are query and index, its output is a first-stage candidate set, and its responsibility stops at recall.
-      ja: inputはquery/index、outputはfirst-stage candidate setで責務はrecallまでです。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-candidate-generation-activity-005
-  - id: CandidateGenerationActivity-example-boundary-manual-001
-    kind: boundary
+      - claim-candidate-generation-pinecone
+      - claim-candidate-generation-design
+  - id: CandidateGenerationActivity-example-chroma
     labels:
-      zh: 候选生成边界例
-      en: "Boundary case: Candidate generation"
-      ja: 候補生成境界例
-    scenario_id: null
+      zh: Chroma 文本查询召回
+      en: Chroma text query recall
+      ja: Chroma テキストクエリ recall
     descriptions:
-      zh: rerank-412 重新评估已有 80 个候选并输出前 12 个。
-      en: rerank-412 rescales an existing set of 80 candidates and returns 12.
-      ja: rerank-412 は既存80候補を再評価し12件を返します。
-    field_values: {}
+      zh: generation-413 调用 collection.query(query_texts=[...], n_results=20, where={"user_id":"alice"}) 生成初始候选。
+      en: generation-413 calls collection.query(query_texts=[...], n_results=20, where={"user_id":"alice"}) for initial candidates.
+      ja: generation-413 が collection.query(n_results=20) で initial candidate を生成。
+    example_source:
+      product: Chroma
+      url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+      version: collection.query
+    field_values:
+      generation_activity_id: candidate-generation-413
+      retrieval_method: dense-vector
+      requested_limit: 20
+      collection: agent_memories_alice
     related_node_ids:
       - CandidateGenerationActivity
     related_relation_ids: []
-    expected_result:
-      zh: 不得归类为 CandidateGenerationActivity。
-      en: Do not classify the object as CandidateGenerationActivity.
-      ja: CandidateGenerationActivity として分類しません。
-    why_valid_or_invalid:
-      zh: 它消费已有候选，属于重排而非候选生成。
-      en: It consumes existing candidates, so it is reranking rather than candidate generation.
-      ja: 既存candidateをconsumeするためcandidate generationでなくrerankingです。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-candidate-generation-activity-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-candidate-generation-chroma
+  - id: CandidateGenerationActivity-example-mem0
+    labels:
+      zh: Mem0 hybrid 召回
+      en: Mem0 hybrid recall
+      ja: Mem0 hybrid recall
+    descriptions:
+      zh: generation-414 调用 Mem0 POST /v1/memories/search/(query=..., top_k=5, user_id=alice) 在实体作用域内召回记忆。
+      en: generation-414 calls Mem0 POST /v1/memories/search/ with top_k=5 and user_id=alice for entity-scoped recall.
+      ja: generation-414 が Mem0 search(top_k=5, user_id=alice) で entity 作用域 recall。
+    example_source:
+      product: Mem0
+      url: https://docs.mem0.ai
+      version: POST /v1/memories/search/
+    field_values:
+      generation_activity_id: candidate-generation-414
+      retrieval_method: mem0-hybrid
+      requested_limit: 5
+      user_id: alice
+    related_node_ids:
+      - CandidateGenerationActivity
+      - memory-stores-scopes
+    related_relation_ids: []
+    source_claims:
+      - claim-candidate-generation-mem0
+  - id: CandidateGenerationActivity-example-langgraph
+    labels:
+      zh: LangGraph store.search 召回
+      en: LangGraph store.search recall
+      ja: LangGraph store.search recall
+    descriptions:
+      zh: generation-415 对 namespace ("tenant-7","user-42") 执行 store.search(limit=10) 返回匹配 Item。
+      en: generation-415 runs store.search(limit=10) on namespace ("tenant-7","user-42") returning matching Items.
+      ja: generation-415 が store.search(limit=10) で matching Item を返却。
+    example_source:
+      product: LangGraph
+      url: https://langchain-ai.github.io/langgraph/reference/store/
+      version: BaseStore.search
+    field_values:
+      generation_activity_id: candidate-generation-415
+      retrieval_method: langgraph-semantic
+      requested_limit: 10
+    related_node_ids:
+      - CandidateGenerationActivity
+    related_relation_ids: []
+    source_claims:
+      - claim-candidate-generation-langgraph
+sources:
+  - id: src-pinecone-query
+    title: Pinecone Query Guide
+    publisher: Pinecone
+    url: https://docs.pinecone.io/guides/search/query-data
+    source_type: official-doc
+    relevance: index.query with vector, namespace, filter, top_k.
+  - id: src-chroma-query
+    title: Chroma Query Documentation
+    publisher: Chroma
+    url: https://docs.trychroma.com/docs/querying-collections/query-and-get
+    source_type: official-doc
+    relevance: collection.query with query_texts, n_results, where filter.
+  - id: src-mem0-search
+    title: Mem0 Platform Documentation
+    publisher: Mem0
+    url: https://docs.mem0.ai
+    source_type: official-doc
+    relevance: POST /v1/memories/search/ with query, entity IDs, filters, top_k.
+  - id: src-langgraph-search
+    title: LangGraph Store Reference
+    publisher: LangChain
+    url: https://langchain-ai.github.io/langgraph/reference/store/
+    source_type: official-doc
+    relevance: BaseStore.search semantic query over namespace prefix.
+  - id: src-memory-retrieval-design
+    title: Moonweave memory-retrieval-ranking module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Separates retrieval stages, scores, results, and context admission.
+source_claims:
+  - id: claim-candidate-generation-pinecone
+    source: src-pinecone-query
+    supports: Pinecone index.query top_k controls first-stage candidate count.
+    locator: index.query parameters
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-candidate-generation-chroma
+    source: src-chroma-query
+    supports: Chroma collection.query n_results controls recall size.
+    locator: collection.query
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-candidate-generation-mem0
+    source: src-mem0-search
+    supports: Mem0 search top_k limits hybrid semantic recall.
+    locator: Search API
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-candidate-generation-langgraph
+    source: src-langgraph-search
+    supports: LangGraph store.search limit bounds semantic recall.
+    locator: BaseStore.search
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-candidate-generation-design
+    source: src-memory-retrieval-design
+    supports: CandidateGenerationActivity stops at recall before ranking stages.
+    locator: module boundary
+    evidence_kind: design-inference
+    confidence: high
+  - id: claim-candidate-generation-id
+    source: src-memory-retrieval-design
+    supports: generation_activity_id identifies one recall stage.
+    locator: structure
+    evidence_kind: design-inference
+    confidence: high
+  - id: claim-candidate-generation-method
+    source: src-memory-retrieval-design
+    supports: retrieval_method records the retriever family used.
+    locator: structure
+    evidence_kind: design-inference
+    confidence: high
+  - id: claim-candidate-generation-limit
+    source: src-pinecone-query
+    supports: requested_limit maps to API top_k/n_results/limit parameters.
+    locator: API parameters
+    evidence_kind: primary-api
+    confidence: high
 parent_relation:
   id: CandidateGenerationActivity-is_a-RetrievalActivity
   predicate: is_a
@@ -190,18 +333,16 @@ parent_relation:
         en: "Assert only when the instance satisfies the complete RetrievalActivity definition and the child differentia: it produces an initial CandidateSet from query, filter, and index version and stops at recall."
         ja: instanceがRetrievalActivity完全定義とchild differentia「query・filter・index versionからinitial CandidateSetを生成し責務がrecallで終わる」を共に満たす時だけassertします。
       source_claims:
-        - claim-candidate-generation-activity-007
+        - claim-candidate-generation-design
   temporal_scope: timeless
   boundary_context: null
   constraints: []
   examples:
     - id: CandidateGenerationActivity-is_a-RetrievalActivity-example-positive-manual-001
-      kind: positive
       labels:
         zh: 是一种RetrievalActivity正例
         en: "Positive case: is a RetrievalActivity"
         ja: RetrievalActivityの一種正例
-      scenario_id: null
       descriptions:
         zh: generation-412 从 index-v19 召回 80 个候选。
         en: generation-412 recalls 80 candidates from index-v19.
@@ -212,25 +353,13 @@ parent_relation:
         - RetrievalActivity
       related_relation_ids:
         - CandidateGenerationActivity-is_a-RetrievalActivity
-      expected_result:
-        zh: 建立该有向事实，并保留条件与证据。
-        en: Assert the directed fact with its condition and evidence retained.
-        ja: condition/evidenceを保持してdirected factをassertします。
-      why_valid_or_invalid:
-        zh: 实例满足端点定义、方向和该关系的显式成立条件。
-        en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-        ja: endpoint定義・direction・明示assertion conditionを満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-candidate-generation-activity-007
+        - claim-candidate-generation-design
     - id: CandidateGenerationActivity-is_a-RetrievalActivity-example-boundary-manual-001
-      kind: boundary
       labels:
         zh: 是一种RetrievalActivity边界例
         en: "Boundary case: is a RetrievalActivity"
         ja: RetrievalActivityの一種境界例
-      scenario_id: null
       descriptions:
         zh: fusion-415 组合已有列表，不生成初始候选。
         en: fusion-415 combines existing lists and does not generate initial candidates.
@@ -241,23 +370,12 @@ parent_relation:
         - RetrievalActivity
       related_relation_ids:
         - CandidateGenerationActivity-is_a-RetrievalActivity
-      expected_result:
-        zh: 验证器不得建立该有向关系事实。
-        en: Do not assert the directed fact.
-        ja: directed factをassertしません。
-      why_valid_or_invalid:
-        zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-        en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-        ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-candidate-generation-activity-007
+        - claim-candidate-generation-design
   source_claims:
-    - claim-candidate-generation-activity-007
+    - claim-candidate-generation-design
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: pending
   endpoint_order: child-to-parent
 relations:
   - id: CandidateGenerationActivity-produces-CandidateSet
@@ -293,18 +411,16 @@ relations:
           en: Assert only when CandidateSet is marked as the initial-recall stage and its generation lineage points to this activity.
           ja: CandidateSetがinitial-recall stageでgeneration lineageがこのactivityを指す時だけassertします。
         source_claims:
-          - claim-candidate-generation-activity-008
+          - claim-candidate-generation-design
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
       - id: CandidateGenerationActivity-produces-CandidateSet-example-positive-manual-001
-        kind: positive
         labels:
           zh: produces CandidateSet正例
           en: "Positive case: produces CandidateSet"
           ja: CandidateSetをproduces正例
-        scenario_id: null
         descriptions:
           zh: generation-412 produces candidate-set-initial-412。
           en: generation-412 produces candidate-set-initial-412.
@@ -315,25 +431,13 @@ relations:
           - CandidateSet
         related_relation_ids:
           - CandidateGenerationActivity-produces-CandidateSet
-        expected_result:
-          zh: 建立该有向事实，并保留条件与证据。
-          en: Assert the directed fact with its condition and evidence retained.
-          ja: condition/evidenceを保持してdirected factをassertします。
-        why_valid_or_invalid:
-          zh: 实例满足端点定义、方向和该关系的显式成立条件。
-          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-          ja: endpoint定義・direction・明示assertion conditionを満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-candidate-generation-activity-008
+          - claim-candidate-generation-design
       - id: CandidateGenerationActivity-produces-CandidateSet-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: produces CandidateSet边界例
           en: "Boundary case: produces CandidateSet"
           ja: CandidateSetをproduces境界例
-        scenario_id: null
         descriptions:
           zh: 重排后的集合不能直接归为候选生成输出。
           en: A post-rerank set is not directly produced by candidate generation.
@@ -344,94 +448,10 @@ relations:
           - CandidateSet
         related_relation_ids:
           - CandidateGenerationActivity-produces-CandidateSet
-        expected_result:
-          zh: 验证器不得建立该有向关系事实。
-          en: Do not assert the directed fact.
-          ja: directed factをassertしません。
-        why_valid_or_invalid:
-          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
-          - claim-candidate-generation-activity-008
+          - claim-candidate-generation-design
     source_claims:
-      - claim-candidate-generation-activity-008
+      - claim-candidate-generation-design
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:CandidateSet
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
-source_claims:
-  - id: claim-candidate-generation-activity-001
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents prefetches that generate candidate sets before a main query, including dense, sparse, and nested multi-stage forms; Moonweave models that stage as an activity.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-candidate-generation-activity-002
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents prefetches that generate candidate sets before a main query, including dense, sparse, and nested multi-stage forms; Moonweave models that stage as an activity. Moonweave records CandidateGenerationActivity.generation_activity_id as the stated auditable datum: Stable identifier for one candidate-generation stage."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-candidate-generation-activity-003
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents prefetches that generate candidate sets before a main query, including dense, sparse, and nested multi-stage forms; Moonweave models that stage as an activity. Moonweave records CandidateGenerationActivity.retrieval_method as the stated auditable datum: Records the retriever or method family used by the stage."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-candidate-generation-activity-004
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents prefetches that generate candidate sets before a main query, including dense, sparse, and nested multi-stage forms; Moonweave models that stage as an activity. Moonweave records CandidateGenerationActivity.requested_limit as the stated auditable datum: Maximum number of candidates requested from this generation stage."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-candidate-generation-activity-005
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents prefetches that generate candidate sets before a main query, including dense, sparse, and nested multi-stage forms; Moonweave models that stage as an activity. Qdrant documents prefetch as a candidate-producing stage before a main refinement query.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-candidate-generation-activity-006
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents prefetches that generate candidate sets before a main query, including dense, sparse, and nested multi-stage forms; Moonweave models that stage as an activity. Official reranking guidance treats reranking as a second stage over initial results.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-candidate-generation-activity-007
-    source: eng-vector-qdrant-hybrid-query
-    supports: The official documentation supports the operational distinction used in this child differentia; Moonweave's CandidateGenerationActivity-to-RetrievalActivity subclass placement is an explicit ontology design decision.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-candidate-generation-activity-008
-    source: eng-vector-qdrant-hybrid-query
-    supports: The cited official documentation supports the endpoint roles and direction of this retrieval fact; the exact relation identifier and ownership boundary are Moonweave design decisions.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

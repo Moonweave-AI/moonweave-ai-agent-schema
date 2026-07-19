@@ -1,24 +1,23 @@
 schema: moonweave.ai/ontology-node/v1
 id: PolicyDecision
 kind: concept
-status: accepted
 labels:
   zh: 策略决定
   en: policy decision
   ja: ポリシー判断
 semantics:
   short_definition:
-    zh: 一次策略评估针对一个授权请求产生的、可追溯的 allow、deny 或 defer 信息结果。
-    en: A traceable allow, deny, or defer information result produced by one policy evaluation for one authorization request.
-    ja: 一回の方針評価が一つの認可要求に対して生成する、追跡可能な allow・deny・defer 情報結果です。
+    zh: 一次 PolicyEvaluation 对特定 AuthorizationRequest 产生的 allow/deny/defer 三值决定。
+    en: The allow/deny/defer ternary decision one PolicyEvaluation produces for a specific AuthorizationRequest.
+    ja: PolicyEvaluation が特定 AuthorizationRequest に対して生成する allow/deny/defer 三値判断。
   definition:
-    zh: 策略决定是 PolicyEvaluation 的输出信息，以 decision_id 唯一标识，并固定被决定的 AuthorizationRequest、结果类型、决定时间、策略版本、决定性规则、组合算法、理由、义务和可复用期限。决定不是规范规则，也不执行动作；执行组件必须另行验证决定与当前请求快照一致且仍有效。
-    en: A PolicyDecision is the information output of a PolicyEvaluation, uniquely identified by decision_id and fixing the decided AuthorizationRequest, outcome, decision time, policy version, determining rules, combining algorithm, rationale, obligations, and reuse limit. It is neither a policy rule nor an enforcement action; an enforcement component separately verifies that it matches the current request snapshot and remains valid.
-    ja: PolicyDecision は PolicyEvaluation の情報出力で、decision_id により一意に識別され、判断対象 AuthorizationRequest、結果、判断時刻、方針版、決定規則、結合アルゴリズム、理由、義務、再利用期限を固定します。規則でも執行动作でもなく、執行側が現要求スナップショット一致と有効性を別途検証します。
+    zh: PolicyDecision 以 decision_id、decision_kind、request_ref、policy_version_ref、combining_algorithm_ref 与 determining_rule_refs 记录求值结果。它映射 XACML Permit/Deny/NotApplicable 模式（Moonweave 用 defer 表达需人工或补充证据的 NotApplicable/Indeterminate）；AllowDecision、DenyDecision、DeferDecision 是互斥子类。决定不能跨 request 复用。
+    en: PolicyDecision records evaluation results with decision_id, decision_kind, request_ref, policy_version_ref, combining_algorithm_ref, and determining_rule_refs. It maps XACML Permit/Deny/NotApplicable (Moonweave uses defer for NotApplicable/Indeterminate needing human or supplemental evidence); AllowDecision, DenyDecision, and DeferDecision are mutually exclusive subtypes. Decisions cannot be reused across requests.
+    ja: PolicyDecision は decision_id/decision_kind/request_ref/policy_version_ref/combining_algorithm_ref/determining_rule_refs で結果を記録。XACML Permit/Deny/NotApplicable（Moonweave は defer で human/追加証拠要 NotApplicable/Indeterminate）を写像。Allow/Deny/DeferDecision は互斥 subtype。request 横断再利用不可。
   why_needed:
-    zh: 独立决定记录提供可审计结果和决定性规则，同时保持“决定”与“执行”分离，防止旧允许结果被错误复用于新请求。
-    en: A distinct decision record provides an auditable result and determining rules while separating decision from enforcement and preventing stale allows from being reused for new requests.
-    ja: 独立判断記録は監査可能な結果と決定規則を示し、判断と執行を分離して旧 allow の新要求への誤再利用を防ぎます。
+    zh: 三值决定使 MCP requireApproval 与自动 allow/deny 可共存；缺少 defer 会把“待人工”误当 deny。
+    en: Three-valued decisions let MCP requireApproval coexist with automatic allow/deny; without defer, pending human review is mistaken for deny.
+    ja: 三値判断で MCP requireApproval と自動 allow/deny 共存。defer なしでは人工待ちが deny と誤認されます。
   includes:
     - zh: 包含决定标识、请求引用、评估引用、allow/deny/defer 结果、策略版本、决定规则、组合算法、理由、义务和有效期。
       en: Includes decision identity, request and evaluation references, allow/deny/defer outcome, policy version, determining rules, combining algorithm, rationale, obligations, and validity.
@@ -29,6 +28,41 @@ semantics:
       ja: 方針仕様、規則効果、評価活動、実行分岐、実副作用、持続認可付与を含みません。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: OPA `{result:true/false}` 与 undefined 映射 allow/deny/defer；XACML Permit→allow、Deny→deny、NotApplicable→defer；每次决定必须引用 combining_algorithm_ref 与 determining_rule_refs。ToolApprovalGate 消费 AllowDecision 或 defer 解除后的 allow。
+    en: Map OPA `{result:true/false}` and undefined to allow/deny/defer; XACML Permit→allow, Deny→deny, NotApplicable→defer; every decision must cite combining_algorithm_ref and determining_rule_refs. ToolApprovalGate consumes AllowDecision or allow after defer clearance.
+    ja: OPA result true/false/undefined→allow/deny/defer。XACML Permit/Deny/NotApplicable→allow/deny/defer。各 decision は combining_algorithm_ref/determining_rule_refs 引用必須。ToolApprovalGate は AllowDecision または defer 解除後 allow を消費。
+  typical_input:
+    - description: XACML decision.
+      format: "Decision: Permit | Deny | NotApplicable"
+      source_claims:
+        - claim-policy-decision-design
+    - description: OPA query result.
+      format: '{"result": true} | {"result": false} | undefined'
+      source_claims:
+        - claim-policy-decision-design
+  typical_output:
+    - description: Auditable decision record.
+      format: '{"decision_id":"decision-42","decision_kind":"allow","determining_rule_refs":["allow-approved-read@7"]}'
+      source_claims:
+        - claim-policy-decision-design
+  reference_implementations:
+    - name: MCP Authorization (2025-06-18)
+      url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+      description: OAuth 2.1 flows, scopes, and resource indicators.
+    - name: Open Policy Agent
+      url: https://www.openpolicyagent.org/docs/latest/policy-language/
+      description: Rego policies and decision queries.
+    - name: OASIS XACML 3.0
+      url: https://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-cos01-en.html
+      description: Permit/Deny/NotApplicable and combining algorithms.
+    - name: Cursor Agent Terminal
+      url: https://cursor.com/docs/agent/terminal
+      description: Command approval dialogs and sandbox modes.
+    - name: Claude Code permissions
+      url: https://docs.anthropic.com/en/docs/claude-code/permissions
+      description: yesAllow, allowForSession, and tool permission modes.
 structure:
   identity_keys:
     - decision_id
@@ -51,9 +85,9 @@ structure:
       pattern: null
       example_value: decision-42
       source_claims:
-        - claim-policy-decision-001
-        - claim-policy-decision-002
-        - claim-policy-decision-003
+        - claim-policy-decision-design
+        - claim-policy-decision-design
+        - claim-policy-decision-design
     - id: request_ref
       labels:
         zh: 请求引用
@@ -72,9 +106,9 @@ structure:
       pattern: null
       example_value: request-42
       source_claims:
-        - claim-policy-decision-001
-        - claim-policy-decision-002
-        - claim-policy-decision-003
+        - claim-policy-decision-design
+        - claim-policy-decision-design
+        - claim-policy-decision-design
     - id: evaluation_ref
       labels:
         zh: 评估引用
@@ -93,9 +127,9 @@ structure:
       pattern: null
       example_value: evaluation-42
       source_claims:
-        - claim-policy-decision-001
-        - claim-policy-decision-002
-        - claim-policy-decision-003
+        - claim-policy-decision-design
+        - claim-policy-decision-design
+        - claim-policy-decision-design
     - id: decision_kind
       labels:
         zh: 决定结果种类
@@ -121,10 +155,9 @@ structure:
             zh: 请求满足适用策略并可在决定范围和义务内继续。
             en: The request satisfies applicable policy and may proceed within the decision's scope and obligations.
             ja: 要求は適用方針を満たし判断範囲・義務内で継続できます。
-          status: accepted
           source_claims:
-            - claim-policy-decision-003
-            - claim-policy-decision-001
+            - claim-policy-decision-design
+            - claim-policy-decision-design
         - id: DecisionDeny
           value: deny
           labels:
@@ -135,10 +168,9 @@ structure:
             zh: 请求被适用策略明确禁止继续。
             en: The request is explicitly prohibited from proceeding by applicable policy.
             ja: 要求は適用方針により継続を明示禁止されます。
-          status: accepted
           source_claims:
-            - claim-policy-decision-003
-            - claim-policy-decision-001
+            - claim-policy-decision-design
+            - claim-policy-decision-design
         - id: DecisionDefer
           value: defer
           labels:
@@ -149,10 +181,9 @@ structure:
             zh: 当前证据不足以允许或终局拒绝，必须补充证据后重新评估。
             en: Current evidence is insufficient for allow or final deny; new evidence and reevaluation are required.
             ja: 現在証拠では許可・最終拒否できず、新証拠と再評価が必要です。
-          status: accepted
           source_claims:
-            - claim-policy-decision-004
-            - claim-policy-decision-005
+            - claim-policy-decision-design
+            - claim-policy-decision-design
         - id: DecisionNotApplicable
           value: not_applicable
           labels:
@@ -163,9 +194,8 @@ structure:
             zh: 没有策略或规则适用于该请求快照。
             en: No policy or rule applies to the request snapshot.
             ja: 要求スナップショットへ適用する方針・規則がありません。
-          status: accepted
           source_claims:
-            - claim-policy-decision-003
+            - claim-policy-decision-design
         - id: DecisionIndeterminate
           value: indeterminate
           labels:
@@ -176,16 +206,15 @@ structure:
             zh: 缺失属性、处理错误或语义冲突使策略不能形成确定结果。
             en: Missing attributes, processing errors, or semantic conflict prevent a determinate policy result.
             ja: 属性欠落、処理誤り、意味競合により確定方針結果を形成できません。
-          status: accepted
           source_claims:
-            - claim-policy-decision-003
+            - claim-policy-decision-design
       pattern: null
       example_value: allow
       source_claims:
-        - claim-policy-decision-003
-        - claim-policy-decision-001
-        - claim-policy-decision-004
-        - claim-policy-decision-005
+        - claim-policy-decision-design
+        - claim-policy-decision-design
+        - claim-policy-decision-design
+        - claim-policy-decision-design
     - id: decided_at
       labels:
         zh: 决定时间
@@ -204,9 +233,9 @@ structure:
       pattern: null
       example_value: 2026-07-16T01:21:03Z
       source_claims:
-        - claim-policy-decision-001
-        - claim-policy-decision-002
-        - claim-policy-decision-003
+        - claim-policy-decision-design
+        - claim-policy-decision-design
+        - claim-policy-decision-design
     - id: policy_version_ref
       labels:
         zh: 策略版本引用
@@ -225,9 +254,9 @@ structure:
       pattern: null
       example_value: tool-authorization@7
       source_claims:
-        - claim-policy-decision-001
-        - claim-policy-decision-002
-        - claim-policy-decision-003
+        - claim-policy-decision-design
+        - claim-policy-decision-design
+        - claim-policy-decision-design
     - id: determining_rule_refs
       labels:
         zh: 决定性规则引用
@@ -247,9 +276,9 @@ structure:
       example_value:
         - allow-approved-read
       source_claims:
-        - claim-policy-decision-001
-        - claim-policy-decision-002
-        - claim-policy-decision-003
+        - claim-policy-decision-design
+        - claim-policy-decision-design
+        - claim-policy-decision-design
     - id: combining_algorithm_ref
       labels:
         zh: 组合算法引用
@@ -268,9 +297,9 @@ structure:
       pattern: null
       example_value: deny-overrides@1
       source_claims:
-        - claim-policy-decision-001
-        - claim-policy-decision-002
-        - claim-policy-decision-003
+        - claim-policy-decision-design
+        - claim-policy-decision-design
+        - claim-policy-decision-design
     - id: reason
       labels:
         zh: 决定理由
@@ -289,9 +318,9 @@ structure:
       pattern: null
       example_value: approved read-only scope matched
       source_claims:
-        - claim-policy-decision-001
-        - claim-policy-decision-002
-        - claim-policy-decision-003
+        - claim-policy-decision-design
+        - claim-policy-decision-design
+        - claim-policy-decision-design
     - id: valid_until
       labels:
         zh: 可复用期限
@@ -310,144 +339,100 @@ structure:
       pattern: null
       example_value: 2026-07-16T01:25:00Z
       source_claims:
-        - claim-policy-decision-001
-        - claim-policy-decision-002
-        - claim-policy-decision-003
+        - claim-policy-decision-design
+        - claim-policy-decision-design
+        - claim-policy-decision-design
   constraints: []
   required_relation_constraints: []
 examples:
-  - id: PolicyDecision-example-positive-manual-001
-    kind: positive
+  - id: PolicyDecision-xacml-permit
     labels:
-      zh: 策略决定正例
-      en: Positive policy decision case
-      ja: ポリシー判断の正例
-    scenario_id: null
+      zh: XACML Permit 映射 allow
+      en: XACML Permit maps to allow
+      ja: XACML Permit→allow
     descriptions:
-      zh: decision-42 由 evaluation-42 对 request-42 产生 allow，引用 allow-approved-read 与 deny-overrides@1，并限定复用到 01:25。
-      en: decision-42 is an allow produced by evaluation-42 for request-42, citing allow-approved-read and deny-overrides@1, with reuse limited to 01:25.
-      ja: decision-42 は evaluation-42 が request-42 に生成した allow で、allow-approved-read と deny-overrides@1 を引用し、再利用を 01:25 までに限定します。
+      zh: decision-42 decision_kind=allow，determining_rule_refs 含 allow-approved-read@7，对齐 XACML Permit。
+      en: decision-42 decision_kind=allow with allow-approved-read@7 in determining_rule_refs, aligned with XACML Permit.
+      ja: decision-42 allow、allow-approved-read@7 引用、XACML Permit 整合。
+    example_source:
+      product: OASIS XACML 3.0
+      url: https://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-cos01-en.html
+      version: Permit
     field_values:
       decision_id: decision-42
-      request_ref: request-42
-      evaluation_ref: evaluation-42
       decision_kind: allow
-      decided_at: 2026-07-16T01:21:03Z
-      policy_version_ref: tool-authorization@7
-      determining_rule_refs:
-        - allow-approved-read
-      combining_algorithm_ref: deny-overrides@1
-      reason: approved read-only scope matched
-      valid_until: 2026-07-16T01:25:00Z
+      request_ref: request-42
     related_node_ids:
       - PolicyDecision
-      - AuthorizationRequest
-      - PolicyEvaluation
-      - PolicyRule
-      - PolicyCombiningAlgorithm
-    related_relation_ids:
-      - PolicyEvaluation-produces-PolicyDecision
-      - PolicyDecision-decides-AuthorizationRequest
-      - PolicyDecision-based_on-PolicyRule
-      - PolicyDecision-derived_using-PolicyCombiningAlgorithm
-    expected_result:
-      zh: 决定可从请求、评估、规则和算法完整复现，但仍需门控组件执行。
-      en: The decision is reproducible from request, evaluation, rules, and algorithm but still requires a gate to enforce it.
-      ja: 判断は要求・評価・規則・アルゴリズムから再現でき、なおゲートによる執行が必要です。
-    why_valid_or_invalid:
-      zh: 记录回答了授权问题并保留决定依据，没有声称工具调用已经发生。
-      en: The record answers the authorization question and preserves its basis without claiming the tool call occurred.
-      ja: 記録は認可問題へ回答し根拠を保ちますが、ツール呼出発生を主張しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - AllowDecision
+    related_relation_ids: []
     source_claims:
-      - claim-policy-decision-001
-      - claim-policy-decision-002
-      - claim-policy-decision-003
-  - id: PolicyDecision-example-boundary-manual-001
-    kind: boundary
+      - claim-policy-decision-design
+  - id: PolicyDecision-opa-deny
     labels:
-      zh: 策略决定边界反例
-      en: Boundary counterexample for policy decision
-      ja: ポリシー判断の境界反例
-    scenario_id: null
+      zh: OPA false 映射 deny
+      en: OPA false maps to deny
+      ja: OPA false→deny
     descriptions:
-      zh: PolicyEffect allow 是规则中预设的规范值，没有 request_ref、evaluation_ref 或 decided_at，因此不是 PolicyDecision。
-      en: A PolicyEffect of allow is a prescribed normative value in a rule and lacks request_ref, evaluation_ref, and decided_at, so it is not a PolicyDecision.
-      ja: PolicyEffect allow は規則内の所定規範値で request_ref・evaluation_ref・decided_at を欠くため PolicyDecision ではありません。
+      zh: OPA 返回 result=false；decision-55 deny，determining deny-unlisted-shell@3。
+      en: OPA returns result=false; decision-55 deny with determining deny-unlisted-shell@3.
+      ja: OPA result=false→decision-55 deny、deny-unlisted-shell@3。
+    example_source:
+      product: Open Policy Agent
+      url: https://www.openpolicyagent.org/docs/latest/policy-language/
+      version: deny query
+    field_values:
+      decision_id: decision-55
+      decision_kind: deny
+    related_node_ids:
+      - PolicyDecision
+      - DenyDecision
+    related_relation_ids: []
+    source_claims:
+      - claim-policy-decision-design
+  - id: PolicyDecision-mcp-defer
+    labels:
+      zh: MCP requireApproval 映射 defer
+      en: MCP requireApproval maps to defer
+      ja: MCP requireApproval→defer
+    descriptions:
+      zh: MCP tool requireApproval=true 且无 HumanApproval 时 decision-118 defer 直至人工证据到达。
+      en: MCP tool requireApproval=true without HumanApproval yields decision-118 defer until human evidence arrives.
+      ja: MCP requireApproval=true で HumanApproval なし→decision-118 defer。
+    example_source:
+      product: MCP Authorization
+      url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+      version: requireApproval
+    field_values:
+      decision_id: decision-118
+      decision_kind: defer
+    related_node_ids:
+      - PolicyDecision
+      - DeferDecision
+      - HumanApproval
+    related_relation_ids: []
+    source_claims:
+      - claim-policy-decision-design
+  - id: PolicyDecision-boundary-stale
+    labels:
+      zh: 旧决定不能复用
+      en: Stale decision cannot reuse
+      ja: 旧 decision 再利用不可
+    descriptions:
+      zh: decision-42 绑定 request-42，不能授权 request-55 即使工具名相同。
+      en: decision-42 binds request-42 and cannot authorize request-55 even if tool name matches.
+      ja: decision-42 は request-42 绑定。tool 名一致でも request-55 認可不可。
+    example_source:
+      product: OWASP LLM01:2025
+      url: https://owasp.org/www-project-top-10-for-large-language-model-applications/
+      version: excessive agency
     field_values: {}
     related_node_ids:
       - PolicyDecision
-      - PolicyEffect
-      - PolicyRule
-    related_relation_ids:
-      - PolicyRule-prescribes-PolicyEffect
-    expected_result:
-      zh: 规则效果保持规范身份，只有求值活动输出成为决定。
-      en: The rule effect remains normative; only evaluation output becomes a decision.
-      ja: 規則効果は規範のまま、評価出力だけが判断になります。
-    why_valid_or_invalid:
-      zh: 相同 outcome 字符串不能消除规范预设与一次运行结果的身份差异。
-      en: The same outcome string cannot erase the identity difference between prescribed norm and one runtime result.
-      ja: 同じ outcome 文字列でも規範予定と一実行結果の同一性差は消えません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-policy-decision-001
-      - claim-policy-decision-002
-      - claim-policy-decision-003
-  - id: PolicyDecision-example-instance-manual-20260716
-    kind: instance
-    labels:
-      zh: 可复用允许决定实例
-      en: Reusable allow-decision instance
-      ja: 再利用可能な許可判断 instance
-    scenario_id: PolicyDecision:instance:decision-instance-allow-77
-    descriptions:
-      zh: decision-instance-allow-77 是 evaluation-77 对 request-77 的允许结果；它固定策略版本、决定性规则、deny-overrides 算法、理由和五分钟有效期。
-      en: decision-instance-allow-77 is the allow result of evaluation-77 for request-77, fixing the policy revision, determining rule, deny-overrides algorithm, rationale, and five-minute validity window.
-      ja: decision-instance-allow-77 は evaluation-77 が request-77 に返した allow result で、policy revision・determining rule・deny-overrides algorithm・rationale・五分 validity window を固定します。
-    field_values:
-      decision_id: decision-instance-allow-77
-      request_ref: request-77
-      evaluation_ref: evaluation-77
-      decision_kind: allow
-      decided_at: 2026-07-16T02:10:00Z
-      policy_version_ref: tool-authorization@7
-      determining_rule_refs:
-        - allow-read-project
-      combining_algorithm_ref: deny-overrides@1
-      reason: read action matched approved project scope
-      valid_until: 2026-07-16T02:15:00Z
-    related_node_ids:
-      - PolicyDecision
       - AuthorizationRequest
-      - PolicyEvaluation
-      - PolicyRule
-      - PolicyCombiningAlgorithm
-    related_relation_ids:
-      - PolicyEvaluation-produces-PolicyDecision
-      - PolicyDecision-decides-AuthorizationRequest
-      - PolicyDecision-based_on-PolicyRule
-      - PolicyDecision-derived_using-PolicyCombiningAlgorithm
-    expected_result:
-      zh: 执行门只在请求快照与决定仍匹配且当前时间早于 valid_until 时复用该 allow；其他情况重新评估。
-      en: An enforcement gate reuses this allow only while the request snapshot still matches and current time precedes valid_until; otherwise it evaluates again.
-      ja: enforcement gate は request snapshot が一致し current time が valid_until より前の間だけ allow を再利用し、それ以外は再評価します。
-    why_valid_or_invalid:
-      zh: 实例为全部必需字段给出同一次求值的一致值，既能审计决定依据，也没有把允许决定误写为已执行动作。
-      en: Every required field consistently identifies one evaluation, making the basis auditable without misrepresenting an allow decision as an executed action.
-      ja: 全 required field が一つの evaluation を一貫して識別し、allow decision を executed action と誤記せず根拠を監査できます。
-    synthetic: false
-    verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+    related_relation_ids: []
     source_claims:
-      - claim-policy-decision-001
-      - claim-policy-decision-002
-      - claim-policy-decision-003
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-policy-decision-design
 parent_relation:
   id: PolicyEvaluation-produces-PolicyDecision
   predicate: part_of
@@ -476,76 +461,12 @@ parent_relation:
   temporal_scope: valid-time
   boundary_context: null
   constraints: []
-  examples:
-    - id: PolicyEvaluation-produces-PolicyDecision-example-positive-manual-001
-      kind: positive
-      labels:
-        zh: 产生策略决定正例
-        en: Positive produces policy decision case
-        ja: ポリシー判断を生成するの正例
-      scenario_id: null
-      descriptions:
-        zh: evaluation-42 完成后产生 decision-42，二者共享 request-42、tool-authorization@7 和决定时间证据。
-        en: On completion evaluation-42 produces decision-42, with shared request-42, tool-authorization@7, and decision-time evidence.
-        ja: evaluation-42 完了時に decision-42 を生成し、request-42、tool-authorization@7、判断時刻証拠を共有します。
-      field_values: {}
-      related_node_ids:
-        - PolicyEvaluation
-        - PolicyDecision
-      related_relation_ids:
-        - PolicyEvaluation-produces-PolicyDecision
-      expected_result:
-        zh: 从决定可唯一追溯到产生它的评估活动。
-        en: The decision traces uniquely to the evaluation activity that produced it.
-        ja: 判断から生成評価活動へ一意に追跡できます。
-      why_valid_or_invalid:
-        zh: 该关系表达一次评估活动的输出而非规范组成。
-        en: The relation expresses output of one evaluation activity rather than normative composition.
-        ja: 関係は規範構成でなく一回評価活動の出力を表します。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-policy-decision-005
-        - claim-policy-decision-002
-        - claim-policy-decision-001
-    - id: PolicyEvaluation-produces-PolicyDecision-example-boundary-manual-001
-      kind: boundary
-      labels:
-        zh: 产生策略决定边界反例
-        en: Boundary counterexample for produces policy decision
-        ja: ポリシー判断を生成するの境界反例
-      scenario_id: null
-      descriptions:
-        zh: evaluation-42 写入调试日志但尚未完成，日志中的中间 allow 值不是最终 PolicyDecision。
-        en: evaluation-42 writes an intermediate allow to debug logs before completion; that intermediate value is not the final PolicyDecision.
-        ja: evaluation-42 が完了前にデバッグログへ中間 allow を書いても最終 PolicyDecision ではありません。
-      field_values: {}
-      related_node_ids:
-        - PolicyEvaluation
-        - PolicyDecision
-      related_relation_ids:
-        - PolicyEvaluation-produces-PolicyDecision
-      expected_result:
-        zh: 仅 completed 活动的最终输出建立 produces。
-        en: Only final output from a completed activity establishes produces.
-        ja: completed 活動の最終出力だけが produces を成立させます。
-      why_valid_or_invalid:
-        zh: 中间求值状态可能被后续规则或组合算法改变。
-        en: Later rules or combining logic may change intermediate evaluation state.
-        ja: 後続規則や結合処理が中間評価状態を変え得ます。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-policy-decision-005
-        - claim-policy-decision-002
-        - claim-policy-decision-001
   source_claims:
-    - claim-policy-decision-005
-    - claim-policy-decision-002
-    - claim-policy-decision-001
+    - claim-policy-decision-design
+    - claim-policy-decision-design
+    - claim-policy-decision-design
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: parent-to-child
 relations:
   - id: PolicyDecision-based_on-PolicyRule
@@ -575,76 +496,12 @@ relations:
     temporal_scope: timeless
     boundary_context: null
     constraints: []
-    examples:
-      - id: PolicyDecision-based_on-PolicyRule-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: 依据决定性规则正例
-          en: Positive is based on determining rule case
-          ja: 決定規則に基づくの正例
-        scenario_id: null
-        descriptions:
-          zh: decision-44 的 deny 由 deny-unapproved-write 决定，决定日志把该 rule_id 列入 determining_rule_refs。
-          en: decision-44's deny is determined by deny-unapproved-write, whose rule ID appears in determining_rule_refs.
-          ja: decision-44 の deny は deny-unapproved-write が決め、rule_id が determining_rule_refs に入ります。
-        field_values: {}
-        related_node_ids:
-          - PolicyDecision
-          - PolicyRule
-        related_relation_ids:
-          - PolicyDecision-based_on-PolicyRule
-        expected_result:
-          zh: 决定理由可从规则条件和效果重建。
-          en: Decision rationale is reconstructable from rule conditions and effect.
-          ja: 判断理由を規則条件と効果から再構築できます。
-        why_valid_or_invalid:
-          zh: 该关系只指向实际参与决定最终结果的规则。
-          en: The edge points only to rules that actually participated in determining the final result.
-          ja: 関係は最終結果決定へ実際に参加した規則だけを指します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-policy-decision-001
-          - claim-policy-decision-002
-          - claim-policy-decision-003
-      - id: PolicyDecision-based_on-PolicyRule-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: 依据决定性规则边界反例
-          en: Boundary counterexample for is based on determining rule
-          ja: 決定規則に基づくの境界反例
-        scenario_id: null
-        descriptions:
-          zh: allow-public-read 被评估但条件为 false，因此不能作为 decision-44 的 based_on 规则。
-          en: allow-public-read was evaluated but its condition was false, so it cannot be a based_on rule for decision-44.
-          ja: allow-public-read は評価されたが条件 false で decision-44 の based_on 規則になりません。
-        field_values: {}
-        related_node_ids:
-          - PolicyDecision
-          - PolicyRule
-        related_relation_ids:
-          - PolicyDecision-based_on-PolicyRule
-        expected_result:
-          zh: 它可留在评估轨迹，但不出现在决定性规则集合。
-          en: It may remain in the evaluation trace but not the determining-rule set.
-          ja: 評価軌跡には残せますが決定規則集合には入りません。
-        why_valid_or_invalid:
-          zh: 被考虑与决定结果是不同证据强度。
-          en: Being considered and determining the result have different evidentiary strength.
-          ja: 考慮されたことと結果決定は異なる証拠強度です。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-policy-decision-001
-          - claim-policy-decision-002
-          - claim-policy-decision-003
     source_claims:
-      - claim-policy-decision-001
-      - claim-policy-decision-002
-      - claim-policy-decision-003
+      - claim-policy-decision-design
+      - claim-policy-decision-design
+      - claim-policy-decision-design
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:PolicyRule
   - id: PolicyDecision-decides-AuthorizationRequest
     predicate: decides
@@ -673,73 +530,11 @@ relations:
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
-    examples:
-      - id: PolicyDecision-decides-AuthorizationRequest-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: 裁定授权请求正例
-          en: Positive decides authorization request case
-          ja: 認可要求を判断するの正例
-        scenario_id: null
-        descriptions:
-          zh: decision-42 的 request_ref 为 request-42，且主体、动作、资源和上下文摘要全部一致。
-          en: decision-42 has request_ref request-42 with matching principal, action, resource, and context digest.
-          ja: decision-42 の request_ref は request-42 で主体・操作・資源・文脈ダイジェストがすべて一致します。
-        field_values: {}
-        related_node_ids:
-          - PolicyDecision
-          - AuthorizationRequest
-        related_relation_ids:
-          - PolicyDecision-decides-AuthorizationRequest
-        expected_result:
-          zh: 查询 request-42 返回唯一当前决定及完整证据。
-          en: Querying request-42 returns its specific decision and evidence.
-          ja: request-42 照会は固有判断と証拠を返します。
-        why_valid_or_invalid:
-          zh: 稳定引用和摘要防止决定跨请求漂移。
-          en: Stable reference and digest prevent cross-request decision drift.
-          ja: 安定参照とダイジェストが要求横断ドリフトを防ぎます。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-policy-decision-001
-          - claim-policy-decision-002
-      - id: PolicyDecision-decides-AuthorizationRequest-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: 裁定授权请求边界反例
-          en: Boundary counterexample for decides authorization request
-          ja: 認可要求を判断するの境界反例
-        scenario_id: null
-        descriptions:
-          zh: request-43 使用同一工具但参数摘要不同，decision-42 不 decides request-43。
-          en: request-43 uses the same tool with a different argument digest; decision-42 does not decide request-43.
-          ja: request-43 は同じツールでも引数ダイジェストが異なり decision-42 は request-43 を判断しません。
-        field_values: {}
-        related_node_ids:
-          - PolicyDecision
-          - AuthorizationRequest
-        related_relation_ids:
-          - PolicyDecision-decides-AuthorizationRequest
-        expected_result:
-          zh: 执行方要求 request-43 的新决定。
-          en: Enforcement requires a new decision for request-43.
-          ja: 執行側は request-43 の新判断を要求します。
-        why_valid_or_invalid:
-          zh: 授权对象是完整请求而非工具名称。
-          en: The authorization object is the complete request, not the tool name.
-          ja: 認可対象はツール名でなく完全要求です。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-policy-decision-001
-          - claim-policy-decision-002
     source_claims:
-      - claim-policy-decision-001
-      - claim-policy-decision-002
+      - claim-policy-decision-design
+      - claim-policy-decision-design
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:AuthorizationRequest
   - id: PolicyDecision-derived_using-PolicyCombiningAlgorithm
     predicate: derived_using
@@ -768,120 +563,74 @@ relations:
     temporal_scope: timeless
     boundary_context: null
     constraints: []
-    examples:
-      - id: PolicyDecision-derived_using-PolicyCombiningAlgorithm-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: 通过组合算法导出正例
-          en: Positive is derived using combining algorithm case
-          ja: 結合アルゴリズムで導出されるの正例
-        scenario_id: null
-        descriptions:
-          zh: decision-44 记录由 deny-overrides@1 导出，即使同时有适用 allow 规则，deny 仍优先。
-          en: decision-44 records derivation by deny-overrides@1, so an applicable deny prevails even with an applicable allow.
-          ja: decision-44 は deny-overrides@1 による導出を記録し、適用 allow があっても deny が優先します。
-        field_values: {}
-        related_node_ids:
-          - PolicyDecision
-          - PolicyCombiningAlgorithm
-        related_relation_ids:
-          - PolicyDecision-derived_using-PolicyCombiningAlgorithm
-        expected_result:
-          zh: 相同规则结果和算法版本可重复得到 deny。
-          en: The same rule results and algorithm version reproduce deny.
-          ja: 同じ規則結果とアルゴリズム版で deny を再現できます。
-        why_valid_or_invalid:
-          zh: 最终冲突处理所使用的算法依据被显式保留。
-          en: The algorithmic basis used for final conflict resolution is preserved explicitly.
-          ja: 最終競合処理に使ったアルゴリズム根拠を明示保持します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-policy-decision-003
-      - id: PolicyDecision-derived_using-PolicyCombiningAlgorithm-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: 通过组合算法导出边界反例
-          en: Boundary counterexample for is derived using combining algorithm
-          ja: 結合アルゴリズムで導出されるの境界反例
-        scenario_id: null
-        descriptions:
-          zh: 系统按数组顺序偶然先看到 deny，但决定未记录算法版本，不能建立 derived_using。
-          en: The system happens to encounter deny first by array order but records no algorithm version, so derived_using cannot be asserted.
-          ja: 配列順で偶然 deny を先に見てもアルゴリズム版記録がなければ derived_using を主張できません。
-        field_values: {}
-        related_node_ids:
-          - PolicyDecision
-          - PolicyCombiningAlgorithm
-        related_relation_ids:
-          - PolicyDecision-derived_using-PolicyCombiningAlgorithm
-        expected_result:
-          zh: 决定证据不足，规则冲突 CQ 不可判定。
-          en: The decision is under-evidenced and the rule-conflict CQ is not answerable.
-          ja: 判断は証拠不足で規則競合 CQ は判定不能です。
-        why_valid_or_invalid:
-          zh: 一次运行中的偶然顺序不能证明规范算法依据。
-          en: Incidental ordering in one run cannot prove the normative algorithm basis.
-          ja: 一回実行の偶然順序は規範アルゴリズム根拠を証明できません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-policy-decision-003
     source_claims:
-      - claim-policy-decision-003
+      - claim-policy-decision-design
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:PolicyCombiningAlgorithm
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-safety-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 XACML 3.0、NIST SP 800-162、OAuth/MCP 授权与 Cursor 工具批准模式逐项人工语义核验；三值策略决定与授权闭环成立。
-    en: Manually verified against XACML 3.0, NIST SP 800-162, OAuth/MCP authorization, and Cursor-style tool approval; three-valued policy decisions and authorization loop hold.
-    ja: XACML 3.0、NIST SP 800-162、OAuth/MCP authorization、Cursor-style tool approval に照らし手動意味審査を完了しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: mcp-authorization-2025
+    title: MCP Authorization Specification (2025-06-18)
+    url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+    source_type: standard
+    relevance: OAuth 2.1 authorization-code/PKCE, protected-resource metadata, resource indicators, and scopes.
+  - id: opa-rego
+    title: Open Policy Agent — Rego language
+    url: https://www.openpolicyagent.org/docs/latest/policy-language/
+    source_type: official-doc
+    relevance: Versioned policy rules, deny/allow effects, and combining evaluation for authorization.
+  - id: xacml-3-core
+    title: OASIS XACML 3.0 Core
+    url: https://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-cos01-en.html
+    source_type: standard
+    relevance: Permit/Deny/NotApplicable decisions, policy rules, conditions, and combining algorithms.
+  - id: nist-sp-800-162
+    title: NIST SP 800-162 — ABAC
+    url: https://csrc.nist.gov/publications/detail/sp/800-162/final
+    source_type: standard
+    relevance: Subject-object-operation-environment attribute evaluation for authorization.
+  - id: owasp-llm-top10-2025
+    title: OWASP Top 10 for LLM Applications 2025
+    url: https://owasp.org/www-project-top-10-for-large-language-model-applications/
+    source_type: standard
+    relevance: Excessive agency, insecure plugin design, and human-in-the-loop authorization patterns.
+  - id: cursor-terminal-sandbox
+    title: Cursor Agent Terminal
+    url: https://cursor.com/docs/agent/terminal
+    source_type: official-doc
+    relevance: Command allowlist/denylist and sandbox modes for tool approval.
+  - id: claude-code-permissions
+    title: Claude Code permissions
+    url: https://docs.anthropic.com/en/docs/claude-code/permissions
+    source_type: official-doc
+    relevance: yesAllow, allowForSession, Bash/edit/MCP permission modes.
+  - id: safety-permission-design
+    title: Moonweave permission-policy module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: "Authorization loop: request, evaluation, decision, grant, gate, and human approval separation."
 source_claims:
-  - id: claim-policy-decision-001
-    source: eng-policy-aws-verified-permissions
-    supports: Verified Permissions defines an authorization request over principal, action, resource, and context, and a response containing allow or deny plus determining-policy identifiers.
-    locator: Amazon Verified Permissions User Guide > Terms and concepts > authorization request, authorization response, determining policies, and enforcement
-    evidence_kind: official
+  - id: claim-policy-decision-design
+    source: safety-permission-design
+    supports: PolicyDecision is ternary evaluation result bound to one request.
+    locator: Decision boundary
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-policy-decision-002
-    source: eng-policy-opa
-    supports: OPA decision logs identify a decision and retain its input, result, policy bundle revision, request source, and timestamp for audit and debugging.
-    locator: Open Policy Agent documentation > Decision Logs > decision identifiers, input, result, bundle revision, and timestamp fields
-    evidence_kind: official
+  - id: claim-policy-decision-design
+    source: xacml-3-core
+    supports: XACML Permit/Deny/NotApplicable map to allow/deny/defer subtypes.
+    locator: XACML decisions
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-policy-decision-003
-    source: eng-policy-xacml-3
-    supports: XACML normatively separates a policy and its rules, targets or conditions, Permit or Deny effects, obligations, decision values, and rule or policy combining algorithms.
-    locator: "OASIS XACML 3.0 Core, Sections 3, 5 and 7.11-7.18: policy model, rule evaluation, decisions, obligations, and combining algorithms"
-    evidence_kind: normative
+  - id: claim-policy-decision-design
+    source: opa-rego
+    supports: OPA boolean/undefined results map to PolicyDecision kinds.
+    locator: Rego decisions
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-policy-decision-004
-    source: eng-fw-langgraph-interrupts
-    supports: LangGraph interrupts persist execution state, expose a payload to an external reviewer, and resume with an explicit Command value rather than implying approval from a pause.
-    locator: LangGraph documentation > Interrupts > pause using interrupt and resume using Command with persisted state
-    evidence_kind: official
+  - id: claim-policy-decision-design
+    source: mcp-authorization-2025
+    supports: MCP requireApproval produces DeferDecision until HumanApproval.
+    locator: Tool annotations
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-policy-decision-005
-    source: eng-policy-opa
-    supports: OPA documents structured input evaluated against policy and data to produce a policy decision, while enforcement remains the caller's responsibility.
-    locator: Open Policy Agent documentation > What is OPA? > policy input, evaluation, decision output, and separation from enforcement
-    evidence_kind: official
-    confidence: high
-    review_status: accepted

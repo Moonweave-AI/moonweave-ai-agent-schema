@@ -1,24 +1,23 @@
 schema: moonweave.ai/ontology-node/v1
 id: ProcessPolicy
 kind: concept
-status: accepted
 labels:
   zh: 进程策略
   en: process policy
   ja: プロセス方針
 semantics:
   short_definition:
-    zh: 限定沙箱进程启动、命名空间、能力、系统调用与资源的隔离规范。
-    en: An isolation specification limiting sandbox process launch, namespaces, capabilities, syscalls, and resources.
-    ja: sandbox process launch・namespace・capability・syscall・resource を制限する isolation specification。
+    zh: IsolationSpecification 内对进程能力、seccomp、cgroup 与隔离后端的规范。
+    en: The specification within IsolationSpecification for process capabilities, seccomp, cgroups, and isolation backend.
+    ja: IsolationSpecification 内の process capability/seccomp/cgroup/isolation backend specification。
   definition:
-    zh: 进程策略是一种 IsolationSpecification，以允许的可执行文件与参数、环境暴露、用户身份、命名空间、Linux capabilities、seccomp/LSM 配置和 cgroup 资源上限为区分特征。它约束进程如何运行，不决定文件路径内容的读写权限，也不是某次 ProcessHandle。
-    en: A ProcessPolicy is an IsolationSpecification distinguished by allowed executables and arguments, environment exposure, user identity, namespaces, Linux capabilities, seccomp/LSM profiles, and cgroup resource limits. It constrains how a process runs, not filesystem-content permissions, and it is not one ProcessHandle.
-    ja: ProcessPolicy は allowed executable/argument・environment exposure・user identity・namespace・Linux capability・seccomp/LSM profile・cgroup resource limit で区別する IsolationSpecification です。process の run 方法を制約し filesystem content permission や個別 ProcessHandle ではありません。
+    zh: ProcessPolicy 以 proc_policy_id+version 声明 capability_drop、seccomp_profile_ref、cgroup_limits、namespace_set 与 isolation_backend（runc/gVisor/Firecracker）。它映射 Docker --cap-drop=ALL、OCI seccomp、E2B process limits 与 gVisor runsc；ProcessPolicy 是规范，ProcessHandle 是运行进程实例。
+    en: ProcessPolicy declares capability_drop, seccomp_profile_ref, cgroup_limits, namespace_set, and isolation_backend (runc/gVisor/Firecracker) via proc_policy_id+version. It maps Docker --cap-drop=ALL, OCI seccomp, E2B process limits, and gVisor runsc; ProcessPolicy is specification, ProcessHandle is running process instance.
+    ja: ProcessPolicy は proc_policy_id+version で capability_drop/seccomp_profile_ref/cgroup_limits/namespace_set/isolation_backend(runc/gVisor/Firecracker) を宣言。Docker --cap-drop=ALL、OCI seccomp、E2B process limit、gVisor runsc を写像。ProcessPolicy は spec、ProcessHandle は running instance。
   why_needed:
-    zh: 把执行允许条件与具体进程实例分离，才能在启动前验证最小权限并在运行后核对实际配置。
-    en: It separates launch constraints from concrete process instances so least privilege can be checked before start and effective configuration audited afterward.
-    ja: launch constraint と concrete process instance を分け start 前 least privilege 検証と実行後 effective config audit を可能にします。
+    zh: 进程隔离层与文件系统层正交；缺少 ProcessPolicy 无法审计 seccomp 加载失败回退。
+    en: Process isolation is orthogonal to filesystem layer; without ProcessPolicy seccomp load-failure fallback cannot be audited.
+    ja: process isolation は filesystem layer と直交。ProcessPolicy なし seccomp load failure fallback 監査不可。
   includes:
     - zh: 可执行文件与参数规则、用户/组、环境变量、命名空间、capability、seccomp/LSM 与 CPU/内存/PID 上限。
       en: Executable and argument rules, user/group, environment, namespaces, capabilities, seccomp/LSM, and CPU/memory/PID limits.
@@ -29,6 +28,38 @@ semantics:
       ja: filesystem path/mount rule・network destination・business authorization・running process handle・command result。
   semantic_kind: specification
   aliases: []
+engineering:
+  explanation:
+    zh: gVisor `runsc` 与 Firecracker microVM 写入 isolation_backend；Docker `--cap-drop=ALL --security-opt seccomp=`→ProcessPolicy；seccomp 加载失败不得建立 Sandbox-constrained_by，应记录 configuration-failure 证据。
+    en: Record gVisor runsc and Firecracker microVM in isolation_backend; Docker --cap-drop=ALL --security-opt seccomp=→ProcessPolicy; seccomp load failure must not assert Sandbox-constrained_by—record configuration-failure evidence.
+    ja: gVisor runsc/Firecracker→isolation_backend。Docker --cap-drop=ALL+seccomp→ProcessPolicy。seccomp load failure 時 Sandbox-constrained_by 不可、configuration-failure 証拠記録。
+  typical_input:
+    - description: gVisor runsc runtime.
+      format: docker run --runtime=runsc ...
+      source_claims:
+        - claim-process-policy-design
+    - description: Docker cap drop + seccomp.
+      format: docker run --cap-drop=ALL --security-opt seccomp=profile.json
+      source_claims:
+        - claim-process-policy-design
+  typical_output:
+    - description: Process policy record.
+      format: '{"proc_policy_id":"proc-python","version":"2","isolation_backend":"gvisor","capability_drop":["ALL"]}'
+      source_claims:
+        - claim-process-policy-design
+  reference_implementations:
+    - name: E2B Sandbox API
+      url: https://e2b.dev/docs
+      description: Cloud sandbox templates and lifecycle.
+    - name: OCI Linux runtime
+      url: https://github.com/opencontainers/runtime-spec/blob/main/config-linux.md
+      description: Docker --read-only, namespaces, seccomp.
+    - name: gVisor runsc
+      url: https://gvisor.dev/docs/
+      description: Application-kernel sandbox isolation.
+    - name: Cursor Agent Terminal
+      url: https://cursor.com/docs/agent/terminal
+      description: workspace-write and allowlist layering.
 structure:
   identity_keys:
     - isolation_spec_id
@@ -55,8 +86,8 @@ structure:
           - /usr/bin/python3
         deny_shell: true
       source_claims:
-        - claim-process-policy-001
-        - claim-process-policy-002
+        - claim-process-policy-design
+        - claim-process-policy-design
     - id: namespace_profile
       labels:
         zh: 命名空间配置
@@ -79,7 +110,7 @@ structure:
         user: new
         network: inherit
       source_claims:
-        - claim-process-policy-002
+        - claim-process-policy-design
     - id: capability_and_syscall_profile
       labels:
         zh: 能力与系统调用配置
@@ -101,8 +132,8 @@ structure:
           - ALL
         seccomp: runtime-default
       source_claims:
-        - claim-process-policy-001
-        - claim-process-policy-002
+        - claim-process-policy-design
+        - claim-process-policy-design
     - id: resource_limit_profile
       labels:
         zh: 资源上限配置
@@ -124,98 +155,98 @@ structure:
         pids: 64
         timeout_seconds: 120
       source_claims:
-        - claim-process-policy-002
+        - claim-process-policy-design
   constraints: []
   required_relation_constraints: []
 examples:
-  - id: ProcessPolicy-example-positive-manual-20260716
-    kind: positive
+  - id: ProcessPolicy-gvisor-runsc
     labels:
-      zh: 最小权限 Python 进程
-      en: Least-privilege Python process
-      ja: least-privilege Python process
-    scenario_id: null
+      zh: gVisor runsc 进程策略
+      en: gVisor runsc process policy
+      ja: gVisor runsc process policy
     descriptions:
-      zh: proc-python@2 仅允许 /usr/bin/python3，创建 PID/mount/user namespace，删除全部 capabilities，使用 runtime-default seccomp，并限制 512 MiB 和 64 个 PID。
-      en: proc-python@2 permits only /usr/bin/python3, creates PID/mount/user namespaces, drops all capabilities, uses runtime-default seccomp, and limits memory to 512 MiB and PIDs to 64.
-      ja: proc-python@2 は /usr/bin/python3 のみ許可し PID/mount/user namespace を作成、全 capability を drop、runtime-default seccomp、512 MiB/64 PID 上限を設定します。
+      zh: proc-gvisor@1 isolation_backend=gvisor，sentry 隔离 syscall 面。
+      en: proc-gvisor@1 isolation_backend=gvisor with sentry-isolated syscall surface.
+      ja: proc-gvisor@1 isolation_backend=gvisor、sentry syscall isolation。
+    example_source:
+      product: gVisor
+      url: https://gvisor.dev/docs/
+      version: runsc runtime
     field_values:
-      isolation_spec_id: proc-python
-      version: "2"
-      applicable_environment_ref: sandbox/python-execution
-      enforcer: container-runtime-security-profile
-      executable_rule_set:
-        allow:
-          - /usr/bin/python3
-      namespace_profile:
-        pid: new
-        mount: new
-        user: new
-      capability_and_syscall_profile:
-        drop:
-          - ALL
-        seccomp: runtime-default
-      resource_limit_profile:
-        memory_bytes: 536870912
-        pids: 64
+      proc_policy_id: proc-gvisor
+      version: "1"
+      isolation_backend: gvisor
     related_node_ids:
       - ProcessPolicy
       - IsolationSpecification
-    related_relation_ids:
-      - ProcessPolicy-is_a-IsolationSpecification
-    expected_result:
-      zh: 分类为 ProcessPolicy，并能在启动前验证进程约束。
-      en: Classify as ProcessPolicy and evaluate launch constraints before start.
-      ja: ProcessPolicy と分類し start 前に launch constraint を評価できます。
-    why_valid_or_invalid:
-      zh: 记录覆盖进程身份、隔离机制、能力、系统调用与资源边界。
-      en: The record covers executable identity, isolation mechanisms, capabilities, syscalls, and resource bounds.
-      ja: executable identity・isolation mechanism・capability・syscall・resource bound を備えます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - Sandbox
+    related_relation_ids: []
     source_claims:
-      - claim-process-policy-001
-      - claim-process-policy-002
-  - id: ProcessPolicy-example-boundary-manual-20260716
-    kind: boundary
+      - claim-process-policy-design
+  - id: ProcessPolicy-docker-seccomp
     labels:
-      zh: 一次命令的超时参数
-      en: One command timeout
-      ja: 一 command timeout
-    scenario_id: sandbox-review-processpolicy-boundary
+      zh: Docker seccomp 进程策略
+      en: Docker seccomp process policy
+      ja: Docker seccomp process policy
     descriptions:
-      zh: ToolCallPlan 仅写 timeout=120，没有可执行规则、用户、命名空间、能力或执行器。
-      en: A ToolCallPlan only states timeout=120 and has no executable rule, user, namespace, capability, or enforcer.
-      ja: ToolCallPlan は timeout=120 だけで executable rule・user・namespace・capability・enforcer がありません。
+      zh: proc-python@2 加载 seccomp-bpf.json，cap-drop ALL。
+      en: proc-python@2 loads seccomp-bpf.json with cap-drop ALL.
+      ja: proc-python@2 seccomp-bpf.json+cap-drop ALL。
+    example_source:
+      product: OCI Linux runtime
+      url: https://github.com/opencontainers/runtime-spec/blob/main/config-linux.md
+      version: seccomp profile
+    field_values:
+      proc_policy_id: proc-python
+      version: "2"
+    related_node_ids:
+      - ProcessPolicy
+      - Sandbox
+    related_relation_ids: []
+    source_claims:
+      - claim-process-policy-design
+  - id: ProcessPolicy-e2b-limits
+    labels:
+      zh: E2B 进程限制策略
+      en: E2B process limit policy
+      ja: E2B process limit policy
+    descriptions:
+      zh: proc-e2b@1 限制 CPU/内存与子进程数，映射 E2B template。
+      en: proc-e2b@1 limits CPU/memory and child processes per E2B template.
+      ja: proc-e2b@1 E2B template CPU/memory/子 process 制限。
+    example_source:
+      product: E2B Sandbox API
+      url: https://e2b.dev/docs
+      version: process limits
+    field_values:
+      proc_policy_id: proc-e2b
+      version: "1"
+    related_node_ids:
+      - ProcessPolicy
+      - IsolationSpecification
+    related_relation_ids: []
+    source_claims:
+      - claim-process-policy-design
+  - id: ProcessPolicy-boundary-loadfail
+    labels:
+      zh: seccomp 加载失败不约束
+      en: Seccomp load failure no constraint
+      ja: seccomp load failure は constrained_by 不可
+    descriptions:
+      zh: proc-python@3 配置存在但 sandbox-run-886 seccomp 加载失败回退 unconfined，不得 constrained_by。
+      en: proc-python@3 exists in config but sandbox-run-886 seccomp load failed to unconfined—no constrained_by.
+      ja: proc-python@3 設定ありも sandbox-run-886 seccomp load failure→unconfined、constrained_by 不可。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: load versus available
     field_values: {}
     related_node_ids:
       - ProcessPolicy
+      - Sandbox
     related_relation_ids: []
-    expected_result:
-      zh: 保留为调用参数，不创建 ProcessPolicy。
-      en: Keep it as an invocation parameter and do not create ProcessPolicy.
-      ja: invocation parameter とし ProcessPolicy を作りません。
-    why_valid_or_invalid:
-      zh: 单个运行参数不足以构成版本化进程隔离规范。
-      en: One runtime parameter is not a versioned process-isolation specification.
-      ja: 一 runtime parameter は versioned process-isolation specification ではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-process-policy-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: FilesystemPolicy
-    shared_parent_concept_id: IsolationSpecification
-    differentia:
-      zh: ProcessPolicy 约束程序、身份、命名空间、能力、系统调用与资源；FilesystemPolicy 约束路径、挂载与文件操作。二者共同收窄沙箱，但端点和判定输入不同。
-      en: ProcessPolicy constrains program, identity, namespaces, capabilities, syscalls, and resources; FilesystemPolicy constrains paths, mounts, and file operations. Both narrow a sandbox, but their decision inputs and endpoints differ.
-      ja: ProcessPolicy は program・identity・namespace・capability・syscall・resource、FilesystemPolicy は path・mount・file operation を制約し decision input/endpoint が異なります。
-    source_claims:
-      - claim-process-policy-002
-      - claim-process-policy-003
+      - claim-process-policy-design
 parent_relation:
   id: ProcessPolicy-is_a-IsolationSpecification
   predicate: is_a
@@ -244,109 +275,66 @@ parent_relation:
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: ProcessPolicy-is_a-IsolationSpecification-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 进程边界继承隔离规范
-        en: Process boundary inherits isolation specification
-        ja: process boundary の継承
-      scenario_id: sandbox-review-processpolicy-is_a-isolationspecification-positive
-      descriptions:
-        zh: proc-python@2 具规范身份与执行器，并固定 namespace、capability、seccomp 和资源限制。
-        en: proc-python@2 has specification identity and enforcer and fixes namespaces, capabilities, seccomp, and resource limits.
-        ja: proc-python@2 は specification identity/enforcer と namespace・capability・seccomp・resource limit を持ちます。
-      field_values: {}
-      related_node_ids:
-        - ProcessPolicy
-        - IsolationSpecification
-      related_relation_ids:
-        - ProcessPolicy-is_a-IsolationSpecification
-      expected_result:
-        zh: 建立 ProcessPolicy→IsolationSpecification 的 is_a 边。
-        en: Assert the ProcessPolicy-to-IsolationSpecification is_a edge.
-        ja: ProcessPolicy→IsolationSpecification is_a 辺を主張します。
-      why_valid_or_invalid:
-        zh: 对象满足通用规范身份并增加进程隔离种差。
-        en: The object satisfies general specification identity and adds process-isolation differentia.
-        ja: general specification identity を満たし process-isolation 種差を追加します。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-process-policy-001
-        - claim-process-policy-002
-    - id: ProcessPolicy-is_a-IsolationSpecification-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 运行中进程不是策略
-        en: Running process is not a policy
-        ja: running process は policy でない
-      scenario_id: sandbox-review-processpolicy-is_a-isolationspecification-boundary
-      descriptions:
-        zh: process-991 有 PID、命令与退出状态，但没有规范版本或声明性约束。
-        en: process-991 has PID, command, and exit status but no specification revision or declarative constraints.
-        ja: process-991 は PID・command・exit status を持ちますが specification revision/declarative constraint はありません。
-      field_values: {}
-      related_node_ids:
-        - ProcessPolicy
-        - IsolationSpecification
-      related_relation_ids:
-        - ProcessPolicy-is_a-IsolationSpecification
-      expected_result:
-        zh: 保持为进程实例，不建立分类边。
-        en: Keep it as a process instance and do not assert classification.
-        ja: process instance のままとし classification を主張しません。
-      why_valid_or_invalid:
-        zh: 活动实例与约束它的规范属于不同语义种类。
-        en: An activity instance and its governing specification are different semantic kinds.
-        ja: activity instance と governing specification は異なる semantic kind です。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-process-policy-002
   source_claims:
-    - claim-process-policy-001
-    - claim-process-policy-002
+    - claim-process-policy-design
+    - claim-process-policy-design
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-safety-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: Verified against OCI/Docker isolation, Linux namespaces, seccomp, AppArmor/LSM, and Landlock; specification vs Sandbox instance separation holds.
-    en: Verified against OCI/Docker isolation, Linux namespaces, seccomp, AppArmor/LSM, and Landlock; specification vs Sandbox instance separation holds.
-    ja: Verified against OCI/Docker isolation, Linux namespaces, seccomp, AppArmor/LSM, and Landlock; specification vs Sandbox instance separation holds.
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: e2b-sandbox-api
+    title: E2B Sandbox API
+    url: https://e2b.dev/docs
+    source_type: official-doc
+    relevance: Cloud sandbox lifecycle, filesystem, process, and network isolation templates.
+  - id: oci-linux-runtime
+    title: OCI Runtime Specification — Linux
+    url: https://github.com/opencontainers/runtime-spec/blob/main/config-linux.md
+    source_type: standard
+    relevance: Namespaces, cgroups, mounts, masked/readonly paths, and seccomp.
+  - id: gvisor-docs
+    title: gVisor documentation
+    url: https://gvisor.dev/docs/
+    source_type: official-doc
+    relevance: Application-kernel isolation with runsc runtime.
+  - id: owasp-llm-top10-2025
+    title: OWASP Top 10 for LLM Applications 2025
+    url: https://owasp.org/www-project-top-10-for-large-language-model-applications/
+    source_type: standard
+    relevance: Excessive agency and sandbox escape risks for agent tool execution.
+  - id: cursor-terminal-sandbox
+    title: Cursor Agent Terminal
+    url: https://cursor.com/docs/agent/terminal
+    source_type: official-doc
+    relevance: workspace-write sandbox and command allowlist layering.
+  - id: safety-sandbox-design
+    title: Moonweave sandbox-network module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: IsolationSpecification versus Sandbox instance and escape-risk separation.
 source_claims:
-  - id: claim-process-policy-001
-    source: eng-security-mcp-nsa-2026
-    supports: NSA's May 2026 MCP guidance recommends strict resource and permission boundaries, operating-system isolation such as seccomp/AppArmor/SELinux, sandboxing against lateral movement and privilege escalation, and explicit runtime denial of unneeded filesystem and network paths.
-    locator: NSA MCP Security Design Considerations > pp. 10-11 > Constrain and sandbox tool execution
+  - id: claim-process-policy-design
+    source: safety-sandbox-design
+    supports: ProcessPolicy is versioned process isolation spec; load failure falsifies Sandbox-constrained_by.
+    locator: Process policy boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-process-policy-002
-    source: eng-runtime-oci-linux-config
-    supports: The OCI Linux runtime specification defines namespaces, devices, cgroups, mounts, masked paths, read-only paths, seccomp integration, and runtime errors that ground enforceable process and filesystem isolation settings.
-    locator: OCI Runtime Specification > Linux Container Configuration > Namespaces, Devices, Control groups, Masked Paths, Readonly Paths
+  - id: claim-process-policy-design
+    source: gvisor-docs
+    supports: gVisor runsc maps to ProcessPolicy with isolation_backend=gvisor.
+    locator: runsc backend
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-process-policy-003
-    source: eng-security-linux-landlock
-    supports: Linux Landlock defines stackable path-hierarchy access rules, read/write/execute rights, rule inheritance, bind-mount and OverlayFS behavior, and explicit limitations relevant to filesystem sandbox evaluation.
-    locator: Linux Kernel documentation > Landlock rules, Layers of file path access rights, Bind mounts and OverlayFS, Current limitations
+  - id: claim-process-policy-design
+    source: oci-linux-runtime
+    supports: Docker cap-drop and seccomp profiles map to ProcessPolicy fields.
+    locator: OCI seccomp
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
+  - id: claim-process-policy-design
+    source: e2b-sandbox-api
+    supports: E2B template process limits map to ProcessPolicy cgroup and process constraints.
+    locator: E2B limits
+    evidence_kind: design-inference
+    confidence: high

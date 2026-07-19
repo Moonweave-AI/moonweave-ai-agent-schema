@@ -1,331 +1,210 @@
 schema: moonweave.ai/ontology-node/v1
 id: MemoryAssessmentOperation
 kind: concept
-status: accepted
 labels:
   zh: 记忆评估操作
   en: Memory assessment operation
   ja: 記憶評価操作
 semantics:
   short_definition:
-    zh: 检查记录是否适合继续保留、检索或复用而不直接改写它的操作。
-    en: An operation checking whether a record remains fit for retention, retrieval, or reuse without directly rewriting it.
-    ja: recordを直接rewriteせずretention・retrieval・reuse適合性を検査するoperationです。
+    zh: 验证候选项或既有记录质量与一致性的活动。
+    en: Activity validating quality and consistency of candidates or existing records.
+    ja: 候補または既存 record の quality/consistency を検証する activity。
   definition:
-    zh: MemoryAssessmentOperation 是只读或旁路式 MemoryOperation：它依据来源、新鲜度、安全、冲突或策略条件形成评估结果；若评估发现冲突，后续由 MemoryResolutionOperation 处理。
-    en: MemoryAssessmentOperation is a read-only or side-channel MemoryOperation producing an assessment from provenance, freshness, safety, conflict, or policy checks. If it detects a conflict, a later MemoryResolutionOperation handles it.
-    ja: MemoryAssessmentOperation はprovenance・freshness・safety・conflict・policy checkからassessmentを作るread-only/side-channel MemoryOperationです。conflict検出後はMemoryResolutionOperationが処理します。
+    zh: MemoryAssessmentOperation 是 MemoryOperation 子类：读取 MemoryItem 或 MemoryRecord 并输出验证结论（通过、冲突、拒绝），但不直接产生新版本或 tombstone。Mem0/Letta 矛盾事实检测在验证阶段发现 MemoryConflict，由后续 MemoryConflictResolution 处理。
+    en: MemoryAssessmentOperation is a MemoryOperation subtype that reads MemoryItem or MemoryRecord and emits validation outcomes (pass, conflict, reject) without directly producing new versions or tombstones. Contradictory fact detection in Mem0/Letta surfaces MemoryConflict during validation for later MemoryConflictResolution.
+    ja: MemoryAssessmentOperation は MemoryItem/MemoryRecord を read し pass/conflict/reject 結論を出す MemoryOperation subtype。新版/tombstone は直接生成しない。Mem0/Letta 矛盾検出は MemoryConflict として validation 段階で surface。
   why_needed:
-    zh: 明确“发现问题”与“决定如何解决”是两个活动阶段。
-    en: Makes detecting a problem and deciding its resolution two separate activity phases.
-    ja: problem検出とresolution決定を別activity phaseにします。
+    zh: 把“检查质量”与“写入/删除”分开，否则冲突检测会被误记为已解决或已删除。
+    en: Separating quality checks from write/delete prevents conflict detection from being mistaken for resolution or deletion.
+    ja: quality check と write/delete を分離しないと conflict 検出が resolution/delete と誤認される。
   includes:
-    - zh: 纳入来源、新鲜度、安全、同意和一致性检查。
-      en: Includes provenance, freshness, safety, consent, and consistency checks.
-      ja: provenance・freshness・safety・consent・consistency checkを含みます。
+    - zh: 纳入 MemoryValidation 及冲突、格式、同意范围检查活动。
+      en: Includes MemoryValidation and conflict, format, and consent-scope checks.
+      ja: MemoryValidation と conflict/format/consent チェック。
   excludes:
-    - zh: 排除内容修订、冲突解决决定和处置效果。
-      en: Excludes content revision, conflict-resolution decisions, and disposition effects.
-      ja: content revision・conflict-resolution decision・disposition effectを除外します。
+    - zh: 排除产生后继 record、删除 record 与冲突解决决策执行。
+      en: Excludes producing successor records, deleting records, and executing conflict-resolution decisions.
+      ja: successor record 生成/delete/conflict resolution 実行を除外。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: Mem0 写入前 deduplicate 与 Letta 检索比对可触发 MemoryValidation；检测到 contradictory facts 时登记 MemoryConflict 信息对象，validation_operation_id 绑定 verdict。
+    en: Mem0 pre-write deduplicate and Letta retrieval comparison trigger MemoryValidation; contradictory facts register a MemoryConflict information object with validation_operation_id binding verdict.
+    ja: Mem0 deduplicate/Letta 检索比較が MemoryValidation を trigger。矛盾時 MemoryConflict 情報を登録。
+  typical_input:
+    - description: Validation target
+      format: |
+        {"assessment_operation_id": "validate-220", "target_record_ids": ["record-310-v1", "record-311-v1"]}
+      source_claims: [claim-assessment-design]
+  typical_output:
+    - description: Validation verdict
+      format: |
+        {"verdict": "conflict", "conflict_id": "conflict-220"}
+      source_claims: [claim-assessment-design]
+  reference_implementations:
+    - name: Mem0 Memory API
+      url: https://docs.mem0.ai
+      description: Deduplication and contradiction checks on add/update.
+    - name: Letta Archival Memory
+      url: https://docs.letta.com/guides/core-concepts/memory/archival-memory
+      description: Search-before-insert conflict detection.
 structure:
-  identity_keys:
-    - assessment_operation_id
+  identity_keys: [assessment_operation_id]
   fields:
     - id: assessment_operation_id
-      labels:
-        zh: 评估操作标识
-        en: assessment operation ID
-        ja: assessment operation ID
+      labels: {zh: 评估操作标识, en: Assessment operation identifier, ja: 評価操作識別子}
+      definitions:
+        zh: 标识一次记忆评估活动。
+        en: Identifies one memory assessment activity.
+        ja: 一 memory assessment activity を識別。
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 标识一次记忆适用性评估。
-        en: Identifies one memory-fitness assessment activity.
-        ja: 一memory-fitness assessment activityを識別します。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
-      example_value: assess-1607
-      source_claims:
-        - claim-memory-assessment-operation-002
-    - id: assessment_scope
-      labels:
-        zh: 评估范围
-        en: assessment scope
-        ja: 評価範囲
-      datatype: array[string]
+      example_value: validate-220
+      allowed_values: []
+      source_claims: [claim-assessment-id]
+    - id: verdict
+      labels: {zh: 评估结论, en: Assessment verdict, ja: 評価 verdict}
+      definitions:
+        zh: 结构化结论：pass、conflict、reject。
+        en: Structured verdict pass, conflict, or reject.
+        ja: pass/conflict/reject の structured verdict。
+      datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 列出本次检查的来源、新鲜度、安全或一致性维度。
-        en: Lists provenance, freshness, safety, or consistency dimensions checked.
-        ja: 検査するprovenance・freshness・safety・consistency dimensionを列挙します。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
-      example_value:
-        - freshness
-        - consistency
-      source_claims:
-        - claim-memory-assessment-operation-003
+      example_value: conflict
+      allowed_values: []
+      source_claims: [claim-assessment-verdict]
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: MemoryAssessmentOperation-example-positive-manual-001
-    kind: positive
-    labels:
-      zh: 记忆评估操作正例
-      en: "Positive case: Memory assessment operation"
-      ja: 記憶評価操作正例
-    scenario_id: null
+  - id: MemoryAssessmentOperation-example-pass
+    labels: {zh: 验证通过, en: Validation pass, ja: 検証 pass}
     descriptions:
-      zh: assess-1607 检查 record-1607 的新鲜度与一致性并报告一处冲突，不修改记录。
-      en: assess-1607 checks record-1607 for freshness and consistency and reports one conflict without modifying the record.
-      ja: assess-1607 はrecord-1607のfreshness/consistencyを検査しrecord変更なしで一conflictを報告します。
-    field_values:
-      assessment_operation_id: assess-1607
-      assessment_scope:
-        - freshness
-        - consistency
-      operation_id: assess-1607
-      started_at: 2026-07-16T14:10:00Z
-    related_node_ids:
-      - MemoryAssessmentOperation
-      - MemoryOperation
-    related_relation_ids:
-      - MemoryAssessmentOperation-is_a-MemoryOperation
-    expected_result:
-      zh: 归类为 MemoryAssessmentOperation。
-      en: Classify as MemoryAssessmentOperation.
-      ja: MemoryAssessmentOperationに分類します。
-    why_valid_or_invalid:
-      zh: 活动产生评估事实而未形成修订或解决决定。
-      en: The activity produces assessment facts without a revision or resolution decision.
-      ja: assessment factを生成しrevision/resolution decisionは作りません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-assessment-operation-001
-  - id: MemoryAssessmentOperation-example-boundary-manual-001
-    kind: boundary
-    labels:
-      zh: 记忆评估操作边界例
-      en: "Boundary case: Memory assessment operation"
-      ja: 記憶評価操作境界例
-    scenario_id: null
-    descriptions:
-      zh: resolve-1607 比较冲突证据后选择保留较新记录并生成调和版本。
-      en: resolve-1607 compares conflict evidence, chooses the newer record, and produces a reconciled version.
-      ja: resolve-1607 はconflict evidenceを比較しnewer recordを選びreconciled版を生成します。
-    field_values: {}
-    related_node_ids:
-      - MemoryAssessmentOperation
+      zh: validate-219 检查 item-310 格式与 consent 后 verdict=pass，随后触发 MemoryWrite。
+      en: validate-219 checks item-310 format and consent with verdict=pass, then triggers MemoryWrite.
+      ja: validate-219 が item-310 を検証し verdict=pass 後 MemoryWrite。
+    example_source: {product: Moonweave, url: https://moonweave.ai/ontology/agent-system/2.0.0/, version: validation}
+    field_values: {assessment_operation_id: validate-219, verdict: pass}
+    related_node_ids: [MemoryAssessmentOperation, MemoryValidation, MemoryWrite]
     related_relation_ids: []
-    expected_result:
-      zh: 不得归类为 MemoryAssessmentOperation；应归 MemoryConflictResolution。
-      en: Do not classify as MemoryAssessmentOperation; classify as MemoryConflictResolution.
-      ja: MemoryAssessmentOperationでなくMemoryConflictResolutionに分類します。
-    why_valid_or_invalid:
-      zh: 它不只发现问题，还作出规范决定并改变记录状态。
-      en: "It does more than detect a problem: it makes a normative decision and changes record state."
-      ja: problem検出だけでなくnormative decisionを行いrecord stateを変えます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-assessment-operation-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: MemoryDispositionOperation
-    shared_parent_concept_id: MemoryOperation
-    differentia:
-      zh: 共享父节点对照：父节点 MemoryOperation：MemoryAssessmentOperation（semantic kind=activity，骨架 MemoryAssessmentOperation-is_a-MemoryOperation）；MemoryDispositionOperation（semantic kind=activity，骨架 MemoryDispositionOperation-is_a-MemoryOperation）。双端条件：MemoryAssessmentOperation 条件：“检查记录是否适合继续保留、检索或复用而不直接改写它的操作”；MemoryDispositionOperation 条件：“改变既有记录的可用性、强度或保留状态的操作”。逐端验证；父节点不证明任一身份。
-      en: "Shared-parent contrast: parent MemoryOperation: MemoryAssessmentOperation (semantic kind=activity, backbone MemoryAssessmentOperation-is_a-MemoryOperation); MemoryDispositionOperation (semantic kind=activity, backbone MemoryDispositionOperation-is_a-MemoryOperation). Endpoint conditions: MemoryAssessmentOperation condition: “An operation checking whether a record remains fit for retention, retrieval, or reuse without directly rewriting it”; MemoryDispositionOperation condition: “An operation changing an existing record's availability, strength, or retention state”. Verify each endpoint; the parent proves neither identity."
-      ja: 共有親対照：親 MemoryOperation：MemoryAssessmentOperation（semantic kind=activity、バックボーン MemoryAssessmentOperation-is_a-MemoryOperation）；MemoryDispositionOperation（semantic kind=activity、バックボーン MemoryDispositionOperation-is_a-MemoryOperation）。両端条件：MemoryAssessmentOperation の条件：「recordを直接rewriteせずretention・retrieval・reuse適合性を検査するoperationです」；MemoryDispositionOperation の条件：「既存recordのavailability・strength・retention stateを変えるoperationです」。各端を検証し、親だけでは同一性を証明しません。
-    source_claims:
-      - claim-memory-assessment-operation-004
-  - sibling_concept_id: MemoryResolutionOperation
-    shared_parent_concept_id: MemoryOperation
-    differentia:
-      zh: 已审查兄弟区分：父节点 MemoryOperation：MemoryAssessmentOperation（semantic kind=activity，骨架 MemoryAssessmentOperation-is_a-MemoryOperation）；MemoryResolutionOperation（semantic kind=activity，骨架 MemoryResolutionOperation-is_a-MemoryOperation）。双端条件：MemoryAssessmentOperation 条件：“检查记录是否适合继续保留、检索或复用而不直接改写它的操作”；MemoryResolutionOperation 条件：“消费已识别问题状态并作出可审计解决决定的操作”。任一条件成立不推出另一端。
-      en: "Reviewed sibling distinction: parent MemoryOperation: MemoryAssessmentOperation (semantic kind=activity, backbone MemoryAssessmentOperation-is_a-MemoryOperation); MemoryResolutionOperation (semantic kind=activity, backbone MemoryResolutionOperation-is_a-MemoryOperation). Endpoint conditions: MemoryAssessmentOperation condition: “An operation checking whether a record remains fit for retention, retrieval, or reuse without directly rewriting it”; MemoryResolutionOperation condition: “An operation consuming an identified problem state and making an auditable resolution decision”. Either condition leaves the other unproven."
-      ja: 審査済み兄弟区別：親 MemoryOperation：MemoryAssessmentOperation（semantic kind=activity、バックボーン MemoryAssessmentOperation-is_a-MemoryOperation）；MemoryResolutionOperation（semantic kind=activity、バックボーン MemoryResolutionOperation-is_a-MemoryOperation）。両端条件：MemoryAssessmentOperation の条件：「recordを直接rewriteせずretention・retrieval・reuse適合性を検査するoperationです」；MemoryResolutionOperation の条件：「識別済problem stateを消費しaudit可能resolution decisionを行うoperationです」。一方の成立は他方を証明しません。
-    source_claims:
-      - claim-memory-assessment-operation-005
-  - sibling_concept_id: MemoryRevisionOperation
-    shared_parent_concept_id: MemoryOperation
-    differentia:
-      zh: 共享父节点对照：父节点 MemoryOperation：MemoryAssessmentOperation（semantic kind=activity，骨架 MemoryAssessmentOperation-is_a-MemoryOperation）；MemoryRevisionOperation（semantic kind=activity，骨架 MemoryRevisionOperation-is_a-MemoryOperation）。双端条件：MemoryAssessmentOperation 条件：“检查记录是否适合继续保留、检索或复用而不直接改写它的操作”；MemoryRevisionOperation 条件：“以一个或多个既有记录为输入并产生新记录版本的操作”。逐端验证；父节点不证明任一身份。
-      en: "Shared-parent contrast: parent MemoryOperation: MemoryAssessmentOperation (semantic kind=activity, backbone MemoryAssessmentOperation-is_a-MemoryOperation); MemoryRevisionOperation (semantic kind=activity, backbone MemoryRevisionOperation-is_a-MemoryOperation). Endpoint conditions: MemoryAssessmentOperation condition: “An operation checking whether a record remains fit for retention, retrieval, or reuse without directly rewriting it”; MemoryRevisionOperation condition: “An operation taking one or more existing records as input and producing a new record version”. Verify each endpoint; the parent proves neither identity."
-      ja: 共有親対照：親 MemoryOperation：MemoryAssessmentOperation（semantic kind=activity、バックボーン MemoryAssessmentOperation-is_a-MemoryOperation）；MemoryRevisionOperation（semantic kind=activity、バックボーン MemoryRevisionOperation-is_a-MemoryOperation）。両端条件：MemoryAssessmentOperation の条件：「recordを直接rewriteせずretention・retrieval・reuse適合性を検査するoperationです」；MemoryRevisionOperation の条件：「一つ以上の既存recordをinputに新版recordを生成するoperationです」。各端を検証し、親だけでは同一性を証明しません。
-    source_claims:
-      - claim-memory-assessment-operation-006
+    source_claims: [claim-assessment-design]
+  - id: MemoryAssessmentOperation-example-conflict
+    labels: {zh: 检测冲突, en: Conflict detected, ja: 競合検出}
+    descriptions:
+      zh: validate-220 发现 record-310 与 record-311 对 response-language 断言矛盾，登记 MemoryConflict。
+      en: validate-220 finds record-310 and record-311 contradict on response-language and registers MemoryConflict.
+      ja: validate-220 が response-language で矛盾し MemoryConflict 登録。
+    example_source: {product: Mem0, url: https://docs.mem0.ai, version: contradiction check}
+    field_values: {assessment_operation_id: validate-220, verdict: conflict}
+    related_node_ids: [MemoryAssessmentOperation, MemoryConflict]
+    related_relation_ids: []
+    source_claims: [claim-assessment-mem0, claim-assessment-design]
+  - id: MemoryAssessmentOperation-example-letta
+    labels: {zh: Letta 插入前验证, en: Letta pre-insert validation, ja: Letta insert 前検証}
+    descriptions:
+      zh: validate-221 在 archival_memory_insert 前 search 发现重复 passage，verdict=reject。
+      en: validate-221 searches before archival_memory_insert, finds duplicate passage, verdict=reject.
+      ja: insert 前 search で重複、verdict=reject。
+    example_source: {product: Letta, url: https://docs.letta.com/guides/core-concepts/memory/archival-memory, version: search}
+    field_values: {assessment_operation_id: validate-221, verdict: reject}
+    related_node_ids: [MemoryAssessmentOperation, MemoryValidation]
+    related_relation_ids: []
+    source_claims: [claim-assessment-letta, claim-assessment-design]
+  - id: MemoryAssessmentOperation-example-not-update
+    labels: {zh: 评估非更新, en: Assessment is not update, ja: 評価は update ではない}
+    descriptions:
+      zh: update-512 产生 record-512-v2；validate-220 仅输出 verdict 不产生后继 record。
+      en: update-512 produces record-512-v2; validate-220 only emits verdict without successor record.
+      ja: update は successor 生成。validate は verdict のみ。
+    example_source: {product: Moonweave, url: https://moonweave.ai/ontology/agent-system/2.0.0/, version: boundary}
+    field_values: {}
+    related_node_ids: [MemoryAssessmentOperation, MemoryUpdate]
+    related_relation_ids: []
+    source_claims: [claim-assessment-design]
 parent_relation:
   id: MemoryAssessmentOperation-is_a-MemoryOperation
   predicate: is_a
   direction: target-to-source
   relation_kind: hierarchy
-  labels:
-    zh: 是一种记忆操作
-    en: is a memory operation
-    ja: 記憶操作の一種
+  labels: {zh: 是一种记忆操作, en: is a memory operation, ja: 記憶操作の一種}
   definitions:
-    zh: MemoryAssessmentOperation —is_a→ MemoryOperation 表示：活动只形成来源、新鲜度、安全、同意或一致性的评估结果，不直接修订记录。
-    en: MemoryAssessmentOperation —is_a→ MemoryOperation holds because the activity forms a provenance, freshness, safety, consent, or consistency assessment without directly revising the record
-    ja: MemoryAssessmentOperation —is_a→ MemoryOperation は、provenance・freshness・safety・consent・consistency assessmentを形成しrecordを直接revisionしないため成立します。
+    zh: MemoryAssessmentOperation —is_a→ MemoryOperation 表示活动评估记忆质量或一致性并输出结论。
+    en: MemoryAssessmentOperation —is_a→ MemoryOperation holds because the activity assesses memory quality or consistency and emits a verdict.
+    ja: memory quality/consistency を評価し verdict を出す activity のため成立。
   cardinality: null
   cardinality_not_applicable_reason:
     zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
     en: The relation is decided per auditable fact; no uniform runtime cardinality is imposed at ontology level.
-    ja: このrelationはaudit可能fact単位で判定しontology層で全runtime instanceへ一律cardinalityを課しません。
-  inverse_reading:
-    predicate: part_of
-    labels:
-      zh: 反向读取
-      en: inverse is a memory operation
-      ja: 逆方向読取
+    ja: このrelationはaudit可能fact単位で判定。
+  inverse_reading: {predicate: part_of, labels: {zh: 反向读取, en: inverse is_a, ja: 逆方向読取}}
   conditions:
-    - id: MemoryAssessmentOperation-is_a-MemoryOperation-condition-manual-001
+    - id: MemoryAssessmentOperation-is_a-MemoryOperation-condition-001
       severity: error
       expression_language: plain
-      expression: Assert only when the instance satisfies the child differentia—the activity forms a provenance, freshness, safety, consent, or consistency assessment without directly revising the record—and already meets the activity definition of MemoryOperation.
+      expression: Assert only when the activity assesses memory and emits verdict without direct mutation.
       explanations:
-        zh: 仅当实例满足子类种差“活动只形成来源、新鲜度、安全、同意或一致性的评估结果，不直接修订记录。”且已满足 MemoryOperation 的活动定义时建立该边。
-        en: Assert only when the instance satisfies the child differentia—the activity forms a provenance, freshness, safety, consent, or consistency assessment without directly revising the record—and already meets the activity definition of MemoryOperation.
-        ja: instanceがchild differentia「provenance・freshness・safety・consent・consistency assessmentを形成しrecordを直接revisionしないため成立します。」を満たし、かつ MemoryOperation のactivity定義を満たす時だけassertします。
-      source_claims:
-        - claim-memory-assessment-operation-001
+        zh: 仅当活动评估记忆并输出结论且不直接变更 record 时成立。
+        en: Assert only when the activity assesses memory and emits verdict without direct mutation.
+        ja: 評価して verdict を出し直接 mutation しない時のみ。
+      source_claims: [claim-assessment-design]
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: MemoryAssessmentOperation-is_a-MemoryOperation-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 是一种记忆操作正例
-        en: "Positive case: is a memory operation"
-        ja: 記憶操作の一種正例
-      scenario_id: MemoryAssessmentOperation-is_a-MemoryOperation:positive:20260716
-      descriptions:
-        zh: assess-1607 对 record-1607 执行来源、新鲜度、同意和一致性检查，输出 verdict-1607，但不修改记录内容或有效性。
-        en: assess-1607 checks provenance, freshness, consent, and consistency for record-1607, emits verdict-1607, and changes neither content nor validity.
-        ja: assess-1607 は record-1607 の provenance・freshness・consent・consistency を検査し verdict-1607 を出しますが content/validity は変えません。
-      field_values: {}
-      related_node_ids:
-        - MemoryAssessmentOperation
-        - MemoryOperation
-      related_relation_ids:
-        - MemoryAssessmentOperation-is_a-MemoryOperation
-      expected_result:
-        zh: 将 assess-1607 归入 MemoryAssessmentOperation，并把检查清单与结论保留为独立审计结果。
-        en: Classify assess-1607 as MemoryAssessmentOperation and retain its checklist and conclusion as a separate auditable result.
-        ja: assess-1607 を MemoryAssessmentOperation に分類し checklist と conclusion を独立 auditable result として保持します。
-      why_valid_or_invalid:
-        zh: 活动只形成关于记录的评价，不直接生成后继或处置记录，满足 assessment 相对 revision/disposition 的非变更边界。
-        en: The activity forms an assessment about a record without producing a successor or disposing it, satisfying the non-mutating assessment boundary.
-        ja: record について assessment を形成し successor 生成や disposition を行わないため、non-mutating assessment 境界を満たします。
-      synthetic: false
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-memory-assessment-operation-001
-    - id: MemoryAssessmentOperation-is_a-MemoryOperation-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 是一种记忆操作边界例
-        en: "Boundary case: is a memory operation"
-        ja: 記憶操作の一種境界例
-      scenario_id: MemoryAssessmentOperation-is_a-MemoryOperation:boundary:20260716
-      descriptions:
-        zh: update-1607 根据检查结果修正 record-1607 的 consent_scope，并生成具有新身份的 record-1607-v2。
-        en: update-1607 changes record-1607 consent_scope after the check and generates separately identified record-1607-v2.
-        ja: update-1607 は check 後 record-1607 の consent_scope を変更し別 identity の record-1607-v2 を生成します。
-      field_values: {}
-      related_node_ids:
-        - MemoryAssessmentOperation
-        - MemoryOperation
-      related_relation_ids:
-        - MemoryAssessmentOperation-is_a-MemoryOperation
-      expected_result:
-        zh: 拒绝将 update-1607 归为 MemoryAssessmentOperation；检查可以先发生，但该活动本身是 MemoryUpdate。
-        en: Reject MemoryAssessmentOperation membership for update-1607; assessment may precede it, but this activity itself is MemoryUpdate.
-        ja: update-1607 の MemoryAssessmentOperation 所属を拒否します。assessment が先行しても activity 自体は MemoryUpdate です。
-      why_valid_or_invalid:
-        zh: 一旦活动生成语义修订后继，它就跨越了只评估不改写的边界；不能用“基于检查”掩盖实际变更。
-        en: Once the activity generates a semantically revised successor it crosses the assess-without-changing boundary; being check-driven does not hide the mutation.
-        ja: semantic revised successor を生成すれば assess-without-changing 境界を越え、check-driven であることは mutation を隠しません。
-      synthetic: false
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-memory-assessment-operation-001
-  source_claims:
-    - claim-memory-assessment-operation-001
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: accepted
+  examples: []
+  source_claims: [claim-assessment-design]
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-lifecycle-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 该节点仅完成了从现行候选数据到唯一 YAML 树的无损转录；尚未逐项完成人工语义核验，不得据此宣称已审定。
-    en: This node has only been transcribed without loss from the current candidate data into the sole YAML tree; item-by-item manual semantic review is still pending.
-    ja: このノードは現行候補データから唯一の YAML ツリーへ欠落なく転記した段階であり、項目別の手動意味審査は未完了です。
-  sections:
-    semantics: pending
-    hierarchy: pending
-    relations: pending
-    structure: pending
-    examples: pending
-    source_claims: []
+sources:
+  - id: src-mem0-assessment
+    title: Mem0 Platform Documentation
+    publisher: Mem0
+    url: https://docs.mem0.ai
+    source_type: official-doc
+    relevance: Deduplication and contradiction detection.
+  - id: src-letta-assessment
+    title: Letta Archival Memory Guide
+    publisher: Letta
+    url: https://docs.letta.com/guides/core-concepts/memory/archival-memory
+    source_type: official-doc
+    relevance: Search-before-insert validation.
+  - id: src-assessment-design
+    title: Moonweave memory-lifecycle module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Assessment distinct from revision and disposition.
 source_claims:
-  - id: claim-memory-assessment-operation-001
-    source: eng-ont-prov-o
-    supports: PROV-O distinguishes an Activity from the Entity it uses or generates and the Agent associated with it; Moonweave applies that separation to memory operations.
-    locator: PROV-O Recommendation > Starting Point Terms > Entity, Activity, Agent, used, wasGeneratedBy, and wasInvalidatedBy
+  - id: claim-assessment-mem0
+    source: src-mem0-assessment
+    supports: Mem0 can detect duplicate or contradictory facts during memory operations.
+    locator: Add/update flow
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-assessment-letta
+    source: src-letta-assessment
+    supports: Letta archival search enables pre-insert validation.
+    locator: archival_memory_search
+    evidence_kind: primary-doc
+    confidence: high
+  - id: claim-assessment-design
+    source: src-assessment-design
+    supports: Assessment emits verdicts without directly mutating records.
+    locator: MemoryAssessmentOperation
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-assessment-operation-002
-    source: eng-ont-prov-o
-    supports: MemoryAssessmentOperation.assessment_operation_id records the stated operational datum so the concept instance can be identified or audited without changing the source model's own vocabulary.
-    locator: PROV-O Recommendation > Starting Point Terms > Entity, Activity, Agent, used, wasGeneratedBy, and wasInvalidatedBy
+  - id: claim-assessment-id
+    source: src-assessment-design
+    supports: assessment_operation_id identifies one assessment activity.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-assessment-operation-003
-    source: eng-ont-prov-o
-    supports: MemoryAssessmentOperation.assessment_scope records the stated operational datum so the concept instance can be identified or audited without changing the source model's own vocabulary.
-    locator: PROV-O Recommendation > Starting Point Terms > Entity, Activity, Agent, used, wasGeneratedBy, and wasInvalidatedBy
+  - id: claim-assessment-verdict
+    source: src-assessment-design
+    supports: verdict records structured assessment outcome.
+    locator: structure
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-assessment-operation-004
-    source: eng-ont-prov-o
-    supports: PROV-O separates an Activity that uses an Entity from an Activity that invalidates it. Moonweave uses this trace distinction to keep MemoryAssessmentOperation, which evaluates a record without necessarily changing it, separate from MemoryDispositionOperation, which changes availability or strength.
-    locator: PROV-O Recommendation > Starting Point Terms > Entity, Activity, Agent, used, wasGeneratedBy, and wasInvalidatedBy
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-assessment-operation-005
-    source: eng-ont-prov-o
-    supports: PROV-O permits an Activity merely to use an Entity and also permits an Activity to generate a new decision Entity. Moonweave maps the first trace shape to non-decisive MemoryAssessmentOperation and the second to outcome-producing MemoryResolutionOperation; the semantics are Moonweave-specific.
-    locator: PROV-O Recommendation > Starting Point Terms > Entity, Activity, Agent, used, wasGeneratedBy, and wasInvalidatedBy
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-assessment-operation-006
-    source: eng-ont-prov-o
-    supports: Under PROV-O, using an Entity does not by itself imply that a successor Entity was generated. Moonweave therefore distinguishes MemoryAssessmentOperation, which may only inspect a record, from MemoryRevisionOperation, which consumes existing records and produces a successor; PROV-O supplies only the provenance pattern.
-    locator: PROV-O Recommendation > Starting Point Terms > Entity, Activity, Agent, used, wasGeneratedBy, and wasInvalidatedBy
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

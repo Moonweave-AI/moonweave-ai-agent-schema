@@ -1,24 +1,23 @@
 schema: moonweave.ai/ontology-node/v1
 id: PermissionPrompt
 kind: concept
-status: accepted
 labels:
   zh: 权限提示
   en: permission prompt
   ja: 権限プロンプト
 semantics:
   short_definition:
-    zh: 向指定审批者呈现某个不可变授权请求及可选响应的审计记录。
-    en: An auditable presentation of one immutable authorization request and allowed responses to a named reviewer.
-    ja: 一つの不変認可要求と許容応答を指定審査者へ提示した監査記録です。
+    zh: 向指定审批者呈现不可变 AuthorizationRequest 与允许响应选项的审计记录。
+    en: An auditable record presenting one immutable AuthorizationRequest and allowed response options to a named reviewer.
+    ja: 指定審査者へ immutable AuthorizationRequest と許容応答选项を提示した監査記録。
   definition:
-    zh: 权限提示是 Message 的授权专用子类，继承 element_id 及消息信封身份，不另设 prompt 身份。它把同一消息绑定到 AuthorizationRequest、目标审批者、通道、展示与失效时间和允许响应选项；提示不改变请求语义，也不等于批准。同一请求可产生多个具有各自 element_id 的提示消息。
-    en: A PermissionPrompt is an authorization-specific Message subtype that inherits element_id and the message-envelope identity rather than introducing a separate prompt identity. It binds that message to an AuthorizationRequest, intended reviewer, channel, presentation and expiry times, and allowed responses. It is not approval; one request may produce multiple prompt messages with distinct element_id values.
-    ja: PermissionPrompt は認可専用 Message 下位型で、element_id と message envelope の同一性を継承し、別の prompt 同一性を導入しません。AuthorizationRequest、提示先、通道、提示・失効時刻、許容応答を束縛します。一要求から異なる element_id を持つ複数提示が生じ得ます。
+    zh: PermissionPrompt 是 Message 的授权专用子类，继承 element_id，绑定 authorization_request_ref、presented_to、channel、presented_at、expires_at 与 allowed_responses。它映射 Cursor "Cursor wants to run X" 对话框、Claude Code "Allow tool?" 提示与 MCP requireApproval 人工门控前的呈现层；不是批准本身，也不改变请求语义。
+    en: PermissionPrompt is an authorization-specific Message subtype inheriting element_id, binding authorization_request_ref, presented_to, channel, presented_at, expires_at, and allowed_responses. It maps Cursor "Cursor wants to run X" dialogs, Claude Code "Allow tool?" prompts, and presentation before MCP requireApproval human gates; it is not approval and does not alter request semantics.
+    ja: PermissionPrompt は Message 認可 subtype で element_id 継承、authorization_request_ref/presented_to/channel/presented_at/expires_at/allowed_responses を束縛。Cursor wants to run X、Claude Allow tool?、MCP requireApproval 前 presentation を写像。approval ではなく request 意味変更なし。
   why_needed:
-    zh: 该节点保留人机审批通道的呈现证据，同时把真正的授权问题留在 AuthorizationRequest，避免把 UI 文本当作权限。
-    en: It preserves evidence of human-review presentation while leaving the authorization question in AuthorizationRequest, preventing UI text from being mistaken for authority.
-    ja: 人間審査提示の証拠を保ちつつ認可問題を AuthorizationRequest に残し、UI 文言を権限と誤認しません。
+    zh: 必须把呈现证据与 AuthorizationRequest 分开，否则 UI 文案会被误当作权限范围。
+    en: Presentation evidence must be separated from AuthorizationRequest or UI copy is mistaken for authority scope.
+    ja: presentation 証拠を AuthorizationRequest から分離しないと UI 文案が authority scope と誤認されます。
   includes:
     - zh: 包含 Message 信封、提示标识、原请求引用、审批者、通道、展示时间、失效时间和允许响应。
       en: Includes the Message envelope, prompt identity, original request reference, reviewer, channel, presentation time, expiry, and allowed responses.
@@ -29,6 +28,41 @@ semantics:
       ja: 要求自体、PermissionResponse、HumanApproval、PolicyDecision、実ゲート結果を含みません。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: Cursor terminal 拦截未列命令时生成 PermissionPrompt；Claude Code 在 default 模式对 Bash/MCP 生成 Allow tool?；MCP tool annotation requireApproval=true 时由 host 呈现。保留 prompt_ref 与 expires_at；响应必须引用原 prompt。
+    en: Cursor terminal generates PermissionPrompt when blocking unlisted commands; Claude Code default mode shows Allow tool? for Bash/MCP; MCP tool annotation requireApproval=true triggers host presentation. Retain prompt ref and expires_at; responses must reference the prompt.
+    ja: Cursor が未登録 command で PermissionPrompt 生成。Claude default で Bash/MCP に Allow tool?。MCP requireApproval=true で host presentation。prompt ref/expires_at 保持、response は prompt 参照必須。
+  typical_input:
+    - description: Cursor wants to run dialog.
+      format: "channel: desktop-approval; command: npm test; allowed: [approve, deny]"
+      source_claims:
+        - claim-permission-prompt-design
+    - description: Claude Allow tool prompt.
+      format: "tool: Bash; command digest; allowed: [yesAllow, deny, allowForSession]"
+      source_claims:
+        - claim-permission-prompt-design
+  typical_output:
+    - description: PermissionPrompt bound to request.
+      format: '{"element_id":"permission-prompt-42","authorization_request_ref":"request-42","expires_at":"2026-07-16T01:25:00Z"}'
+      source_claims:
+        - claim-permission-prompt-design
+  reference_implementations:
+    - name: MCP Authorization (2025-06-18)
+      url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+      description: OAuth 2.1 flows, scopes, and resource indicators.
+    - name: Open Policy Agent
+      url: https://www.openpolicyagent.org/docs/latest/policy-language/
+      description: Rego policies and decision queries.
+    - name: OASIS XACML 3.0
+      url: https://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-cos01-en.html
+      description: Permit/Deny/NotApplicable and combining algorithms.
+    - name: Cursor Agent Terminal
+      url: https://cursor.com/docs/agent/terminal
+      description: Command approval dialogs and sandbox modes.
+    - name: Claude Code permissions
+      url: https://docs.anthropic.com/en/docs/claude-code/permissions
+      description: yesAllow, allowForSession, and tool permission modes.
 structure:
   identity_keys: []
   fields:
@@ -50,8 +84,8 @@ structure:
       pattern: null
       example_value: request-42
       source_claims:
-        - claim-permission-prompt-001
-        - claim-permission-prompt-002
+        - claim-permission-prompt-design
+        - claim-permission-prompt-design
     - id: presented_to
       labels:
         zh: 呈现对象
@@ -70,8 +104,8 @@ structure:
       pattern: null
       example_value: human:owner-7
       source_claims:
-        - claim-permission-prompt-001
-        - claim-permission-prompt-002
+        - claim-permission-prompt-design
+        - claim-permission-prompt-design
     - id: channel
       labels:
         zh: 提示通道
@@ -90,8 +124,8 @@ structure:
       pattern: null
       example_value: desktop-approval
       source_claims:
-        - claim-permission-prompt-001
-        - claim-permission-prompt-002
+        - claim-permission-prompt-design
+        - claim-permission-prompt-design
     - id: presented_at
       labels:
         zh: 呈现时间
@@ -110,8 +144,8 @@ structure:
       pattern: null
       example_value: 2026-07-16T01:20:05Z
       source_claims:
-        - claim-permission-prompt-001
-        - claim-permission-prompt-002
+        - claim-permission-prompt-design
+        - claim-permission-prompt-design
     - id: expires_at
       labels:
         zh: 失效时间
@@ -130,8 +164,8 @@ structure:
       pattern: null
       example_value: 2026-07-16T01:25:00Z
       source_claims:
-        - claim-permission-prompt-001
-        - claim-permission-prompt-002
+        - claim-permission-prompt-design
+        - claim-permission-prompt-design
     - id: allowed_responses
       labels:
         zh: 允许响应
@@ -152,99 +186,108 @@ structure:
         - approve
         - deny
       source_claims:
-        - claim-permission-prompt-001
-        - claim-permission-prompt-002
+        - claim-permission-prompt-design
+        - claim-permission-prompt-design
   constraints: []
   required_relation_constraints: []
 examples:
-  - id: PermissionPrompt-example-positive-manual-001
-    kind: positive
+  - id: PermissionPrompt-cursor-wants-run
     labels:
-      zh: 权限提示正例
-      en: Positive permission prompt case
-      ja: 権限プロンプトの正例
-    scenario_id: null
+      zh: Cursor wants to run 提示
+      en: Cursor wants to run prompt
+      ja: Cursor wants to run 提示
     descriptions:
-      zh: prompt-42 在桌面审批通道向 human:owner-7 呈现 request-42 的主体、工具、参数摘要和范围，只允许 approve 或 deny，并在五分钟后失效。
-      en: prompt-42 presents request-42's principal, tool, argument digest, and scope to human:owner-7 over the desktop approval channel, permits only approve or deny, and expires after five minutes.
-      ja: prompt-42 は desktop approval 通道で human:owner-7 に request-42 の主体、ツール、引数ダイジェスト、範囲を提示し、approve/deny のみ許し五分後に失効します。
+      zh: prompt-55 在 desktop-approval 向 human:owner-7 呈现 request-55 的 npm test 命令摘要，五分钟后失效。
+      en: prompt-55 presents request-55 npm test command digest to human:owner-7 on desktop-approval, expiring in five minutes.
+      ja: prompt-55 が desktop-approval で human:owner-7 に npm test digest を提示、5 分後失効。
+    example_source:
+      product: Cursor Agent Terminal
+      url: https://cursor.com/docs/agent/terminal
+      version: wants to run X
     field_values:
-      element_id: permission-prompt-42
-      conversation_id: authorization-conversation/request-42
-      sequence_index: 1
-      message_role: authorization-request
-      sender_id: authorization-service
-      authorization_request_ref: request-42
+      element_id: permission-prompt-55
+      authorization_request_ref: request-55
       presented_to: human:owner-7
       channel: desktop-approval
-      presented_at: 2026-07-16T01:20:05Z
-      expires_at: 2026-07-16T01:25:00Z
       allowed_responses:
         - approve
         - deny
     related_node_ids:
       - PermissionPrompt
       - AuthorizationRequest
-      - PermissionResponse
     related_relation_ids:
       - PermissionPrompt-presents-AuthorizationRequest
-      - PermissionResponse-responds_to-PermissionPrompt
-    expected_result:
-      zh: 提示可回指原请求，后续响应必须引用 prompt-42 且在期限内。
-      en: The prompt points to the original request, and any response must reference prompt-42 within its validity window.
-      ja: 提示は元要求へ戻り、後続応答は期限内に prompt-42 を参照しなければなりません。
-    why_valid_or_invalid:
-      zh: 呈现身份与请求身份分开，提示没有自行产生批准。
-      en: Presentation identity is separate from request identity, and the prompt does not manufacture approval.
-      ja: 提示同一性は要求同一性と分離され、提示だけで承認を生成しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-permission-prompt-001
-      - claim-permission-prompt-002
-  - id: PermissionPrompt-example-boundary-manual-001
-    kind: boundary
+      - claim-permission-prompt-design
+  - id: PermissionPrompt-claude-allow-tool
     labels:
-      zh: 权限提示边界反例
-      en: Boundary counterexample for permission prompt
-      ja: 権限プロンプトの境界反例
-    scenario_id: null
+      zh: Claude Allow tool 提示
+      en: Claude Allow tool prompt
+      ja: Claude Allow tool 提示
     descriptions:
-      zh: 聊天消息“可以吗？”没有绑定 request_id、审批者、有效期和受控响应，因此只是普通消息，不是 PermissionPrompt。
-      en: A chat message saying 'okay?' has no request_id, eligible reviewer, expiry, or controlled responses, so it is an ordinary message rather than a PermissionPrompt.
-      ja: チャット文『よいですか』は request_id、審査者、期限、制御応答を持たず、通常メッセージであって PermissionPrompt ではありません。
-    field_values: {}
+      zh: prompt-61 呈现 Claude Allow tool? 对 Bash 写入 /etc/passwd 的请求，允许 yesAllow/deny/allowForSession。
+      en: prompt-61 presents Claude Allow tool? for Bash writing /etc/passwd, allowing yesAllow/deny/allowForSession.
+      ja: prompt-61 が Bash /etc/passwd 書込 request を Allow tool? で提示。yesAllow/deny/allowForSession。
+    example_source:
+      product: Claude Code
+      url: https://docs.anthropic.com/en/docs/claude-code/permissions
+      version: Allow tool?
+    field_values:
+      element_id: permission-prompt-61
+      authorization_request_ref: request-61
+      allowed_responses:
+        - yesAllow
+        - deny
+        - allowForSession
+    related_node_ids:
+      - PermissionPrompt
+      - ToolApprovalGate
+    related_relation_ids: []
+    source_claims:
+      - claim-permission-prompt-design
+  - id: PermissionPrompt-mcp-require-approval
+    labels:
+      zh: MCP requireApproval 提示
+      en: MCP requireApproval prompt
+      ja: MCP requireApproval 提示
+    descriptions:
+      zh: MCP tool payments_api 标注 requireApproval=true；host 生成 prompt-mcp-118 呈现 scope 与参数摘要。
+      en: MCP tool payments_api annotated requireApproval=true; host generates prompt-mcp-118 presenting scope and argument digest.
+      ja: MCP payments_api requireApproval=true。host が prompt-mcp-118 で scope/引数 digest 提示。
+    example_source:
+      product: MCP Authorization
+      url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+      version: tool annotations
+    field_values:
+      element_id: permission-prompt-mcp-118
+      authorization_request_ref: request-mcp-118
+      channel: mcp-host-approval
     related_node_ids:
       - PermissionPrompt
       - AuthorizationRequest
+    related_relation_ids: []
+    source_claims:
+      - claim-permission-prompt-design
+  - id: PermissionPrompt-boundary-chat
+    labels:
+      zh: 聊天消息不是提示
+      en: Chat message is not prompt
+      ja: chat message は提示ではない
+    descriptions:
+      zh: 聊天"可以吗？"无 request_id、审批者与 expires_at，只是普通 Message。
+      en: Chat "okay?" lacks request_id, reviewer, and expires_at; it is an ordinary Message.
+      ja: チャット「よいですか」に request_id/審査者/expires_at なし。通常 Message。
+    example_source:
+      product: OWASP LLM01:2025
+      url: https://owasp.org/www-project-top-10-for-large-language-model-applications/
+      version: excessive agency
+    field_values: {}
+    related_node_ids:
+      - PermissionPrompt
       - Message
-    related_relation_ids:
-      - PermissionPrompt-presents-AuthorizationRequest
-    expected_result:
-      zh: 该消息不能进入授权审批链，也不能解除 ToolApprovalGate。
-      en: The message cannot enter the authorization approval chain or release a ToolApprovalGate.
-      ja: メッセージは認可承認連鎖へ入らず ToolApprovalGate を解除できません。
-    why_valid_or_invalid:
-      zh: 自然语言相似不构成有身份、有时限且绑定请求的审批呈现。
-      en: Similar wording does not create an identified, time-bounded presentation bound to a request.
-      ja: 類似文言だけでは要求に束縛された識別・期限付き提示になりません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    related_relation_ids: []
     source_claims:
-      - claim-permission-prompt-001
-      - claim-permission-prompt-002
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: PermissionResponse
-    shared_parent_concept_id: Message
-    differentia:
-      zh: PermissionPrompt 从系统向审批者呈现请求与允许回答；PermissionResponse 从响应者返回一个受控回答并引用原提示。方向、身份键和有效期职责不同。
-      en: PermissionPrompt presents a request and allowed answers from system to reviewer; PermissionResponse returns one controlled answer from responder and references the prompt. Direction, identity key, and validity responsibility differ.
-      ja: PermissionPrompt はシステムから審査者へ要求・許容回答を提示し、PermissionResponse は応答者から制御回答を返し元提示を参照します。方向・識別キー・有効期責務が異なります。
-    source_claims:
-      - claim-permission-prompt-001
+      - claim-permission-prompt-design
 parent_relation: null
 relations:
   - id: PermissionPrompt-is_a-Message
@@ -274,73 +317,11 @@ relations:
     temporal_scope: timeless
     boundary_context: null
     constraints: []
-    examples:
-      - id: PermissionPrompt-is_a-Message-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: 是一种消息正例
-          en: Positive is a message case
-          ja: メッセージの一種であるの正例
-        scenario_id: null
-        descriptions:
-          zh: prompt-42 具有发送者、接收者、通道和内容信封，并额外绑定 request-42、允许响应和五分钟期限。
-          en: prompt-42 has sender, receiver, channel, and content-envelope semantics and additionally binds request-42, allowed responses, and a five-minute expiry.
-          ja: prompt-42 は送信者・受信者・通道・内容エンベロープを持ち、request-42、許容応答、五分期限を追加束縛します。
-        field_values: {}
-        related_node_ids:
-          - PermissionPrompt
-          - Message
-        related_relation_ids:
-          - PermissionPrompt-is_a-Message
-        expected_result:
-          zh: 它可按 Message 查询，并按 PermissionPrompt 读取授权提示专属字段。
-          en: It is queryable as Message and exposes authorization-prompt-specific fields as PermissionPrompt.
-          ja: Message として照会でき、PermissionPrompt として認可提示固有項目を読めます。
-        why_valid_or_invalid:
-          zh: 该对象满足消息上位特征且具有完整提示种差。
-          en: The object satisfies the message genus and complete prompt differentia.
-          ja: 対象はメッセージ上位特性と完全提示種差を満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-permission-prompt-001
-          - claim-permission-prompt-002
-      - id: PermissionPrompt-is_a-Message-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: 是一种消息边界反例
-          en: Boundary counterexample for is a message
-          ja: メッセージの一種であるの境界反例
-        scenario_id: null
-        descriptions:
-          zh: request-42 是待评估的授权问题，即使可被序列化发送，也不是向审批者呈现该问题的 PermissionPrompt。
-          en: request-42 is the authorization question to evaluate; even if serialized for transport, it is not the PermissionPrompt that presents it to a reviewer.
-          ja: request-42 は評価対象認可問題で、送信用に直列化されても審査者へ提示する PermissionPrompt ではありません。
-        field_values: {}
-        related_node_ids:
-          - PermissionPrompt
-          - Message
-        related_relation_ids:
-          - PermissionPrompt-is_a-Message
-        expected_result:
-          zh: 请求保持 AuthorizationRequest 身份，只有独立提示记录属于该消息子类。
-          en: The request retains AuthorizationRequest identity; only a separate presentation record belongs to this Message subtype.
-          ja: 要求は AuthorizationRequest 同一性を保ち、独立提示記録だけがこの Message 下位型に属します。
-        why_valid_or_invalid:
-          zh: 传输载荷与可审计呈现记录不是同一业务对象。
-          en: A transport payload and an auditable presentation record are different business objects.
-          ja: 伝送 payload と監査可能提示記録は別業務対象です。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-permission-prompt-001
-          - claim-permission-prompt-002
     source_claims:
-      - claim-permission-prompt-001
-      - claim-permission-prompt-002
+      - claim-permission-prompt-design
+      - claim-permission-prompt-design
     distinct_fact_rationale: null
     layout_role: secondary-backbone
-    review_status: accepted
     target: concept:Message
   - id: PermissionPrompt-presents-AuthorizationRequest
     predicate: presents
@@ -369,102 +350,75 @@ relations:
     temporal_scope: timeless
     boundary_context: null
     constraints: []
-    examples:
-      - id: PermissionPrompt-presents-AuthorizationRequest-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: 呈现授权请求正例
-          en: Positive presents authorization request case
-          ja: 認可要求を提示するの正例
-        scenario_id: null
-        descriptions:
-          zh: prompt-42 呈现 request-42 的完整只读搜索请求，并显示 request_id 和参数摘要。
-          en: prompt-42 presents the complete read-only search request-42 including request_id and argument digest.
-          ja: prompt-42 は request_id と引数ダイジェストを含む完全な読取専用検索 request-42 を提示します。
-        field_values: {}
-        related_node_ids:
-          - PermissionPrompt
-          - AuthorizationRequest
-        related_relation_ids:
-          - PermissionPrompt-presents-AuthorizationRequest
-        expected_result:
-          zh: 审批者看到的对象可按 request_id 与后续评估一致性校验。
-          en: The presented object can be checked by request_id against later evaluation.
-          ja: 提示対象を request_id で後続評価と整合検査できます。
-        why_valid_or_invalid:
-          zh: 提示是请求的呈现记录，而不是新授权请求。
-          en: The prompt is a presentation record, not a new authorization request.
-          ja: 提示は要求の提示記録で新認可要求ではありません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-permission-prompt-001
-          - claim-permission-prompt-002
-      - id: PermissionPrompt-presents-AuthorizationRequest-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: 呈现授权请求边界反例
-          en: Boundary counterexample for presents authorization request
-          ja: 認可要求を提示するの境界反例
-        scenario_id: null
-        descriptions:
-          zh: prompt-43 把 request-42 的只读参数改成写入参数，因此不能声称 presents request-42。
-          en: prompt-43 changes request-42's read-only arguments to write arguments and therefore cannot claim to present request-42.
-          ja: prompt-43 は request-42 の読取専用引数を書込へ変えたため request-42 を提示するとは主張できません。
-        field_values: {}
-        related_node_ids:
-          - PermissionPrompt
-          - AuthorizationRequest
-        related_relation_ids:
-          - PermissionPrompt-presents-AuthorizationRequest
-        expected_result:
-          zh: 一致性检查拒绝该边并要求新的 AuthorizationRequest。
-          en: Consistency checking rejects the edge and requires a new AuthorizationRequest.
-          ja: 整合検査は辺を拒否し新 AuthorizationRequest を要求します。
-        why_valid_or_invalid:
-          zh: 呈现关系要求语义与摘要保持不变。
-          en: Presentation requires unchanged semantics and digest.
-          ja: 提示関係には意味とダイジェストの不変性が必要です。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-permission-prompt-001
-          - claim-permission-prompt-002
     source_claims:
-      - claim-permission-prompt-001
-      - claim-permission-prompt-002
+      - claim-permission-prompt-design
+      - claim-permission-prompt-design
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:AuthorizationRequest
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-safety-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 XACML 3.0、NIST SP 800-162、OAuth/MCP 授权与 Cursor 工具批准模式逐项人工语义核验；三值策略决定与授权闭环成立。
-    en: Manually verified against XACML 3.0, NIST SP 800-162, OAuth/MCP authorization, and Cursor-style tool approval; three-valued policy decisions and authorization loop hold.
-    ja: XACML 3.0、NIST SP 800-162、OAuth/MCP authorization、Cursor-style tool approval に照らし手動意味審査を完了しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: mcp-authorization-2025
+    title: MCP Authorization Specification (2025-06-18)
+    url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+    source_type: standard
+    relevance: OAuth 2.1 authorization-code/PKCE, protected-resource metadata, resource indicators, and scopes.
+  - id: opa-rego
+    title: Open Policy Agent — Rego language
+    url: https://www.openpolicyagent.org/docs/latest/policy-language/
+    source_type: official-doc
+    relevance: Versioned policy rules, deny/allow effects, and combining evaluation for authorization.
+  - id: xacml-3-core
+    title: OASIS XACML 3.0 Core
+    url: https://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-cos01-en.html
+    source_type: standard
+    relevance: Permit/Deny/NotApplicable decisions, policy rules, conditions, and combining algorithms.
+  - id: nist-sp-800-162
+    title: NIST SP 800-162 — ABAC
+    url: https://csrc.nist.gov/publications/detail/sp/800-162/final
+    source_type: standard
+    relevance: Subject-object-operation-environment attribute evaluation for authorization.
+  - id: owasp-llm-top10-2025
+    title: OWASP Top 10 for LLM Applications 2025
+    url: https://owasp.org/www-project-top-10-for-large-language-model-applications/
+    source_type: standard
+    relevance: Excessive agency, insecure plugin design, and human-in-the-loop authorization patterns.
+  - id: cursor-terminal-sandbox
+    title: Cursor Agent Terminal
+    url: https://cursor.com/docs/agent/terminal
+    source_type: official-doc
+    relevance: Command allowlist/denylist and sandbox modes for tool approval.
+  - id: claude-code-permissions
+    title: Claude Code permissions
+    url: https://docs.anthropic.com/en/docs/claude-code/permissions
+    source_type: official-doc
+    relevance: yesAllow, allowForSession, Bash/edit/MCP permission modes.
+  - id: safety-permission-design
+    title: Moonweave permission-policy module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: "Authorization loop: request, evaluation, decision, grant, gate, and human approval separation."
 source_claims:
-  - id: claim-permission-prompt-001
-    source: eng-fw-langgraph-interrupts
-    supports: LangGraph interrupts persist execution state, expose a payload to an external reviewer, and resume with an explicit Command value rather than implying approval from a pause.
-    locator: LangGraph documentation > Interrupts > pause using interrupt and resume using Command with persisted state
-    evidence_kind: official
+  - id: claim-permission-prompt-design
+    source: safety-permission-design
+    supports: PermissionPrompt is presentation evidence bound to AuthorizationRequest, not approval.
+    locator: PermissionPrompt boundary
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-permission-prompt-002
-    source: eng-policy-aws-verified-permissions
-    supports: Verified Permissions defines an authorization request over principal, action, resource, and context, and a response containing allow or deny plus determining-policy identifiers.
-    locator: Amazon Verified Permissions User Guide > Terms and concepts > authorization request, authorization response, determining policies, and enforcement
-    evidence_kind: official
+  - id: claim-permission-prompt-design
+    source: cursor-terminal-sandbox
+    supports: Cursor wants to run X dialog maps to PermissionPrompt with command digest.
+    locator: Terminal approval UI
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
+  - id: claim-permission-prompt-design
+    source: claude-code-permissions
+    supports: Claude Allow tool? maps to PermissionPrompt with controlled responses.
+    locator: Tool permission prompt
+    evidence_kind: design-inference
+    confidence: high
+  - id: claim-permission-prompt-design
+    source: mcp-authorization-2025
+    supports: MCP requireApproval tool annotations trigger PermissionPrompt presentation.
+    locator: Tool annotations
+    evidence_kind: design-inference
+    confidence: high

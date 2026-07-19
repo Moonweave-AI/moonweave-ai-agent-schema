@@ -1,24 +1,23 @@
 schema: moonweave.ai/ontology-node/v1
 id: HumanApproval
 kind: concept
-status: accepted
 labels:
   zh: 人工批准事件
   en: human approval event
   ja: 人間承認イベント
 semantics:
   short_definition:
-    zh: 有资格的人针对一个确定授权请求、范围和期限作出肯定批准的事件。
-    en: An event in which an eligible human affirmatively approves one fixed authorization request, scope, and validity interval.
-    ja: 資格ある人間が一つの固定認可要求・範囲・有効期間を肯定承認したイベントです。
+    zh: 有资格的人类对固定 AuthorizationRequest 作出肯定批准的可审计事件。
+    en: An auditable event where an eligible human affirmatively approves one fixed AuthorizationRequest.
+    ja: 資格ある人間が固定 AuthorizationRequest を肯定承認した監査可能イベント。
   definition:
-    zh: 人工批准是一种 AuthorizationEvent，继承 event_id 作为唯一事件身份；审批者、AuthorizationRequest、不超过请求的 PermissionScope、生效时间、权限依据和理由构成批准种差。它不是可复用凭证，也不直接签发 AuthorizationGrant；PolicyEvaluation 可将其作为决定证据。
-    en: A HumanApproval is an AuthorizationEvent and inherits event_id as its sole event identity. Approver, AuthorizationRequest, no-broader PermissionScope, occurrence time, authority basis, and rationale form its approval differentia. It is not a reusable credential and does not directly issue an AuthorizationGrant; PolicyEvaluation may use it as decision evidence.
-    ja: HumanApproval は AuthorizationEvent の一種で、唯一のイベント同一性として event_id を継承します。審査者、AuthorizationRequest、要求を超えない PermissionScope、発生時刻、権限根拠、理由が承認の種差です。再利用資格でも AuthorizationGrant の直接発行でもなく、PolicyEvaluation の証拠になります。
+    zh: HumanApproval 继承 AuthorizationEvent 的 event_id，并以 approver_ref、request_ref、approved_scope_ref、valid_until 与 rationale 为种差。它映射 MCP OAuth consent 页用户点击 Allow、Cursor "Cursor wants to run X" 对话框 Run、Claude Code "Allow tool?" yesAllow 与 allowForSession 会话级人工证据；是 PolicyEvaluation 的 defer→allow 证据，不直接签发 AuthorizationGrant。
+    en: HumanApproval inherits AuthorizationEvent event_id and is distinguished by approver_ref, request_ref, approved_scope_ref, valid_until, and rationale. It maps MCP OAuth consent Allow clicks, Cursor "Cursor wants to run X" Run, Claude Code "Allow tool?" yesAllow and allowForSession human evidence; it is defer→allow evidence for PolicyEvaluation, not a direct AuthorizationGrant issuer.
+    ja: HumanApproval は AuthorizationEvent event_id を継承し approver_ref/request_ref/approved_scope_ref/valid_until/rationale が種差。MCP OAuth Allow、Cursor wants to run X Run、Claude Allow tool yesAllow/allowForSession を写像。PolicyEvaluation の defer→allow 証拠で AuthorizationGrant 直接発行ではない。
   why_needed:
-    zh: 它把人的行为证据与机器策略决定和持久授权授予分开，避免“一次点击”自动扩张为长期权限。
-    en: It separates evidence of a human act from machine policy decision and durable grant, preventing one click from silently expanding into standing authority.
-    ja: 人間行為の証拠を機械方針判断と持続付与から分離し、一回のクリックが恒常権限へ拡張されるのを防ぎます。
+    zh: 必须把 OAuth consent 点击与机器 allow 决定分开，否则 MCP scope 会被误当作永久 grant。
+    en: OAuth consent clicks must be separated from machine allow decisions or MCP scopes are mistaken for permanent grants.
+    ja: OAuth consent クリックと machine allow decision を分離しないと MCP scope が permanent grant と誤認されます。
   includes:
     - zh: 包含批准事件标识、请求引用、审批者、批准范围、发生时间、失效时间、权限依据和理由。
       en: Includes approval-event identity, request reference, approver, approved scope, occurrence time, expiry, authority basis, and rationale.
@@ -29,6 +28,41 @@ semantics:
       ja: 元提示・応答、PolicyDecision、AuthorizationGrant、承認者同一性自体、ツール実行結果を含みません。
   semantic_kind: event
   aliases: []
+engineering:
+  explanation:
+    zh: HumanApproval 仅在 PermissionResponse 通过资格、prompt 有效期与 request 一致性验证后创建；MCP consent 与 Cursor/Claude 对话框都先产生 PermissionPrompt/PermissionResponse，再升格为 HumanApproval。绑定 request_ref 与 approved_scope_ref，禁止跨 request 复用。
+    en: Create HumanApproval only after PermissionResponse passes eligibility, prompt validity, and request-consistency checks; MCP consent and Cursor/Claude dialogs first yield PermissionPrompt/PermissionResponse, then promote to HumanApproval. Bind request_ref and approved_scope_ref; forbid cross-request reuse.
+    ja: PermissionResponse が資格/prompt 有効性/request 整合を通過後のみ HumanApproval 作成。MCP consent/Cursor/Claude dialog は PermissionPrompt/PermissionResponse 経由。request_ref/approved_scope_ref 束縛、request 横断再利用禁止。
+  typical_input:
+    - description: MCP OAuth consent Allow.
+      format: user clicks Allow; scopes=tools:read tools:call; resource=https://mcp.example.com
+      source_claims:
+        - claim-human-approval-design
+    - description: Claude Code yesAllow.
+      format: "permission_mode: default; user selects yesAllow for Bash tool"
+      source_claims:
+        - claim-human-approval-design
+  typical_output:
+    - description: HumanApproval evidence for PolicyEvaluation.
+      format: '{"event_id":"approval-42","request_ref":"request-42","approved_scope_ref":"scope-search-read"}'
+      source_claims:
+        - claim-human-approval-design
+  reference_implementations:
+    - name: MCP Authorization (2025-06-18)
+      url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+      description: OAuth 2.1 flows, scopes, and resource indicators.
+    - name: Open Policy Agent
+      url: https://www.openpolicyagent.org/docs/latest/policy-language/
+      description: Rego policies and decision queries.
+    - name: OASIS XACML 3.0
+      url: https://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-cos01-en.html
+      description: Permit/Deny/NotApplicable and combining algorithms.
+    - name: Cursor Agent Terminal
+      url: https://cursor.com/docs/agent/terminal
+      description: Command approval dialogs and sandbox modes.
+    - name: Claude Code permissions
+      url: https://docs.anthropic.com/en/docs/claude-code/permissions
+      description: yesAllow, allowForSession, and tool permission modes.
 structure:
   identity_keys: []
   fields:
@@ -50,8 +84,8 @@ structure:
       pattern: null
       example_value: request-42
       source_claims:
-        - claim-human-approval-001
-        - claim-human-approval-002
+        - claim-human-approval-design
+        - claim-human-approval-design
     - id: approver_ref
       labels:
         zh: 审批者引用
@@ -70,8 +104,8 @@ structure:
       pattern: null
       example_value: human:owner-7
       source_claims:
-        - claim-human-approval-001
-        - claim-human-approval-002
+        - claim-human-approval-design
+        - claim-human-approval-design
     - id: approved_scope_ref
       labels:
         zh: 批准范围引用
@@ -90,8 +124,8 @@ structure:
       pattern: null
       example_value: scope-search-read
       source_claims:
-        - claim-human-approval-001
-        - claim-human-approval-002
+        - claim-human-approval-design
+        - claim-human-approval-design
     - id: valid_until
       labels:
         zh: 批准失效时间
@@ -110,8 +144,8 @@ structure:
       pattern: null
       example_value: 2026-07-16T01:25:00Z
       source_claims:
-        - claim-human-approval-001
-        - claim-human-approval-002
+        - claim-human-approval-design
+        - claim-human-approval-design
     - id: rationale
       labels:
         zh: 批准理由
@@ -130,97 +164,102 @@ structure:
       pattern: null
       example_value: read-only search required for task
       source_claims:
-        - claim-human-approval-001
-        - claim-human-approval-002
+        - claim-human-approval-design
+        - claim-human-approval-design
   constraints: []
   required_relation_constraints: []
 examples:
-  - id: HumanApproval-example-positive-manual-001
-    kind: positive
+  - id: HumanApproval-mcp-oauth-allow
     labels:
-      zh: 人工批准事件正例
-      en: Positive human approval event case
-      ja: 人間承認イベントの正例
-    scenario_id: null
+      zh: MCP OAuth Allow 批准
+      en: MCP OAuth Allow approval
+      ja: MCP OAuth Allow 承認
     descriptions:
-      zh: human:owner-7 依据 project-owner-policy@3 在 prompt-42 有效期内批准 request-42 的只读搜索范围；approval-42 不批准写入或其他工具。
-      en: Under project-owner-policy@3, human:owner-7 approves request-42's read-only search scope while prompt-42 is valid; approval-42 does not approve writes or other tools.
-      ja: human:owner-7 は project-owner-policy@3 に基づき prompt-42 有効中に request-42 の読取専用検索範囲を承認し、approval-42 は書込や他ツールを承認しません。
+      zh: human:user-7 在 MCP consent 页批准 scope tools:read tools:call；approval-mcp-42 绑定 request-mcp-42。
+      en: human:user-7 approves scopes tools:read tools:call on MCP consent; approval-mcp-42 binds request-mcp-42.
+      ja: human:user-7 が MCP consent で tools:read tools:call を承認。approval-mcp-42 が request-mcp-42 に束縛。
+    example_source:
+      product: MCP Authorization
+      url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+      version: OAuth consent
     field_values:
-      event_id: approval-42
-      event_kind: human-approval
-      actor_ref: human:owner-7
-      authorization_object_ref: request-42
-      request_ref: request-42
-      approver_ref: human:owner-7
-      approved_scope_ref: scope-search-read
-      occurred_at: 2026-07-16T01:21:00Z
-      valid_until: 2026-07-16T01:25:00Z
-      authority_basis: project-owner-policy@3
-      rationale: read-only search required for task
+      event_id: approval-mcp-42
+      request_ref: request-mcp-42
+      approver_ref: human:user-7
+      approved_scope_ref: scope-mcp-read-call
     related_node_ids:
       - HumanApproval
       - AuthorizationRequest
-      - PolicyEvaluation
     related_relation_ids:
       - HumanApproval-approves-AuthorizationRequest
-      - PolicyEvaluation-considers-HumanApproval
-    expected_result:
-      zh: 评估可验证审批者、请求、范围和时间，并把 approval-42 作为证据而非授权凭证。
-      en: Evaluation can verify approver, request, scope, and time and treat approval-42 as evidence rather than a credential.
-      ja: 評価は承認者・要求・範囲・時刻を検証し、approval-42 を資格ではなく証拠として扱えます。
-    why_valid_or_invalid:
-      zh: 批准事实被严格绑定到一个请求和范围，没有跨请求或无限期复用。
-      en: The approval fact is strictly bound to one request and scope with no cross-request or indefinite reuse.
-      ja: 承認事実は一要求・一範囲へ厳密に束縛され、要求横断や無期限再利用がありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-human-approval-001
-      - claim-human-approval-002
-  - id: HumanApproval-example-boundary-manual-001
-    kind: boundary
+      - claim-human-approval-design
+  - id: HumanApproval-cursor-run
     labels:
-      zh: 人工批准事件边界反例
-      en: Boundary counterexample for human approval event
-      ja: 人間承認イベントの境界反例
-    scenario_id: null
+      zh: Cursor Run 批准
+      en: Cursor Run approval
+      ja: Cursor Run 承認
     descriptions:
-      zh: human:owner-7 曾在昨天批准相似搜索，但旧批准引用 request-17；它不能作为 request-42 的 HumanApproval。
-      en: human:owner-7 approved a similar search yesterday, but that approval references request-17 and cannot serve as HumanApproval for request-42.
-      ja: human:owner-7 が昨日類似検索を承認していても request-17 を参照するため request-42 の HumanApproval には使えません。
+      zh: human:owner-7 在 Cursor wants to run npm test 对话框点击 Run；approval-55 仅批准该命令摘要。
+      en: human:owner-7 clicks Run on Cursor wants to run npm test; approval-55 approves only that command digest.
+      ja: Cursor wants to run npm test で Run クリック。approval-55 は当該 command digest のみ承認。
+    example_source:
+      product: Cursor Agent Terminal
+      url: https://cursor.com/docs/agent/terminal
+      version: wants to run dialog
+    field_values:
+      event_id: approval-55
+      request_ref: request-55
+      approver_ref: human:owner-7
+    related_node_ids:
+      - HumanApproval
+      - PermissionPrompt
+    related_relation_ids: []
+    source_claims:
+      - claim-human-approval-design
+  - id: HumanApproval-claude-yesallow
+    labels:
+      zh: Claude yesAllow 批准
+      en: Claude yesAllow approval
+      ja: Claude yesAllow 承認
+    descriptions:
+      zh: Claude Code Allow tool? 对话框选择 yesAllow；approval-claude-61 绑定 Bash 写入 workspace 外路径请求。
+      en: Claude Code Allow tool? dialog selects yesAllow; approval-claude-61 binds Bash write-outside-workspace request.
+      ja: Claude Allow tool? で yesAllow。approval-claude-61 が workspace 外 Bash write request に束縛。
+    example_source:
+      product: Claude Code
+      url: https://docs.anthropic.com/en/docs/claude-code/permissions
+      version: yesAllow
+    field_values:
+      event_id: approval-claude-61
+      request_ref: request-61
+      approver_ref: human:dev-3
+    related_node_ids:
+      - HumanApproval
+      - ToolApprovalGate
+    related_relation_ids: []
+    source_claims:
+      - claim-human-approval-design
+  - id: HumanApproval-boundary-stale
+    labels:
+      zh: 旧批准不能复用
+      en: Stale approval cannot reuse
+      ja: 旧承認は再利用不可
+    descriptions:
+      zh: 昨天 approval-17 引用 request-17，不能作为 request-42 的 HumanApproval。
+      en: Yesterday approval-17 references request-17 and cannot serve as HumanApproval for request-42.
+      ja: 昨日 approval-17 は request-17 参照のため request-42 の HumanApproval になれません。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: request binding
     field_values: {}
     related_node_ids:
       - HumanApproval
       - AuthorizationRequest
-    related_relation_ids:
-      - HumanApproval-approves-AuthorizationRequest
-    expected_result:
-      zh: 验证按 request_ref 和有效期拒绝复用旧批准。
-      en: Validation rejects reuse of the old approval by request_ref and validity interval.
-      ja: 検証は request_ref と有効期間により旧承認の再利用を拒否します。
-    why_valid_or_invalid:
-      zh: 动作名称相似不改变审批事件由请求和时间决定的身份。
-      en: Similar action names do not change approval-event identity determined by request and time.
-      ja: 操作名の類似は要求と時刻で決まる承認イベント同一性を変えません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    related_relation_ids: []
     source_claims:
-      - claim-human-approval-001
-      - claim-human-approval-002
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: AuthorizationRevocation
-    shared_parent_concept_id: AuthorizationEvent
-    differentia:
-      zh: HumanApproval 为确定请求提供肯定的人类证据；AuthorizationRevocation 使确定授予不再授权未来动作。批准请求不等于撤销或签发授予。
-      en: HumanApproval supplies affirmative human evidence for a fixed request; AuthorizationRevocation stops a fixed grant from authorizing future actions. Approving a request is neither revoking nor issuing a grant.
-      ja: HumanApproval は固定要求への肯定的人間証拠、AuthorizationRevocation は固定付与の将来認可を停止します。要求承認は取消や付与発行ではありません。
-    source_claims:
-      - claim-human-approval-001
-      - claim-human-approval-003
+      - claim-human-approval-design
 parent_relation:
   id: HumanApproval-is_a-AuthorizationEvent
   predicate: is_a
@@ -249,73 +288,11 @@ parent_relation:
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: HumanApproval-is_a-AuthorizationEvent-example-positive-manual-001
-      kind: positive
-      labels:
-        zh: 是一种授权事件正例
-        en: Positive is an authorization event case
-        ja: 認可イベントの一種であるの正例
-      scenario_id: null
-      descriptions:
-        zh: approval-42 由合格审批者在期限内针对 request-42 发生，并记录权限依据与批准范围。
-        en: approval-42 occurs when an eligible reviewer approves request-42 within the interval and records authority basis and approved scope.
-        ja: approval-42 は資格ある審査者が期限内に request-42 を承認し、権限根拠と承認範囲を記録します。
-      field_values: {}
-      related_node_ids:
-        - HumanApproval
-        - AuthorizationEvent
-      related_relation_ids:
-        - HumanApproval-is_a-AuthorizationEvent
-      expected_result:
-        zh: 该记录同时满足授权事件共同身份和人工批准种差。
-        en: The record satisfies both shared authorization-event identity and the human-approval differentia.
-        ja: 記録は共通認可イベント同一性と人間承認種差をともに満たします。
-      why_valid_or_invalid:
-        zh: 存在可验证的人类行动者、发生时间、请求对象和批准效果。
-        en: A verifiable human actor, occurrence time, request object, and approval effect are present.
-        ja: 検証可能な人間行為者、発生時刻、要求対象、承認効果があります。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-human-approval-001
-        - claim-human-approval-004
-    - id: HumanApproval-is_a-AuthorizationEvent-example-boundary-manual-001
-      kind: boundary
-      labels:
-        zh: 是一种授权事件边界反例
-        en: Boundary counterexample for is an authorization event
-        ja: 認可イベントの一種であるの境界反例
-      scenario_id: null
-      descriptions:
-        zh: response-42 只记录用户提交 approve 文本，尚未验证资格、请求一致性和范围；它仍是 PermissionResponse，不是 HumanApproval 事件。
-        en: response-42 only records submitted approve text before eligibility, request identity, and scope are validated; it remains a PermissionResponse rather than a HumanApproval event.
-        ja: response-42 は資格・要求同一性・範囲検証前の approve 入力記録にすぎず、PermissionResponse のままで HumanApproval イベントではありません。
-      field_values: {}
-      related_node_ids:
-        - HumanApproval
-        - AuthorizationEvent
-      related_relation_ids:
-        - HumanApproval-is_a-AuthorizationEvent
-      expected_result:
-        zh: 分类器拒绝提升为 HumanApproval，评估不能据此直接授权。
-        en: Classification refuses promotion to HumanApproval and evaluation cannot authorize directly from it.
-        ja: 分類は HumanApproval への昇格を拒否し、評価はそれだけで認可できません。
-      why_valid_or_invalid:
-        zh: 消息回答与具有业务效果的授权事件身份不同。
-        en: A message answer and an authorization event with business effect have different identities.
-        ja: メッセージ回答と業務効果を持つ認可イベントは同一性が異なります。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-human-approval-001
-        - claim-human-approval-004
   source_claims:
-    - claim-human-approval-001
-    - claim-human-approval-004
+    - claim-human-approval-design
+    - claim-human-approval-design
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations:
   - id: HumanApproval-approves-AuthorizationRequest
@@ -345,116 +322,75 @@ relations:
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
-    examples:
-      - id: HumanApproval-approves-AuthorizationRequest-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: 批准授权请求正例
-          en: Positive approves authorization request case
-          ja: 認可要求を承認するの正例
-        scenario_id: null
-        descriptions:
-          zh: approval-42 由合格项目所有者在期限内批准 request-42 的 scope-search-read。
-          en: approval-42 is made by an eligible project owner within the interval for request-42 and scope-search-read.
-          ja: approval-42 は資格あるプロジェクト所有者が期限内に request-42 の scope-search-read を承認します。
-        field_values: {}
-        related_node_ids:
-          - HumanApproval
-          - AuthorizationRequest
-        related_relation_ids:
-          - HumanApproval-approves-AuthorizationRequest
-        expected_result:
-          zh: 请求可查询有效人工批准，评估仍须验证策略条件。
-          en: The request can query valid human approval while evaluation still checks policy conditions.
-          ja: 要求は有効人間承認を照会でき、評価はなお方針条件を検証します。
-        why_valid_or_invalid:
-          zh: 批准与请求、范围、审批者和时间全部绑定。
-          en: Approval is bound to request, scope, reviewer, and time.
-          ja: 承認は要求・範囲・審査者・時刻へ束縛されます。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-human-approval-001
-          - claim-human-approval-002
-      - id: HumanApproval-approves-AuthorizationRequest-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: 批准授权请求边界反例
-          en: Boundary counterexample for approves authorization request
-          ja: 認可要求を承認するの境界反例
-        scenario_id: null
-        descriptions:
-          zh: human:owner-7 的一般角色权限并未针对 request-42 发生批准事件，因此不能建立 approves。
-          en: human:owner-7's general role authority is not an approval occurrence for request-42 and cannot establish approves.
-          ja: human:owner-7 の一般役割権限は request-42 の承認発生ではなく approves を作れません。
-        field_values: {}
-        related_node_ids:
-          - HumanApproval
-          - AuthorizationRequest
-        related_relation_ids:
-          - HumanApproval-approves-AuthorizationRequest
-        expected_result:
-          zh: 角色可用于资格校验，但请求仍没有批准事件。
-          en: The role may validate eligibility, but the request still has no approval event.
-          ja: 役割は資格検証に使えますが要求には承認イベントがありません。
-        why_valid_or_invalid:
-          zh: 具备批准资格与已经针对请求批准是不同事实。
-          en: Eligibility to approve and having approved the specific request are different facts.
-          ja: 承認資格と特定要求を承認済みであることは別事実です。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-human-approval-001
-          - claim-human-approval-002
     source_claims:
-      - claim-human-approval-001
-      - claim-human-approval-002
+      - claim-human-approval-design
+      - claim-human-approval-design
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:AuthorizationRequest
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-safety-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 XACML 3.0、NIST SP 800-162、OAuth/MCP 授权与 Cursor 工具批准模式逐项人工语义核验；三值策略决定与授权闭环成立。
-    en: Manually verified against XACML 3.0, NIST SP 800-162, OAuth/MCP authorization, and Cursor-style tool approval; three-valued policy decisions and authorization loop hold.
-    ja: XACML 3.0、NIST SP 800-162、OAuth/MCP authorization、Cursor-style tool approval に照らし手動意味審査を完了しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: mcp-authorization-2025
+    title: MCP Authorization Specification (2025-06-18)
+    url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+    source_type: standard
+    relevance: OAuth 2.1 authorization-code/PKCE, protected-resource metadata, resource indicators, and scopes.
+  - id: opa-rego
+    title: Open Policy Agent — Rego language
+    url: https://www.openpolicyagent.org/docs/latest/policy-language/
+    source_type: official-doc
+    relevance: Versioned policy rules, deny/allow effects, and combining evaluation for authorization.
+  - id: xacml-3-core
+    title: OASIS XACML 3.0 Core
+    url: https://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-cos01-en.html
+    source_type: standard
+    relevance: Permit/Deny/NotApplicable decisions, policy rules, conditions, and combining algorithms.
+  - id: nist-sp-800-162
+    title: NIST SP 800-162 — ABAC
+    url: https://csrc.nist.gov/publications/detail/sp/800-162/final
+    source_type: standard
+    relevance: Subject-object-operation-environment attribute evaluation for authorization.
+  - id: owasp-llm-top10-2025
+    title: OWASP Top 10 for LLM Applications 2025
+    url: https://owasp.org/www-project-top-10-for-large-language-model-applications/
+    source_type: standard
+    relevance: Excessive agency, insecure plugin design, and human-in-the-loop authorization patterns.
+  - id: cursor-terminal-sandbox
+    title: Cursor Agent Terminal
+    url: https://cursor.com/docs/agent/terminal
+    source_type: official-doc
+    relevance: Command allowlist/denylist and sandbox modes for tool approval.
+  - id: claude-code-permissions
+    title: Claude Code permissions
+    url: https://docs.anthropic.com/en/docs/claude-code/permissions
+    source_type: official-doc
+    relevance: yesAllow, allowForSession, Bash/edit/MCP permission modes.
+  - id: safety-permission-design
+    title: Moonweave permission-policy module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: "Authorization loop: request, evaluation, decision, grant, gate, and human approval separation."
 source_claims:
-  - id: claim-human-approval-001
-    source: eng-fw-langgraph-interrupts
-    supports: LangGraph interrupts persist execution state, expose a payload to an external reviewer, and resume with an explicit Command value rather than implying approval from a pause.
-    locator: LangGraph documentation > Interrupts > pause using interrupt and resume using Command with persisted state
-    evidence_kind: official
+  - id: claim-human-approval-design
+    source: safety-permission-design
+    supports: HumanApproval is human act evidence distinct from PolicyDecision and AuthorizationGrant.
+    locator: HumanApproval boundary
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-human-approval-002
-    source: eng-security-nist-abac
-    supports: NIST defines authorization as evaluation of subject, object, requested operation, and environment attributes against policy, rules, or relationships describing allowed operations.
-    locator: "NIST SP 800-162, Section 3: ABAC definition using subject, object, operation, environment attributes, policy, and rules"
-    evidence_kind: official
+  - id: claim-human-approval-design
+    source: mcp-authorization-2025
+    supports: MCP OAuth consent Allow maps to HumanApproval bound to authorization request and scopes.
+    locator: OAuth consent
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-human-approval-003
-    source: eng-proto-oauth-rfc7009
-    supports: RFC 7009 specifies an explicit revocation request and permits invalidation of related authorization credentials while requiring clients to tolerate unexpected invalidation.
-    locator: "RFC 7009, Sections 2.1-2.3: token revocation request, response, and authorization-server invalidation behavior"
-    evidence_kind: normative
+  - id: claim-human-approval-design
+    source: cursor-terminal-sandbox
+    supports: Cursor Run/Allow clicks map to HumanApproval after prompt validation.
+    locator: Tool dialog
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-human-approval-004
-    source: eng-policy-aws-verified-permissions
-    supports: Verified Permissions defines an authorization request over principal, action, resource, and context, and a response containing allow or deny plus determining-policy identifiers.
-    locator: Amazon Verified Permissions User Guide > Terms and concepts > authorization request, authorization response, determining policies, and enforcement
-    evidence_kind: official
+  - id: claim-human-approval-design
+    source: claude-code-permissions
+    supports: Claude yesAllow and allowForSession map to HumanApproval with session scope limits.
+    locator: Permission modes
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted

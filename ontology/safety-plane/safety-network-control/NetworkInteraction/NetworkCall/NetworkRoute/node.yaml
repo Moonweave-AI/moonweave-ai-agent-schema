@@ -1,34 +1,62 @@
 schema: moonweave.ai/ontology-node/v1
 id: NetworkRoute
 kind: concept
-status: accepted
 labels:
   zh: 网络路由记录
   en: network route record
-  ja: network route record
+  ja: ネットワークルート記録
 semantics:
   short_definition:
-    zh: 一次调用实际选择并验证的有序网络跳点路径记录。
-    en: The ordered, selected, and verified hop path actually used or attempted by one network call.
-    ja: 一 network call が実際に selected/verified した ordered hop path record。
+    zh: 一次 NetworkCall 实际选择并验证的有序跳点路径记录。
+    en: The ordered hop path actually selected and verified by one NetworkCall.
+    ja: 一回 NetworkCall が実際に selected/verified した ordered hop path record。
   definition:
-    zh: 网络路由记录是一种信息，以路由标识、选择时间、有序跳点、最终端点和路由决定证据为身份，描述某次 NetworkCall 实际使用或尝试使用的路径。它可以是直连或代理路径；它不是静态路由规则、Proxy 端点、DNS 候选集合或抽象网络拓扑。
-    en: A NetworkRoute is information identified by route ID, selection time, ordered hops, final endpoint, and route-decision evidence, describing the path actually used or attempted by one NetworkCall. It may be direct or proxied; it is not a static routing rule, Proxy endpoint, DNS candidate set, or abstract network topology.
-    ja: NetworkRoute は route ID・selection time・ordered hop・final endpoint・route-decision evidence で識別する information で一 NetworkCall が実際に used/attempted した path を表します。direct/proxied のいずれでもよく static routing rule・Proxy endpoint・DNS candidate set・abstract topology ではありません。
+    zh: NetworkRoute 是 NetworkCall 内的路径 genus，以 route_id、selected_at、hop_sequence、final_endpoint_ref 与 route_decision_evidence_ref 为身份，记录直连或经 Proxy 的实际有效路径。它映射 HTTP CONNECT 隧道、SOCKS5 relay 与直连 TLS 的 audit 跳点序列；不是静态 PAC 候选、Proxy 实体或 NetworkPolicy 规则。
+    en: "NetworkRoute is the route genus within NetworkCall identified by route_id, selected_at, hop_sequence, final_endpoint_ref, and route_decision_evidence_ref, recording the actual effective path whether direct or via Proxy. It maps audit hop sequences for HTTP CONNECT tunnels, SOCKS5 relays, and direct TLS; it is not static PAC candidates, Proxy Entity, or NetworkPolicy rules."
+    ja: NetworkRoute は NetworkCall 内 route genus で route_id/selected_at/hop_sequence/final_endpoint_ref/route_decision_evidence_ref を identity とし direct/Proxy 経由 actual effective path を記録。HTTP CONNECT tunnel/SOCKS5 relay/direct TLS audit hop sequence を写像。static PAC candidate/Proxy Entity/NetworkPolicy rule ではない。
   why_needed:
-    zh: 把有效路径从代理实体和路由策略中独立出来，才能审计调用到底经过哪里，而不是只知道配置声称应经过哪里。
-    en: Separating effective path from proxy Entity and route policy enables audit of where a call actually went rather than where configuration said it should go.
-    ja: effective path を proxy Entity/route policy から分離し config 上の予定でなく call が実際に通った場所を audit できます。
+    zh: 有效路径从代理实体与策略配置独立后，才能审计调用实际经过 proxy-egress-2 还是直连，而不是只看配置声称应走哪条路径。
+    en: Separating effective path from Proxy Entity and policy configuration audits where a call actually went through proxy-egress-2 versus direct, not merely where configuration claimed it should go.
+    ja: effective path を Proxy Entity/policy config から分離後 call が proxy-egress-2 経由か direct か actual audit 可。config 上の予定だけではない。
   includes:
-    - zh: 直连源站路径、经 HTTP 或 SOCKS 代理的路径，以及包含重定向后最终端点的路径记录。
-      en: Direct origin paths, paths through HTTP or SOCKS proxies, and route records containing a post-redirect final endpoint.
-      ja: direct origin path・HTTP/SOCKS proxy path・post-redirect final endpoint を含む route record。
+    - zh: 含直连源站路径、HTTP CONNECT/SOCKS relay 代理路径与 redirect 后最终端点。
+      en: Includes direct origin paths, HTTP CONNECT or SOCKS relay proxy paths, and post-redirect final endpoints.
+      ja: direct origin path/HTTP CONNECT/SOCKS relay proxy path/redirect 後 final endpoint を含む。
   excludes:
-    - zh: 代理服务器实体、环境变量、网络策略、DNS 查询本身和未被任何调用选择的候选路径。
-      en: Proxy-server Entities, environment variables, network policies, DNS queries themselves, and candidate paths selected by no call.
-      ja: proxy server Entity・environment variable・network policy・DNS query・call に selected されない candidate path。
+    - zh: 不包含 Proxy 服务实体、环境变量、NetworkPolicy 规范、DNS 查询或未被任何 call 选择的 PAC 候选。
+      en: Excludes Proxy service Entity, environment variables, NetworkPolicy specification, DNS queries, or PAC candidates not selected by any call.
+      ja: Proxy service Entity/environment variable/NetworkPolicy spec/DNS query/call 未選択 PAC candidate は含まない。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: 集成：net-call-884 routed_by route-884；hop_sequence [proxy-egress-2, endpoint-api-example-443]；CONNECT 2xx 后 route_result=established；PAC 返回 proxy-a 但 health check 失败改直连时 hop_sequence 不含 proxy-a。
+    en: "Integration: net-call-884 routed_by route-884; hop_sequence [proxy-egress-2, endpoint-api-example-443]; CONNECT 2xx then route_result=established; when PAC returns proxy-a but health check fails to direct connect, hop_sequence excludes proxy-a."
+    ja: 統合：net-call-884 routed_by route-884。hop_sequence [proxy-egress-2, endpoint-api-example-443]。CONNECT 2xx 後 route_result=established。PAC proxy-a 返却も health check failure で direct 時 hop_sequence proxy-a 除外。
+  typical_input:
+    - description: Route selection after proxy CONNECT success.
+      format: |
+        route_id: route-884
+        hop_sequence:
+          - proxy-egress-2
+          - endpoint-api-example-443
+        route_decision_evidence_ref: route-decision-884
+      source_claims:
+        - claim-network-route-design
+  typical_output:
+    - description: Route targeting verified final endpoint.
+      format: |
+        final_endpoint_ref: endpoint-api-example-443
+        route_result: established
+      source_claims:
+        - claim-network-route-design
+  reference_implementations:
+    - name: RFC 9110 HTTP Semantics
+      url: https://www.rfc-editor.org/rfc/rfc9110.html
+      description: HTTP proxy intermediaries, CONNECT tunnel, direct versus proxy routing.
+    - name: RFC 1928 SOCKS Protocol Version 5
+      url: https://www.rfc-editor.org/rfc/rfc1928.html
+      description: SOCKS CONNECT relay hop establishment.
 structure:
   identity_keys:
     - route_id
@@ -47,13 +75,12 @@ structure:
       definitions:
         zh: 稳定标识一次调用的有效路径记录。
         en: Stable identifier for one call's effective-route record.
-        ja: 一 call の effective route record の stable identifier。
+        ja: 一 call effective route record の stable identifier。
       allowed_values: []
       pattern: null
       example_value: route-884
       source_claims:
-        - claim-network-route-001
-        - claim-network-route-002
+        - claim-network-route-design
     - id: selected_at
       labels:
         zh: 选择时间
@@ -65,14 +92,14 @@ structure:
         min: 1
         max: 1
       definitions:
-        zh: 记录该路径被调用选择或确认的时间。
-        en: Records when the call selected or confirmed the path.
+        zh: 路径被调用选择或确认的时间。
+        en: When the call selected or confirmed the path.
         ja: call が path を selected/confirmed した時刻。
       allowed_values: []
       pattern: null
       example_value: 2026-07-16T02:31:04Z
       source_claims:
-        - claim-network-route-001
+        - claim-network-route-design
     - id: hop_sequence
       labels:
         zh: 跳点序列
@@ -84,17 +111,16 @@ structure:
         min: 1
         max: 1
       definitions:
-        zh: 按实际顺序记录代理、网关或最终端点引用。
-        en: Records proxy, gateway, or final endpoint references in actual order.
-        ja: proxy・gateway・final endpoint ref を actual order で記録します。
+        zh: 按实际顺序记录 Proxy、网关或最终 NetworkEndpoint 引用。
+        en: Records Proxy, gateway, or final NetworkEndpoint references in actual order.
+        ja: actual order で Proxy/gateway/final NetworkEndpoint ref を記録。
       allowed_values: []
       pattern: null
       example_value:
         - proxy-egress-2
         - endpoint-api-example-443
       source_claims:
-        - claim-network-route-001
-        - claim-network-route-003
+        - claim-network-route-rfc9110
     - id: final_endpoint_ref
       labels:
         zh: 最终端点引用
@@ -106,15 +132,14 @@ structure:
         min: 1
         max: 1
       definitions:
-        zh: 引用连接或转发完成后实际验证的目的端点。
-        en: References the destination endpoint actually verified after connection or forwarding.
-        ja: connection/forwarding 後に実際に verified された destination endpoint。
+        zh: 连接或转发完成后实际验证的目的 NetworkEndpoint。
+        en: Destination NetworkEndpoint actually verified after connection or forwarding.
+        ja: connection/forwarding 後 actually verified destination NetworkEndpoint。
       allowed_values: []
       pattern: null
       example_value: endpoint-api-example-443
       source_claims:
-        - claim-network-route-001
-        - claim-network-route-002
+        - claim-network-route-design
     - id: route_decision_evidence_ref
       labels:
         zh: 路由决定证据引用
@@ -126,190 +151,145 @@ structure:
         min: 1
         max: 1
       definitions:
-        zh: 引用代理选择、直连判断、重定向处理和策略检查证据。
+        zh: 引用代理选择、直连判断、redirect 处理与 policy 检查证据。
         en: References proxy selection, direct-route decision, redirect handling, and policy-check evidence.
-        ja: proxy selection・direct route decision・redirect handling・policy check evidence。
+        ja: proxy selection/direct route decision/redirect handling/policy check evidence を参照。
       allowed_values: []
       pattern: null
       example_value: route-decision-884
       source_claims:
-        - claim-network-route-001
-        - claim-network-route-002
+        - claim-network-route-design
   constraints: []
   required_relation_constraints: []
 examples:
-  - id: NetworkRoute-example-positive-manual-20260716
-    kind: positive
+  - id: NetworkRoute-proxy-connect
     labels:
       zh: 经出口代理的实际路径
       en: Actual path through egress proxy
       ja: egress proxy 経由 actual path
-    scenario_id: null
     descriptions:
-      zh: route-884 在 02:31:04 选择 proxy-egress-2，再连接并验证 endpoint-api-example-443；证据包含代理配置、CONNECT 成功和策略决定。
-      en: route-884 selected proxy-egress-2 at 02:31:04, then connected to and verified endpoint-api-example-443; evidence includes proxy selection, CONNECT success, and policy decision.
-      ja: route-884 は proxy-egress-2 を選び endpoint-api-example-443 に connect/verify、proxy selection・CONNECT success・policy decision evidence を保持します。
+      zh: route-884 02:31:04 选择 proxy-egress-2 再 TLS 验证 endpoint-api-example-443；证据含 CONNECT 2xx 与 policy 决定。
+      en: route-884 at 02:31:04 selects proxy-egress-2 then TLS-verifies endpoint-api-example-443; evidence includes CONNECT 2xx and policy decision.
+      ja: route-884 02:31:04 proxy-egress-2 選択後 endpoint-api-example-443 TLS verify。CONNECT 2xx/policy decision evidence 含む。
+    example_source:
+      product: RFC 9110
+      url: https://www.rfc-editor.org/rfc/rfc9110.html
+      version: HTTP CONNECT proxy
     field_values:
       route_id: route-884
-      selected_at: 2026-07-16T02:31:04Z
       hop_sequence:
         - proxy-egress-2
         - endpoint-api-example-443
-      final_endpoint_ref: endpoint-api-example-443
-      route_decision_evidence_ref: route-decision-884
     related_node_ids:
       - NetworkRoute
       - NetworkCall
       - NetworkEndpoint
+      - ProxyRoute
     related_relation_ids:
-      - NetworkCall-routed_by-NetworkRoute
       - NetworkRoute-targets-NetworkEndpoint
-    expected_result:
-      zh: 建立一条有序且有证据的有效路由记录。
-      en: Create one ordered effective-route record with evidence.
-      ja: evidence 付き ordered effective route record を作成します。
-    why_valid_or_invalid:
-      zh: 路径记录来自实际选择和连接证据，不是静态配置推断。
-      en: The route comes from actual selection and connection evidence, not static-configuration inference.
-      ja: actual selection/connection evidence に基づき static config inference ではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-network-route-001
-      - claim-network-route-002
-  - id: NetworkRoute-example-boundary-manual-20260716
-    kind: boundary
+      - claim-network-route-rfc9110
+  - id: NetworkRoute-pac-candidate-boundary
     labels:
-      zh: 候选代理清单
-      en: Candidate proxy list
-      ja: candidate proxy list
-    scenario_id: network-review-networkroute-boundary
+      zh: PAC 候选非有效路由
+      en: PAC candidate is not effective route
+      ja: PAC candidate は effective route ではない
     descriptions:
-      zh: 配置提供 proxy-a 与 proxy-b 两个候选，但没有任何调用选择、连接顺序或最终端点证据。
-      en: Configuration offers proxy-a and proxy-b as candidates but no call selected either and no connection order or final endpoint is evidenced.
-      ja: config は proxy-a/proxy-b を候補にしますが call selection・connection order・final endpoint evidence がありません。
-    field_values: {}
+      zh: 配置提供 proxy-a/proxy-b 候选但无 call 选择、连接顺序或 final endpoint 证据；不创建 NetworkRoute。
+      en: Configuration offers proxy-a and proxy-b but no call selection, connection order, or final endpoint evidence; do not create NetworkRoute.
+      ja: config proxy-a/proxy-b 候補提供も call selection/connection order/final endpoint evidence なし。NetworkRoute 作成不可。
+    example_source:
+      product: Moonweave design
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: route evidence boundary
+    field_values:
+      accepted: false
     related_node_ids:
+      - NetworkRoute
       - Proxy
     related_relation_ids: []
-    expected_result:
-      zh: 保留为配置候选，不创建 NetworkRoute。
-      en: Retain candidates as configuration and do not create a NetworkRoute.
-      ja: config candidate として保持し NetworkRoute を作成しません。
-    why_valid_or_invalid:
-      zh: 候选集合不具有一次有效路径的时间和有序跳点身份。
-      en: A candidate set lacks the time and ordered-hop identity of one effective route.
-      ja: candidate set は一 effective route の time/ordered-hop identity を欠きます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-network-route-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-network-route-design
+  - id: NetworkRoute-direct-origin
+    labels:
+      zh: 直连源站路由
+      en: Direct origin route
+      ja: direct origin route
+    descriptions:
+      zh: route-885 hop_sequence 仅 endpoint-api-example-443；无 Proxy 握手；分类为 NetworkRoute 非 ProxyRoute。
+      en: route-885 hop_sequence only endpoint-api-example-443; no Proxy handshake; classify as NetworkRoute not ProxyRoute.
+      ja: route-885 hop_sequence endpoint-api-example-443 のみ。Proxy handshake なし。NetworkRoute 分類、ProxyRoute ではない。
+    example_source:
+      product: Moonweave design
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: direct route
+    field_values:
+      route_id: route-885
+      hop_sequence:
+        - endpoint-api-example-443
+    related_node_ids:
+      - NetworkRoute
+      - NetworkEndpoint
+    related_relation_ids:
+      - NetworkRoute-targets-NetworkEndpoint
+    source_claims:
+      - claim-network-route-design
+  - id: NetworkRoute-proxy-not-final-target
+    labels:
+      zh: 代理非最终目标
+      en: Proxy is not final target
+      ja: proxy は final target ではない
+    descriptions:
+      zh: route-884 连接 proxy-egress-2 仅为 CONNECT 隧道；targets 指向 api.example.com 源站而非 proxy。
+      en: route-884 connects to proxy-egress-2 only for CONNECT tunnel; targets points to api.example.com origin not the proxy.
+      ja: route-884 proxy-egress-2 connect は CONNECT tunnel のみ。targets api.example.com origin を指し proxy ではない。
+    example_source:
+      product: RFC 9110
+      url: https://www.rfc-editor.org/rfc/rfc9110.html
+      version: proxy intermediary
+    field_values:
+      final_endpoint_ref: endpoint-api-example-443
+    related_node_ids:
+      - NetworkRoute
+      - Proxy
+      - NetworkEndpoint
+    related_relation_ids:
+      - NetworkRoute-targets-NetworkEndpoint
+    source_claims:
+      - claim-network-route-rfc9110
 parent_relation:
-  id: NetworkCall-routed_by-NetworkRoute
+  id: NetworkRoute-part_of-NetworkCall
   predicate: part_of
   direction: target-to-source
   relation_kind: composition
   labels:
-    zh: 采用有效路由
-    en: routed by effective route
-    ja: effective route で routed
+    zh: 属于网络调用路由
+    en: part of network call routing
+    ja: ネットワーク呼出しルーティングの一部
   definitions:
-    zh: NetworkCall 通过 routed_by 指向其实际选择并有证据的 NetworkRoute，无论直连还是代理路径；计划配置、候选代理和静态策略不建立该边，一次调用至多有一条最终有效路径记录。
-    en: NetworkCall points through routed_by to the evidenced NetworkRoute it actually selected, whether direct or proxied. Planned configuration, candidate proxies, and static policy do not establish this edge, and one call has at most one final effective-route record.
-    ja: NetworkCall は direct/proxied を問わず actual selected/evidenced NetworkRoute を routed_by で指します。planned config・candidate proxy・static policy は edge を成立させず一 call は最大一 final effective route を持ちます。
-  cardinality:
-    source:
-      min: 1
-      max: 1
-    target:
-      min: 0
-      max: 1
-  cardinality_not_applicable_reason: null
+    zh: NetworkRoute 是 NetworkCall 实际选择并有证据的有效路径组成部分；一次 call 至多一条最终有效路径。
+    en: NetworkRoute is the evidenced effective-path component of NetworkCall; one call has at most one final effective route.
+    ja: NetworkRoute は NetworkCall actual selected/evidenced effective path 構成部分。一 call 最大一 final effective route。
+  cardinality: null
+  cardinality_not_applicable_reason:
+    zh: 一次 call 至多一条最终有效路径记录。
+    en: One call has at most one final effective-route record.
+    ja: 一 call 最大一 final effective route record。
   inverse_reading:
-    predicate: part_of
+    predicate: contains
     labels:
-      zh: 反向读取 routed_by
-      en: is routed_by of
-      ja: routed_by の inverse
+      zh: 包含网络路由
+      en: contains network route
+      ja: ネットワークルートを含む
   conditions: []
   temporal_scope: valid-time
   boundary_context: null
   constraints: []
-  examples:
-    - id: NetworkCall-routed_by-NetworkRoute-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 调用采用代理路径
-        en: Call adopts proxy route
-        ja: call が proxy route を採用
-      scenario_id: network-relation-networkcall-routed_by-networkroute-positive
-      descriptions:
-        zh: net-call-884 的连接审计引用 route-884，顺序为 proxy-egress-2 后 endpoint-api-example-443，并有 CONNECT 结果。
-        en: net-call-884's connection audit references route-884 with proxy-egress-2 followed by endpoint-api-example-443 and a CONNECT result.
-        ja: net-call-884 connection audit は route-884 の proxy→endpoint sequence/CONNECT result を参照します。
-      field_values: {}
-      related_node_ids:
-        - NetworkCall
-        - NetworkRoute
-      related_relation_ids:
-        - NetworkCall-routed_by-NetworkRoute
-      expected_result:
-        zh: 建立 net-call-884 routed_by route-884。
-        en: Assert net-call-884 routed_by route-884.
-        ja: net-call-884 routed_by route-884 を主張します。
-      why_valid_or_invalid:
-        zh: 调用和路由共享选择时间、端点与连接证据。
-        en: Call and route share selection time, endpoint, and connection evidence.
-        ja: call/route は selection time・endpoint・connection evidence を共有します。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-network-route-001
-        - claim-network-route-002
-    - id: NetworkCall-routed_by-NetworkRoute-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 未采用的 PAC 候选
-        en: Unused PAC candidate
-        ja: 未採用 PAC candidate
-      scenario_id: network-relation-networkcall-routed_by-networkroute-boundary
-      descriptions:
-        zh: PAC 返回 proxy-a，但健康检查失败后调用直接连接；proxy-a 从未出现在有效 hop_sequence。
-        en: PAC returns proxy-a, but after health-check failure the call connects directly; proxy-a never appears in the effective hop sequence.
-        ja: PAC は proxy-a を返しますが health check failure 後 call は direct connect し proxy-a は effective hop sequence にありません。
-      field_values: {}
-      related_node_ids:
-        - NetworkCall
-        - NetworkRoute
-        - Proxy
-      related_relation_ids:
-        - NetworkCall-routed_by-NetworkRoute
-      expected_result:
-        zh: 调用关联直连 NetworkRoute，不关联候选代理路径。
-        en: Link the call to the direct NetworkRoute, not the candidate proxy path.
-        ja: call は direct NetworkRoute に link し candidate proxy path にはしません。
-      why_valid_or_invalid:
-        zh: 配置选择候选不等于实际有效路由。
-        en: Configuration candidacy is not an actual effective route.
-        ja: config candidacy は actual effective route ではありません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-network-route-001
   source_claims:
-    - claim-network-route-001
-    - claim-network-route-002
-  distinct_fact_rationale:
-    zh: 关系目标提升到 NetworkRoute，使直连和代理路由共享统一事实；ProxyRoute 只作为有代理种差的子类。
-    en: Targeting NetworkRoute unifies direct and proxied facts; ProxyRoute remains the subtype with proxy-hop differentia.
-    ja: NetworkRoute target により direct/proxied fact を統一し ProxyRoute は proxy-hop differentia subtype とします。
+    - claim-network-route-design
+  distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
-  endpoint_order: parent-to-child
+  endpoint_order: child-to-parent
 relations:
   - id: NetworkRoute-targets-NetworkEndpoint
     predicate: targets
@@ -320,133 +300,64 @@ relations:
       en: targets final route endpoint
       ja: final route endpoint を target
     definitions:
-      zh: NetworkRoute targets 其有序跳点完成后实际到达并验证的最终 NetworkEndpoint；中间 Proxy 通过 hop_sequence 或 ProxyRoute-via-Proxy 表达，候选解析地址和重定向前端点不充当最终目标。
-      en: NetworkRoute targets the final NetworkEndpoint actually reached and verified after its ordered hops. Intermediate Proxy values belong in hop_sequence or ProxyRoute-via-Proxy, while resolution candidates and pre-redirect endpoints are not the final route target.
-      ja: NetworkRoute は ordered hop 後に actually reached/verified された final NetworkEndpoint を targets します。intermediate Proxy は hop_sequence/via で表し resolution candidate/pre-redirect endpoint は final target ではありません。
-    cardinality:
-      source:
-        min: 0
-        max: null
-      target:
-        min: 1
-        max: 1
-    cardinality_not_applicable_reason: null
+      zh: NetworkRoute targets 有序跳点完成后实际到达并验证的最终 NetworkEndpoint；中间 Proxy 在 hop_sequence 或 ProxyRoute-via-Proxy 表达。
+      en: NetworkRoute targets the final NetworkEndpoint actually reached and verified after ordered hops; intermediate Proxy values appear in hop_sequence or ProxyRoute-via-Proxy.
+      ja: NetworkRoute は ordered hop 後 actually reached/verified final NetworkEndpoint を targets。intermediate Proxy は hop_sequence/ProxyRoute-via-Proxy で表現。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 每条有效路由指向一个最终验证端点。
+      en: Each effective route points to one final verified endpoint.
+      ja: 各 effective route は一 final verified endpoint を指す。
     inverse_reading:
       predicate: is_targets_of
       labels:
-        zh: 反向读取 targets
+        zh: 被路由目标
         en: is targets of
-        ja: targets の inverse
+        ja: targets 対象
     conditions: []
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
-    examples:
-      - id: NetworkRoute-targets-NetworkEndpoint-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 代理后最终源站
-          en: Final origin after proxy
-          ja: proxy 後 final origin
-        scenario_id: network-relation-networkroute-targets-networkendpoint-positive
-        descriptions:
-          zh: route-884 先经过 proxy-egress-2，随后 TLS 验证 endpoint-api-example-443，final_endpoint_ref 与该端点一致。
-          en: route-884 first traverses proxy-egress-2 and then TLS-verifies endpoint-api-example-443, matching its final_endpoint_ref.
-          ja: route-884 は proxy-egress-2 後 endpoint-api-example-443 を TLS verify し final_endpoint_ref と一致します。
-        field_values: {}
-        related_node_ids:
-          - NetworkRoute
-          - NetworkEndpoint
-        related_relation_ids:
-          - NetworkRoute-targets-NetworkEndpoint
-        expected_result:
-          zh: 建立 route-884 targets endpoint-api-example-443。
-          en: Assert route-884 targets endpoint-api-example-443.
-          ja: route-884 targets endpoint-api-example-443 を主張します。
-        why_valid_or_invalid:
-          zh: 最终跳点与验证证据共同确定路由目标。
-          en: Final hop and verification evidence jointly establish the route target.
-          ja: final hop/verification evidence が route target を確立します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-network-route-001
-          - claim-network-route-002
-      - id: NetworkRoute-targets-NetworkEndpoint-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 代理不是最终目标
-          en: Proxy is not final target
-          ja: proxy は final target ではない
-        scenario_id: network-relation-networkroute-targets-networkendpoint-boundary
-        descriptions:
-          zh: route-884 连接 proxy-egress-2 只是为 CONNECT 隧道，业务请求最终 authority 与 TLS 身份是 api.example.com。
-          en: route-884 connects to proxy-egress-2 only for a CONNECT tunnel; the business request's final authority and TLS identity are api.example.com.
-          ja: route-884 は CONNECT tunnel のため proxy に connect しますが business request final authority/TLS identity は api.example.com です。
-        field_values: {}
-        related_node_ids:
-          - NetworkRoute
-          - Proxy
-          - NetworkEndpoint
-        related_relation_ids:
-          - NetworkRoute-targets-NetworkEndpoint
-        expected_result:
-          zh: Proxy 记录为中间跳点，targets 指向源站端点。
-          en: Record Proxy as an intermediate hop and targets the origin endpoint.
-          ja: Proxy は intermediate hop とし targets は origin endpoint を指します。
-        why_valid_or_invalid:
-          zh: 首先连接的中介不一定是通信意图的最终目标。
-          en: The first connected intermediary is not necessarily the final target of communication intent.
-          ja: first connected intermediary は communication intent final target とは限りません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-network-route-001
     source_claims:
-      - claim-network-route-001
-      - claim-network-route-002
+      - claim-network-route-design
     distinct_fact_rationale:
-      zh: 路由目标与调用目标可指向同一端点，但前者解释路径终点，后者解释调用采用对象。
-      en: Route target and call target may share an endpoint but explain path termination and call adoption respectively.
-      ja: route target/call target は同 endpoint でも path termination/call adoption を別々に説明します。
+      zh: 路由目标解释路径终点，与 NetworkCall targets 解释调用采用对象可同端点但语义不同。
+      en: Route target explains path termination; NetworkCall targets explains call adoption—they may share an endpoint with different semantics.
+      ja: route target は path termination 説明。NetworkCall targets は call adoption 説明。同 endpoint でも semantics 異なる。
     layout_role: cross-link
-    review_status: accepted
     target: concept:NetworkEndpoint
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-safety-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: Verified against Cursor sandbox.json egress control, HTTP/SOCKS proxy semantics, and network policy patterns; endpoint, policy, and call lifecycle modeling hold.
-    en: Verified against Cursor sandbox.json egress control, HTTP/SOCKS proxy semantics, and network policy patterns; endpoint, policy, and call lifecycle modeling hold.
-    ja: Verified against Cursor sandbox.json egress control, HTTP/SOCKS proxy semantics, and network policy patterns; endpoint, policy, and call lifecycle modeling hold.
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: rfc9110-http
+    title: RFC 9110 HTTP Semantics
+    url: https://www.rfc-editor.org/rfc/rfc9110.html
+    source_type: standard
+    relevance: HTTP proxy intermediaries, CONNECT tunnels, direct versus proxy routing.
+  - id: rfc1928-socks5
+    title: RFC 1928 SOCKS Protocol Version 5
+    url: https://www.rfc-editor.org/rfc/rfc1928.html
+    source_type: standard
+    relevance: SOCKS relay hop sequences in proxied routes.
+  - id: safety-network-design
+    title: Moonweave safety-network-control module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: NetworkRoute as evidenced effective path within NetworkCall.
 source_claims:
-  - id: claim-network-route-001
-    source: eng-proto-rfc9110-http-semantics
-    supports: RFC 9110 distinguishes HTTP request and response messages, target resources and authorities, origin servers, proxy intermediaries, direct versus proxy routing, redirects, and response status; Moonweave places these protocol facts under broader network concepts.
-    locator: RFC 9110 Sections 3.1-3.7, 4.2-4.3, 6, 7.1-7.4, 10.2, and 15.4
+  - id: claim-network-route-rfc9110
+    source: rfc9110-http
+    supports: RFC 9110 proxy intermediaries and CONNECT tunnels map to ordered hop_sequence in NetworkRoute.
+    locator: HTTP proxy and CONNECT
+    evidence_kind: official
+    confidence: high
+  - id: claim-network-route-socks5
+    source: rfc1928-socks5
+    supports: RFC 1928 SOCKS CONNECT relay establishment maps to proxied hop sequences in NetworkRoute.
+    locator: SOCKS CONNECT
+    evidence_kind: official
+    confidence: high
+  - id: claim-network-route-design
+    source: safety-network-design
+    supports: Moonweave requires evidenced hop_sequence and final_endpoint_ref separate from static PAC candidates and Proxy Entity.
+    locator: NetworkRoute boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-network-route-002
-    source: eng-network-nist-zero-trust
-    supports: NIST SP 800-207 distinguishes an access request, per-resource policy decision, policy administrator, policy enforcement point, and the communication path that is enabled, monitored, and terminated; Moonweave uses those distinctions to separate policy, interaction occurrence, endpoint, and effective route evidence.
-    locator: NIST SP 800-207 Sections 2.1-2.2 and 3.2, policy engine, policy administrator, and policy enforcement point
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-network-route-003
-    source: eng-proto-rfc1928-socks5
-    supports: RFC 1928 defines SOCKS client-to-server negotiation, authentication selection, CONNECT/BIND/UDP ASSOCIATE commands, IPv4/domain/IPv6 addressing, relay establishment, and denial replies; Moonweave treats SOCKSProxy as a protocol-specific Proxy subtype.
-    locator: RFC 1928 Sections 3-7, TCP client procedure, requests, addressing, replies, and UDP client procedure
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

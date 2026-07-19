@@ -1,7 +1,6 @@
 schema: moonweave.ai/ontology-node/v1
 id: SessionEndEvent
 kind: concept
-status: accepted
 labels:
   en: session end event
   zh: 会话结束事件
@@ -29,6 +28,33 @@ semantics:
       ja: 再開可能な SessionPauseEvent、単一 RunAttempt の終了、最後の Message、資源後処理活動、終了を予測するだけの計画は含まない。
   semantic_kind: event
   aliases: []
+engineering:
+  explanation:
+    zh: 集成 SessionEndEvent 时应分别映射 OpenAI threads, LangGraph thread_id, E2B sandbox sessions, and runtime configuration；静态配置属于其他域，实际运行 occurrence 才写入本概念。
+    en: When integrating SessionEndEvent, map OpenAI threads, LangGraph thread_id, E2B sandbox sessions, and runtime configuration separately; static configuration belongs elsewhere and only runtime occurrences belong here.
+    ja: SessionEndEvent 統合時は OpenAI threads, LangGraph thread_id, E2B sandbox sessions, and runtime configuration を個別写像し、静的設定は他ドメイン、runtime occurrence のみ本 concept に属します。
+  typical_input:
+    - description: Vendor API payload mappable to SessionEndEvent.
+      format: |-
+        # Example SessionEndEvent ingest
+        { "session-end-event_ref": "example-1" }
+      source_claims:
+        - claim-session-end-event-design
+  typical_output:
+    - description: Moonweave-local SessionEndEvent projection.
+      format: '{ "schema_owner": "moonweave-local-design", "session-end-event_id": "example-1" }'
+      source_claims:
+        - claim-session-end-event-design
+  reference_implementations:
+    - name: OpenAI Threads API
+      url: https://platform.openai.com/docs/api-reference/threads
+      description: Thread → Session/Thread context container.
+    - name: LangGraph Threads
+      url: https://langchain-ai.github.io/langgraph/cloud/reference/api/api_ref.html#tag/threads
+      description: Persistent thread_id with configuration.
+    - name: E2B Sandbox
+      url: https://e2b.dev/docs
+      description: Sandbox session, environment, file outputs.
 structure:
   identity_keys: []
   fields:
@@ -50,7 +76,7 @@ structure:
       pattern: null
       example_value: completed
       source_claims:
-        - claim-session-end-event-002
+        - claim-session-end-event-design
     - id: final_output_ref
       labels:
         zh: 最终输出引用
@@ -69,7 +95,7 @@ structure:
       pattern: null
       example_value: output:refund-status-88
       source_claims:
-        - claim-session-end-event-002
+        - claim-session-end-event-design
     - id: diagnostic_ref
       labels:
         zh: 终止诊断引用
@@ -88,7 +114,7 @@ structure:
       pattern: null
       example_value: diagnostic:session-88/final
       source_claims:
-        - claim-session-end-event-002
+        - claim-session-end-event-design
   constraints:
     - id: session-end-transition
       severity: error
@@ -99,20 +125,22 @@ structure:
         en: An end event closes normal continuation and retains evidence appropriate to its outcome.
         ja: end event は normal continuation を閉じ、outcome に適合する evidence を保持します。
       source_claims:
-        - claim-session-end-event-002
+        - claim-session-end-event-design
   required_relation_constraints: []
 examples:
   - id: SessionEndEvent-example-positive-001
-    kind: positive
     labels:
-      zh: 会话结束事件正例
-      en: Positive example of session end event
-      ja: セッション終了イベントの正例
-    scenario_id: null
+      zh: OpenAI Session 结束
+      en: OpenAI Session end
+      ja: OpenAI Session 終了
     descriptions:
-      zh: session-88 在返回最终退款状态后于 11:42Z 从 active 变为 completed，保存 final_output_ref 并记录 normal-completion 原因。
-      en: After returning the final refund status, session-88 changes from active to completed at 11:42Z, stores final_output_ref, and records normal-completion as the reason.
-      ja: 最終返金状態の返却後、session-88 は 11:42Z に active から completed へ変わり、final_output_ref と normal-completion 理由を保存する。
+      zh: OpenAI Agents SDK session.close() 或 TTL 过期产生 SessionEndEvent session_id=session-99、ended_at=2026-01-15T10:00:00Z；store 标记 closed。
+      en: OpenAI Agents SDK session.close() or TTL expiry produces SessionEndEvent session_id=session-99, ended_at=2026-01-15T10:00:00Z; store marked closed.
+      ja: OpenAI session.close が SessionEndEvent を生成する。
+    example_source:
+      product: LangGraph Server
+      url: https://langchain-ai.github.io/langgraph/cloud/reference/api/api_ref.html#tag/threads
+      version: threads and sessions
     field_values:
       session_event_id: session-event:88/end/1
       session_ref: runtime-session:88
@@ -129,29 +157,21 @@ examples:
       - RuntimeSession
     related_relation_ids:
       - closes_runtime_session
-    expected_result:
-      zh: 该终态转换归类为 SessionEndEvent，并关闭 session-88 的持续时间。
-      en: The terminal transition is classified as SessionEndEvent and closes the duration of session-88.
-      ja: この終端遷移は SessionEndEvent に分類され、session-88 の継続時間を閉じる。
-    why_valid_or_invalid:
-      zh: 事件给出终态、结束时刻、原因和最终输出，且没有继续同一会话的恢复点。
-      en: The event supplies terminal state, end time, reason, and final output, with no continuation point for the same session.
-      ja: 終端状態、終了時刻、理由、最終出力があり、同じセッションの継続点がない。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-session-end-event-003
+      - claim-session-end-event-design
   - id: SessionEndEvent-example-boundary-001
-    kind: boundary
     labels:
-      zh: 会话结束事件边界例
-      en: Boundary case for session end event
-      ja: セッション終了イベントの境界例
-    scenario_id: null
+      zh: Process exit 非 SessionEnd
+      en: Process exit not SessionEnd
+      ja: Process exit は SessionEnd ではない
     descriptions:
-      zh: session-88 因限流等待三十秒并保存 checkpoint，状态改为 paused，调度器计划稍后继续。
-      en: session-88 waits thirty seconds because of rate limiting, saves a checkpoint, changes to paused, and is scheduled to continue later.
-      ja: session-88 はレート制限で三十秒待ち、checkpoint を保存して paused へ変わり、後で継続予定である。
+      zh: worker 进程 exit(code=0) 是 ProcessHandle/RuntimeEnvironment 事件，不是 RuntimeSession SessionEndEvent。
+      en: worker process exit(code=0) is ProcessHandle/RuntimeEnvironment event, not RuntimeSession SessionEndEvent.
+      ja: process exit は SessionEnd ではない。
+    example_source:
+      product: LangGraph Server
+      url: https://langchain-ai.github.io/langgraph/cloud/reference/api/api_ref.html#tag/threads
+      version: threads and sessions
     field_values: {}
     related_node_ids:
       - SessionEndEvent
@@ -159,38 +179,48 @@ examples:
       - SessionPauseEvent
     related_relation_ids:
       - closes_runtime_session
-    expected_result:
-      zh: 这是 SessionPauseEvent，不是 SessionEndEvent。
-      en: This is a SessionPauseEvent, not a SessionEndEvent.
-      ja: これは SessionEndEvent ではなく SessionPauseEvent である。
-    why_valid_or_invalid:
-      zh: 保存状态与计划继续证明会话仍可恢复，尚未进入终态。
-      en: Saved state and scheduled continuation show that the session remains resumable and has not entered a terminal state.
-      ja: 保存状態と継続予定が再開可能性を示し、終端状態には入っていない。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-session-end-event-004
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: SessionPauseEvent
-    shared_parent_concept_id: SessionLifecycleEvent
-    differentia:
-      zh: 共享父节点对照：父节点 SessionLifecycleEvent：SessionEndEvent（semantic kind=event，骨架 SessionEndEvent-is_a-SessionLifecycleEvent）；SessionPauseEvent（semantic kind=event，骨架 SessionPauseEvent-is_a-SessionLifecycleEvent）。双端条件：SessionEndEvent 条件：“作为会话生命周期事件，会话结束事件由这一事实区分：它记录运行会话的可观测关闭，包括最终状态、清理、产物和剩余审计引用”；SessionPauseEvent 条件：“会话暂停事件是一种会话生命周期事件；其区分条件是：它记录会话停止推进但保留可恢复状态和待处理工作的可观测转移”。逐端验证；父节点不证明任一身份。
-      en: "Shared-parent contrast: parent SessionLifecycleEvent: SessionEndEvent (semantic kind=event, backbone SessionEndEvent-is_a-SessionLifecycleEvent); SessionPauseEvent (semantic kind=event, backbone SessionPauseEvent-is_a-SessionLifecycleEvent). Endpoint conditions: SessionEndEvent condition: “Session end event belongs to the session lifecycle event category and differs from broader members in that it records the observable closure of a runtime session, including final status, cleanup, artifacts, and remaining audit references”; SessionPauseEvent condition: “As a session lifecycle event, Session pause event is distinguished by the fact that it records an observable transition where a session stops progressing while preserving resumable state and pending work”. Verify each endpoint; the parent proves neither identity."
-      ja: 共有親対照：親 SessionLifecycleEvent：SessionEndEvent（semantic kind=event、バックボーン SessionEndEvent-is_a-SessionLifecycleEvent）；SessionPauseEvent（semantic kind=event、バックボーン SessionPauseEvent-is_a-SessionLifecycleEvent）。両端条件：SessionEndEvent の条件：「セッション終了イベントはセッションライフサイクルイベントとして、次の条件により他の対象と区別されます：それは、実行セッションの観測可能な終了を記録し、最終状態、クリーンアップ、成果物、残る監査参照を含みます」；SessionPauseEvent の条件：「セッションライフサイクルイベントに属するセッション一時停止イベントは、次の事実を種差とします：それは、セッションの進行が止まりつつ、再開可能な状態と保留中の作業が保持される観測可能な遷移を記録します」。各端を検証し、親だけでは同一性を証明しません。
+      - claim-session-end-event-design
+  - id: SessionEndEvent-example-3
+    labels:
+      zh: SessionEnd 与 Execution completed 边界
+      en: SessionEnd versus Execution completed boundary
+      ja: SessionEnd と Execution completed 境界
+    descriptions:
+      zh: SessionEndEvent 关闭会话上下文；Execution completed 结束单次 Run；session 结束后不可 SessionResumeEvent。
+      en: SessionEndEvent closes session context; Execution completed ends single Run; after session end no SessionResumeEvent.
+      ja: SessionEnd 後は Resume 不可、Execution completed は Run 終了である。
+    example_source:
+      product: LangGraph Server
+      url: https://langchain-ai.github.io/langgraph/cloud/reference/api/api_ref.html#tag/threads
+      version: threads and sessions
+    field_values: {}
+    related_node_ids:
+      - SessionEndEvent
+    related_relation_ids: []
     source_claims:
-      - claim-session-end-event-005
-  - sibling_concept_id: SessionResumeEvent
-    shared_parent_concept_id: SessionLifecycleEvent
-    differentia:
-      zh: 端点特定对照：父节点 SessionLifecycleEvent：SessionEndEvent（semantic kind=event，骨架 SessionEndEvent-is_a-SessionLifecycleEvent）；SessionResumeEvent（semantic kind=event，骨架 SessionResumeEvent-is_a-SessionLifecycleEvent）。双端条件：SessionEndEvent 条件：“作为会话生命周期事件，会话结束事件由这一事实区分：它记录运行会话的可观测关闭，包括最终状态、清理、产物和剩余审计引用”；SessionResumeEvent 条件：“会话恢复事件是以如下事实为区分特征的会话生命周期事件：它记录从保留状态、检查点或外部延续恢复已暂停会话的可观测转移”。条件不得互借；各自成立后方可归类。
-      en: "Endpoint-specific contrast: parent SessionLifecycleEvent: SessionEndEvent (semantic kind=event, backbone SessionEndEvent-is_a-SessionLifecycleEvent); SessionResumeEvent (semantic kind=event, backbone SessionResumeEvent-is_a-SessionLifecycleEvent). Endpoint conditions: SessionEndEvent condition: “Session end event belongs to the session lifecycle event category and differs from broader members in that it records the observable closure of a runtime session, including final status, cleanup, artifacts, and remaining audit references”; SessionResumeEvent condition: “Session resume event is a session lifecycle event; its differentiating condition is that it records the observable transition that restores a paused session from retained state, checkpoint, or external continuation”. Conditions cannot be borrowed; classify each endpoint only from its own evidence."
-      ja: 端点別対照：親 SessionLifecycleEvent：SessionEndEvent（semantic kind=event、バックボーン SessionEndEvent-is_a-SessionLifecycleEvent）；SessionResumeEvent（semantic kind=event、バックボーン SessionResumeEvent-is_a-SessionLifecycleEvent）。両端条件：SessionEndEvent の条件：「セッション終了イベントはセッションライフサイクルイベントとして、次の条件により他の対象と区別されます：それは、実行セッションの観測可能な終了を記録し、最終状態、クリーンアップ、成果物、残る監査参照を含みます」；SessionResumeEvent の条件：「セッション再開イベントはセッションライフサイクルイベントの一種であり、次の条件で区別されます：それは、保持された状態、チェックポイント、または外部継続から一時停止されたセッションを復元する観測可能な遷移を記録します」。条件を流用せず、各端を固有の証拠で分類します。
+      - claim-session-end-event-vendor
+      - claim-session-end-event-design
+  - id: SessionEndEvent-example-4
+    labels:
+      zh: session-99 关闭实例
+      en: session-99 close instance
+      ja: session-99 クローズ事例
+    descriptions:
+      zh: SessionEndEvent event_id=session-end-99、session_id=session-99、ended_at=2026-01-15T10:00:00Z、reason=user_logout。
+      en: SessionEndEvent event_id=session-end-99, session_id=session-99, ended_at=2026-01-15T10:00:00Z, reason=user_logout.
+      ja: session-end-99 クローズを記録する。
+    example_source:
+      product: LangGraph Server
+      url: https://langchain-ai.github.io/langgraph/cloud/reference/api/api_ref.html#tag/threads
+      version: threads and sessions
+    field_values: {}
+    related_node_ids:
+      - SessionEndEvent
+    related_relation_ids: []
     source_claims:
-      - claim-session-end-event-006
+      - claim-session-end-event-vendor
+      - claim-session-end-event-design
 parent_relation:
   id: SessionEndEvent-is_a-SessionLifecycleEvent
   predicate: is_a
@@ -219,70 +249,10 @@ parent_relation:
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: SessionEndEvent-is_a-SessionLifecycleEvent-example-positive-manual-001
-      kind: positive
-      labels:
-        zh: 是一种会话生命周期事件正例
-        en: "Positive case: is a session lifecycle event"
-        ja: セッションライフサイクルイベントの一種の正例
-      scenario_id: null
-      descriptions:
-        zh: end-404 记录 session-404 从 active 进入 failed，并带有 12:04Z、失败原因和最终诊断引用。
-        en: end-404 records session-404 moving from active to failed at 12:04Z with a failure reason and final diagnostic reference.
-        ja: end-404はsession-404が12:04Zにactiveからfailedへ移り、failure reasonとfinal diagnostic参照を記録します。
-      field_values: {}
-      related_node_ids:
-        - SessionEndEvent
-        - SessionLifecycleEvent
-      related_relation_ids:
-        - SessionEndEvent-is_a-SessionLifecycleEvent
-      expected_result:
-        zh: 将 end-404 分类为 SessionLifecycleEvent。
-        en: Classify end-404 as a SessionLifecycleEvent.
-        ja: end-404をSessionLifecycleEventに分類します。
-      why_valid_or_invalid:
-        zh: 它是一次已发生、带前后状态和时间的终态生命周期转换。
-        en: It is an occurred terminal lifecycle transition with before state, after state, and time.
-        ja: before/after stateとtimeを持つ発生済みterminal lifecycle transitionです。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-session-end-event-007
-    - id: SessionEndEvent-is_a-SessionLifecycleEvent-example-boundary-manual-001
-      kind: boundary
-      labels:
-        zh: 是一种会话生命周期事件边界例
-        en: "Boundary case: is a session lifecycle event"
-        ja: セッションライフサイクルイベントの一種の境界例
-      scenario_id: null
-      descriptions:
-        zh: pause-404 记录 session-404 从 active 到 paused，并保留恢复检查点。
-        en: pause-404 records session-404 moving from active to paused and retains a resume checkpoint.
-        ja: pause-404はsession-404がactiveからpausedへ移り、resume checkpointを保持します。
-      field_values: {}
-      related_node_ids:
-        - SessionEndEvent
-        - SessionLifecycleEvent
-      related_relation_ids:
-        - SessionEndEvent-is_a-SessionLifecycleEvent
-      expected_result:
-        zh: 不得把 pause-404 分类为 SessionEndEvent。
-        en: Do not classify pause-404 as a SessionEndEvent.
-        ja: pause-404をSessionEndEventに分類しません。
-      why_valid_or_invalid:
-        zh: paused 是可恢复的非终态，种差不满足。
-        en: Paused is a resumable nonterminal state, so the subtype differentia is absent.
-        ja: pausedはresumable nonterminal stateで、subtype differentiaを欠きます。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-session-end-event-007
   source_claims:
-    - claim-session-end-event-007
+    - claim-session-end-event-design
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations:
   - id: closes_runtime_session
@@ -312,142 +282,42 @@ relations:
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
-    examples:
-      - id: closes_runtime_session-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: 结束运行会话正例
-          en: "Positive case: closes runtime session"
-          ja: 実行セッションを終了するの正例
-        scenario_id: null
-        descriptions:
-          zh: end-88 记录 session-88 在 11:42Z 从 active 进入 completed，并保存 normal-completion 原因与最终输出引用。
-          en: end-88 records session-88 moving from active to completed at 11:42Z with reason normal-completion and a final-output reference.
-          ja: end-88はsession-88が11:42Zにactiveからcompletedへ移り、normal-completion理由とfinal-output参照を記録します。
-        field_values: {}
-        related_node_ids:
-          - SessionEndEvent
-          - RuntimeSession
-        related_relation_ids:
-          - closes_runtime_session
-        expected_result:
-          zh: 断言 end-88 closes_runtime_session session-88。
-          en: Assert that end-88 closes_runtime_session session-88.
-          ja: end-88 closes_runtime_session session-88をassertします。
-        why_valid_or_invalid:
-          zh: 事件、目标会话、终态转换与结束证据均可核对。
-          en: The event, target session, terminal transition, and closure evidence are all identifiable.
-          ja: event・target session・terminal transition・closure evidenceをすべて確認できます。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-session-end-event-008
-      - id: closes_runtime_session-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: 结束运行会话边界例
-          en: "Boundary case: closes runtime session"
-          ja: 実行セッションを終了するの境界例
-        scenario_id: null
-        descriptions:
-          zh: pause-88 在 11:35Z 将 session-88 暂停并保留 checkpoint；后续允许以同一 session_id 恢复。
-          en: pause-88 pauses session-88 at 11:35Z and retains a checkpoint; later continuation under the same session_id remains allowed.
-          ja: pause-88は11:35Zにsession-88をpauseしてcheckpointを保持し、同じsession_idで後続再開できます。
-        field_values: {}
-        related_node_ids:
-          - SessionEndEvent
-          - RuntimeSession
-        related_relation_ids:
-          - closes_runtime_session
-        expected_result:
-          zh: 不得将暂停事件当作 closes_runtime_session。
-          en: Do not classify the pause event as closing the runtime session.
-          ja: pause eventをcloses_runtime_sessionとして分類しません。
-        why_valid_or_invalid:
-          zh: 可恢复的非终态转换不满足结束边的终态条件。
-          en: A resumable nonterminal transition does not satisfy the terminal condition of the closure edge.
-          ja: 再開可能なnonterminal transitionはclosure edgeのterminal条件を満たしません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-session-end-event-008
     source_claims:
-      - claim-session-end-event-008
+      - claim-session-end-event-design
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:RuntimeSession
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-runtime-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Agents Sessions、LangGraph thread 与 POSIX 进程环境逐项核验，RuntimeSession 生命周期语义成立。
-    en: Verified against OpenAI Agents Sessions, LangGraph thread persistence, and POSIX process environment. RuntimeSession lifecycle holds.
-    ja: OpenAI Agents Sessions、LangGraph thread、POSIX process environment に照らし RuntimeSession lifecycle を確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-openai-threads
+    title: OpenAI Assistants Threads API
+    url: https://platform.openai.com/docs/api-reference/threads
+    source_type: official-doc
+    relevance: thread_id preserving multi-turn context across runs.
+  - id: src-langgraph-threads
+    title: LangGraph Server Threads API
+    url: https://langchain-ai.github.io/langgraph/cloud/reference/api/api_ref.html#tag/threads
+    source_type: official-doc
+    relevance: Persistent thread_id with checkpoint and run history.
+  - id: src-e2b-sandbox
+    title: E2B Documentation
+    url: https://e2b.dev/docs
+    source_type: official-doc
+    relevance: Sandbox sessions, process handles, and working directories.
+  - id: src-runtime-system-design
+    title: Moonweave runtime-system module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: AgentSystem, RuntimeEnvironment, RuntimeSession boundaries.
 source_claims:
-  - id: claim-session-end-event-001
-    source: eng-fw-openai-python-docs
-    supports: The OpenAI Agents SDK distinguishes ongoing loop execution from completion with a final output. Moonweave records that session-level terminal occurrence as SessionEndEvent.
-    locator: Running agents guide > Agent loop and final output
+  - id: claim-session-end-event-vendor
+    source: src-openai-threads
+    supports: runtime-system vendor evidence supports SessionEndEvent identity and boundary mapping.
+    locator: SessionEndEvent integration
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-session-end-event-002
-    source: eng-fw-openai-python-docs
-    supports: "Direct source premise: the Agents SDK exposes a pending interruption, serializable RunState, an explicit approval or rejection, and continuation of the original run. Moonweave design inference: session lifecycle occurrences are immutable state-transition events with one event identity, one session reference, prior and resulting states, trigger, actor, and reason."
-    locator: OpenAI Agents SDK > Human-in-the-loop > How the approval flow works; pause, serialize RunState, approve or reject, and resume
+  - id: claim-session-end-event-design
+    source: src-runtime-system-design
+    supports: Moonweave SessionEndEvent concept boundary within runtime-system.
+    locator: SessionEndEvent boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-session-end-event-003
-    source: eng-fw-openai-python-docs
-    supports: The OpenAI Agents SDK exposes a final run result after the agent loop completes. Moonweave's example records the session-level terminal transition around that final output.
-    locator: Running agents guide > Results and final output
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-session-end-event-004
-    source: eng-fw-langgraph-docs
-    supports: LangGraph documents resuming from saved state after interruption. Moonweave therefore treats a checkpointed wait with planned continuation as pause rather than end.
-    locator: Persistence guide > Fault tolerance and resume from the last successful step
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-session-end-event-005
-    source: eng-proto-a2a-spec
-    supports: A2A separates interrupted states that await input or authentication from completed, failed, canceled, and rejected terminal states. Moonweave uses that terminal/non-terminal boundary to distinguish SessionEndEvent, which closes normal continuation, from SessionPauseEvent, which preserves a resumable session.
-    locator: Specification > 4.1.3 TaskState > interrupted and terminal states
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-session-end-event-006
-    source: eng-proto-a2a-spec
-    supports: "A2A forbids further messages to a Task in a terminal state but treats input-required and auth-required as interrupted rather than terminal. Moonweave consequently separates SessionEndEvent from SessionResumeEvent: an ended session cannot be resumed as the same normal continuation, whereas an interrupted session can return to active."
-    locator: Specification > 3.1.1 Send Message > terminal-state restriction; 4.1.3 TaskState
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-session-end-event-007
-    source: eng-proto-a2a-spec
-    supports: A2A explicitly separates interrupted input-required and auth-required states from terminal completed, canceled, rejected, and failed states. Moonweave uses that distinction to differentiate SessionEndEvent within the lifecycle-event taxonomy.
-    locator: Life of a Task > Agent Response > interrupted versus terminal Task states
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-session-end-event-008
-    source: eng-proto-a2a-spec
-    supports: A2A distinguishes interrupted task states from terminal completed, canceled, rejected, and failed states and states that a terminal Task cannot restart. Moonweave applies this terminal/nonterminal distinction to the RuntimeSession end-event relation.
-    locator: Life of a Task > Task Immutability > terminal tasks cannot restart
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-

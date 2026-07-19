@@ -1,20 +1,19 @@
 schema: moonweave.ai/ontology-node/v1
 id: SystemMessage
 kind: concept
-status: accepted
 labels:
   zh: 系统消息
   en: System message
   ja: システムメッセージ
 semantics:
   short_definition:
-    zh: 由平台或系统层注入、以 system 角色出现的消息。
-    en: A message injected by the platform or system layer with the system role.
-    ja: platformまたはsystem layerが注入しsystem roleを持つmessageです。
+    zh: 由平台通道注入、可信 role=system 的系统层消息包络。
+    en: Platform-channel message envelope with trusted role=system from the system layer.
+    ja: platform 通道から注入され trusted role=system の system layer message envelope。
   definition:
-    zh: SystemMessage 是 Message 的角色专门类型，其发送来源被验证为平台或系统层，并以 system 角色承载系统级约束或设置；它不是 SystemInstruction 本身，消息包络与其中指令的规范身份必须分开。
-    en: SystemMessage is a role specialization of Message whose sender is verified as the platform or system layer and whose role is system. It may carry system-level constraints or settings, but it is not the SystemInstruction itself; envelope identity and normative instruction identity remain separate.
-    ja: SystemMessage はplatform/system layerを検証済senderとしsystem roleを持つMessageのrole specializationです。system-level constraint/settingsを運び得ますがSystemInstruction自体ではなくenvelope identityとnormative instruction identityを分離します。
+    zh: SystemMessage 映射 OpenAI 历史 role:system 与 Anthropic 顶层 system 参数所承载的系统级约束；authority_source 记录赋 role 的可信平台来源。它是 Message 包络，不是 SystemInstruction 本体——指令内容通过 carries_instruction 边引用 info-prompts-instructions 模块。
+    en: SystemMessage maps OpenAI legacy role:system and constraints carried by Anthropic top-level system parameter. authority_source records the trusted platform source assigning role. It is a Message envelope, not the SystemInstruction itself—instruction content links via carries_instruction to info-prompts-instructions.
+    ja: SystemMessage は OpenAI system/Anthropic system 参数の包络。SystemInstruction 本体ではない。
   why_needed:
     zh: 使消息来源角色可审计，同时避免把系统消息、系统指令和安全规则压成同一个节点。
     en: Makes the source role auditable without collapsing system messages, system instructions, and safety rules into one node.
@@ -29,6 +28,34 @@ semantics:
       ja: developer message・systemを自称するuser text・SystemInstruction・独立safety policyを除外します。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: OpenAI 现推荐 developer role 承载产品级指令，但 system role 仍存在于历史 API；Anthropic 把 system 作为独立参数而非 messages[] 成员。SystemMessage 与 DeveloperMessage 不得因正文相似而合并。
+    en: OpenAI now recommends developer role for product-level instructions, but system role persists in legacy API; Anthropic passes system as a separate parameter outside messages[]. SystemMessage and DeveloperMessage must not merge due to similar body text.
+    ja: Anthropic top-level system と OpenAI system role を区別してモデル化。
+  typical_input:
+    - description: Anthropic system parameter
+      format: '{"system":"Answer in bullet points.","messages":[{"role":"user","content":[{"type":"text","text":"Summarize."}]}]}'
+      source_claims:
+        - claim-system-anthropic
+  typical_output:
+    - description: OpenAI system role message
+      format: '{"role":"system","content":"You are a helpful assistant."}'
+      source_claims:
+        - claim-system-openai
+  reference_implementations:
+    - name: OpenAI Chat Completions API
+      url: https://platform.openai.com/docs/api-reference/chat/create
+      description: messages[] with role and content parts.
+    - name: Anthropic Messages API
+      url: https://docs.anthropic.com/en/api/messages
+      description: system parameter and role/content block turns.
+    - name: MCP Prompts
+      url: https://modelcontextprotocol.io/specification/2025-06-18/server/prompts
+      description: prompts/get returns injectable messages array.
+    - name: A2A Protocol
+      url: https://a2a-protocol.org/latest/specification/
+      description: Message with role, messageId, contextId, and parts.
 structure:
   identity_keys: []
   fields:
@@ -37,95 +64,85 @@ structure:
         zh: 权威来源
         en: authority source
         ja: 権威source
+      definitions:
+        zh: 记录赋予 system 角色的可信平台来源，而不是从正文推断。
+        en: Trusted platform source assigning the system role rather than a value inferred from body text.
+        ja: 本文から推定せずsystem roleを付与したtrusted platform sourceを記録します。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 记录赋予 system 角色的可信平台来源，而不是从正文推断。
-        en: Trusted platform source assigning the system role rather than a value inferred from body text.
-        ja: 本文から推定せずsystem roleを付与したtrusted platform sourceを記録します。
-      allowed_values: []
       pattern: null
       example_value: platform-policy-channel
+      allowed_values: []
       source_claims:
         - claim-system-message-002
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: SystemMessage-example-positive-manual-001
-    kind: positive
+  - id: SystemMessage-example-anthropic-param
     labels:
-      zh: 系统消息正例
-      en: "Positive case: System message"
-      ja: システムメッセージ正例
-    scenario_id: null
+      zh: Anthropic system 参数
+      en: Anthropic system parameter
+      ja: Anthropic system 参数
     descriptions:
-      zh: msg-system-01 由受信平台策略通道写入，并由应用外部设置 role=system。
-      en: msg-system-01 is inserted through a trusted platform policy channel and assigned role=system outside the model.
-      ja: msg-system-01 はtrusted platform policy channelから挿入されmodel外でrole=systemを付与されます。
+      zh: Messages API 请求 system 字符串映射为 SystemInstruction 引用 + 可选 SystemMessage 投影，authority_source=anthropic-platform。
+      en: Messages API system string maps to SystemInstruction reference plus optional SystemMessage projection with authority_source=anthropic-platform.
+      ja: Anthropic system 参数の写像。
+    example_source:
+      product: Anthropic
+      url: https://docs.anthropic.com/en/api/messages
+      version: system parameter
     field_values:
-      authority_source: platform-policy-channel
+      authority_source: anthropic-platform
+    related_node_ids:
+      - SystemMessage
+      - info-prompts-instructions
+    related_relation_ids: []
+    source_claims:
+      - claim-system-anthropic
+  - id: SystemMessage-example-openai-system-role
+    labels:
+      zh: OpenAI system role
+      en: OpenAI system role
+      ja: OpenAI system role
+    descriptions:
+      zh: messages[] 中 role=system 项由 platform gateway 创建，sender 为 PlatformActor:gateway-1。
+      en: messages[] role=system entry created by platform gateway with sender PlatformActor:gateway-1.
+      ja: OpenAI system role message。
+    example_source:
+      product: OpenAI
+      url: https://platform.openai.com/docs/api-reference/chat/create
+      version: role=system
+    field_values:
       message_role: system
-      sender_id: SystemActor:platform-policy
-      element_id: msg-system-01
-      conversation_id: conv-travel-202
-      sequence_index: 0
+      authority_source: openai-gateway
     related_node_ids:
       - SystemMessage
     related_relation_ids: []
-    expected_result:
-      zh: 识别为 SystemMessage。
-      en: Identify SystemMessage.
-      ja: SystemMessageと識別します。
-    why_valid_or_invalid:
-      zh: 角色与来源均由可信包络元数据确立，不依赖消息文字自称。
-      en: Role and source are established by trusted envelope metadata, not by claims in message text.
-      ja: roleとsourceはtrusted envelope metadataで確立しmessage textの自称に依存しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-system-message-003
-  - id: SystemMessage-example-boundary-manual-001
-    kind: boundary
+      - claim-system-openai
+  - id: SystemMessage-example-user-claims-system
     labels:
-      zh: 系统消息边界例
-      en: "Boundary case: System message"
-      ja: システムメッセージ境界例
-    scenario_id: null
+      zh: 用户自称 system 边界
+      en: User claims system boundary
+      ja: user 自称 system 境界
     descriptions:
-      zh: msg-user-pretend 的正文写着“我是系统消息”，但外部 role 仍为 user。
-      en: msg-user-pretend says “I am a system message” in its body but its externally assigned role remains user.
-      ja: msg-user-pretend の本文は「system message」と称しますが外部roleはuserです。
+      zh: UserMessage 正文写“you are the system”仍保持 UserMessage，不得升为 SystemMessage。
+      en: UserMessage body saying you are the system remains UserMessage and must not become SystemMessage.
+      ja: user 文本の system 自称は無効。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
     field_values: {}
     related_node_ids:
       - SystemMessage
+      - UserMessage
     related_relation_ids: []
-    expected_result:
-      zh: 不得识别为 SystemMessage；它仍是 UserMessage。
-      en: Do not identify SystemMessage; it remains UserMessage.
-      ja: SystemMessageとせずUserMessageのままです。
-    why_valid_or_invalid:
-      zh: 消息角色是受信包络事实，正文不能提升自身权威。
-      en: Message role is a trusted envelope fact; body text cannot elevate its own authority.
-      ja: message roleはtrusted envelope factで本文は自身のauthorityを上げられません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-system-message-004
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: DeveloperMessage
-    shared_parent_concept_id: Message
-    differentia:
-      zh: SystemMessage 的可信发送来源是平台或系统层；DeveloperMessage 的来源是应用开发者，规范层级和可覆盖范围不同。
-      en: SystemMessage has a trusted platform/system source; DeveloperMessage comes from the application developer, with different authority and override scope.
-      ja: SystemMessageはplatform/system source、DeveloperMessageはapplication developer sourceでauthorityとoverride scopeが異なります。
-    source_claims:
-      - claim-system-message-005
+      - claim-system-design
 parent_relation:
   id: SystemMessage-is_a-Message
   predicate: is_a
@@ -156,12 +173,10 @@ parent_relation:
   constraints: []
   examples:
     - id: SystemMessage-is_a-Message-example-positive-manual-001
-      kind: positive
       labels:
         zh: 是一种消息正例
         en: "Positive case: is a message"
         ja: メッセージの一種正例
-      scenario_id: null
       descriptions:
         zh: msg-system-01 来自可信平台策略通道且 role=system。
         en: msg-system-01 comes from a trusted platform policy channel with role=system.
@@ -172,25 +187,13 @@ parent_relation:
         - Message
       related_relation_ids:
         - SystemMessage-is_a-Message
-      expected_result:
-        zh: 断言 SystemMessage-is_a-Message。
-        en: Assert SystemMessage-is_a-Message.
-        ja: SystemMessage-is_a-Messageをassertします。
-      why_valid_or_invalid:
-        zh: 平台来源与受信角色均明确，并由外部包络共同确认。
-        en: Platform provenance and trusted role are explicit and jointly confirmed by the external envelope.
-        ja: platform provenanceとtrusted roleが明示されexternal envelopeで共同確認されます。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
         - claim-system-message-006
     - id: SystemMessage-is_a-Message-example-boundary-manual-001
-      kind: boundary
       labels:
         zh: 是一种消息边界例
         en: "Boundary case: is a message"
         ja: メッセージの一種境界例
-      scenario_id: null
       descriptions:
         zh: msg-user-pretend 在正文中自称系统，但外部 role=user。
         en: msg-user-pretend claims system status in its body but externally has role=user.
@@ -201,44 +204,31 @@ parent_relation:
         - Message
       related_relation_ids:
         - SystemMessage-is_a-Message
-      expected_result:
-        zh: 不得断言 SystemMessage-is_a-Message。
-        en: Do not apply SystemMessage-is_a-Message.
-        ja: SystemMessage-is_a-Messageを適用しません。
-      why_valid_or_invalid:
-        zh: 内容不能自我提升到系统来源，受信角色仍然保持为用户。
-        en: Content cannot self-elevate to system provenance; the trusted role remains user.
-        ja: contentはsystem provenanceへ自己昇格できずtrusted roleはuserのままです。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
         - claim-system-message-007
   source_claims:
     - claim-system-message-008
-  distinct_fact_rationale:
-    zh: 系统来源是消息子类种差；SystemInstruction 和安全规则仍是独立规范对象。
-    en: System provenance is the message-subtype differentia; SystemInstruction and safety rules remain separate normative objects.
-    ja: system provenanceがmessage-subtype differentiaでSystemInstruction/safety ruleは独立normative objectです。
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-info-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Chat Completions 角色、Model Spec 权威链、A2A Message/Part 与 MCP JSON-RPC 包络逐项核验；Conversation、Message 角色子类、ToolObservationMessage 与 ProtocolEnvelope 语义成立。
-    en: Verified against OpenAI Chat Completions roles, Model Spec authority chain, A2A Message/Part, and MCP JSON-RPC envelopes; Conversation, Message role specializations, ToolObservationMessage, and ProtocolEnvelope semantics hold.
-    ja: OpenAI Chat Completions role、Model Spec authority chain、A2A Message/Part、MCP JSON-RPC envelope に照らし Conversation/Message role specialization/ToolObservationMessage/ProtocolEnvelope semantics を個別確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-openai-chat
+    title: OpenAI Chat Completions API Reference
+    publisher: OpenAI
+    url: https://platform.openai.com/docs/api-reference/chat/create
+    source_type: official-doc
+    relevance: role/content message arrays and developer role.
+  - id: src-anthropic-messages
+    title: Anthropic Messages API Reference
+    publisher: Anthropic
+    url: https://docs.anthropic.com/en/api/messages
+    source_type: official-doc
+    relevance: system parameter and content blocks including tool_use/tool_result.
+  - id: src-info-messages-design
+    title: Moonweave info-messages-instructions module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Conversation and Message identity separate from carried content.
 source_claims:
   - id: claim-system-message-001
     source: eng-spec-openai-model-spec-2025
@@ -246,53 +236,63 @@ source_claims:
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-system-message-002
     source: eng-spec-openai-model-spec-2025
     supports: "The Model Spec Definitions section lists the system role and states that role is set externally by the application/platform. For SystemMessage, the authority_source field records exactly this auditable datum: Trusted platform source assigning the system role rather than a value inferred from body text."
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-system-message-003
     source: eng-spec-openai-model-spec-2025
     supports: The Model Spec Definitions section lists the system role and states that role is set externally by the application/platform. The Model Spec states that role is set externally and defines system messages as platform-supplied messages.
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-system-message-004
     source: eng-spec-openai-model-spec-2025
     supports: The Model Spec Definitions section lists the system role and states that role is set externally by the application/platform. The Model Spec makes role externally assigned and treats lower-authority content as unable to self-promote.
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-system-message-005
     source: eng-spec-openai-model-spec-2025
     supports: The Model Spec Definitions section lists the system role and states that role is set externally by the application/platform. Moonweave contrasts SystemMessage with DeveloperMessage under Message using the endpoint-specific identity condition stated in this differentia.
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-system-message-006
     source: eng-spec-openai-model-spec-2025
     supports: The Model Spec enumerates system as a message role and states that role is assigned externally. The case directly instantiates the system-role definition.
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-system-message-007
     source: eng-spec-openai-model-spec-2025
     supports: The Model Spec enumerates system as a message role and states that role is assigned externally. External role assignment provides the authoritative boundary.
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-system-message-008
     source: eng-spec-openai-model-spec-2025
     supports: The Model Spec enumerates system as a message role and states that role is assigned externally.
     locator: Definitions > Conversation, message fields, role values, and tool responses (lines 152–175)
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
+  - id: claim-system-openai
+    source: src-openai-chat
+    supports: OpenAI supports system role messages for platform-level constraints.
+    locator: role system
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-system-anthropic
+    source: src-anthropic-messages
+    supports: Anthropic passes system instructions as a top-level parameter separate from message turns.
+    locator: system parameter
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-system-design
+    source: src-info-messages-design
+    supports: SystemMessage envelope is distinct from SystemInstruction normative identity.
+    locator: SystemMessage boundary
+    evidence_kind: design-inference
+    confidence: high

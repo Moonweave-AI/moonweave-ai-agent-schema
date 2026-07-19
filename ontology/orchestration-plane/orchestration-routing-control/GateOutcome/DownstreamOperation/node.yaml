@@ -1,34 +1,66 @@
 schema: moonweave.ai/ontology-node/v1
 id: DownstreamOperation
 kind: concept
-status: accepted
 labels:
   zh: 下游操作
   en: downstream operation
-  ja: downstream operation
+  ja: 下流操作
 semantics:
   short_definition:
-    zh: 在路由或门控结果允许后实际启动的有界下游执行活动。
+    zh: 路由或门控结果允许后实际启动的有界下游执行活动。
     en: A bounded downstream execution activity actually started after a routing or gate outcome permits it.
-    ja: routing/gate outcome の許可後に実際に開始する bounded downstream execution activity。
+    ja: routing/gate outcome の許可後に実際に開始する bounded downstream execution activity です。
   definition:
-    zh: 下游操作是一种有时限活动，以操作标识、操作类型、执行入口、开始时间和执行状态为身份，表示 GateOutcome 触发后真正发生的发布、调用、转交、停止或其他运行步骤。RoutingTarget 只是可在执行前存在、并解析到入口的信息引用；两者即使指向同一入口，也不构成子类关系。只有触发结果、入口、开始时间与执行状态能够核对时，才建立 GateOutcome→DownstreamOperation 的因果事实。
-    en: A DownstreamOperation is a time-bounded activity identified by operation ID, operation type, execution entry point, start time, and execution state, representing publication, invocation, handoff, stop, or another runtime step actually initiated by a GateOutcome. RoutingTarget is only an information reference that may exist before execution and resolve to an entry point; sharing that entry point does not create a subclass relation. The GateOutcome→DownstreamOperation causal fact is asserted only when outcome, entry point, start time, and execution state reconcile.
-    ja: DownstreamOperation は operation ID・type・entry point・start time・state で識別する time-bounded activity で、GateOutcome 後に実際に始まる publish/invoke/handoff/stop step です。RoutingTarget は実行前から存在でき entry point に resolve する information reference にすぎず、同じ entry を指しても subtype 関係にはなりません。outcome・entry・start time・state を照合できる場合だけ GateOutcome→DownstreamOperation causal fact を立てます。
+    zh: DownstreamOperation 是以 downstream_operation_id、operation_type、execution_entry_ref、started_at 与 execution_state 标识的有时限活动，表示 GateOutcome 或 RoutingDecision 触发后真正发生的发布、调用、转交、停止或其他运行步骤。LangGraph Command(goto=...) 后的节点执行、A2A tasks/send 激活的远程任务、OpenAI handoff 后的 agent 循环均可产生 DownstreamOperation。RoutingTarget 只是执行前存在的入口引用；同入口不构成子类关系。
+    en: A DownstreamOperation is a time-bounded activity identified by operation ID, operation type, execution entry reference, start time, and execution state, representing publication, invocation, handoff, stop, or another runtime step actually initiated after a GateOutcome or RoutingDecision. LangGraph execution after Command(goto=...), A2A tasks/send activated remote tasks, and OpenAI agent loops after handoff may produce DownstreamOperation. RoutingTarget is only a pre-execution entry reference; sharing an entry point does not create a subclass relation.
+    ja: DownstreamOperation は operation ID・type・entry point・start time・state で識別する time-bounded activity で GateOutcome/RoutingDecision 後に実際に始まる publish/invoke/handoff/stop step です。LangGraph Command 後 node execution、A2A tasks/send、OpenAI handoff 後 agent loop が DownstreamOperation を生成できます。
   why_needed:
-    zh: 把实际下游活动显式化，门控闭环才能从条件、求值、结果、决定一直追到被触发的执行。
-    en: Making the actual downstream activity explicit closes traceability from condition through evaluation, outcome, and decision to execution.
-    ja: actual downstream activity を明示し condition→evaluation→outcome→decision→execution の traceability を閉じます。
+    zh: 显式记录被触发的下游活动，使门控与路由闭环可从条件、求值、结果、决定一直追到实际执行。
+    en: Explicit downstream activity records close traceability from condition through evaluation, outcome, and decision to actual execution.
+    ja: downstream activity を明示し condition→evaluation→outcome→decision→execution の traceability を閉じます。
   includes:
-    - zh: 发布输出、启动工具调用、转交人工、进入后续工作流节点和执行会话停止。
-      en: Publishing output, starting a tool call, handing off to a human, entering a subsequent workflow node, and executing session stop.
-      ja: output publish・tool call start・human handoff・next workflow node・session stop execution。
+    - zh: 发布输出、启动工具调用、转交人工、进入后续工作流节点、A2A 远程任务激活和执行会话停止。
+      en: Publishing output, starting tool calls, handing off to humans, entering subsequent workflow nodes, A2A remote task activation, and session stop execution.
+      ja: output publish・tool call start・human handoff・next workflow node・A2A remote task・session stop execution。
   excludes:
     - zh: 静态目标引用、未发生的计划步骤、门控结果记录、路由条件和整个工作流定义。
-      en: A static target reference, unexecuted planned step, gate-outcome record, routing condition, and whole workflow definition.
+      en: Static target references, unexecuted planned steps, gate-outcome records, routing conditions, and whole workflow definitions.
       ja: static target ref・unexecuted plan step・gate outcome・routing condition・whole workflow definition。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: GateOutcome=redirect 且 RoutingDecision 选中 human-review 目标后，创建 operation_type=handoff 的 DownstreamOperation 并写入 started_at。LangGraph 中 Command(goto="billing_handler") 后的 billing_handler 节点首次接收控制即 downstream 活动。A2A tasks/get 返回 TASK_STATE_WORKING 表示 remote downstream 已开始。allow 结果不等于 downstream 已启动——必须有 started_at 与 execution_state。
+    en: After GateOutcome=redirect and RoutingDecision selects a human-review target, create DownstreamOperation with operation_type=handoff and started_at. In LangGraph, the billing_handler node first receiving control after Command(goto="billing_handler") is a downstream activity. A2A tasks/get returning TASK_STATE_WORKING shows remote downstream started. allow alone does not prove downstream started—started_at and execution_state are required.
+    ja: GateOutcome=redirect かつ RoutingDecision が human-review target を選んだ後 handoff DownstreamOperation を作成します。LangGraph Command 後の node 初回 control 受領も downstream activity です。allow だけでは downstream start を証明しません。
+  typical_input:
+    - description: Triggering gate outcome and selected target.
+      format: |
+        gate_outcome_id: gate-outcome-884
+        gate_result: redirect
+        selected_target_ref: human-queue:quality-review
+      source_claims: [claim-downstream-operation-design]
+  typical_output:
+    - description: Started downstream operation record.
+      format: |
+        {
+          "downstream_operation_id": "operation-human-review-884",
+          "operation_type": "handoff",
+          "execution_entry_ref": "human-queue:quality-review",
+          "started_at": "2026-07-16T04:20:03Z",
+          "execution_state": "queued"
+        }
+      source_claims: [claim-downstream-operation-design]
+  reference_implementations:
+    - name: LangGraph
+      url: https://langchain-ai.github.io/langgraph/
+      description: Node execution after Command(goto=...) as downstream activity.
+    - name: A2A Protocol
+      url: https://a2a-protocol.org/latest/specification/
+      description: tasks/send activation and TASK_STATE_WORKING as downstream start.
+    - name: OpenAI Agents SDK
+      url: https://openai.github.io/openai-agents-python/
+      description: Agent loop continuation after handoff as downstream operation.
 structure:
   identity_keys:
     - downstream_operation_id
@@ -51,7 +83,7 @@ structure:
       pattern: null
       example_value: operation-human-review-884
       source_claims:
-        - claim-downstream-operation-002
+        - claim-downstream-operation-design
     - id: operation_type
       labels:
         zh: 操作类型
@@ -65,12 +97,12 @@ structure:
       definitions:
         zh: 声明 publish、invoke、handoff、continue 或 stop 等动作类别。
         en: Declares an action category such as publish, invoke, handoff, continue, or stop.
-        ja: publish・invoke・handoff・continue・stop 等の action category を宣言します。
+        ja: publish・invoke・handoff・continue・stop 等 action category。
       allowed_values: []
       pattern: null
       example_value: handoff
       source_claims:
-        - claim-downstream-operation-001
+        - claim-downstream-operation-langgraph
     - id: execution_entry_ref
       labels:
         zh: 执行入口引用
@@ -89,7 +121,7 @@ structure:
       pattern: null
       example_value: human-queue:quality-review
       source_claims:
-        - claim-downstream-operation-001
+        - claim-downstream-operation-langgraph
     - id: started_at
       labels:
         zh: 开始时间
@@ -108,7 +140,7 @@ structure:
       pattern: null
       example_value: 2026-07-16T04:20:03Z
       source_claims:
-        - claim-downstream-operation-002
+        - claim-downstream-operation-design
     - id: execution_state
       labels:
         zh: 执行状态
@@ -127,21 +159,23 @@ structure:
       pattern: null
       example_value: queued
       source_claims:
-        - claim-downstream-operation-002
+        - claim-downstream-operation-a2a
   constraints: []
   required_relation_constraints: []
 examples:
-  - id: DownstreamOperation-example-positive-manual-20260716
-    kind: positive
+  - id: DownstreamOperation-example-handoff-human
     labels:
-      zh: 转交人工质量复核
+      zh: 转向人工质量复核
       en: Handoff to human quality review
-      ja: human quality-review handoff
-    scenario_id: null
+      ja: human quality review handoff
     descriptions:
-      zh: operation-human-review-884 因 gate-outcome-884=redirect 于 04:20:03 将控制权交给 quality-review 队列，状态为 queued。
+      zh: operation-human-review-884 因 gate-outcome-884=redirect 于 04:20:03 将控制权交给 quality-review 队列，状态 queued。
       en: operation-human-review-884 receives gate-outcome-884=redirect and hands control to the quality-review queue at 04:20:03 with state queued.
-      ja: operation-human-review-884 は gate-outcome-884=redirect により 04:20:03 quality-review queue へ control を渡し queued です。
+      ja: operation-human-review-884 は redirect outcome により 04:20:03 quality-review queue へ control を渡します。
+    example_source:
+      product: LangGraph
+      url: https://langchain-ai.github.io/langgraph/
+      version: Command goto downstream execution
     field_values:
       downstream_operation_id: operation-human-review-884
       operation_type: handoff
@@ -153,52 +187,79 @@ examples:
       - GateOutcome
     related_relation_ids:
       - GateOutcome-triggers-DownstreamOperation
-    expected_result:
-      zh: 建立一次有时间与状态的下游活动。
-      en: Create one downstream activity with time and execution state.
-      ja: time/state を持つ downstream activity occurrence を作成します。
-    why_valid_or_invalid:
-      zh: 实际入口、开始时间和状态证明执行已被触发。
-      en: Concrete entry point, start time, and state prove that execution was triggered.
-      ja: entry point・start time・state が execution trigger を証明します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-downstream-operation-001
-      - claim-downstream-operation-002
-  - id: DownstreamOperation-example-boundary-manual-20260716
-    kind: boundary
+      - claim-downstream-operation-design
+  - id: DownstreamOperation-example-a2a-remote
     labels:
-      zh: 人工复核候选目标
-      en: Human-review candidate target
-      ja: human-review candidate target
-    scenario_id: routing-review-downstreamoperation-boundary
+      zh: A2A 远程任务激活
+      en: A2A remote task activation
+      ja: A2A remote task 活性化
     descriptions:
-      zh: target-human-review 仅解析到 quality-review 队列并声明可用，没有开始时间、状态或触发结果。
+      zh: operation-a2a-551 在 tasks/send 后于 04:21 启动 billing_agent，execution_state=running，tasks/get 返回 TASK_STATE_WORKING。
+      en: operation-a2a-551 starts billing_agent at 04:21 after tasks/send with execution_state=running; tasks/get returns TASK_STATE_WORKING.
+      ja: operation-a2a-551 は tasks/send 後 04:21 billing_agent を running で開始します。
+    example_source:
+      product: A2A Protocol
+      url: https://a2a-protocol.org/latest/specification/
+      version: tasks/send, tasks/get
+    field_values:
+      downstream_operation_id: operation-a2a-551
+      operation_type: invoke
+      execution_entry_ref: agent:billing-agent@1
+      started_at: 2026-07-16T04:21:00Z
+      execution_state: running
+    related_node_ids:
+      - DownstreamOperation
+      - RoutingTarget
+      - RoutingDecision
+    related_relation_ids: []
+    source_claims:
+      - claim-downstream-operation-a2a
+  - id: DownstreamOperation-example-openai-handoff
+    labels:
+      zh: OpenAI handoff 后继续执行
+      en: OpenAI handoff continuation
+      ja: OpenAI handoff 継続実行
+    descriptions:
+      zh: operation-handoff-042 在 transfer_to_billing_agent 后于 04:22 启动 billing_agent 循环，execution_state=running。
+      en: operation-handoff-042 starts the billing_agent loop at 04:22 after transfer_to_billing_agent with execution_state=running.
+      ja: operation-handoff-042 は transfer_to_billing_agent 後 04:22 billing_agent loop を running で開始します。
+    example_source:
+      product: OpenAI Agents SDK
+      url: https://openai.github.io/openai-agents-python/
+      version: handoffs
+    field_values:
+      downstream_operation_id: operation-handoff-042
+      operation_type: continue
+      execution_entry_ref: agent:billing_agent
+      started_at: 2026-07-16T04:22:00Z
+      execution_state: running
+    related_node_ids:
+      - DownstreamOperation
+      - RoutingDecision
+    related_relation_ids: []
+    source_claims:
+      - claim-downstream-operation-openai
+  - id: DownstreamOperation-example-boundary-target
+    labels:
+      zh: 候选目标不是下游操作
+      en: Candidate target is not downstream operation
+      ja: 候補 target は downstream operation ではない
+    descriptions:
+      zh: target-human-review 仅解析到 quality-review 队列并声明可用，没有 started_at、execution_state 或触发结果。
       en: target-human-review only resolves to the quality-review queue and declares availability; it has no start time, execution state, or triggering outcome.
-      ja: target-human-review は quality-review queue に resolve し availability を宣言するだけで start time/state/trigger outcome はありません。
+      ja: target-human-review は queue に resolve するだけで start time/state/trigger outcome がありません。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: target versus operation
     field_values: {}
     related_node_ids:
       - RoutingTarget
       - DownstreamOperation
     related_relation_ids: []
-    expected_result:
-      zh: 只保留 RoutingTarget，不创建 DownstreamOperation。
-      en: Keep only a RoutingTarget; do not create a DownstreamOperation.
-      ja: RoutingTarget のみとし DownstreamOperation を作りません。
-    why_valid_or_invalid:
-      zh: 候选入口不证明下游活动已经发生。
-      en: An eligible entry point does not prove that downstream activity occurred.
-      ja: eligible entry point は downstream activity occurrence を証明しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-downstream-operation-001
-      - claim-downstream-operation-002
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-downstream-operation-design
 parent_relation:
   id: GateOutcome-triggers-DownstreamOperation
   predicate: part_of
@@ -209,9 +270,9 @@ parent_relation:
     en: triggers
     ja: 起動する
   definitions:
-    zh: 一个可执行的 GateOutcome 使相应 DownstreamOperation 获得控制权并开始；目标操作、触发结果和开始时间必须一致。
+    zh: 可执行的 GateOutcome 使相应 DownstreamOperation 获得控制权并开始；目标操作、触发结果和开始时间必须一致。
     en: An actionable GateOutcome causes the corresponding DownstreamOperation to receive control and start; target operation, triggering outcome, and start time must agree.
-    ja: actionable GateOutcome により corresponding DownstreamOperation が control を受け start し target・outcome・start time が一致します。
+    ja: actionable GateOutcome により DownstreamOperation が control を受け start し target・outcome・start time が一致します。
   cardinality: null
   cardinality_not_applicable_reason:
     zh: 该关系表达类型级语义，不在此规定实例基数。
@@ -228,13 +289,12 @@ parent_relation:
   boundary_context: null
   constraints: []
   examples:
-    - id: GateOutcome-triggers-DownstreamOperation-example-positive-manual-20260716
+    - id: GateOutcome-triggers-DownstreamOperation-example-positive
       kind: positive
       labels:
         zh: 转向结果触发人工复核
         en: Redirect outcome triggers human review
         ja: redirect outcome triggers human review
-      scenario_id: routing-relation-gateoutcome-triggers-downstreamoperation-positive
       descriptions:
         zh: gate-outcome-884=redirect 在 04:20:03 触发 operation-human-review-884。
         en: gate-outcome-884=redirect triggers operation-human-review-884 at 04:20:03.
@@ -245,85 +305,55 @@ parent_relation:
         - DownstreamOperation
       related_relation_ids:
         - GateOutcome-triggers-DownstreamOperation
-      expected_result:
-        zh: 建立结果到实际操作的因果边。
-        en: Create the causal edge from outcome to actual operation.
-        ja: outcome から actual operation への causal edge を作成します。
-      why_valid_or_invalid:
-        zh: 操作记录明确引用触发结果并在其后开始。
-        en: The operation explicitly references the triggering outcome and starts afterward.
-        ja: operation は triggering outcome を参照し後に start します。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
-        - claim-downstream-operation-001
-        - claim-downstream-operation-002
-    - id: GateOutcome-triggers-DownstreamOperation-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 允许结果后客户端断开
-        en: Client disconnects after allow outcome
-        ja: client disconnects after allow outcome
-      scenario_id: routing-relation-gateoutcome-triggers-downstreamoperation-boundary
-      descriptions:
-        zh: outcome-885=allow，但发送操作没有开始时间或执行状态。
-        en: outcome-885=allow, but the delivery operation has no start time or execution state.
-        ja: outcome-885=allow でも delivery operation に start time/state がありません。
-      field_values: {}
-      related_node_ids:
-        - GateOutcome
-        - DownstreamOperation
-      related_relation_ids:
-        - GateOutcome-triggers-DownstreamOperation
-      expected_result:
-        zh: 保留结果，不断言触发成功。
-        en: Keep the outcome but do not assert successful triggering.
-        ja: outcome を保持し successful trigger を assert しません。
-      why_valid_or_invalid:
-        zh: 获得允许结果并不等于下游入口已经接收控制并开始执行。
-        en: Allow does not mean downstream control was received.
-        ja: allow は downstream control received を意味しません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-downstream-operation-001
-        - claim-downstream-operation-002
+        - claim-downstream-operation-design
   source_claims:
-    - claim-downstream-operation-001
-    - claim-downstream-operation-002
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: accepted
+    - claim-downstream-operation-design
   endpoint_order: parent-to-child
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-orchestration-tool-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照权威来源逐项完成人工语义核验；概念定义、层级、关系、结构与来源主张成立。
-    en: Manual semantic verification against authoritative sources completed; concept definitions, hierarchy, relations, structure, and source claims hold.
-    ja: 権威ソースに照らし手動意味検証を完了し、概念定義・階層・関係・構造・出典主張が成立。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: langgraph-downstream
+    title: LangGraph
+    url: https://langchain-ai.github.io/langgraph/
+    source_type: official-doc
+    relevance: Node execution after Command routing as downstream activity.
+  - id: a2a-downstream
+    title: A2A Protocol specification
+    url: https://a2a-protocol.org/latest/specification/
+    source_type: standard
+    relevance: tasks/send and Task state as downstream operation evidence.
+  - id: openai-downstream
+    title: OpenAI Agents SDK
+    url: https://openai.github.io/openai-agents-python/
+    source_type: official-doc
+    relevance: Agent loop continuation after handoff.
+  - id: downstream-operation-design
+    title: Moonweave routing and gates design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: DownstreamOperation distinct from RoutingTarget reference.
 source_claims:
-  - id: claim-downstream-operation-001
-    source: eng-fw-langgraph-graph-api
-    supports: LangGraph's Graph API distinguishes workflow state, executable nodes, static edges, conditional routing functions, termination targets, and Command values that combine state updates with a selected destination. Moonweave uses this to separate reusable routing specifications and targets from one RoutingDecision occurrence.
-    locator: LangGraph Graph API documentation, Graphs, Edges, Conditional edges, and Command sections
+  - id: claim-downstream-operation-langgraph
+    source: langgraph-downstream
+    supports: LangGraph Command(goto=...) routes control to a node whose execution is a downstream operation occurrence.
+    locator: Graph API — Command, goto
+    evidence_kind: official
+    confidence: high
+  - id: claim-downstream-operation-a2a
+    source: a2a-downstream
+    supports: A2A Task state transitions after tasks/send evidence downstream operation start.
+    locator: Specification — tasks/send, tasks/get, Task state
+    evidence_kind: official
+    confidence: high
+  - id: claim-downstream-operation-openai
+    source: openai-downstream
+    supports: OpenAI handoff transfers control to another agent loop as downstream operation.
+    locator: Handoffs — transfer_to_*
+    evidence_kind: official
+    confidence: high
+  - id: claim-downstream-operation-design
+    source: downstream-operation-design
+    supports: DownstreamOperation is time-bounded activity distinct from RoutingTarget information reference.
+    locator: DownstreamOperation concept boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-downstream-operation-002
-    source: eng-ont-prov-o
-    supports: W3C PROV-O distinguishes plans and other Entities from time-bounded Activities that use or generate Entities. Moonweave therefore treats routing policy and conditions as reusable specifications, RoutingDecision as an occurrence, and GateOutcome as information produced by gate evaluation.
-    locator: W3C PROV-O Recommendation Sections 3.1 and 3.2, Entity, Activity, generation, and Plan
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

@@ -1,20 +1,19 @@
 schema: moonweave.ai/ontology-node/v1
 id: SourceIdentity
 kind: concept
-status: accepted
 labels:
   zh: 来源状态身份
   en: source-state identity
   ja: 出典状態同一性
 semantics:
   short_definition:
-    zh: 把来源引用限定到一个可核验内容状态的身份记录。
-    en: An identity record constraining a source reference to one verifiable content state.
-    ja: source reference を一 verifiable content state に限定する identity record。
+    zh: 固定被引用内容在某一版本状态下的身份分支。
+    en: Identity branch fixing cited content state at a specific version.
+    ja: 特定 version における cited content state を固定する identity branch。
   definition:
-    zh: 来源状态身份是一种信息记录，以独立 identity_id 组合 SourceVersion 与 ContentDigest，从而把 SourceReference 限定到一个具体来源状态；摘要算法由 ContentDigest.algorithm 记录，规范摘要字节由 ContentDigest.checksum_bytes 承载，二者是 SourceIdentity 的组成证据而不是其伪子类。
-    en: SourceIdentity is an information record with its own identity_id that composes SourceVersion and ContentDigest to constrain a SourceReference to one concrete source state. ContentDigest.algorithm records the digest algorithm, and ContentDigest.checksum_bytes carries the canonical digest bytes; both records are components rather than fake subtypes of SourceIdentity.
-    ja: SourceIdentity は独自の identity_id で SourceVersion と ContentDigest を組み合わせ、SourceReference を一つの具体的な source state に限定する情報記録である。digest algorithm は ContentDigest.algorithm が記録し、canonical digest bytes は ContentDigest.checksum_bytes が保持する。両記録は SourceIdentity の構成証拠であって偽の下位型ではない。
+    zh: SourceIdentity 含 SourceVersion 与 ContentDigest，用于验证引用解析时内容是否仍与 cited state 一致；对应 RAG document version 与 MCP resource 重读校验。
+    en: SourceIdentity includes SourceVersion and ContentDigest to verify resolved content still matches cited state—RAG document versions and MCP resource reread checks.
+    ja: SourceIdentity は version+digest 固定。
   why_needed:
     zh: 同一 URI 可以随时间返回不同内容；独立状态身份让引用解析与位置选择都绑定到可核验版本，并明确版本值和摘要值不是身份记录本身。
     en: The same URI can return different content over time; an independent state identity binds reference resolution and location selection to a verifiable version while clarifying that version and digest values are not the identity record itself.
@@ -29,6 +28,26 @@ semantics:
       ja: bare version string・bare checksum byte・resource URI・location range・source business entity。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: content_digest_sha256 不匹配时必须记录 revision drift 并拒绝 same-evidence 断言。
+    en: content_digest_sha256 mismatch must record revision drift and reject same-evidence claims.
+    ja: digest mismatch→drift。
+  typical_input: []
+  typical_output: []
+  reference_implementations:
+    - name: MCP Server Resources
+      url: https://modelcontextprotocol.io/specification/2025-06-18/server/resources
+      description: resources/read URI identity with mimeType and contents.
+    - name: A2A Protocol
+      url: https://a2a-protocol.org/latest/specification/
+      description: FilePart with name, mimeType, bytes, or uri.
+    - name: OpenAI Chat Completions API
+      url: https://platform.openai.com/docs/api-reference/chat/create
+      description: image_url and file content parts for attachments.
+    - name: Anthropic Messages API
+      url: https://docs.anthropic.com/en/api/messages
+      description: image and document blocks with source URLs.
 structure:
   identity_keys:
     - source_identity_id
@@ -38,18 +57,18 @@ structure:
         zh: 来源状态身份标识
         en: source-state identity ID
         ja: 出典状態同一性 ID
+      definitions:
+        zh: 稳定标识由版本与完整性证据组成的状态记录。
+        en: Stably identifies the state record composed from version and integrity evidence.
+        ja: version/integrity evidence から成る state record を安定識別します。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 稳定标识由版本与完整性证据组成的状态记录。
-        en: Stably identifies the state record composed from version and integrity evidence.
-        ja: version/integrity evidence から成る state record を安定識別します。
-      allowed_values: []
       pattern: null
       example_value: source-state-2026-07-16-a
+      allowed_values: []
       source_claims:
         - claim-source-identity-002
   constraints:
@@ -57,109 +76,74 @@ structure:
       severity: error
       expression_language: plain
       expression: at least one accepted SourceIdentity-has_version-SourceVersion or SourceIdentity-has_digest-ContentDigest fact exists
-      explanations:
+      explanation:
         zh: 来源身份必须至少固定一个版本标识或内容/表示摘要；只有裸 ID 不能核验来源状态。
         en: A source identity pins at least one version identifier or content/representation digest; a bare ID cannot verify source state.
         ja: source identity は少なくとも version identifier または content/representation digest を固定し、bare ID だけでは source state を検証できません。
       source_claims:
         - claim-source-identity-003
         - claim-source-identity-004
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: SourceIdentity-example-positive-manual-001
-    kind: positive
+  - id: SourceIdentity-example-digest
     labels:
-      zh: 来源状态身份正例
-      en: source-state identity positive case
-      ja: 出典状態同一性正例
-    scenario_id: null
+      zh: 带 digest 的身份
+      en: Identity with digest
+      ja: digest 付き identity
     descriptions:
-      zh: source-state-2026-07-16-a 组合 version=v7 与 sha-256 摘要，限定同一文档状态。
-      en: source-state-2026-07-16-a composes version=v7 and a SHA-256 digest to constrain one document state.
-      ja: source-state-2026-07-16-a は version=v7 と SHA-256 digest を構成し一 document state を限定します。
-    field_values:
-      source_identity_id: source-state-2026-07-16-a
+      zh: lines:42..58 与 sha256 digest 固定 cited 版本。
+      en: lines:42..58 with sha256 digest pins cited version.
+      ja: digest pin。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: digest
+    field_values: {}
     related_node_ids:
-      - SourceReference
       - SourceIdentity
-    related_relation_ids:
-      - SourceReference-has_identity-SourceIdentity
-    expected_result:
-      zh: SourceIdentity 保持其已审查身份，并按定义解释 SourceReference-has_identity-SourceIdentity。
-      en: Retain the reviewed identity of SourceIdentity and interpret SourceReference-has_identity-SourceIdentity exactly as defined.
-      ja: SourceIdentity の reviewed identity を保持し SourceReference-has_identity-SourceIdentity を定義どおり解釈します。
-    why_valid_or_invalid:
-      zh: 身份记录自身可引用，并以组成证据核验状态。
-      en: The identity record is independently referenceable and verifies state through its components.
-      ja: identity record は独立参照でき component で state を検証します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+      - ContentDigest
+    related_relation_ids: []
     source_claims:
-      - claim-source-identity-005
-  - id: SourceIdentity-example-instance-manual-002
-    kind: instance
+      - claim-source-identity-design
+  - id: SourceIdentity-example-version
     labels:
-      zh: 来源状态身份实例
-      en: source-state identity instance case
-      ja: 出典状態同一性実例
-    scenario_id: null
+      zh: 文档版本
+      en: Document version
+      ja: document version
     descriptions:
-      zh: 两个 SourceReference 可共享同一 SourceIdentity，表示它们指向同一内容状态。
-      en: Two SourceReferences may share one SourceIdentity to denote the same content state.
-      ja: 二 SourceReference が一 SourceIdentity を共有し同じ content state を示します。
-    field_values:
-      source_identity_id: source-state-2026-07-16-a
+      zh: doc-policy/v7 SourceVersion 与 TextDocumentReference 组合。
+      en: doc-policy/v7 SourceVersion combined with TextDocumentReference.
+      ja: doc version。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: version
+    field_values: {}
     related_node_ids:
-      - SourceReference
       - SourceIdentity
-    related_relation_ids:
-      - SourceReference-has_identity-SourceIdentity
-    expected_result:
-      zh: SourceIdentity 保持其已审查身份，并按定义解释 SourceReference-has_identity-SourceIdentity。
-      en: Retain the reviewed identity of SourceIdentity and interpret SourceReference-has_identity-SourceIdentity exactly as defined.
-      ja: SourceIdentity の reviewed identity を保持し SourceReference-has_identity-SourceIdentity を定義どおり解釈します。
-    why_valid_or_invalid:
-      zh: 共享状态身份不合并两条引用记录。
-      en: Sharing state identity does not merge the two reference records.
-      ja: state identity の共有は二 reference record を merge しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+      - SourceVersion
+    related_relation_ids: []
     source_claims:
-      - claim-source-identity-006
-  - id: SourceIdentity-example-boundary-manual-003
-    kind: boundary
+      - claim-source-identity-design
+  - id: SourceIdentity-example-live-only
     labels:
-      zh: 来源状态身份边界例
-      en: source-state identity boundary case
-      ja: 出典状態同一性境界例
-    scenario_id: null
+      zh: 无固定身份
+      en: No pinned identity
+      ja: pin なし identity
     descriptions:
-      zh: 字符串 v7 只声明一个版本值，没有 identity_id 或完整性组合。
-      en: String v7 declares only a version value and has no identity_id or integrity composition.
-      ja: string v7 は version value だけを宣言し identity_id/integrity composition がありません。
-    field_values:
-      display_title: v7
+      zh: 仅 URL 无 version/digest 的引用 identity 弱，需显式标记。
+      en: URL-only references without version/digest have weak identity and need explicit marking.
+      ja: weak identity。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: weak
+    field_values: {}
     related_node_ids:
-      - SourceReference
       - SourceIdentity
-    related_relation_ids:
-      - SourceReference-has_identity-SourceIdentity
-    expected_result:
-      zh: 不把该对象归入 SourceIdentity，也不凭邻近或词形推断 SourceReference-has_identity-SourceIdentity。
-      en: Do not classify the object as SourceIdentity or infer SourceReference-has_identity-SourceIdentity from proximity or lexical form.
-      ja: object を SourceIdentity に分類せず proximity/lexical form から SourceReference-has_identity-SourceIdentity を推論しません。
-    why_valid_or_invalid:
-      zh: 该值是 SourceVersion 组成，不是 SourceIdentity。
-      en: That value is a SourceVersion component, not SourceIdentity.
-      ja: その value は SourceIdentity ではなく SourceVersion component です。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+    related_relation_ids: []
     source_claims:
-      - claim-source-identity-007
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-source-identity-design
 parent_relation:
   id: SourceReference-has_identity-SourceIdentity
   predicate: part_of
@@ -190,12 +174,10 @@ parent_relation:
   constraints: []
   examples:
     - id: SourceReference-has_identity-SourceIdentity-example-positive-manual-001
-      kind: positive
       labels:
         zh: SourceReference-has_identity-SourceIdentity正例
         en: SourceReference-has_identity-SourceIdentity positive case
         ja: SourceReference-has_identity-SourceIdentity正例
-      scenario_id: null
       descriptions:
         zh: src-ref-42 连接 source-state-a，后者组合 v7 与 Repr-Digest。
         en: src-ref-42 links to source-state-a, which composes v7 and a Repr-Digest.
@@ -206,25 +188,13 @@ parent_relation:
         - SourceIdentity
       related_relation_ids:
         - SourceReference-has_identity-SourceIdentity
-      expected_result:
-        zh: 建立 SourceReference —has_identity→ SourceIdentity，并保持该方向与限定条件。
-        en: Assert SourceReference —has_identity→ SourceIdentity while preserving its direction and qualifiers.
-        ja: SourceReference —has_identity→ SourceIdentity を assertion し direction/qualifier を保持します。
-      why_valid_or_invalid:
-        zh: 引用记录与可核验内容状态之间存在明确绑定事实。
-        en: The reference is explicitly bound to a verifiable state.
-        ja: reference と verifiable state が明示結合されています。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
       source_claims:
         - claim-source-identity-008
     - id: SourceReference-has_identity-SourceIdentity-example-boundary-manual-001
-      kind: boundary
       labels:
         zh: SourceReference-has_identity-SourceIdentity边界例
         en: SourceReference-has_identity-SourceIdentity boundary case
         ja: SourceReference-has_identity-SourceIdentity境界例
-      scenario_id: null
       descriptions:
         zh: src-ref-42 与 source-state-a 只共享同一 URI 字符串。
         en: src-ref-42 and source-state-a merely share the same URI string.
@@ -235,44 +205,25 @@ parent_relation:
         - SourceIdentity
       related_relation_ids:
         - SourceReference-has_identity-SourceIdentity
-      expected_result:
-        zh: 拒绝建立 SourceReference-has_identity-SourceIdentity，两端对象仍保留各自身份。
-        en: Reject SourceReference-has_identity-SourceIdentity; both endpoint objects retain their own identities.
-        ja: SourceReference-has_identity-SourceIdentity を拒否し両 endpoint object は各 identity を保持します。
-      why_valid_or_invalid:
-        zh: URI 相同不能证明状态身份相同。
-        en: URI equality does not prove source-state identity.
-        ja: URI equality は source-state identity を証明しません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
       source_claims:
         - claim-source-identity-009
   source_claims:
     - claim-source-identity-010
-  distinct_fact_rationale:
-    zh: SourceReference-has_identity-SourceIdentity 记录 SourceReference 到 SourceIdentity 的单一 has_identity 事实，不能由端点命名、共现或其他边自动替代。
-    en: SourceReference-has_identity-SourceIdentity records one has_identity fact from SourceReference to SourceIdentity; endpoint naming, co-occurrence, or another edge cannot substitute for it.
-    ja: SourceReference-has_identity-SourceIdentity は SourceReference から SourceIdentity への一 has_identity fact を記録し、endpoint naming・co-occurrence・他 edge では代替できません。
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: parent-to-child
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-info-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: Manual semantic verification completed.
-    en: Verified against W3C Web Annotation, RFC 3986/8089/9530, LSP position encoding, and PROV-O.
-    ja: Manual semantic verification completed.
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-info-sources-design
+    title: Moonweave info-storage-sources module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: SourceReference as pointer and locator without referent body.
+  - id: src-prov-o
+    title: PROV-O — The PROV Ontology
+    publisher: W3C
+    url: https://www.w3.org/TR/prov-o/
+    source_type: standard
+    relevance: Entity, location, and provenance separation.
 source_claims:
   - id: claim-source-identity-001
     source: eng-ont-prov-o
@@ -280,67 +231,63 @@ source_claims:
     locator: §3.2 expanded properties, prov:alternateOf and prov:specializationOf, lines 1444–1505
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-source-identity-002
     source: eng-ont-prov-o
     supports: "PROV-O models concrete entity states as specializations of a more general entity; Moonweave records the cited source state as SourceIdentity. For SourceIdentity.source_identity_id, the field records this reviewed value: Stably identifies the state record composed from version and integrity evidence."
     locator: §3.2 expanded properties, prov:alternateOf and prov:specializationOf, lines 1444–1505
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-source-identity-003
     source: eng-ont-prov-o
     supports: PROV-O distinguishes entity states and revisions, while Moonweave requires a version or digest to make the referenced state verifiable.
     locator: §3.2 > specialization, revision, and generation
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-source-identity-004
     source: eng-proto-rfc9530-digest-fields
     supports: RFC 9530 defines digest fields for content and representation integrity. Moonweave accepts a digest as one way to pin SourceIdentity state.
     locator: RFC 9530 §§2–3 > Content-Digest and Repr-Digest
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-source-identity-005
     source: eng-ont-prov-o
     supports: "PROV-O models concrete entity states as specializations of a more general entity; Moonweave records the cited source state as SourceIdentity. This evidence supports the manually reviewed positive case for SourceIdentity: source-state-2026-07-16-a composes version=v7 and a SHA-256 digest to constrain one document state."
     locator: §3.2 expanded properties, prov:alternateOf and prov:specializationOf, lines 1444–1505
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-source-identity-006
     source: eng-ont-prov-o
     supports: "PROV-O models concrete entity states as specializations of a more general entity; Moonweave records the cited source state as SourceIdentity. This evidence supports the manually reviewed instance case for SourceIdentity: Two SourceReferences may share one SourceIdentity to denote the same content state."
     locator: §3.2 expanded properties, prov:alternateOf and prov:specializationOf, lines 1444–1505
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-source-identity-007
     source: eng-ont-prov-o
     supports: "PROV-O models concrete entity states as specializations of a more general entity; Moonweave records the cited source state as SourceIdentity. This evidence supports the manually reviewed boundary case for SourceIdentity: String v7 declares only a version value and has no identity_id or integrity composition."
     locator: §3.2 expanded properties, prov:alternateOf and prov:specializationOf, lines 1444–1505
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-source-identity-008
     source: eng-ont-prov-o
     supports: "PROV-O uses specializationOf to relate a concrete entity state to a more general entity; Moonweave cross-links a reference to its cited state identity. This evidence supports the manually reviewed positive case for SourceReference-has_identity-SourceIdentity: src-ref-42 links to source-state-a, which composes v7 and a Repr-Digest."
     locator: §3.2 expanded properties, prov:alternateOf and prov:specializationOf, lines 1444–1505
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-source-identity-009
     source: eng-ont-prov-o
     supports: "PROV-O uses specializationOf to relate a concrete entity state to a more general entity; Moonweave cross-links a reference to its cited state identity. This evidence supports the manually reviewed boundary case for SourceReference-has_identity-SourceIdentity: src-ref-42 and source-state-a merely share the same URI string."
     locator: §3.2 expanded properties, prov:alternateOf and prov:specializationOf, lines 1444–1505
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-source-identity-010
     source: eng-ont-prov-o
     supports: PROV-O uses specializationOf to relate a concrete entity state to a more general entity; Moonweave cross-links a reference to its cited state identity.
     locator: §3.2 expanded properties, prov:alternateOf and prov:specializationOf, lines 1444–1505
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
+  - id: claim-source-identity-design
+    source: src-info-sources-design
+    supports: SourceIdentity pins cited state via version and digest for verification.
+    locator: SourceIdentity
+    evidence_kind: design-inference
+    confidence: high

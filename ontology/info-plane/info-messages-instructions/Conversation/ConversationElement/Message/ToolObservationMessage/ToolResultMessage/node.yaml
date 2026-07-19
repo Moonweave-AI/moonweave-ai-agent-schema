@@ -1,20 +1,19 @@
 schema: moonweave.ai/ontology-node/v1
 id: ToolResultMessage
 kind: concept
-status: accepted
 labels:
   zh: 工具结果消息
   en: Tool-result message
   ja: ツール結果メッセージ
 semantics:
   short_definition:
-    zh: 把一次工具调用的终止结果封装进会话的工具观测消息。
-    en: A tool-observation message that stages one tool invocation's terminal result into a conversation.
-    ja: 一tool invocationのterminal resultをconversationへstageするtool-observation messageです。
+    zh: 携带一次已完成工具调用结果内容的 ToolObservationMessage 特化。
+    en: ToolObservationMessage specialization carrying content of one completed tool invocation result.
+    ja: 完了した tool 呼び出し結果 content を運ぶ ToolObservationMessage 特化。
   definition:
-    zh: ToolResultMessage 是 ToolObservationMessage 的严格子类，表示一次已关联 ToolInvocation 的成功结果或终止错误被包装为会话消息；它必须引用独立 ToolResult，不覆盖进度或日志通知，也不把消息包络误作工具执行结果本身。
-    en: ToolResultMessage is a strict subtype of ToolObservationMessage representing a successful result or terminal error of a correlated ToolInvocation packaged as a conversation message. It must reference a separate ToolResult, excludes progress and log notifications, and does not turn the message envelope into the execution result itself.
-    ja: ToolResultMessage はcorrelated ToolInvocationのsuccess resultまたはterminal errorをconversation messageに包むToolObservationMessageのstrict subtypeです。独立ToolResultを参照しprogress/log notificationを除外しmessage envelopeをexecution result自体にしません。
+    zh: ToolResultMessage 通过 tool_call_id/tool_use_id 引用先前 AssistantMessage 中的 tool_use 或 OpenAI tool_calls；result_status 记录 success、error 或 cancelled。它是模型可见的结果消息，不是 ToolResult 执行身份或 runtime 模块中的 invocation 记录。
+    en: ToolResultMessage references prior tool_use in AssistantMessage or OpenAI tool_calls via tool_call_id/tool_use_id; result_status records success, error, or cancelled. It is the model-visible result message, not ToolResult execution identity or runtime invocation records.
+    ja: ToolResultMessage は tool_use_id 配对で結果を返す model-visible message。
   why_needed:
     zh: 形成“工具观测 → 工具结果消息”的真实层级，保留消息身份与执行结果身份之间的可追踪桥接。
     en: Creates the real ToolObservationMessage → ToolResultMessage hierarchy while preserving a traceable bridge between message identity and execution-result identity.
@@ -29,6 +28,34 @@ semantics:
       ja: progress・log・non-terminal warning・ToolResult・ToolInvocation・raw tool output自体を除外します。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: 配对规则：Anthropic tool_result.tool_use_id 必须指向同会话较早 assistant tool_use；OpenAI tool_call_id 必须指向 assistant tool_calls.id。孤立 tool_result 拒绝注册为 ToolResultMessage evidence。
+    en: "Pairing rule: Anthropic tool_result.tool_use_id must point to an earlier assistant tool_use in the same conversation; OpenAI tool_call_id must point to assistant tool_calls.id. Orphan tool_result must not register as ToolResultMessage evidence."
+    ja: tool_use_id/tool_call_id 配对必須。
+  typical_input:
+    - description: Paired Anthropic tool_result
+      format: '{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_01","content":"Revenue +12%"}]}'
+      source_claims:
+        - claim-tool-result-anthropic
+  typical_output:
+    - description: ToolResultMessage record
+      format: '{"message_id":"msg-903-user","tool_call_id":"toolu_01","result_status":"success"}'
+      source_claims:
+        - claim-tool-result-design
+  reference_implementations:
+    - name: OpenAI Chat Completions API
+      url: https://platform.openai.com/docs/api-reference/chat/create
+      description: messages[] with role and content parts.
+    - name: Anthropic Messages API
+      url: https://docs.anthropic.com/en/api/messages
+      description: system parameter and role/content block turns.
+    - name: MCP Prompts
+      url: https://modelcontextprotocol.io/specification/2025-06-18/server/prompts
+      description: prompts/get returns injectable messages array.
+    - name: A2A Protocol
+      url: https://a2a-protocol.org/latest/specification/
+      description: Message with role, messageId, contextId, and parts.
 structure:
   identity_keys: []
   fields:
@@ -37,18 +64,18 @@ structure:
         zh: 工具调用标识
         en: tool call ID
         ja: ツール呼出しID
+      definitions:
+        zh: 关联产生该终止结果的具体 ToolInvocation。
+        en: Correlates the concrete ToolInvocation that produced this terminal result.
+        ja: このterminal resultを生成した具体ToolInvocationに相関します。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 关联产生该终止结果的具体 ToolInvocation。
-        en: Correlates the concrete ToolInvocation that produced this terminal result.
-        ja: このterminal resultを生成した具体ToolInvocationに相関します。
-      allowed_values: []
       pattern: null
       example_value: tool-call-312
+      allowed_values: []
       source_claims:
         - claim-tool-result-message-002
     - id: result_status
@@ -56,90 +83,86 @@ structure:
         zh: 结果状态
         en: result status
         ja: 結果状態
+      definitions:
+        zh: 记录包装结果是 success 还是 terminal-error。
+        en: Records whether the packaged result is success or terminal-error.
+        ja: packaged resultがsuccessかterminal-errorか記録します。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 记录包装结果是 success 还是 terminal-error。
-        en: Records whether the packaged result is success or terminal-error.
-        ja: packaged resultがsuccessかterminal-errorか記録します。
-      allowed_values: []
       pattern: null
       example_value: success
+      allowed_values: []
       source_claims:
         - claim-tool-result-message-003
   constraints: []
-  required_relation_constraints: []
+  required_relations: []
 examples:
-  - id: ToolResultMessage-example-positive-manual-001
-    kind: positive
+  - id: ToolResultMessage-example-anthropic-pair
     labels:
-      zh: 工具结果消息正例
-      en: "Positive case: Tool-result message"
-      ja: ツール結果メッセージ正例
-    scenario_id: null
+      zh: Anthropic 配对 tool_result
+      en: Anthropic paired tool_result
+      ja: Anthropic 配对 tool_result
     descriptions:
-      zh: tool-result-msg-312 包装 tool-call-312 的成功结果并引用 ToolResult result-312。
-      en: tool-result-msg-312 packages the successful result of tool-call-312 and references ToolResult result-312.
-      ja: tool-result-msg-312 はtool-call-312のsuccess resultを包みToolResult result-312を参照します。
+      zh: msg-903-user tool_result tool_use_id=toolu_01 回答 msg-902-assistant 的 lookup 调用，result_status=success。
+      en: msg-903-user tool_result tool_use_id=toolu_01 answers msg-902-assistant lookup call with result_status=success.
+      ja: tool_use 配对 tool_result。
+    example_source:
+      product: Anthropic
+      url: https://docs.anthropic.com/en/api/messages
+      version: tool_result pairing
     field_values:
-      tool_call_id: tool-call-312
+      tool_call_id: toolu_01
       result_status: success
-      tool_name: flight_search
-      observation_kind: result
-      message_role: tool
-      sender_id: ToolActor:flight_search
-      element_id: tool-result-msg-312
-      conversation_id: conv-travel-202
-      sequence_index: 5
     related_node_ids:
       - ToolResultMessage
+      - AssistantMessage
     related_relation_ids: []
-    expected_result:
-      zh: 识别为 ToolResultMessage。
-      en: Identify ToolResultMessage.
-      ja: ToolResultMessageと識別します。
-    why_valid_or_invalid:
-      zh: 消息具有终止状态、调用关联和独立结果引用，满足更深子类条件。
-      en: The message has terminal status, invocation correlation, and a separate result reference, satisfying the deeper subtype condition.
-      ja: terminal status・invocation correlation・separate result referenceを持ちdeep subtype条件を満たします。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-tool-result-message-004
-  - id: ToolResultMessage-example-boundary-manual-001
-    kind: boundary
+      - claim-tool-result-anthropic
+  - id: ToolResultMessage-example-openai-tool
     labels:
-      zh: 工具结果消息边界例
-      en: "Boundary case: Tool-result message"
-      ja: ツール結果メッセージ境界例
-    scenario_id: null
+      zh: OpenAI tool 结果
+      en: OpenAI tool result
+      ja: OpenAI tool result
     descriptions:
-      zh: tool-progress-msg-312 报告 75% 进度，调用仍在运行且没有 ToolResult。
-      en: tool-progress-msg-312 reports 75% progress while the call is still running and has no ToolResult.
-      ja: tool-progress-msg-312 は75% progressを報告しcallは実行中でToolResultがありません。
-    field_values: {}
+      zh: role=tool tool_call_id=call_01 返回 JSON，result_status=success。
+      en: role=tool tool_call_id=call_01 returns JSON with result_status=success.
+      ja: OpenAI tool result message。
+    example_source:
+      product: OpenAI
+      url: https://platform.openai.com/docs/api-reference/chat/create
+      version: role=tool
+    field_values:
+      tool_call_id: call_01
+      result_status: success
     related_node_ids:
       - ToolResultMessage
     related_relation_ids: []
-    expected_result:
-      zh: 只识别为 ToolObservationMessage，不得识别为 ToolResultMessage。
-      en: Identify only ToolObservationMessage, not ToolResultMessage.
-      ja: ToolObservationMessageだけとしToolResultMessageではありません。
-    why_valid_or_invalid:
-      zh: 非终止通知缺少完成状态和结果身份。
-      en: A non-terminal notification lacks completion status and result identity.
-      ja: non-terminal notificationはcompletion statusとresult identityを欠きます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-tool-result-message-005
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-tool-result-openai
+  - id: ToolResultMessage-example-orphan-boundary
+    labels:
+      zh: 孤立 tool_result 边界
+      en: Orphan tool_result boundary
+      ja: 孤立 tool_result 境界
+    descriptions:
+      zh: tool_use_id=toolu_99 无对应 assistant tool_use 时不得断言 ToolResultMessage。
+      en: tool_use_id=toolu_99 without matching assistant tool_use must not assert ToolResultMessage.
+      ja: orphan tool_result 拒否。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: boundary
+    field_values:
+      tool_call_id: toolu_99
+    related_node_ids:
+      - ToolResultMessage
+    related_relation_ids: []
+    source_claims:
+      - claim-tool-result-design
 parent_relation:
   id: ToolResultMessage-is_a-ToolObservationMessage
   predicate: is_a
@@ -170,12 +193,10 @@ parent_relation:
   constraints: []
   examples:
     - id: ToolResultMessage-is_a-ToolObservationMessage-example-positive-manual-001
-      kind: positive
       labels:
         zh: 是一种工具观测消息正例
         en: "Positive case: is a tool-observation message"
         ja: ツール観測メッセージの一種正例
-      scenario_id: null
       descriptions:
         zh: tool-result-msg-312 关联 tool-call-312、状态 success，并引用 result-312。
         en: tool-result-msg-312 correlates tool-call-312, has status success, and references result-312.
@@ -186,25 +207,13 @@ parent_relation:
         - ToolObservationMessage
       related_relation_ids:
         - ToolResultMessage-is_a-ToolObservationMessage
-      expected_result:
-        zh: 断言 ToolResultMessage-is_a-ToolObservationMessage。
-        en: Assert ToolResultMessage-is_a-ToolObservationMessage.
-        ja: ToolResultMessage-is_a-ToolObservationMessageをassertします。
-      why_valid_or_invalid:
-        zh: 它满足一般工具观测条件，并增加终止结果种差。
-        en: It satisfies general tool-observation conditions and adds terminal-result differentia.
-        ja: general tool-observation条件を満たしterminal-result differentiaを追加します。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
         - claim-tool-result-message-006
     - id: ToolResultMessage-is_a-ToolObservationMessage-example-boundary-manual-001
-      kind: boundary
       labels:
         zh: 是一种工具观测消息边界例
         en: "Boundary case: is a tool-observation message"
         ja: ツール観測メッセージの一種境界例
-      scenario_id: null
       descriptions:
         zh: tool-progress-msg-312 只有进行中进度，没有结果引用。
         en: tool-progress-msg-312 carries in-progress status and no result reference.
@@ -215,26 +224,11 @@ parent_relation:
         - ToolObservationMessage
       related_relation_ids:
         - ToolResultMessage-is_a-ToolObservationMessage
-      expected_result:
-        zh: 只断言 ToolObservationMessage，不断言 ToolResultMessage。
-        en: Assert only ToolObservationMessage, not ToolResultMessage.
-        ja: ToolObservationMessageだけをassertしToolResultMessageはassertしません。
-      why_valid_or_invalid:
-        zh: 缺少终止状态和独立 ToolResult，不能满足更深种差。
-        en: Without terminal status and a separate ToolResult, the deeper differentia is not met.
-        ja: terminal status/separate ToolResultを欠きdeep differentiaを満たしません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
       source_claims:
         - claim-tool-result-message-007
   source_claims:
     - claim-tool-result-message-008
-  distinct_fact_rationale:
-    zh: 结果消息继承工具观测消息的会话可见性，并以终止性和结果引用形成更深种差。
-    en: A result message inherits conversation-visible tool observation and adds terminality plus a result reference as deeper differentia.
-    ja: result messageはconversation-visible tool observationを継承しterminality/result referenceをdeep differentiaとして追加します。
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations:
   - id: ToolResultMessage-references_tool_result-ToolResult
@@ -266,12 +260,10 @@ relations:
     constraints: []
     examples:
       - id: ToolResultMessage-references_tool_result-ToolResult-example-positive-manual-001
-        kind: positive
         labels:
           zh: 引用工具结果正例
           en: "Positive case: references tool result"
           ja: ツール結果を参照正例
-        scenario_id: null
         descriptions:
           zh: tool-result-msg-312 与 result-312 均记录 tool_call_id=tool-call-312。
           en: tool-result-msg-312 and result-312 both record tool_call_id=tool-call-312.
@@ -282,25 +274,13 @@ relations:
           - ToolResult
         related_relation_ids:
           - ToolResultMessage-references_tool_result-ToolResult
-        expected_result:
-          zh: 断言 ToolResultMessage references_tool_result ToolResult。
-          en: Assert ToolResultMessage references_tool_result ToolResult.
-          ja: ToolResultMessage references_tool_result ToolResultをassertします。
-        why_valid_or_invalid:
-          zh: 调用关联一致，消息与结果各自拥有不同身份。
-          en: Invocation correlation agrees while message and result retain separate identities.
-          ja: invocation correlationが一致しmessage/resultは別identityを保持します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-tool-result-message-009
       - id: ToolResultMessage-references_tool_result-ToolResult-example-boundary-manual-001
-        kind: boundary
         labels:
           zh: 引用工具结果边界例
           en: "Boundary case: references tool result"
           ja: ツール結果を参照境界例
-        scenario_id: null
         descriptions:
           zh: tool-progress-msg-312 关联同一调用但没有终止 ToolResult。
           en: tool-progress-msg-312 correlates to the same call but has no terminal ToolResult.
@@ -311,43 +291,30 @@ relations:
           - ToolResult
         related_relation_ids:
           - ToolResultMessage-references_tool_result-ToolResult
-        expected_result:
-          zh: 不得建立 references_tool_result 边。
-          en: Do not create a references_tool_result edge.
-          ja: references_tool_result edgeを作りません。
-        why_valid_or_invalid:
-          zh: 共享调用标识不足以虚构尚未产生的结果记录。
-          en: A shared call ID is insufficient to fabricate a result record that does not yet exist.
-          ja: shared call IDだけで未生成result recordを捏造できません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
         source_claims:
           - claim-tool-result-message-010
     source_claims:
       - claim-tool-result-message-011
-    distinct_fact_rationale:
-      zh: 明确区分工具执行的结果产物与进入会话的结果消息，避免两个概念合并或重复字段。
-      en: Explicitly separates the tool-execution result artifact from the result message entering the conversation, avoiding merged concepts or duplicated fields.
-      ja: tool-execution result artifactとconversationへ入るresult messageを明示分離しconcept統合/field重複を防ぎます。
     layout_role: cross-link
-    review_status: accepted
     target: concept:ToolResult
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-info-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Chat Completions 角色、Model Spec 权威链、A2A Message/Part 与 MCP JSON-RPC 包络逐项核验；Conversation、Message 角色子类、ToolObservationMessage 与 ProtocolEnvelope 语义成立。
-    en: Verified against OpenAI Chat Completions roles, Model Spec authority chain, A2A Message/Part, and MCP JSON-RPC envelopes; Conversation, Message role specializations, ToolObservationMessage, and ProtocolEnvelope semantics hold.
-    ja: OpenAI Chat Completions role、Model Spec authority chain、A2A Message/Part、MCP JSON-RPC envelope に照らし Conversation/Message role specialization/ToolObservationMessage/ProtocolEnvelope semantics を個別確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-openai-chat
+    title: OpenAI Chat Completions API Reference
+    publisher: OpenAI
+    url: https://platform.openai.com/docs/api-reference/chat/create
+    source_type: official-doc
+    relevance: role/content message arrays and developer role.
+  - id: src-anthropic-messages
+    title: Anthropic Messages API Reference
+    publisher: Anthropic
+    url: https://docs.anthropic.com/en/api/messages
+    source_type: official-doc
+    relevance: system parameter and content blocks including tool_use/tool_result.
+  - id: src-info-messages-design
+    title: Moonweave info-messages-instructions module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: Conversation and Message identity separate from carried content.
 source_claims:
   - id: claim-tool-result-message-001
     source: eng-proto-mcp-spec
@@ -355,74 +322,81 @@ source_claims:
     locator: "Base Protocol > Messages: JSON-RPC requests, responses, notifications, and request IDs"
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-tool-result-message-002
     source: eng-proto-mcp-spec
     supports: "MCP JSON-RPC responses carry the matching request ID and exactly one result or error; Moonweave distinguishes the response's message form from the ToolResult artifact it references. For ToolResultMessage, the tool_call_id field records exactly this auditable datum: Correlates the concrete ToolInvocation that produced this terminal result."
     locator: "Base Protocol > Messages: JSON-RPC requests, responses, notifications, and request IDs"
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-tool-result-message-003
     source: eng-proto-mcp-spec
     supports: "MCP JSON-RPC responses carry the matching request ID and exactly one result or error; Moonweave distinguishes the response's message form from the ToolResult artifact it references. For ToolResultMessage, the result_status field records exactly this auditable datum: Records whether the packaged result is success or terminal-error."
     locator: "Base Protocol > Messages: JSON-RPC requests, responses, notifications, and request IDs"
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-tool-result-message-004
     source: eng-proto-mcp-spec
     supports: MCP JSON-RPC responses carry the matching request ID and exactly one result or error; Moonweave distinguishes the response's message form from the ToolResult artifact it references. MCP responses correlate by request ID and contain either result or error; the Model Spec appends the tool response as a new tool-role message.
     locator: "Base Protocol > Messages: JSON-RPC requests, responses, notifications, and request IDs"
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-tool-result-message-005
     source: eng-proto-mcp-spec
     supports: MCP JSON-RPC responses carry the matching request ID and exactly one result or error; Moonweave distinguishes the response's message form from the ToolResult artifact it references. MCP distinguishes progress notifications from JSON-RPC result or error responses.
     locator: "Base Protocol > Messages: JSON-RPC requests, responses, notifications, and request IDs"
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-tool-result-message-006
     source: eng-proto-mcp-spec
     supports: MCP distinguishes final JSON-RPC result/error responses from non-terminal notifications; Moonweave uses that distinction for the deeper subtype. The case maps an MCP final response into a conversation-visible result message.
     locator: "Base Protocol > Messages: JSON-RPC requests, responses, notifications, and request IDs"
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-tool-result-message-007
     source: eng-proto-mcp-spec
     supports: MCP distinguishes final JSON-RPC result/error responses from non-terminal notifications; Moonweave uses that distinction for the deeper subtype. MCP progress notifications are explicitly distinct from result or error responses.
     locator: "Base Protocol > Messages: JSON-RPC requests, responses, notifications, and request IDs"
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-tool-result-message-008
     source: eng-proto-mcp-spec
     supports: MCP distinguishes final JSON-RPC result/error responses from non-terminal notifications; Moonweave uses that distinction for the deeper subtype.
     locator: "Base Protocol > Messages: JSON-RPC requests, responses, notifications, and request IDs"
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-tool-result-message-009
     source: eng-proto-mcp-spec
     supports: MCP correlates a final response to its request ID and carries result or error; the Model Spec appends that response as a new tool-role message, motivating two identities connected by reference. The case follows the documented request-response correlation and conversation append semantics.
     locator: "Base Protocol > Messages: JSON-RPC requests, responses, notifications, and request IDs"
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-tool-result-message-010
     source: eng-proto-mcp-spec
     supports: MCP correlates a final response to its request ID and carries result or error; the Model Spec appends that response as a new tool-role message, motivating two identities connected by reference. MCP progress notifications precede and differ from final result/error responses.
     locator: "Base Protocol > Messages: JSON-RPC requests, responses, notifications, and request IDs"
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-tool-result-message-011
     source: eng-proto-mcp-spec
     supports: MCP correlates a final response to its request ID and carries result or error; the Model Spec appends that response as a new tool-role message, motivating two identities connected by reference.
     locator: "Base Protocol > Messages: JSON-RPC requests, responses, notifications, and request IDs"
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
+  - id: claim-tool-result-anthropic
+    source: src-anthropic-messages
+    supports: Anthropic tool_result must reference a prior tool_use_id in the same thread.
+    locator: tool_result tool_use_id
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-tool-result-openai
+    source: src-openai-chat
+    supports: OpenAI tool role messages reference assistant tool_calls by tool_call_id.
+    locator: tool_call_id
+    evidence_kind: primary-api
+    confidence: high
+  - id: claim-tool-result-design
+    source: src-info-messages-design
+    supports: ToolResultMessage requires paired tool invocation reference; orphan results are rejected.
+    locator: ToolResultMessage boundary
+    evidence_kind: design-inference
+    confidence: high

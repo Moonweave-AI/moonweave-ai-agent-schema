@@ -1,20 +1,19 @@
 schema: moonweave.ai/ontology-node/v1
 id: MCPSession
 kind: concept
-status: review
 labels:
   zh: MCP 会话
   en: MCP Session
   ja: MCP セッション
 semantics:
   short_definition:
-    zh: 由协议版本、协商能力和一对客户端/服务器端点约束的有状态交互期间。
-    en: A stateful interaction period bound to one client/server pair, protocol version, and negotiated capabilities.
-    ja: 一対の client/server、プロトコル版、交渉済み能力に結び付く状態付き対話期間。
+    zh: 绑定一对 MCP 客户端/服务器端点、协议版本与协商能力的有状态协议上下文。
+    en: Stateful protocol context binding one MCP client/server endpoint pair, protocol version, and negotiated capabilities.
+    ja: 一対 MCP client/server endpoint・protocol version・交渉 capability に bind された stateful protocol context。
   definition:
-    zh: MCP 会话是一种实体，表示一个客户端—服务器端点对从初始化、版本与能力协商、运行直到传输关闭的有状态协议上下文；它约束消息 id、能力和版本，不等同于裸 TCP/HTTP 连接、OAuth token session、宿主聚合状态或单个请求。
-    en: An MCP session is an entity representing the stateful protocol context for one client-server endpoint pair from initialization and version/capability negotiation through operation until transport closure. It scopes message IDs, capabilities, and version and is not a raw TCP/HTTP connection, OAuth token session, host aggregate, or one request.
-    ja: MCP session は一 client-server endpoint pair の initialization・version/capability negotiation・operation・transport close までを表す entity です。message ID/capability/version を scope し raw connection・OAuth session・host aggregate・single request ではありません。
+    zh: MCP 会话表示从 initialize 与能力协商开始，经 notifications/initialized 进入 operation，直到传输关闭的有状态协议上下文。它约束 JSON-RPC 消息 id、enabled capabilities 与 protocol_version，并区分 initialization、operation、termination 阶段。裸 TCP/HTTP 连接、OAuth token session、宿主跨服务器聚合状态或单个未初始化请求都不构成 MCPSession。Moonweave 用 mcp_session_id 作为工程标识，该字段不是 MCP 线路字段。
+    en: An MCP session represents the stateful protocol context from initialize and capability negotiation through notifications/initialized into operation until transport closure. It scopes JSON-RPC message IDs, enabled capabilities, and protocol_version and distinguishes initialization, operation, and termination phases. A raw TCP/HTTP connection, OAuth token session, host aggregate across servers, or a single uninitialized request does not constitute an MCPSession. Moonweave uses mcp_session_id as an engineering identifier that is not an MCP wire field.
+    ja: MCP session は initialize/capability negotiation から notifications/initialized を経て operation に入り transport close までの stateful protocol context です。JSON-RPC message ID/enabled capabilities/protocol_version を scope し initialization/operation/termination phase を区別。raw TCP/HTTP connection/OAuth token session/host aggregate/single uninitialized request は MCPSession を構成しません。Moonweave は mcp_session_id を engineering identifier として使い MCP wire field ではありません。
   why_needed:
     zh: 会话把版本和能力承诺固定到具体端点对，使验证器能够拒绝初始化前消息、未协商特性和错误服务器上的状态复用。
     en: The session binds version and capability commitments to a concrete endpoint pair, allowing validators to reject pre-initialization traffic, unnegotiated features, and state reused with the wrong server.
@@ -29,6 +28,30 @@ semantics:
       ja: 未初期化 transport 接続、個別 JSON-RPC 要求、OAuth token セッション、host のサーバー横断集約状態を除きます。
   semantic_kind: entity
   aliases: []
+engineering:
+  explanation:
+    zh: MCP 2025-11-25 生命周期要求 initialize 为首个 client-server 交互，双方交换 capabilities，客户端发送 notifications/initialized 后才可进入普通 operation。典型 initialize 请求为 {"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{...}}}，响应返回 server capabilities。stdio 与 Streamable HTTP 传输都承载同一 session 状态机，但线路分帧不同。
+    en: MCP 2025-11-25 lifecycle requires initialize as the first client-server interaction, exchanges capabilities, and enters ordinary operation only after the client sends notifications/initialized. A typical initialize request is {"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{...}}} and the response returns server capabilities. Stdio and Streamable HTTP transports carry the same session state machine with different wire framing.
+    ja: MCP 2025-11-25 lifecycle は initialize を first client-server interaction とし capabilities 交換後 client notifications/initialized 後に ordinary operation へ。典型 initialize request/response は protocolVersion/capabilities を交換。stdio/Streamable HTTP transport は同一 session state machine を異なる wire framing で運びます。
+  typical_input:
+    - description: MCP initialize request and negotiated result.
+      format: |
+        {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{"roots":{}}}}
+        =>
+        {"protocolVersion":"2025-11-25","capabilities":{"tools":{}}}
+      source_claims: [claim-mcp-session-lifecycle]
+  typical_output:
+    - description: Moonweave-local session record after notifications/initialized.
+      format: |
+        {"mcp_session_id":"mcp-session-roots-resources-1","protocol_version":"2025-11-25","phase":"operation","state":"active"}
+      source_claims: [claim-mcp-session-design]
+  reference_implementations:
+    - name: MCP Lifecycle
+      url: https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
+      description: Initialization, operation, and shutdown phases.
+    - name: LangChain MCP Adapters
+      url: https://python.langchain.com/docs/integrations/tools/mcp/
+      description: Host-side MCP client session establishment.
 structure:
   identity_keys:
     - mcp_session_id
@@ -51,7 +74,7 @@ structure:
       pattern: null
       example_value: mcp-session-001
       source_claims:
-        - claim-mcp-session-002
+        - claim-mcp-session-lifecycle
     - id: protocol_version
       labels:
         zh: 协议版本
@@ -70,7 +93,7 @@ structure:
       pattern: null
       example_value: 2025-11-25
       source_claims:
-        - claim-mcp-session-003
+        - claim-mcp-session-lifecycle
     - id: state
       labels:
         zh: 会话状态
@@ -89,7 +112,7 @@ structure:
       pattern: null
       example_value: initialized
       source_claims:
-        - claim-mcp-session-004
+        - claim-mcp-session-design
     - id: phase
       labels:
         zh: 协议阶段
@@ -117,7 +140,7 @@ structure:
             ja: protocol version/capability を交渉中。
           status: accepted
           source_claims:
-            - claim-mcp-session-005
+            - claim-mcp-session-lifecycle
         - id: MCPSessionPhaseOperation
           value: operation
           labels:
@@ -130,7 +153,7 @@ structure:
             ja: initialization 完了後の ordinary protocol interaction。
           status: accepted
           source_claims:
-            - claim-mcp-session-006
+            - claim-mcp-session-lifecycle
         - id: MCPSessionPhaseTermination
           value: termination
           labels:
@@ -143,11 +166,11 @@ structure:
             ja: transport closure/session failure 後の terminating phase。
           status: accepted
           source_claims:
-            - claim-mcp-session-007
+            - claim-mcp-session-lifecycle
       pattern: null
       example_value: operation
       source_claims:
-        - claim-mcp-session-008
+        - claim-mcp-session-design
   constraints:
     - id: mcp-session-negotiated-before-use
       severity: error
@@ -158,7 +181,7 @@ structure:
         en: Requests other than initialization occur only after protocol version and capabilities are negotiated.
         ja: 初期化以外の要求はプロトコルバージョンと能力の交渉後にのみ発生します。
       source_claims:
-        - claim-mcp-session-009
+        - claim-mcp-session-lifecycle
   required_relation_constraints:
     - id: mcp-session-has-client
       direction: outgoing
@@ -172,7 +195,7 @@ structure:
         en: An MCP session has one client participant.
         ja: MCP セッションには一つのクライアント参加者があります。
       source_claims:
-        - claim-mcp-session-010
+        - claim-mcp-session-design
     - id: mcp-session-has-server
       direction: outgoing
       predicate: has_participant
@@ -185,7 +208,7 @@ structure:
         en: An MCP session has one server participant.
         ja: MCP セッションには一つのサーバー参加者があります。
       source_claims:
-        - claim-mcp-session-011
+        - claim-mcp-session-design
 examples:
   - id: mcp-session-positive-negotiated-operation
     kind: positive
@@ -222,8 +245,11 @@ examples:
       ja: 三段階初期化が完了し、後続呼出しは交渉済み契約内です。
     synthetic: true
     verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    example_source:
+      product: Model Context Protocol
+      url: https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
     source_claims:
-      - claim-mcp-session-001
+      - claim-mcp-session-lifecycle
   - id: mcp-session-boundary-preinitialize-http
     kind: boundary
     labels:
@@ -252,12 +278,11 @@ examples:
       ja: 版・能力交渉がなく、セッション契約が成立しません。
     synthetic: true
     verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    example_source:
+      product: MCP Transports
+      url: https://modelcontextprotocol.io/specification/2025-11-25/basic/transports
     source_claims:
-      - claim-mcp-session-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-mcp-session-lifecycle
 parent_relation: null
 relations:
   - id: MCPSession-has_participant-MCPClient
@@ -468,111 +493,49 @@ relations:
     layout_role: cross-link
     review_status: accepted
     target: concept:MCPServer
-review:
-  status: accepted
-  method: manual-mcp-spec-verification
-  reviewer: manual-mcp-spec-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 MCP 2025-11-25 规范（生命周期、传输、授权、能力协商、JSON-RPC 消息、资源订阅）完成人工语义核验。
-    en: Manually verified against MCP 2025-11-25 (lifecycle, transports, authorization, capability negotiation, JSON-RPC messages, resource subscriptions).
-    ja: MCP 2025-11-25 仕様（ライフサイクル、トランスポート、認可、能力協議、JSON-RPC メッセージ、リソース購読）に照らして手動意味審査を完了しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-mcp-session-lifecycle
+    title: MCP Base Protocol Lifecycle
+    publisher: Model Context Protocol
+    url: https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
+    version: checked 2026-07-19
+    accessed_on: 2026-07-19
+    source_type: official-spec
+    authority: A
+    status: fetched
+    why_it_matters: Defines initialize, notifications/initialized, operation, and shutdown.
+  - id: src-mcp-session-design
+    title: Moonweave MCPSession concept boundary design
+    publisher: Moonweave
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    version: checked 2026-07-19
+    accessed_on: 2026-07-19
+    source_type: design-inference
+    authority: B
+    status: fetched
+    why_it_matters: Engineering mcp_session_id separate from wire fields and negotiated-before-use constraint.
 source_claims:
-  - id: claim-mcp-session-001
-    source: eng-proto-mcp-2025-spec
-    supports: MCP 2025-11-25 requires initialization to be the first client-server interaction, exchanges distinct client and server capability declarations, negotiates one protocol version, enters operation only after notifications/initialized, and shuts down through the selected transport.
-    locator: MCP 2025-11-25 > Base Protocol > Lifecycle > Initialization, Capability Negotiation, Operation, and Shutdown
+  - id: claim-mcp-session-lifecycle
+    source: src-mcp-session-lifecycle
+    supports: MCP requires initialization and capability negotiation before ordinary operations and enters operation after notifications/initialized.
+    locator: Lifecycle > Initialization and Operation
+    evidence_kind: primary-spec
+    confidence: high
+  - id: claim-mcp-session-design
+    source: src-mcp-session-design
+    supports: Moonweave models MCPSession as stateful protocol context distinct from raw transport connections.
+    locator: MCPSession concept boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-mcp-session-002
-    source: eng-proto-mcp-spec
-    supports: The MCP architecture defines a stateful client-server connection whose initialization, negotiated capabilities, requests, and notifications belong to one protocol interaction. Moonweave adds mcp_session_id as a stable engineering identifier for that connection; the identifier field is a design inference, not an MCP wire field.
-    locator: Specification > Architecture, base protocol, and server features
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-mcp-session-003
-    source: eng-proto-mcp-spec
-    supports: MCP initialization requires the client and server to negotiate a protocol version before ordinary operations. The protocol_version field records the version accepted for this session and is directly grounded in that initialization contract.
-    locator: Specification > Architecture, base protocol, and server features
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-mcp-session-004
-    source: eng-proto-mcp-spec
-    supports: MCP defines an initialization phase before normal requests and requires both sides to respect connection closure and protocol errors. Moonweave summarizes those observable phases as initialized, active, closed, or failed session state; the four-value lifecycle is a design inference over the protocol state machine.
-    locator: Specification > Architecture, base protocol, and server features
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-mcp-session-005
-    source: eng-proto-mcp-2025-spec
-    supports: MCP requires initialization and capability negotiation before ordinary operations.
-    locator: MCP 2025-11-25 > Lifecycle > Initialization
-    evidence_kind: normative
-    confidence: high
-    review_status: accepted
-  - id: claim-mcp-session-006
-    source: eng-proto-mcp-2025-spec
-    supports: After initialized notification, ordinary feature requests and notifications may proceed.
-    locator: MCP 2025-11-25 > Lifecycle > Operation
-    evidence_kind: normative
-    confidence: high
-    review_status: accepted
-  - id: claim-mcp-session-007
-    source: eng-proto-mcp-2025-spec
-    supports: MCP connections end through transport-specific shutdown or failure handling.
-    locator: MCP 2025-11-25 > Lifecycle > Shutdown
-    evidence_kind: normative
-    confidence: high
-    review_status: accepted
-  - id: claim-mcp-session-008
-    source: eng-proto-mcp-2025-spec
-    supports: MCP lifecycle separates initialization, normal operation, and shutdown behavior.
-    locator: MCP 2025-11-25 > Base Protocol > Lifecycle
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-mcp-session-009
-    source: eng-proto-mcp-spec
-    supports: The MCP lifecycle requires initialization to negotiate protocol version and capabilities before either side begins ordinary protocol operations. This directly supports the negotiated-before-use integrity constraint.
-    locator: Specification > Architecture, base protocol, and server features
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-mcp-session-010
-    source: eng-proto-mcp-spec
-    supports: MCP uses a client-server architecture in which one client initiates the connection and initialization exchange. Moonweave requires each MCPSession record to identify exactly one client through the accepted has_participant fact.
-    locator: Specification > Architecture, base protocol, and server features
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-mcp-session-011
-    source: eng-proto-mcp-spec
-    supports: MCP defines the server as the counterparty that exposes negotiated features to a connected client. Moonweave therefore requires each MCPSession record to identify exactly one server participant.
-    locator: Specification > Architecture, base protocol, and server features
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
   - id: claim-mcp-session-012
-    source: eng-proto-mcp-2025-spec
-    supports: "MCP 2025-11-25 requires initialization to be the first client-server interaction, exchanges distinct client and server capability declarations, negotiates one protocol version, enters operation only after notifications/initialized, and shuts down through the selected transport. For this reviewed edge, the operational reading is: MCPSession has one MCPClient participant maintaining isolated protocol state for the specific server; a host may manage multiple clients, but the host itself and clients for other servers are not this session endpoint."
-    locator: MCP 2025-11-25 > Base Protocol > Lifecycle > Initialization, Capability Negotiation, Operation, and Shutdown
+    source: src-mcp-session-lifecycle
+    supports: MCPSession has one MCPClient participant maintaining isolated protocol state for the specific server.
+    locator: Lifecycle > Initialization
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-mcp-session-013
-    source: eng-proto-mcp-2025-spec
-    supports: "MCP 2025-11-25 requires initialization to be the first client-server interaction, exchanges distinct client and server capability declarations, negotiates one protocol version, enters operation only after notifications/initialized, and shuts down through the selected transport. For this reviewed edge, the operational reading is: MCPSession has one MCPServer participant returning the initialize result and providing server capabilities; an upstream API, OAuth authorization server, proxy, or another MCP service in the same process does not become this session participant through dependency."
-    locator: MCP 2025-11-25 > Base Protocol > Lifecycle > Initialization, Capability Negotiation, Operation, and Shutdown
+    source: src-mcp-session-lifecycle
+    supports: MCPSession has one MCPServer participant returning initialize result and server capabilities.
+    locator: Lifecycle > Initialization
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted

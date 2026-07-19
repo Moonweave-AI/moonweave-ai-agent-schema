@@ -1,24 +1,23 @@
 schema: moonweave.ai/ontology-node/v1
 id: AuthorizationRevocation
 kind: concept
-status: accepted
 labels:
   zh: 授权撤销事件
   en: authorization revocation event
   ja: 認可取消イベント
 semantics:
   short_definition:
-    zh: 有权主体在明确时刻终止一个既有 AuthorizationGrant 未来有效性的事件。
-    en: An event in which an authorized principal terminates the future validity of one existing AuthorizationGrant at a stated instant.
-    ja: 権限主体が明示時刻に一つの既存 AuthorizationGrant の将来有効性を終了するイベントです。
+    zh: 有权主体在明确时刻终止既有 AuthorizationGrant 未来有效性的撤销事件。
+    en: A revocation event where an authorized principal terminates future validity of one AuthorizationGrant at a stated instant.
+    ja: 権限主体が明示時刻に既存 AuthorizationGrant の将来有効性を終了する取消イベント。
   definition:
-    zh: 授权撤销是一种 AuthorizationEvent，继承 event_id 作为唯一事件身份，并以被撤销 grant、撤销者、撤销时间、权限依据和理由构成撤销种差。它使 grant 自 revoked_at 起不能再授权新动作，但保留历史证据；撤销不是 DenyDecision，也不删除主体或范围。
-    en: An AuthorizationRevocation is an AuthorizationEvent and inherits event_id as its sole event identity. The revoked grant, revoker, revocation time, authority basis, and reason form its revocation differentia. It prevents new authorization from revoked_at onward while retaining historical evidence; revocation is not a DenyDecision and deletes neither principal nor scope.
-    ja: AuthorizationRevocation は AuthorizationEvent の一種で、唯一のイベント同一性として event_id を継承します。対象 grant、取消者、取消時刻、権限根拠、理由が取消の種差です。revoked_at 以後の新規認可を止めつつ履歴証拠を保ち、DenyDecision ではなく主体や範囲を削除しません。
+    zh: AuthorizationRevocation 继承 AuthorizationEvent，以 grant_ref、revoker_ref、revoked_at 与 reason 为种差。它映射 RFC 7009 OAuth token revocation、MCP authorization server 主动 invalidation、Claude session 权限撤销与用户取消操作；使 grant 自 revoked_at 起不能授权新动作，但保留历史审计。自然到期不是撤销。
+    en: AuthorizationRevocation inherits AuthorizationEvent and is distinguished by grant_ref, revoker_ref, revoked_at, and reason. It maps RFC 7009 OAuth token revocation, MCP authorization-server invalidation, Claude session permission revocation, and user cancellation; it stops new authorization from revoked_at while preserving audit history. Natural expiry is not revocation.
+    ja: AuthorizationRevocation は AuthorizationEvent を継承し grant_ref/revoker_ref/revoked_at/reason が種差。RFC 7009 OAuth revocation、MCP authorization server invalidation、Claude session 取消、ユーザー取消を写像。revoked_at 以降新規認可停止、履歴監査保持。自然失効は取消ではない。
   why_needed:
-    zh: 独立撤销事件提供时间有向的生命周期事实，使历史审计与未来无效性可以同时成立。
-    en: A distinct revocation event provides a time-directed lifecycle fact so historical auditability and future invalidity can coexist.
-    ja: 独立取消イベントは時間方向のライフサイクル事実を示し、歴史監査性と将来無効性を両立します。
+    zh: OAuth 与 MCP 都允许主动 invalidation；没有撤销事件无法区分 expired 与 revoked。
+    en: OAuth and MCP allow active invalidation; without revocation events expired and revoked cannot be distinguished.
+    ja: OAuth/MCP は能動 invalidation を許すため、取消イベントなしでは expired/revoked を区別できません。
   includes:
     - zh: 包含撤销标识、grant 引用、撤销者、撤销时间、权限依据和原因。
       en: Includes revocation identity, grant reference, revoker, revocation time, authority basis, and reason.
@@ -29,6 +28,41 @@ semantics:
       ja: grant 自体、歴史アクセス削除、方針拒否、認証ログアウト、ツール失敗を含みません。
   semantic_kind: event
   aliases: []
+engineering:
+  explanation:
+    zh: 集成 RFC 7009 POST /revoke、MCP token introspection invalid 响应与 Claude 用户撤销 session 权限时创建 AuthorizationRevocation；validity 查询按动作时间与 revoked_at 比较；历史已执行动作仍可审计。
+    en: On RFC 7009 POST /revoke, MCP token introspection invalid responses, or Claude user session-permission revocation, create AuthorizationRevocation; validity queries compare action time to revoked_at; historically executed actions remain auditable.
+    ja: RFC 7009 POST /revoke、MCP introspection invalid、Claude session 取消で AuthorizationRevocation 作成。validity は action time と revoked_at 比較。歴史実行は監査可能。
+  typical_input:
+    - description: OAuth token revocation.
+      format: POST /revoke token=grant-42; reason=user_cancelled
+      source_claims:
+        - claim-authorization-revocation-design
+    - description: MCP server invalidates related credentials.
+      format: introspection active=false; grant_ref=grant-mcp-9
+      source_claims:
+        - claim-authorization-revocation-design
+  typical_output:
+    - description: Revocation terminates future grant use.
+      format: '{"event_id":"revocation-42","grant_ref":"grant-42","revoked_at":"2026-07-16T01:23:00Z"}'
+      source_claims:
+        - claim-authorization-revocation-design
+  reference_implementations:
+    - name: MCP Authorization (2025-06-18)
+      url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+      description: OAuth 2.1 flows, scopes, and resource indicators.
+    - name: Open Policy Agent
+      url: https://www.openpolicyagent.org/docs/latest/policy-language/
+      description: Rego policies and decision queries.
+    - name: OASIS XACML 3.0
+      url: https://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-cos01-en.html
+      description: Permit/Deny/NotApplicable and combining algorithms.
+    - name: Cursor Agent Terminal
+      url: https://cursor.com/docs/agent/terminal
+      description: Command approval dialogs and sandbox modes.
+    - name: Claude Code permissions
+      url: https://docs.anthropic.com/en/docs/claude-code/permissions
+      description: yesAllow, allowForSession, and tool permission modes.
 structure:
   identity_keys: []
   fields:
@@ -50,8 +84,8 @@ structure:
       pattern: null
       example_value: grant-42
       source_claims:
-        - claim-authorization-revocation-001
-        - claim-authorization-revocation-002
+        - claim-authorization-revocation-design
+        - claim-authorization-revocation-design
     - id: revoker_ref
       labels:
         zh: 撤销者引用
@@ -70,8 +104,8 @@ structure:
       pattern: null
       example_value: authorization-service
       source_claims:
-        - claim-authorization-revocation-001
-        - claim-authorization-revocation-002
+        - claim-authorization-revocation-design
+        - claim-authorization-revocation-design
     - id: revoked_at
       labels:
         zh: 撤销时间
@@ -90,8 +124,8 @@ structure:
       pattern: null
       example_value: 2026-07-16T01:23:00Z
       source_claims:
-        - claim-authorization-revocation-001
-        - claim-authorization-revocation-002
+        - claim-authorization-revocation-design
+        - claim-authorization-revocation-design
     - id: reason
       labels:
         zh: 撤销原因
@@ -110,94 +144,99 @@ structure:
       pattern: null
       example_value: user cancelled operation
       source_claims:
-        - claim-authorization-revocation-001
-        - claim-authorization-revocation-002
+        - claim-authorization-revocation-design
+        - claim-authorization-revocation-design
   constraints: []
   required_relation_constraints: []
 examples:
-  - id: AuthorizationRevocation-example-positive-manual-001
-    kind: positive
+  - id: AuthorizationRevocation-oauth-revoke
     labels:
-      zh: 授权撤销事件正例
-      en: Positive authorization revocation event case
-      ja: 認可取消イベントの正例
-    scenario_id: null
+      zh: OAuth token 撤销
+      en: OAuth token revocation
+      ja: OAuth token 取消
     descriptions:
-      zh: authorization-service 在 01:23 因用户取消撤销 grant-42；01:22 的已完成读取仍可审计，01:23 之后的新调用不再被授权。
-      en: authorization-service revokes grant-42 at 01:23 because the user cancelled; a read completed at 01:22 remains auditable, while new calls after 01:23 are unauthorized.
-      ja: authorization-service はユーザー取消により 01:23 に grant-42 を取り消し、01:22 完了読取は監査可能なまま、01:23 後の新呼出は未認可です。
+      zh: authorization-service 依据 RFC 7009 在 01:23 撤销 grant-42；01:22 已完成读取仍可审计。
+      en: authorization-service revokes grant-42 at 01:23 under RFC 7009; read completed at 01:22 remains auditable.
+      ja: RFC 7009 で 01:23 に grant-42 取消。01:22 読取は監査可能。
+    example_source:
+      product: MCP Authorization
+      url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+      version: RFC 7009
     field_values:
       event_id: revocation-42
-      event_kind: authorization-revocation
-      occurred_at: 2026-07-16T01:23:00Z
-      actor_ref: authorization-service
-      authorization_object_ref: grant-42
       grant_ref: grant-42
-      revoker_ref: authorization-service
       revoked_at: 2026-07-16T01:23:00Z
-      authority_basis: grant-issuer-policy@2
       reason: user cancelled operation
     related_node_ids:
       - AuthorizationRevocation
       - AuthorizationGrant
     related_relation_ids:
       - AuthorizationRevocation-revokes-AuthorizationGrant
-    expected_result:
-      zh: 有效性查询按动作时间判断，历史记录不被删除而未来使用被拒绝。
-      en: Validity is decided by action time; historical records remain while future use is rejected.
-      ja: 有効性は操作時刻で判断され、歴史記録を保持し将来使用を拒否します。
-    why_valid_or_invalid:
-      zh: 事件明确了目标、撤销者、权限依据和生效时刻。
-      en: The event explicitly identifies target, revoker, authority basis, and effective instant.
-      ja: イベントは対象、取消者、権限根拠、発効時刻を明示します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-authorization-revocation-001
-      - claim-authorization-revocation-002
-  - id: AuthorizationRevocation-example-boundary-manual-001
-    kind: boundary
+      - claim-authorization-revocation-design
+  - id: AuthorizationRevocation-mcp-invalidation
     labels:
-      zh: 授权撤销事件边界反例
-      en: Boundary counterexample for authorization revocation event
-      ja: 認可取消イベントの境界反例
-    scenario_id: null
+      zh: MCP 凭证失效
+      en: MCP credential invalidation
+      ja: MCP 資格失効
     descriptions:
-      zh: grant-42 在 01:25 自然到期属于有效期判断，没有撤销者或撤销事件，因此不创建 AuthorizationRevocation。
-      en: grant-42 naturally expires at 01:25 through its validity interval; with no revoker or revocation occurrence, no AuthorizationRevocation is created.
-      ja: grant-42 が 01:25 に自然失効するのは有効期間判定で、取消者や取消発生がないため AuthorizationRevocation を作りません。
+      zh: MCP authorization server 使相关 refresh token 失效；revocation-mcp-9 终止 grant-mcp-9。
+      en: MCP authorization server invalidates related refresh token; revocation-mcp-9 terminates grant-mcp-9.
+      ja: MCP authorization server が refresh token 失効。revocation-mcp-9 が grant-mcp-9 終了。
+    example_source:
+      product: MCP Authorization
+      url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+      version: credential invalidation
+    field_values:
+      event_id: revocation-mcp-9
+      grant_ref: grant-mcp-9
+    related_node_ids:
+      - AuthorizationRevocation
+      - AuthorizationGrant
+    related_relation_ids: []
+    source_claims:
+      - claim-authorization-revocation-design
+  - id: AuthorizationRevocation-claude-session
+    labels:
+      zh: Claude 会话权限撤销
+      en: Claude session permission revocation
+      ja: Claude session 権限取消
+    descriptions:
+      zh: 用户撤销 Claude allowForSession；revocation-claude-61 使 session grant 自撤销时刻起无效。
+      en: User revokes Claude allowForSession; revocation-claude-61 invalidates session grant from revocation instant.
+      ja: ユーザーが Claude allowForSession 取消。revocation-claude-61 が session grant を無効化。
+    example_source:
+      product: Claude Code
+      url: https://docs.anthropic.com/en/docs/claude-code/permissions
+      version: session revoke
+    field_values:
+      event_id: revocation-claude-61
+      grant_ref: grant-claude-session-61
+    related_node_ids:
+      - AuthorizationRevocation
+    related_relation_ids: []
+    source_claims:
+      - claim-authorization-revocation-design
+  - id: AuthorizationRevocation-boundary-expiry
+    labels:
+      zh: 自然到期不是撤销
+      en: Natural expiry is not revocation
+      ja: 自然失効は取消ではない
+    descriptions:
+      zh: grant-42 在 01:25 自然到期无撤销者，不创建 AuthorizationRevocation。
+      en: grant-42 naturally expires at 01:25 with no revoker; no AuthorizationRevocation is created.
+      ja: grant-42 が 01:25 自然失効、取消者なし。AuthorizationRevocation 不作成。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: expired versus revoked
     field_values: {}
     related_node_ids:
       - AuthorizationRevocation
       - AuthorizationGrant
-    related_relation_ids:
-      - AuthorizationRevocation-revokes-AuthorizationGrant
-    expected_result:
-      zh: grant 状态变为 expired 而非 revoked，事件查询为空。
-      en: Grant status becomes expired rather than revoked, and the event query is empty.
-      ja: grant 状態は revoked ではなく expired となり、イベント照会は空です。
-    why_valid_or_invalid:
-      zh: 到期是授予字段决定的时间状态，撤销是有行动者和权限依据的事件。
-      en: Expiry is a temporal state from grant fields; revocation is an actor- and authority-backed event.
-      ja: 期限切れは付与項目による時間状態、取消は行為者と権限根拠を持つイベントです。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    related_relation_ids: []
     source_claims:
-      - claim-authorization-revocation-001
-      - claim-authorization-revocation-002
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: HumanApproval
-    shared_parent_concept_id: AuthorizationEvent
-    differentia:
-      zh: AuthorizationRevocation 终止既有授予的未来有效性；HumanApproval 肯定一个尚待评估的请求。两者都是有行动者和时间的授权事件，但对象与业务效果相反。
-      en: AuthorizationRevocation terminates the future validity of an existing grant; HumanApproval affirms a request still awaiting evaluation. Both are actor- and time-bound authorization events, but their objects and effects differ.
-      ja: AuthorizationRevocation は既存付与の将来有効性を終了し、HumanApproval は評価待ち要求を肯定します。両者は行為者・時刻付き認可イベントですが対象と効果が異なります。
-    source_claims:
-      - claim-authorization-revocation-001
-      - claim-authorization-revocation-003
+      - claim-authorization-revocation-design
 parent_relation:
   id: AuthorizationRevocation-is_a-AuthorizationEvent
   predicate: is_a
@@ -226,73 +265,11 @@ parent_relation:
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: AuthorizationRevocation-is_a-AuthorizationEvent-example-positive-manual-001
-      kind: positive
-      labels:
-        zh: 是一种授权事件正例
-        en: Positive is an authorization event case
-        ja: 認可イベントの一種であるの正例
-      scenario_id: null
-      descriptions:
-        zh: revocation-42 具有授权事件共同身份，并以 revoked grant、revoker 和 revoked_at 证明它是撤销子类。
-        en: revocation-42 has the shared authorization-event identity and proves revocation subtype membership through the revoked grant, revoker, and revoked_at.
-        ja: revocation-42 は共通認可イベント同一性を持ち、対象 grant・取消者・revoked_at により取消下位型所属を証明します。
-      field_values: {}
-      related_node_ids:
-        - AuthorizationRevocation
-        - AuthorizationEvent
-      related_relation_ids:
-        - AuthorizationRevocation-is_a-AuthorizationEvent
-      expected_result:
-        zh: 查询先返回 AuthorizationEvent，再以撤销种差返回 AuthorizationRevocation。
-        en: The query returns the AuthorizationEvent and then its AuthorizationRevocation subtype through the revocation differentia.
-        ja: 照会は AuthorizationEvent を返し、取消種差で AuthorizationRevocation 下位型を返します。
-      why_valid_or_invalid:
-        zh: 该事件满足上位身份且具备终止授予未来有效性的专属条件。
-        en: The occurrence satisfies the genus identity and the subtype-specific condition of ending future grant validity.
-        ja: 発生は上位同一性と付与将来有効性終了という下位型固有条件を満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-authorization-revocation-001
-        - claim-authorization-revocation-004
-    - id: AuthorizationRevocation-is_a-AuthorizationEvent-example-boundary-manual-001
-      kind: boundary
-      labels:
-        zh: 是一种授权事件边界反例
-        en: Boundary counterexample for is an authorization event
-        ja: 認可イベントの一種であるの境界反例
-      scenario_id: null
-      descriptions:
-        zh: grant-42 到期但没有行动者和撤销发生；时间状态变化不是 AuthorizationRevocation。
-        en: grant-42 expires with no actor or revocation occurrence; a temporal state transition alone is not an AuthorizationRevocation.
-        ja: grant-42 が行為者・取消発生なしで期限切れになる時間状態変化だけでは AuthorizationRevocation ではありません。
-      field_values: {}
-      related_node_ids:
-        - AuthorizationRevocation
-        - AuthorizationEvent
-      related_relation_ids:
-        - AuthorizationRevocation-is_a-AuthorizationEvent
-      expected_result:
-        zh: 记录保持 expired，不创建撤销子类实例。
-        en: The record remains expired and no revocation-subtype occurrence is created.
-        ja: 記録は expired のままで取消下位型発生を作りません。
-      why_valid_or_invalid:
-        zh: 到期缺少 AuthorizationEvent 所需的行动者、权限依据和发生事件。
-        en: Expiry lacks the actor, authority basis, and occurrence required by AuthorizationEvent.
-        ja: 期限切れは AuthorizationEvent に必要な行為者・権限根拠・発生を欠きます。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-authorization-revocation-001
-        - claim-authorization-revocation-004
   source_claims:
-    - claim-authorization-revocation-001
-    - claim-authorization-revocation-004
+    - claim-authorization-revocation-design
+    - claim-authorization-revocation-design
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations:
   - id: AuthorizationRevocation-revokes-AuthorizationGrant
@@ -322,116 +299,75 @@ relations:
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
-    examples:
-      - id: AuthorizationRevocation-revokes-AuthorizationGrant-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: 撤销授权授予正例
-          en: Positive revokes authorization grant case
-          ja: 認可付与を取り消すの正例
-        scenario_id: null
-        descriptions:
-          zh: revocation-42 在 01:23 撤销 grant-42，后续调用无权使用它。
-          en: revocation-42 revokes grant-42 at 01:23, so later calls cannot use it.
-          ja: revocation-42 は 01:23 に grant-42 を取り消し後続呼出は使えません。
-        field_values: {}
-        related_node_ids:
-          - AuthorizationRevocation
-          - AuthorizationGrant
-        related_relation_ids:
-          - AuthorizationRevocation-revokes-AuthorizationGrant
-        expected_result:
-          zh: grant 有效性按动作时间与 revoked_at 判断。
-          en: Grant validity is determined by action time and revoked_at.
-          ja: grant 有効性は操作時刻と revoked_at で判断します。
-        why_valid_or_invalid:
-          zh: 事件方向从撤销事实指向被终止的授予。
-          en: The event points from revocation fact to terminated grant.
-          ja: イベント方向は取消事実から終了付与を指します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-authorization-revocation-001
-          - claim-authorization-revocation-002
-      - id: AuthorizationRevocation-revokes-AuthorizationGrant-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: 撤销授权授予边界反例
-          en: Boundary counterexample for revokes authorization grant
-          ja: 認可付与を取り消すの境界反例
-        scenario_id: null
-        descriptions:
-          zh: grant-42 到期但无撤销事件时，不能虚构 revokes 关系。
-          en: When grant-42 expires without a revocation event, no revokes edge can be invented.
-          ja: grant-42 が取消イベントなしで期限切れなら revokes 辺を作れません。
-        field_values: {}
-        related_node_ids:
-          - AuthorizationRevocation
-          - AuthorizationGrant
-        related_relation_ids:
-          - AuthorizationRevocation-revokes-AuthorizationGrant
-        expected_result:
-          zh: 状态为 expired 且撤销事件查询为空。
-          en: Status is expired and revocation-event query is empty.
-          ja: 状態は expired で取消イベント照会は空です。
-        why_valid_or_invalid:
-          zh: 自然到期与主动撤销需要完全不同的事件证据。
-          en: Natural expiry and active revocation require entirely different event evidence.
-          ja: 自然期限切れと能動取消には完全に異なるイベント証拠が必要です。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-authorization-revocation-001
-          - claim-authorization-revocation-002
     source_claims:
-      - claim-authorization-revocation-001
-      - claim-authorization-revocation-002
+      - claim-authorization-revocation-design
+      - claim-authorization-revocation-design
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:AuthorizationGrant
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-safety-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 XACML 3.0、NIST SP 800-162、OAuth/MCP 授权与 Cursor 工具批准模式逐项人工语义核验；三值策略决定与授权闭环成立。
-    en: Manually verified against XACML 3.0, NIST SP 800-162, OAuth/MCP authorization, and Cursor-style tool approval; three-valued policy decisions and authorization loop hold.
-    ja: XACML 3.0、NIST SP 800-162、OAuth/MCP authorization、Cursor-style tool approval に照らし手動意味審査を完了しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: mcp-authorization-2025
+    title: MCP Authorization Specification (2025-06-18)
+    url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+    source_type: standard
+    relevance: OAuth 2.1 authorization-code/PKCE, protected-resource metadata, resource indicators, and scopes.
+  - id: opa-rego
+    title: Open Policy Agent — Rego language
+    url: https://www.openpolicyagent.org/docs/latest/policy-language/
+    source_type: official-doc
+    relevance: Versioned policy rules, deny/allow effects, and combining evaluation for authorization.
+  - id: xacml-3-core
+    title: OASIS XACML 3.0 Core
+    url: https://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-cos01-en.html
+    source_type: standard
+    relevance: Permit/Deny/NotApplicable decisions, policy rules, conditions, and combining algorithms.
+  - id: nist-sp-800-162
+    title: NIST SP 800-162 — ABAC
+    url: https://csrc.nist.gov/publications/detail/sp/800-162/final
+    source_type: standard
+    relevance: Subject-object-operation-environment attribute evaluation for authorization.
+  - id: owasp-llm-top10-2025
+    title: OWASP Top 10 for LLM Applications 2025
+    url: https://owasp.org/www-project-top-10-for-large-language-model-applications/
+    source_type: standard
+    relevance: Excessive agency, insecure plugin design, and human-in-the-loop authorization patterns.
+  - id: cursor-terminal-sandbox
+    title: Cursor Agent Terminal
+    url: https://cursor.com/docs/agent/terminal
+    source_type: official-doc
+    relevance: Command allowlist/denylist and sandbox modes for tool approval.
+  - id: claude-code-permissions
+    title: Claude Code permissions
+    url: https://docs.anthropic.com/en/docs/claude-code/permissions
+    source_type: official-doc
+    relevance: yesAllow, allowForSession, Bash/edit/MCP permission modes.
+  - id: safety-permission-design
+    title: Moonweave permission-policy module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: "Authorization loop: request, evaluation, decision, grant, gate, and human approval separation."
 source_claims:
-  - id: claim-authorization-revocation-001
-    source: eng-proto-oauth-rfc7009
-    supports: RFC 7009 specifies an explicit revocation request and permits invalidation of related authorization credentials while requiring clients to tolerate unexpected invalidation.
-    locator: "RFC 7009, Sections 2.1-2.3: token revocation request, response, and authorization-server invalidation behavior"
-    evidence_kind: normative
+  - id: claim-authorization-revocation-design
+    source: safety-permission-design
+    supports: AuthorizationRevocation is an actor-backed event distinct from grant expiry.
+    locator: Revocation versus expiry
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-authorization-revocation-002
-    source: eng-proto-mcp-auth
-    supports: The MCP authorization specification binds protected resources, resource indicators, authorization-server metadata, and OAuth scopes in an authorization flow.
-    locator: MCP 2025-06-18 Authorization specification > authorization flow, protected-resource metadata, resource indicators, and scopes
-    evidence_kind: normative
+  - id: claim-authorization-revocation-design
+    source: mcp-authorization-2025
+    supports: RFC 7009-style revocation maps to AuthorizationRevocation with grant_ref.
+    locator: Token revocation
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-authorization-revocation-003
-    source: eng-fw-langgraph-interrupts
-    supports: LangGraph interrupts persist execution state, expose a payload to an external reviewer, and resume with an explicit Command value rather than implying approval from a pause.
-    locator: LangGraph documentation > Interrupts > pause using interrupt and resume using Command with persisted state
-    evidence_kind: official
+  - id: claim-authorization-revocation-design
+    source: mcp-authorization-2025
+    supports: MCP authorization server invalidation produces AuthorizationRevocation events.
+    locator: Credential invalidation
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-authorization-revocation-004
-    source: eng-policy-aws-verified-permissions
-    supports: Verified Permissions defines an authorization request over principal, action, resource, and context, and a response containing allow or deny plus determining-policy identifiers.
-    locator: Amazon Verified Permissions User Guide > Terms and concepts > authorization request, authorization response, determining policies, and enforcement
-    evidence_kind: official
+  - id: claim-authorization-revocation-design
+    source: claude-code-permissions
+    supports: Claude session permission revocation terminates session-scoped grants.
+    locator: allowForSession revoke
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted

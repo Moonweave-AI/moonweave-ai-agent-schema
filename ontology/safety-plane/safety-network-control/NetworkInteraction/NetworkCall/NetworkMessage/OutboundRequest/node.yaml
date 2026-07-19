@@ -1,296 +1,277 @@
 schema: moonweave.ai/ontology-node/v1
 id: OutboundRequest
 kind: concept
-status: accepted
 labels:
   zh: 出站请求
   en: outbound request
-  ja: outbound request
+  ja: 送信要求
 semantics:
   short_definition:
-    zh: 由受控主体面向网络目标构造并准备发送的请求消息。
-    en: A request message constructed by a controlled subject for transmission to a network target.
-    ja: controlled subject が network target へ送信するため構成した request message。
+    zh: 一次 egress HTTP/协议调用的出站请求消息，含审计日志身份。
+    en: An outbound request message for one egress HTTP or protocol call with audit-log identity.
+    ja: 一回 egress HTTP/protocol call の outbound request message（audit log identity 付き）。
   definition:
-    zh: 出站请求是一种 NetworkMessage，其种差是由受控主体构造、以目标 URI 或 authority、方法或操作、凭据范围和载荷引用表达意图，并可发起 NetworkCall。它可以在调用前存在，因此不证明连接已经建立，也不是授权请求或路由记录。
-    en: An OutboundRequest is a NetworkMessage distinguished by construction by a controlled subject and by target URI or authority, method or operation, credential scope, and payload reference; it may initiate a NetworkCall. It can exist before a call, so it does not prove a connection was established and is not an authorization request or route record.
-    ja: OutboundRequest は controlled subject が構成し target URI/authority・method/operation・credential scope・payload reference で intent を表して NetworkCall を initiate できる NetworkMessage です。call 前にも存在でき connection establishment を証明せず authorization request/route record ではありません。
+    zh: OutboundRequest 是 NetworkMessage 的出站特化，拥有 request_id、method、authority、path、header digest、发起时间与 audit logging 引用。它映射 Agent 或 MCP server tools/call 触发的 egress HTTP call；通过 initiates 启动 NetworkCall。302 到新 authority 必须产生新 request_id，不得继承原 allow。
+    en: "OutboundRequest is the outbound specialization of NetworkMessage with request_id, method, authority, path, header digest, initiation time, and audit logging reference. It maps egress HTTP calls triggered by agent or MCP server tools/call; it initiates NetworkCall via initiates. A 302 to a new authority must produce a new request_id without inheriting the original allow."
+    ja: OutboundRequest は NetworkMessage の outbound 特化で request_id/method/authority/path/header digest/開始時刻/audit logging reference を持つ。Agent/MCP server tools/call 由来 egress HTTP call を写像。initiates で NetworkCall 開始。新 authority へ 302 は新 request_id 必須、原 allow 継承不可。
   why_needed:
-    zh: 将调用意图和协议载荷从发生事件中分离，使未发送、被策略拒绝和已发送请求都能保持同一消息身份。
-    en: Separating call intent and protocol payload from the occurrence event preserves one message identity across unsent, policy-denied, and transmitted states.
-    ja: call intent/protocol payload を occurrence event から分け unsent・policy-denied・transmitted state を通じ同一 message identity を保ちます。
+    zh: 出站请求身份与响应分离后，才能在并发 egress 审计中唯一关联 InboundResponse，并记录每次 allowlisted 调用的完整 audit trail。
+    en: Separating outbound request identity from responses uniquely correlates InboundResponse under concurrent egress audit and records a full audit trail for each allowlisted call.
+    ja: outbound request identity/response 分離後、並行 egress audit で InboundResponse を一意 correlate し各 allowlisted call の full audit trail 記録可。
   includes:
-    - zh: HTTP 请求、SOCKS relay 请求和面向远程 API 的协议请求信封。
-      en: HTTP requests, SOCKS relay requests, and protocol request envelopes targeting remote APIs.
-      ja: HTTP request・SOCKS relay request・remote API 向け protocol request envelope。
+    - zh: 含 request_id、HTTP method、target authority、audit log ref 与 NetworkCall initiates 边。
+      en: Includes request_id, HTTP method, target authority, audit log ref, and NetworkCall initiates edge.
+      ja: request_id/HTTP method/target authority/audit log ref/NetworkCall initiates edge を含む。
   excludes:
-    - zh: 安全域的 AuthorizationRequest、实际 NetworkCall、代理路由和远程响应。
-      en: Safety-domain AuthorizationRequest, actual NetworkCall occurrence, proxy route, and remote response.
-      ja: safety-domain AuthorizationRequest・actual NetworkCall・proxy route・remote response。
+    - zh: 不包含 InboundResponse body、SideEffect、ToolResult 或 NetworkPolicy 规范全文。
+      en: Excludes InboundResponse body, SideEffect, ToolResult, or full NetworkPolicy specification text.
+      ja: InboundResponse body/SideEffect/ToolResult/NetworkPolicy spec 全文は含まない。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: 集成：MCP tools/call fetch npm registry → OutboundRequest out-req-mcp-7 GET registry.npmjs.org；audit log 记录 request_id、timestamp、actor_ref、governed_by policy ref。redirect 必须新 OutboundRequest/NetworkCall/policy 链。
+    en: "Integration: MCP tools/call fetch npm registry → OutboundRequest out-req-mcp-7 GET registry.npmjs.org; audit log records request_id, timestamp, actor_ref, governed_by policy ref. Redirect requires new OutboundRequest, NetworkCall, and policy chain."
+    ja: 統合：MCP tools/call npm registry fetch → OutboundRequest out-req-mcp-7 GET registry.npmjs.org。audit log が request_id/timestamp/actor_ref/governed_by policy ref 記録。redirect は新 OutboundRequest/NetworkCall/policy chain 必須。
+  typical_input:
+    - description: Egress HTTP call with audit logging.
+      format: |
+        request_id: out-req-884
+        method: GET
+        authority: api.example.com
+        audit_log_ref: audit-egress-884
+      source_claims:
+        - claim-outbound-request-design
+  typical_output:
+    - description: Initiated NetworkCall reference.
+      format: |
+        network_call_id: net-call-884
+        call_status: completed
+      source_claims:
+        - claim-outbound-request-design
+  reference_implementations:
+    - name: MCP Specification — Tools
+      url: https://spec.modelcontextprotocol.io/specification/2025-06-18/server/tools/
+      description: tools/call triggering outbound HTTP from MCP servers.
+    - name: RFC 9110 HTTP Semantics
+      url: https://www.rfc-editor.org/rfc/rfc9110.html
+      description: HTTP request message fields and redirect semantics.
 structure:
   identity_keys:
-    - method_or_operation
-    - target_uri_or_authority
+    - request_id
   fields:
-    - id: method_or_operation
+    - id: request_id
       labels:
-        zh: 方法或操作
-        en: method or operation
-        ja: method or operation
+        zh: 出站请求标识
+        en: outbound request ID
+        ja: 送信要求 ID
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
       definitions:
-        zh: 记录请求要求对目标执行的协议动作。
-        en: Records the protocol action requested of the target.
-        ja: target に要求する protocol action。
+        zh: 一次 OutboundRequest 的唯一 ID；redirect 目标必须新 request_id。
+        en: Unique ID of one OutboundRequest; redirect targets must use a new request_id.
+        ja: 一回 OutboundRequest の一意 ID。redirect 先は新 request_id 必須。
       allowed_values: []
       pattern: null
-      example_value: POST
+      example_value: out-req-884
       source_claims:
-        - claim-outbound-request-001
-        - claim-outbound-request-002
-    - id: target_uri_or_authority
+        - claim-outbound-request-design
+    - id: method
       labels:
-        zh: 目标 URI 或 authority
-        en: target URI or authority
-        ja: target URI or authority
+        zh: HTTP 方法
+        en: HTTP method
+        ja: HTTP method
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
       definitions:
-        zh: 记录调用方声明的原始目标，保留重定向或解析前值。
-        en: Records the caller-declared original target before redirect or resolution.
-        ja: redirect/resolution 前の caller-declared original target。
+        zh: GET、POST、PUT 等 HTTP 方法。
+        en: HTTP method such as GET, POST, or PUT.
+        ja: GET/POST/PUT 等 HTTP method。
       allowed_values: []
       pattern: null
-      example_value: https://api.example.com/v1/jobs
+      example_value: GET
       source_claims:
-        - claim-outbound-request-001
-        - claim-outbound-request-002
-    - id: credential_scope_ref
+        - claim-outbound-request-rfc9110
+    - id: authority
       labels:
-        zh: 凭据范围引用
-        en: credential-scope reference
-        ja: credential-scope reference
+        zh: 目标权威
+        en: target authority
+        ja: target authority
       datatype: string
-      required: false
+      required: true
       cardinality:
-        min: 0
+        min: 1
         max: 1
       definitions:
-        zh: 引用请求允许携带的凭据范围，不复制秘密值。
-        en: References the credential scope permitted for the request without copying secret values.
-        ja: secret value をコピーせず request に許可された credential scope を参照します。
+        zh: HTTP authority 或 host，用于 allowlist 匹配。
+        en: HTTP authority or host for allowlist matching.
+        ja: allowlist match 用 HTTP authority/host。
       allowed_values: []
       pattern: null
-      example_value: cred-scope-api-read
+      example_value: api.example.com
       source_claims:
-        - claim-outbound-request-003
-        - claim-outbound-request-001
-    - id: payload_reference
+        - claim-outbound-request-design
+    - id: audit_log_ref
       labels:
-        zh: 载荷引用
-        en: payload reference
-        ja: payload reference
-      datatype: string
-      required: false
+        zh: 审计日志引用
+        en: audit log reference
+        ja: 監査 log 参照
+      datatype: reference
+      required: true
       cardinality:
-        min: 0
+        min: 1
         max: 1
       definitions:
-        zh: 引用待传输正文或参数工件。
-        en: References the body or argument artifact to be transmitted.
-        ja: transmit する body/argument artifact を参照します。
+        zh: 引用该出站请求在 egress audit log 中的稳定条目。
+        en: References the stable egress audit log entry for this outbound request.
+        ja: 本 outbound request の egress audit log 安定 entry を参照。
       allowed_values: []
       pattern: null
-      example_value: artifact-payload-884
+      example_value: audit-egress-884
       source_claims:
-        - claim-outbound-request-001
-  constraints: []
+        - claim-outbound-request-design
+  constraints:
+    - id: network-redirect-new-request
+      severity: error
+      expression_language: plain
+      expression: When final authority differs after redirect, a new OutboundRequest with new request_id and policy chain is required
+      explanations:
+        zh: 重定向到新 authority 必须新 request_id 与策略链。
+        en: Redirect to new authority requires new request_id and policy chain.
+        ja: 新 authority へ redirect は新 request_id/policy chain 必須。
+      source_claims:
+        - claim-outbound-request-design
   required_relation_constraints: []
 examples:
-  - id: OutboundRequest-example-positive-manual-20260716
-    kind: positive
+  - id: OutboundRequest-mcp-registry
     labels:
-      zh: 准备发送的 API 请求
-      en: Prepared API request
-      ja: prepared API request
-    scenario_id: null
+      zh: MCP registry 出站请求
+      en: MCP registry outbound request
+      ja: MCP registry outbound request
     descriptions:
-      zh: out-req-884 保存 POST、原始目标 https://api.example.com/v1/jobs、read-write 凭据范围和载荷引用，随后通过 initiates 关联 net-call-884。
-      en: out-req-884 stores POST, original target https://api.example.com/v1/jobs, a read-write credential scope, and a payload reference, then initiates net-call-884.
-      ja: out-req-884 は POST・original target・read-write credential scope・payload reference を保持し net-call-884 を initiate します。
+      zh: HTTP MCP server tools/call 触发 GET registry.npmjs.org；out-req-mcp-7 写入 egress audit log，governed_by egress-mcp-tools@4。
+      en: HTTP MCP server tools/call triggers GET registry.npmjs.org; out-req-mcp-7 written to egress audit log, governed_by egress-mcp-tools@4.
+      ja: HTTP MCP server tools/call が GET registry.npmjs.org trigger。out-req-mcp-7 egress audit log 記録、governed_by egress-mcp-tools@4。
+    example_source:
+      product: MCP
+      url: https://spec.modelcontextprotocol.io/specification/2025-06-18/server/tools/
+      version: tools/call egress
     field_values:
-      message_id: out-req-884
-      occurred_at: 2026-07-16T02:31:04Z
-      protocol: https
-      method_or_operation: POST
-      target_uri_or_authority: https://api.example.com/v1/jobs
-      credential_scope_ref: cred-scope-api-write
-      payload_reference: artifact-payload-884
+      request_id: out-req-mcp-7
+      method: GET
+      authority: registry.npmjs.org
     related_node_ids:
       - OutboundRequest
-      - NetworkMessage
       - NetworkCall
+      - NetworkPolicy
     related_relation_ids:
-      - OutboundRequest-is_a-NetworkMessage
       - OutboundRequest-initiates-NetworkCall
-    expected_result:
-      zh: 保留一份请求消息并连接到其发起的调用事件。
-      en: Retain one request message and connect it to the call occurrence it initiates.
-      ja: 一 request message を保持し initiate する call occurrence へ接続します。
-    why_valid_or_invalid:
-      zh: 消息意图字段完整，调用发生由另一关系和事件提供。
-      en: Message-intent fields are complete while a separate relation and event supply occurrence evidence.
-      ja: message intent field は完全で occurrence evidence は別 relation/event が提供します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-outbound-request-001
-      - claim-outbound-request-003
-  - id: OutboundRequest-example-boundary-manual-20260716
-    kind: boundary
+      - claim-outbound-request-mcp
+  - id: OutboundRequest-proxy-egress
     labels:
-      zh: 权限审批请求
-      en: Permission approval request
-      ja: permission approval request
-    scenario_id: network-review-outboundrequest-boundary
+      zh: 经代理的出站请求
+      en: Outbound request via proxy
+      ja: proxy 経由 outbound request
     descriptions:
-      zh: 记录询问用户是否允许工具访问外部 API，包含主体、资源、操作和审批上下文，但没有网络协议方法或目标 authority。
-      en: A record asks whether a user permits a tool to access an external API and contains subject, resource, operation, and approval context but no network method or target authority.
-      ja: user に external API access 許可を尋ね subject/resource/operation/approval context はありますが network method/target authority はありません。
-    field_values: {}
+      zh: out-req-884 GET api.example.com；audit log 记录 ordered_hops 含 proxy-egress-2 与 audit-egress-884。
+      en: out-req-884 GET api.example.com; audit log records ordered_hops including proxy-egress-2 and audit-egress-884.
+      ja: out-req-884 GET api.example.com。audit log ordered_hops proxy-egress-2/audit-egress-884 記録。
+    example_source:
+      product: Moonweave design
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: egress audit logging
+    field_values:
+      request_id: out-req-884
+      audit_log_ref: audit-egress-884
     related_node_ids:
-      - AuthorizationRequest
+      - OutboundRequest
+      - NetworkRoute
     related_relation_ids: []
-    expected_result:
-      zh: 归安全权限域的 AuthorizationRequest，不归 OutboundRequest。
-      en: Classify it as the permission-domain AuthorizationRequest, not OutboundRequest.
-      ja: permission-domain AuthorizationRequest とし OutboundRequest にはしません。
-    why_valid_or_invalid:
-      zh: 审批意图和协议传输消息具有不同身份与生命周期。
-      en: Approval intent and a protocol-transmission message have different identity and lifecycle.
-      ja: approval intent と protocol-transmission message は identity/lifecycle が異なります。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-outbound-request-003
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: InboundResponse
-    shared_parent_concept_id: NetworkMessage
-    differentia:
-      zh: OutboundRequest 由受控主体面向目标表达操作意图；InboundResponse 是对既有请求返回的状态与内容。
-      en: OutboundRequest expresses an operation toward a target from the controlled subject; InboundResponse returns status and content for an existing request.
-      ja: OutboundRequest は controlled subject から target への operation、InboundResponse は既存 request への status/content を表します。
+      - claim-outbound-request-design
+  - id: OutboundRequest-denied-before-send
+    labels:
+      zh: 策略拒绝未发送请求
+      en: Policy denied before send
+      ja: policy deny 未送信 request
+    descriptions:
+      zh: out-req-885 目标 updates.unapproved.example；policy deny 后无实际 wire send，但 OutboundRequest 与 audit 意图仍记录。
+      en: out-req-885 targets updates.unapproved.example; after policy deny no wire send but OutboundRequest and audit intent still recorded.
+      ja: out-req-885 updates.unapproved.example target。policy deny 後 wire send なし。OutboundRequest/audit intent は記録。
+    example_source:
+      product: Kubernetes
+      url: https://kubernetes.io/docs/concepts/services-networking/network-policies/
+      version: egress deny
+    field_values:
+      request_id: out-req-885
+      call_status: denied
+    related_node_ids:
+      - OutboundRequest
+      - NetworkCall
+    related_relation_ids: []
     source_claims:
-      - claim-outbound-request-001
+      - claim-outbound-request-k8s
+  - id: OutboundRequest-redirect-new-id
+    labels:
+      zh: 重定向需新请求 ID
+      en: Redirect requires new request ID
+      ja: redirect は新 request ID 必要
+    descriptions:
+      zh: 302 Location 169.254.169.254 不得复用 out-req-884；必须 null new_request_id 直至新 policy 链完成。
+      en: 302 Location 169.254.169.254 must not reuse out-req-884; new_request_id null until new policy chain completes.
+      ja: 302 Location 169.254.169.254 out-req-884 再利用不可。新 policy chain 完了まで new_request_id null。
+    example_source:
+      product: OWASP SSRF
+      url: https://owasp.org/www-community/attacks/Server_Side_Request_Forgery
+      version: redirect SSRF
+    field_values:
+      original_request_id: out-req-884
+      new_request_id: null
+    related_node_ids:
+      - OutboundRequest
+      - InboundResponse
+    related_relation_ids: []
+    source_claims:
+      - claim-outbound-request-design
 parent_relation:
   id: OutboundRequest-is_a-NetworkMessage
   predicate: is_a
   direction: target-to-source
   relation_kind: hierarchy
   labels:
-    zh: 是一种
-    en: is a
-    ja: is a
+    zh: 是一种网络消息
+    en: is a network message
+    ja: ネットワークメッセージの一種
   definitions:
-    zh: OutboundRequest 是 NetworkMessage 的子类：它具有协议消息身份、元数据和正文引用，并增加由受控主体面向目标表达方法、authority、凭据范围和载荷意图的出站种差。
-    en: "OutboundRequest is a subtype of NetworkMessage: it has protocol-message identity, metadata, and body reference and adds the outbound differentia of expressing method, authority, credential scope, and payload intent from a controlled subject toward a target."
-    ja: OutboundRequest は NetworkMessage subtype で protocol message identity・metadata・body ref に controlled subject から target への method・authority・credential scope・payload intent differentia を追加します。
+    zh: 每个 OutboundRequest 都是 NetworkMessage，种差是 egress 方向与 audit-logged 发起身份。
+    en: Every OutboundRequest is a NetworkMessage distinguished by egress direction and audit-logged initiation identity.
+    ja: すべての OutboundRequest は NetworkMessage で egress direction/audit-logged initiation identity が種差。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 分类继承描述概念包含，不使用实例关系基数。
-    en: Taxonomic inheritance describes concept inclusion and does not use instance-relation cardinality.
-    ja: taxonomic inheritance は concept inclusion を表し instance relation cardinality を使いません。
+    zh: 分类继承不使用实例关系基数。
+    en: Taxonomic inheritance does not use instance-relation cardinality.
+    ja: 分類継承にはインスタンス関係の基数を用いません。
   inverse_reading:
-    predicate: part_of
+    predicate: has_subtype
     labels:
-      zh: 以 出站请求 为子类
-      en: has subtype 出站请求
-      ja: 出站请求 を subtype に持つ
+      zh: 有下位类型
+      en: has subtype
+      ja: 下位型を持つ
   conditions: []
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: OutboundRequest-is_a-NetworkMessage-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 出站 HTTP 请求
-        en: Outbound HTTP request
-        ja: outbound HTTP request
-      scenario_id: network-relation-outboundrequest-is_a-networkmessage-positive
-      descriptions:
-        zh: out-req-884 带 message_id、HTTP/2 元数据、POST、原始目标和载荷引用，并从 agent-code 发出。
-        en: out-req-884 carries message_id, HTTP/2 metadata, POST, original target, and payload reference and originates from agent-code.
-        ja: out-req-884 は message_id・HTTP/2 metadata・POST・original target・payload ref を持ち agent-code から発します。
-      field_values: {}
-      related_node_ids:
-        - OutboundRequest
-        - NetworkMessage
-      related_relation_ids:
-        - OutboundRequest-is_a-NetworkMessage
-      expected_result:
-        zh: 断言 OutboundRequest is_a NetworkMessage。
-        en: Assert OutboundRequest is_a NetworkMessage.
-        ja: OutboundRequest is_a NetworkMessage を主張します。
-      why_valid_or_invalid:
-        zh: 请求满足消息身份并具有明确出站方向种差。
-        en: The request satisfies message identity and has explicit outbound-direction differentia.
-        ja: request は message identity/outbound direction differentia を満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-outbound-request-001
-    - id: OutboundRequest-is_a-NetworkMessage-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 授权审批不是网络消息
-        en: Approval is not a network message
-        ja: approval は network message ではない
-      scenario_id: network-relation-outboundrequest-is_a-networkmessage-boundary
-      descriptions:
-        zh: AuthorizationRequest 询问是否允许访问某资源，但没有传输协议、消息头、正文引用或网络目标 authority。
-        en: AuthorizationRequest asks whether resource access is allowed but has no transport protocol, message metadata, body reference, or network target authority.
-        ja: AuthorizationRequest は resource access 許可を問いますが transport protocol・message metadata・body ref・network authority がありません。
-      field_values: {}
-      related_node_ids:
-        - OutboundRequest
-        - AuthorizationRequest
-        - NetworkMessage
-      related_relation_ids:
-        - OutboundRequest-is_a-NetworkMessage
-      expected_result:
-        zh: 不得把审批对象分类为 OutboundRequest。
-        en: Do not classify the approval object as OutboundRequest.
-        ja: approval object を OutboundRequest と分類しません。
-      why_valid_or_invalid:
-        zh: 治理请求和网络协议消息的身份不同。
-        en: A governance request and a network protocol message have different identities.
-        ja: governance request と network protocol message は identity が異なります。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-outbound-request-003
   source_claims:
-    - claim-outbound-request-001
-    - claim-outbound-request-003
-  distinct_fact_rationale:
-    zh: OutboundRequest 满足 NetworkMessage 的全部身份条件并增加不可替换的种差。
-    en: OutboundRequest satisfies every identity condition of NetworkMessage and adds a non-substitutable differentia.
-    ja: OutboundRequest は NetworkMessage の全 identity condition を満たし non-substitutable differentia を追加します。
+    - claim-outbound-request-design
+  distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations:
   - id: OutboundRequest-initiates-NetworkCall
@@ -298,136 +279,79 @@ relations:
     direction: source-to-target
     relation_kind: causal
     labels:
-      zh: 发起调用
-      en: initiates call
-      ja: call を initiate
+      zh: 发起网络调用
+      en: initiates network call
+      ja: ネットワーク呼出しを開始
     definitions:
-      zh: OutboundRequest 仅在其消息身份、原始目标和载荷被某个 NetworkCall 采用为起始输入时发起该调用；未发送草稿不建立此边，一个重试产生的新调用需有新的关联事实。
-      en: OutboundRequest initiates a NetworkCall only when that call adopts the request's message identity, original target, and payload as its starting input. An unsent draft has no such edge, and a retry creating a new call requires a new association fact.
-      ja: OutboundRequest は NetworkCall が message identity・original target・payload を starting input として採用した場合のみ initiate します。unsent draft には edge がなく retry new call は新 association fact を要します。
-    cardinality:
-      source:
-        min: 1
-        max: 1
-      target:
-        min: 0
-        max: null
-    cardinality_not_applicable_reason: null
+      zh: OutboundRequest 通过 initiates 启动恰好一次 NetworkCall。
+      en: OutboundRequest initiates exactly one NetworkCall via initiates.
+      ja: OutboundRequest は initiates で exactly 一 NetworkCall を開始。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 一次出站请求启动一次主 NetworkCall。
+      en: One outbound request initiates one primary NetworkCall.
+      ja: 一 outbound request は一 primary NetworkCall 開始。
     inverse_reading:
-      predicate: is_initiates_of
+      predicate: initiated_by
       labels:
-        zh: 反向读取 initiates
-        en: is initiates of
-        ja: initiates の inverse
+        zh: 由出站请求发起
+        en: initiated by outbound request
+        ja: 送信要求により開始
     conditions: []
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
-    examples:
-      - id: OutboundRequest-initiates-NetworkCall-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 请求被调用采用
-          en: Request adopted by call
-          ja: request が call に採用
-        scenario_id: network-relation-outboundrequest-initiates-networkcall-positive
-        descriptions:
-          zh: net-call-884 的起始审计记录引用 out-req-884 的 message_id、目标、方法和载荷摘要，时间紧随请求冻结。
-          en: net-call-884's start audit references out-req-884's message ID, target, method, and payload digest immediately after the request was frozen.
-          ja: net-call-884 start audit は out-req-884 の message ID・target・method・payload digest を request freeze 直後に参照します。
-        field_values: {}
-        related_node_ids:
-          - OutboundRequest
-          - NetworkCall
-        related_relation_ids:
-          - OutboundRequest-initiates-NetworkCall
-        expected_result:
-          zh: 建立 out-req-884 initiates net-call-884。
-          en: Assert out-req-884 initiates net-call-884.
-          ja: out-req-884 initiates net-call-884 を主張します。
-        why_valid_or_invalid:
-          zh: 调用的起始输入与请求身份及内容摘要一致。
-          en: The call's starting input matches the request identity and content digest.
-          ja: call starting input が request identity/content digest と一致します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-outbound-request-001
-          - claim-outbound-request-003
-      - id: OutboundRequest-initiates-NetworkCall-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 未发送草稿
-          en: Unsent draft
-          ja: unsent draft
-        scenario_id: network-relation-outboundrequest-initiates-networkcall-boundary
-        descriptions:
-          zh: out-req-draft 通过校验但用户取消，之后没有网络交互标识、解析、策略判断或连接记录。
-          en: out-req-draft passes validation but the user cancels; no network interaction ID, resolution, policy evaluation, or connection record follows.
-          ja: out-req-draft は validation pass 後 user cancel され network interaction ID・resolution・policy evaluation・connection record がありません。
-        field_values: {}
-        related_node_ids:
-          - OutboundRequest
-          - NetworkCall
-        related_relation_ids:
-          - OutboundRequest-initiates-NetworkCall
-        expected_result:
-          zh: 保留请求草稿，不建立 initiates 边。
-          en: Retain the request draft and do not assert initiates.
-          ja: request draft を保持し initiates edge を主張しません。
-        why_valid_or_invalid:
-          zh: 消息存在不等于调用生命周期已开始。
-          en: Message existence does not mean a call lifecycle began.
-          ja: message existence は call lifecycle start を意味しません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-outbound-request-001
     source_claims:
-      - claim-outbound-request-001
-      - claim-outbound-request-003
+      - claim-outbound-request-design
     distinct_fact_rationale:
-      zh: 该边连接消息意图与发生事件，不等同于 is_a 或响应关联。
-      en: This edge links message intent to an occurrence event and is distinct from taxonomy or response correlation.
-      ja: message intent と occurrence event を結び taxonomy/response correlation と異なります。
+      zh: 请求存在不能推出 NetworkCall 已 completed。
+      en: Request existence cannot imply NetworkCall completed.
+      ja: request 存在だけでは NetworkCall completed は導けない。
     layout_role: cross-link
-    review_status: accepted
     target: concept:NetworkCall
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-safety-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: Verified against Cursor sandbox.json egress control, HTTP/SOCKS proxy semantics, and network policy patterns; endpoint, policy, and call lifecycle modeling hold.
-    en: Verified against Cursor sandbox.json egress control, HTTP/SOCKS proxy semantics, and network policy patterns; endpoint, policy, and call lifecycle modeling hold.
-    ja: Verified against Cursor sandbox.json egress control, HTTP/SOCKS proxy semantics, and network policy patterns; endpoint, policy, and call lifecycle modeling hold.
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: mcp-tools-2025-06-18
+    title: MCP Specification — Tools
+    url: https://spec.modelcontextprotocol.io/specification/2025-06-18/server/tools/
+    source_type: official-spec
+    relevance: tools/call triggering outbound HTTP with audit trail.
+  - id: rfc9110-http
+    title: RFC 9110 HTTP Semantics
+    url: https://www.rfc-editor.org/rfc/rfc9110.html
+    source_type: standard
+    relevance: HTTP request fields and redirect authority changes.
+  - id: k8s-network-policy
+    title: Kubernetes NetworkPolicy
+    url: https://kubernetes.io/docs/concepts/services-networking/network-policies/
+    source_type: official-doc
+    relevance: Policy-denied outbound requests before wire send.
+  - id: safety-network-design
+    title: Moonweave safety-network-control module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: OutboundRequest as audit-logged egress message initiating NetworkCall.
 source_claims:
-  - id: claim-outbound-request-001
-    source: eng-proto-rfc9110-http-semantics
-    supports: RFC 9110 distinguishes HTTP request and response messages, target resources and authorities, origin servers, proxy intermediaries, direct versus proxy routing, redirects, and response status; Moonweave places these protocol facts under broader network concepts.
-    locator: RFC 9110 Sections 3.1-3.7, 4.2-4.3, 6, 7.1-7.4, 10.2, and 15.4
+  - id: claim-outbound-request-mcp
+    source: mcp-tools-2025-06-18
+    supports: MCP tools/call triggers outbound HTTP mappable to OutboundRequest with audit logging.
+    locator: tools/call
+    evidence_kind: official
+    confidence: high
+  - id: claim-outbound-request-rfc9110
+    source: rfc9110-http
+    supports: RFC 9110 HTTP request message fields map to OutboundRequest method and authority.
+    locator: HTTP requests
+    evidence_kind: official
+    confidence: high
+  - id: claim-outbound-request-k8s
+    source: k8s-network-policy
+    supports: Policy-denied egress records OutboundRequest intent even when wire send does not occur.
+    locator: NetworkPolicy egress
+    evidence_kind: official
+    confidence: high
+  - id: claim-outbound-request-design
+    source: safety-network-design
+    supports: Moonweave requires OutboundRequest audit identity, initiates NetworkCall, and new request_id on redirect.
+    locator: OutboundRequest boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-outbound-request-002
-    source: eng-proto-rfc1928-socks5
-    supports: RFC 1928 defines SOCKS client-to-server negotiation, authentication selection, CONNECT/BIND/UDP ASSOCIATE commands, IPv4/domain/IPv6 addressing, relay establishment, and denial replies; Moonweave treats SOCKSProxy as a protocol-specific Proxy subtype.
-    locator: RFC 1928 Sections 3-7, TCP client procedure, requests, addressing, replies, and UDP client procedure
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-outbound-request-003
-    source: eng-network-nist-zero-trust
-    supports: NIST SP 800-207 distinguishes an access request, per-resource policy decision, policy administrator, policy enforcement point, and the communication path that is enabled, monitored, and terminated; Moonweave uses those distinctions to separate policy, interaction occurrence, endpoint, and effective route evidence.
-    locator: NIST SP 800-207 Sections 2.1-2.2 and 3.2, policy engine, policy administrator, and policy enforcement point
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

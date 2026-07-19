@@ -1,56 +1,96 @@
 schema: moonweave.ai/ontology-node/v1
 id: NetworkPolicy
 kind: concept
-status: accepted
 labels:
   zh: 网络策略
   en: network policy
-  ja: network policy
+  ja: ネットワークポリシー
 semantics:
   short_definition:
     zh: 按主体、方向、端点、协议与端口决定网络通信的版本化策略规范。
     en: A versioned policy specification deciding network communication by subject, direction, endpoint, protocol, and port.
-    ja: subject・direction・endpoint・protocol・port で network communication を決定する versioned policy specification。
+    ja: subject/direction/endpoint/protocol/port で network communication を決定する versioned policy specification。
   definition:
-    zh: 网络策略是一种 PolicySpecification，继承 policy_id 与 version 作为唯一的版本化策略身份；入站或出站方向、主体和端点选择器、协议端口约束及动作是网络治理种差。它治理 NetworkCall，但不等同于一次 PolicyDecision、操作系统隔离规范、代理路由或已建立连接。
-    en: A NetworkPolicy is a versioned PolicySpecification and inherits policy_id and version as its sole policy identity. Direction, subject and endpoint selectors, protocol-port constraints, and action are network-governance differentia. It governs NetworkCall but is not one PolicyDecision, an operating-system isolation specification, a proxy route, or an established connection.
-    ja: NetworkPolicy は PolicySpecification の一種で、唯一の版管理された方針同一性として policy_id と version を継承します。direction、subject・endpoint selector、protocol-port constraint、action がネットワーク統制の種差です。PolicyDecision、OS isolation、proxy route、established connection ではありません。
+    zh: NetworkPolicy 是 safety-permission-policy 中 PolicySpecification 的网络专门化（NetworkPolicy-is_a-PolicySpecification），继承 policy_id 与 version，以 ingress/egress 方向、podSelector/workload selector、ipBlock/namespaceSelector 端点约束、协议端口与 allow/deny 动作为种差。它映射 Kubernetes NetworkPolicy、Docker network isolation 与 MCP server egress allowlist；治理 NetworkCall 但不等同于 PolicyDecision 或已建立连接。
+    en: "NetworkPolicy is the network specialization of PolicySpecification in safety-permission-policy (NetworkPolicy-is_a-PolicySpecification), inheriting policy_id and version with ingress/egress direction, podSelector or workload selector, ipBlock or namespaceSelector endpoint constraints, protocol-port rules, and allow or deny action as differentia. It maps Kubernetes NetworkPolicy, Docker network isolation, and MCP server egress allowlists; it governs NetworkCall but is not a PolicyDecision or established connection."
+    ja: NetworkPolicy は safety-permission-policy PolicySpecification の network 専門化（NetworkPolicy-is_a-PolicySpecification）で policy_id/version を継承し ingress/egress direction/podSelector/ipBlock/namespaceSelector/protocol-port/allow/deny action を種差とする。Kubernetes NetworkPolicy/Docker network isolation/MCP server egress allowlist を写像。NetworkCall を govern するが PolicyDecision/established connection ではない。
   why_needed:
-    zh: 网络专属选择器与协议约束需要复用通用 PolicySpecification 生命周期，同时与本地沙箱约束和业务资源授权保持边界。
-    en: Network-specific selectors and protocol constraints reuse the general PolicySpecification lifecycle while remaining separate from local sandbox constraints and business-resource authorization.
-    ja: network-specific selector/protocol constraint は general PolicySpecification lifecycle を reuse し local sandbox constraint/business-resource authorization と分離します。
+    zh: 网络专属选择器需要复用 PolicySpecification 生命周期，并与业务 AuthorizationGrant、本地 Sandbox 约束保持边界；否则 Agent 会把 TCP 超时误报为策略拒绝。
+    en: Network-specific selectors need PolicySpecification lifecycle reuse and boundaries from business AuthorizationGrant and local Sandbox constraints; otherwise agents misreport TCP timeouts as policy denials.
+    ja: network-specific selector は PolicySpecification lifecycle reuse と business AuthorizationGrant/local Sandbox constraint 境界が必要。否则 TCP timeout を policy deny と誤報。
   includes:
-    - zh: 出口目标白名单、入口来源限制、协议/端口规则、代理强制要求和默认拒绝网络策略。
-      en: Egress destination allowlists, ingress source restrictions, protocol/port rules, proxy requirements, and default-deny network policies.
-      ja: egress destination allowlist・ingress source restriction・protocol/port rule・proxy requirement・default-deny network policy。
+    - zh: 出口目标白名单、入口来源限制、协议/端口规则、代理强制与 default-deny 网络策略。
+      en: Egress destination allowlists, ingress source restrictions, protocol or port rules, proxy requirements, and default-deny network policies.
+      ja: egress destination allowlist/ingress source restriction/protocol/port rule/proxy requirement/default-deny network policy。
   excludes:
-    - zh: 主体对业务对象的 AuthorizationGrant、文件与进程隔离、具体路由记录、一次允许/拒绝决定和防火墙设备本身。
-      en: AuthorizationGrant over a business object, filesystem and process isolation, concrete route records, one allow/deny decision, and firewall devices themselves.
-      ja: business object AuthorizationGrant・filesystem/process isolation・concrete route record・一 allow/deny decision・firewall device。
+    - zh: 业务 AuthorizationGrant、FilesystemPolicy/Sandbox、具体 NetworkRoute 记录、一次 allow/deny 决定。
+      en: Business AuthorizationGrant, FilesystemPolicy or Sandbox, concrete NetworkRoute records, one allow or deny decision.
+      ja: business AuthorizationGrant/FilesystemPolicy/Sandbox/concrete NetworkRoute record/一 allow/deny decision。
   semantic_kind: specification
   aliases: []
+engineering:
+  explanation:
+    zh: "集成：K8s NetworkPolicy egress to ipBlock → egress-agent-tools@9；MCP HTTP server allowlist registry.npmjs.org → egress-mcp-tools@4；Docker --network none → deny-all egress policy。NetworkCall 必须 governed_by 实际评估的 policy revision。"
+    en: "Integration: K8s NetworkPolicy egress to ipBlock → egress-agent-tools@9; MCP HTTP server allowlist registry.npmjs.org → egress-mcp-tools@4; Docker --network none → deny-all egress policy. NetworkCall must be governed_by actually evaluated policy revision."
+    ja: 統合：K8s NetworkPolicy egress ipBlock → egress-agent-tools@9；MCP allowlist registry.npmjs.org → egress-mcp-tools@4；Docker --network none → deny-all egress。NetworkCall は actually evaluated policy revision に governed_by 必須。
+  typical_input:
+    - description: Kubernetes NetworkPolicy egress rule.
+      format: |
+        apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        spec:
+          podSelector: {matchLabels: {app: agent-runner}}
+          policyTypes: [Egress]
+          egress:
+            - to: [{ipBlock: {cidr: 203.0.113.0/24}}]
+              ports: [{protocol: TCP, port: 443}]
+      source_claims:
+        - claim-network-policy-k8s
+  typical_output:
+    - description: Policy reference on NetworkCall evaluation.
+      format: |
+        network_policy_ref: egress-agent-tools@9
+        call_status: denied
+        denial_stage: policy
+      source_claims:
+        - claim-network-policy-design
+  reference_implementations:
+    - name: Kubernetes NetworkPolicy
+      url: https://kubernetes.io/docs/concepts/services-networking/network-policies/
+      description: Selector-scoped ingress/egress rules, peers, ports, protocols.
+    - name: Docker network isolation
+      url: https://docs.docker.com/network/
+      description: Container network modes and isolation boundaries.
+    - name: MCP Specification — Transports
+      url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/transports/
+      description: stdio vs HTTP/SSE egress boundaries for MCP servers.
 structure:
-  identity_keys: []
+  identity_keys:
+    - policy_id
+    - version
   fields:
     - id: direction
       labels:
         zh: 适用方向
         en: applicable direction
-        ja: applicable direction
+        ja: 適用 direction
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
       definitions:
-        zh: 声明策略适用于入站、出站或两者。
-        en: States whether the policy applies to ingress, egress, or both.
-        ja: policy が ingress・egress・both のどれに apply するか。
-      allowed_values: []
+        zh: 策略适用于 ingress、egress 或 both。
+        en: Policy applies to ingress, egress, or both.
+        ja: policy が ingress/egress/both に apply。
+      allowed_values:
+        - ingress
+        - egress
+        - both
       pattern: null
       example_value: egress
       source_claims:
-        - claim-network-policy-002
+        - claim-network-policy-k8s
     - id: subject_selector
       labels:
         zh: 主体选择器
@@ -62,16 +102,15 @@ structure:
         min: 1
         max: 1
       definitions:
-        zh: 选择受策略治理的代理、工作负载、会话或运行身份。
-        en: Selects the agent, workload, session, or runtime identity governed by the policy.
-        ja: policy が govern する agent・workload・session・runtime identity を select します。
+        zh: 选择受策略治理的 agent、workload、session 或 runtime identity。
+        en: Selects agent, workload, session, or runtime identity governed by the policy.
+        ja: policy が govern する agent/workload/session/runtime identity を select。
       allowed_values: []
       pattern: null
       example_value:
-        workload: agent-code
+        workload: agent-runner
       source_claims:
-        - claim-network-policy-001
-        - claim-network-policy-002
+        - claim-network-policy-k8s
     - id: endpoint_selector
       labels:
         zh: 端点选择器
@@ -83,147 +122,110 @@ structure:
         min: 1
         max: 1
       definitions:
-        zh: 按主机、IP/CIDR、服务身份、信任区或代理端点选择网络目标或来源。
-        en: Selects network destinations or sources by host, IP/CIDR, service identity, trust zone, or proxy endpoint.
-        ja: host・IP/CIDR・service identity・trust zone・proxy endpoint で destination/source を select します。
+        zh: 允许或拒绝的 destination/source 选择器，如 ipBlock、namespaceSelector、domain allowlist。
+        en: Allowed or denied destination or source selector such as ipBlock, namespaceSelector, domain allowlist.
+        ja: ipBlock/namespaceSelector/domain allowlist 等 allow/deny destination/source selector。
       allowed_values: []
       pattern: null
       example_value:
-        host: api.example.com
-        trust_zone: zone-external-api
+        allowed_hosts:
+          - registry.npmjs.org
+          - api.example.com
       source_claims:
-        - claim-network-policy-001
-        - claim-network-policy-002
-    - id: protocol_port_constraints
-      labels:
-        zh: 协议与端口约束
-        en: protocol and port constraints
-        ja: protocol and port constraints
-      datatype: object
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 限定允许或拒绝的协议、端口及必要的代理或 TLS 条件。
-        en: Constrains allowed or denied protocols, ports, and required proxy or TLS conditions.
-        ja: allow/deny protocol・port・required proxy/TLS condition。
-      allowed_values: []
-      pattern: null
-      example_value:
-        protocol: TCP
-        port: 443
-        require_proxy: true
-      source_claims:
-        - claim-network-policy-002
-        - claim-network-policy-003
-    - id: action
-      labels:
-        zh: 策略动作
-        en: policy action
-        ja: policy action
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 声明匹配时允许、拒绝或要求提升审批的动作。
-        en: Declares allow, deny, or require-escalation action on a match.
-        ja: match 時の allow・deny・require-escalation action。
-      allowed_values: []
-      pattern: null
-      example_value: allow
-      source_claims:
-        - claim-network-policy-001
-        - claim-network-policy-002
+        - claim-network-policy-mcp
   constraints: []
   required_relation_constraints: []
 examples:
-  - id: NetworkPolicy-example-positive-manual-20260716
-    kind: positive
+  - id: NetworkPolicy-k8s-egress-allow
     labels:
-      zh: 仅经代理访问 HTTPS API
-      en: HTTPS API only through proxy
-      ja: proxy 経由 HTTPS API のみ
-    scenario_id: null
+      zh: Kubernetes 出口白名单
+      en: Kubernetes egress allowlist
+      ja: Kubernetes egress allowlist
     descriptions:
-      zh: egress-agent-tools@9 适用于 agent-code 出站流量，只允许 api.example.com:443，要求 proxy-egress-2 与 TLS 身份验证，其他目标默认拒绝。
-      en: egress-agent-tools@9 governs agent-code egress, allows only api.example.com:443 through proxy-egress-2 with TLS identity verification, and denies other destinations by default.
-      ja: egress-agent-tools@9 は agent-code egress を govern し api.example.com:443 を proxy-egress-2/TLS verification 条件でのみ allow、他を default deny します。
+      zh: egress-agent-tools@9 限制 agent-runner pod 仅 egress 到 203.0.113.0/24:443；未列目的地 denial_stage=policy。
+      en: egress-agent-tools@9 restricts agent-runner pods to egress 203.0.113.0/24:443 only; unlisted destinations get denial_stage=policy.
+      ja: egress-agent-tools@9 が agent-runner pod を 203.0.113.0/24:443 egress のみに制限。未登録 destination は denial_stage=policy。
+    example_source:
+      product: Kubernetes
+      url: https://kubernetes.io/docs/concepts/services-networking/network-policies/
+      version: NetworkPolicy egress
     field_values:
-      policy_id: egress-agent-tools
-      issuer_ref: security-policy-service
-      effective_from: 2026-07-16T00:00:00Z
-      applicability:
-        workload: agent-code
-        direction: egress
-      version: "9"
+      network_policy_ref: egress-agent-tools@9
       direction: egress
-      subject_selector:
-        workload: agent-code
-      endpoint_selector:
-        host: api.example.com
-      protocol_port_constraints:
-        protocol: TCP
-        port: 443
-        require_proxy: true
-      action: allow
     related_node_ids:
       - NetworkPolicy
-      - PolicySpecification
       - NetworkCall
     related_relation_ids:
-      - NetworkPolicy-is_a-PolicySpecification
       - NetworkCall-governed_by-NetworkPolicy
-    expected_result:
-      zh: 建立可版本化网络策略并用于判断具体 NetworkCall。
-      en: Create a versioned NetworkPolicy usable to evaluate a concrete NetworkCall.
-      ja: versioned NetworkPolicy を作成し concrete NetworkCall 評価に使用します。
-    why_valid_or_invalid:
-      zh: 主体、方向、端点、协议端口与动作均可判定且版本固定。
-      en: Subject, direction, endpoint, protocol/port, and action are decidable and fixed by version.
-      ja: subject・direction・endpoint・protocol/port・action が decidable で version 固定です。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-network-policy-001
-      - claim-network-policy-002
-      - claim-network-policy-003
-  - id: NetworkPolicy-example-boundary-manual-20260716
-    kind: boundary
+      - claim-network-policy-k8s
+  - id: NetworkPolicy-mcp-allowlist
     labels:
-      zh: 沙箱文件系统只读规则
-      en: Sandbox read-only filesystem rule
-      ja: sandbox readonly filesystem rule
-    scenario_id: network-review-networkpolicy-boundary
+      zh: MCP 出站允许列表
+      en: MCP egress allowlist
+      ja: MCP egress allowlist
     descriptions:
-      zh: 规则将 /workspace 设为只读并屏蔽 /secrets，但不选择网络主体、方向、端点、协议或端口。
-      en: A rule makes /workspace read-only and masks /secrets but selects no network subject, direction, endpoint, protocol, or port.
-      ja: rule は /workspace readonly・/secrets mask を設定しますが network subject・direction・endpoint・protocol・port を選択しません。
-    field_values: {}
+      zh: egress-mcp-tools@4 允许 HTTP MCP server tools/call 触发出站到 registry.npmjs.org，拒绝 internal.corp。
+      en: egress-mcp-tools@4 allows HTTP MCP server tools/call egress to registry.npmjs.org and denies internal.corp.
+      ja: egress-mcp-tools@4 が HTTP MCP server tools/call egress を registry.npmjs.org allow/internal.corp deny。
+    example_source:
+      product: MCP
+      url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/transports/
+      version: HTTP egress boundaries
+    field_values:
+      network_policy_ref: egress-mcp-tools@4
+      allowed_host: registry.npmjs.org
+      denied_host: internal.corp
     related_node_ids:
-      - FilesystemPolicy
-      - IsolationSpecification
-      - PolicySpecification
+      - NetworkPolicy
+      - NetworkEndpoint
     related_relation_ids: []
-    expected_result:
-      zh: 归执行隔离的 FilesystemPolicy，不归 NetworkPolicy。
-      en: Classify it as execution-isolation FilesystemPolicy, not NetworkPolicy.
-      ja: execution-isolation FilesystemPolicy とし NetworkPolicy にはしません。
-    why_valid_or_invalid:
-      zh: 本地路径执行约束和网络通信选择器回答不同问题。
-      en: Local path enforcement and network-communication selectors answer different questions.
-      ja: local path enforcement と network communication selector は異なる question に答えます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-network-policy-002
-      - claim-network-policy-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-network-policy-mcp
+  - id: NetworkPolicy-docker-none
+    labels:
+      zh: Docker 无网络隔离
+      en: Docker none network isolation
+      ja: Docker none network isolation
+    descriptions:
+      zh: "--network none 容器无 egress NetworkCall；stdio MCP transport 同样无 NetworkCall 记录。"
+      en: Containers with --network none have no egress NetworkCall; stdio MCP transport likewise records no NetworkCall.
+      ja: --network none container は egress NetworkCall なし。stdio MCP transport も NetworkCall 記録なし。
+    example_source:
+      product: Docker
+      url: https://docs.docker.com/network/
+      version: none network mode
+    field_values:
+      network_mode: none
+      egress_allowed: false
+    related_node_ids:
+      - NetworkPolicy
+      - NetworkCall
+    related_relation_ids: []
+    source_claims:
+      - claim-network-policy-docker
+  - id: NetworkPolicy-transport-failure-boundary
+    labels:
+      zh: 运输失败非策略拒绝
+      en: Transport failure is not policy denial
+      ja: transport failure は policy deny ではない
+    descriptions:
+      zh: call_status=failed failure_stage=connection 且 network_policy_result=allow 不得报告为 policy denial。
+      en: call_status=failed with failure_stage=connection and network_policy_result=allow must not be reported as policy denial.
+      ja: call_status=failed/failure_stage=connection/network_policy_result=allow を policy denial と報告不可。
+    example_source:
+      product: Moonweave design
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: policy vs transport failure
+    field_values:
+      denial_stage: null
+      call_status: failed
+    related_node_ids:
+      - NetworkPolicy
+      - NetworkCall
+    related_relation_ids: []
+    source_claims:
+      - claim-network-policy-design
 parent_relation: null
 relations:
   - id: NetworkPolicy-is_a-PolicySpecification
@@ -231,134 +233,79 @@ relations:
     direction: source-to-target
     relation_kind: hierarchy
     labels:
-      zh: 是一种
-      en: is a
-      ja: is a
+      zh: 是一种策略规范
+      en: is a policy specification
+      ja: PolicySpecification の一種
     definitions:
-      zh: NetworkPolicy 是 PolicySpecification 的子类：它具有稳定策略标识、不可变版本和可执行动作，并增加网络主体、入站/出站方向、端点选择器、协议和端口约束等种差。
-      en: "NetworkPolicy is a subtype of PolicySpecification: it has stable policy identity, immutable version, and executable action, and adds network-subject, ingress or egress direction, endpoint selector, protocol, and port differentia."
-      ja: NetworkPolicy は PolicySpecification subtype で stable policy ID・immutable version・executable action に network subject・ingress/egress direction・endpoint selector・protocol・port differentia を追加します。
+      zh: 每个 NetworkPolicy 都是 PolicySpecification，以网络方向、端点 selector、协议端口与 allow/deny 为种差。
+      en: Every NetworkPolicy is a PolicySpecification distinguished by network direction, endpoint selectors, protocol-port rules, and allow or deny action.
+      ja: すべての NetworkPolicy は PolicySpecification で network direction/endpoint selector/protocol-port/allow/deny action が種差。
     cardinality: null
     cardinality_not_applicable_reason:
-      zh: 分类继承描述概念包含，不使用实例关系基数。
-      en: Taxonomic inheritance describes concept inclusion and does not use instance-relation cardinality.
-      ja: taxonomic inheritance は concept inclusion を表し instance relation cardinality を使いません。
+      zh: 分类继承不使用实例关系基数。
+      en: Taxonomic inheritance does not use instance-relation cardinality.
+      ja: 分類継承にはインスタンス関係の基数を用いません。
     inverse_reading:
       predicate: has_subtype
       labels:
-        zh: 以 网络策略 为子类
-        en: has subtype 网络策略
-        ja: 网络策略 を subtype に持つ
+        zh: 有下位类型
+        en: has subtype
+        ja: 下位型を持つ
     conditions: []
     temporal_scope: timeless
     boundary_context: null
     constraints: []
-    examples:
-      - id: NetworkPolicy-is_a-PolicySpecification-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 版本化出口策略
-          en: Versioned egress policy
-          ja: versioned egress policy
-        scenario_id: network-relation-networkpolicy-is_a-policyspecification-positive
-        descriptions:
-          zh: egress-agent-tools@9 固定主体选择器、出站方向、api.example.com:443、代理要求和 allow 动作。
-          en: egress-agent-tools@9 fixes subject selector, egress direction, api.example.com:443, proxy requirement, and allow action.
-          ja: egress-agent-tools@9 は subject selector・egress・api.example.com:443・proxy requirement・allow action を固定します。
-        field_values: {}
-        related_node_ids:
-          - NetworkPolicy
-          - PolicySpecification
-        related_relation_ids:
-          - NetworkPolicy-is_a-PolicySpecification
-        expected_result:
-          zh: 断言 NetworkPolicy is_a PolicySpecification。
-          en: Assert NetworkPolicy is_a PolicySpecification.
-          ja: NetworkPolicy is_a PolicySpecification を主張します。
-        why_valid_or_invalid:
-          zh: 该对象满足版本化策略身份并增加网络选择种差。
-          en: The object satisfies versioned-policy identity and adds network-selection differentia.
-          ja: versioned-policy identity を満たし network-selection differentia を追加します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-network-policy-001
-          - claim-network-policy-002
-      - id: NetworkPolicy-is_a-PolicySpecification-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 一次允许决定不是策略规范
-          en: One allow decision is not policy specification
-          ja: 一 allow decision は policy specification ではない
-        scenario_id: network-relation-networkpolicy-is_a-policyspecification-boundary
-        descriptions:
-          zh: policy-decision-884 记录某次调用 allow、时间和理由，但没有稳定策略 ID、版本或规则集合。
-          en: policy-decision-884 records allow, time, and rationale for one call but has no stable policy ID, version, or rule set.
-          ja: policy-decision-884 は一 call の allow・time・rationale を記録しますが stable policy ID・version・rule set がありません。
-        field_values: {}
-        related_node_ids:
-          - NetworkPolicy
-          - PolicySpecification
-          - PolicyDecision
-        related_relation_ids:
-          - NetworkPolicy-is_a-PolicySpecification
-        expected_result:
-          zh: 归类为 PolicyDecision，不归 NetworkPolicy。
-          en: Classify it as PolicyDecision, not NetworkPolicy.
-          ja: PolicyDecision とし NetworkPolicy にはしません。
-        why_valid_or_invalid:
-          zh: 一次判断和可复用版本化规范具有不同生命周期。
-          en: One decision and a reusable versioned specification have different lifecycles.
-          ja: 一 decision と reusable versioned specification は lifecycle が異なります。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-network-policy-001
     source_claims:
-      - claim-network-policy-001
-      - claim-network-policy-002
+      - claim-network-policy-design
     distinct_fact_rationale:
-      zh: NetworkPolicy 满足 PolicySpecification 的全部身份条件并增加不可替换的种差。
-      en: NetworkPolicy satisfies every identity condition of PolicySpecification and adds a non-substitutable differentia.
-      ja: NetworkPolicy は PolicySpecification の全 identity condition を満たし non-substitutable differentia を追加します。
+      zh: NetworkPolicy 继承 PolicySpecification 生命周期而非业务 AuthorizationGrant。
+      en: NetworkPolicy inherits PolicySpecification lifecycle, not business AuthorizationGrant.
+      ja: NetworkPolicy は business AuthorizationGrant ではなく PolicySpecification lifecycle を継承。
     layout_role: secondary-backbone
-    review_status: accepted
     target: concept:PolicySpecification
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-safety-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: Verified against Cursor sandbox.json egress control, HTTP/SOCKS proxy semantics, and network policy patterns; endpoint, policy, and call lifecycle modeling hold.
-    en: Verified against Cursor sandbox.json egress control, HTTP/SOCKS proxy semantics, and network policy patterns; endpoint, policy, and call lifecycle modeling hold.
-    ja: Verified against Cursor sandbox.json egress control, HTTP/SOCKS proxy semantics, and network policy patterns; endpoint, policy, and call lifecycle modeling hold.
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: k8s-network-policy
+    title: Kubernetes NetworkPolicy
+    url: https://kubernetes.io/docs/concepts/services-networking/network-policies/
+    source_type: official-doc
+    relevance: Selector-scoped ingress/egress isolation, peers, ports, protocols.
+  - id: docker-network
+    title: Docker network documentation
+    url: https://docs.docker.com/network/
+    source_type: official-doc
+    relevance: Container network isolation modes including none.
+  - id: mcp-transports-2025-06-18
+    title: MCP Specification — Transports
+    url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/transports/
+    source_type: official-spec
+    relevance: MCP server egress allowlist and transport boundaries.
+  - id: safety-network-design
+    title: Moonweave safety-network-control module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: NetworkPolicy as network PolicySpecification governing NetworkCall.
 source_claims:
-  - id: claim-network-policy-001
-    source: eng-network-nist-zero-trust
-    supports: NIST SP 800-207 distinguishes an access request, per-resource policy decision, policy administrator, policy enforcement point, and the communication path that is enabled, monitored, and terminated; Moonweave uses those distinctions to separate policy, interaction occurrence, endpoint, and effective route evidence.
-    locator: NIST SP 800-207 Sections 2.1-2.2 and 3.2, policy engine, policy administrator, and policy enforcement point
+  - id: claim-network-policy-k8s
+    source: k8s-network-policy
+    supports: Kubernetes NetworkPolicy defines selector-scoped egress with peers, ports, and protocols generalizable to NetworkPolicy rules.
+    locator: NetworkPolicy resource
+    evidence_kind: official
+    confidence: high
+  - id: claim-network-policy-mcp
+    source: mcp-transports-2025-06-18
+    supports: MCP HTTP/SSE servers have bind addresses and outbound calls mappable to egress NetworkPolicy allowlists.
+    locator: MCP transports
+    evidence_kind: official
+    confidence: high
+  - id: claim-network-policy-docker
+    source: docker-network
+    supports: Docker none network mode provides deny-all egress analogous to restrictive NetworkPolicy.
+    locator: Network modes
+    evidence_kind: official
+    confidence: high
+  - id: claim-network-policy-design
+    source: safety-network-design
+    supports: Moonweave separates NetworkPolicy specification from NetworkCall governed_by evaluation and transport failures.
+    locator: NetworkPolicy boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-network-policy-002
-    source: eng-network-kubernetes-network-policy
-    supports: Kubernetes NetworkPolicy defines selector-scoped ingress and egress isolation with peers, ports, and protocols, and requires source egress and destination ingress allowance for a connection; Moonweave generalizes only the policy-specification distinction.
-    locator: "Kubernetes Network Policies: The two sorts of pod isolation; The NetworkPolicy resource; Behavior of to and from selectors"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-network-policy-003
-    source: eng-proto-rfc9110-http-semantics
-    supports: RFC 9110 distinguishes HTTP request and response messages, target resources and authorities, origin servers, proxy intermediaries, direct versus proxy routing, redirects, and response status; Moonweave places these protocol facts under broader network concepts.
-    locator: RFC 9110 Sections 3.1-3.7, 4.2-4.3, 6, 7.1-7.4, 10.2, and 15.4
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

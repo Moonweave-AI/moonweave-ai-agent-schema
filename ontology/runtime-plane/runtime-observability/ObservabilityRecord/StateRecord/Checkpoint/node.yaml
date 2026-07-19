@@ -1,7 +1,6 @@
 schema: moonweave.ai/ontology-node/v1
 id: Checkpoint
 kind: concept
-status: accepted
 labels:
   en: checkpoint
   zh: 检查点
@@ -29,6 +28,32 @@ semantics:
       ja: 永続化を実行する CheckpointCaptureActivity、値集合だけの StateSnapshot、二状態間の変化だけを示す StateDiff は含みません。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: Checkpoint 映射 LangGraph checkpoint_id、PostgresSaver 快照键与 StateSnapshot 引用；RestoreActivity 必须指向确切 checkpoint 身份。
+    en: Checkpoint maps LangGraph checkpoint_id, PostgresSaver snapshot keys, and StateSnapshot references; RestoreActivity must reference exact checkpoint identity.
+    ja: Checkpoint は LangGraph checkpoint_id/StateSnapshot を写像し exact identity が restore に必須です。
+  typical_input:
+    - description: OTLP export or LangSmith run tree ingest.
+      format: '{"checkpoint_id":"1f070a87-33b3-6d36-8001-50c306580336","thread_id":"thread-42"}'
+      source_claims:
+        - claim-otel-observability
+        - claim-checkpoint-design
+  typical_output:
+    - description: Moonweave observability record projection.
+      format: '{"checkpoint_id":"checkpoint-330-1","state_snapshot_id":"snap-330-1"}'
+      source_claims:
+        - claim-checkpoint-design
+  reference_implementations:
+    - name: OpenTelemetry OTLP
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      description: Traces and spans → Trace, Span, Metric export.
+    - name: LangSmith
+      url: https://docs.smith.langchain.com/
+      description: Run trees and feedback → RunTree, TraceRecord.
+    - name: LangGraph Checkpoints
+      url: https://langchain-ai.github.io/langgraph/concepts/persistence/
+      description: State snapshots and checkpoint restore events.
 structure:
   identity_keys: []
   fields: []
@@ -36,16 +61,18 @@ structure:
   required_relation_constraints: []
 examples:
   - id: Checkpoint-example-positive-001
-    kind: positive
     labels:
-      zh: 可恢复图执行边界
-      en: Resumable graph-execution boundary
-      ja: 再開可能なグラフ実行境界
-    scenario_id: null
+      zh: LangGraph CheckpointSaver.put
+      en: LangGraph CheckpointSaver.put
+      ja: LangGraph CheckpointSaver.put
     descriptions:
-      zh: 审批节点完成后，检查点记录 thread_id、单调递增的 checkpoint_id、各通道值与版本、已完成写入、下一待执行节点以及状态摘要；恢复器可据此继续同一线程。
-      en: After an approval node completes, a checkpoint records the thread identifier, monotonic checkpoint identifier, channel values and versions, completed writes, the next pending node, and a state digest so execution can resume in the same thread.
-      ja: 承認ノード完了後、チェックポイントはスレッド識別子、単調増加する識別子、チャネル値と版、完了済み書込み、次の待機ノード、状態ダイジェストを記録し、同じスレッドを再開できる。
+      zh: LangGraph checkpointer.put(config, checkpoint, metadata, new_versions) 持久化 checkpoint_id=1f070a87-33b3-6d36-8001-50c306580336、channel_values 与 pending_writes（docs.langchain.com/langgraph/persistence）。
+      en: LangGraph checkpointer.put(config, checkpoint, metadata, new_versions) persists checkpoint_id=1f070a87-33b3-6d36-8001-50c306580336, channel_values, and pending_writes.
+      ja: LangGraph checkpointer.put が checkpoint_id と channel_values を永続化する。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
     field_values:
       record_id: checkpoint-record-cp-approval-27
       record_kind: checkpoint
@@ -61,29 +88,21 @@ examples:
       - Checkpoint-is_a-StateRecord
       - checkpoint_belongs_to_session
       - Checkpoint-references-StateSnapshot
-    expected_result:
-      zh: 该记录可唯一定位一个可恢复版本，并让恢复逻辑找到状态和值得继续的执行位置。
-      en: The record uniquely identifies a resumable version and lets restoration locate both saved state and the next execution position.
-      ja: 記録は再開可能な版を一意に示し、復元処理が保存状態と次の実行位置を特定できる。
-    why_valid_or_invalid:
-      zh: 它同时具备持久化状态版本、线程归属和恢复位置，符合检查点而不仅是普通快照。
-      en: It combines a persisted state version, thread membership, and a resumption position, making it a checkpoint rather than a generic snapshot.
-      ja: 永続化された状態版、スレッド所属、再開位置を併せ持つため、単なるスナップショットではなくチェックポイントである。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-checkpoint-001
+      - claim-checkpoint-design
   - id: Checkpoint-example-boundary-001
-    kind: boundary
     labels:
-      zh: 无恢复坐标的状态副本
-      en: State copy without a resumption coordinate
-      ja: 再開座標を持たない状態コピー
-    scenario_id: null
+      zh: OTel trace 非 Checkpoint
+      en: OTel trace not Checkpoint
+      ja: OTel trace は Checkpoint ではない
     descriptions:
-      zh: 调试面板导出当前变量的 JSON 副本，但未记录 thread_id、checkpoint_id、通道版本、待处理写入或下一节点。它是状态快照材料，却不能作为运行恢复坐标。
-      en: A debug panel exports a JSON copy of current variables but records no thread identifier, checkpoint identifier, channel versions, pending writes, or next node. It is snapshot material, not a runtime resumption coordinate.
-      ja: デバッグ画面が現在変数のJSONコピーを出力するが、スレッドID、チェックポイントID、チャネル版、保留書込み、次ノードを記録しない。これは状態資料であり実行再開座標ではない。
+      zh: OTel trace export JSON 含 trace_id/span 树但无 channel_values/next/checkpoint tuple，不是 LangGraph Checkpoint。
+      en: OTel trace export JSON has trace_id/span tree but no channel_values/next/checkpoint tuple, not LangGraph Checkpoint.
+      ja: OTel trace は LangGraph Checkpoint ではない。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
     field_values: {}
     related_node_ids:
       - Checkpoint
@@ -92,30 +111,48 @@ examples:
     related_relation_ids:
       - Checkpoint-is_a-StateRecord
       - Checkpoint-references-StateSnapshot
-    expected_result:
-      zh: 该对象归入状态快照而非检查点；不得据此声明可无歧义恢复执行。
-      en: The object remains a StateSnapshot rather than a Checkpoint and cannot support an unambiguous resumption claim.
-      ja: 対象はCheckpointではなくStateSnapshotに留まり、曖昧さなく実行再開できるとは主張できない。
-    why_valid_or_invalid:
-      zh: 保存值副本不等于保存执行版本、线程归属和继续位置。
-      en: Copying values is not the same as preserving an execution version, thread identity, and continuation point.
-      ja: 値の複製は、実行版、スレッド識別子、継続位置の保存とは異なる。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-checkpoint-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: StateDiff
-    shared_parent_concept_id: StateRecord
-    differentia:
-      zh: 端点特定对照：父节点 StateRecord：Checkpoint（semantic kind=information，骨架 Checkpoint-is_a-StateRecord）；StateDiff（semantic kind=information，骨架 StateDiff-is_a-StateRecord）。双端条件：Checkpoint 条件：“检查点是一种状态记录（StateRecord），保存会话、版本、创建活动、状态摘要和所引用的 StateSnapshot；捕获动作由 CheckpointActivity 执行，而该记录本身不修改或生成状态”；StateDiff 条件：“状态差异属于状态记录，区别于其他同类对象的条件是：它记录从一个状态快照到另一个状态快照的差别，显示两个已捕获状态之间变化的值、通道、产物或生命周期位置”。条件不得互借；各自成立后方可归类。
-      en: "Endpoint-specific contrast: parent StateRecord: Checkpoint (semantic kind=information, backbone Checkpoint-is_a-StateRecord); StateDiff (semantic kind=information, backbone StateDiff-is_a-StateRecord). Endpoint conditions: Checkpoint condition: “A Checkpoint is a StateRecord that stores session, version, creating activity, state digest, and referenced StateSnapshot; CheckpointActivity performs capture, while the record itself neither mutates nor generates state”; StateDiff condition: “State diff is a state record whose defining condition is that it is a difference record from one state snapshot to another, showing changed values, channels, artifacts, or lifecycle positions between two captured states”. Conditions cannot be borrowed; classify each endpoint only from its own evidence."
-      ja: 端点別対照：親 StateRecord：Checkpoint（semantic kind=information、バックボーン Checkpoint-is_a-StateRecord）；StateDiff（semantic kind=information、バックボーン StateDiff-is_a-StateRecord）。両端条件：Checkpoint の条件：「状態記録に属するチェックポイントは、次の事実を種差とします：それはセッション、版、作成活動、状態要約、参照 StateSnapshot を記録します」；StateDiff の条件：「状態差分は状態記録のうち、次の事実を定義条件とする対象です：それは、ある状態スナップショットから別の状態スナップショットへの差を記録し、二つの捕捉済み状態の間で変化した値、チャネル、成果物、ライフサイクル位置を示します」。条件を流用せず、各端を固有の証拠で分類します。
+      - claim-checkpoint-design
+  - id: Checkpoint-example-3
+    labels:
+      zh: Checkpoint 与 StateSnapshot 边界
+      en: Checkpoint versus StateSnapshot
+      ja: Checkpoint と StateSnapshot 境界
+    descriptions:
+      zh: Checkpoint 是存储 tuple；graph.get_state 返回 StateSnapshot 查询视图；put tuple 与 get_state view 角色不同。
+      en: Checkpoint is storage tuple; graph.get_state returns StateSnapshot query view; put tuple and get_state view have different roles.
+      ja: Checkpoint tuple と StateSnapshot クエリ view は役割が異なる。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
+    field_values: {}
+    related_node_ids:
+      - Checkpoint
+    related_relation_ids: []
     source_claims:
-      - claim-checkpoint-001
+      - claim-checkpoint-design
+      - claim-checkpoint-design
+  - id: Checkpoint-example-4
+    labels:
+      zh: PostgresSaver checkpoint 实例
+      en: PostgresSaver checkpoint instance
+      ja: PostgresSaver checkpoint 事例
+    descriptions:
+      zh: LangGraph PostgresSaver 在 thread_id=thread-1 super-step 后写入 checkpoint，含 pending_writes 支持 HITL interrupt 后 resume。
+      en: LangGraph PostgresSaver writes checkpoint after super-step on thread_id=thread-1 with pending_writes supporting HITL interrupt resume.
+      ja: PostgresSaver checkpoint は HITL resume を支持する。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
+    field_values: {}
+    related_node_ids:
+      - Checkpoint
+    related_relation_ids: []
+    source_claims:
+      - claim-checkpoint-design
+      - claim-checkpoint-design
 parent_relation:
   id: Checkpoint-is_a-StateRecord
   predicate: is_a
@@ -144,70 +181,10 @@ parent_relation:
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: Checkpoint-is_a-StateRecord-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 逐项核实正例
-        en: Point-reviewed positive case
-        ja: 項目別審査の正例
-      scenario_id: null
-      descriptions:
-        zh: cp-12 以 thread_id、checkpoint_id 和 step=12 标识，并引用当时 values、next 与 pending writes。
-        en: cp-12 is identified by thread_id, checkpoint_id, and step=12 and references the values, next nodes, and pending writes at that boundary.
-        ja: cp-12 は thread_id・checkpoint_id・step=12 で識別され、その時点の values・next node・pending write を参照します。
-      field_values: {}
-      related_node_ids:
-        - Checkpoint
-        - StateRecord
-      related_relation_ids:
-        - Checkpoint-is_a-StateRecord
-      expected_result:
-        zh: 仅在所述证据存在时返回这条有向事实。
-        en: Return this directed fact only when the described evidence exists.
-        ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
-      why_valid_or_invalid:
-        zh: 每个 Checkpoint 都是 StateRecord，其种差是用稳定标识固定一个可恢复执行边界，并引用相应状态快照、执行位置和恢复元数据。
-        en: Every Checkpoint is a StateRecord distinguished by a stable identity that fixes a recoverable execution boundary and references its state snapshot, execution position, and recovery metadata.
-        ja: すべての Checkpoint は StateRecord で、安定 ID により回復可能な実行境界を固定し、snapshot・実行位置・回復 metadata を参照する点が種差です。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-checkpoint-002
-    - id: Checkpoint-is_a-StateRecord-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 逐项核实边界例
-        en: Point-reviewed boundary case
-        ja: 項目別審査の境界例
-      scenario_id: null
-      descriptions:
-        zh: 内存调试面板临时显示当前变量，但没有稳定 checkpoint_id，也不能作为恢复起点。
-        en: A debugger temporarily displays current variables but provides no stable checkpoint_id and cannot serve as a recovery point.
-        ja: debugger が現在変数を一時表示しますが、安定 checkpoint_id がなく回復点にもなりません。
-      field_values: {}
-      related_node_ids:
-        - Checkpoint
-        - StateRecord
-      related_relation_ids:
-        - Checkpoint-is_a-StateRecord
-      expected_result:
-        zh: 不得从该边界情形推断这条关系。
-        en: Do not infer this relation from the boundary case.
-        ja: この境界事例から当該関係を推論しません。
-      why_valid_or_invalid:
-        zh: 瞬时状态显示可以是观察结果，却没有检查点所需的持久身份与恢复边界。
-        en: A transient state display may be observable evidence but lacks checkpoint identity and a durable recovery boundary.
-        ja: 一時状態表示は観測証拠でも、Checkpoint の持続 ID と回復境界を欠きます。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-checkpoint-002
   source_claims:
-    - claim-checkpoint-002
+    - claim-checkpoint-design
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations:
   - id: checkpoint_belongs_to_session
@@ -237,70 +214,10 @@ relations:
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
-    examples:
-      - id: checkpoint_belongs_to_session-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 逐项核实正例
-          en: Point-reviewed positive case
-          ja: 項目別審査の正例
-        scenario_id: null
-        descriptions:
-          zh: cp-12 的配置含 thread_id=t-7，状态历史也只在 t-7 范围内按 checkpoint_id 查找。
-          en: cp-12 carries thread_id=t-7 and its checkpoint_id is resolved only within session t-7's state history.
-          ja: cp-12 は thread_id=t-7 を持ち、その checkpoint_id は session t-7 の state history 内だけで解決されます。
-        field_values: {}
-        related_node_ids:
-          - Checkpoint
-          - RuntimeSession
-        related_relation_ids:
-          - checkpoint_belongs_to_session
-        expected_result:
-          zh: 仅在所述证据存在时返回这条有向事实。
-          en: Return this directed fact only when the described evidence exists.
-          ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
-        why_valid_or_invalid:
-          zh: Checkpoint 通过 checkpoint_belongs_to_session 指向其状态所属的 RuntimeSession；该关系固定线程或会话范围，不表示会话是检查点的分类父项。
-          en: checkpoint_belongs_to_session links a Checkpoint to the RuntimeSession whose state it preserves, fixing thread or session scope without classifying the checkpoint as a session.
-          ja: checkpoint_belongs_to_session は Checkpoint を保存対象の RuntimeSession に結び、thread/session scope を固定しますが Checkpoint を Session の下位概念にはしません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-checkpoint-003
-      - id: checkpoint_belongs_to_session-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 逐项核实边界例
-          en: Point-reviewed boundary case
-          ja: 項目別審査の境界例
-        scenario_id: null
-        descriptions:
-          zh: cp-12 和 session t-8 使用同一存储后端，但 checkpoint 配置没有 t-8 的 thread_id。
-          en: cp-12 and session t-8 use the same storage backend, but cp-12's configuration contains no t-8 thread_id.
-          ja: cp-12 と session t-8 は同じ storage backend を使いますが、cp-12 config に t-8 thread_id はありません。
-        field_values: {}
-        related_node_ids:
-          - Checkpoint
-          - RuntimeSession
-        related_relation_ids:
-          - checkpoint_belongs_to_session
-        expected_result:
-          zh: 不得从该边界情形推断这条关系。
-          en: Do not infer this relation from the boundary case.
-          ja: この境界事例から当該関係を推論しません。
-        why_valid_or_invalid:
-          zh: 共享存储位置不能证明会话归属；必须由检查点配置或历史索引明确绑定 session。
-          en: A shared storage location does not prove session membership; checkpoint configuration or history indexing must bind the session explicitly.
-          ja: 共有 storage location は session 所属を証明せず、checkpoint config または history index の明示 binding が必要です。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-checkpoint-003
     source_claims:
-      - claim-checkpoint-003
+      - claim-checkpoint-design
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:RuntimeSession
   - id: Checkpoint-references-StateSnapshot
     predicate: references
@@ -329,114 +246,48 @@ relations:
     temporal_scope: timeless
     boundary_context: null
     constraints: []
-    examples:
-      - id: Checkpoint-references-StateSnapshot-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 逐项核实正例
-          en: Point-reviewed positive case
-          ja: 項目別審査の正例
-        scenario_id: null
-        descriptions:
-          zh: cp-12 保存 snapshot_id=s-12 与 digest=sha256:ab7；读取检查点后可按该引用取得完整 values。
-          en: cp-12 stores snapshot_id=s-12 and digest=sha256:ab7, allowing the complete values to be resolved through that reference.
-          ja: cp-12 が snapshot_id=s-12 と digest=sha256:ab7 を保存し、その参照から完全 values を解決できます。
-        field_values: {}
-        related_node_ids:
-          - Checkpoint
-          - StateSnapshot
-        related_relation_ids:
-          - Checkpoint-references-StateSnapshot
-        expected_result:
-          zh: 仅在所述证据存在时返回这条有向事实。
-          en: Return this directed fact only when the described evidence exists.
-          ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
-        why_valid_or_invalid:
-          zh: Checkpoint 通过 references 指向它所固定的 StateSnapshot 身份；关系保留快照与恢复边界的区别，不把引用对象复制进检查点类型。
-          en: Checkpoint references the StateSnapshot identity fixed at its recovery boundary, preserving the distinction between the snapshot and the checkpoint instead of copying one type into the other.
-          ja: Checkpoint は回復境界で固定した StateSnapshot identity を references し、snapshot と checkpoint の区別を保って一方を他方の type にしません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-checkpoint-004
-      - id: Checkpoint-references-StateSnapshot-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 逐项核实边界例
-          en: Point-reviewed boundary case
-          ja: 項目別審査の境界例
-        scenario_id: null
-        descriptions:
-          zh: cp-12 只与 s-12 在同一批次写入，但没有 snapshot_id、digest 或其他引用键。
-          en: cp-12 and s-12 are written in the same batch but no snapshot_id, digest, or other reference key connects them.
-          ja: cp-12 と s-12 は同じ batch で書かれますが snapshot_id・digest・他 reference key で接続されません。
-        field_values: {}
-        related_node_ids:
-          - Checkpoint
-          - StateSnapshot
-        related_relation_ids:
-          - Checkpoint-references-StateSnapshot
-        expected_result:
-          zh: 不得从该边界情形推断这条关系。
-          en: Do not infer this relation from the boundary case.
-          ja: この境界事例から当該関係を推論しません。
-        why_valid_or_invalid:
-          zh: 同批次共现不能确定检查点固定了哪个快照；必须存在稳定引用。
-          en: Batch co-occurrence cannot identify which snapshot the checkpoint fixes; a stable reference is required.
-          ja: 同一 batch の共起だけでは Checkpoint が固定する snapshot を特定できず、安定 reference が必要です。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-checkpoint-004
     source_claims:
-      - claim-checkpoint-004
+      - claim-checkpoint-design
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:StateSnapshot
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-runtime-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenTelemetry、W3C Trace Context 与 LangGraph checkpoint/replay 逐项核验，TraceSpan 与 Checkpoint 语义成立。
-    en: Verified against OpenTelemetry, W3C Trace Context, and LangGraph checkpoint/replay. TraceSpan and Checkpoint semantics hold.
-    ja: OpenTelemetry、W3C Trace Context、LangGraph checkpoint/replay に照らし TraceSpan と Checkpoint semantics を確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-otel-protocol
+    title: OpenTelemetry Protocol Specification
+    url: https://opentelemetry.io/docs/specs/otel/protocol/
+    source_type: official-spec
+    relevance: OTLP traceId, spanId, parent links, status codes.
+  - id: src-langsmith
+    title: LangSmith Documentation
+    url: https://docs.smith.langchain.com/
+    source_type: official-doc
+    relevance: Run trees with parent_run_id and nested child runs.
+  - id: src-langgraph-checkpoints
+    title: LangGraph Persistence
+    url: https://langchain-ai.github.io/langgraph/concepts/persistence/
+    source_type: official-doc
+    relevance: Checkpoint and StateSnapshot capture for recovery.
+  - id: src-runtime-observability-design
+    title: Moonweave runtime-observability module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: TraceSpan, Checkpoint, TraceEvent boundaries versus Execution.
 source_claims:
-  - id: claim-checkpoint-001
-    source: eng-fw-langgraph-persistence
-    supports: LangGraph identifies persisted graph-state checkpoints by thread and checkpoint configuration and uses them for resume, time travel, and fault tolerance; Moonweave models that durable boundary as a StateRecord.
-    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
+  - id: claim-otel-observability
+    source: src-otel-protocol
+    supports: OpenTelemetry OTLP export provides traceId, spanId, and parent links for TraceSpan mapping.
+    locator: OTLP > TracesData
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-checkpoint-002
-    source: eng-fw-langgraph-persistence
-    supports: Every Checkpoint is a StateRecord distinguished by a stable identity that fixes a recoverable execution boundary and references its state snapshot, execution position, and recovery metadata. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
-    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
+  - id: claim-langsmith-observability
+    source: src-langsmith
+    supports: LangSmith run trees expose parent_run_id hierarchy mappable to TraceRecord.
+    locator: Runs > run tree
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-checkpoint-003
-    source: eng-fw-langgraph-persistence
-    supports: checkpoint_belongs_to_session links a Checkpoint to the RuntimeSession whose state it preserves, fixing thread or session scope without classifying the checkpoint as a session. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
-    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
+  - id: claim-checkpoint-design
+    source: src-runtime-observability-design
+    supports: Checkpoint is recoverable state boundary for replay and restore.
+    locator: Checkpoint boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-checkpoint-004
-    source: eng-fw-langgraph-persistence
-    supports: Checkpoint references the StateSnapshot identity fixed at its recovery boundary, preserving the distinction between the snapshot and the checkpoint instead of copying one type into the other. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
-    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-

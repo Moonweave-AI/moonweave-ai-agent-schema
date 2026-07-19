@@ -1,7 +1,6 @@
 schema: moonweave.ai/ontology-node/v1
 id: CheckpointCaptureActivity
 kind: concept
-status: accepted
 labels:
   zh: 检查点捕获活动
   en: checkpoint capture activity
@@ -29,6 +28,33 @@ semantics:
       ja: 既存 checkpoint を読む復元、軌跡を再実行する再生、checkpoint record 自体を除外します。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: 集成 CheckpointCaptureActivity 时应分别映射 OpenTelemetry OTLP traces/spans, LangSmith run trees, LangGraph checkpoint snapshots；静态配置属于其他域，实际运行 occurrence 才写入本概念。
+    en: When integrating CheckpointCaptureActivity, map OpenTelemetry OTLP traces/spans, LangSmith run trees, LangGraph checkpoint snapshots separately; static configuration belongs elsewhere and only runtime occurrences belong here.
+    ja: CheckpointCaptureActivity 統合時は OpenTelemetry OTLP traces/spans, LangSmith run trees, LangGraph checkpoint snapshots を個別写像し、静的設定は他ドメイン、runtime occurrence のみ本 concept に属します。
+  typical_input:
+    - description: Vendor API payload mappable to CheckpointCaptureActivity.
+      format: |-
+        # Example CheckpointCaptureActivity ingest
+        { "checkpoint-capture-activity_ref": "example-1" }
+      source_claims:
+        - claim-checkpoint-capture-activity-design
+  typical_output:
+    - description: Moonweave-local CheckpointCaptureActivity projection.
+      format: '{ "schema_owner": "moonweave-local-design", "checkpoint-capture-activity_id": "example-1" }'
+      source_claims:
+        - claim-checkpoint-capture-activity-design
+  reference_implementations:
+    - name: OpenTelemetry OTLP
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      description: Traces and spans → Trace, Span, Metric export.
+    - name: LangSmith
+      url: https://docs.smith.langchain.com/
+      description: Run trees and feedback → RunTree, TraceRecord.
+    - name: LangGraph Checkpoints
+      url: https://langchain-ai.github.io/langgraph/concepts/persistence/
+      description: State snapshots and checkpoint restore events.
 structure:
   identity_keys: []
   fields: []
@@ -36,16 +62,18 @@ structure:
   required_relation_constraints: []
 examples:
   - id: CheckpointCaptureActivity-example-positive-manual-001
-    kind: positive
     labels:
-      zh: 检查点捕获正例
-      en: Positive checkpoint capture example
-      ja: checkpoint 取得の正例
-    scenario_id: null
+      zh: LangGraph checkpointer.put 捕获
+      en: LangGraph checkpointer.put capture
+      ja: LangGraph checkpointer.put キャプチャ
     descriptions:
-      zh: capture-12 在线程 t-7 的 super-step 12 结束时读取 channel values、next nodes 与 task metadata，生成 StateSnapshot snapshot-12，并通过新 checkpoint_id=cp-12 和 parent_config=cp-11 将其持久化。
-      en: At the end of super-step 12 in thread t-7, capture-12 reads channel values, next nodes, and task metadata, forms StateSnapshot snapshot-12, and persists it under new checkpoint ID cp-12 with parent_config cp-11.
-      ja: capture-12 は thread t-7 の super-step 12 終了時に channel values・next nodes・task metadata を読み、StateSnapshot snapshot-12 を形成し、新しい checkpoint ID cp-12 と parent_config cp-11 で永続化します。
+      zh: LangGraph checkpointer.put(config, checkpoint, metadata, new_versions) 在 super-step 结束捕获 CheckpointCaptureActivity，写入 checkpoint_id 与 channel_values。
+      en: LangGraph checkpointer.put(config, checkpoint, metadata, new_versions) at super-step end captures CheckpointCaptureActivity writing checkpoint_id and channel_values.
+      ja: checkpointer.put が CheckpointCaptureActivity として super-step checkpoint を捕獲する。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
     field_values:
       lifecycle_activity_id: checkpoint-capture-t7-s12
       lifecycle_operation: capture
@@ -61,29 +89,21 @@ examples:
       - CheckpointLifecycleActivity
     related_relation_ids:
       - CheckpointCaptureActivity-is_a-CheckpointLifecycleActivity
-    expected_result:
-      zh: 把 capture-12 识别为 CheckpointCaptureActivity，并把新建的 cp-12 与 snapshot-12 作为其输出证据；不得把同一活动解释为恢复或回放。
-      en: Classify capture-12 as CheckpointCaptureActivity and retain newly created cp-12 and snapshot-12 as its output evidence; do not reinterpret the same activity as restore or replay.
-      ja: capture-12 を CheckpointCaptureActivity とし、新規 cp-12 と snapshot-12 を出力証拠として保持します。同じ活動を restore または replay と解釈しません。
-    why_valid_or_invalid:
-      zh: 该活动不仅读取当前状态，还第一次形成具有新 checkpoint_id、父检查点引用和创建时间的可恢复边界；创建新边界正是捕获与恢复、回放之间的种差。
-      en: "The activity does more than read current state: it first forms an addressable recovery boundary with a new checkpoint ID, parent reference, and creation time. Creating that new boundary is the differentia from restore and replay."
-      ja: この活動は現在状態を読むだけでなく、新しい checkpoint ID、親参照、作成時刻を持つ回復境界を初めて形成します。この新境界の作成が restore・replay との種差です。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-checkpoint-capture-activity-001
+      - claim-checkpoint-capture-activity-design
   - id: CheckpointCaptureActivity-example-boundary-manual-001
-    kind: boundary
     labels:
-      zh: 检查点捕获边界例
-      en: Checkpoint capture boundary example
-      ja: checkpoint 取得の境界例
-    scenario_id: null
+      zh: 手动 JSON 快照非 CaptureActivity
+      en: Manual JSON snapshot not CaptureActivity
+      ja: 手動 JSON スナップショットは CaptureActivity ではない
     descriptions:
-      zh: restore-13 使用既有 thread_id=t-7 与 checkpoint_id=cp-12 读取 snapshot-12，重建 channel values 并从 next 节点继续；它没有分配新 checkpoint_id，也没有写出新的 StateSnapshot。
-      en: restore-13 uses existing thread ID t-7 and checkpoint ID cp-12 to read snapshot-12, reconstruct channel values, and continue from next; it allocates no new checkpoint ID and writes no new StateSnapshot.
-      ja: restore-13 は既存 thread ID t-7 と checkpoint ID cp-12 で snapshot-12 を読み、channel values を再構成して next から継続します。新しい checkpoint ID を割り当てず、新規 StateSnapshot も書きません。
+      zh: 开发者手动 json.dump(state) 到 /tmp/snap.json 无 checkpointer.put metadata/new_versions，不是 CheckpointCaptureActivity。
+      en: Developer manual json.dump(state) to /tmp/snap.json without checkpointer.put metadata/new_versions is not CheckpointCaptureActivity.
+      ja: 手動 json.dump は CheckpointCaptureActivity ではない。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
     field_values: {}
     related_node_ids:
       - CheckpointCaptureActivity
@@ -91,22 +111,48 @@ examples:
       - CheckpointLifecycleActivity
     related_relation_ids:
       - CheckpointCaptureActivity-is_a-CheckpointLifecycleActivity
-    expected_result:
-      zh: 把 restore-13 归为 RestoreActivity，并明确拒绝 CheckpointCaptureActivity；既有检查点仍是输入而不是该活动新创建的输出。
-      en: Classify restore-13 as RestoreActivity and explicitly reject CheckpointCaptureActivity; the existing checkpoint remains its input rather than a newly created output.
-      ja: restore-13 を RestoreActivity とし CheckpointCaptureActivity を明示的に否定します。既存 checkpoint は入力であり、この活動が新規作成した出力ではありません。
-    why_valid_or_invalid:
-      zh: 读取并应用既有状态边界满足恢复语义，却缺少捕获所必需的新快照身份、持久化写入和父检查点链更新；共享同一 checkpoint 不能消除两类活动的方向差异。
-      en: Reading and applying an existing state boundary satisfies restore semantics but lacks the new snapshot identity, persistence write, and parent-checkpoint update required by capture. Sharing one checkpoint does not erase the directional difference.
-      ja: 既存状態境界の読取と適用は restore semantics を満たしますが、capture に必要な新 snapshot identity、永続化 write、親 checkpoint chain 更新を欠きます。同じ checkpoint の共有は方向差を消しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-checkpoint-capture-activity-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-checkpoint-capture-activity-design
+  - id: CheckpointCaptureActivity-example-3
+    labels:
+      zh: Capture 与 StateSnapshot 边界
+      en: Capture versus StateSnapshot boundary
+      ja: Capture と StateSnapshot 境界
+    descriptions:
+      zh: CheckpointCaptureActivity 是写 checkpoint 的 Activity；StateSnapshot 是 get_state 读视图；capture 写、snapshot 读。
+      en: CheckpointCaptureActivity is Activity writing checkpoint; StateSnapshot is get_state read view; capture writes, snapshot reads.
+      ja: Capture は書込 Activity、Snapshot は読取 view である。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
+    field_values: {}
+    related_node_ids:
+      - CheckpointCaptureActivity
+    related_relation_ids: []
+    source_claims:
+      - claim-checkpoint-capture-activity-vendor
+      - claim-checkpoint-capture-activity-design
+  - id: CheckpointCaptureActivity-example-4
+    labels:
+      zh: super-step checkpoint 捕获实例
+      en: super-step checkpoint capture instance
+      ja: super-step checkpoint キャプチャ事例
+    descriptions:
+      zh: CheckpointCaptureActivity activity_id=cp-capture-31、checkpoint_id=1f070a87-33b3-6d36-8001-50c306580336、thread_id=thread-1、captured_at=2026-01-15T10:00:01Z。
+      en: CheckpointCaptureActivity activity_id=cp-capture-31, checkpoint_id=1f070a87-33b3-6d36-8001-50c306580336, thread_id=thread-1, captured_at=2026-01-15T10:00:01Z.
+      ja: cp-capture-31 が super-step checkpoint を捕獲する。
+    example_source:
+      product: OpenTelemetry
+      url: https://opentelemetry.io/docs/specs/otel/protocol/
+      version: OTLP traces
+    field_values: {}
+    related_node_ids:
+      - CheckpointCaptureActivity
+    related_relation_ids: []
+    source_claims:
+      - claim-checkpoint-capture-activity-vendor
+      - claim-checkpoint-capture-activity-design
 parent_relation:
   id: CheckpointCaptureActivity-is_a-CheckpointLifecycleActivity
   predicate: is_a
@@ -135,70 +181,10 @@ parent_relation:
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: CheckpointCaptureActivity-is_a-CheckpointLifecycleActivity-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 逐项核实正例
-        en: Point-reviewed positive case
-        ja: 項目別審査の正例
-      scenario_id: null
-      descriptions:
-        zh: 线程 t-7 在 super-step 12 保存 channel 值、next、metadata 与 tasks，并创建 cp-12。
-        en: Thread t-7 saves channel values, next, metadata, and tasks at super-step 12 and creates cp-12.
-        ja: thread t-7 が super-step 12 の channel 値・next・metadata・tasks を保存し cp-12 を作ります。
-      field_values: {}
-      related_node_ids:
-        - CheckpointCaptureActivity
-        - CheckpointLifecycleActivity
-      related_relation_ids:
-        - CheckpointCaptureActivity-is_a-CheckpointLifecycleActivity
-      expected_result:
-        zh: 仅在所述证据存在时返回这条有向事实。
-        en: Return this directed fact only when the described evidence exists.
-        ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
-      why_valid_or_invalid:
-        zh: 每个 CheckpointCaptureActivity 都是 CheckpointLifecycleActivity，其种差是在确定执行位置读取当前可恢复状态并创建新的检查点记录。
-        en: Every CheckpointCaptureActivity is a CheckpointLifecycleActivity distinguished by reading current recoverable state at a determined execution position and creating a new checkpoint record.
-        ja: すべての CheckpointCaptureActivity は CheckpointLifecycleActivity で、確定した実行位置の回復可能状態を読み新 Checkpoint を作る点が種差です。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-checkpoint-capture-activity-002
-    - id: CheckpointCaptureActivity-is_a-CheckpointLifecycleActivity-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 逐项核实边界例
-        en: Point-reviewed boundary case
-        ja: 項目別審査の境界例
-      scenario_id: null
-      descriptions:
-        zh: 恢复过程读取已存在的 cp-12，却没有产生任何新的检查点标识。
-        en: A restore process reads existing cp-12 but creates no new checkpoint identity.
-        ja: restore 処理が既存 cp-12 を読みますが、新しい Checkpoint 識別子は作りません。
-      field_values: {}
-      related_node_ids:
-        - CheckpointCaptureActivity
-        - CheckpointLifecycleActivity
-      related_relation_ids:
-        - CheckpointCaptureActivity-is_a-CheckpointLifecycleActivity
-      expected_result:
-        zh: 不得从该边界情形推断这条关系。
-        en: Do not infer this relation from the boundary case.
-        ja: この境界事例から当該関係を推論しません。
-      why_valid_or_invalid:
-        zh: 读取既有检查点不满足“创建新状态边界”的捕获种差。
-        en: Reading an existing checkpoint does not satisfy capture's new-state-boundary differentia.
-        ja: 既存 Checkpoint の読取は、新しい状態境界を作る capture の種差を満たしません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-checkpoint-capture-activity-002
   source_claims:
-    - claim-checkpoint-capture-activity-002
+    - claim-checkpoint-capture-activity-design
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations:
   - id: CheckpointCaptureActivity-captures-StateSnapshot
@@ -228,70 +214,10 @@ relations:
     temporal_scope: timeless
     boundary_context: null
     constraints: []
-    examples:
-      - id: CheckpointCaptureActivity-captures-StateSnapshot-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 逐项核实正例
-          en: Point-reviewed positive case
-          ja: 項目別審査の正例
-        scenario_id: null
-        descriptions:
-          zh: capture-12 在 super-step 12 读取 channel values、next 与 tasks，生成 snapshot s-12。
-          en: capture-12 reads channel values, next, and tasks at super-step 12 and forms snapshot s-12.
-          ja: capture-12 が super-step 12 の channel values・next・tasks を読み snapshot s-12 を形成します。
-        field_values: {}
-        related_node_ids:
-          - CheckpointCaptureActivity
-          - StateSnapshot
-        related_relation_ids:
-          - CheckpointCaptureActivity-captures-StateSnapshot
-        expected_result:
-          zh: 仅在所述证据存在时返回这条有向事实。
-          en: Return this directed fact only when the described evidence exists.
-          ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
-        why_valid_or_invalid:
-          zh: CheckpointCaptureActivity 通过 captures 指向它在确定执行位置读取并冻结为一致视图的 StateSnapshot。
-          en: CheckpointCaptureActivity captures the StateSnapshot it reads and freezes as a consistent view at a determined execution position.
-          ja: CheckpointCaptureActivity は確定実行位置で読み、一貫 view として固定した StateSnapshot を captures します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-checkpoint-capture-activity-003
-      - id: CheckpointCaptureActivity-captures-StateSnapshot-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 逐项核实边界例
-          en: Point-reviewed boundary case
-          ja: 項目別審査の境界例
-        scenario_id: null
-        descriptions:
-          zh: capture-12 仅计算状态摘要 hash，却从未读取或形成完整一致状态视图。
-          en: capture-12 computes only a state-summary hash and never reads or forms a complete consistent state view.
-          ja: capture-12 は state-summary hash だけを計算し、完全で一貫した状態 view を読み形成しません。
-        field_values: {}
-        related_node_ids:
-          - CheckpointCaptureActivity
-          - StateSnapshot
-        related_relation_ids:
-          - CheckpointCaptureActivity-captures-StateSnapshot
-        expected_result:
-          zh: 不得从该边界情形推断这条关系。
-          en: Do not infer this relation from the boundary case.
-          ja: この境界事例から当該関係を推論しません。
-        why_valid_or_invalid:
-          zh: 摘要哈希可以辅助完整性校验，但单独并不是被捕获的 StateSnapshot。
-          en: A summary hash may support integrity checking but is not by itself the captured StateSnapshot.
-          ja: summary hash は integrity 検査を助けても、それ自体は capture された StateSnapshot ではありません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-checkpoint-capture-activity-003
     source_claims:
-      - claim-checkpoint-capture-activity-003
+      - claim-checkpoint-capture-activity-design
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:StateSnapshot
   - id: CheckpointCaptureActivity-produces-Checkpoint
     predicate: produces
@@ -320,114 +246,42 @@ relations:
     temporal_scope: timeless
     boundary_context: null
     constraints: []
-    examples:
-      - id: CheckpointCaptureActivity-produces-Checkpoint-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 逐项核实正例
-          en: Point-reviewed positive case
-          ja: 項目別審査の正例
-        scenario_id: null
-        descriptions:
-          zh: capture-12 完成后写入 checkpoint_id=cp-12、thread_id=t-7、step=12 与 snapshot 引用。
-          en: After capture-12 completes, it writes checkpoint_id=cp-12, thread_id=t-7, step=12, and the snapshot reference.
-          ja: capture-12 完了後、checkpoint_id=cp-12・thread_id=t-7・step=12・snapshot reference を書きます。
-        field_values: {}
-        related_node_ids:
-          - CheckpointCaptureActivity
-          - Checkpoint
-        related_relation_ids:
-          - CheckpointCaptureActivity-produces-Checkpoint
-        expected_result:
-          zh: 仅在所述证据存在时返回这条有向事实。
-          en: Return this directed fact only when the described evidence exists.
-          ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
-        why_valid_or_invalid:
-          zh: CheckpointCaptureActivity 通过 produces 指向该次捕获新创建的 Checkpoint 记录；产物具有新的稳定检查点身份。
-          en: CheckpointCaptureActivity produces the newly identified Checkpoint record created by that capture, and the output has a new stable checkpoint identity.
-          ja: CheckpointCaptureActivity は当該 capture が新規作成した Checkpoint record を produces し、output は新しい安定 checkpoint identity を持ちます。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-checkpoint-capture-activity-004
-      - id: CheckpointCaptureActivity-produces-Checkpoint-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 逐项核实边界例
-          en: Point-reviewed boundary case
-          ja: 項目別審査の境界例
-        scenario_id: null
-        descriptions:
-          zh: 健康检查读取 cp-12 并验证 digest，但没有创建新 checkpoint_id。
-          en: A health check reads cp-12 and verifies its digest but creates no new checkpoint_id.
-          ja: health check が cp-12 を読み digest を検証しますが、新 checkpoint_id を作りません。
-        field_values: {}
-        related_node_ids:
-          - CheckpointCaptureActivity
-          - Checkpoint
-        related_relation_ids:
-          - CheckpointCaptureActivity-produces-Checkpoint
-        expected_result:
-          zh: 不得从该边界情形推断这条关系。
-          en: Do not infer this relation from the boundary case.
-          ja: この境界事例から当該関係を推論しません。
-        why_valid_or_invalid:
-          zh: 读取或验证既有检查点不构成 produces；关系要求新记录由该活动产生。
-          en: Reading or verifying an existing checkpoint is not produces; the activity must create a new record.
-          ja: 既存 Checkpoint の読取・検証は produces ではなく、活動が新 record を作る必要があります。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-checkpoint-capture-activity-004
     source_claims:
-      - claim-checkpoint-capture-activity-004
+      - claim-checkpoint-capture-activity-design
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:Checkpoint
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-runtime-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenTelemetry、W3C Trace Context 与 LangGraph checkpoint/replay 逐项核验，TraceSpan 与 Checkpoint 语义成立。
-    en: Verified against OpenTelemetry, W3C Trace Context, and LangGraph checkpoint/replay. TraceSpan and Checkpoint semantics hold.
-    ja: OpenTelemetry、W3C Trace Context、LangGraph checkpoint/replay に照らし TraceSpan と Checkpoint semantics を確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: src-otel-protocol
+    title: OpenTelemetry Protocol Specification
+    url: https://opentelemetry.io/docs/specs/otel/protocol/
+    source_type: official-spec
+    relevance: OTLP traceId, spanId, parent links, status codes.
+  - id: src-langsmith
+    title: LangSmith Documentation
+    url: https://docs.smith.langchain.com/
+    source_type: official-doc
+    relevance: Run trees with parent_run_id and nested child runs.
+  - id: src-langgraph-checkpoints
+    title: LangGraph Persistence
+    url: https://langchain-ai.github.io/langgraph/concepts/persistence/
+    source_type: official-doc
+    relevance: Checkpoint and StateSnapshot capture for recovery.
+  - id: src-runtime-observability-design
+    title: Moonweave runtime-observability module boundary design
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: TraceSpan, Checkpoint, TraceEvent boundaries versus Execution.
 source_claims:
-  - id: claim-checkpoint-capture-activity-001
-    source: eng-fw-langgraph-persistence
-    supports: LangGraph saves a StateSnapshot as a checkpoint at graph execution steps; this supports an explicit capture activity that creates, rather than merely reads, a checkpoint.
-    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
+  - id: claim-checkpoint-capture-activity-vendor
+    source: src-otel-protocol
+    supports: runtime-observability vendor evidence supports CheckpointCaptureActivity identity and boundary mapping.
+    locator: CheckpointCaptureActivity integration
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-checkpoint-capture-activity-002
-    source: eng-fw-langgraph-persistence
-    supports: Every CheckpointCaptureActivity is a CheckpointLifecycleActivity distinguished by reading current recoverable state at a determined execution position and creating a new checkpoint record. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
-    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
+  - id: claim-checkpoint-capture-activity-design
+    source: src-runtime-observability-design
+    supports: Moonweave CheckpointCaptureActivity concept boundary within runtime-observability.
+    locator: CheckpointCaptureActivity boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-checkpoint-capture-activity-003
-    source: eng-fw-langgraph-persistence
-    supports: CheckpointCaptureActivity captures the StateSnapshot it reads and freezes as a consistent view at a determined execution position. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
-    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-checkpoint-capture-activity-004
-    source: eng-fw-langgraph-persistence
-    supports: CheckpointCaptureActivity produces the newly identified Checkpoint record created by that capture, and the output has a new stable checkpoint identity. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
-    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-

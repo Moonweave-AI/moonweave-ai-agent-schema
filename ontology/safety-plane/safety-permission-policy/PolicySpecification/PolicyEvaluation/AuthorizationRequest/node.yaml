@@ -1,24 +1,23 @@
 schema: moonweave.ai/ontology-node/v1
 id: AuthorizationRequest
 kind: concept
-status: accepted
 labels:
   zh: 授权请求
   en: authorization request
   ja: 認可要求
 semantics:
   short_definition:
-    zh: 把一个主体、动作、资源和当时上下文绑定为一次授权判断输入的不可变记录。
-    en: An immutable record binding one principal, action, resource, and contemporaneous context as input to an authorization decision.
-    ja: 一つの主体・操作・資源・当時文脈を一回の認可判断入力へ束縛する不変記録です。
+    zh: 主体对资源执行动作的一次不可变授权问题快照。
+    en: One immutable authorization question snapshot of a principal requesting action on a resource.
+    ja: 主体が資源に対して操作を求める一回の immutable 認可問題スナップショット。
   definition:
-    zh: 授权请求是一次授权问题的信息记录，以 request_id 唯一标识，并固定主体引用、请求动作、目标资源、目的、请求时间、上下文摘要及请求的 PermissionScope。后续评估、提示或决定都引用它；请求描述想做什么，但不证明主体已经获准。
-    en: An AuthorizationRequest is the information record for one authorization question, uniquely identified by request_id and fixing the principal reference, requested action, target resource, purpose, request time, context digest, and requested PermissionScope. Later evaluation, prompt, or decision references it; the request states what is sought but does not prove authority.
-    ja: AuthorizationRequest は一つの認可問題を表す情報記録で、request_id により一意に識別され、主体参照、要求操作、対象資源、目的、要求時刻、文脈ダイジェスト、要求 PermissionScope を固定します。後続評価・提示・判断が参照しますが、要求は希望を表すだけで権限を証明しません。
+    zh: AuthorizationRequest 以 request_id 标识不可变快照，包含 principal_ref、action、resource_ref、argument_digest、context 与 requested_scope_ref。MCP OAuth authorize 请求（client_id、scope、resource indicator）、Cursor 拦截的 shell 命令、Claude Bash/MCP 工具调用计划与 OPA input JSON 都应映射为 AuthorizationRequest；参数或上下文变化必须产生新 request_id。
+    en: AuthorizationRequest is an immutable snapshot identified by request_id with principal_ref, action, resource_ref, argument_digest, context, and requested_scope_ref. MCP OAuth authorize requests (client_id, scope, resource indicator), Cursor intercepted shell commands, Claude Bash/MCP tool call plans, and OPA input JSON map here; any argument or context change must yield a new request_id.
+    ja: AuthorizationRequest は request_id で immutable snapshot を識別し principal_ref/action/resource_ref/argument_digest/context/requested_scope_ref を含む。MCP OAuth authorize、Cursor shell command、Claude Bash/MCP plan、OPA input JSON を写像。引数/context 変更は新 request_id 必須。
   why_needed:
-    zh: 不可变请求把“判断了什么”与策略版本和最终决定关联起来，避免在批准后改写参数造成范围漂移。
-    en: An immutable request links exactly what was decided to the policy version and outcome, preventing argument or scope drift after approval.
-    ja: 不変要求は判断対象を方針版と結果へ結び、承認後の引数・範囲ドリフトを防ぎます。
+    zh: 授权对象身份必须稳定；把“相似 curl”当作同一 request 会导致 stale decision 复用。
+    en: Authorization object identity must be stable; treating similar curl commands as one request enables stale decision reuse.
+    ja: 認可対象 identity は安定必須。類似 curl を同一 request とすると stale decision 再利用が起きます。
   includes:
     - zh: 包含请求标识、主体、动作、资源、上下文摘要、目的、时间和所请求范围。
       en: Includes request identity, principal, action, resource, context digest, purpose, time, and requested scope.
@@ -29,6 +28,41 @@ semantics:
       ja: 方針評価、許可・拒否結果、人間応答、認可付与、実際のツール呼出を含みません。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: 生成 request_id 时 hash principal+action+resource+argument_digest+context；MCP authorize URL 参数与 OPA input 字段一一映射；ToolApprovalGate 验证 attempt 与 request 摘要完全一致。
+    en: When generating request_id, hash principal+action+resource+argument_digest+context; map MCP authorize URL parameters and OPA input fields one-to-one; ToolApprovalGate verifies attempt matches request digest exactly.
+    ja: request_id 生成時 principal+action+resource+argument_digest+context を hash。MCP authorize URL パラメータと OPA input を 1:1 写像。ToolApprovalGate は attempt と request digest 完全一致を検証。
+  typical_input:
+    - description: MCP OAuth authorize request.
+      format: client_id, scope, resource, redirect_uri, code_challenge
+      source_claims:
+        - claim-authorization-request-design
+    - description: OPA decision input.
+      format: '{"input":{"subject","object","action","environment"}}'
+      source_claims:
+        - claim-authorization-request-design
+  typical_output:
+    - description: Immutable request record.
+      format: '{"request_id":"request-42","principal_ref":"agent:planner-1","action":"invoke_tool","resource_ref":"tool:search_documents"}'
+      source_claims:
+        - claim-authorization-request-design
+  reference_implementations:
+    - name: MCP Authorization (2025-06-18)
+      url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+      description: OAuth 2.1 flows, scopes, and resource indicators.
+    - name: Open Policy Agent
+      url: https://www.openpolicyagent.org/docs/latest/policy-language/
+      description: Rego policies and decision queries.
+    - name: OASIS XACML 3.0
+      url: https://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-cos01-en.html
+      description: Permit/Deny/NotApplicable and combining algorithms.
+    - name: Cursor Agent Terminal
+      url: https://cursor.com/docs/agent/terminal
+      description: Command approval dialogs and sandbox modes.
+    - name: Claude Code permissions
+      url: https://docs.anthropic.com/en/docs/claude-code/permissions
+      description: yesAllow, allowForSession, and tool permission modes.
 structure:
   identity_keys:
     - request_id
@@ -51,9 +85,9 @@ structure:
       pattern: null
       example_value: request-42
       source_claims:
-        - claim-authorization-request-001
-        - claim-authorization-request-002
-        - claim-authorization-request-003
+        - claim-authorization-request-design
+        - claim-authorization-request-design
+        - claim-authorization-request-design
     - id: subject_ref
       labels:
         zh: 主体引用
@@ -72,9 +106,9 @@ structure:
       pattern: null
       example_value: agent:planner-1
       source_claims:
-        - claim-authorization-request-001
-        - claim-authorization-request-002
-        - claim-authorization-request-003
+        - claim-authorization-request-design
+        - claim-authorization-request-design
+        - claim-authorization-request-design
     - id: action
       labels:
         zh: 请求动作
@@ -93,9 +127,9 @@ structure:
       pattern: null
       example_value: invoke_tool
       source_claims:
-        - claim-authorization-request-001
-        - claim-authorization-request-002
-        - claim-authorization-request-003
+        - claim-authorization-request-design
+        - claim-authorization-request-design
+        - claim-authorization-request-design
     - id: resource_ref
       labels:
         zh: 资源引用
@@ -114,9 +148,9 @@ structure:
       pattern: null
       example_value: tool:search_documents
       source_claims:
-        - claim-authorization-request-001
-        - claim-authorization-request-002
-        - claim-authorization-request-003
+        - claim-authorization-request-design
+        - claim-authorization-request-design
+        - claim-authorization-request-design
     - id: context_digest
       labels:
         zh: 上下文摘要
@@ -135,9 +169,9 @@ structure:
       pattern: null
       example_value: sha256:42ab
       source_claims:
-        - claim-authorization-request-001
-        - claim-authorization-request-002
-        - claim-authorization-request-003
+        - claim-authorization-request-design
+        - claim-authorization-request-design
+        - claim-authorization-request-design
     - id: purpose
       labels:
         zh: 请求目的
@@ -156,9 +190,9 @@ structure:
       pattern: null
       example_value: answer user question
       source_claims:
-        - claim-authorization-request-001
-        - claim-authorization-request-002
-        - claim-authorization-request-003
+        - claim-authorization-request-design
+        - claim-authorization-request-design
+        - claim-authorization-request-design
     - id: requested_at
       labels:
         zh: 请求时间
@@ -177,9 +211,9 @@ structure:
       pattern: null
       example_value: 2026-07-16T01:20:00Z
       source_claims:
-        - claim-authorization-request-001
-        - claim-authorization-request-002
-        - claim-authorization-request-003
+        - claim-authorization-request-design
+        - claim-authorization-request-design
+        - claim-authorization-request-design
     - id: requested_scope_ref
       labels:
         zh: 请求范围引用
@@ -198,89 +232,102 @@ structure:
       pattern: null
       example_value: scope-search-read
       source_claims:
-        - claim-authorization-request-001
-        - claim-authorization-request-002
-        - claim-authorization-request-003
+        - claim-authorization-request-design
+        - claim-authorization-request-design
+        - claim-authorization-request-design
   constraints: []
   required_relation_constraints: []
 examples:
-  - id: AuthorizationRequest-example-positive-manual-001
-    kind: positive
+  - id: AuthorizationRequest-mcp-oauth
     labels:
-      zh: 授权请求正例
-      en: Positive authorization request case
-      ja: 認可要求の正例
-    scenario_id: null
+      zh: MCP OAuth 授权请求
+      en: MCP OAuth authorization request
+      ja: MCP OAuth authorization request
     descriptions:
-      zh: request-42 固定 agent:planner-1 对 tool:search_documents 执行 invoke_tool 的请求、上下文摘要和只读搜索范围；评估前后这些字段均不可改写。
-      en: request-42 fixes agent:planner-1's invoke_tool request for tool:search_documents, its context digest, and read-only search scope; those fields cannot be rewritten before or after evaluation.
-      ja: request-42 は agent:planner-1 の tool:search_documents への invoke_tool 要求、文脈ダイジェスト、読取専用検索範囲を固定し、評価前後に書き換えません。
+      zh: request-mcp-42 绑定 client_id=mcp-client-1、scope=tools:read tools:call、resource=https://mcp.example.com。
+      en: request-mcp-42 binds client_id=mcp-client-1, scope=tools:read tools:call, resource=https://mcp.example.com.
+      ja: request-mcp-42 が client_id/scope/resource を束縛。
+    example_source:
+      product: MCP Authorization
+      url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+      version: authorize endpoint
     field_values:
-      request_id: request-42
-      subject_ref: agent:planner-1
-      action: invoke_tool
-      resource_ref: tool:search_documents
-      context_digest: sha256:42ab
-      purpose: answer user question
-      requested_at: 2026-07-16T01:20:00Z
-      requested_scope_ref: scope-search-read
+      request_id: request-mcp-42
+      principal_ref: client:mcp-client-1
+      action: oauth_authorize
+      resource_ref: https://mcp.example.com
     related_node_ids:
       - AuthorizationRequest
       - PermissionScope
-      - PolicyEvaluation
-    related_relation_ids:
-      - AuthorizationRequest-requests-PermissionScope
-      - PolicyEvaluation-consumes-AuthorizationRequest
-    expected_result:
-      zh: 所有后续决定都可回指同一请求快照，并验证主体、动作、资源和上下文未漂移。
-      en: Every later decision can point back to the same request snapshot and verify that principal, action, resource, and context did not drift.
-      ja: 後続判断は同一要求スナップショットへ戻り、主体・操作・資源・文脈のドリフトがないことを検証できます。
-    why_valid_or_invalid:
-      zh: 请求只陈述授权问题，并通过结构边连接范围和评估活动。
-      en: The request states only the authorization question and connects scope and evaluation through explicit structural edges.
-      ja: 要求は認可問題だけを表し、明示構造辺で範囲と評価活動へ接続します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    related_relation_ids: []
     source_claims:
-      - claim-authorization-request-001
-      - claim-authorization-request-002
-      - claim-authorization-request-003
-  - id: AuthorizationRequest-example-boundary-manual-001
-    kind: boundary
+      - claim-authorization-request-design
+  - id: AuthorizationRequest-cursor-curl
     labels:
-      zh: 授权请求边界反例
-      en: Boundary counterexample for authorization request
-      ja: 認可要求の境界反例
-    scenario_id: null
+      zh: Cursor curl 命令请求
+      en: Cursor curl command request
+      ja: Cursor curl command request
     descriptions:
-      zh: grant-42 与 request-42 具有相同主体、动作和资源，但 grant-42 是已签发且有有效期的 AuthorizationGrant，不能作为原始请求替代。
-      en: grant-42 shares principal, action, and resource with request-42, but it is an issued, time-bounded AuthorizationGrant and cannot replace the original request.
-      ja: grant-42 は request-42 と主体・操作・資源を共有しますが、発行済みで期限付きの AuthorizationGrant であり元要求を代替しません。
+      zh: request-55 快照 agent 请求 Bash curl https://metadata.internal/latest 与 argument_digest。
+      en: request-55 snapshots agent Bash curl https://metadata.internal/latest with argument_digest.
+      ja: request-55 が Bash curl コマンドと argument_digest を snapshot。
+    example_source:
+      product: Cursor Agent Terminal
+      url: https://cursor.com/docs/agent/terminal
+      version: shell command
+    field_values:
+      request_id: request-55
+      action: Bash
+      argument_digest: sha256:curl-metadata-internal
+    related_node_ids:
+      - AuthorizationRequest
+      - PolicyEvaluation
+    related_relation_ids: []
+    source_claims:
+      - claim-authorization-request-design
+  - id: AuthorizationRequest-claude-bash
+    labels:
+      zh: Claude Bash 工具请求
+      en: Claude Bash tool request
+      ja: Claude Bash tool request
+    descriptions:
+      zh: request-61 记录 Claude Code 计划执行 echo secret > /etc/passwd 的参数摘要。
+      en: request-61 records Claude Code planned echo secret > /etc/passwd argument digest.
+      ja: request-61 が Claude Code の /etc/passwd 書込 plan digest を記録。
+    example_source:
+      product: Claude Code
+      url: https://docs.anthropic.com/en/docs/claude-code/permissions
+      version: Bash tool
+    field_values:
+      request_id: request-61
+      action: Bash
+      resource_ref: path:/etc/passwd
+    related_node_ids:
+      - AuthorizationRequest
+      - PermissionPrompt
+    related_relation_ids: []
+    source_claims:
+      - claim-authorization-request-design
+  - id: AuthorizationRequest-boundary-similar
+    labels:
+      zh: 相似命令是新请求
+      en: Similar command is new request
+      ja: 類似 command は新 request
+    descriptions:
+      zh: request-55 与 request-56 命令相似但 argument_digest 不同，必须独立 PolicyEvaluation。
+      en: request-55 and request-56 have similar commands but different argument_digest; each needs independent PolicyEvaluation.
+      ja: request-55/56 は類似 command だが argument_digest 異なり独立 PolicyEvaluation 必須。
+    example_source:
+      product: Moonweave
+      url: https://moonweave.ai/ontology/agent-system/2.0.0/
+      version: request identity
     field_values: {}
     related_node_ids:
       - AuthorizationRequest
-      - AuthorizationGrant
-      - PermissionScope
-    related_relation_ids:
-      - AuthorizationGrant-scoped_by-PermissionScope
-    expected_result:
-      zh: 请求与授予保持两个身份；同一范围字段不等于同一业务事实。
-      en: Request and grant retain separate identities; matching scope fields do not make them the same business fact.
-      ja: 要求と付与は別同一性を保ち、範囲項目の一致は同一業務事実を意味しません。
-    why_valid_or_invalid:
-      zh: 请求表示所求权限，授予表示已建立的权限状态。
-      en: A request expresses authority sought, while a grant records authority established.
-      ja: 要求は求める権限を、付与は成立した権限状態を表します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - PolicyEvaluation
+    related_relation_ids: []
     source_claims:
-      - claim-authorization-request-001
-      - claim-authorization-request-002
-      - claim-authorization-request-003
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-authorization-request-design
 parent_relation:
   id: PolicyEvaluation-consumes-AuthorizationRequest
   predicate: part_of
@@ -309,73 +356,11 @@ parent_relation:
   temporal_scope: valid-time
   boundary_context: null
   constraints: []
-  examples:
-    - id: PolicyEvaluation-consumes-AuthorizationRequest-example-positive-manual-001
-      kind: positive
-      labels:
-        zh: 消费授权请求正例
-        en: Positive consumes authorization request case
-        ja: 認可要求を消費するの正例
-      scenario_id: null
-      descriptions:
-        zh: evaluation-42 读取 request-42 的固定输入摘要 sha256:42ab，并把该引用写入评估记录。
-        en: evaluation-42 reads request-42's fixed input digest sha256:42ab and records that reference in the evaluation.
-        ja: evaluation-42 は request-42 の固定入力ダイジェスト sha256:42ab を読み評価記録へ参照を書きます。
-      field_values: {}
-      related_node_ids:
-        - PolicyEvaluation
-        - AuthorizationRequest
-      related_relation_ids:
-        - PolicyEvaluation-consumes-AuthorizationRequest
-      expected_result:
-        zh: 决定链可证明评估使用了哪一个请求快照。
-        en: The decision chain proves which request snapshot the evaluation used.
-        ja: 判断連鎖は評価が使った要求スナップショットを証明できます。
-      why_valid_or_invalid:
-        zh: consumes 表达输入职责并取代仅说明先后的 precedes。
-        en: consumes expresses input responsibility and replaces a precedes edge that stated only order.
-        ja: consumes は入力責務を表し順序だけの precedes を置換します。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-authorization-request-003
-        - claim-authorization-request-001
-    - id: PolicyEvaluation-consumes-AuthorizationRequest-example-boundary-manual-001
-      kind: boundary
-      labels:
-        zh: 消费授权请求边界反例
-        en: Boundary counterexample for consumes authorization request
-        ja: 認可要求を消費するの境界反例
-      scenario_id: null
-      descriptions:
-        zh: request-42 在 evaluation-42 前创建这一时间事实不足以证明 evaluation-42 实际读取了它。
-        en: Creation of request-42 before evaluation-42 does not by itself prove that the evaluation consumed it.
-        ja: request-42 が evaluation-42 より前に作られた時間事実だけでは評価が消費した証明になりません。
-      field_values: {}
-      related_node_ids:
-        - PolicyEvaluation
-        - AuthorizationRequest
-      related_relation_ids:
-        - PolicyEvaluation-consumes-AuthorizationRequest
-      expected_result:
-        zh: 没有显式请求引用时不建立 consumes。
-        en: No consumes assertion is made without an explicit request reference.
-        ja: 明示要求参照がなければ consumes を作りません。
-      why_valid_or_invalid:
-        zh: 仅有时间先后不能证明评估实际消费了该输入。
-        en: Temporal precedence alone cannot prove that evaluation actually consumed the input.
-        ja: 時間先行だけでは評価が実際に入力を消費したと証明できません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-authorization-request-003
-        - claim-authorization-request-001
   source_claims:
-    - claim-authorization-request-003
-    - claim-authorization-request-001
+    - claim-authorization-request-design
+    - claim-authorization-request-design
   distinct_fact_rationale: null
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: parent-to-child
 relations:
   - id: AuthorizationRequest-requests-PermissionScope
@@ -405,109 +390,81 @@ relations:
     temporal_scope: timeless
     boundary_context: null
     constraints: []
-    examples:
-      - id: AuthorizationRequest-requests-PermissionScope-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: 请求权限范围正例
-          en: Positive requests permission scope case
-          ja: 権限範囲を要求するの正例
-        scenario_id: null
-        descriptions:
-          zh: request-42 请求 scope-search-read，只含一个搜索工具的只读访问和五分钟期限。
-          en: request-42 requests scope-search-read, limited to read access on one search tool for five minutes.
-          ja: request-42 は scope-search-read を要求し、一検索ツールの読取アクセスと五分期限に限定します。
-        field_values: {}
-        related_node_ids:
-          - AuthorizationRequest
-          - PermissionScope
-        related_relation_ids:
-          - AuthorizationRequest-requests-PermissionScope
-        expected_result:
-          zh: 评估与授予可逐维比较请求范围。
-          en: Evaluation and grant can compare requested scope dimension by dimension.
-          ja: 評価と付与は要求範囲を各次元で比較できます。
-        why_valid_or_invalid:
-          zh: 请求范围被独立建模且未被请求记录内联隐藏。
-          en: Requested scope is modeled explicitly rather than hidden inside request prose.
-          ja: 要求範囲は要求文中へ隠さず明示モデル化されます。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-authorization-request-002
-          - claim-authorization-request-001
-      - id: AuthorizationRequest-requests-PermissionScope-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: 请求权限范围边界反例
-          en: Boundary counterexample for requests permission scope
-          ja: 権限範囲を要求するの境界反例
-        scenario_id: null
-        descriptions:
-          zh: grant-42 最终只批准公开数据，但不能把该收窄结果反写成 request-42 原本请求的范围。
-          en: grant-42 ultimately narrows authority to public data, but that narrowed result cannot be rewritten as the scope originally requested by request-42.
-          ja: grant-42 が公開データへ権限を縮小しても、その結果を request-42 の元要求範囲へ書き戻せません。
-        field_values: {}
-        related_node_ids:
-          - AuthorizationRequest
-          - PermissionScope
-        related_relation_ids:
-          - AuthorizationRequest-requests-PermissionScope
-        expected_result:
-          zh: 请求范围保持历史事实，授予通过 scoped_by 记录实际范围。
-          en: Requested scope remains historical fact and the grant records actual scope through scoped_by.
-          ja: 要求範囲は歴史事実を保ち、付与は scoped_by で実際範囲を記録します。
-        why_valid_or_invalid:
-          zh: 请求与授予范围可以不同但必须可比较。
-          en: Requested and granted scopes may differ but must remain comparable.
-          ja: 要求範囲と付与範囲は異なり得ますが比較可能でなければなりません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-authorization-request-002
-          - claim-authorization-request-001
     source_claims:
-      - claim-authorization-request-002
-      - claim-authorization-request-001
+      - claim-authorization-request-design
+      - claim-authorization-request-design
     distinct_fact_rationale: null
     layout_role: cross-link
-    review_status: accepted
     target: concept:PermissionScope
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-safety-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 XACML 3.0、NIST SP 800-162、OAuth/MCP 授权与 Cursor 工具批准模式逐项人工语义核验；三值策略决定与授权闭环成立。
-    en: Manually verified against XACML 3.0, NIST SP 800-162, OAuth/MCP authorization, and Cursor-style tool approval; three-valued policy decisions and authorization loop hold.
-    ja: XACML 3.0、NIST SP 800-162、OAuth/MCP authorization、Cursor-style tool approval に照らし手動意味審査を完了しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: mcp-authorization-2025
+    title: MCP Authorization Specification (2025-06-18)
+    url: https://spec.modelcontextprotocol.io/specification/2025-06-18/basic/authorization/
+    source_type: standard
+    relevance: OAuth 2.1 authorization-code/PKCE, protected-resource metadata, resource indicators, and scopes.
+  - id: opa-rego
+    title: Open Policy Agent — Rego language
+    url: https://www.openpolicyagent.org/docs/latest/policy-language/
+    source_type: official-doc
+    relevance: Versioned policy rules, deny/allow effects, and combining evaluation for authorization.
+  - id: xacml-3-core
+    title: OASIS XACML 3.0 Core
+    url: https://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-cos01-en.html
+    source_type: standard
+    relevance: Permit/Deny/NotApplicable decisions, policy rules, conditions, and combining algorithms.
+  - id: nist-sp-800-162
+    title: NIST SP 800-162 — ABAC
+    url: https://csrc.nist.gov/publications/detail/sp/800-162/final
+    source_type: standard
+    relevance: Subject-object-operation-environment attribute evaluation for authorization.
+  - id: owasp-llm-top10-2025
+    title: OWASP Top 10 for LLM Applications 2025
+    url: https://owasp.org/www-project-top-10-for-large-language-model-applications/
+    source_type: standard
+    relevance: Excessive agency, insecure plugin design, and human-in-the-loop authorization patterns.
+  - id: cursor-terminal-sandbox
+    title: Cursor Agent Terminal
+    url: https://cursor.com/docs/agent/terminal
+    source_type: official-doc
+    relevance: Command allowlist/denylist and sandbox modes for tool approval.
+  - id: claude-code-permissions
+    title: Claude Code permissions
+    url: https://docs.anthropic.com/en/docs/claude-code/permissions
+    source_type: official-doc
+    relevance: yesAllow, allowForSession, Bash/edit/MCP permission modes.
+  - id: safety-permission-design
+    title: Moonweave permission-policy module boundary
+    url: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_type: design-inference
+    relevance: "Authorization loop: request, evaluation, decision, grant, gate, and human approval separation."
 source_claims:
-  - id: claim-authorization-request-001
-    source: eng-policy-aws-verified-permissions
-    supports: Verified Permissions defines an authorization request over principal, action, resource, and context, and a response containing allow or deny plus determining-policy identifiers.
-    locator: Amazon Verified Permissions User Guide > Terms and concepts > authorization request, authorization response, determining policies, and enforcement
-    evidence_kind: official
+  - id: claim-authorization-request-design
+    source: safety-permission-design
+    supports: AuthorizationRequest is immutable snapshot; digest changes require new request_id.
+    locator: Request identity
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-authorization-request-002
-    source: eng-security-nist-abac
-    supports: NIST defines authorization as evaluation of subject, object, requested operation, and environment attributes against policy, rules, or relationships describing allowed operations.
-    locator: "NIST SP 800-162, Section 3: ABAC definition using subject, object, operation, environment attributes, policy, and rules"
-    evidence_kind: official
+  - id: claim-authorization-request-design
+    source: mcp-authorization-2025
+    supports: MCP OAuth authorize parameters map to AuthorizationRequest fields.
+    locator: Authorize request
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-authorization-request-003
-    source: eng-policy-opa
-    supports: OPA documents structured input evaluated against policy and data to produce a policy decision, while enforcement remains the caller's responsibility.
-    locator: Open Policy Agent documentation > What is OPA? > policy input, evaluation, decision output, and separation from enforcement
-    evidence_kind: official
+  - id: claim-authorization-request-design
+    source: opa-rego
+    supports: OPA input JSON maps to AuthorizationRequest principal/object/action/context.
+    locator: Rego input
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
+  - id: claim-authorization-request-design
+    source: cursor-terminal-sandbox
+    supports: Cursor intercepted commands map to AuthorizationRequest with argument digest.
+    locator: Shell request
+    evidence_kind: design-inference
+    confidence: high
+  - id: claim-authorization-request-design
+    source: claude-code-permissions
+    supports: Claude tool invocation plans map to AuthorizationRequest snapshots.
+    locator: Tool request
+    evidence_kind: design-inference
+    confidence: high
