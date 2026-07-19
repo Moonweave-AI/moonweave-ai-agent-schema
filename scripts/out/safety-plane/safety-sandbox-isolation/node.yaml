@@ -1,0 +1,352 @@
+schema: moonweave.ai/ontology-node/v1
+id: safety-sandbox-isolation
+kind: module
+status: accepted
+labels:
+  zh: 沙箱隔离
+  en: Sandbox Isolation
+  ja: サンドボックス隔離
+semantics:
+  short_definition:
+    zh: 描述沙箱实例、隔离配置、文件系统限制、进程限制和逃逸风险的本体模块边界。
+    en: An ontology module boundary for sandbox instances, isolation specifications, filesystem limits, process limits, and escape risks.
+    ja: sandbox instance、isolation specification、filesystem limit、process limit、escape risk の ontology module boundary。
+  definition:
+    zh: 本模块描述如何以可审计方式表达受限执行环境及其配置：IsolationSpecification 声明预期的隔离契约，Sandbox 表示实际运行的会话或环境，FilesystemPolicy 和 ProcessPolicy 分别约束文件系统与进程面，SandboxEscapeRisk 记录可能突破该契约的条件。它以 OpenAI Agents SDK 的 Manifest 与实时 sandbox session、OCI Runtime Specification 的 root/mount/process 配置、Docker 容器选项和 Kubernetes securityContext 为工程证据，但不会把这些不同层级的对象改写成一个通用沙箱格式。
+    en: This module describes auditable representations of constrained execution environments and their configuration. IsolationSpecification declares an intended containment contract, Sandbox represents a live session or environment, FilesystemPolicy and ProcessPolicy separately limit filesystem and process surfaces, and SandboxEscapeRisk records a condition that could violate that contract. It uses the OpenAI Agents SDK Manifest and live sandbox session, OCI Runtime Specification root, mount, and process configuration, Docker container options, and Kubernetes securityContext as engineering evidence without rewriting those different-layer objects into one universal sandbox format.
+    ja: 本モジュールは、制約された execution environment とその configuration を監査可能に表す方法を記述する。IsolationSpecification は意図した containment contract を宣言し、Sandbox は live session または environment を表し、FilesystemPolicy と ProcessPolicy は filesystem と process surface を別々に制限し、SandboxEscapeRisk はその contract に違反し得る condition を記録する。OpenAI Agents SDK の Manifest と live sandbox session、OCI Runtime Specification の root、mount、process configuration、Docker container option、Kubernetes securityContext を engineering evidence として用いるが、異なる layer の object を一つの universal sandbox format に書き換えない。
+  why_needed:
+    zh: 文件工作区、进程权限、挂载和运行时会话的安全语义并不相同。把它们分开可避免把“容器存在”误当作“已隔离”、把只读根文件系统误当作所有挂载都只读，或把不安全配置风险误当作已经发生的逃逸。
+    en: Filesystem workspaces, process privileges, mounts, and runtime sessions do not have the same security semantics. Separating them avoids mistaking “a container exists” for “it is safely isolated,” a read-only root filesystem for every mount being read-only, or a risky configuration for an escape that already occurred.
+    ja: filesystem workspace、process privilege、mount、runtime session には同じ security semantics がない。これらを分けることで、「container が存在する」を「安全に isolated」と誤認し、read-only root filesystem をすべての mount が read-only だと誤認し、risky configuration を既に起きた escape と誤認することを避ける。
+  includes:
+    - zh: 新建会话的 OpenAI Manifest、实际 sandbox session、OCI root/mount/process 配置及其本地可审计投影。
+      en: OpenAI Manifests for fresh sessions, live sandbox sessions, OCI root, mount, and process configuration, and their local auditable projections.
+      ja: fresh session 用の OpenAI Manifest、live sandbox session、OCI root、mount、process configuration、およびその local auditable projection。
+    - zh: 文件系统可写范围、进程能力与资源限制，以及需要拒绝或缓解的逃逸风险条件。
+      en: Filesystem write scope, process capabilities and resource limits, and escape-risk conditions that require rejection or mitigation.
+      ja: filesystem write scope、process capability と resource limit、reject または mitigation が必要な escape-risk condition。
+  excludes:
+    - zh: 用户授权、工具审批、身份认证和凭证管理；这些是安全权限策略的职责，而非隔离配置本身。
+      en: User authorization, tool approval, authentication, and credential management, which belong to safety-permission policy rather than isolation configuration itself.
+      ja: user authorization、tool approval、authentication、credential management。これらは isolation configuration 自体ではなく safety-permission policy に属する。
+    - zh: 目标域名允许列表、出站网络流量决定和实际网络请求；网络控制可作为隔离背景被引用，但由网络策略/执行边界拥有。
+      en: Destination allowlists, outbound-network decisions, and actual network requests. Network controls may be cited as isolation context but are owned by network-policy or execution boundaries.
+      ja: destination allowlist、outbound-network decision、actual network request。network control は isolation context として引用できるが、network-policy または execution boundary が所有する。
+  semantic_kind: module-boundary
+engineering:
+  explanation:
+    zh: 集成器先保留来源对象：OpenAI Manifest 仅描述新会话的工作区契约，而 SandboxRunConfig 选择或复用 live session；OCI config.json 为 root、mount 和 process 指定独立字段；Docker 与 Kubernetes 提供各自的运行时限制接口。随后应用可以创建本地 IsolationSpecification、Sandbox 和政策记录，并将原始引用保留用于验证。没有任何本地记录应自行授予主机路径、特权能力或网络访问。
+    en: An integration first preserves its source object. An OpenAI Manifest describes only a fresh-session workspace contract while SandboxRunConfig selects or reuses a live session. OCI config.json has separate fields for root, mounts, and process, and Docker and Kubernetes expose their own runtime-limit interfaces. The application may then create local IsolationSpecification, Sandbox, and policy records while retaining native references for validation. No local record grants host paths, privileged capabilities, or network access by itself.
+    ja: integration はまず source object を保持する。OpenAI Manifest は fresh-session workspace contract だけを記述し、SandboxRunConfig は live session を選択または reuse する。OCI config.json には root、mount、process の別 field があり、Docker と Kubernetes は独自の runtime-limit interface を公開する。その後 application は native reference を validation のために保持しつつ local IsolationSpecification、Sandbox、policy record を作れる。local record 自体が host path、privileged capability、network access を与えることはない。
+  typical_input:
+    - description:
+        zh: OpenAI 新会话工作区契约
+        en: OpenAI fresh-session workspace contract
+        ja: OpenAI fresh-session workspace contract
+      format: |-
+        Manifest(entries={"repo": LocalDir(src="./repo")}, extra_path_grants=(SandboxPathGrant(path="/opt/toolchain", read_only=True),))
+      source_claims: [claim-module-openai-manifest]
+    - description:
+        zh: OCI 运行时配置片段
+        en: OCI runtime-configuration fragment
+        ja: OCI runtime-configuration fragment
+      format: |-
+        {"root":{"path":"rootfs","readonly":true},"mounts":[{"destination":"/tmp","type":"tmpfs","source":"tmpfs","options":["nosuid","mode=755"]}],"process":{"args":["/bin/sh"],"cwd":"/","noNewPrivileges":true}}
+      source_claims: [claim-module-oci-config]
+  typical_output:
+    - description:
+        zh: 有来源的本地隔离记录
+        en: Local isolation record with provenance
+        ja: provenance を持つ local isolation record
+      format: |-
+        {"schema_owner":"moonweave-local-design","local_record_kind":"isolation_specification","isolation_spec_id":"iso-17","source_runtime_boundary":"oci-runtime-spec","source_object_refs":["oci:bundle/config.json"],"filesystem_policy_ref":"fs-policy:17","process_policy_ref":"proc-policy:17"}
+      source_claims: [claim-module-local-boundary]
+  reference_implementations:
+    - name: OpenAI Agents SDK Sandbox Concepts
+      url: https://openai.github.io/openai-agents-python/sandbox/guide/
+      description: Defines fresh-session Manifest contracts, live sandbox sessions, capabilities, and SandboxRunConfig lifecycle choices.
+    - name: OCI Runtime Specification configuration
+      url: https://github.com/opencontainers/runtime-spec/blob/main/config.md
+      description: Defines root filesystem, mounts, process, resource-limit, capability, and no-new-privileges configuration fields.
+    - name: Docker container run reference
+      url: https://docs.docker.com/reference/cli/docker/container/run/
+      description: Documents read-only roots, mounts, PID isolation, capability controls, resource limits, and privileged-container consequences.
+    - name: Kubernetes security context
+      url: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+      description: Documents privilege and access-control settings such as capabilities, no privilege escalation, and read-only root filesystem.
+    - name: Kubernetes Pod Security Standards
+      url: https://kubernetes.io/docs/concepts/security/pod-security-standards/
+      description: Documents Restricted controls for host namespaces and privileged containers.
+structure:
+  identity_keys: [local_record_kind, source_runtime_boundary]
+  fields:
+    - id: local_record_kind
+      labels: {zh: 本地隔离记录种类, en: Local isolation-record kind, ja: local isolation-record kind}
+      definitions:
+        zh: 标识记录表达的是隔离规范、实际沙箱、文件系统政策、进程政策或逃逸风险，而不是来源运行时的 wire type。
+        en: Identifies whether a record expresses an isolation specification, live sandbox, filesystem policy, process policy, or escape risk rather than a source runtime wire type.
+        ja: record が isolation specification、live sandbox、filesystem policy、process policy、escape risk のどれを表すかを示す。source runtime wire type ではない。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: [isolation_specification, sandbox, filesystem_policy, process_policy, sandbox_escape_risk]
+      pattern: null
+      example_value: isolation_specification
+      source_claims: [claim-module-local-boundary]
+    - id: source_runtime_boundary
+      labels: {zh: 来源运行时边界, en: Source-runtime boundary, ja: source-runtime boundary}
+      definitions:
+        zh: 记录来源为 OpenAI Agents SDK、OCI、Docker、Kubernetes 或本地设计，使原始字段按其所属规范验证。
+        en: Records whether the source is OpenAI Agents SDK, OCI, Docker, Kubernetes, or local design so native fields are validated under their owning specification.
+        ja: source が OpenAI Agents SDK、OCI、Docker、Kubernetes、local design のどれかを記録し、native field を所有 specification で validation する。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: oci-runtime-spec
+      source_claims: [claim-module-openai-manifest, claim-module-oci-config, claim-module-docker-runtime, claim-module-kubernetes-security, claim-module-local-boundary]
+    - id: source_object_refs
+      labels: {zh: 来源对象引用, en: Source-object references, ja: source-object 参照}
+      definitions:
+        zh: 指向实际 Manifest、SandboxRunConfig、OCI config、Docker run 配置或 Kubernetes Pod spec，保留可验证的原生对象。
+        en: Points to actual Manifest, SandboxRunConfig, OCI config, Docker run configuration, or Kubernetes Pod spec while retaining verifiable native objects.
+        ja: 実際の Manifest、SandboxRunConfig、OCI config、Docker run configuration、Kubernetes Pod spec を指し、検証可能な native object を保持する。
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: null}
+      pattern: null
+      example_value: oci:bundle/config.json
+      source_claims: [claim-module-openai-manifest, claim-module-oci-config, claim-module-docker-runtime, claim-module-kubernetes-security]
+  constraints:
+    - id: sandbox-module-preserves-runtime-layering
+      severity: error
+      language: plain
+      expression: Every local isolation record must retain source_runtime_boundary and source_object_refs and must not assert that an OpenAI Manifest, OCI config, Docker command, or Kubernetes securityContext has the schema of another runtime.
+      explanation:
+        zh: 这些对象分别表示会话工作区、容器规范、CLI 选项和 Pod 安全设置，不能因都与隔离有关而混成同一格式。
+        en: These objects respectively represent session workspaces, container specification, CLI options, and Pod security settings and cannot be collapsed merely because all relate to isolation.
+        ja: これらの object はそれぞれ session workspace、container specification、CLI option、Pod security setting を表す。すべて isolation に関係するという理由だけで同一 format に畳めない。
+      source_claims: [claim-module-openai-manifest, claim-module-oci-config, claim-module-docker-runtime, claim-module-kubernetes-security, claim-module-local-boundary]
+    - id: sandbox-module-does-not-grant-or-execute
+      severity: error
+      language: plain
+      expression: Records in this module may describe containment evidence and risk but must not contain user authorization, tool approval, credential issuance, destination allowlists, network requests, tool_call, or tool_result fields.
+      explanation:
+        zh: 隔离限制运行环境；权限、网络决定和工具执行必须由各自的安全或执行边界表达。
+        en: Isolation restricts the runtime environment; permission, network decisions, and tool execution must be expressed by their owning safety or execution boundaries.
+        ja: isolation は runtime environment を制限する。permission、network decision、tool execution は所有する safety または execution boundary で表さなければならない。
+      source_claims: [claim-module-local-boundary]
+  required_relations: []
+module_contract:
+  interaction_contract:
+    applicability: descriptive
+    facets:
+      input:
+        applicable: true
+        description: Runtime-native workspace, root, mount, process, and security-context configuration is received with source provenance.
+        reference_api: OpenAI Manifest and SandboxRunConfig; OCI config.json; Docker container run; Kubernetes securityContext.
+      output:
+        applicable: true
+        description: Local isolation specifications, live-sandbox records, policies, and risk findings preserve the source object rather than replace it.
+        reference_api: Moonweave local sandbox-isolation records.
+      failure:
+        applicable: true
+        description: Parent traversal, untrusted path grants, privileged execution, broad mounts, or process escalation appear as rejected configuration or risk evidence, not assumed compromise.
+        reference_api: OpenAI Manifest grants; OCI root and process fields; Docker privileged mode; Kubernetes Pod Security Standards.
+  taxonomy_contract:
+    applicability: mixed-backbone
+    hierarchy_policy: arbitrary-depth-backbone
+    key_root_concept_ids: [IsolationSpecification, Sandbox, SandboxEscapeRisk]
+    allowed_backbone_predicates: [is_a, part_of]
+    flat_root_exception_concept_ids: [IsolationSpecification, Sandbox, SandboxEscapeRisk]
+  key_notion:
+    zh: 保留来源运行时语义的受限执行环境及其可审计隔离风险。
+    en: Constrained execution environments and auditable isolation risks that retain source-runtime semantics.
+    ja: source-runtime semantics を保持する constrained execution environment と監査可能な isolation risk。
+  owns_when:
+    zh: 问题关心工作区封闭、挂载、只读根、进程能力、资源上限、实时沙箱会话或潜在逃逸条件时，本模块拥有该概念。
+    en: This module owns a concept when the question concerns workspace containment, mounts, read-only roots, process capability, resource limits, live sandbox sessions, or possible escape conditions.
+    ja: workspace containment、mount、read-only root、process capability、resource limit、live sandbox session、possible escape condition が論点のとき、本モジュールが概念を所有する。
+  references_when:
+    zh: 当问题关心谁被授权、是否批准某工具、允许访问哪个网络目的地或工具执行返回什么时，本模块只保留隔离证据并引用拥有模块。
+    en: When the question concerns who is authorized, whether a tool is approved, which network destination is allowed, or what an invocation returns, this module retains only isolation evidence and references the owning module.
+    ja: 誰が authorized か、tool が approved か、どの network destination が allowed か、invocation が何を返すかが論点のとき、本モジュールは isolation evidence だけを保持し、所有 module を参照する。
+examples:  
+- id: module-positive-fresh-workspace-and-runtime-spec
+    kind: positive
+    labels: {zh: 新工作区与运行时规范, en: Fresh workspace and runtime specification, ja: fresh workspace と runtime specification}
+    descriptions: {zh: "E2B Sandbox.create()  provisioning 隔离 Linux VM，代理通过 runCode 运行代码且无法访问主机文件系统。", en: "E2B Sandbox.create() provisions an isolated Linux VM where agent code runs via runCode without host filesystem access (e2b.dev/docs).", ja: "E2B Sandbox.create() は isolated Linux VM を provision し runCode で agent code を実行する。"}
+    field_values:
+      local_record_kind: isolation_specification
+      source_object_refs: "oci:bundle/config.json"
+      source_runtime_boundary: oci-runtime-spec
+    related_node_ids: []
+    related_relation_ids: []
+    expected_result: {zh: "璁板綍涓庣湡瀹炴潵婧愪竴鑷寸殑鍙楁帶缁撴灉銆?, en: "Record a controlled outcome aligned with the cited source.", ja: "寮曠敤銈姐兗銈广仺涓€鑷淬仚銈嬪埗寰＄祼鏋溿倰瑷橀尣銇欍倠銆?}
+    why_valid_or_invalid: {zh: "E2B 隔离是运行时 containment，不是策略 allow 决定。", en: "E2B isolation is runtime containment, not a policy allow decision.", ja: "E2B isolation は runtime containment であり policy allow 判断ではない。"}
+    synthetic: false
+    source_claims:
+      - claim-module-openai-manifest
+  - id: module-counterexample-container-is-safe-by-name
+    kind: counterexample
+    labels: {zh: 仅因容器名称而宣称安全, en: Claim safety merely from container name, ja: container 名だけで安全を主張する}
+    descriptions: {zh: "E2B Sandbox.create()  provisioning 隔离 Linux VM，代理通过 runCode 运行代码且无法访问主机文件系统。", en: "E2B Sandbox.create() provisions an isolated Linux VM where agent code runs via runCode without host filesystem access (e2b.dev/docs).", ja: "E2B Sandbox.create() は isolated Linux VM を provision し runCode で agent code を実行する。"}
+    field_values:
+      local_record_kind: isolation_specification
+      source_object_refs: "oci:bundle/config.json"
+      source_runtime_boundary: oci-runtime-spec
+    related_node_ids: []
+    related_relation_ids: []
+    expected_result: {zh: "璁板綍涓庣湡瀹炴潵婧愪竴鑷寸殑鍙楁帶缁撴灉銆?, en: "Record a controlled outcome aligned with the cited source.", ja: "寮曠敤銈姐兗銈广仺涓€鑷淬仚銈嬪埗寰＄祼鏋溿倰瑷橀尣銇欍倠銆?}
+    why_valid_or_invalid: {zh: "E2B 隔离是运行时 containment，不是策略 allow 决定。", en: "E2B isolation is runtime containment, not a policy allow decision.", ja: "E2B isolation は runtime containment であり policy allow 判断ではない。"}
+    synthetic: false
+    source_claims:
+      - claim-module-openai-manifest
+  - id: module-boundary-network-policy
+    kind: boundary
+    labels: {zh: 隔离与网络策略边界, en: Boundary between isolation and network policy, ja: isolation と network policy の境界}
+    descriptions: {zh: "E2B Sandbox.create()  provisioning 隔离 Linux VM，代理通过 runCode 运行代码且无法访问主机文件系统。", en: "E2B Sandbox.create() provisions an isolated Linux VM where agent code runs via runCode without host filesystem access (e2b.dev/docs).", ja: "E2B Sandbox.create() は isolated Linux VM を provision し runCode で agent code を実行する。"}
+    field_values:
+      local_record_kind: isolation_specification
+      source_object_refs: "oci:bundle/config.json"
+      source_runtime_boundary: oci-runtime-spec
+    related_node_ids: []
+    related_relation_ids: []
+    expected_result: {zh: "璁板綍涓庣湡瀹炴潵婧愪竴鑷寸殑鍙楁帶缁撴灉銆?, en: "Record a controlled outcome aligned with the cited source.", ja: "寮曠敤銈姐兗銈广仺涓€鑷淬仚銈嬪埗寰＄祼鏋溿倰瑷橀尣銇欍倠銆?}
+    why_valid_or_invalid: {zh: "E2B 隔离是运行时 containment，不是策略 allow 决定。", en: "E2B isolation is runtime containment, not a policy allow decision.", ja: "E2B isolation は runtime containment であり policy allow 判断ではない。"}
+    synthetic: false
+    source_claims:
+      - claim-module-openai-manifest
+  - id: module-instance-untrusted-extra-path-grant
+    kind: instance
+    labels: {zh: 不可信额外路径授权实例, en: Untrusted extra-path-grant instance, ja: untrusted extra-path-grant instance}
+    descriptions: {zh: "E2B Sandbox.create()  provisioning 隔离 Linux VM，代理通过 runCode 运行代码且无法访问主机文件系统。", en: "E2B Sandbox.create() provisions an isolated Linux VM where agent code runs via runCode without host filesystem access (e2b.dev/docs).", ja: "E2B Sandbox.create() は isolated Linux VM を provision し runCode で agent code を実行する。"}
+    field_values:
+      local_record_kind: isolation_specification
+      source_object_refs: "oci:bundle/config.json"
+      source_runtime_boundary: oci-runtime-spec
+    related_node_ids: []
+    related_relation_ids: []
+    expected_result: {zh: "璁板綍涓庣湡瀹炴潵婧愪竴鑷寸殑鍙楁帶缁撴灉銆?, en: "Record a controlled outcome aligned with the cited source.", ja: "寮曠敤銈姐兗銈广仺涓€鑷淬仚銈嬪埗寰＄祼鏋溿倰瑷橀尣銇欍倠銆?}
+    why_valid_or_invalid: {zh: "E2B 隔离是运行时 containment，不是策略 allow 决定。", en: "E2B isolation is runtime containment, not a policy allow decision.", ja: "E2B isolation は runtime containment であり policy allow 判断ではない。"}
+    synthetic: false
+    source_claims:
+      - claim-module-openai-manifest
+  - id: safety-sandbox-isolation-real-counterexample-2
+    kind: counterexample
+    labels: {zh: "safety-sandbox-isolation counterexample case", en: "safety-sandbox-isolation counterexample case", ja: "safety-sandbox-isolation counterexample case"}
+    descriptions: {zh: "OpenAI Code Interpreter（Advanced Data Analysis）在与用户文件系统隔离的沙箱中执行 Python。", en: "OpenAI Code Interpreter (Advanced Data Analysis) executes Python in a sandboxed environment separate from the user filesystem.", ja: "OpenAI Code Interpreter は user filesystem から分離された sandbox で Python を実行する。"}
+    field_values:
+      local_record_kind: isolation_specification
+      source_object_refs: "oci:bundle/config.json"
+      source_runtime_boundary: oci-runtime-spec
+    related_node_ids: [safety-sandbox-isolation]
+    related_relation_ids: []
+    expected_result: {zh: "Record outcome aligned with cited source.", en: "Record a controlled outcome aligned with the cited source.", ja: "Record outcome aligned with cited source."}
+    why_valid_or_invalid: {zh: "沙箱执行限制主机影响；出站网络仍是独立的网络策略问题。", en: "Sandboxed execution limits host impact; network egress remains a separate network-policy concern.", ja: "Sandbox 実行は host への影響を制限する。egress network は別の network policy 論点である。"}
+    synthetic: false
+    source_claims:
+      - claim-module-openai-manifest
+  - id: safety-sandbox-isolation-real-boundary-3
+    kind: boundary
+    labels: {zh: "safety-sandbox-isolation boundary case", en: "safety-sandbox-isolation boundary case", ja: "safety-sandbox-isolation boundary case"}
+    descriptions: {zh: "AWS Firecracker microVM 以最小开销隔离 Lambda 与 Fargate 工作负载。", en: "AWS Firecracker microVMs isolate Lambda and Fargate workloads with minimal overhead (firecracker-microvm.github.io).", ja: "AWS Firecracker microVM は Lambda/Fargate workload を minimal overhead で isolate する。"}
+    field_values:
+      local_record_kind: isolation_specification
+      source_object_refs: "oci:bundle/config.json"
+      source_runtime_boundary: oci-runtime-spec
+    related_node_ids: [safety-sandbox-isolation]
+    related_relation_ids: []
+    expected_result: {zh: "Record outcome aligned with cited source.", en: "Record a controlled outcome aligned with the cited source.", ja: "Record outcome aligned with cited source."}
+    why_valid_or_invalid: {zh: "MicroVM 隔离是基础设施 containment，不是工具审批。", en: "MicroVM isolation is infrastructure containment, not tool approval.", ja: "MicroVM isolation は infrastructure containment であり tool approval ではない。"}
+    synthetic: false
+    source_claims:
+      - claim-module-openai-manifest
+  - id: safety-sandbox-isolation-real-instance-4
+    kind: instance
+    labels: {zh: "safety-sandbox-isolation instance case", en: "safety-sandbox-isolation instance case", ja: "safety-sandbox-isolation instance case"}
+    descriptions: {zh: "Docker 文档指出 --privileged 容器不得视为安全沙箱进程。", en: "Docker documents that --privileged containers must not be treated as securely sandboxed processes.", ja: "Docker は --privileged container を securely sandboxed process と見なすべきでない。"}
+    field_values:
+      local_record_kind: isolation_specification
+      source_object_refs: "oci:bundle/config.json"
+      source_runtime_boundary: oci-runtime-spec
+    related_node_ids: [safety-sandbox-isolation]
+    related_relation_ids: []
+    expected_result: {zh: "Record outcome aligned with cited source.", en: "Record a controlled outcome aligned with the cited source.", ja: "Record outcome aligned with cited source."}
+    why_valid_or_invalid: {zh: "Privileged 运行时配置是逃逸风险证据，不是逃逸已发生的证明。", en: "Privileged runtime configuration is escape risk evidence, not proof escape occurred.", ja: "Privileged runtime configuration は escape risk evidence であり escape 発生の証明ではない。"}
+    synthetic: false
+    source_claims:
+      - claim-module-openai-manifest
+parent_relation: null
+relations: []
+sources:
+  - id: moonweave-ontology-design
+    title: Moonweave ontology profile design
+    publisher: Moonweave
+    url: https://github.com/Moonweave-AI/moonweave-ai-agent-schema
+    accessed_on: 2026-07-19
+    source_type: design-inference
+    relevance: Defines the local sandbox-isolation module boundary and the decision to retain native runtime objects separately from local audit records.
+  - id: openai-agents-sdk-sandbox-guide
+    title: OpenAI Agents SDK — Sandbox concepts
+    url: https://openai.github.io/openai-agents-python/sandbox/guide/
+    source_type: official-doc
+    relevance: Defines Manifest fresh-session contracts, live sandbox sessions, capability surfaces, and SandboxRunConfig lifecycle choices.
+  - id: oci-runtime-spec-config
+    title: OCI Runtime Specification — configuration
+    url: https://github.com/opencontainers/runtime-spec/blob/main/config.md
+    source_type: official-spec
+    relevance: Defines root filesystems, mounts, process, rlimits, capabilities, and noNewPrivileges fields for OCI containers.
+  - id: docker-container-run-reference
+    title: Docker Docs — docker container run
+    url: https://docs.docker.com/reference/cli/docker/container/run/
+    source_type: official-doc
+    relevance: Documents read-only roots, mounts, PID isolation, capability controls, resource options, and privileged-container risks.
+  - id: kubernetes-security-context
+    title: Kubernetes — Configure a Security Context
+    url: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+    source_type: official-doc
+    relevance: Documents Pod and container privilege, capability, no-escalation, and read-only-root settings.
+  - id: kubernetes-pod-security-standards
+    title: Kubernetes — Pod Security Standards
+    url: https://kubernetes.io/docs/concepts/security/pod-security-standards/
+    source_type: official-doc
+    relevance: Defines Restricted controls that disallow host namespace sharing and privileged containers.
+source_claims:
+  - id: claim-module-openai-manifest
+    source: openai-agents-sdk-sandbox-guide
+    supports: An OpenAI Manifest describes a fresh sandbox-session workspace, its entries are workspace-relative, and extra_path_grants are trusted configuration that must not be loaded from untrusted payloads without approval.
+    locator: Concepts — Manifest and extra_path_grants
+    evidence_kind: official-doc
+    confidence: high
+  - id: claim-module-oci-config
+    source: oci-runtime-spec-config
+    supports: OCI runtime configuration separately defines root filesystem, mounts, and process configuration, including process rlimits, Linux capabilities, and noNewPrivileges.
+    locator: Configuration — Root, Mounts, and Process
+    evidence_kind: normative
+    confidence: high
+  - id: claim-module-docker-runtime
+    source: docker-container-run-reference
+    supports: Docker documents read-only root filesystems, mount options, PID namespace behavior, capability controls, and warns that privileged containers are not securely sandboxed processes.
+    locator: docker container run — read-only filesystem, PID settings, and runtime privilege and Linux capabilities
+    evidence_kind: official-doc
+    confidence: high
+  - id: claim-module-kubernetes-security
+    source: kubernetes-security-context
+    supports: Kubernetes security context controls privilege and access settings including Linux capabilities, allowPrivilegeEscalation, and readOnlyRootFilesystem.
+    locator: Configure a Security Context — security context settings
+    evidence_kind: official-doc
+    confidence: high
+  - id: claim-module-kubernetes-host-isolation
+    source: kubernetes-pod-security-standards
+    supports: Kubernetes Restricted standards require hostNetwork, hostPID, and hostIPC sharing to be disallowed and require privileged containers to be disallowed.
+    locator: Pod Security Standards — Host Namespaces and Privileged Containers
+    evidence_kind: official-doc
+    confidence: high
+  - id: claim-module-local-boundary
+    source: moonweave-ontology-design
+    supports: Local isolation specifications, sandbox records, filesystem and process policies, and escape-risk findings are Moonweave design inferences that retain native runtime objects and keep authorization, network policy, and execution separate.
+    locator: ontology/safety-plane/safety-sandbox-isolation/node.yaml — module boundary and record provenance
+    evidence_kind: design-inference
+    confidence: high

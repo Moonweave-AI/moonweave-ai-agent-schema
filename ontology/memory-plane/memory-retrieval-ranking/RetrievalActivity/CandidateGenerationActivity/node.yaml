@@ -3,435 +3,400 @@ id: CandidateGenerationActivity
 kind: concept
 status: accepted
 labels:
-  zh: 候选生成
-  en: Candidate generation
-  ja: 候補生成
+  zh: 候选生成活动
+  en: Candidate Generation Activity
+  ja: 候補生成活動
 semantics:
   short_definition:
-    zh: 从查询、过滤条件和索引版本产生初始候选集合的检索阶段。
-    en: A retrieval stage that produces an initial candidate set from a query, filter, and index version.
-    ja: query・filter・index versionからinitial candidate setを生成するretrieval stageです。
+    zh: 根据一个检索请求从一个或多个可访问来源召回候选的 RetrievalActivity 子类型。
+    en: A RetrievalActivity subtype that recalls candidates from one or more accessible sources for a retrieval request.
+    ja: retrieval request に対して一つ以上のアクセス可能 source から candidate を recall する RetrievalActivity の下位型。
   definition:
-    zh: CandidateGenerationActivity 是读取一个已声明 IndexVersion，并按 RetrievalQuery 与可选 RetrievalFilter 生成 CandidateSet 的活动；它决定召回范围，不负责跨列表融合、语义重排或上下文采用。
-    en: CandidateGenerationActivity reads a declared IndexVersion and produces a CandidateSet for a RetrievalQuery and optional RetrievalFilter. It establishes recall scope but does not perform list fusion, semantic reranking, or context admission.
-    ja: CandidateGenerationActivity は指定IndexVersionを読みRetrievalQueryと任意RetrievalFilterからCandidateSetを生成します。recall範囲を決めますがlist fusion・semantic reranking・context admissionは行いません。
+    zh: CandidateGenerationActivity 是实际执行初始召回的 RetrievalActivity：它消费已解析的请求或查询，使用明确检索方法和范围，产生一个 CandidateSet 或失败事实。它可使用向量、词法或混合检索，但不是候选本身、最终排序、top-k 截断、rerank、rank fusion、索引构建或 ContextPackage 选择。生成候选只说明它们被召回，不证明相关性、授权、最终排名或模型可见性。
+    en: CandidateGenerationActivity is the RetrievalActivity that actually performs initial recall. It consumes resolved request or query, uses an explicit retrieval method and scope, and produces a CandidateSet or failure fact. It may use vector, lexical, or hybrid retrieval, but is not the candidate itself, final ranking, top-k truncation, rerank, rank fusion, index construction, or ContextPackage selection. Generating a candidate shows it was recalled, not relevance, authorization, final rank, or model visibility.
+    ja: CandidateGenerationActivity は実際に初期 recall を行う RetrievalActivity です。解決済み request または query を消費し、明示的 retrieval method と scope を用い、CandidateSet または failure fact を生成します。vector、lexical、hybrid retrieval を使えますが、candidate 自体、最終 ranking、top-k truncation、rerank、rank fusion、index construction、ContextPackage selection ではありません。candidate の生成は recall されたことを示すだけで、relevance、authorization、最終 rank、model visibility を示しません。
   why_needed:
-    zh: 把“取得候选”与后续评分、融合、重排和 TopK 分开。
-    en: Separates obtaining candidates from later scoring, fusion, reranking, and TopK selection.
-    ja: candidate取得を後続scoring・fusion・reranking・TopK selectionから分離します。
+    zh: 初始召回通常追求高召回率并允许后续排序改进。将它独立记录可说明候选来自哪个索引和方法、在哪个范围生成，并阻止系统把“被找到”误读为“已被选入答案”。
+    en: Initial recall usually aims for high recall and permits later ranking improvement. Recording it separately explains which index and method produced candidates in which scope and prevents reading “found” as “selected into the answer.”
+    ja: 初期 recall は通常 high recall を目指し、後続 ranking の改善を許します。独立に記録すると、どの index・method がどの scope で candidate を生成したかを説明でき、「見つかった」を「回答に選ばれた」と読むことを防げます。
   includes:
-    - zh: 纳入向量、词汇或其他检索器对索引执行的首阶段召回。
-      en: Includes first-stage recall by vector, lexical, or other retrievers over an index.
-      ja: vector・lexical等retrieverによるindex上のfirst-stage recallを含みます。
+    - zh: 请求或查询引用、检索方法、来源范围、候选上限、活动状态以及生成候选集引用。
+      en: Request or query reference, retrieval method, source scope, candidate limit, activity status, and generated candidate-set reference.
+      ja: request または query 参照、retrieval method、source scope、candidate limit、activity status、生成 candidate-set 参照。
   excludes:
-    - zh: 排除仅计算分数、合并已排序列表、重排已有候选或选择上下文的活动。
-      en: Excludes activities that only score, fuse existing ranked lists, rerank candidates, or select context.
-      ja: score計算のみ・既存ranked list融合・candidate再順位付け・context選択を除外します。
+    - zh: 单个候选内容、候选最终排名、融合分数、交叉编码器重排、离线索引构建和上下文选择。
+      en: One candidate's content, final candidate ranking, fusion score, cross-encoder rerank, offline index construction, and context selection.
+      ja: 一候補の content、最終 candidate ranking、fusion score、cross-encoder rerank、offline index construction、context selection。
   semantic_kind: activity
-  aliases: []
+  aliases: [initial recall, first-stage retrieval, 初始召回]
+engineering:
+  explanation:
+    zh: FAISS Index 的 search 接受查询向量数量、向量数组和 k，并返回距离与标签数组。pgvector 也可按距离 ORDER BY 并 LIMIT 返回近邻。两者产生候选而不是最终答案；Moonweave 把这次调用记为生成活动，并把返回标识建为 CandidateSet 和 RetrievedCandidate。
+    en: FAISS Index search accepts query-vector count, vector array, and k and returns distance and label arrays. pgvector can likewise order by distance and LIMIT nearest neighbors. Both produce candidates rather than final answers. Moonweave records the call as generation activity and represents returned identifiers as CandidateSet and RetrievedCandidate.
+    ja: FAISS Index search は query-vector count、vector array、k を受け、distance と label array を返します。pgvector も距離順と LIMIT で nearest neighbor を返せます。両者は final answer ではなく candidate を生成します。Moonweave は call を generation activity として記録し、返却 identifier を CandidateSet と RetrievedCandidate として表します。
+  typical_input:
+    - description: FAISS index search
+      format: |
+        index.search(
+          1,
+          query_vector,
+          50,
+          distances,
+          labels
+        );
+  typical_output:
+    - description: Candidate-generation record
+      format: |
+        {
+          "candidate_generation_activity_id": "candidate-generation-18",
+          "retrieval_activity_id": "retrieval-activity-support-18",
+          "request_ref": "retrieval-request-support-18",
+          "retrieval_method_ref": "retrieval-impl-faiss-l2-v1",
+          "implementation_ref": "retrieval-impl-faiss-l2-v1",
+          "retrieval_scope_id": "scope-support-18",
+          "candidate_set_ref": "candidate-set-support-18",
+          "candidate_limit": 50,
+          "started_at": "2026-07-19T01:00:00Z",
+          "execution_status": "completed"
+        }
+  reference_implementations:
+    - name: FAISS Index search API
+      url: https://faiss.ai/cpp_api/struct/structfaiss_1_1Index.html
+      description: Documents Index search API returning distances and labels for k nearest neighbors.
+    - name: pgvector
+      url: https://github.com/pgvector/pgvector
+      description: Documents nearest-neighbor query with distance ordering and LIMIT.
 structure:
-  identity_keys:
-    - generation_activity_id
+  identity_keys: [candidate_generation_activity_id]
   fields:
-    - id: generation_activity_id
-      labels:
-        zh: 生成活动标识
-        en: generation activity ID
-        ja: generation activity ID
+    - id: candidate_generation_activity_id
+      labels: {zh: 候选生成活动标识, en: candidate-generation activity ID, ja: candidate-generation activity ID}
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
+      cardinality: {min: 1, max: 1}
       definitions:
-        zh: 稳定标识一次候选生成阶段。
-        en: Stable identifier for one candidate-generation stage.
-        ja: 一つのcandidate-generation stageを安定識別します。
+        zh: 标识一次实际候选召回执行，不复用为候选集或结果标识。
+        en: Identifies one actual candidate-recall execution and is not reused as candidate-set or result ID.
+        ja: 一回の実際 candidate-recall execution を識別し、candidate-set や result ID として再利用しません。
       allowed_values: []
-      pattern: null
-      example_value: candidate-generation-412
-      source_claims:
-        - claim-candidate-generation-activity-002
-    - id: retrieval_method
-      labels:
-        zh: 检索方法
-        en: retrieval method
-        ja: 検索方式
+      pattern: "^candidate-generation-[A-Za-z0-9._-]+$"
+      example_value: candidate-generation-18
+      source_claims: [claim-candidate-generation-faiss-api]
+    - id: request_ref
+      labels: {zh: 请求引用, en: request reference, ja: request 参照}
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 指向本次召回消费的 RetrievalRequest，不可用候选集反推。
+        en: Points to the RetrievalRequest consumed by this recall and cannot be inferred backward from a candidate set.
+        ja: この recall が消費する RetrievalRequest を指し、candidate set から逆推定できません。
+      allowed_values: []
+      pattern: "^retrieval-request-[A-Za-z0-9._-]+$"
+      example_value: retrieval-request-support-18
+      source_claims: [claim-candidate-generation-prov]
+    - id: retrieval_method_ref
+      labels: {zh: 检索方法引用, en: retrieval-method reference, ja: retrieval-method 参照}
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 指向本次召回所用向量、词法或混合方法版本，而不是一个具体分数。
+        en: Points to vector, lexical, or hybrid method revision used for recall and is not a concrete score.
+        ja: recall に使う vector、lexical、hybrid method revision を指し、具体 score ではありません。
+      allowed_values: []
+      pattern: "^retrieval-impl-[A-Za-z0-9._-]+$"
+      example_value: retrieval-impl-faiss-l2-v1
+      source_claims: [claim-candidate-generation-faiss-api]
+    - id: retrieval_scope_id
+      labels: {zh: 检索范围标识, en: retrieval scope ID, ja: retrieval scope ID}
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
+      cardinality: {min: 1, max: 1}
       definitions:
-        zh: 记录该阶段使用的检索器或方法类别。
-        en: Records the retriever or method family used by the stage.
-        ja: stageが使うretrieverまたはmethod familyを記録します。
+        zh: 限定可搜索来源、租户或索引快照的范围，不等同于访问授权。
+        en: Bounds searchable source, tenant, or index snapshot and is not equivalent to access authorization.
+        ja: 検索可能 source、tenant、index snapshot の範囲を限定し、access authorization と同値ではありません。
       allowed_values: []
-      pattern: null
-      example_value: dense-vector
-      source_claims:
-        - claim-candidate-generation-activity-003
-    - id: requested_limit
-      labels:
-        zh: 请求上限
-        en: requested limit
-        ja: 要求上限
+      pattern: "^scope-[A-Za-z0-9._-]+$"
+      example_value: scope-support-18
+      source_claims: [claim-candidate-generation-prov]
+    - id: candidate_limit
+      labels: {zh: 候选上限, en: candidate limit, ja: candidate limit}
       datatype: integer
       required: true
-      cardinality:
-        min: 1
-        max: 1
+      cardinality: {min: 1, max: 1}
       definitions:
-        zh: 记录该候选生成阶段请求的最大候选数量。
-        en: Maximum number of candidates requested from this generation stage.
-        ja: このgeneration stageで要求する最大candidate数です。
+        zh: 此活动请求或允许返回的最大候选数，不保证实际数量或最终上下文数量。
+        en: Maximum candidates this activity requests or permits to return and does not guarantee actual count or final context count.
+        ja: この activity が要求または許す最大 candidate 数で、実際の count や最終 context count を保証しません。
       allowed_values: []
       pattern: null
-      example_value: 80
-      source_claims:
-        - claim-candidate-generation-activity-004
-  constraints: []
-  required_relation_constraints: []
+      example_value: 50
+      source_claims: [claim-candidate-generation-faiss-api]
+    - id: candidate_set_ref
+      labels: {zh: 候选集引用, en: candidate-set reference, ja: candidate-set 参照}
+      datatype: reference
+      required: false
+      cardinality: {min: 0, max: 1}
+      definitions:
+        zh: 成功时指向本活动生成的 CandidateSet；失败或运行中时不可伪造该引用。
+        en: Points to CandidateSet generated by this activity on success and cannot be fabricated on failure or while running.
+        ja: 成功時にこの activity が生成した CandidateSet を指し、failure または running 時には捏造できません。
+      allowed_values: []
+      pattern: "^candidate-set-[A-Za-z0-9._-]+$"
+      example_value: candidate-set-support-18
+      source_claims: [claim-candidate-generation-prov]
+    - id: retrieval_activity_id
+      labels:
+        zh: 检索活动标识
+        en: retrieval activity ID
+        ja: retrieval activity ID
+      definitions:
+        zh: 标识同一候选召回执行的通用检索活动身份，不复用为请求、候选集、分数或结果标识。
+        en: Identifies the same candidate-recall execution as a general retrieval activity and is not reused as a request, candidate-set, score, or result ID.
+        ja: 同じ candidate-recall execution を一般の retrieval activity として識別し、request、candidate-set、score、result ID として再利用しない。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: '^retrieval-activity-[A-Za-z0-9._-]+$'
+      example_value: retrieval-activity-candidate-generation-18
+      source_claims: [claim-candidate-generation-prov]
+    - id: implementation_ref
+      labels:
+        zh: 实现引用
+        en: implementation reference
+        ja: implementation 参照
+      definitions:
+        zh: 指向本次候选召回所用检索器、索引或排序实现版本，不等同于某个候选分数。
+        en: Points to the retriever, index, or ranking implementation revision used by this candidate-recall execution and is not a candidate score.
+        ja: この candidate-recall execution が使う retriever、index、ranking implementation revision を指し、candidate score ではない。
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: '^retrieval-impl-[A-Za-z0-9._-]+$'
+      example_value: retrieval-impl-faiss-l2-v1
+      source_claims: [claim-candidate-generation-faiss-api]
+    - id: started_at
+      labels:
+        zh: 开始时间
+        en: started at
+        ja: 開始時刻
+      definitions:
+        zh: 记录该候选召回检索活动开始的时间，不可由请求创建时间或候选集发布时间替代。
+        en: Records when this candidate-recall retrieval activity began and cannot be substituted by request creation or candidate-set publication time.
+        ja: この candidate-recall retrieval activity の開始時刻を記録し、request 作成時刻や candidate-set 公開時刻では代替できない。
+      datatype: datetime
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: null
+      example_value: '2026-07-19T03:20:00Z'
+      source_claims: [claim-candidate-generation-prov]
+    - id: execution_status
+      labels:
+        zh: 执行状态
+        en: execution status
+        ja: execution status
+      definitions:
+        zh: 指明候选召回活动处于运行中、已完成或失败，不代替候选集来源或错误细节。
+        en: States whether candidate recall is running, completed, or failed and does not replace candidate-set provenance or error detail.
+        ja: candidate recall が running、completed、failed のいずれかを示し、candidate-set provenance や error detail を置き換えない。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: [running, completed, failed]
+      pattern: null
+      example_value: completed
+      source_claims: [claim-candidate-generation-prov]
+  constraints:
+    - id: candidate-generation-inherits-retrieval-activity-fields
+      severity: error
+      expression_language: plain
+      expression: CandidateGenerationActivity is one RetrievalActivity record. retrieval_activity_id and candidate_generation_activity_id must resolve to that same execution; implementation_ref must resolve to the implementation revision named by retrieval_method_ref; request_ref, started_at, and execution_status describe that execution rather than a second parent record.
+      explanation:
+        zh: 候选生成是检索活动的种差，专用身份和方法字段只细化同一执行记录，不能通过第二个父记录规避继承字段。
+        en: Candidate generation is a retrieval-activity specialization; its local identity and method refine the same execution record and cannot evade inherited fields through a second parent record.
+        ja: candidate generation は retrieval activity の特殊化であり、ローカル identity と method は同じ execution record を細化する。第2の親 record で継承 field を回避してはならない。
+      source_claims: [claim-candidate-generation-prov, claim-candidate-generation-faiss-api]
+    - id: candidate-generation-output-consistency
+      severity: error
+      expression_language: plain
+      expression: A completed generation activity requires candidate_set_ref and candidate count no greater than candidate_limit. CandidateSet members must be traceable to request_ref and retrieval_scope_id; an activity with failed status must not claim the set.
+      explanation:
+        zh: 候选输出必须与具体请求、范围和运行状态对应，不能通过相似主题或同一索引位置推断。
+        en: Candidate output must correspond to concrete request, scope, and run state and cannot be inferred from similar topic or co-location in one index.
+        ja: candidate output は具体 request、scope、run state に対応し、類似 topic や同一 index 内の共存から推定できません。
+      source_claims: [claim-candidate-generation-prov]
+    - id: candidate-generation-not-final-ranking
+      severity: error
+      expression_language: plain
+      expression: CandidateGenerationActivity must not assert final rank, fused rank, rerank score, ContextPackage inclusion, or answer correctness. Such claims require distinct RankingOperation, ContextAssembly, or evaluation facts.
+      explanation:
+        zh: 召回仅产生候选；排序、融合、上下文选择和质量判断均是后续边界。
+        en: Recall produces candidates only; ranking, fusion, context selection, and quality judgment are later boundaries.
+        ja: recall は candidate だけを生成し、ranking、fusion、context selection、quality judgment は後続境界です。
+      source_claims: [claim-candidate-generation-beir-boundary]
+  required_relations: []
 examples:
-  - id: CandidateGenerationActivity-example-positive-manual-001
-    kind: positive
-    labels:
-      zh: 候选生成正例
-      en: "Positive case: Candidate generation"
-      ja: 候補生成正例
-    scenario_id: null
+  - id: candidate-generation-example-positive-faiss
+
+    labels: {zh: FAISS 召回五十个候选, en: FAISS recalls fifty candidates, ja: FAISS が五十 candidate を recall する}
+
     descriptions:
-      zh: generation-412 对 index-v19 执行稠密向量召回并产生 80 个初始候选。
-      en: generation-412 performs dense-vector recall on index-v19 and produces 80 initial candidates.
-      ja: generation-412 はindex-v19でdense-vector recallを行い80件のinitial candidateを生成します。
+      zh: Lewis RAG p(y|x)=Σ_z p(z|x)·p(y|x,z)；HyDE 假设文档 embedding；RAPTOR 树检索；Self-RAG [Retrieve] adaptive；Generative Agents score=α·recency+β·importance+γ·relevance。
+      en: Lewis RAG p(y|x)=Σ_z p(z|x)·p(y|x,z); HyDE hypothetical doc embedding; RAPTOR tree retrieval; Self-RAG [Retrieve] adaptive; Generative Agents score=α·recency+β·importance+γ·relevance.
+      ja: Lewis RAG p(y|x,z)。HyDE 仮説 doc embedding。RAPTOR tree retrieval。Self-RAG [Retrieve]。Generative Agents score 公式。
     field_values:
-      generation_activity_id: candidate-generation-412
-      retrieval_method: dense-vector
-      requested_limit: 80
-      activity_id: candidate-generation-412
-      started_at: 2026-07-16T12:00:00Z
-    related_node_ids:
-      - CandidateGenerationActivity
-    related_relation_ids: []
-    expected_result:
-      zh: 归类为 CandidateGenerationActivity。
-      en: Classify the object as CandidateGenerationActivity.
-      ja: CandidateGenerationActivity として分類します。
-    why_valid_or_invalid:
-      zh: 输入是查询/索引，输出是首阶段候选集合，职责止于召回。
-      en: Its inputs are query and index, its output is a first-stage candidate set, and its responsibility stops at recall.
-      ja: inputはquery/index、outputはfirst-stage candidate setで責務はrecallまでです。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-candidate-generation-activity-005
-  - id: CandidateGenerationActivity-example-boundary-manual-001
-    kind: boundary
-    labels:
-      zh: 候选生成边界例
-      en: "Boundary case: Candidate generation"
-      ja: 候補生成境界例
-    scenario_id: null
+      candidate_generation_activity_id: candidate-generation-18
+      retrieval_activity_id: retrieval-activity-support-18
+      request_ref: retrieval-request-support-18
+      retrieval_method_ref: retrieval-impl-faiss-l2-v1
+      implementation_ref: retrieval-impl-faiss-l2-v1
+      retrieval_scope_id: scope-support-18
+      candidate_limit: 50
+      candidate_set_ref: candidate-set-support-18
+      started_at: "2026-07-19T01:00:00Z"
+      execution_status: completed
+    related_node_ids: [CandidateGenerationActivity, RetrievalRequest, CandidateSet]
+    related_relation_ids: [CandidateGenerationActivity-is_a-RetrievalActivity]
+
+    source_claims: [claim-candidate-generation-faiss-api]
+  - id: candidate-generation-example-counterexample-index-build
+
+    labels: {zh: 添加向量到索引, en: Adding vectors to index, ja: index へ vector を追加する}
+
     descriptions:
-      zh: rerank-412 重新评估已有 80 个候选并输出前 12 个。
-      en: rerank-412 rescales an existing set of 80 candidates and returns 12.
-      ja: rerank-412 は既存80候補を再評価し12件を返します。
-    field_values: {}
-    related_node_ids:
-      - CandidateGenerationActivity
+      zh: 反例：RetrievalResult 候选无 TopKSelection/token budget 直接全量进 ContextPackage。
+      en: Counterexample: RetrievalResult candidates enter ContextPackage without TopKSelection/token budget.
+      ja: 反例：RetrievalResult candidate が TopKSelection/token budget なしで ContextPackage 全量進入。
+    field_values:
+      operation_kind: index_add
+      request_ref: null
+      candidate_set_ref: null
+      candidate_limit: null
+    related_node_ids: [CandidateGenerationActivity]
     related_relation_ids: []
-    expected_result:
-      zh: 不得归类为 CandidateGenerationActivity。
-      en: Do not classify the object as CandidateGenerationActivity.
-      ja: CandidateGenerationActivity として分類しません。
-    why_valid_or_invalid:
-      zh: 它消费已有候选，属于重排而非候选生成。
-      en: It consumes existing candidates, so it is reranking rather than candidate generation.
-      ja: 既存candidateをconsumeするためcandidate generationでなくrerankingです。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-candidate-generation-activity-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+
+    source_claims: [claim-candidate-generation-faiss-api]
+  - id: candidate-generation-example-boundary-recalled-not-selected
+
+    labels: {zh: 被召回不等于被选入上下文, en: Recalled is not selected into context, ja: recall は context 選択ではない}
+
+    descriptions:
+      zh: IndexBuildRun 离线索引 vs RetrievalRun 在线查询；RAG-Sequence vs RAG-Token 变体边界。
+      en: IndexBuildRun offline index vs RetrievalRun online query; RAG-Sequence vs RAG-Token variant boundary.
+      ja: IndexBuildRun offline vs RetrievalRun online。RAG-Sequence vs RAG-Token 境界。
+    field_values:
+      candidate_limit: 50
+      candidate_set_ref: candidate-set-support-18
+      later_context_count: 5
+    related_node_ids: [CandidateGenerationActivity, CandidateSet, ContextAssembly]
+    related_relation_ids: []
+
+    source_claims: [claim-candidate-generation-beir-boundary]
+  - id: candidate-generation-example-instance-pgvector
+
+    labels: {zh: "实例：pgvector LIMIT 20 召回", en: "Instance: pgvector LIMIT 20 recall", ja: "インスタンス：pgvector LIMIT 20 recall"}
+
+    descriptions:
+      zh: pgvector ORDER BY embedding <=> query LIMIT 20；Anthropic Contextual Retrieval top-20 + rerank → top-5 context。
+      en: pgvector ORDER BY embedding <=> query LIMIT 20; Anthropic Contextual Retrieval top-20 + rerank → top-5 context.
+      ja: pgvector <=> LIMIT 20。Anthropic Contextual Retrieval top-20+rerank→top-5 context。
+    field_values:
+      candidate_generation_activity_id: candidate-generation-19
+      retrieval_activity_id: retrieval-activity-support-19
+      request_ref: retrieval-request-support-19
+      retrieval_method_ref: retrieval-impl-pgvector-l2-v1
+      implementation_ref: retrieval-impl-pgvector-l2-v1
+      retrieval_scope_id: scope-support-19
+      candidate_limit: 20
+      candidate_set_ref: candidate-set-support-19
+      started_at: "2026-07-19T02:00:00Z"
+      execution_status: completed
+    related_node_ids: [CandidateGenerationActivity, CandidateSet, RetrievedCandidate]
+    related_relation_ids: [CandidateGenerationActivity-is_a-RetrievalActivity]
+    source_claims: [claim-candidate-generation-pgvector-api]
 parent_relation:
   id: CandidateGenerationActivity-is_a-RetrievalActivity
   predicate: is_a
-  direction: target-to-source
+  target: concept:RetrievalActivity
+  endpoint_order: child-to-parent
+  direction: source-to-target
   relation_kind: hierarchy
   labels:
-    zh: 是一种RetrievalActivity
-    en: is a RetrievalActivity
-    ja: RetrievalActivityの一種
+    zh: 是检索活动的候选生成子类型
+    en: is a candidate-generation subtype of retrieval activity
+    ja: retrieval activity の candidate-generation 下位型である
   definitions:
-    zh: CandidateGenerationActivity —is_a→ RetrievalActivity 成立，因为它从查询、过滤器与索引版本产生初始 CandidateSet，职责止于召回。
-    en: CandidateGenerationActivity —is_a→ RetrievalActivity holds because it produces an initial CandidateSet from query, filter, and index version and stops at recall.
-    ja: CandidateGenerationActivity —is_a→ RetrievalActivity はquery・filter・index versionからinitial CandidateSetを生成し責務がrecallで終わるため成立します。
+    zh: CandidateGenerationActivity —is_a→ RetrievalActivity 表示每次候选生成都是检索执行，但其结果仅到候选集边界。
+    en: CandidateGenerationActivity —is_a→ RetrievalActivity means every candidate generation is retrieval execution whose result ends at candidate-set boundary.
+    ja: CandidateGenerationActivity —is_a→ RetrievalActivity は、各 candidate generation が candidate-set boundary で結果が終わる retrieval execution であることを表します。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
-    en: The relation is decided per auditable fact; no universal runtime cardinality is imposed at ontology level.
-    ja: このrelationはaudit可能fact単位で判定しontology層で一律runtime cardinalityを課しません。
+    zh: 分类关系不规定一次运行能有多少候选生成活动。
+    en: Classification does not prescribe how many candidate-generation activities one run can have.
+    ja: 分類関係は一 run が持てる candidate-generation activity 数を規定しません。
   inverse_reading:
-    predicate: part_of
-    labels:
-      zh: 反向读取
-      en: inverse is_a
-      ja: 逆方向読取
-  conditions:
-    - id: CandidateGenerationActivity-is_a-RetrievalActivity-condition-manual-001
-      severity: error
-      expression_language: plain
-      expression: "Assert only when the instance satisfies the complete RetrievalActivity definition and the child differentia: it produces an initial CandidateSet from query, filter, and index version and stops at recall."
-      explanations:
-        zh: 仅当实例既满足 RetrievalActivity 的完整定义，又满足子类种差“它从查询、过滤器与索引版本产生初始 CandidateSet，职责止于召回。”时建立该边。
-        en: "Assert only when the instance satisfies the complete RetrievalActivity definition and the child differentia: it produces an initial CandidateSet from query, filter, and index version and stops at recall."
-        ja: instanceがRetrievalActivity完全定義とchild differentia「query・filter・index versionからinitial CandidateSetを生成し責務がrecallで終わる」を共に満たす時だけassertします。
-      source_claims:
-        - claim-candidate-generation-activity-007
+    predicate: has_candidate_generation_subtype
+    labels: {zh: 具有候选生成子类型, en: has candidate-generation subtype, ja: candidate-generation 下位型を持つ}
+  conditions: []
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: CandidateGenerationActivity-is_a-RetrievalActivity-example-positive-manual-001
-      kind: positive
-      labels:
-        zh: 是一种RetrievalActivity正例
-        en: "Positive case: is a RetrievalActivity"
-        ja: RetrievalActivityの一種正例
-      scenario_id: null
-      descriptions:
-        zh: generation-412 从 index-v19 召回 80 个候选。
-        en: generation-412 recalls 80 candidates from index-v19.
-        ja: generation-412がindex-v19から80候補をrecallします。
-      field_values: {}
-      related_node_ids:
-        - CandidateGenerationActivity
-        - RetrievalActivity
-      related_relation_ids:
-        - CandidateGenerationActivity-is_a-RetrievalActivity
-      expected_result:
-        zh: 建立该有向事实，并保留条件与证据。
-        en: Assert the directed fact with its condition and evidence retained.
-        ja: condition/evidenceを保持してdirected factをassertします。
-      why_valid_or_invalid:
-        zh: 实例满足端点定义、方向和该关系的显式成立条件。
-        en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-        ja: endpoint定義・direction・明示assertion conditionを満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-candidate-generation-activity-007
-    - id: CandidateGenerationActivity-is_a-RetrievalActivity-example-boundary-manual-001
-      kind: boundary
-      labels:
-        zh: 是一种RetrievalActivity边界例
-        en: "Boundary case: is a RetrievalActivity"
-        ja: RetrievalActivityの一種境界例
-      scenario_id: null
-      descriptions:
-        zh: fusion-415 组合已有列表，不生成初始候选。
-        en: fusion-415 combines existing lists and does not generate initial candidates.
-        ja: fusion-415は既存listを結合しinitial candidateを生成しません。
-      field_values: {}
-      related_node_ids:
-        - CandidateGenerationActivity
-        - RetrievalActivity
-      related_relation_ids:
-        - CandidateGenerationActivity-is_a-RetrievalActivity
-      expected_result:
-        zh: 验证器不得建立该有向关系事实。
-        en: Do not assert the directed fact.
-        ja: directed factをassertしません。
-      why_valid_or_invalid:
-        zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-        en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-        ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-candidate-generation-activity-007
-  source_claims:
-    - claim-candidate-generation-activity-007
-  distinct_fact_rationale: null
+  examples: []
+  source_claims: [claim-candidate-generation-faiss-api]
+  distinct_fact_rationale:
+    zh: 此关系表达活动类型归属，不表达具体候选集生成、方法使用、最终排序或上下文选择。
+    en: This relation states activity type membership, not concrete candidate-set generation, method use, final ranking, or context selection.
+    ja: この関係は activity type membership を表し、具体 candidate-set generation、method use、最終 ranking、context selection を表しません。
   layout_role: primary-backbone
-  review_status: pending
-  endpoint_order: child-to-parent
-relations:
-  - id: CandidateGenerationActivity-produces-CandidateSet
-    predicate: produces
-    direction: source-to-target
-    relation_kind: causal
-    labels:
-      zh: produces CandidateSet
-      en: produces CandidateSet
-      ja: CandidateSetをproduces
-    definitions:
-      zh: CandidateGenerationActivity —produces→ CandidateSet 表示该初始候选集合是此候选生成阶段对查询、过滤器和索引求值后的直接输出。
-      en: CandidateGenerationActivity —produces→ CandidateSet states that the initial candidate set is the direct output of evaluating query, filter, and index in this generation stage.
-      ja: CandidateGenerationActivity —produces→ CandidateSet はinitial candidate setがこのgeneration stageでquery・filter・indexを評価した直接outputです。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
-      en: The relation is decided per auditable fact; no universal runtime cardinality is imposed at ontology level.
-      ja: このrelationはaudit可能fact単位で判定しontology層で一律runtime cardinalityを課しません。
-    inverse_reading:
-      predicate: inverse_produces
-      labels:
-        zh: 反向读取
-        en: inverse produces
-        ja: 逆方向読取
-    conditions:
-      - id: CandidateGenerationActivity-produces-CandidateSet-condition-manual-001
-        severity: error
-        expression_language: plain
-        expression: Assert only when CandidateSet is marked as the initial-recall stage and its generation lineage points to this activity.
-        explanations:
-          zh: 仅当 CandidateSet 的 stage_name 标为初始召回且生成血缘指向该活动时建立。
-          en: Assert only when CandidateSet is marked as the initial-recall stage and its generation lineage points to this activity.
-          ja: CandidateSetがinitial-recall stageでgeneration lineageがこのactivityを指す時だけassertします。
-        source_claims:
-          - claim-candidate-generation-activity-008
-    temporal_scope: valid-time
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: CandidateGenerationActivity-produces-CandidateSet-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: produces CandidateSet正例
-          en: "Positive case: produces CandidateSet"
-          ja: CandidateSetをproduces正例
-        scenario_id: null
-        descriptions:
-          zh: generation-412 produces candidate-set-initial-412。
-          en: generation-412 produces candidate-set-initial-412.
-          ja: generation-412がcandidate-set-initial-412を生成します。
-        field_values: {}
-        related_node_ids:
-          - CandidateGenerationActivity
-          - CandidateSet
-        related_relation_ids:
-          - CandidateGenerationActivity-produces-CandidateSet
-        expected_result:
-          zh: 建立该有向事实，并保留条件与证据。
-          en: Assert the directed fact with its condition and evidence retained.
-          ja: condition/evidenceを保持してdirected factをassertします。
-        why_valid_or_invalid:
-          zh: 实例满足端点定义、方向和该关系的显式成立条件。
-          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
-          ja: endpoint定義・direction・明示assertion conditionを満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-candidate-generation-activity-008
-      - id: CandidateGenerationActivity-produces-CandidateSet-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: produces CandidateSet边界例
-          en: "Boundary case: produces CandidateSet"
-          ja: CandidateSetをproduces境界例
-        scenario_id: null
-        descriptions:
-          zh: 重排后的集合不能直接归为候选生成输出。
-          en: A post-rerank set is not directly produced by candidate generation.
-          ja: post-rerank setをcandidate generation direct outputとしません。
-        field_values: {}
-        related_node_ids:
-          - CandidateGenerationActivity
-          - CandidateSet
-        related_relation_ids:
-          - CandidateGenerationActivity-produces-CandidateSet
-        expected_result:
-          zh: 验证器不得建立该有向关系事实。
-          en: Do not assert the directed fact.
-          ja: directed factをassertしません。
-        why_valid_or_invalid:
-          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
-          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
-          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-candidate-generation-activity-008
-    source_claims:
-      - claim-candidate-generation-activity-008
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:CandidateSet
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+relations: []
+sources:
+  - id: faiss-index-api
+    title: FAISS Index API
+    source_type: official-project-documentation
+    url: https://faiss.ai/cpp_api/struct/structfaiss_1_1Index.html
+    relevance: Documents Index search input vectors, k, distance output, and label output.
+  - id: pgvector-readme
+    title: pgvector project documentation
+    source_type: official-project-documentation
+    url: https://github.com/pgvector/pgvector
+    relevance: Documents nearest-neighbor queries with ORDER BY distance and LIMIT.
+  - id: beir-paper
+    title: "BEIR: A Heterogenous Benchmark for Zero-shot Evaluation of Information Retrieval Models"
+    source_type: academic-paper
+    url: https://arxiv.org/abs/2104.08663
+    relevance: Evaluates retrieval models across heterogeneous information-retrieval tasks and separates retrieval effectiveness measurement from downstream generation.
+  - id: w3c-prov-o
+    title: W3C PROV-O
+    source_type: standard
+    url: https://www.w3.org/TR/prov-o/
+    relevance: Distinguishes activities from inputs and generated entities.
 source_claims:
-  - id: claim-candidate-generation-activity-001
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents prefetches that generate candidate sets before a main query, including dense, sparse, and nested multi-stage forms; Moonweave models that stage as an activity.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
+  - id: claim-candidate-generation-faiss-api
+    source: faiss-index-api
+    supports: FAISS documents Index search with query vectors, k, and output distance and label arrays. Moonweave treats that call as candidate-generation activity and its labels as candidate identifiers rather than final answer evidence.
+    locator: "faiss::Index search method"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-candidate-generation-activity-002
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents prefetches that generate candidate sets before a main query, including dense, sparse, and nested multi-stage forms; Moonweave models that stage as an activity. Moonweave records CandidateGenerationActivity.generation_activity_id as the stated auditable datum: Stable identifier for one candidate-generation stage."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
+  - id: claim-candidate-generation-pgvector-api
+    source: pgvector-readme
+    supports: pgvector documents ORDER BY vector distance with LIMIT to get nearest neighbors. Moonweave maps a bounded query invocation to candidate generation, not to context inclusion or final ranking.
+    locator: "Querying nearest neighbors"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-candidate-generation-activity-003
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents prefetches that generate candidate sets before a main query, including dense, sparse, and nested multi-stage forms; Moonweave models that stage as an activity. Moonweave records CandidateGenerationActivity.retrieval_method as the stated auditable datum: Records the retriever or method family used by the stage."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
+  - id: claim-candidate-generation-beir-boundary
+    source: beir-paper
+    supports: BEIR evaluates retrieval models using information-retrieval effectiveness across diverse tasks. The paper supports treating recall output and its evaluation as retrieval concerns; Moonweave's boundary to context selection and answer quality is a local design inference.
+    locator: "Abstract and benchmark evaluation scope"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-candidate-generation-activity-004
-    source: eng-vector-qdrant-hybrid-query
-    supports: "Qdrant documents prefetches that generate candidate sets before a main query, including dense, sparse, and nested multi-stage forms; Moonweave models that stage as an activity. Moonweave records CandidateGenerationActivity.requested_limit as the stated auditable datum: Maximum number of candidates requested from this generation stage."
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
+  - id: claim-candidate-generation-prov
+    source: w3c-prov-o
+    supports: PROV-O separates an activity from entities it uses and generates. Moonweave applies that distinction to a request, candidate-generation activity, and candidate set.
+    locator: "PROV-O Activity, used, and wasGeneratedBy"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-candidate-generation-activity-005
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents prefetches that generate candidate sets before a main query, including dense, sparse, and nested multi-stage forms; Moonweave models that stage as an activity. Qdrant documents prefetch as a candidate-producing stage before a main refinement query.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-candidate-generation-activity-006
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents prefetches that generate candidate sets before a main query, including dense, sparse, and nested multi-stage forms; Moonweave models that stage as an activity. Official reranking guidance treats reranking as a second stage over initial results.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-candidate-generation-activity-007
-    source: eng-vector-qdrant-hybrid-query
-    supports: The official documentation supports the operational distinction used in this child differentia; Moonweave's CandidateGenerationActivity-to-RetrievalActivity subclass placement is an explicit ontology design decision.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-candidate-generation-activity-008
-    source: eng-vector-qdrant-hybrid-query
-    supports: The cited official documentation supports the endpoint roles and direction of this retrieval fact; the exact relation identifier and ownership boundary are Moonweave design decisions.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

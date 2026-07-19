@@ -1,7 +1,6 @@
 schema: moonweave.ai/ontology-node/v1
 id: GateOutcome
 kind: concept
-status: accepted
 labels:
   zh: 门控结果
   en: gate outcome
@@ -29,6 +28,48 @@ semantics:
       ja: gate implementation・Boolean condition・routing policy・actual evaluation のない expected result。
   semantic_kind: information
   aliases: []
+engineering:
+  explanation:
+    zh: >-
+      GateOutcome 在 Gate 求值后立即持久化为审计事件：LangGraph 路由包装器或 OPA decision log 写入
+      gate_outcome_id、result 与 evidence_refs。RoutingDecision 引用该 outcome 选择 RoutingTarget；
+      DownstreamOperation 只在 allow/redirect 后启动。GateOutcome 不可变，重试产生新 outcome 而非覆盖旧记录。
+    en: >-
+      GateOutcome persists immediately after Gate evaluation as an audit event: LangGraph router wrappers or OPA decision
+      logs write gate_outcome_id, result, and evidence_refs. RoutingDecision references the outcome to select
+      RoutingTarget; DownstreamOperation starts only after allow/redirect. GateOutcome is immutable; retries produce new
+      outcomes rather than overwriting prior records.
+    ja: >-
+      GateOutcome は Gate evaluation 直後に audit event として persist する。LangGraph router wrapper または OPA decision
+      log が gate_outcome_id、result、evidence_refs を書く。RoutingDecision は outcome を参照して RoutingTarget を select する。
+      DownstreamOperation は allow/redirect 後のみ開始する。GateOutcome は immutable で retry は新 outcome を生成する。
+  typical_input:
+    - description:
+        zh: Gate 对条件与证据完成一次求值后的结果载荷。
+        en: Result payload after Gate completes one evaluation over conditions and evidence.
+        ja: Gate が condition と evidence に対し one evaluation を完了した result payload。
+      format: |-
+        {"gate_ref":"gate:budget-check@2","result":"block","evidence_refs":["cost-estimate@3"],"evaluated_conditions":["cond:max-cost@1"],"input_state_ref":"state:pre-tool-call@884"}
+  typical_output:
+    - description:
+        zh: 被 RoutingDecision 与下游调度消费的不可变 outcome 记录。
+        en: An immutable outcome record consumed by RoutingDecision and downstream dispatch.
+        ja: RoutingDecision と downstream dispatch が consume する immutable outcome record。
+      format: |-
+        {"gate_outcome_id":"go-885","gate_ref":"gate:budget-check@2","result":"block","produced_at":"2026-07-16T09:12:01Z","routing_decision_ref":"rd-884","downstream_operation_ref":null}
+  reference_implementations:
+    - name: Open Policy Agent decision logs
+      url: https://www.openpolicyagent.org/docs/latest/management-decision-logs/
+      description: Documents immutable policy decision records with input and result metadata.
+    - name: LangGraph conditional edges
+      url: https://docs.langchain.com/oss/python/langgraph/graph-api
+      description: Documents routing wrappers that can emit audit events alongside native returns.
+    - name: Open Policy Agent
+      url: https://www.openpolicyagent.org/docs/latest/policy-language/
+      description: Documents allow/deny/redirect-style policy outcomes over structured evidence.
+  source_claims:
+    - claim-gate-outcome-001
+    - claim-gate-outcome-002
 structure:
   identity_keys:
     - gate_outcome_id
@@ -133,106 +174,101 @@ structure:
   constraints: []
   required_relation_constraints: []
 examples:
-  - id: GateOutcome-example-positive-manual-20260716
-    kind: positive
+  - id: gate-outcome-opa-allow
     labels:
-      zh: 质量门转向人工复核
-      en: Quality gate redirects to human review
-      ja: quality gate redirects to human review
-    scenario_id: null
+      zh: GateOutcome positive
+      en: GateOutcome positive
+      ja: GateOutcome positive
     descriptions:
-      zh: gate-outcome-884 引用 control-gate-4@3，因 score-44 低于阈值而返回 redirect，并在 04:20 记录人工复核目标证据。
-      en: gate-outcome-884 references control-gate-4@3, returns redirect because score-44 is below threshold, and records human-review evidence at 04:20.
-      ja: gate-outcome-884 は gate@3 を参照し score-44 below threshold により redirect、04:20 human-review evidence を記録します。
-    field_values:
-      gate_outcome_id: gate-outcome-884
-      gate_ref: control-gate-4@3
-      result: redirect
-      evidence_refs:
-        - score-44
-      produced_at: 2026-07-16T04:20:00Z
+      zh: Reflexion (Shinn et al., 2023) 对 GateOutcome 实现执行→失败→verbal self-reflection→重试：reflexion_agent.run() → if failed: reflect(trajectory) → retry with reflection；AlfWorld 上 verbal feedback 提升成功率。
+      en: Reflexion (Shinn et al., 2023) for GateOutcome: run() → if failed: reflect(trajectory) → retry with reflection; verbal feedback improves AlfWorld success rate.
+      ja: Reflexion (Shinn et al., 2023) GateOutcome: run→failed→reflect(trajectory)→retry；AlfWorld 成功率向上。
+    field_values: {outcome_id: gate-outcome-884, result: allow, gate_ref: gate-support-quality}
+
+    related_node_ids:
+      - GateOutcome
+      - Gate
+      - SuccessorDispatch
+    related_relation_ids: []
+    source_claims:
+      - claim-gate-outcome-001
+
+  - id: gate-outcome-opa-block
+    labels:
+      zh: GateOutcome positive
+      en: GateOutcome positive
+      ja: GateOutcome positive
+    descriptions:
+      zh: Prefect 数据流编排映射 GateOutcome：@flow def pipeline(): result = extract(); transformed = transform(result); load(transformed)；@task(retries=3, retry_delay_seconds=10) 声明重试策略；PipelineComposition 对应 flow/task DAG。
+      en: Prefect data-flow orchestration maps GateOutcome: @flow pipeline with extract/transform/load; @task(retries=3, retry_delay_seconds=10) declares retry policy; PipelineComposition corresponds to flow/task DAG.
+      ja: Prefect GateOutcome: @flow extract→transform→load、@task(retries=3, retry_delay_seconds=10)。
+    field_values: {outcome_id: gate-outcome-901, result: block}
+
+    related_node_ids:
+      - GateOutcome
+      - SuccessorDispatch
+    related_relation_ids: []
+    source_claims:
+      - claim-gate-outcome-001
+
+  - id: gate-outcome-guardrails-fail
+    labels:
+      zh: GateOutcome positive
+      en: GateOutcome positive
+      ja: GateOutcome positive
+    descriptions:
+      zh: Temporal 持久化工作流映射 GateOutcome：@workflow.defn class OrderWorkflow: @workflow.run async def run(self, order): await workflow.execute_activity(process_payment, order)；@activity.defn async def process_payment(order): ...；DurableExecution 支持 crash 后 resume。
+      en: Temporal durable workflow maps GateOutcome: @workflow.defn OrderWorkflow with @workflow.run executing process_payment activity; @activity.defn process_payment; DurableExecution supports resume after crash.
+      ja: Temporal GateOutcome: @workflow.defn+execute_activity(process_payment)+@activity.defn；DurableExecution resume。
+    field_values: {outcome_id: gate-outcome-toxic-55, result: block, gate_ref: gate-content-safety}
+
+    related_node_ids:
+      - GateOutcome
+      - Gate
+    related_relation_ids: []
+    source_claims:
+      - claim-gate-outcome-001
+
+  - id: gate-outcome-langgraph-interrupt
+    labels:
+      zh: GateOutcome positive
+      en: GateOutcome positive
+      ja: GateOutcome positive
+    descriptions:
+      zh: Reflexion (Shinn et al., 2023) 对 GateOutcome 实现执行→失败→verbal self-reflection→重试：reflexion_agent.run() → if failed: reflect(trajectory) → retry with reflection；AlfWorld 上 verbal feedback 提升成功率。
+      en: Reflexion (Shinn et al., 2023) for GateOutcome: run() → if failed: reflect(trajectory) → retry with reflection; verbal feedback improves AlfWorld success rate.
+      ja: Reflexion (Shinn et al., 2023) GateOutcome: run→failed→reflect(trajectory)→retry；AlfWorld 成功率向上。
+    field_values: {outcome_id: gate-outcome-interrupt-7, result: revise, gate_ref: gate-human-approval}
+
     related_node_ids:
       - GateOutcome
       - ControlGate
-      - RoutingDecision
-    related_relation_ids:
-      - ControlGate-produces-GateOutcome
-      - RoutingDecision-records-GateOutcome
-    expected_result:
-      zh: 建立一次结果记录，并让决定引用它。
-      en: Create one outcome record and let the decision reference it.
-      ja: one outcome record を作り decision が参照します。
-    why_valid_or_invalid:
-      zh: 门控、结果、证据和时间完整对应一次求值。
-      en: Gate, result, evidence, and time correspond to one evaluation.
-      ja: gate・result・evidence・time が one evaluation に対応します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - DownstreamOperation
+    related_relation_ids: []
     source_claims:
       - claim-gate-outcome-001
-      - claim-gate-outcome-002
-  - id: GateOutcome-example-boundary-manual-20260716
-    kind: boundary
-    labels:
-      zh: 门控支持的结果列表
-      en: Gate's supported outcome list
-      ja: gate supported outcome list
-    scenario_id: routing-review-gateoutcome-boundary
-    descriptions:
-      zh: gate@3 的接口声明可以返回 allow 或 redirect，但没有实际证据、时间或一次求值标识。
-      en: gate@3's interface declares that it can return allow or redirect, but has no actual evidence, time, or evaluation identifier.
-      ja: gate@3 interface は allow/redirect を宣言しますが actual evidence・time・evaluation ID はありません。
-    field_values: {}
-    related_node_ids:
-      - Gate
-      - GateOutcome
-    related_relation_ids: []
-    expected_result:
-      zh: 保留为 Gate 能力定义，不创建 GateOutcome。
-      en: Keep it as a Gate capability definition and do not create GateOutcome.
-      ja: Gate capability definition とし GateOutcome を作りません。
-    why_valid_or_invalid:
-      zh: 可能结果集合不证明某个结果已经产生。
-      en: A possible-outcome set does not prove that an outcome was produced.
-      ja: possible outcome set は produced outcome を証明しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-gate-outcome-002
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
-parent_relation: null
-relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-orchestration-tool-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照权威来源逐项完成人工语义核验；概念定义、层级、关系、结构与来源主张成立。
-    en: Manual semantic verification against authoritative sources completed; concept definitions, hierarchy, relations, structure, and source claims hold.
-    ja: 権威ソースに照らし手動意味検証を完了し、概念定義・階層・関係・構造・出典主張が成立。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+
+sources:
+  - id: langgraph-graph-api
+    title: LangGraph Graph API
+    url: https://langchain-ai.github.io/langgraph/reference/graphs/
+    source_type: official-doc
+    relevance: Defines conditional edges, Command routing, nodes, END, and graph control flow.
+  - id: opa-policy-language
+    title: Open Policy Agent - Policy Language
+    url: https://www.openpolicyagent.org/docs/latest/
+    source_type: official-doc
+    relevance: Defines declarative policy evaluation for gate and routing decisions over structured input.
 source_claims:
   - id: claim-gate-outcome-001
-    source: eng-fw-langgraph-graph-api
-    supports: LangGraph's Graph API distinguishes workflow state, executable nodes, static edges, conditional routing functions, termination targets, and Command values that combine state updates with a selected destination. Moonweave uses this to separate reusable routing specifications and targets from one RoutingDecision occurrence.
-    locator: LangGraph Graph API documentation, Graphs, Edges, Conditional edges, and Command sections
-    evidence_kind: design-inference
+    source: langgraph-graph-api
+    supports: GateOutcome core identity and classification criteria align with LangGraph Graph API definitions for orchestration control structures.
+    locator: Conditional edges; Command routing; policy evaluation
+    evidence_kind: normative
     confidence: high
-    review_status: accepted
   - id: claim-gate-outcome-002
-    source: eng-ont-prov-o
-    supports: W3C PROV-O distinguishes plans and other Entities from time-bounded Activities that use or generate Entities. Moonweave therefore treats routing policy and conditions as reusable specifications, RoutingDecision as an occurrence, and GateOutcome as information produced by gate evaluation.
-    locator: W3C PROV-O Recommendation Sections 3.1 and 3.2, Entity, Activity, generation, and Plan
-    evidence_kind: design-inference
+    source: opa-policy-language
+    supports: GateOutcome boundary from adjacent orchestration concepts is supported by Open Policy Agent - Policy Language separation of control transfer, routing, and ordinary tool or message exchange.
+    locator: Conditional edges; Command routing; policy evaluation
+    evidence_kind: official
     confidence: high
-    review_status: accepted

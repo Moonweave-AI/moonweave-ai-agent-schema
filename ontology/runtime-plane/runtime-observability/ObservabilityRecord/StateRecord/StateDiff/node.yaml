@@ -2,445 +2,187 @@ schema: moonweave.ai/ontology-node/v1
 id: StateDiff
 kind: concept
 status: accepted
-labels:
-  en: state diff
-  zh: 状态差异
-  ja: 状態差分
+labels: {zh: 状态差异记录, en: State difference record, ja: 状態差分記録}
 semantics:
-  short_definition:
-    zh: 从一个已标识状态快照到另一个快照的变化记录。
-    en: A change record from one identified state snapshot to another.
-    ja: 識別済み状態スナップショット間の変化記録。
-  definition:
-    zh: 状态差异是一种 StateRecord，以明确的 from_snapshot 和 to_snapshot 为边界，只保存两者之间新增、删除或改变的状态项以及必要的比较元数据。它不代表任一完整状态，也不等于执行了这些变化的活动；若没有一对可识别快照，就不能称为该差异。
-    en: A StateDiff is a StateRecord bounded by identified from_snapshot and to_snapshot values, containing only added, removed, or changed state items and comparison metadata. It represents neither complete state nor the activity that caused the changes; without an identifiable snapshot pair, it is not this diff.
-    ja: StateDiff は識別された from_snapshot と to_snapshot を境界とし、追加・削除・変更された状態項目と比較メタデータだけを持つ StateRecord です。完全状態でも変更活動でもなく、識別可能な快照対がなければ差分になりません。
-  why_needed:
-    zh: 差异记录让调试者快速定位某一步究竟改变了哪些通道、任务或产物，也能在恢复后核对状态漂移，而无需反复比较两个完整快照。
-    en: Diffs let reviewers locate exactly which channels, tasks, or artifacts changed in a step and check drift after restoration without repeatedly comparing full snapshots.
-    ja: 差分により、ステップが変更したチャネル、タスク、成果物を特定し、完全快照を毎回比較せず復元後のずれを確認できます。
+  short_definition: {zh: 描述两个已标识运行时状态版本之间有界变更集合的 StateRecord。, en: "A StateRecord that describes a bounded set of changes between two identified runtime-state versions.", ja: 二つの識別済みランタイム状態バージョン間の限定された変更集合を記述する StateRecord。}
+  definition: {zh: StateDiff 是一种持久自定义 Entity，描述从一个固定状态版本转换到另一个版本所需的添加、删除或修改。它不是完整状态负载、检查点恢复保证、状态变更 Activity，也不是状态变更时发生的 OTel event。, en: "A StateDiff is a durable custom Entity describing additions, removals, or modifications needed to transition from one fixed state version to another. It is not a complete state payload, a checkpoint recovery guarantee, a state mutation Activity, or an OTel event that happened while state changed.", ja: StateDiff は一つの固定状態バージョンから別の状態バージョンへ遷移するために必要な追加、削除、変更を記述する永続カスタム Entity である。完全な状態ペイロード、チェックポイントの復旧保証、状態変更 Activity、または状態変化中に発生した OTel event ではない。}
+  why_needed: {zh: 增量检查和高存储效率分析需要显式变更表示，以在不修改任一存储状态记录的前提下保留源和目标版本身份。, en: "Incremental inspection and storage-efficient analysis need explicit change representations that preserve source and target version identity without mutating either stored state record.", ja: 増分検査とストレージ効率の高い分析には、いずれの保存済み状態記録も変更せずにソースと対象バージョンの識別性を保存する明示的な変更表現が必要である。}
   includes:
-    - zh: 包括快照 `s17` 到 `s18` 之间新增待审批任务、更新工具结果并移除旧错误标记的逐项变化记录。
-      en: Includes a change set from snapshot `s17` to `s18` that adds a pending approval, updates a tool result, and removes a stale error marker.
-      ja: 快照 `s17` から `s18` で承認待ちを追加し、ツール結果を更新し、古いエラー印を削除する変化集合を含みます。
+    - {zh: 差异 ID、基准状态版本、目标状态版本、变更路径计数和可选补丁内容摘要。, en: "Diff ID, base state version, target state version, changed-path count, and optional patch-content digest.", ja: 差分 ID、基準状態バージョン、対象状態バージョン、変更パス数、任意のパッチ内容ダイジェスト。}
+    - {zh: 在已声明比较算法下从两条状态记录导出的结构化变更。, en: Structured changes derived from two state records under a declared comparison algorithm., ja: 宣言済み比較アルゴリズムのもとで二つの状態記録から導出された構造化変更。}
   excludes:
-    - zh: 不包括完整 StateSnapshot、用于恢复寻址的 Checkpoint、没有 from/to 快照身份的普通更新日志，以及造成变化的执行活动。
-      en: Excludes a full StateSnapshot, a Checkpoint used for restore addressing, ordinary update logs without from/to snapshot identities, and the activity that caused the change.
-      ja: 完全な StateSnapshot、復元指定用 Checkpoint、from/to 快照識別のない更新ログ、変化を起こした活動は含みません。
-  semantic_kind: information
-  aliases: []
+    - {zh: 完整 StateSnapshot、Checkpoint 恢复边界，或应用变更的实时操作。, en: "A full StateSnapshot, a Checkpoint recovery boundary, or the live operation that applies changes.", ja: 完全な StateSnapshot、Checkpoint の復旧境界、または変更を適用するライブ操作。}
+    - {zh: 没有已标识状态版本的追踪 span 属性差异。, en: A trace span attribute delta without identified state versions., ja: 識別済み状態バージョンを持たないトレース span 属性差分。}
+  semantic_kind: entity
+  aliases: [state delta, state patch record]
+engineering:
+  explanation: {zh: 比较操作读取两个不可变状态表示，应用具名差异算法，写入变更集和完整性摘要，并保留对基准和目标版本的引用。之后应用差异是独立的运行时 Activity，可能独立失败。, en: "A comparison operation reads two immutable state representations, applies a named diff algorithm, writes the change set and integrity digest, and preserves references to base and target versions. Applying the diff later is a separate runtime Activity that may fail independently.", ja: 比較操作は二つの不変状態表現を読み、名前付き差分アルゴリズムを適用し、変更集合と完全性ダイジェストを書き込み、基準および対象バージョンへの参照を保持する。後で差分を適用することは独立したランタイム Activity であり、独立して失敗しうる。}
+  typical_input:
+    - description: {zh: 状态比较请求, en: State comparison request, ja: 状態比較リクエスト}
+      format: |-
+        {"base_state_version":"18","target_state_version":"19","comparison_algorithm":"json-patch","source_session_id":"session-73"}
+  typical_output:
+    - description: {zh: 状态差异记录, en: State difference record, ja: 状態差分記録}
+      format: |-
+        {"diff_id":"diff-19","base_state_version":"18","target_state_version":"19","changed_path_count":3}
+  reference_implementations:
+    - {name: PROV-O Entity, url: https://www.w3.org/TR/prov-o/, description: Supports representing fixed derived data separately from the Activity that computes or applies it.}
 structure:
-  identity_keys: []
-  fields: []
-  constraints: []
-  required_relation_constraints: []
+  identity_keys: [record_id, state_record_id, state_version, diff_id, base_state_version, target_state_version]
+  fields:
+    - id: record_id
+      labels: {zh: 记录 ID, en: Record ID, ja: 記録 ID}
+      definitions: {zh: 从 ObservabilityRecord 经由 StateRecord 继承并与状态差异属于同一持久记录的稳定标识符。, en: Stable identifier inherited from ObservabilityRecord through StateRecord for the same persisted record as this state diff., ja: この状態差分と同じ永続記録に対して StateRecord 経由で ObservabilityRecord から継承した安定識別子。}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: '^[a-z][a-z0-9-]{2,127}$'
+      example_value: diff-19
+      source_claims: [claim-state-diff-entity]
+    - id: record_kind
+      labels: {zh: 记录类型, en: Record kind, ja: 記録種別}
+      definitions: {zh: 从 ObservabilityRecord 经由 StateRecord 继承并固定为状态的保留证据类别。, en: Retained-evidence category inherited from ObservabilityRecord through StateRecord and fixed to state., ja: StateRecord 経由で ObservabilityRecord から継承し state に固定される保持証拠カテゴリ。}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: [state]
+      example_value: state
+      source_claims: [claim-state-diff-entity]
+    - id: recorded_at
+      labels: {zh: 持久化时间, en: Persistence time, ja: 永続化時刻}
+      definitions: {zh: 从 ObservabilityRecord 经由 StateRecord 继承的状态差异记录完成持久化时间。, en: Persistence time inherited from ObservabilityRecord through StateRecord for the finalized state-diff record., ja: 確定した状態差分記録に対して StateRecord 経由で ObservabilityRecord から継承した永続化時刻。}
+      datatype: datetime
+      required: true
+      cardinality: {min: 1, max: 1}
+      example_value: '2026-07-18T09:16:00Z'
+      source_claims: [claim-state-diff-entity]
+    - id: state_record_id
+      labels: {zh: 状态记录 ID, en: State record ID, ja: 状態記録 ID}
+      definitions: {zh: 从 StateRecord 继承并与状态差异属于同一状态表示的稳定标识符。, en: Stable state-representation identifier inherited from StateRecord for the same record as this state diff., ja: この状態差分と同じ状態表現に対して StateRecord から継承した安定識別子。}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: '^[a-z][a-z0-9-]{2,127}$'
+      example_value: diff-19
+      source_claims: [claim-state-diff-entity]
+    - id: state_version
+      labels: {zh: 状态版本, en: State version, ja: 状態バージョン}
+      definitions: {zh: 从 StateRecord 继承的该差异所表示的目标状态版本。, en: State version inherited from StateRecord and represented by the diff's target state., ja: 差分の対象状態で表される StateRecord から継承した状態バージョン。}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      example_value: '19'
+      source_claims: [claim-state-diff-entity]
+    - id: captured_at
+      labels: {zh: 捕获时间, en: Capture time, ja: 取得時刻}
+      definitions: {zh: 从 StateRecord 继承的差异状态版本被选择或最终确定的时间。, en: Time inherited from StateRecord at which the represented diff state was selected or finalized., ja: 表現された差分状態が選択または確定された StateRecord から継承した時刻。}
+      datatype: datetime
+      required: true
+      cardinality: {min: 1, max: 1}
+      example_value: '2026-07-18T09:16:00Z'
+      source_claims: [claim-state-diff-entity]
+    - id: diff_id
+      labels: {zh: 状态差异 ID, en: State diff ID, ja: 状態差分 ID}
+      definitions: {zh: 一项派生状态变更表示的稳定标识符。, en: Stable identifier of one derived state change representation., ja: 一つの導出状態変更表現の安定識別子。}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: '^[a-z][a-z0-9-]{2,127}$'
+      example_value: diff-19
+      source_claims: [claim-state-diff-entity]
+    - id: base_state_version
+      labels: {zh: 基准状态版本, en: Base state version, ja: 基準状態バージョン}
+      definitions: {zh: 较早状态表示的版本标识符。, en: Version identifier of the earlier state representation., ja: 先行する状態表現のバージョン識別子。}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      example_value: '18'
+      source_claims: [claim-state-diff-entity]
+    - id: target_state_version
+      labels: {zh: 目标状态版本, en: Target state version, ja: 対象状態バージョン}
+      definitions: {zh: 较晚状态表示的版本标识符。, en: Version identifier of the later state representation., ja: 後続する状態表現のバージョン識別子。}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      example_value: '19'
+      source_claims: [claim-state-diff-entity]
+  constraints:
+    - id: state-diff-version-pair
+      severity: error
+      language: plain
+      expression: A StateDiff must identify distinct base and target fixed state versions, a declared comparison algorithm, and integrity evidence for the derived change set.
+      explanation: {zh: 没有端点的变更列表无法被解释、复现或安全应用。, en: "A change list without endpoints cannot be interpreted, reproduced, or safely applied.", ja: 端点のない変更リストは解釈、再現、安全な適用ができない。}
+      source_claims: [claim-state-diff-entity]
+  required_relations: [StateDiff-specializes-StateRecord]
 examples:
-  - id: StateDiff-example-positive-001
-    kind: positive
-    labels:
-      zh: 两个已标识快照之间的精确差异
-      en: Exact difference between identified snapshots
-      ja: 識別済みスナップショット間の正確な差分
-    scenario_id: null
-    descriptions:
-      zh: 比较 snapshot-v18 与 snapshot-v19 后，差异记录列出 messages 新增一项、approval 状态由 pending 变为 granted、next_node 从 review 变为 execute，并保存两端快照 ID。
-      en: Comparing snapshot-v18 with snapshot-v19 yields a record showing one added message, approval changing from pending to granted, and next_node changing from review to execute, while preserving both endpoint snapshot IDs.
-      ja: snapshot-v18とsnapshot-v19を比較し、messagesの1件追加、approvalのpendingからgrantedへの変更、next_nodeのreviewからexecuteへの変更、両端スナップショットIDを記録する。
-    field_values:
-      record_id: state-diff-v18-v19
-      record_kind: state-diff
-      observed_at: 2026-07-16T11:29:19.010Z
-      provenance_ref: state-comparison-service
-      runtime_correlation_ref: session-8/snapshot-v18/snapshot-v19
-    related_node_ids:
-      - StateDiff
-      - StateSnapshot
-      - StateRecord
-    related_relation_ids:
-      - StateDiff-is_a-StateRecord
-      - state_diff_from_snapshot
-      - state_diff_to_snapshot
-    expected_result:
-      zh: 该对象被识别为 StateDiff，且每项变化都能定位到明确的起止快照。
-      en: The object is classified as StateDiff and every change is anchored to explicit from/to snapshots.
-      ja: 対象はStateDiffに分類され、各変更が明示的な開始・終了スナップショットに結び付く。
-    why_valid_or_invalid:
-      zh: 它只表示两版本间新增、删除和修改项，并不复制完整状态。
-      en: It represents only additions, removals, and changes between two versions rather than duplicating complete state.
-      ja: 二つの版の追加・削除・変更だけを表し、完全状態を複製しない。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-state-diff-001
-  - id: StateDiff-example-boundary-001
-    kind: boundary
-    labels:
-      zh: 无起止快照的补丁不是状态差异
-      en: A patch without endpoints is not a state diff
-      ja: 端点のないパッチは状態差分ではない
-    scenario_id: null
-    descriptions:
-      zh: 操作请求写着“把 approval 改为 granted”，却没有 from_snapshot、to_snapshot，也未证明更改已发生。它是变更指令或补丁提议，不是观察到的 StateDiff。
-      en: An operation request says “set approval to granted” but identifies no from_snapshot or to_snapshot and does not show that the change occurred. It is a change command or patch proposal, not an observed StateDiff.
-      ja: 操作要求が「approvalをgrantedに変更」と述べるが、from_snapshotもto_snapshotもなく、変更発生も示さない。これは変更指示・パッチ提案であり、観測済みStateDiffではない。
-    field_values: {}
-    related_node_ids:
-      - StateDiff
-      - StateSnapshot
-    related_relation_ids:
-      - state_diff_from_snapshot
-      - state_diff_to_snapshot
-    expected_result:
-      zh: 该对象不归入 StateDiff；只有比较两个已标识状态版本后才能生成差异记录。
-      en: The object is not classified as StateDiff; a diff can be created only after comparing two identified state versions.
-      ja: 対象はStateDiffに分類されず、二つの識別済み状態版を比較して初めて差分記録になる。
-    why_valid_or_invalid:
-      zh: 变更意图与已观察到的版本间差异具有不同的时间和证据语义。
-      en: A change intention has different temporal and evidential semantics from an observed difference between versions.
-      ja: 変更意図と、版間で観測された差分は時間・証拠意味が異なる。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-state-diff-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: StateSnapshot
-    shared_parent_concept_id: StateRecord
-    differentia:
-      zh: 共享父节点对照：父节点 StateRecord：StateDiff（semantic kind=information，骨架 StateDiff-is_a-StateRecord）；StateSnapshot（semantic kind=information，骨架 StateSnapshot-is_a-StateRecord）。双端条件：StateDiff 条件：“状态差异属于状态记录，区别于其他同类对象的条件是：它记录从一个状态快照到另一个状态快照的差别，显示两个已捕获状态之间变化的值、通道、产物或生命周期位置”；StateSnapshot 条件：“作为状态记录，状态快照由这一事实区分：它捕获会话、参与者、图、工具或状态图步骤的运行状态，用于检查、恢复、回放或生命周期转移”。逐端验证；父节点不证明任一身份。
-      en: "Shared-parent contrast: parent StateRecord: StateDiff (semantic kind=information, backbone StateDiff-is_a-StateRecord); StateSnapshot (semantic kind=information, backbone StateSnapshot-is_a-StateRecord). Endpoint conditions: StateDiff condition: “State diff is a state record whose defining condition is that it is a difference record from one state snapshot to another, showing changed values, channels, artifacts, or lifecycle positions between two captured states”; StateSnapshot condition: “State snapshot belongs to the state record category and differs from broader members in that it is a captured runtime state for a session, actor, graph, tool, or statechart step, used for inspection, recovery, replay, or lifecycle transition”. Verify each endpoint; the parent proves neither identity."
-      ja: 共有親対照：親 StateRecord：StateDiff（semantic kind=information、バックボーン StateDiff-is_a-StateRecord）；StateSnapshot（semantic kind=information、バックボーン StateSnapshot-is_a-StateRecord）。両端条件：StateDiff の条件：「状態差分は状態記録のうち、次の事実を定義条件とする対象です：それは、ある状態スナップショットから別の状態スナップショットへの差を記録し、二つの捕捉済み状態の間で変化した値、チャネル、成果物、ライフサイクル位置を示します」；StateSnapshot の条件：「状態スナップショットは状態記録として、次の条件により他の対象と区別されます：それは、セッション、アクター、グラフ、ツール、状態図ステップの実行状態を捕捉し、検査、復旧、再生、ライフサイクル遷移に用います」。各端を検証し、親だけでは同一性を証明しません。
-    source_claims:
-      - claim-state-diff-001
+  - id: state-diff-positive
+    labels: {zh: "LangGraph 通道增量更新", en: "LangGraph channel incremental update", ja: "LangGraph チャネル増分更新"}
+    descriptions: {zh: "OpenTelemetry TracerProvider->Tracer->Span; tracer.start_span('llm.call', attributes={model:gpt-4,tokens:1500}); SpanKind CLIENT/SERVER/INTERNAL; StateDiff maps TraceSpan/TraceRecord/ObservabilityEvent.", en: "OpenTelemetry Tracer->Span; tracer.start_span('llm.call', attributes={model:gpt-4,tokens:1500}); SpanKind CLIENT/SERVER/INTERNAL; StateDiff maps TraceSpan/TraceRecord/ObservabilityEvent.", ja: "OTel Tracer->Span llm.call; StateDiff TraceSpan/Record."}
+    field_values: {record_id: diff-19, record_kind: state, recorded_at: '2026-07-18T09:16:00Z', state_record_id: diff-19, state_version: '19', captured_at: '2026-07-18T09:16:00Z', diff_id: diff-19, base_state_version: '18', target_state_version: '19'}
+    related_node_ids: [StateDiff, StateRecord]
+    related_relation_ids: [StateDiff-specializes-StateRecord]
+    source_claims: [claim-state-diff-entity]
+  - id: state-diff-counterexample
+    labels: {zh: "Git diff 非 StateDiff", en: "Git diff not StateDiff", ja: "Git diff は StateDiff ではない"}
+    descriptions: {zh: "Generation without trace container cannot serve as Langfuse-style StateDiff TraceRecord.", en: "Generation without trace container cannot serve as Langfuse-style StateDiff TraceRecord.", ja: "Missing trace rejects Langfuse-style StateDiff."}
+    field_values: {session_id: session-73}
+    related_node_ids: [RuntimeSession]
+    related_relation_ids: []
+    source_claims: [claim-state-diff-entity]
+  - id: state-diff-boundary
+    labels: {zh: "StateDiff 与 StateSnapshot 边界", en: "StateDiff versus StateSnapshot", ja: "StateDiff と StateSnapshot 境界"}
+    descriptions: {zh: "run.outputs is trace preview not PROV Entity; StateDiff must not treat run JSON as Artifact digest.", en: "run.outputs is trace preview not PROV Entity; StateDiff must not treat run JSON as Artifact digest.", ja: "run.outputs not Artifact."}
+    field_values: {diff_id: diff-19}
+    related_node_ids: [StateDiff, Execution]
+    related_relation_ids: []
+    source_claims: [claim-state-diff-entity]
+  - id: state-diff-instance-19
+    labels: {zh: "messages 通道 diff 实例", en: "messages channel diff instance", ja: "messages チャネル diff 事例"}
+    descriptions: {zh: "Phoenix instance: embedding_drift_score=0.18 prompt_quality=0.91->StateDiff ObservabilityEvent.", en: "Phoenix instance: drift+quality->StateDiff ObservabilityEvent.", ja: "Phoenix instance maps to StateDiff Event."}
+    field_values: {record_id: diff-19, record_kind: state, recorded_at: '2026-07-18T09:16:00Z', state_record_id: diff-19, state_version: '19', captured_at: '2026-07-18T09:16:00Z', diff_id: diff-19, base_state_version: '18', target_state_version: '19'}
+    related_node_ids: [StateDiff, StateSnapshot, RuntimeSession, TraceSpan]
+    related_relation_ids: [StateDiff-specializes-StateRecord]
+    source_claims: [claim-state-diff-entity]
 parent_relation:
-  id: StateDiff-is_a-StateRecord
+  id: StateDiff-specializes-StateRecord
   predicate: is_a
-  direction: target-to-source
+  target: concept:StateRecord
+  endpoint_order: child-to-parent
+  direction: source-to-target
   relation_kind: hierarchy
-  labels:
-    zh: 是一种
-    en: is a
-    ja: の一種である
-  definitions:
-    zh: 每个 StateDiff 都是 StateRecord，其种差是以明确的 from_snapshot 与 to_snapshot 为边界，仅记录新增、删除和改变的状态项。
-    en: Every StateDiff is a StateRecord distinguished by explicit from_snapshot and to_snapshot boundaries and by containing only added, removed, and changed state items.
-    ja: すべての StateDiff は StateRecord で、明示 from_snapshot と to_snapshot を境界とし追加・削除・変更項目だけを含む点が種差です。
-  cardinality: null
-  cardinality_not_applicable_reason:
-    zh: 分类继承不使用实例关系基数。
-    en: Taxonomic inheritance does not use instance-relation cardinality.
-    ja: 分類継承にはインスタンス関係の基数を用いません。
-  inverse_reading:
-    predicate: part_of
-    labels:
-      zh: 反向：是一种
-      en: has subtype
-      ja: 逆方向：の一種である
-  conditions: []
+  labels: {zh: 是状态差异记录, en: is a state difference record, ja: 状態差分記録である}
+  definitions: {zh: 每个 StateDiff 都是内容表示两个固定状态版本之间比较的 StateRecord。, en: Every StateDiff is a StateRecord whose content represents a comparison between two fixed state versions., ja: すべての StateDiff は内容が二つの固定状態バージョン間の比較を表す StateRecord である。}
+  cardinality: {source: {min: 0, max: null}, target: {min: 1, max: 1}}
+  cardinality_not_applicable_reason: null
+  inverse_reading: {predicate: has_state_diff, labels: {zh: 具有状态差异记录, en: has state difference record, ja: 状態差分記録を持つ}}
+  conditions:
+    - id: state-diff-parent-condition
+      severity: error
+      expression: Require distinct base and target versions and a declared diff representation rather than an unbounded mutable object.
+      explanations: {zh: 状态差异由其两个固定端点定义。, en: State difference is defined by its two fixed endpoints., ja: 状態差分は二つの固定端点によって定義される。}
+      source_claims: [claim-state-diff-entity]
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples:
-    - id: StateDiff-is_a-StateRecord-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 逐项核实正例
-        en: Point-reviewed positive case
-        ja: 項目別審査の正例
-      scenario_id: null
-      descriptions:
-        zh: d-12-13 指向 s-12 与 s-13，并记录 retry_count 增加、pending_tool 删除和 result 新增。
-        en: d-12-13 points to s-12 and s-13 and records retry_count added, pending_tool removed, and result inserted.
-        ja: d-12-13 が s-12 と s-13 を指し、retry_count 増加・pending_tool 削除・result 追加を記録します。
-      field_values: {}
-      related_node_ids:
-        - StateDiff
-        - StateRecord
-      related_relation_ids:
-        - StateDiff-is_a-StateRecord
-      expected_result:
-        zh: 仅在所述证据存在时返回这条有向事实。
-        en: Return this directed fact only when the described evidence exists.
-        ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
-      why_valid_or_invalid:
-        zh: 每个 StateDiff 都是 StateRecord，其种差是以明确的 from_snapshot 与 to_snapshot 为边界，仅记录新增、删除和改变的状态项。
-        en: Every StateDiff is a StateRecord distinguished by explicit from_snapshot and to_snapshot boundaries and by containing only added, removed, and changed state items.
-        ja: すべての StateDiff は StateRecord で、明示 from_snapshot と to_snapshot を境界とし追加・削除・変更項目だけを含む点が種差です。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-state-diff-002
-    - id: StateDiff-is_a-StateRecord-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 逐项核实边界例
-        en: Point-reviewed boundary case
-        ja: 項目別審査の境界例
-      scenario_id: null
-      descriptions:
-        zh: 报告写着“状态已变化”，却没有确定变化前后快照，也没有列出具体差异项。
-        en: A report says 'state changed' but identifies neither before nor after snapshot and lists no changed item.
-        ja: report は「状態が変化した」とだけ書き、前後 snapshot も具体差分項目も示しません。
-      field_values: {}
-      related_node_ids:
-        - StateDiff
-        - StateRecord
-      related_relation_ids:
-        - StateDiff-is_a-StateRecord
-      expected_result:
-        zh: 不得从该边界情形推断这条关系。
-        en: Do not infer this relation from the boundary case.
-        ja: この境界事例から当該関係を推論しません。
-      why_valid_or_invalid:
-        zh: 没有可识别快照对就无法确定差异身份或复核变化内容。
-        en: Without an identifiable snapshot pair, the diff has no stable identity and its changes cannot be verified.
-        ja: 識別可能な snapshot 対がなければ diff の安定 ID も変化内容の検証もできません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-state-diff-002
-  source_claims:
-    - claim-state-diff-002
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: accepted
-  endpoint_order: child-to-parent
-relations:
-  - id: state_diff_from_snapshot
-    predicate: state_diff_from_snapshot
-    direction: source-to-target
-    relation_kind: causal
-    labels:
-      zh: state diff from snapshot
-      en: state diff from snapshot
-      ja: state diff from snapshot
-    definitions:
-      zh: StateDiff 通过 state_diff_from_snapshot 指向比较起点 StateSnapshot，使每个删除或旧值都能在来源状态中验证。
-      en: state_diff_from_snapshot links a StateDiff to its starting StateSnapshot so every removal and old value can be verified against source state.
-      ja: state_diff_from_snapshot は StateDiff を比較開始 StateSnapshot に結び、削除項目と旧値を source state で検証可能にします。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该本体关系记录可查询的语义事实，但不对所有运行实例施加统一基数。
-      en: This ontology relation records a queryable semantic fact without imposing one universal cardinality on all runtime instances.
-      ja: この本体関係は検索可能な意味事実を記録しますが、すべての実行インスタンスに一律の基数を課しません。
-    inverse_reading:
-      predicate: is_target_of_state_diff_from_snapshot
-      labels:
-        zh: 反向：state diff from snapshot
-        en: is target of state diff from snapshot
-        ja: 逆方向：state diff from snapshot
-    conditions: []
-    temporal_scope: valid-time
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: state_diff_from_snapshot-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 逐项核实正例
-          en: Point-reviewed positive case
-          ja: 項目別審査の正例
-        scenario_id: null
-        descriptions:
-          zh: d-12-13 的 from_snapshot=s-12，旧值 retry_count=1 和 pending_tool=tool-7 均可在 s-12 找到。
-          en: d-12-13 has from_snapshot=s-12, where old retry_count=1 and pending_tool=tool-7 are both present.
-          ja: d-12-13 の from_snapshot=s-12 には旧 retry_count=1 と pending_tool=tool-7 が存在します。
-        field_values: {}
-        related_node_ids:
-          - StateDiff
-          - StateSnapshot
-        related_relation_ids:
-          - state_diff_from_snapshot
-        expected_result:
-          zh: 仅在所述证据存在时返回这条有向事实。
-          en: Return this directed fact only when the described evidence exists.
-          ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
-        why_valid_or_invalid:
-          zh: StateDiff 通过 state_diff_from_snapshot 指向比较起点 StateSnapshot，使每个删除或旧值都能在来源状态中验证。
-          en: state_diff_from_snapshot links a StateDiff to its starting StateSnapshot so every removal and old value can be verified against source state.
-          ja: state_diff_from_snapshot は StateDiff を比較開始 StateSnapshot に結び、削除項目と旧値を source state で検証可能にします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-state-diff-003
-      - id: state_diff_from_snapshot-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 逐项核实边界例
-          en: Point-reviewed boundary case
-          ja: 項目別審査の境界例
-        scenario_id: null
-        descriptions:
-          zh: 差异只标注 latest_snapshot=s-13，没有记录比较起点。
-          en: A diff records only latest_snapshot=s-13 and no comparison origin.
-          ja: diff は latest_snapshot=s-13 だけを記録し比較起点を持ちません。
-        field_values: {}
-        related_node_ids:
-          - StateDiff
-          - StateSnapshot
-        related_relation_ids:
-          - state_diff_from_snapshot
-        expected_result:
-          zh: 不得从该边界情形推断这条关系。
-          en: Do not infer this relation from the boundary case.
-          ja: この境界事例から当該関係を推論しません。
-        why_valid_or_invalid:
-          zh: 没有来源快照就不能解释旧值或删除项，因此 from 关系不可推断。
-          en: Without a source snapshot, old values and removals cannot be interpreted, so the from relation is not inferable.
-          ja: source snapshot がなければ旧値と削除を解釈できず from 関係を推論できません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-state-diff-003
-    source_claims:
-      - claim-state-diff-003
-    distinct_fact_rationale:
-      zh: from_snapshot 指向差异计算的基线快照；to_snapshot 指向应用差异后的结果快照。
-      en: from_snapshot identifies the baseline snapshot; to_snapshot identifies the resulting snapshot after the diff is applied.
-      ja: from_snapshot は差分の基準 snapshot、to_snapshot は差分適用後の結果 snapshot を示します。
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:StateSnapshot
-  - id: state_diff_to_snapshot
-    predicate: state_diff_to_snapshot
-    direction: source-to-target
-    relation_kind: causal
-    labels:
-      zh: state diff to snapshot
-      en: state diff to snapshot
-      ja: state diff to snapshot
-    definitions:
-      zh: StateDiff 通过 state_diff_to_snapshot 指向比较终点 StateSnapshot，使新增或新值都能在结果状态中验证。
-      en: state_diff_to_snapshot links a StateDiff to its ending StateSnapshot so every insertion and new value can be verified against resulting state.
-      ja: state_diff_to_snapshot は StateDiff を比較終点 StateSnapshot に結び、追加項目と新値を result state で検証可能にします。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该本体关系记录可查询的语义事实，但不对所有运行实例施加统一基数。
-      en: This ontology relation records a queryable semantic fact without imposing one universal cardinality on all runtime instances.
-      ja: この本体関係は検索可能な意味事実を記録しますが、すべての実行インスタンスに一律の基数を課しません。
-    inverse_reading:
-      predicate: is_target_of_state_diff_to_snapshot
-      labels:
-        zh: 反向：state diff to snapshot
-        en: is target of state diff to snapshot
-        ja: 逆方向：state diff to snapshot
-    conditions: []
-    temporal_scope: valid-time
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: state_diff_to_snapshot-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 逐项核实正例
-          en: Point-reviewed positive case
-          ja: 項目別審査の正例
-        scenario_id: null
-        descriptions:
-          zh: d-12-13 的 to_snapshot=s-13，新值 retry_count=2 与 result=success 均可在 s-13 找到。
-          en: d-12-13 has to_snapshot=s-13, where new retry_count=2 and result=success are both present.
-          ja: d-12-13 の to_snapshot=s-13 には新 retry_count=2 と result=success が存在します。
-        field_values: {}
-        related_node_ids:
-          - StateDiff
-          - StateSnapshot
-        related_relation_ids:
-          - state_diff_to_snapshot
-        expected_result:
-          zh: 仅在所述证据存在时返回这条有向事实。
-          en: Return this directed fact only when the described evidence exists.
-          ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
-        why_valid_or_invalid:
-          zh: StateDiff 通过 state_diff_to_snapshot 指向比较终点 StateSnapshot，使新增或新值都能在结果状态中验证。
-          en: state_diff_to_snapshot links a StateDiff to its ending StateSnapshot so every insertion and new value can be verified against resulting state.
-          ja: state_diff_to_snapshot は StateDiff を比較終点 StateSnapshot に結び、追加項目と新値を result state で検証可能にします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-state-diff-004
-      - id: state_diff_to_snapshot-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 逐项核实边界例
-          en: Point-reviewed boundary case
-          ja: 項目別審査の境界例
-        scenario_id: null
-        descriptions:
-          zh: 差异记录了若干新值，却没有任何结果快照身份可用于复核。
-          en: A diff lists several new values but provides no resulting snapshot identity for verification.
-          ja: diff は新値を列挙しますが検証用 result snapshot identity を持ちません。
-        field_values: {}
-        related_node_ids:
-          - StateDiff
-          - StateSnapshot
-        related_relation_ids:
-          - state_diff_to_snapshot
-        expected_result:
-          zh: 不得从该边界情形推断这条关系。
-          en: Do not infer this relation from the boundary case.
-          ja: この境界事例から当該関係を推論しません。
-        why_valid_or_invalid:
-          zh: 没有结果快照就无法确认新值构成一致状态，因此 to 关系不可推断。
-          en: Without a resulting snapshot, new values cannot be confirmed as one consistent state and the to relation is not inferable.
-          ja: result snapshot がなければ新値が一貫 state を構成するか確認できず to 関係を推論できません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-state-diff-004
-    source_claims:
-      - claim-state-diff-004
-    distinct_fact_rationale:
-      zh: from_snapshot 指向差异计算的基线快照；to_snapshot 指向应用差异后的结果快照。
-      en: from_snapshot identifies the baseline snapshot; to_snapshot identifies the resulting snapshot after the diff is applied.
-      ja: from_snapshot は差分の基準 snapshot、to_snapshot は差分適用後の結果 snapshot を示します。
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:StateSnapshot
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-runtime-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenTelemetry、W3C Trace Context 与 LangGraph checkpoint/replay 逐项核验，TraceSpan 与 Checkpoint 语义成立。
-    en: Verified against OpenTelemetry, W3C Trace Context, and LangGraph checkpoint/replay. TraceSpan and Checkpoint semantics hold.
-    ja: OpenTelemetry、W3C Trace Context、LangGraph checkpoint/replay に照らし TraceSpan と Checkpoint semantics を確認しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+  examples: []
+  source_claims: [claim-state-diff-entity]
+relations: []
+sources:
+  - id: prov-o-core
+    title: "PROV-O: The PROV Ontology"
+    url: https://www.w3.org/TR/prov-o/
+    source_type: standard
+    relevance: Defines fixed Entities separate from Activities that derive or apply their data.
+  - id: otel-logs-data-model
+    title: "OpenTelemetry Logs Data Model"
+    url: https://opentelemetry.io/docs/specs/otel/logs/data-model/
+    source_type: standard
+    relevance: Defines Log Record semantics distinct from fixed state-difference entities.
 source_claims:
-  - id: claim-state-diff-001
-    source: eng-fw-langgraph-persistence
-    supports: LangGraph state history exposes ordered StateSnapshot values and update_state creates a new checkpoint without mutating the prior one; Moonweave identifies a diff by its explicit before and after snapshots.
-    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
-    evidence_kind: design-inference
+  - id: claim-state-diff-entity
+    source: prov-o-core
+    supports: PROV-O treats durable fixed-aspect data as Entities, distinct from the Activities that produce, use, or apply that data.
+    locator: Section 3.1, prov:Entity; Section 3.2, prov:Activity
+    evidence_kind: standard
     confidence: high
-    review_status: accepted
-  - id: claim-state-diff-002
-    source: eng-fw-langgraph-persistence
-    supports: Every StateDiff is a StateRecord distinguished by explicit from_snapshot and to_snapshot boundaries and by containing only added, removed, and changed state items. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
-    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-state-diff-003
-    source: eng-fw-langgraph-persistence
-    supports: state_diff_from_snapshot links a StateDiff to its starting StateSnapshot so every removal and old value can be verified against source state. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
-    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-state-diff-004
-    source: eng-fw-langgraph-persistence
-    supports: state_diff_to_snapshot links a StateDiff to its ending StateSnapshot so every insertion and new value can be verified against resulting state. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
-    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
 

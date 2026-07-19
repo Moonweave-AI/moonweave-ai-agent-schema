@@ -4,341 +4,685 @@ kind: concept
 status: accepted
 labels:
   zh: 摄入阶段
-  en: Ingestion phase
-  ja: 取込phase
+  en: Ingestion Phase
+  ja: 取り込みフェーズ
 semantics:
   short_definition:
-    zh: 一次 IngestionRun 内具有顺序和局部输入输出的活动。
-    en: An activity within an IngestionRun with sequence and local input/output.
-    ja: 一 IngestionRun 内で順序とlocal入出力を持つactivityです。
+    zh: 属于一个摄入运行、具有局部顺序和单一处理职责的可审计摄入活动。
+    en: An auditable ingestion activity belonging to one ingestion run with local order and one processing responsibility.
+    ja: 一つの ingestion run に属し、局所的な順序と一つの processing responsibility を持つ監査可能な ingestion activity。
   definition:
-    zh: IngestionPhase 是 IngestionRun 中可单独审计的局部 IngestionActivity，拥有 phase_id、所属 run 与顺序号并只负责一个转换职责；它不是完整运行或输出文档。
-    en: IngestionPhase is a separately auditable local IngestionActivity within an IngestionRun, owning phase_id, run membership, and sequence while carrying one transformation responsibility; it is not the complete run or output document.
-    ja: IngestionPhase は IngestionRun 内で個別監査でき phase_id・run所属・順序を持ち一変換責務だけを担うlocal IngestionActivityで、完全runやoutput documentではありません。
+    zh: >-
+      IngestionPhase 是 IngestionActivity 的特化，表示一个完整 IngestionRun 内可单独观察的局部处理步骤。
+      它以 activity_id、phase_id、ingestion_run_ref、sequence_number、phase_kind、started_at、status 和输入信息引用标识，
+      并可记录 ended_at 和输出信息引用。它可以是加载、规范化、去重、分块、嵌入或索引等一步，
+      但不是完整 IngestionRun、来源资源、输出 Document、静态流程定义、策略、加载器实现、检索活动或提示上下文。
+      阶段既继承活动的时间和输入输出边界，也额外承担一个运行内的局部顺序和职责。
+    en: >-
+      An IngestionPhase is an IngestionActivity specialization for one separately observable local processing step within a
+      complete IngestionRun. It is identified by activity_id, phase_id, ingestion_run_ref, sequence_number, phase_kind,
+      started_at, status, and input information references and can record ended_at and output information references. It
+      can be one load, normalization, deduplication, chunking, embedding, or indexing step, but it is not a complete
+      IngestionRun, source resource, output Document, static workflow definition, policy, loader implementation, retrieval
+      activity, or prompt context. A phase inherits an activity's temporal and input-output boundaries and additionally
+      carries one local order and responsibility within a run.
+    ja: >-
+      IngestionPhase は完全な IngestionRun 内の一つの個別に観測可能な局所 processing step を表す IngestionActivity の特化です。
+      activity_id、phase_id、ingestion_run_ref、sequence_number、phase_kind、started_at、status、input information reference で
+      識別され、ended_at と output information reference を記録できます。loading、normalization、deduplication、chunking、embedding、
+      indexing の一 step にはなれますが、完全な IngestionRun、source resource、output Document、静的 workflow definition、policy、
+      loader implementation、retrieval activity、prompt context ではありません。phase は activity の temporal と input-output boundary を
+      継承し、さらに run 内の一つの局所 order と responsibility を担います。
   why_needed:
-    zh: 显式补上运行与规范化/去重活动之间的阶段层。
-    en: Explicitly adds the phase layer between a run and normalization/deduplication activities.
-    ja: runとnormalization/deduplication activityの間にphase階層を明示追加します。
+    zh: 将端到端运行拆分为可单独审计和恢复的局部转换，可定位哪一步使用了哪个输入、失败在哪里以及输出如何交接。
+    en: Splitting an end-to-end run into separately auditable and recoverable local transformations shows which step used which input, where failure occurred, and how output was handed off.
+    ja: end-to-end run を個別に監査および回復可能な局所 transformation に分けることで、どの step がどの input を使い、どこで failure が発生し、output がどう handoff されたかを示します。
   includes:
-    - zh: 纳入规范化、去重等有局部输入输出的阶段。
-      en: Includes normalization, deduplication, and other phases with local inputs/outputs.
-      ja: normalization・deduplication等local入出力を持つphaseを含みます。
+    - zh: 在一个运行内按序号二执行、把加载的原始信息规范化为 Document 的阶段。
+      en: A sequence-two step inside one run that normalizes loaded raw information into a Document.
+      ja: 一つの run 内で sequence two として実行され、loaded raw information を Document に正規化する step。
   excludes:
-    - zh: 排除完整 IngestionRun、触发事件和产出信息。
-      en: Excludes complete IngestionRun, trigger events, and produced information.
-      ja: 完全IngestionRun・trigger event・生成informationを除外します。
+    - zh: 编排所有阶段的完整运行、阶段模板、阶段调用的加载器和阶段生成后持续存在的 Document。
+      en: A complete run orchestrating all phases, a phase template, a loader invoked by a phase, or a Document persisting after phase generation.
+      ja: すべての phase を編成する complete run、phase template、phase が呼び出す loader、phase generation 後に存続する Document。
   semantic_kind: activity
-  aliases: []
+  aliases:
+    - run-local ingestion step
+    - ingestion processing phase
+engineering:
+  explanation:
+    zh: >-
+      编排器将一个运行拆成顺序明确的局部活动，并为每个阶段写入独立的活动标识、开始时间、输入引用、状态和输出引用。
+      每一阶段只执行一种职责，例如把加载结果规范化为 Document；它在终态写入结束时间，并把错误或重试信息连到该局部活动。
+      阶段之间通过输出和输入引用交接，但前一步的输出、完整运行和实现代码都不会成为阶段自身的身份。
+    en: >-
+      An orchestrator divides one run into locally ordered activities and writes an independent activity ID, start time,
+      input references, status, and output references for each phase. Each phase performs one responsibility, such as
+      normalizing a load result into a Document; it writes an end time in a terminal state and connects errors or retries to
+      that local activity. Phases hand off through output and input references, but the previous output, complete run, and
+      implementation code never become the phase's identity.
+    ja: >-
+      orchestrator は一つの run を局所的に順序付けた activity に分け、各 phase に独立した activity ID、start time、input reference、
+      status、output reference を書きます。各 phase は load result を Document に normalize するなど一つの responsibility を実行し、
+      terminal state で end time を書き、error や retry をその局所 activity に結びます。phase は output と input reference で handoff
+      しますが、前 step の output、complete run、implementation code は phase 自体の identity にはなりません。
+  typical_input:
+    - description: Started normalization phase
+      format: |
+        {
+          "activity_id": "normalize-policy-42-02",
+          "phase_id": "normalize-policy-42-02",
+          "ingestion_run_ref": "ingest-policy-directory-42",
+          "sequence_number": 2,
+          "phase_kind": "normalize",
+          "started_at": "2026-07-18T09:00:20Z",
+          "status": "running",
+          "input_resource_refs": ["dir-policy-2026-07"],
+          "input_information_refs": ["loaded-policy-17"]
+        }
+  typical_output:
+    - description: Completed phase handoff
+      format: |
+        {
+          "activity_id": "normalize-policy-42-02",
+          "ended_at": "2026-07-18T09:00:29Z",
+          "status": "completed",
+          "output_information_refs": ["document-policy-17"],
+          "next_phase_ref": "deduplicate-policy-42-03"
+        }
+  reference_implementations:
+    - name: LangChain document loaders
+      url: https://docs.langchain.com/oss/python/integrations/document_loaders/index
+      description: Documents loading external data into Document objects that downstream processing can normalize and index.
+    - name: W3C PROV-O
+      url: https://www.w3.org/TR/prov-o/
+      description: Defines activities with time bounds that use entities and generate entities for provenance chains.
 structure:
   identity_keys:
     - phase_id
+    - ingestion_run_ref
   fields:
+    - id: activity_id
+      labels:
+        zh: 活动标识
+        en: activity ID
+        ja: アクティビティ ID
+      definitions:
+        zh: 稳定标识一个发生过的局部摄入活动，而不是完整运行、模板或该阶段的输出。
+        en: Stably identifies one local ingestion activity that occurred rather than the complete run, a template, or the phase output.
+        ja: complete run、template、phase output ではなく、実際に発生した一つの局所 ingestion activity を安定して識別します。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      allowed_values: []
+      pattern: null
+      example_value: normalize-policy-42-02
+      source_claims:
+        - claim-ingestion-phase-activity
     - id: phase_id
       labels:
         zh: 阶段标识
         en: phase ID
-        ja: phase ID
+        ja: フェーズ ID
+      definitions:
+        zh: 在所属运行中稳定标识局部处理步骤，可与 activity_id 相同但不表示完整运行身份。
+        en: Stably identifies the local processing step within its owning run and can equal activity_id without representing complete-run identity.
+        ja: 所属 run 内の局所 processing step を安定して識別し、activity_id と同じ値でも complete-run identity を表しません。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 稳定标识局部阶段。
-        en: Stable identifier for the local phase.
-        ja: local phaseの安定識別子です。
       allowed_values: []
       pattern: null
-      example_value: phase-17-01
+      example_value: normalize-policy-42-02
       source_claims:
-        - claim-ingestion-phase-002
-    - id: ingestion_run_id
+        - claim-ingestion-phase-identity
+    - id: ingestion_run_ref
       labels:
-        zh: 所属运行
-        en: ingestion run ID
-        ja: 所属run ID
-      datatype: string
+        zh: 所属摄入运行引用
+        en: owning ingestion-run reference
+        ja: 所属取り込み run 参照
+      definitions:
+        zh: 引用编排该阶段并拥有端到端结果的完整 IngestionRun，而不是前一阶段或触发事件。
+        en: References the complete IngestionRun that orchestrates this phase and owns end-to-end outcome rather than a preceding phase or trigger event.
+        ja: 前 phase や trigger event ではなく、この phase を編成して end-to-end outcome を所有する完全な IngestionRun を参照します。
+      datatype: reference
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 记录阶段所属完整运行。
-        en: Records the complete run containing this phase.
-        ja: phaseを含む完全runを記録します。
       allowed_values: []
       pattern: null
-      example_value: ingest-run-17
+      example_value: ingest-policy-directory-42
       source_claims:
-        - claim-ingestion-phase-003
-    - id: sequence
+        - claim-ingestion-phase-run-membership
+    - id: sequence_number
       labels:
-        zh: 顺序号
-        en: sequence
-        ja: 順序
+        zh: 阶段顺序号
+        en: phase sequence number
+        ja: フェーズ順序番号
+      definitions:
+        zh: 记录该阶段在所属运行内的正整数顺序；它不是全局排序键也不是重试次数。
+        en: Records this phase's positive integer order within its owning run; it is neither a global ordering key nor retry count.
+        ja: 所属 run 内におけるこの phase の正の整数 order を記録し、global ordering key や retry count ではありません。
       datatype: integer
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 记录运行内执行顺序。
-        en: Records execution order within the run.
-        ja: run内実行順序を記録します。
       allowed_values: []
       pattern: null
-      example_value: 1
+      example_value: 2
       source_claims:
-        - claim-ingestion-phase-004
-  constraints: []
-  required_relation_constraints: []
+        - claim-ingestion-phase-order
+    - id: phase_kind
+      labels:
+        zh: 阶段职责类型
+        en: phase responsibility kind
+        ja: フェーズ責務種別
+      definitions:
+        zh: 声明该局部阶段的唯一主要转换职责，而不是完整管道或实现库名称。
+        en: Declares the one primary transformation responsibility of this local phase rather than the complete pipeline or implementation-library name.
+        ja: complete pipeline や implementation-library name ではなく、この局所 phase の一つの primary transformation responsibility を宣言します。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      allowed_values:
+        - load
+        - normalize
+        - deduplicate
+        - chunk
+        - embed
+        - index
+      pattern: null
+      example_value: normalize
+      source_claims:
+        - claim-ingestion-phase-responsibility
+    - id: started_at
+      labels:
+        zh: 开始时间
+        en: started at
+        ja: 開始時刻
+      definitions:
+        zh: 记录该局部阶段开始处理其输入的时间点，独立于完整运行的开始时间。
+        en: Records when this local phase began processing its inputs independently of complete-run start time.
+        ja: complete-run start time とは独立に、この局所 phase が input の処理を開始した時点を記録します。
+      datatype: date-time
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      allowed_values: []
+      pattern: null
+      example_value: "2026-07-18T09:00:20Z"
+      source_claims:
+        - claim-ingestion-phase-temporal
+    - id: ended_at
+      labels:
+        zh: 结束时间
+        en: ended at
+        ja: 終了時刻
+      definitions:
+        zh: 可选记录阶段完成、失败或取消的时间点；运行中阶段尚未拥有结束边界。
+        en: Optionally records when the phase completed, failed, or was cancelled; a running phase does not yet have an end boundary.
+        ja: phase が completed、failed、cancelled になった時点を任意で記録し、running phase はまだ end boundary を持ちません。
+      datatype: date-time
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      allowed_values: []
+      pattern: null
+      example_value: "2026-07-18T09:00:29Z"
+      source_claims:
+        - claim-ingestion-phase-temporal
+    - id: status
+      labels:
+        zh: 阶段状态
+        en: phase status
+        ja: フェーズ状態
+      definitions:
+        zh: 声明局部阶段的生命周期状态，不将该状态写入完整运行、输入资源或输出信息的身份。
+        en: Declares lifecycle state of the local phase without writing the state into identity of the complete run, input resource, or output information.
+        ja: complete run、input resource、output information の identity に state を書き込まず、局所 phase の lifecycle state を宣言します。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      allowed_values:
+        - running
+        - completed
+        - failed
+        - cancelled
+      pattern: null
+      example_value: completed
+      source_claims:
+        - claim-ingestion-phase-temporal
+    - id: input_resource_refs
+      labels:
+        zh: 父活动输入资源引用
+        en: parent-activity input resource references
+        ja: 親活動入力リソース参照
+      definitions:
+        zh: 保留所属 IngestionActivity 实际使用的版本化 IngestibleResource 引用；它与本阶段转换的 input_information_refs 分属来源层和局部表示层。
+        en: Retains the versioned IngestibleResource references actually used by the owning IngestionActivity; they are source-layer facts distinct from this phase's input_information_refs.
+        ja: 所属 IngestionActivity が実際に使った versioned IngestibleResource 参照を保持し、この phase の input_information_refs とは source 層と局所 representation 層で異なります。
+      datatype: array
+      required: true
+      cardinality:
+        min: 1
+        max: null
+      allowed_values: []
+      pattern: null
+      example_value:
+        - dir-policy-2026-07
+      source_claims:
+        - claim-ingestion-phase-parent-usage
+    - id: input_information_refs
+      labels:
+        zh: 输入信息引用
+        en: input information references
+        ja: 入力情報参照
+      definitions:
+        zh: 引用本阶段实际转换的局部 IngestibleInformation 或已加载的来源表示，而不是整个运行的所有来源。
+        en: References local IngestibleInformation or loaded source representations actually transformed by this phase rather than every source of the complete run.
+        ja: complete run のすべての source ではなく、この phase が実際に変換する局所 IngestibleInformation または loaded source representation を参照します。
+      datatype: array
+      required: true
+      cardinality:
+        min: 1
+        max: null
+      allowed_values: []
+      pattern: null
+      example_value:
+        - loaded-policy-17
+      source_claims:
+        - claim-ingestion-phase-usage
+    - id: output_information_refs
+      labels:
+        zh: 输出信息引用
+        en: output information references
+        ja: 出力情報参照
+      definitions:
+        zh: 可选引用本阶段生成或更新并交接给后续阶段的信息实体，而不是将其作为活动自身。
+        en: Optionally references information entities generated or updated by this phase and handed to a later phase without treating them as the activity itself.
+        ja: activity 自体とみなさず、この phase が生成または更新して後続 phase に handoff する information entity を任意で参照します。
+      datatype: array
+      required: false
+      cardinality:
+        min: 0
+        max: null
+      allowed_values: []
+      pattern: null
+      example_value:
+        - document-policy-17
+      source_claims:
+        - claim-ingestion-phase-generation
+  constraints:
+    - id: ingestion-phase-local-lifecycle
+      severity: error
+      expression_language: plain
+      expression: >-
+        activity_id, phase_id, ingestion_run_ref, sequence_number, phase_kind, started_at, status, at least one
+        input_resource_refs value, and at least one input_information_refs value are required. sequence_number must be a positive integer unique within ingestion_run_ref,
+        and phase_kind must name exactly one listed local responsibility. status must be running, completed, failed, or
+        cancelled. ended_at is absent while running and required in terminal states. A completed phase must provide at least
+        one output_information_refs value. A complete run, phase template, source resource, loader, policy, output Document,
+        retrieval candidate, or prompt context cannot substitute for phase identity.
+      explanation:
+        zh: 阶段既是有时间边界和输入输出的活动，又必须拥有运行内唯一顺序和单一职责；端到端运行与静态模板不能承担这种局部身份。
+        en: A phase is both an activity with time and input-output bounds and a run-local unit with unique order and one responsibility; an end-to-end run and static template cannot carry that local identity.
+        ja: phase は time と input-output boundary を持つ activity であると同時に、一意の order と一つの responsibility を持つ run-local unit です。end-to-end run や静的 template はその局所 identity を担えません。
+      source_claims:
+        - claim-ingestion-phase-temporal
+        - claim-ingestion-phase-usage
+        - claim-ingestion-phase-generation
+        - claim-ingestion-phase-run-membership
+        - claim-ingestion-phase-boundary
+  required_relations: []
 examples:
-  - id: IngestionPhase-example-positive-manual-20260716
-    kind: positive
+  - id: ingestion-phase-positive
+
     labels:
-      zh: 摄入阶段正例
-      en: "Positive case: Ingestion phase"
-      ja: 取込phase正例
-    scenario_id: null
+      zh: 完成的规范化阶段
+      en: Completed normalization phase
+      ja: 完了した正規化フェーズ
+
     descriptions:
-      zh: phase-17-01 以 ingest-run-17、phase_id=normalize、sequence=1、局部 start/end、输入 info-17 与输出 document-17 识别。
-      en: phase-17-01 is identified by ingest-run-17, phase ID normalize, sequence 1, local start and end times, input info-17, and output document-17.
-      ja: phase-17-01 は ingest-run-17、phase ID、sequence 1、local start/end、input info-17、output document-17 で識別されます。
+      zh: LlamaIndex SimpleDirectoryReader + VectorStoreIndex.from_documents；KnowledgeGraphIndex；LangChain PyPDFLoader Document(page_content, metadata)。
+      en: LlamaIndex SimpleDirectoryReader + VectorStoreIndex.from_documents; KnowledgeGraphIndex; LangChain PyPDFLoader Document(page_content, metadata).
+      ja: LlamaIndex SimpleDirectoryReader + VectorStoreIndex.from_documents。KnowledgeGraphIndex。LangChain PyPDFLoader Document。
     field_values:
-      phase_id: phase-17-01
-      ingestion_run_id: ingest-run-17
-      sequence: 1
-      activity_id: phase-17-01
-      started_at: 2026-07-16T10:01:00Z
+      activity_id: normalize-policy-42-02
+      phase_id: normalize-policy-42-02
+      ingestion_run_ref: ingest-policy-directory-42
+      sequence_number: 2
+      phase_kind: normalize
+      started_at: "2026-07-18T09:00:20Z"
+      ended_at: "2026-07-18T09:00:29Z"
       status: completed
+      input_resource_refs:
+        - dir-policy-2026-07
+      input_information_refs:
+        - loaded-policy-17
+      output_information_refs:
+        - document-policy-17
     related_node_ids:
       - IngestionPhase
-    related_relation_ids: []
-    expected_result:
-      zh: 将该运行内部的局部处理单元表示为 IngestionPhase，并保留完整 run 归属。
-      en: Represent the run-local processing unit as IngestionPhase while retaining its complete-run membership.
-      ja: 当該 run-local processing unit を IngestionPhase とし complete-run membership を保持します。
-    why_valid_or_invalid:
-      zh: 阶段拥有运行内唯一序号、局部时间和局部输入输出，但不覆盖读取到交接的全部执行范围。
-      en: The phase has a run-unique sequence, local time, and local inputs and outputs but does not cover the full execution from reading through handoff.
-      ja: phase は run-unique sequence、local time、local input/output を持つが reading-to-handoff 全範囲を覆いません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - IngestionActivity
+      - IngestionRun
+      - Document
+    related_relation_ids:
+      - IngestionPhase-is_a-IngestionActivity
+      - IngestionPhase-part-of-IngestionRun
+
     source_claims:
-      - claim-ingestion-phase-005
-  - id: IngestionPhase-example-boundary-manual-20260716
-    kind: boundary
+      - claim-ingestion-phase-activity
+      - claim-ingestion-phase-run-membership
+      - claim-ingestion-phase-generation
+  - id: ingestion-phase-counterexample
+
     labels:
-      zh: 摄入阶段边界例
-      en: "Boundary case: Ingestion phase"
-      ja: 取込phase境界例
-    scenario_id: null
+      zh: 完整运行不是单一阶段
+      en: Complete run is not one phase
+      ja: 完全な run は一つのフェーズではない
+
     descriptions:
-      zh: ingest-run-17 包含加载、规范化、去重与最终交接的整体时间和状态；它不是其中 sequence=1 的单一阶段。
-      en: ingest-run-17 spans loading, normalization, deduplication, and final handoff with overall time and state and is not the single phase at sequence 1.
-      ja: ingest-run-17 は loading、normalization、deduplication、handoff 全体を覆い sequence=1 の単一 phase ではありません。
-    field_values: {}
+      zh: 反例：DocumentLoader 输出无 DocumentMetadata source/page 就进入 EmbeddingRun，丢失 ChunkProvenance。
+      en: Counterexample: DocumentLoader output enters EmbeddingRun without DocumentMetadata source/page, losing ChunkProvenance.
+      ja: 反例：DocumentLoader 出力が DocumentMetadata source/page なしで EmbeddingRun へ。
+    field_values:
+      activity_id: ingest-policy-directory-42
+      started_at: "2026-07-18T09:00:00Z"
+      ended_at: "2026-07-18T09:01:14Z"
+      status: completed
+      phase_id: absent
+      ingestion_run_ref: absent
+      sequence_number: absent
+      phase_kind: absent
     related_node_ids:
       - IngestionPhase
-    related_relation_ids: []
-    expected_result:
-      zh: 把 ingest-run-17 保持为 IngestionRun，而不是 IngestionPhase。
-      en: Keep ingest-run-17 as IngestionRun rather than IngestionPhase.
-      ja: ingest-run-17 は IngestionRun とし IngestionPhase にしません。
-    why_valid_or_invalid:
-      zh: 完整运行编排多个阶段并拥有端到端结果；阶段只在该运行内拥有局部责任和顺序。
-      en: A complete run orchestrates several phases and owns end-to-end outcomes, while a phase has only local responsibility and order inside that run.
-      ja: complete run は複数 phase を編成し end-to-end outcome を持ち phase は local responsibility・order だけを持ちます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - IngestionRun
+      - IngestionActivity
+    related_relation_ids:
+      - IngestionPhase-part-of-IngestionRun
+
     source_claims:
-      - claim-ingestion-phase-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: IngestionRun
-    shared_parent_concept_id: IngestionActivity
-    differentia:
-      zh: 正向身份比较：父节点 IngestionActivity：IngestionPhase（semantic kind=activity，骨架 IngestionPhase-is_a-IngestionActivity）；IngestionRun（semantic kind=activity，骨架 IngestionRun-is_a-IngestionActivity）。双端条件：IngestionPhase 条件：“一次 IngestionRun 内具有顺序和局部输入输出的活动”；IngestionRun 条件：“按一份政策协调来源读取与有序阶段的完整摄入活动”。仅依据各自定义与骨架逐端验证。
-      en: "Positive identity comparison: parent IngestionActivity: IngestionPhase (semantic kind=activity, backbone IngestionPhase-is_a-IngestionActivity); IngestionRun (semantic kind=activity, backbone IngestionRun-is_a-IngestionActivity). Endpoint conditions: IngestionPhase condition: “An activity within an IngestionRun with sequence and local input/output”; IngestionRun condition: “A complete ingestion activity coordinating source reading and ordered phases under one policy”. Verify each endpoint from its own definition and backbone."
-      ja: 正の同一性比較：親 IngestionActivity：IngestionPhase（semantic kind=activity、バックボーン IngestionPhase-is_a-IngestionActivity）；IngestionRun（semantic kind=activity、バックボーン IngestionRun-is_a-IngestionActivity）。両端条件：IngestionPhase の条件：「一 IngestionRun 内で順序とlocal入出力を持つactivityです」；IngestionRun の条件：「一policy下でsource読込と順序phaseを調整する完全取込activityです」。各端を固有の定義とバックボーンで検証します。
+      - claim-ingestion-phase-boundary
+  - id: ingestion-phase-boundary
+
+    labels:
+      zh: 尚在运行的去重阶段
+      en: Deduplication phase still running
+      ja: 実行中の重複排除フェーズ
+
+    descriptions:
+      zh: IngestionRun 产出 Document vs ChunkingRun 分割；GraphStore node/edge vs TextCorpus 资源类型边界。
+      en: IngestionRun produces Document vs ChunkingRun splits; GraphStore node/edge vs TextCorpus resource type boundary.
+      ja: IngestionRun Document 生成 vs ChunkingRun 分割。GraphStore vs TextCorpus 境界。
+    field_values:
+      activity_id: deduplicate-policy-42-03
+      phase_id: deduplicate-policy-42-03
+      ingestion_run_ref: ingest-policy-directory-42
+      sequence_number: 3
+      phase_kind: deduplicate
+      started_at: "2026-07-18T09:00:30Z"
+      status: running
+      input_information_refs:
+        - document-policy-17
+      output_information_refs: []
+    related_node_ids:
+      - IngestionPhase
+      - DeduplicationActivity
+      - IngestionRun
+    related_relation_ids:
+      - IngestionPhase-part-of-IngestionRun
+
     source_claims:
-      - claim-ingestion-phase-007
+      - claim-ingestion-phase-temporal
+      - claim-ingestion-phase-usage
+  - id: ingestion-phase-instance
+
+    labels:
+      zh: 实例：失败的分块阶段
+      en: "Instance: failed chunking phase"
+      ja: "事例：失敗したチャンク化フェーズ"
+
+    descriptions:
+      zh: LlamaIndex PDFReader load_data → Document list metadata file_name/page_label → downstream RAPTOR chunking。
+      en: LlamaIndex PDFReader load_data → Document list metadata file_name/page_label → downstream RAPTOR chunking.
+      ja: LlamaIndex PDFReader→Document list metadata→downstream RAPTOR chunking。
+    field_values:
+      activity_id: chunk-contract-51-04
+      phase_id: chunk-contract-51-04
+      ingestion_run_ref: ingest-contract-51
+      sequence_number: 4
+      phase_kind: chunk
+      started_at: "2026-07-18T10:00:40Z"
+      ended_at: "2026-07-18T10:00:42Z"
+      status: failed
+      input_resource_refs:
+        - file-contract-v51
+      input_information_refs:
+        - document-contract-51
+      output_information_refs: []
+    related_node_ids:
+      - IngestionPhase
+      - IngestionRun
+      - Document
+      - ObservabilityEvent
+    related_relation_ids:
+      - IngestionPhase-part-of-IngestionRun
+
+    source_claims:
+      - claim-ingestion-phase-temporal
+      - claim-ingestion-phase-boundary
 parent_relation:
   id: IngestionPhase-is_a-IngestionActivity
   predicate: is_a
-  direction: target-to-source
+  target: concept:IngestionActivity
+  endpoint_order: child-to-parent
+  direction: source-to-target
   relation_kind: hierarchy
   labels:
-    zh: 是一种
-    en: is a
-    ja: の一種である
+    zh: 是摄入活动的阶段特化
+    en: is a phase specialization of ingestion activity
+    ja: 取り込みアクティビティのフェーズ特化である
   definitions:
-    zh: IngestionPhase 是 IngestionActivity 的严格子类；种差为：属于一个 IngestionRun、具有顺序号并只负责一个局部转换。
-    en: "IngestionPhase is a strict subtype of IngestionActivity; its reviewed differentia is: it belongs to one IngestionRun, has a sequence number, and owns one local transformation responsibility."
-    ja: IngestionPhase は IngestionActivity の厳密なsubtypeで、審査済み種差は「一 IngestionRun に属しsequence番号を持ち一local変換責務だけを担います。」です。
-  cardinality: null
-  cardinality_not_applicable_reason:
-    zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
-    en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
-    ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
+    zh: IngestionPhase 是拥有所属运行、局部顺序和单一转换职责的 IngestionActivity。
+    en: IngestionPhase is an IngestionActivity with an owning run, local order, and one transformation responsibility.
+    ja: IngestionPhase は所属 run、局所 order、一つの transformation responsibility を持つ IngestionActivity です。
+  cardinality:
+    source:
+      min: 0
+      max: null
+    target:
+      min: 1
+      max: 1
+  cardinality_not_applicable_reason: null
   inverse_reading:
-    predicate: part_of
+    predicate: has_specialization
     labels:
-      zh: 反向读取
-      en: inverse reading
-      ja: 逆方向読取
+      zh: 有阶段特化
+      en: has phase specialization
+      ja: フェーズ特化を持つ
   conditions:
-    - id: IngestionPhase-is_a-IngestionActivity-condition-manual-001
+    - id: ingestion-phase-is-a-activity-condition
       severity: error
       expression_language: plain
-      expression: "Assert only when the object first satisfies IngestionActivity and also satisfies the differentia: it belongs to one IngestionRun, has a sequence number, and owns one local transformation responsibility."
-      explanations:
-        zh: 仅当对象首先满足 IngestionActivity 定义且满足种差“属于一个 IngestionRun、具有顺序号并只负责一个局部转换。”时成立。
-        en: "Assert only when the object first satisfies IngestionActivity and also satisfies the differentia: it belongs to one IngestionRun, has a sequence number, and owns one local transformation responsibility."
-        ja: 対象がまず IngestionActivity を満たし、さらに種差「一 IngestionRun に属しsequence番号を持ち一local変換責務だけを担います。」を満たす時だけ成立します。
+      expression: >-
+        Assert the specialization only when an object satisfies IngestionActivity identity and additionally has one owning
+        ingestion_run_ref, a positive run-local sequence_number, one phase_kind, and local input-output responsibility.
+        A complete run, phase template, source resource, output document, loader, or policy does not satisfy this differentia.
+      explanation:
+        zh: 阶段特化在上位活动身份之外还必须固定所属运行、局部顺序和单一职责；端到端运行或静态模板不具备这些种差。
+        en: The phase specialization must add owning run, local order, and one responsibility to parent activity identity; an end-to-end run or static template lacks those differentiae.
+        ja: phase specialization は親 activity identity に所属 run、局所 order、一つの responsibility を加えなければなりません。end-to-end run や静的 template にはこれらの differentia がありません。
       source_claims:
-        - claim-ingestion-phase-008
-  temporal_scope: timeless
-  boundary_context: null
+        - claim-ingestion-phase-specialization
+  temporal_scope: valid-time
+  boundary_context: A phase is local to one run and does not absorb the run's end-to-end outcome or the identity of inputs and outputs.
   constraints: []
-  examples:
-    - id: IngestionPhase-is_a-IngestionActivity-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 是一种正例
-        en: "Positive case: is a"
-        ja: の一種である正例
-      scenario_id: null
-      descriptions:
-        zh: phase-17-01 具有独立 start/end、输入 info-17、输出 document-17 与状态变化，并由 run_id 和 sequence=1 限定为 ingest-run-17 内的局部活动。
-        en: phase-17-01 has independent start and end times, input info-17, output document-17, and a state change and is scoped as a local activity in ingest-run-17 by run ID and sequence 1.
-        ja: phase-17-01 は start/end、input、output、state change を持ち run ID・sequence で local activity に限定されます。
-      field_values: {}
-      related_node_ids:
-        - IngestionPhase
-        - IngestionActivity
-      related_relation_ids:
-        - IngestionPhase-is_a-IngestionActivity
-      expected_result:
-        zh: 确认 phase-17-01 是 IngestionActivity 的 IngestionPhase 特化。
-        en: Confirm phase-17-01 as an IngestionPhase specialization of IngestionActivity.
-        ja: phase-17-01 を IngestionActivity の IngestionPhase specialization とします。
-      why_valid_or_invalid:
-        zh: 它满足有持续时间和输入输出的活动上位条件，并以运行成员资格和局部序号形成阶段种差。
-        en: It satisfies the parent activity conditions of duration, input, and output and adds run membership and local sequence as phase differentia.
-        ja: duration・input/output parent activity 条件を満たし run membership・local sequence を differentia とします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-ingestion-phase-008
-    - id: IngestionPhase-is_a-IngestionActivity-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 是一种边界例
-        en: "Boundary case: is a"
-        ja: の一種である境界例
-      scenario_id: null
-      descriptions:
-        zh: ingest-run-17 拥有从加载到最终交接的整体时间和多阶段协调，不是其内部一个局部 sequence。
-        en: ingest-run-17 owns the overall time and multi-phase coordination from loading through final handoff and is not one local sequence inside itself.
-        ja: ingest-run-17 は overall time・multi-phase coordination を持ち一 local sequence ではありません。
-      field_values: {}
-      related_node_ids:
-        - IngestionPhase
-        - IngestionActivity
-      related_relation_ids:
-        - IngestionPhase-is_a-IngestionActivity
-      expected_result:
-        zh: 不要通过该子类边把完整 IngestionRun 归为 IngestionPhase。
-        en: Do not use this subtype edge to classify the complete IngestionRun as IngestionPhase.
-        ja: この subtype edge で complete IngestionRun を IngestionPhase に分類しません。
-      why_valid_or_invalid:
-        zh: 上位活动成员资格不能抹去完整运行与局部阶段的范围差异；阶段还必须有运行内局部身份。
-        en: Shared membership in Activity does not erase the scope difference between a complete run and local phase; a phase additionally requires run-local identity.
-        ja: Activity membership 共通でも complete run と local phase の scope 差は消えず run-local identity が必要です。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-ingestion-phase-008
+  examples: []
   source_claims:
-    - claim-ingestion-phase-008
-  distinct_fact_rationale: null
+    - claim-ingestion-phase-specialization
+  distinct_fact_rationale: This hierarchy records activity specialization; run membership and phase handoff are retained as distinct relations.
   layout_role: primary-backbone
-  review_status: accepted
-  endpoint_order: child-to-parent
-relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-ingestion-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 Anthropic Contextual Retrieval、LangChain text splitters/document loaders、LlamaIndex node parsers/ingestion pipeline、Unstructured 解析模式与 ETL 去重策略逐项人工语义核验通过。
-    en: Manually verified against Anthropic Contextual Retrieval, LangChain text splitters and document loaders, LlamaIndex node parsers and ingestion pipeline, Unstructured parsing patterns, and ETL deduplication strategies.
-    ja: Anthropic Contextual Retrieval、LangChain text splitters/document loaders、LlamaIndex node parsers/ingestion pipeline、Unstructured 解析パターン、ETL 重複排除戦略に照らし手動意味審査を完了しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+relations:
+  - id: IngestionPhase-part-of-IngestionRun
+    predicate: part_of
+    target: concept:IngestionRun
+    endpoint_order: child-to-parent
+    direction: source-to-target
+    relation_kind: composition
+    labels:
+      zh: 是摄入运行的阶段成员
+      en: is a phase member of ingestion run
+      ja: 取り込み run のフェーズメンバーである
+    definitions:
+      zh: IngestionPhase 由 ingestion_run_ref 所指的 IngestionRun 编排，并只承担该运行中一个带顺序的局部转换。
+      en: IngestionPhase is orchestrated by the IngestionRun named by ingestion_run_ref and carries only one ordered local transformation in that run.
+      ja: IngestionPhase は ingestion_run_ref が指す IngestionRun により編成され、その run 内の一つの順序付けられた局所 transformation だけを担います。
+    cardinality:
+      source:
+        min: 1
+        max: 1
+      target:
+        min: 0
+        max: null
+    cardinality_not_applicable_reason: null
+    inverse_reading:
+      predicate: has_phase_member
+      labels:
+        zh: 有阶段成员
+        en: has phase member
+        ja: フェーズメンバーを持つ
+    conditions:
+      - id: ingestion-phase-part-of-run-condition
+        severity: error
+        expression_language: plain
+        expression: >-
+          Assert composition only when phase.ingestion_run_ref equals run.activity_id, phase.sequence_number is unique among
+          phases of that run, and the phase time interval falls within or is explicitly associated with the run interval.
+          A workflow template, an output document, or a phase from another run does not establish membership.
+        explanation:
+          zh: 阶段成员关系需要所属运行引用、运行内唯一顺序和时间关联；模板、输出文档或另一运行中的阶段不能建立该关系。
+          en: Phase membership needs owning-run reference, run-unique order, and temporal association; a template, output document, or phase from another run cannot establish it.
+          ja: phase membership には owning-run reference、run-unique order、temporal association が必要であり、template、output document、別 run の phase では確立できません。
+        source_claims:
+          - claim-ingestion-phase-run-membership
+    temporal_scope: valid-time
+    boundary_context: Membership preserves local phase identity and does not make one phase identical to the complete run or another phase.
+    constraints: []
+    examples: []
+    source_claims:
+      - claim-ingestion-phase-run-membership
+    distinct_fact_rationale: This composition captures ownership by one run separately from activity specialization and information handoff.
+    layout_role: cross-link
+sources:
+  - id: w3c-prov-o
+    title: W3C PROV-O
+    url: https://www.w3.org/TR/prov-o/
+    type: standard
+    source_type: standard
+    relevance: Defines activities with time boundaries that use and generate entities and can form provenance chains.
+  - id: langchain-document-loaders
+    title: LangChain document loaders
+    url: https://docs.langchain.com/oss/python/integrations/document_loaders/index
+    type: official-doc
+    source_type: official-doc
+    relevance: Documents loading varied external sources into Document objects for downstream processing.
 source_claims:
-  - id: claim-ingestion-phase-001
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured's ordered ingest flow provides the operational basis for separately identified phases.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
+  - id: claim-ingestion-phase-activity
+    source: w3c-prov-o
+    supports: >-
+      PROV-O defines an Activity as something that occurs over a period of time and acts upon or with entities. Moonweave
+      models an ingestion phase as one local activity rather than as a static process definition or output entity.
+    locator: PROV-O section 3.1 starting point terms for Activity and Entity
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-ingestion-phase-002
-    source: eng-fw-unstructured-ingestion
-    supports: IngestionPhase.phase_id records the separately auditable phase identity; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
+  - id: claim-ingestion-phase-temporal
+    source: w3c-prov-o
+    supports: >-
+      PROV-O states that activities start and end at particular points in time. Moonweave records phase-local start and
+      terminal end times separately so a running phase is not represented as a completed step.
+    locator: PROV-O section 3.1 on activity start and end times
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-ingestion-phase-003
-    source: eng-fw-unstructured-ingestion
-    supports: IngestionPhase.ingestion_run_id records phase-to-run membership; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
+  - id: claim-ingestion-phase-usage
+    source: w3c-prov-o
+    supports: >-
+      PROV-O states that an activity can use entities during its lifetime. Moonweave records the local information
+      representations actually transformed by a phase rather than assigning every run input to every phase.
+    locator: PROV-O section 3.1 on prov used and Entity Activity relations
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-ingestion-phase-004
-    source: eng-fw-unstructured-ingestion
-    supports: IngestionPhase.sequence records deterministic phase ordering; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
+  - id: claim-ingestion-phase-parent-usage
+    source: w3c-prov-o
+    supports: PROV-O describes activities using entities during their lifetime. Moonweave retains the owning IngestionActivity's versioned source-resource references on an IngestionPhase while separately recording the local information representations transformed by that phase.
+    locator: PROV-O section 3.1 on prov:used and Entity Activity relations
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-ingestion-phase-005
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured presents ingestion as ordered steps, each with distinct transformation behavior.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
+  - id: claim-ingestion-phase-generation
+    source: w3c-prov-o
+    supports: >-
+      PROV-O states that activities can generate entities. Moonweave records a phase's output information separately from
+      the phase and can hand that output to the next phase as a new input reference.
+    locator: PROV-O section 3.1 on prov wasGeneratedBy and generated entities
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-ingestion-phase-006
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured distinguishes the overall ingest flow from each ordered step.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
+  - id: claim-ingestion-phase-identity
+    source: w3c-prov-o
+    supports: >-
+      PROV-O supports independently identifiable activities and entities. Moonweave uses phase ID and owning run reference
+      to distinguish one local processing activity from the complete run and its outputs.
+    locator: PROV-O Entity and Activity
+    evidence_kind: ontology-design-inference
+    confidence: medium
+  - id: claim-ingestion-phase-order
+    source: w3c-prov-o
+    supports: >-
+      PROV-O supports provenance chains among activities and entities but does not prescribe an ingestion-step ordinal.
+      Moonweave records a positive sequence number unique within one run as a local orchestration inference so phase handoff
+      can be replayed without treating the ordinal as a global timestamp or retry count.
+    locator: PROV-O Activity relations and provenance chains
+    evidence_kind: ontology-design-inference
+    confidence: medium
+  - id: claim-ingestion-phase-run-membership
+    source: w3c-prov-o
+    supports: >-
+      PROV-O supports provenance chains among activities and entities. Moonweave models a run-local phase as a composition
+      member of one IngestionRun using owning-run reference and sequence as a local orchestration inference.
+    locator: PROV-O Activity relations and provenance chains
+    evidence_kind: ontology-design-inference
+    confidence: medium
+  - id: claim-ingestion-phase-responsibility
+    source: langchain-document-loaders
+    supports: >-
+      LangChain documents loaders that read external source data into Document objects. Moonweave uses named local phase
+      responsibilities such as load and normalize to make each transformation step inspectable without treating a loader as the phase itself.
+    locator: LangChain document loader integrations and source-to-Document processing
+    evidence_kind: ontology-design-inference
+    confidence: medium
+  - id: claim-ingestion-phase-specialization
+    source: w3c-prov-o
+    supports: >-
+      Modeling a run-local ordered activity as an IngestionPhase specialization of IngestionActivity is a Moonweave taxonomy
+      inference grounded in PROV-O's distinction between activities and the entities they use or generate.
+    locator: PROV-O Entity Activity usage and generation
+    evidence_kind: ontology-design-inference
+    confidence: medium
+  - id: claim-ingestion-phase-boundary
+    source: w3c-prov-o
+    supports: >-
+      PROV-O distinguishes activities from entities and supports chains of provenance. Moonweave keeps complete run, local
+      phase, workflow template, source resource, output document, loader, policy, and retrieval context as separate facts.
+    locator: PROV-O Entity Activity usage and generation
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-ingestion-phase-007
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured documents an ordered ingestion flow composed of distinct steps from indexing and download through partitioning, chunking, embedding, staging, and upload. Moonweave models IngestionRun as the complete coordinated execution and IngestionPhase as one ordered step with local inputs and outputs; the class names and sibling placement are Moonweave design inferences.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-ingestion-phase-008
-    source: eng-fw-unstructured-ingestion
-    supports: Unstructured enumerates distinct ordered ingest steps inside the overall flow.
-    locator: "Ingestion overview > ordered ingest flow: index, filter, download, uncompress, partition, chunk, embed, stage, upload"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

@@ -20,12 +20,12 @@ const ids = <T extends { id: string }>(values: readonly T[] | undefined) =>
   (values ?? []).map(({ id }) => id).sort();
 
 describe("canonical ontology index", () => {
-  it("indexes the canonical root and all eight first-level domains without a GraphView shadow model", () => {
+  it("indexes the canonical root and all seven first-level domains without a GraphView shadow model", () => {
     const index = buildFixtureIndex();
 
     expect(index.rootRef).toBe(fixtureRefs.root);
     expect(index.entitiesByRef.get(fixtureRefs.root)?.kind).toBe("root");
-    expect(index.organizationalChildrenByRef.get(fixtureRefs.root)).toHaveLength(8);
+    expect(index.organizationalChildrenByRef.get(fixtureRefs.root)).toHaveLength(7);
     expect(index.organizationalChildrenByRef.get(fixtureRefs.root)).toEqual(
       expect.arrayContaining([
         "plane:runtime-plane",
@@ -35,7 +35,6 @@ describe("canonical ontology index", () => {
         "plane:feedback-plane",
         "plane:memory-plane",
         "plane:info-plane",
-        "plane:adapter-plane",
       ]),
     );
   });
@@ -173,7 +172,7 @@ describe("canonical ontology index", () => {
     const index = buildFixtureIndex();
     const indexedKinds = [...index.entitiesByRef.values()].map(({ kind }) => kind);
 
-    expect(index.entitiesByRef.size).toBe(25);
+    expect(index.entitiesByRef.size).toBe(23);
     expect(new Set(indexedKinds)).toEqual(new Set(["root", "plane", "module", "concept"]));
     expect(index.entitiesByRef.has("field:agentrun_field_1")).toBe(false);
     expect(index.entitiesByRef.has("example:AgentRun-example-1")).toBe(false);
@@ -226,7 +225,7 @@ describe("canonical ontology index", () => {
     expect(index.entitiesByRef.has(`example:${relationExample.id}`)).toBe(false);
   });
 
-  it("derives AssistantMessage and AudioBlock fields from is_a without persisting copies", () => {
+  it("derives AssistantMessage and AudioContent fields from is_a without persisting copies", () => {
     const index = buildOntologyIndex(
       inheritanceProjectionFixture as unknown as Parameters<typeof buildOntologyIndex>[0],
     );
@@ -237,11 +236,11 @@ describe("canonical ontology index", () => {
       { field: { id: "assistant_role", required: true }, declaredOnId: "AssistantMessage", inheritanceDepth: 0 },
       { field: { id: "message_id", required: true }, declaredOnId: "Message", inheritanceDepth: 1 },
     ]);
-    expect(index.conceptsById.get("AudioBlock")?.structure?.fields?.map(({ id }) => id))
+    expect(index.conceptsById.get("AudioContent")?.structure?.fields?.map(({ id }) => id))
       .toEqual(["sample_rate_hz"]);
-    expect(index.effectiveFieldsByConceptId.get("AudioBlock")).toMatchObject([
-      { field: { id: "sample_rate_hz" }, declaredOnId: "AudioBlock", inheritanceDepth: 0 },
-      { field: { id: "media_type", required: true }, declaredOnId: "MediaBlock", inheritanceDepth: 1 },
+    expect(index.effectiveFieldsByConceptId.get("AudioContent")).toMatchObject([
+      { field: { id: "sample_rate_hz" }, declaredOnId: "AudioContent", inheritanceDepth: 0 },
+      { field: { id: "media_type", required: true }, declaredOnId: "MediaContent", inheritanceDepth: 1 },
     ]);
   });
 
@@ -285,7 +284,7 @@ describe("canonical ontology index", () => {
 
   it("accepts a subtype discriminator that narrows an inherited controlled value", () => {
     const parentField = inheritanceProjectionFixture.classes
-      .find(({ id }) => id === "MediaBlock")
+      .find(({ id }) => id === "MediaContent")
       ?.structure.fields.find(({ id }) => id === "media_type");
     expect(parentField).toBeDefined();
 
@@ -294,7 +293,7 @@ describe("canonical ontology index", () => {
     const ontologyWithDiscriminator = {
       ...inheritanceProjectionFixture,
       classes: inheritanceProjectionFixture.classes.map((concept) => {
-        if (concept.id === "MediaBlock") {
+        if (concept.id === "MediaContent") {
           return {
             ...concept,
             structure: {
@@ -307,7 +306,7 @@ describe("canonical ontology index", () => {
             },
           };
         }
-        if (concept.id === "AudioBlock") {
+        if (concept.id === "AudioContent") {
           return {
             ...concept,
             structure: {
@@ -331,10 +330,10 @@ describe("canonical ontology index", () => {
       ontologyWithDiscriminator as unknown as Parameters<typeof buildOntologyIndex>[0],
     );
     expect(
-      index.effectiveFieldsByConceptId.get("AudioBlock")
+      index.effectiveFieldsByConceptId.get("AudioContent")
         ?.find(({ field }) => field.id === "media_type"),
     ).toMatchObject({
-      declaredOnId: "AudioBlock",
+      declaredOnId: "AudioContent",
       inheritanceDepth: 0,
       field: { allowed_values: [allowedAudio] },
     });
@@ -342,7 +341,7 @@ describe("canonical ontology index", () => {
     const ontologyWithInvalidValue = {
       ...ontologyWithDiscriminator,
       classes: ontologyWithDiscriminator.classes.map((concept) =>
-        concept.id === "AudioBlock"
+        concept.id === "AudioContent"
           ? {
               ...concept,
               structure: {
@@ -361,14 +360,14 @@ describe("canonical ontology index", () => {
       buildOntologyIndex(
         ontologyWithInvalidValue as unknown as Parameters<typeof buildOntologyIndex>[0],
       ),
-    ).toThrow(/Conflicting inherited field media_type on AudioBlock/);
+    ).toThrow(/Conflicting inherited field media_type on AudioContent/);
 
     const replaceAudioDiscriminator = (
       transform: (field: typeof parentField & Record<string, unknown>) => Record<string, unknown>,
     ) => ({
       ...ontologyWithDiscriminator,
       classes: ontologyWithDiscriminator.classes.map((concept) =>
-        concept.id === "AudioBlock"
+        concept.id === "AudioContent"
           ? {
               ...concept,
               structure: {
@@ -403,13 +402,13 @@ describe("canonical ontology index", () => {
     for (const incompatible of incompatibleRefinements) {
       expect(() =>
         buildOntologyIndex(incompatible as unknown as Parameters<typeof buildOntologyIndex>[0]),
-      ).toThrow(/Conflicting inherited field media_type on AudioBlock/);
+      ).toThrow(/Conflicting inherited field media_type on AudioContent/);
     }
 
     const ontologyWithOpenParent = {
       ...ontologyWithDiscriminator,
       classes: ontologyWithDiscriminator.classes.map((concept) =>
-        concept.id === "MediaBlock"
+        concept.id === "MediaContent"
           ? {
               ...concept,
               structure: {
@@ -429,14 +428,14 @@ describe("canonical ontology index", () => {
     const ontologyWithParentPattern = {
       ...ontologyWithDiscriminator,
       classes: ontologyWithDiscriminator.classes.map((concept) => {
-        if (concept.id !== "MediaBlock" && concept.id !== "AudioBlock") return concept;
+        if (concept.id !== "MediaContent" && concept.id !== "AudioContent") return concept;
         return {
           ...concept,
           structure: {
             ...concept.structure,
             fields: concept.structure.fields.map((field) =>
               field.id === "media_type"
-                ? { ...field, pattern: concept.id === "MediaBlock" ? "^audio$" : "^.+$" }
+                ? { ...field, pattern: concept.id === "MediaContent" ? "^audio$" : "^.+$" }
                 : field,
             ),
           },
@@ -445,12 +444,12 @@ describe("canonical ontology index", () => {
     };
     expect(() =>
       buildOntologyIndex(ontologyWithParentPattern as unknown as Parameters<typeof buildOntologyIndex>[0]),
-    ).toThrow(/Conflicting inherited field media_type on AudioBlock/);
+    ).toThrow(/Conflicting inherited field media_type on AudioContent/);
 
-    const mediaTemplate = inheritanceProjectionFixture.classes.find(({ id }) => id === "MediaBlock")!;
-    const audioTemplate = inheritanceProjectionFixture.classes.find(({ id }) => id === "AudioBlock")!;
+    const mediaTemplate = inheritanceProjectionFixture.classes.find(({ id }) => id === "MediaContent")!;
+    const audioTemplate = inheritanceProjectionFixture.classes.find(({ id }) => id === "AudioContent")!;
     const hierarchyTemplate = inheritanceProjectionFixture.relations.find(
-      ({ id }) => id === "AudioBlock-is_a-MediaBlock",
+      ({ id }) => id === "AudioContent-is_a-MediaContent",
     )!;
     const inheritedThroughNearerRefinement = {
       ...inheritanceProjectionFixture,
@@ -458,7 +457,7 @@ describe("canonical ontology index", () => {
         ...inheritanceProjectionFixture.classes,
         {
           ...mediaTemplate,
-          id: "GeneralMediaBlock",
+          id: "GeneralMediaContent",
           primary_parent_relation_id: null,
           structure: {
             ...mediaTemplate.structure,
@@ -467,14 +466,14 @@ describe("canonical ontology index", () => {
         },
         {
           ...audioTemplate,
-          id: "AIndirectMediaBlock",
-          primary_parent_relation_id: "AIndirectMediaBlock-is_a-GeneralMediaBlock",
+          id: "AIndirectMediaContent",
+          primary_parent_relation_id: "AIndirectMediaContent-is_a-GeneralMediaContent",
           structure: { ...audioTemplate.structure, fields: [] },
         },
         {
           ...audioTemplate,
-          id: "ZRefinedMediaBlock",
-          primary_parent_relation_id: "ZRefinedMediaBlock-is_a-GeneralMediaBlock",
+          id: "ZRefinedMediaContent",
+          primary_parent_relation_id: "ZRefinedMediaContent-is_a-GeneralMediaContent",
           structure: {
             ...audioTemplate.structure,
             fields: [{ ...parentField!, allowed_values: [allowedAudio] }],
@@ -483,7 +482,7 @@ describe("canonical ontology index", () => {
         {
           ...audioTemplate,
           id: "RefinementLeaf",
-          primary_parent_relation_id: "RefinementLeaf-is_a-AIndirectMediaBlock",
+          primary_parent_relation_id: "RefinementLeaf-is_a-AIndirectMediaContent",
           structure: { ...audioTemplate.structure, fields: [] },
         },
       ],
@@ -491,27 +490,27 @@ describe("canonical ontology index", () => {
         ...inheritanceProjectionFixture.relations,
         {
           ...hierarchyTemplate,
-          id: "AIndirectMediaBlock-is_a-GeneralMediaBlock",
-          source_id: "AIndirectMediaBlock",
-          target_id: "GeneralMediaBlock",
+          id: "AIndirectMediaContent-is_a-GeneralMediaContent",
+          source_id: "AIndirectMediaContent",
+          target_id: "GeneralMediaContent",
         },
         {
           ...hierarchyTemplate,
-          id: "ZRefinedMediaBlock-is_a-GeneralMediaBlock",
-          source_id: "ZRefinedMediaBlock",
-          target_id: "GeneralMediaBlock",
+          id: "ZRefinedMediaContent-is_a-GeneralMediaContent",
+          source_id: "ZRefinedMediaContent",
+          target_id: "GeneralMediaContent",
         },
         {
           ...hierarchyTemplate,
-          id: "RefinementLeaf-is_a-AIndirectMediaBlock",
+          id: "RefinementLeaf-is_a-AIndirectMediaContent",
           source_id: "RefinementLeaf",
-          target_id: "AIndirectMediaBlock",
+          target_id: "AIndirectMediaContent",
         },
         {
           ...hierarchyTemplate,
-          id: "RefinementLeaf-is_a-ZRefinedMediaBlock",
+          id: "RefinementLeaf-is_a-ZRefinedMediaContent",
           source_id: "RefinementLeaf",
-          target_id: "ZRefinedMediaBlock",
+          target_id: "ZRefinedMediaContent",
         },
       ],
     };
@@ -521,7 +520,7 @@ describe("canonical ontology index", () => {
     expect(
       refinementIndex.effectiveFieldsByConceptId.get("RefinementLeaf")
         ?.find(({ field }) => field.id === "media_type"),
-    ).toMatchObject({ declaredOnId: "ZRefinedMediaBlock", inheritanceDepth: 1 });
+    ).toMatchObject({ declaredOnId: "ZRefinedMediaContent", inheritanceDepth: 1 });
   });
 
   it("deduplicates a diamond field declaration and rejects conflicting field semantics", () => {

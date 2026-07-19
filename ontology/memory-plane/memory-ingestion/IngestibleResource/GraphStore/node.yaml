@@ -4,299 +4,455 @@ kind: concept
 status: accepted
 labels:
   zh: 图存储
-  en: Graph store
-  ja: グラフstore
+  en: Graph Store
+  ja: グラフストア
 semantics:
   short_definition:
-    zh: 以图快照身份组织节点与边并可被摄入读取的资源。
-    en: A graph-snapshot-identified resource organizing nodes and edges for ingestion.
-    ja: graph snapshot同一性でnodeとedgeを編成し取込read可能なresourceです。
+    zh: 以查询端点和版本化图清单标识、可供摄入读取节点与关系的属性图来源容器。
+    en: A property-graph source container identified by a query endpoint and versioned graph manifest from which ingestion can read nodes and relationships.
+    ja: query endpoint と版管理された graph manifest で識別され、ingestion が node と relationship を読み取れる property graph の source container。
   definition:
-    zh: GraphStore 是具有图/数据库身份和版本摘要、包含 GraphNode 与 GraphEdge 信息的 IngestibleResource；它不是单个节点、边或图嵌入。
-    en: GraphStore is an IngestibleResource with graph/database identity and version digest that contains GraphNode and GraphEdge information; it is not one node, edge, or graph embedding.
-    ja: GraphStore はgraph/database同一性と版digestを持ち GraphNode と GraphEdge informationを含む IngestibleResource で、単一node・edge・graph embeddingではありません。
+    zh: >-
+      GraphStore 是 IngestibleResource 的特化，表示一个可查询的属性图来源及其固定图快照。
+      它以 resource_id、canonical_locator、graph_model、version_ref 和 content_digest 识别，其中摘要针对已规范化的节点与关系清单。
+      它承载 GraphNode 和 GraphEdge，供后续 IngestionRun 读取，但不是单个节点、单个关系、查询文本、查询结果、GraphEmbedding、Document、图加载器、连接凭据、一次查询活动或向量检索后端。
+    en: >-
+      A GraphStore is an IngestibleResource specialization representing one queryable property-graph source and a pinned
+      graph snapshot. It is identified by resource_id, canonical_locator, graph_model, version_ref, and content_digest over
+      a normalized node-and-relationship manifest. It hosts GraphNodes and GraphEdges for a later IngestionRun to read, but
+      it is not one node, one relationship, query text, query result, GraphEmbedding, Document, graph loader, connection
+      credential, one query activity, or a vector-retrieval backend.
+    ja: >-
+      GraphStore は一つの queryable property-graph source と固定された graph snapshot を表す IngestibleResource の特化です。
+      resource_id、canonical_locator、graph_model、version_ref、および正規化された node-and-relationship manifest に対する
+      content_digest で識別されます。後続の IngestionRun が読む GraphNode と GraphEdge を収容しますが、一つの node、一つの
+      relationship、query text、query result、GraphEmbedding、Document、graph loader、connection credential、一回の query activity、
+      vector-retrieval backend ではありません。
   why_needed:
-    zh: 形成 GraphStore→GraphNode/GraphEdge 的来源层级。
-    en: Creates the GraphStore-to-GraphNode/GraphEdge source hierarchy.
-    ja: GraphStore→GraphNode/GraphEdgeのsource階層を作ります。
+    zh: 图源容器身份将图快照、节点和关系与查询活动和派生嵌入分开，使图摄入能够重现并审计端点和成员范围。
+    en: A graph-source container identity separates graph snapshot, nodes, and relationships from query activity and derived embeddings so graph ingestion can reproduce and audit endpoint and membership scope.
+    ja: graph-source container identity は graph snapshot、node、relationship を query activity と派生 embedding から分離し、graph ingestion が endpoint と membership scope を再現および監査できるようにします。
   includes:
-    - zh: 纳入可查询的属性图、RDF 图或图快照。
-      en: Includes queryable property graphs, RDF graphs, or graph snapshots.
-      ja: query可能property graph・RDF graph・graph snapshotを含みます。
+    - zh: 具有无凭据 Neo4j 端点、版本引用和节点关系清单摘要的属性图来源。
+      en: A property-graph source with a credential-free Neo4j endpoint, version reference, and node-and-relationship manifest digest.
+      ja: credential-free の Neo4j endpoint、version reference、node-and-relationship manifest digest を持つ property-graph source。
   excludes:
-    - zh: 排除 GraphNode、GraphEdge 与 GraphEmbedding。
-      en: Excludes GraphNode, GraphEdge, and GraphEmbedding.
-      ja: GraphNode・GraphEdge・GraphEmbeddingを除外します。
+    - zh: 图中的一个业务节点、一条关系、针对图运行的 Cypher 文本、返回的行集和从图计算出的嵌入向量。
+      en: One business node in the graph, one relationship, Cypher text run against the graph, returned rows, or an embedding computed from the graph.
+      ja: graph 内の一つの business node、一つの relationship、graph に対して実行する Cypher text、返却された row、または graph から計算された embedding。
   semantic_kind: entity
-  aliases: []
+  aliases:
+    - versioned property-graph source
+    - ingestible graph snapshot
+engineering:
+  explanation:
+    zh: >-
+      摄入编排器先以不含密码的端点引用登记图来源，并从秘密管理系统取得运行时凭据。
+      它在固定版本下执行受控只读图查询，按稳定顺序汇总节点标识、关系标识和端点引用以计算清单摘要，
+      并将查询文本、参数、实际返回内容和规范化结果记录到独立 IngestionRun。这样查询的结果与图源身份不会相互覆盖。
+    en: >-
+      An ingestion orchestrator registers the graph source using a password-free endpoint reference and obtains runtime
+      credentials from secret management. At a fixed version it executes controlled read-only graph queries, collects node
+      IDs, relationship IDs, and endpoint references in stable order for the manifest digest, and records query text,
+      parameters, actual returned content, and normalization results on a separate IngestionRun. Query output and source
+      identity therefore cannot overwrite each other.
+    ja: >-
+      ingestion orchestrator は password-free の endpoint reference で graph source を登録し、runtime credential は secret
+      management から取得します。固定 version で制御された read-only graph query を実行し、node ID、relationship ID、endpoint
+      reference を stable order で集めて manifest digest を作ります。query text、parameter、実際の返却 content、normalization result
+      は別の IngestionRun に記録するため、query output と source identity は互いを上書きできません。
+  typical_input:
+    - description: Version-pinned graph source descriptor
+      format: |
+        {
+          "resource_id": "graph-policy-v7",
+          "canonical_locator": "neo4j+s://policy-graph.example",
+          "graph_model": "property-graph",
+          "version_ref": "snapshot:policy-graph:7",
+          "content_digest": "ni:///sha-256;B9w7avKcCw0VFmNp0aBR4NnUFg10_ErmH2RrKSkQcvY"
+        }
+  typical_output:
+    - description: Read observation separated from graph identity
+      format: |
+        {
+          "graph_store_ref": "graph-policy-v7",
+          "ingestion_run_ref": "ingest-graph-policy-7",
+          "read_version_ref": "snapshot:policy-graph:7",
+          "graph_manifest_verified": true,
+          "graph_node_refs": ["node-policy-17"],
+          "graph_edge_refs": ["edge-policy-17-18"]
+        }
+  reference_implementations:
+    - name: Neo4j node and relationship patterns
+      url: https://neo4j.com/docs/cypher-manual/current/patterns/reference/node-and-relationship-patterns/
+      description: Documents graph patterns that match nodes and relationships and the direction of relationships.
+    - name: Neo4j Cypher queries
+      url: https://neo4j.com/docs/cypher-manual/current/queries/
+      description: Documents Cypher query concepts for nodes, relationships, paths, and graph queries.
+    - name: RFC 6920 Named Information
+      url: https://datatracker.ietf.org/doc/rfc6920/
+      description: Defines hash-based named-information identifiers for verifying one graph-manifest representation.
 structure:
   identity_keys:
     - resource_id
   fields:
     - id: resource_id
       labels:
-        zh: 资源标识
-        en: resource ID
-        ja: resource ID
+        zh: 图存储资源标识
+        en: graph-store resource ID
+        ja: グラフストアリソース ID
+      definitions:
+        zh: 稳定标识一个待摄入的图来源容器，而不是节点、关系、查询或一次查询运行。
+        en: Stably identifies one graph source container awaiting ingestion rather than a node, relationship, query, or one query run.
+        ja: node、relationship、query、一回の query run ではなく、取り込み待ちの一つの graph source container を安定して識別します。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 稳定标识图存储。
-        en: Stable identifier for the graph store.
-        ja: graph storeの安定識別子です。
       allowed_values: []
       pattern: null
-      example_value: graph-policy
+      example_value: graph-policy-v7
       source_claims:
-        - claim-graph-store-002
-    - id: graph_version_digest
+        - claim-graph-store-identity
+    - id: canonical_locator
       labels:
-        zh: 图版本摘要
-        en: graph-version digest
-        ja: graph版digest
+        zh: 规范图端点定位符
+        en: canonical graph endpoint locator
+        ja: 正規グラフエンドポイントロケータ
+      definitions:
+        zh: 记录不含凭据、可由图客户端解析的连接端点或逻辑图定位符，不保存用户名、令牌或密码。
+        en: Records a credential-free connection endpoint or logical graph locator resolvable by a graph client and stores no username, token, or password.
+        ja: graph client が解決できる credential-free の connection endpoint または logical graph locator を記録し、username、token、password は保存しません。
+      datatype: uri
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      allowed_values: []
+      pattern: null
+      example_value: neo4j+s://policy-graph.example
+      source_claims:
+        - claim-graph-store-query
+    - id: graph_model
+      labels:
+        zh: 图模型
+        en: graph model
+        ja: グラフモデル
+      definitions:
+        zh: 声明来源采用的图数据模型，使摄入器能够解释节点、关系和端点语义，而不是把查询语言名称当成模型。
+        en: Declares the source graph data model so an ingestor can interpret nodes, relationships, and endpoints rather than treating a query-language name as the model.
+        ja: query-language name を model とみなすのではなく、ingestor が node、relationship、endpoint semantics を解釈できるよう source graph data model を宣言します。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
+      allowed_values:
+        - property-graph
+      pattern: null
+      example_value: property-graph
+      source_claims:
+        - claim-graph-store-model
+    - id: version_ref
+      labels:
+        zh: 图快照版本引用
+        en: graph-snapshot version reference
+        ja: グラフスナップショット版参照
       definitions:
-        zh: 固定本次读取的图快照。
-        en: Fixes the graph snapshot read for ingestion.
-        ja: 取込read対象graph snapshotを固定します。
+        zh: 记录来源系统选择的图快照、事务版本或导出版本，用于限定节点和关系的可见集合，而不是查询返回行的摘要。
+        en: Records the graph snapshot, transaction version, or export version selected by the source system to bound visible nodes and relationships rather than a summary of returned rows.
+        ja: 返却 row の要約ではなく、可視の node と relationship を限定するために source system が選択した graph snapshot、transaction version、export version を記録します。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
       allowed_values: []
       pattern: null
-      example_value: sha256:graph-policy-7
+      example_value: "snapshot:policy-graph:7"
       source_claims:
-        - claim-graph-store-003
-  constraints: []
-  required_relation_constraints: []
+        - claim-graph-store-version
+    - id: content_digest
+      labels:
+        zh: 图清单摘要
+        en: graph-manifest digest
+        ja: グラフマニフェストダイジェスト
+      definitions:
+        zh: 记录对该图快照中规范化节点标识、关系标识、关系类型和端点引用清单计算的算法标记摘要，而不是单个图嵌入或查询输出摘要。
+        en: Records an algorithm-tagged digest over normalized node IDs, relationship IDs, relationship types, and endpoint references in the graph snapshot rather than a digest of one graph embedding or query output.
+        ja: 一つの graph embedding や query output の digest ではなく、graph snapshot 内の正規化された node ID、relationship ID、relationship type、endpoint reference の manifest に対する algorithm-tagged digest を記録します。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      allowed_values: []
+      pattern: null
+      example_value: "ni:///sha-256;B9w7avKcCw0VFmNp0aBR4NnUFg10_ErmH2RrKSkQcvY"
+      source_claims:
+        - claim-graph-store-digest
+  constraints:
+    - id: graph-store-versioned-manifest
+      severity: error
+      expression_language: plain
+      expression: >-
+        resource_id, canonical_locator, graph_model, version_ref, and content_digest are required. The locator must
+        contain no credential. graph_model must be property-graph, and content_digest must verify a deterministically
+        normalized node-and-relationship manifest for version_ref. A node, relationship, query text, query result,
+        connection, secret, GraphEmbedding, generated Document, or vector backend cannot substitute for graph-store identity.
+      explanation:
+        zh: 图存储身份必须固定可查询来源、模型、快照和成员完整性；成员、访问材料、查询活动和派生表示必须保持为不同的事实。
+        en: Graph-store identity must pin queryable source, model, snapshot, and member integrity; members, access material, query activity, and derived representations must remain distinct facts.
+        ja: graph-store identity は queryable source、model、snapshot、member integrity を固定しなければなりません。member、access material、query activity、derived representation は別個の fact として保持します。
+      source_claims:
+        - claim-graph-store-model
+        - claim-graph-store-query
+        - claim-graph-store-digest
+        - claim-graph-store-boundary
+  required_relations: []
 examples:
-  - id: GraphStore-example-positive-manual-20260716
-    kind: positive
+  - id: graph-store-positive
+
     labels:
-      zh: 图存储正例
-      en: "Positive case: Graph store"
-      ja: グラフstore正例
-    scenario_id: null
+      zh: 版本固定的政策属性图
+      en: Version-pinned policy property graph
+      ja: 版固定の政策 property graph
+
     descriptions:
-      zh: graph-policy@7 以 query endpoint、tenant、snapshot digest 和节点/边清单识别，清单保证 edge:17-18 的两个端点都属于该版本。
-      en: graph-policy@7 is identified by query endpoint, tenant, snapshot digest, and node and edge manifests, which ensure that both endpoints of edge:17-18 belong to that version.
-      ja: graph-policy@7 は query endpoint、tenant、snapshot digest、node/edge manifest で識別され edge endpoints の所属を保証します。
+      zh: LlamaIndex SimpleDirectoryReader + VectorStoreIndex.from_documents；KnowledgeGraphIndex；LangChain PyPDFLoader Document(page_content, metadata)。
+      en: LlamaIndex SimpleDirectoryReader + VectorStoreIndex.from_documents; KnowledgeGraphIndex; LangChain PyPDFLoader Document(page_content, metadata).
+      ja: LlamaIndex SimpleDirectoryReader + VectorStoreIndex.from_documents。KnowledgeGraphIndex。LangChain PyPDFLoader Document。
     field_values:
-      resource_id: graph-policy
-      graph_version_digest: sha256:graph-policy-7
+      resource_id: graph-policy-v7
       canonical_locator: neo4j+s://policy-graph.example
-      version_ref: graph-policy@7
-      content_digest: sha256:graph-policy-7
+      graph_model: property-graph
+      version_ref: "snapshot:policy-graph:7"
+      content_digest: "ni:///sha-256;B9w7avKcCw0VFmNp0aBR4NnUFg10_ErmH2RrKSkQcvY"
     related_node_ids:
       - GraphStore
-    related_relation_ids: []
-    expected_result:
-      zh: 将该版本化图容器表示为 GraphStore，并把节点与边成员限定到 snapshot @7。
-      en: Represent the versioned graph container as GraphStore and scope node and edge membership to snapshot @7.
-      ja: 当該 versioned graph container を GraphStore とし node/edge membership を snapshot @7 に限定します。
-    why_valid_or_invalid:
-      zh: 独立查询端点、租户边界、快照身份和闭合成员清单构成可被图加载器读取的资源容器。
-      en: An independent query endpoint, tenant boundary, snapshot identity, and closed membership manifests establish a resource container readable by a graph loader.
-      ja: query endpoint、tenant boundary、snapshot identity、closed manifests が graph loader で読取可能な resource container を形成します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - IngestibleResource
+      - GraphNode
+      - GraphEdge
+    related_relation_ids:
+      - GraphStore-is_a-IngestibleResource
+      - GraphStore-contains-GraphNode
+      - GraphStore-contains-GraphEdge
+
     source_claims:
-      - claim-graph-store-004
-  - id: GraphStore-example-boundary-manual-20260716
-    kind: boundary
+      - claim-graph-store-model
+      - claim-graph-store-digest
+  - id: graph-store-counterexample
+
     labels:
-      zh: 图存储边界例
-      en: "Boundary case: Graph store"
-      ja: グラフstore境界例
-    scenario_id: null
+      zh: 连接凭据不是图存储
+      en: Connection credential is not a graph store
+      ja: connection credential はグラフストアではない
+
     descriptions:
-      zh: node:policy:17 只有节点 ID、标签与属性，依赖 graph-policy@7 解释其范围，不能枚举其他节点或边。
-      en: node:policy:17 has only a node ID, labels, and properties and depends on graph-policy@7 for scope; it cannot enumerate other nodes or edges.
-      ja: node:policy:17 は node ID、labels、properties だけを持ち graph-policy@7 に scope を依存し他 member を列挙できません。
-    field_values: {}
+      zh: 反例：DocumentLoader 输出无 DocumentMetadata source/page 就进入 EmbeddingRun，丢失 ChunkProvenance。
+      en: Counterexample: DocumentLoader output enters EmbeddingRun without DocumentMetadata source/page, losing ChunkProvenance.
+      ja: 反例：DocumentLoader 出力が DocumentMetadata source/page なしで EmbeddingRun へ。
+    field_values:
+      credential_kind: graph-database-password
+      canonical_locator: absent
+      graph_model: absent
+      version_ref: absent
+      content_digest: absent
     related_node_ids:
       - GraphStore
+      - IngestibleResource
     related_relation_ids: []
-    expected_result:
-      zh: 把 node:policy:17 保持为 GraphNode，不把单个成员当作 GraphStore。
-      en: Keep node:policy:17 as GraphNode and do not treat one member as GraphStore.
-      ja: node:policy:17 は GraphNode とし一 member を GraphStore としません。
-    why_valid_or_invalid:
-      zh: 成员节点没有图容器的查询、快照和成员管理责任，即使它在图中连接度很高也不成为容器。
-      en: A member node lacks the graph container's query, snapshot, and membership-management responsibilities; high degree does not make it the container.
-      ja: member node は container の query・snapshot・membership management 責任を持たず高 degree でも container になりません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+
     source_claims:
-      - claim-graph-store-005
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-graph-store-boundary
+  - id: graph-store-boundary
+
+    labels:
+      zh: 图中的一个政策节点
+      en: One policy node in the graph
+      ja: グラフ内の一つの政策ノード
+
+    descriptions:
+      zh: IngestionRun 产出 Document vs ChunkingRun 分割；GraphStore node/edge vs TextCorpus 资源类型边界。
+      en: IngestionRun produces Document vs ChunkingRun splits; GraphStore node/edge vs TextCorpus resource type boundary.
+      ja: IngestionRun Document 生成 vs ChunkingRun 分割。GraphStore vs TextCorpus 境界。
+    field_values:
+      node_id: node-policy-17
+      graph_store_ref: graph-policy-v7
+      version_ref: "snapshot:policy-graph:7"
+      node_property_digest: "sha256:node-policy-17-v7"
+    related_node_ids:
+      - GraphStore
+      - GraphNode
+    related_relation_ids:
+      - GraphStore-contains-GraphNode
+
+    source_claims:
+      - claim-graph-store-model
+      - claim-graph-store-boundary
+  - id: graph-store-instance
+
+    labels:
+      zh: 实例：政策关系快照摄入
+      en: "Instance: policy-relationship snapshot ingestion"
+      ja: "事例：政策 relationship snapshot ingestion"
+
+    descriptions:
+      zh: LlamaIndex PDFReader load_data → Document list metadata file_name/page_label → downstream RAPTOR chunking。
+      en: LlamaIndex PDFReader load_data → Document list metadata file_name/page_label → downstream RAPTOR chunking.
+      ja: LlamaIndex PDFReader→Document list metadata→downstream RAPTOR chunking。
+    field_values:
+      resource_id: graph-compliance-v4
+      canonical_locator: neo4j+s://compliance-graph.example
+      graph_model: property-graph
+      version_ref: "snapshot:compliance-graph:4"
+      content_digest: "ni:///sha-256;u3dJvP6oMUQGqKqLFv9tC7eW8d3Yb2nVQrZmSsaYI0I"
+    related_node_ids:
+      - GraphStore
+      - GraphNode
+      - GraphEdge
+      - IngestionRun
+      - Document
+    related_relation_ids:
+      - GraphStore-contains-GraphNode
+      - GraphStore-contains-GraphEdge
+
+    source_claims:
+      - claim-graph-store-query
+      - claim-graph-store-boundary
 parent_relation:
   id: GraphStore-is_a-IngestibleResource
   predicate: is_a
-  direction: target-to-source
+  target: concept:IngestibleResource
+  endpoint_order: child-to-parent
+  direction: source-to-target
   relation_kind: hierarchy
   labels:
-    zh: 是一种
-    en: is a
-    ja: の一種である
+    zh: 是可摄入资源的图存储特化
+    en: is a graph-store specialization of ingestible resource
+    ja: ingestible resource のグラフストア特化である
   definitions:
-    zh: GraphStore 是 IngestibleResource 的严格子类；种差为：以图快照身份组织 GraphNode 与 GraphEdge 并支持查询读取。
-    en: "GraphStore is a strict subtype of IngestibleResource; its reviewed differentia is: it organizes GraphNode and GraphEdge under graph-snapshot identity and supports query reads."
-    ja: GraphStore は IngestibleResource の厳密なsubtypeで、審査済み種差は「graph snapshot同一性で GraphNode と GraphEdge を編成しquery readを支えます。」です。
-  cardinality: null
-  cardinality_not_applicable_reason:
-    zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
-    en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
-    ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
+    zh: GraphStore 是以可查询属性图端点和版本化节点关系清单为种差的 IngestibleResource。
+    en: GraphStore is an IngestibleResource whose differentia is a queryable property-graph endpoint with a versioned node-and-relationship manifest.
+    ja: GraphStore は queryable property-graph endpoint と版管理された node-and-relationship manifest を種差とする IngestibleResource です。
+  cardinality:
+    source:
+      min: 0
+      max: null
+    target:
+      min: 1
+      max: 1
+  cardinality_not_applicable_reason: null
   inverse_reading:
-    predicate: part_of
+    predicate: has_specialization
     labels:
-      zh: 反向读取
-      en: inverse reading
-      ja: 逆方向読取
+      zh: 有图存储特化
+      en: has graph-store specialization
+      ja: グラフストア特化を持つ
   conditions:
-    - id: GraphStore-is_a-IngestibleResource-condition-manual-001
+    - id: graph-store-is-a-resource-condition
       severity: error
       expression_language: plain
-      expression: "Assert only when the object first satisfies IngestibleResource and also satisfies the differentia: it organizes GraphNode and GraphEdge under graph-snapshot identity and supports query reads."
-      explanations:
-        zh: 仅当对象首先满足 IngestibleResource 定义且满足种差“以图快照身份组织 GraphNode 与 GraphEdge 并支持查询读取。”时成立。
-        en: "Assert only when the object first satisfies IngestibleResource and also satisfies the differentia: it organizes GraphNode and GraphEdge under graph-snapshot identity and supports query reads."
-        ja: 対象がまず IngestibleResource を満たし、さらに種差「graph snapshot同一性で GraphNode と GraphEdge を編成しquery readを支えます。」を満たす時だけ成立します。
+      expression: >-
+        Assert the specialization only when an object satisfies IngestibleResource identity and additionally identifies a
+        queryable property-graph endpoint through graph_model and a versioned node-and-relationship manifest. A node,
+        relationship, query, query result, credential, graph embedding, or query activity does not satisfy this differentia.
+      explanation:
+        zh: 图存储特化要求在上位来源资源身份之外固定图模型、查询端点和版本化成员集合，而不是仅有一个图成员或查询结果。
+        en: The graph-store specialization requires graph model, query endpoint, and versioned member set in addition to parent source-resource identity rather than merely a graph member or query result.
+        ja: graph-store specialization には親 source-resource identity に加えて graph model、query endpoint、versioned member set が必要であり、単なる graph member や query result では足りません。
       source_claims:
-        - claim-graph-store-006
-  temporal_scope: timeless
-  boundary_context: null
+        - claim-graph-store-specialization
+  temporal_scope: valid-time
+  boundary_context: Graph nodes and relationships are members at a version; query execution and generated information are activities or outputs rather than the graph source itself.
   constraints: []
-  examples:
-    - id: GraphStore-is_a-IngestibleResource-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 是一种正例
-        en: "Positive case: is a"
-        ja: の一種である正例
-      scenario_id: null
-      descriptions:
-        zh: graph-policy@7 具有稳定 query endpoint、tenant、snapshot digest 和闭合节点/边清单，并可由 Neo4j loader 按该版本读取。
-        en: graph-policy@7 has a stable query endpoint, tenant, snapshot digest, and closed node and edge manifests and can be read by a Neo4j loader at that version.
-        ja: graph-policy@7 は stable query endpoint、tenant、snapshot digest、closed manifests を持ち Neo4j loader で読取可能です。
-      field_values: {}
-      related_node_ids:
-        - GraphStore
-        - IngestibleResource
-      related_relation_ids:
-        - GraphStore-is_a-IngestibleResource
-      expected_result:
-        zh: 确认 graph-policy@7 是 IngestibleResource 的 GraphStore 特化。
-        en: Confirm graph-policy@7 as a GraphStore specialization of IngestibleResource.
-        ja: graph-policy@7 を IngestibleResource の GraphStore specialization とします。
-      why_valid_or_invalid:
-        zh: 对象满足资源的可寻址、可版本化和加载器适用条件，并以图查询与节点边容器形成种差。
-        en: The object satisfies resource addressability, versioning, and loader applicability and adds graph query and node-and-edge containment as its differentia.
-        ja: resource addressability・versioning・loader 条件を満たし graph query・node/edge containment を differentia とします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-graph-store-006
-    - id: GraphStore-is_a-IngestibleResource-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 是一种边界例
-        en: "Boundary case: is a"
-        ja: の一種である境界例
-      scenario_id: null
-      descriptions:
-        zh: node:policy:17 只有一个图成员身份，依赖 graph-policy@7 的查询和快照上下文，不能被图加载器当作完整图源遍历。
-        en: node:policy:17 has only one graph-member identity and depends on graph-policy@7 for query and snapshot context; a graph loader cannot traverse it as the complete source.
-        ja: node:policy:17 は一 member identity だけで graph query・snapshot context を依存し complete source として traverse できません。
-      field_values: {}
-      related_node_ids:
-        - GraphStore
-        - IngestibleResource
-      related_relation_ids:
-        - GraphStore-is_a-IngestibleResource
-      expected_result:
-        zh: 不要通过该子类边把单个 GraphNode 归为 GraphStore。
-        en: Do not use this subtype edge to classify one GraphNode as GraphStore.
-        ja: この subtype edge で一 GraphNode を GraphStore に分類しません。
-      why_valid_or_invalid:
-        zh: 成员节点没有独立图端点、快照与成员管理责任，因此不满足图存储资源的完整种差。
-        en: A member node has no independent graph endpoint, snapshot, or membership-management responsibility and therefore fails the GraphStore differentia.
-        ja: member node は independent graph endpoint、snapshot、membership management を持たず GraphStore differentia を満たしません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-graph-store-006
+  examples: []
   source_claims:
-    - claim-graph-store-006
-  distinct_fact_rationale: null
+    - claim-graph-store-specialization
+  distinct_fact_rationale: This hierarchy records source specialization while node and relationship membership and query activity remain separate facts.
   layout_role: primary-backbone
-  review_status: accepted
-  endpoint_order: child-to-parent
 relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-ingestion-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 Anthropic Contextual Retrieval、LangChain text splitters/document loaders、LlamaIndex node parsers/ingestion pipeline、Unstructured 解析模式与 ETL 去重策略逐项人工语义核验通过。
-    en: Manually verified against Anthropic Contextual Retrieval, LangChain text splitters and document loaders, LlamaIndex node parsers and ingestion pipeline, Unstructured parsing patterns, and ETL deduplication strategies.
-    ja: Anthropic Contextual Retrieval、LangChain text splitters/document loaders、LlamaIndex node parsers/ingestion pipeline、Unstructured 解析パターン、ETL 重複排除戦略に照らし手動意味審査を完了しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: neo4j-node-relationship-patterns
+    title: Neo4j node and relationship patterns
+    url: https://neo4j.com/docs/cypher-manual/current/patterns/reference/node-and-relationship-patterns/
+    type: official-doc
+    source_type: official-doc
+    relevance: Documents node and relationship patterns and directed relationships in a property graph.
+  - id: neo4j-cypher-queries
+    title: Neo4j Cypher queries
+    url: https://neo4j.com/docs/cypher-manual/current/queries/
+    type: official-doc
+    source_type: official-doc
+    relevance: Documents core Cypher query concepts for graph nodes relationships and paths.
+  - id: rfc-6920
+    title: RFC 6920 Named Information
+    url: https://datatracker.ietf.org/doc/rfc6920/
+    type: standard
+    source_type: standard
+    relevance: Defines hash-based named-information identifiers for resource representations.
+  - id: w3c-prov-o
+    title: W3C PROV-O
+    url: https://www.w3.org/TR/prov-o/
+    type: standard
+    source_type: standard
+    relevance: Defines separate entities activities usage and generation for provenance tracking.
 source_claims:
-  - id: claim-graph-store-001
-    source: eng-graph-neo4j-node-embeddings
-    supports: Neo4j GDS 2026.06 documents named graph management and graph nodes/relationships as distinct from derived embeddings.
-    locator: Graph Data Science 2026.06 > Node embeddings > algorithms, downstream use, structural search, and generalization
-    evidence_kind: design-inference
+  - id: claim-graph-store-model
+    source: neo4j-node-relationship-patterns
+    supports: >-
+      Neo4j documents node patterns and relationship patterns including directed relationships. Moonweave models a
+      property-graph source as a container whose versioned manifest lists nodes relationships types and endpoints.
+    locator: Neo4j node patterns and relationship patterns
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-graph-store-002
-    source: eng-graph-neo4j-node-embeddings
-    supports: GraphStore.resource_id records the source graph identity; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: Graph Data Science 2026.06 > Node embeddings > algorithms, downstream use, structural search, and generalization
-    evidence_kind: design-inference
+  - id: claim-graph-store-query
+    source: neo4j-cypher-queries
+    supports: >-
+      Neo4j documents Cypher query concepts for nodes relationships and paths. Moonweave uses a credential-free graph
+      endpoint locator to identify the graph source while recording query text and returned content on a separate run.
+    locator: Neo4j Cypher queries core concepts
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-graph-store-003
-    source: eng-graph-neo4j-node-embeddings
-    supports: GraphStore.graph_version_digest records exact graph source version; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: Graph Data Science 2026.06 > Node embeddings > algorithms, downstream use, structural search, and generalization
-    evidence_kind: design-inference
+  - id: claim-graph-store-digest
+    source: rfc-6920
+    supports: >-
+      RFC 6920 defines named-information identifiers using a hash algorithm and digest value and separates naming from
+      dereferencing. Moonweave uses a content digest to verify the manifest for one graph snapshot behind a separately
+      recorded endpoint and version.
+    locator: RFC 6920 sections 1 and 3 on named information identifiers and ni URI syntax
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-graph-store-004
-    source: eng-graph-neo4j-node-embeddings
-    supports: Neo4j GDS distinguishes a named graph from its nodes, relationships, and derived embeddings.
-    locator: Graph Data Science 2026.06 > Node embeddings > algorithms, downstream use, structural search, and generalization
-    evidence_kind: design-inference
+  - id: claim-graph-store-version
+    source: rfc-6920
+    supports: >-
+      RFC 6920 distinguishes a hash-based name from a locator. Moonweave records source-system version_ref separately from
+      the digest so a graph snapshot is not conflated with the integrity value that verifies its manifest.
+    locator: RFC 6920 sections 1 and 3 on names locators and digest values
+    evidence_kind: ontology-design-inference
+    confidence: medium
+  - id: claim-graph-store-identity
+    source: w3c-prov-o
+    supports: >-
+      PROV-O distinguishes independently identifiable entities from activities that use or generate them. Moonweave uses
+      resource ID endpoint model version and manifest digest to identify a graph source separately from graph members and queries.
+    locator: PROV-O Entity Activity usage and generation
+    evidence_kind: ontology-design-inference
+    confidence: medium
+  - id: claim-graph-store-boundary
+    source: w3c-prov-o
+    supports: >-
+      PROV-O distinguishes source entities from operational activities and generated entities. Moonweave keeps graph source,
+      node, relationship, query run, credential, graph embedding, and generated Document identities separate.
+    locator: PROV-O Entity Activity prov used and prov wasGeneratedBy
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-graph-store-005
-    source: eng-graph-neo4j-node-embeddings
-    supports: Neo4j distinguishes named graphs from the nodes projected into them.
-    locator: Graph Data Science 2026.06 > Node embeddings > algorithms, downstream use, structural search, and generalization
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-graph-store-006
-    source: eng-graph-neo4j-node-embeddings
-    supports: Neo4j GDS distinguishes named graph identity from contained nodes and relationships.
-    locator: Graph Data Science 2026.06 > Node embeddings > algorithms, downstream use, structural search, and generalization
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
+  - id: claim-graph-store-specialization
+    source: w3c-prov-o
+    supports: >-
+      Modeling a versioned queryable property graph as a GraphStore specialization of IngestibleResource is a Moonweave
+      taxonomy inference grounded in PROV-O's distinction between enduring source entities and operational activities.
+    locator: PROV-O Entity and Activity
+    evidence_kind: ontology-design-inference
+    confidence: medium

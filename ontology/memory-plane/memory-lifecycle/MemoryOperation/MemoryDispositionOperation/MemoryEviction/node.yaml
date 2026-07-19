@@ -5,288 +5,694 @@ status: accepted
 labels:
   zh: 记忆驱逐
   en: Memory eviction
-  ja: 記憶追出し
+  ja: 記憶追い出し
 semantics:
   short_definition:
-    zh: 因容量或性能策略把记录从活动缓存或检索层移除的处置操作。
-    en: A disposition operation removing a record from an active cache or retrieval tier because of capacity or performance policy.
-    ja: capacity/performance policyによりrecordをactive cache/retrieval tierから除去するdisposition operationです。
+    zh: 因明确容量或性能策略，移除既有记忆记录在指定活动层中驻留副本的处置操作，同时不将该效果误称为记录删除。
+    en: A disposition operation that removes an existing memory record's resident copy from a named active tier under an explicit capacity or performance policy without mislabeling that effect as record deletion.
+    ja: 明示的な容量または性能ポリシーに従い、既存記憶レコードの指定アクティブ層常駐コピーを除去する処分操作であり、その効果をレコード削除と誤称しません。
   definition:
-    zh: MemoryEviction 由 maxmemory、容量水位、LRU/LFU 等策略触发，改变活动层驻留状态；持久来源可能仍存在，因此驱逐不自动产生 MemoryTombstone，也不等同删除。
-    en: MemoryEviction is triggered by maxmemory, capacity thresholds, LRU, LFU, or similar policies and changes active-tier residency. A durable source may remain, so eviction does not automatically produce MemoryTombstone and is not deletion.
-    ja: MemoryEviction はmaxmemory・capacity threshold・LRU/LFU等でtriggerされactive-tier residencyを変えます。durable sourceが残り得るため自動でMemoryTombstoneを生成せずdeleteではありません。
+    zh: MemoryEviction 是一种已执行的 MemoryDispositionOperation：当命名的活动缓存、检索或热数据层达到受控容量或性能阈值时，它按已记录策略选择既有 MemoryRecord，移除该层副本并记录层、策略、触发测量、发生时间和证据。在本概念中，目标记录的耐久来源仍可用或可重新加载，记录本身未失效，也不生成删除墓碑；若全局有效性被终止，则是 MemoryDelete；若仅降低排序强度，则是 MemoryDecay；若只标记保留期限，则是 MemoryExpiration。
+    en: "MemoryEviction is an executed MemoryDispositionOperation: when a named active cache, retrieval, or hot-data tier reaches a controlled capacity or performance threshold, it selects an existing MemoryRecord under a recorded policy, removes that tier's copy, and records tier, policy, triggering measurement, occurrence time, and evidence. In this concept, the target record's durable source remains usable or reloadable, the record itself is not invalidated, and no deletion tombstone is produced; global validity termination is MemoryDelete, a ranking-strength decrease only is MemoryDecay, and retention-deadline marking only is MemoryExpiration."
+    ja: MemoryEviction は実行済みの MemoryDispositionOperation です。名前付きのアクティブキャッシュ、検索、またはホットデータ層が管理された容量または性能しきい値に達したとき、記録済みポリシーにより既存 MemoryRecord を選び、その層のコピーを除去し、層、ポリシー、トリガー測定、発生時刻、証跡を記録します。この概念では対象レコードの耐久ソースは使用可能または再読込み可能なままで、レコード自体は失効せず、削除墓標も生成しません。全体有効性の終了は MemoryDelete、順位強度のみの低下は MemoryDecay、保持期限の印付けだけは MemoryExpiration です。
   why_needed:
-    zh: 严格落实缓存驱逐与持久删除的不同效果。
-    en: Makes cache eviction and durable deletion strictly distinct by effect.
-    ja: cache evictionとdurable deleteをeffectで厳密に区別します。
+    zh: 容量管理通常只改变活动层驻留，而删除改变记录可用性；将两者混淆会导致错误的合规、恢复和事故结论。
+    en: Capacity management usually changes active-tier residency while deletion changes record validity; conflating them produces incorrect compliance, recovery, and incident conclusions.
+    ja: 容量管理は通常アクティブ層常駐だけを変更し、削除はレコード有効性を変更します。両者を混同すると、コンプライアンス、回復、障害に関する誤った結論を招きます。
   includes:
-    - zh: 纳入 LRU、LFU、随机和容量阈值触发的活动层移除。
-      en: Includes active-tier removal under LRU, LFU, random, or capacity-threshold policies.
-      ja: LRU・LFU・random・capacity-threshold policyによるactive-tier removalを含みます。
+    - zh: 因 maxmemory、容量预算、LRU、LFU、LRM、随机选择或明确性能策略，实际移除可重新加载记录的活动缓存、检索索引或热层副本。
+      en: Actual removal of a reloadable record's active-cache, retrieval-index, or hot-tier copy under maxmemory, capacity budget, LRU, LFU, LRM, random selection, or an explicit performance policy.
+      ja: maxmemory、容量予算、LRU、LFU、LRM、ランダム選択、または明示的性能ポリシーにより、再読込み可能なレコードのアクティブキャッシュ、検索インデックス、ホット層コピーを実際に除去することを含みます。
   excludes:
-    - zh: 排除法律删除、TTL 资格变化和仅降低召回权重。
-      en: Excludes legal deletion, TTL eligibility change, and merely lowering recall weight.
-      ja: legal delete・TTL eligibility change・recall weight低下のみを除外します。
+    - zh: 用户或法律授权下使记录失效、仅改变检索强度、仅标记到期资格、拒绝写入而没有移除任何既有副本、达到阈值但 noeviction 策略仅返回错误，以及尚未执行的驱逐计划。
+      en: Invalidating a record under user or legal authority, changing retrieval strength only, marking expiry eligibility only, rejecting a write without removing any existing copy, reaching a limit under noeviction and returning only an error, and an unexecuted eviction plan.
+      ja: 利用者または法的許可によるレコード失効、検索強度だけの変更、期限切れ適格性の印付けだけ、既存コピーを除去せず書込みを拒否すること、noeviction で上限に達してエラーだけを返すこと、未実行の追い出し計画を除外します。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: 将驱逐实现为层级明确的状态转换：采集触发容量或性能测量，记录选择策略和候选，移除指定活动层副本，并验证耐久来源仍有效或可重载。不得只凭缓存未命中、低分数或“空间不足”日志推断已发生驱逐。
+    en: "Implement eviction as a tier-scoped state transition: capture the triggering capacity or performance measurement, record selection policy and candidate, remove the named active-tier copy, and verify a durable source remains valid or reloadable. Do not infer eviction merely from a cache miss, a low score, or a \"space low\" log."
+    ja: 追い出しは層を限定した状態遷移として実装します。トリガーとなる容量または性能測定を取得し、選択ポリシーと候補を記録し、名前付きアクティブ層コピーを除去し、耐久ソースが有効または再読込み可能であることを検証します。キャッシュミス、低スコア、「空き容量不足」ログだけから追い出しを推論してはいけません。
+  typical_input:
+    - description: An existing target repeated in the disposition collection, a named tier, capacity measurement, eviction policy, durable-source reference, executor identity, and actual execution start.
+      format: "{operation_id, operation_kind:'disposition', target_record_ref, target_record_refs:[target_record_ref], disposition_kind:'eviction', disposition_basis:'capacity_pressure', active_tier_ref, trigger_measurement, eviction_policy, durable_source_ref, actor_ref, started_at}"
+  typical_output:
+    - description: A completed active-tier removal with retained durable availability, aligned disposition effect and evidence, actual eviction time, result, and audit event.
+      format: "{operation_id, status:'succeeded', disposition_effect:'active_tier_removed', active_tier_ref, active_tier_residency_after:false, durable_source_state:'reloadable', eviction_evidence_digest, disposition_evidence_digest:eviction_evidence_digest, evicted_at, disposed_at:evicted_at, result_ref?, audit_event_ref?}"
+  reference_implementations:
+    - name: Redis key eviction
+      url: https://redis.io/docs/latest/develop/reference/eviction/
+      description: Documents maxmemory-based key eviction policies including LRU, LFU, LRM, random, and TTL-related policies.
+    - name: W3C PROV-O
+      url: https://www.w3.org/TR/prov-o/
+      description: Distinguishes executed activities, entities, agents, time, and provenance facts.
+    - name: FIPS 180-4 Secure Hash Standard
+      url: https://csrc.nist.gov/pubs/fips/180/4/final
+      description: Specifies SHA-256 digests that can bind eviction evidence snapshots.
+  source_claims:
+    - claim-memory-eviction-activity
+    - claim-memory-eviction-policy
+    - claim-memory-eviction-boundary
 structure:
   identity_keys:
-    - eviction_operation_id
+    - operation_id
   fields:
-    - id: eviction_operation_id
+    - id: operation_id
       labels:
-        zh: 驱逐操作标识
-        en: eviction operation ID
-        ja: eviction operation ID
+        zh: 操作标识
+        en: operation ID
+        ja: 操作 ID
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
       definitions:
-        zh: 标识一次活动层驻留移除。
-        en: Identifies one active-tier residency removal.
-        ja: 一active-tier residency removalを識別します。
+        zh: 复用父类 MemoryOperation 的稳定标识，以关联一次驱逐的目标、层、策略、测量、证据、结果和审计事实。
+        en: Reuses the stable MemoryOperation identity to join one eviction's target, tier, policy, measurement, evidence, result, and audit facts.
+        ja: 親 MemoryOperation の安定識別子を再利用し、一つの追い出しの対象、層、ポリシー、測定、証跡、結果、監査事実を結びます。
+      allowed_values: []
+      pattern: '^mem-op-[a-z0-9][a-z0-9-]*$'
+      example_value: mem-op-evict-2701
+      source_claims:
+        - claim-memory-eviction-identity
+    - id: operation_kind
+      labels:
+        zh: 操作类别
+        en: operation kind
+        ja: 操作種別
+      datatype: string
+      required: true
+      cardinality: { min: 1, max: 1 }
+      definitions:
+        zh: 继承父类执行包络并固定为 disposition，说明该事实是已执行的生命周期处置而非缓存策略配置或容量告警。
+        en: Retains the parent execution envelope and is fixed to disposition, so this fact is an executed lifecycle disposition rather than cache-policy configuration or a capacity alert.
+        ja: 親の実行包絡を継承して disposition に固定する。これはキャッシュ方針設定や容量アラートではなく、実行済みのライフサイクル処置である。
+      allowed_values: [disposition]
+      pattern: null
+      example_value: disposition
+      source_claims: [claim-memory-eviction-activity]
+    - id: status
+      labels:
+        zh: 运行状态
+        en: runtime status
+        ja: 実行状態
+      datatype: string
+      required: true
+      cardinality: { min: 1, max: 1 }
+      definitions:
+        zh: 继承的工作单元状态，区分已经移除活动层副本的执行与仅检测到容量压力的未执行计划。
+        en: The inherited work-unit state, distinguishing an execution that removed an active-tier copy from a plan that merely observed capacity pressure.
+        ja: 作業単位の状態を継承する。アクティブ層の複製を除去した実行と、容量圧力を観測しただけの未実行計画を区別する。
+      allowed_values: [running, succeeded, failed, partially_succeeded, rejected, cancelled]
+      pattern: null
+      example_value: succeeded
+      source_claims: [claim-memory-eviction-activity]
+    - id: started_at
+      labels:
+        zh: 开始时间
+        en: started at
+        ja: 開始時刻
+      datatype: date-time
+      required: true
+      cardinality: { min: 1, max: 1 }
+      definitions:
+        zh: 继承的驱逐执行开始时间，不得用 maxmemory 配置时间、阈值预测时间或缓存未命中时间替代。
+        en: The inherited eviction-execution start time; maxmemory configuration, threshold prediction, and cache-miss time cannot substitute for it.
+        ja: 追い出し実行の開始時刻を継承する。maxmemory の設定時刻、閾値予測時刻、キャッシュミス時刻で代用してはならない。
       allowed_values: []
       pattern: null
-      example_value: evict-1405
+      example_value: "2026-07-18T22:30:00Z"
+      source_claims: [claim-memory-eviction-activity]
+    - id: actor_ref
+      labels:
+        zh: 执行主体引用
+        en: executor reference
+        ja: 実行主体参照
+      datatype: string
+      required: true
+      cardinality: { min: 1, max: 1 }
+      definitions:
+        zh: 继承的实际执行者；缓存所有者、监控告警发出者或策略作者不是执行证据。
+        en: The inherited actual executor; a cache owner, monitoring-alert sender, or policy author is not execution evidence.
+        ja: 実際の実行者を継承する。キャッシュ所有者、監視アラート送信者、方針作成者は実行証拠ではない。
+      allowed_values: []
+      pattern: "^[A-Za-z0-9][A-Za-z0-9._:@/-]*$"
+      example_value: retrieval-tier-manager-1
+      source_claims: [claim-memory-eviction-activity]
+    - id: target_record_refs
+      labels:
+        zh: 目标记录引用集合
+        en: target record references
+        ja: 対象レコード参照集合
+      datatype: string
+      required: true
+      cardinality: { min: 1, max: null }
+      definitions:
+        zh: 继承的处置目标集合；本节点单条驱逐将 target_record_ref 作为其中唯一被移除活动层副本的既有记录，不能以未命中键或候选评分替代。
+        en: The inherited disposition-target collection. This single eviction puts target_record_ref in it as the only existing record whose active-tier copy was removed; a missed key or candidate score cannot substitute.
+        ja: 処置対象集合を継承する。この単一追い出しでは target_record_ref を、アクティブ層複製が除去された唯一の既存レコードとして含める。ミスしたキーや候補スコアで代用してはならない。
+      allowed_values: []
+      pattern: "^record-[A-Za-z0-9._-]+$"
+      example_value: [record-2701-v2]
+      source_claims: [claim-memory-eviction-target]
+    - id: disposition_kind
+      labels:
+        zh: 处置种类
+        en: disposition kind
+        ja: 処置種別
+      datatype: string
+      required: true
+      cardinality: { min: 1, max: 1 }
+      definitions:
+        zh: 将继承的处置种类收窄为 eviction，明确效果是层级驻留终止而不是记录失效。
+        en: Narrows the inherited disposition kind to eviction, making the effect tier-residency termination rather than record invalidation.
+        ja: 継承した処置種別を eviction に限定し、効果がレコード無効化ではなく層内常駐の終了であることを明示する。
+      allowed_values: [eviction]
+      pattern: null
+      example_value: eviction
+      source_claims: [claim-memory-eviction-boundary]
+    - id: disposition_basis
+      labels:
+        zh: 处置依据类别
+        en: disposition basis
+        ja: 処置根拠種別
+      datatype: string
+      required: true
+      cardinality: { min: 1, max: 1 }
+      definitions:
+        zh: 固定为 capacity_pressure；它由可审计 trigger_measurement 和 eviction_policy 支持，不能由事后“低价值”标签臆断。
+        en: Fixed to capacity_pressure and supported by auditable trigger_measurement and eviction_policy; it cannot be inferred from a retrospective “low value” label.
+        ja: capacity_pressure に固定する。監査可能な trigger_measurement と eviction_policy で裏付け、事後的な「低価値」ラベルから推定してはならない。
+      allowed_values: [capacity_pressure]
+      pattern: null
+      example_value: capacity_pressure
+      source_claims: [claim-memory-eviction-policy]
+    - id: disposition_effect
+      labels:
+        zh: 处置效果
+        en: disposition effect
+        ja: 処置効果
+      datatype: string
+      required: true
+      cardinality: { min: 1, max: 1 }
+      definitions:
+        zh: 固定为 active_tier_removed；它表示命名层副本被移除，同时 durable_source_ref 仍可使用或重载。
+        en: Fixed to active_tier_removed, meaning the named-tier copy was removed while durable_source_ref remains usable or reloadable.
+        ja: active_tier_removed に固定する。名前付き層の複製を除去し、durable_source_ref は引き続き利用または再読み込み可能である。
+      allowed_values: [active_tier_removed]
+      pattern: null
+      example_value: active_tier_removed
+      source_claims: [claim-memory-eviction-effect]
+    - id: disposition_evidence_digest
+      labels:
+        zh: 处置证据摘要
+        en: disposition evidence digest
+        ja: 処置証拠ダイジェスト
+      datatype: string
+      required: true
+      cardinality: { min: 1, max: 1 }
+      definitions:
+        zh: 继承的处置证据摘要；此处必须与 eviction_evidence_digest 相同，绑定层、阈值测量、选择策略、耐久来源和实际移除结果。
+        en: The inherited disposition-evidence digest. Here it must equal eviction_evidence_digest and bind tier, threshold measurement, selection policy, durable source, and actual removal outcome.
+        ja: 処置証拠ダイジェストを継承する。ここでは eviction_evidence_digest と同一でなければならず、層、閾値測定、選択方針、永続ソース、実際の除去結果を結び付ける。
+      allowed_values: []
+      pattern: "^sha256:[a-f0-9]{64}$"
+      example_value: sha256:35f8b2fbd6f7b3ce0b1f6f8e8d4ad7a3b1e74391ec3d75f97fbbf1c4e1d027ca
+      source_claims: [claim-memory-eviction-evidence]
+    - id: disposed_at
+      labels:
+        zh: 处置生效时间
+        en: disposed at
+        ja: 処置発生時刻
+      datatype: date-time
+      required: true
+      cardinality: { min: 1, max: 1 }
+      definitions:
+        zh: 继承的处置生效时间；驱逐中必须等于 evicted_at，表示该副本实际离开命名层的时刻。
+        en: The inherited disposition-effective time. For eviction it must equal evicted_at, the time the copy actually left the named tier.
+        ja: 処置の有効時刻を継承する。追い出しでは evicted_at と一致し、複製が名前付き層から実際に離れた時刻を示す。
+      allowed_values: []
+      pattern: null
+      example_value: "2026-07-18T22:30:00.064Z"
+      source_claims: [claim-memory-eviction-activity]
+    - id: target_record_ref
+      labels:
+        zh: 目标记录引用
+        en: target record reference
+        ja: 対象レコード参照
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 引用活动层副本实际被移除的既有 MemoryRecord；相同命名空间、相似向量、相同主体或共享追踪不能替代精确目标身份。
+        en: References the existing MemoryRecord whose active-tier copy is actually removed; the same namespace, similar vector, same actor, or shared trace cannot substitute for exact target identity.
+        ja: アクティブ層コピーが実際に除去される既存 MemoryRecord を参照します。同じ名前空間、類似ベクトル、同じ主体、共有トレースでは正確な対象識別を代替できません。
+      allowed_values: []
+      pattern: '^record-[A-Za-z0-9._-]+$'
+      example_value: record-2701-v2
       source_claims:
-        - claim-memory-eviction-002
+        - claim-memory-eviction-target
+    - id: active_tier_ref
+      labels:
+        zh: 活动层引用
+        en: active tier reference
+        ja: アクティブ層参照
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 标识被移除副本所在的命名缓存、检索索引或热数据层，使活动层未命中不会被误读成所有存储层缺失。
+        en: Identifies the named cache, retrieval index, or hot-data tier from which the copy is removed so an active-tier miss is not misread as absence from every storage tier.
+        ja: コピーが除去される名前付きキャッシュ、検索インデックス、またはホットデータ層を識別し、アクティブ層ミスをすべての保存層からの不在と誤読しないようにします。
+      allowed_values: []
+      pattern: '^tier-[A-Za-z0-9._-]+$'
+      example_value: tier-retrieval-cache-east
+      source_claims:
+        - claim-memory-eviction-effect
     - id: eviction_policy
       labels:
         zh: 驱逐策略
         en: eviction policy
-        ja: 追出しpolicy
+        ja: 追い出しポリシー
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
       definitions:
-        zh: 记录触发驱逐的容量选择策略。
-        en: Records the capacity-selection policy that triggered eviction.
-        ja: evictionをtriggerしたcapacity-selection policyを記録します。
+        zh: 记录从该层选择移除目标的明确策略，而不是将某个记录事后称为“低价值”。
+        en: Records the explicit policy that selected a target for removal from this tier rather than retroactively calling a record "low value".
+        ja: レコードを後から「低価値」と呼ぶのではなく、この層からの除去対象を選択した明示的ポリシーを記録します。
+      allowed_values:
+        - lru
+        - lfu
+        - lrm
+        - random
+        - ttl_priority
+        - explicit_capacity_priority
+      pattern: null
+      example_value: lfu
+      source_claims:
+        - claim-memory-eviction-policy
+    - id: trigger_measurement
+      labels:
+        zh: 触发测量
+        en: trigger measurement
+        ja: トリガー測定
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 记录实际超过或达到受控阈值的可审计容量或性能测量，而不是含糊的“空间不足”描述。
+        en: Records an auditable capacity or performance measurement that actually reached or exceeded a controlled threshold rather than a vague "space low" description.
+        ja: 曖昧な「空き容量不足」の説明ではなく、管理されたしきい値に実際に達したまたは超えた監査可能な容量または性能測定を記録します。
+      allowed_values: []
+      pattern: '^[A-Za-z0-9][A-Za-z0-9._:@/=-]*$'
+      example_value: used_memory_bytes=104857600>maxmemory_bytes=104857599
+      source_claims:
+        - claim-memory-eviction-policy
+    - id: durable_source_ref
+      labels:
+        zh: 耐久来源引用
+        en: durable source reference
+        ja: 耐久ソース参照
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 指向仍保存或可重新加载该记录的耐久来源，使这次活动被限定为活动层驻留变化而非全局删除。
+        en: Points to a durable source that still stores or can reload the record, constraining this activity to active-tier residency change rather than global deletion.
+        ja: レコードを依然として保存または再読込みできる耐久ソースを指し、この活動を全体削除ではなくアクティブ層常駐変更に限定します。
+      allowed_values: []
+      pattern: '^[A-Za-z0-9][A-Za-z0-9._:@/-]*$'
+      example_value: store-durable-east/records/record-2701-v2
+      source_claims:
+        - claim-memory-eviction-boundary
+    - id: eviction_evidence_digest
+      labels:
+        zh: 驱逐证据摘要
+        en: eviction evidence digest
+        ja: 追い出し証跡ダイジェスト
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 固定目标版本、层、触发测量、策略选择、耐久来源状态和执行输出摘要，以便审计确实发生的活动层移除。
+        en: Fixes a digest of target version, tier, triggering measurement, policy selection, durable-source state, and execution output to audit an actual active-tier removal.
+        ja: 対象バージョン、層、トリガー測定、ポリシー選択、耐久ソース状態、実行出力のダイジェストを固定し、実際のアクティブ層除去を監査できるようにします。
+      allowed_values: []
+      pattern: '^sha256:[a-f0-9]{64}$'
+      example_value: sha256:35f8b2fbd6f7b3ce0b1f6f8e8d4ad7a3b1e74391ec3d75f97fbbf1c4e1d027ca
+      source_claims:
+        - claim-memory-eviction-evidence
+    - id: evicted_at
+      labels:
+        zh: 驱逐发生时间
+        en: evicted at
+        ja: 追い出し発生時刻
+      datatype: date-time
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 记录该层副本实际不再驻留的事件时间，而不是阈值配置、预估或日志摄取时间。
+        en: Records the event time at which the copy actually ceased to reside in the tier, not threshold configuration, prediction, or log-ingestion time.
+        ja: コピーが実際に層に常駐しなくなったイベント時刻を記録します。しきい値設定、予測、ログ取込み時刻ではありません。
       allowed_values: []
       pattern: null
-      example_value: allkeys-lfu
+      example_value: "2026-07-18T22:30:00.064Z"
       source_claims:
-        - claim-memory-eviction-003
-  constraints: []
+        - claim-memory-eviction-activity
+  constraints:
+    - id: MemoryEviction-parent-disposition-contract
+      expression: "operation_kind = disposition, disposition_kind = eviction, disposition_basis = capacity_pressure, disposition_effect = active_tier_removed, target_record_refs contains exactly target_record_ref, disposition_evidence_digest = eviction_evidence_digest, and disposed_at = evicted_at."
+      explanation:
+        zh: 驱逐保留父类的活动、目标、依据、效果、证据和发生时间合同，但用活动层副本移除来具体化这些事实；它不能借父类名称掩盖删除或到期的不同效果。
+        en: Eviction retains the parent contract for activity, target, basis, effect, evidence, and occurrence time, but specializes those facts to active-tier copy removal; the parent name cannot conceal deletion or expiry effects.
+        ja: 追い出しは親の活動、対象、根拠、効果、証拠、発生時刻の契約を保持し、アクティブ層複製の除去として具体化する。親の名称で削除や期限切れの異なる効果を隠してはならない。
+      source_claims:
+        - claim-memory-eviction-activity
+        - claim-memory-eviction-policy
+        - claim-memory-eviction-effect
+        - claim-memory-eviction-evidence
+    - id: MemoryEviction-capacity-policy-and-measurement
+      expression: "trigger_measurement demonstrates that active_tier_ref reached or exceeded its controlled capacity or performance threshold, and eviction_policy identifies the selection method applied to target_record_ref."
+      explanation:
+        zh: 容量或性能压力与选择策略必须都有可审计记录，否则不能区分实际驱逐、普通缓存未命中和随意删除。
+        en: Both capacity or performance pressure and selection policy need auditable records; otherwise actual eviction cannot be distinguished from an ordinary cache miss or arbitrary deletion.
+        ja: 容量または性能圧力と選択ポリシーの両方に監査可能な記録が必要です。なければ実際の追い出しを通常のキャッシュミスや恣意的削除から区別できません。
+      source_claims:
+        - claim-memory-eviction-policy
+    - id: MemoryEviction-tier-residency-and-durable-boundary
+      expression: "The target's copy was resident in active_tier_ref before evicted_at and is absent from that tier after evicted_at, while durable_source_ref remains usable or reloadable and the target record remains valid."
+      explanation:
+        zh: 驱逐的效果范围是指定活动层；耐久来源和记录有效性保留这一条件防止将驱逐误写为删除。
+        en: Eviction's effect scope is the named active tier; retaining durable source and record validity prevents eviction from being mislabeled as deletion.
+        ja: 追い出しの効果範囲は名前付きアクティブ層です。耐久ソースとレコード有効性を保持する条件により、追い出しを削除と誤称することを防ぎます。
+      source_claims:
+        - claim-memory-eviction-effect
+        - claim-memory-eviction-boundary
+    - id: MemoryEviction-evidence-and-time-consistency
+      expression: "evicted_at is on or after started_at, a terminal parent operation has ended_at on or after evicted_at, and eviction_evidence_digest covers target, tier, measurement, policy, durable source, and output."
+      explanation:
+        zh: 驱逐必须是已经发生且可验证的层驻留变化，不能被计划、阈值设置或事后解释替代。
+        en: Eviction must be an occurred and verifiable tier-residency change and cannot be substituted by a plan, threshold setting, or retrospective explanation.
+        ja: 追い出しはすでに起きて検証可能な層常駐変更でなければならず、計画、しきい値設定、事後説明では代替できません。
+      source_claims:
+        - claim-memory-eviction-activity
+        - claim-memory-eviction-evidence
+    - id: MemoryEviction-nondelete-nondecay-boundary
+      expression: "Eviction does not create a deletion tombstone, invalidate the record, or merely reduce retrieval strength; those effects belong to MemoryDelete or MemoryDecay and must be recorded as separate operations."
+      explanation:
+        zh: 同一工作流可包含驱逐、删除或衰减，但各自具有不同的目标效果和审计责任，不能由一个名称覆盖。
+        en: One workflow can contain eviction, deletion, or decay, but each has a different target effect and audit responsibility and cannot be covered by one name.
+        ja: 一つのワークフローには追い出し、削除、減衰を含められますが、それぞれ対象効果と監査責任が異なり、一つの名称で覆えません。
+      source_claims:
+        - claim-memory-eviction-boundary
   required_relation_constraints: []
 examples:
-  - id: MemoryEviction-example-positive-manual-001
-    kind: positive
+  - id: MemoryEviction-example-positive-lfu-cache
+
     labels:
-      zh: 记忆驱逐正例
-      en: "Positive case: Memory eviction"
-      ja: 記憶追出し正例
-    scenario_id: null
+      zh: LFU 缓存层驱逐
+      en: LFU cache-tier eviction
+      ja: LFU キャッシュ層追い出し
+
     descriptions:
-      zh: memory-op-eviction-001 在 active cache 达到 maxmemory 后按 allkeys-lfu 移出 record-1405，但其耐久副本和有效身份保持不变。
-      en: memory-op-eviction-001 removes record-1405 from the active cache under allkeys-lfu after maxmemory is reached while its durable copy and valid identity remain intact.
-      ja: memory-op-eviction-001 は maxmemory 到達後 allkeys-lfu で record-1405 を active cache から外しますが、永続コピーと有効同一性は保持します。
+      zh: Generative Agents Memory Stream + Reflection；MemGPT core_memory_append/archival_memory_insert；Redis SET EX TTL + FT.SEARCH vector eviction。
+      en: Generative Agents Memory Stream + Reflection; MemGPT core_memory_append/archival_memory_insert; Redis SET EX TTL + FT.SEARCH vector eviction.
+      ja: Generative Agents Memory Stream + Reflection。MemGPT core_memory_append/archival_memory_insert。Redis SET EX TTL + vector eviction。
     field_values:
-      eviction_operation_id: memory-op-eviction-001
-      eviction_policy: allkeys-lfu
-      operation_id: memory-op-eviction-001
-      reason: the active store exceeds its capacity budget
-      disposition_operation_id: memory-op-eviction-001
-      target_record_id: record-1405
-      started_at: 2026-07-16T14:03:00Z
-    related_node_ids:
-      - MemoryEviction
-      - MemoryDispositionOperation
-    related_relation_ids:
-      - MemoryEviction-is_a-MemoryDispositionOperation
-    expected_result:
-      zh: 归类为 MemoryEviction，且不生成删除墓碑。
-      en: Classify as MemoryEviction and do not generate a deletion tombstone.
-      ja: MemoryEvictionに分類しdelete tombstoneを生成しません。
-    why_valid_or_invalid:
-      zh: 触发器是容量策略，效果仅是活动层驻留变化。
-      en: The trigger is capacity policy and the effect is only active-tier residency change.
-      ja: triggerはcapacity policyでeffectはactive-tier residency changeだけです。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-eviction-001
-  - id: MemoryEviction-example-instance-manual-20260716
-    kind: instance
-    labels:
-      zh: 容量策略驱逐实例
-      en: Capacity-policy eviction instance
-      ja: 容量方針による退去インスタンス
-    scenario_id: MemoryEviction:instance:memory-op-eviction-001
-    descriptions:
-      zh: memory-op-eviction-001 在 active cache 达到 maxmemory 后按 allkeys-lfu 移出 record-1405，但其耐久副本和有效身份保持不变。
-      en: memory-op-eviction-001 removes record-1405 from the active cache under allkeys-lfu after maxmemory is reached while its durable copy and valid identity remain intact.
-      ja: memory-op-eviction-001 は maxmemory 到達後 allkeys-lfu で record-1405 を active cache から外しますが、永続コピーと有効同一性は保持します。
-    field_values:
-      eviction_operation_id: memory-op-eviction-001
-      eviction_policy: allkeys-lfu
-      operation_id: memory-op-eviction-001
-      reason: the active store exceeds its capacity budget
+      operation_id: mem-op-evict-2701
+      operation_kind: disposition
+      status: succeeded
+      started_at: "2026-07-18T22:30:00Z"
+      ended_at: "2026-07-18T22:30:00.083Z"
+      actor_ref: retrieval-tier-manager-1
+      target_record_ref: record-2701-v2
+      target_record_refs:
+        - record-2701-v2
+      disposition_kind: eviction
+      disposition_basis: capacity_pressure
+      disposition_effect: active_tier_removed
+      active_tier_ref: tier-retrieval-cache-east
+      eviction_policy: lfu
+      trigger_measurement: used_memory_bytes=104857600>maxmemory_bytes=104857599
+      durable_source_ref: store-durable-east/records/record-2701-v2
+      eviction_evidence_digest: sha256:35f8b2fbd6f7b3ce0b1f6f8e8d4ad7a3b1e74391ec3d75f97fbbf1c4e1d027ca
+      disposition_evidence_digest: sha256:35f8b2fbd6f7b3ce0b1f6f8e8d4ad7a3b1e74391ec3d75f97fbbf1c4e1d027ca
+      evicted_at: "2026-07-18T22:30:00.064Z"
+      disposed_at: "2026-07-18T22:30:00.064Z"
+      active_tier_residency_after: false
+      durable_source_state: reloadable
+      record_validity: valid
     related_node_ids:
       - MemoryEviction
       - MemoryDispositionOperation
       - MemoryRecord
+      - MemoryOperationResult
+      - MemoryAuditEvent
     related_relation_ids:
       - MemoryEviction-is_a-MemoryDispositionOperation
       - MemoryEviction-evicts-MemoryRecord
-    expected_result:
-      zh: 查询显示 active-tier residency 已结束，但没有墓碑且耐久记录仍可从下层存储恢复。
-      en: The query shows that active-tier residency ended, no tombstone exists, and the durable record remains recoverable from lower storage.
-      ja: active tier 滞在は終了したが墓標はなく、永続記録を下位保存から回復できることを示します。
-    why_valid_or_invalid:
-      zh: 触发条件是容量与 LFU 策略，效果只是驻留变化，不是有效性终止。
-      en: Capacity and LFU policy trigger the activity, whose effect is residency change rather than validity termination.
-      ja: 容量と LFU 方針が起動し、効果は滞在変更であって有効性終了ではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+      - MemoryOperation-acts_on-MemoryRecord
+      - MemoryOperation-has_result-MemoryOperationResult
+      - MemoryOperation-has_audit_event-MemoryAuditEvent
+
     source_claims:
-      - claim-memory-eviction-001
-  - id: MemoryEviction-example-boundary-manual-001
-    kind: boundary
+      - claim-memory-eviction-policy
+      - claim-memory-eviction-effect
+      - claim-memory-eviction-boundary
+  - id: MemoryEviction-example-counterexample-delete
+
     labels:
-      zh: 记忆驱逐边界例
-      en: "Boundary case: Memory eviction"
-      ja: 記憶追出し境界例
-    scenario_id: null
+      zh: 授权删除不是驱逐
+      en: Authorized deletion is not eviction
+      ja: 許可済み削除は追い出しではない
+
     descriptions:
-      zh: evict-1406 响应用户遗忘请求永久无效化唯一持久副本。
-      en: evict-1406 permanently invalidates the only durable copy in response to a user forget request.
-      ja: evict-1406 はuser forget requestに応じ唯一durable copyを永久invalidateします。
-    field_values: {}
+      zh: 反例：ephemeral tool output 无 MemoryRetentionPolicy/Redis EX TTL 就永久 MemoryWrite。
+      en: Counterexample: ephemeral tool output MemoryWrite permanently without MemoryRetentionPolicy/Redis EX TTL.
+      ja: 反例：ephemeral tool output が MemoryRetentionPolicy/Redis EX TTL なしで永久 MemoryWrite。
+    field_values:
+      operation_id: mem-op-delete-2701
+      operation_kind: disposition
+      target_record_ref: record-2701-v2
+      deletion_basis: user_erasure_request
+      invalidated_at: "2026-07-18T22:40:00.074Z"
+      tombstone_ref: tombstone-2701
+      durable_source_state: invalidated
+      active_tier_residency_after: false
     related_node_ids:
       - MemoryEviction
-    related_relation_ids: []
-    expected_result:
-      zh: 不得归类为 MemoryEviction；应归 MemoryDelete。
-      en: Do not classify as MemoryEviction; classify as MemoryDelete.
-      ja: MemoryEvictionでなくMemoryDeleteに分類します。
-    why_valid_or_invalid:
-      zh: 触发器和效果都是显式删除，而非容量驻留管理。
-      en: Both trigger and effect are explicit deletion, not capacity residency management.
-      ja: trigger/effectともexplicit deleteでcapacity residency managementではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - MemoryDelete
+      - MemoryRecord
+      - MemoryTombstone
+    related_relation_ids:
+      - MemoryEviction-is_a-MemoryDispositionOperation
+      - MemoryDelete-is_a-MemoryDispositionOperation
+      - MemoryDelete-invalidates-MemoryRecord
+      - MemoryDelete-produces-MemoryTombstone
+
     source_claims:
-      - claim-memory-eviction-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: MemoryExpiration
-    shared_parent_concept_id: MemoryDispositionOperation
-    differentia:
-      zh: 正向身份比较：父节点 MemoryDispositionOperation：MemoryEviction（semantic kind=activity，骨架 MemoryEviction-is_a-MemoryDispositionOperation）；MemoryExpiration（semantic kind=activity，骨架 MemoryExpiration-is_a-MemoryDispositionOperation）。双端条件：MemoryEviction 条件：“因容量或性能策略把记录从活动缓存或检索层移除的处置操作”；MemoryExpiration 条件：“记录达到时间、同意或作用域期限并改变保留资格的处置操作”。仅依据各自定义与骨架逐端验证。
-      en: "Positive identity comparison: parent MemoryDispositionOperation: MemoryEviction (semantic kind=activity, backbone MemoryEviction-is_a-MemoryDispositionOperation); MemoryExpiration (semantic kind=activity, backbone MemoryExpiration-is_a-MemoryDispositionOperation). Endpoint conditions: MemoryEviction condition: “A disposition operation removing a record from an active cache or retrieval tier because of capacity or performance policy”; MemoryExpiration condition: “A disposition operation marking that a record has reached a time, consent, or scope deadline and changing retention eligibility”. Verify each endpoint from its own definition and backbone."
-      ja: 正の同一性比較：親 MemoryDispositionOperation：MemoryEviction（semantic kind=activity、バックボーン MemoryEviction-is_a-MemoryDispositionOperation）；MemoryExpiration（semantic kind=activity、バックボーン MemoryExpiration-is_a-MemoryDispositionOperation）。両端条件：MemoryEviction の条件：「capacity/performance policyによりrecordをactive cache/retrieval tierから除去するdisposition operationです」；MemoryExpiration の条件：「recordがtime・consent・scope deadlineへ達しretention eligibilityを変えるdisposition operationです」。各端を固有の定義とバックボーンで検証します。
+      - claim-memory-eviction-boundary
+  - id: MemoryEviction-example-boundary-noeviction
+
+    labels:
+      zh: noeviction 阈值错误不是驱逐
+      en: noeviction threshold error is not eviction
+      ja: noeviction のしきい値エラーは追い出しではない
+
+    descriptions:
+      zh: MemGPT main_context vs archival vs recall 生命周期阶段；Generative Agents importance 累计 vs MemoryDecay recency 衰减。
+      en: MemGPT main_context vs archival vs recall lifecycle stages; Generative Agents importance accumulation vs MemoryDecay recency decay.
+      ja: MemGPT main/recall/archival lifecycle 段階。Generative Agents importance 累計 vs MemoryDecay recency 減衰。
+    field_values:
+      request_id: write-rejected-2702
+      active_tier_ref: tier-retrieval-cache-east
+      trigger_measurement: used_memory_bytes=104857600>maxmemory_bytes=104857599
+      configured_policy: noeviction
+      operation_id: absent
+      target_record_ref: absent
+      evicted_at: absent
+      existing_copy_removed: false
+    related_node_ids:
+      - MemoryEviction
+      - MemoryRecord
+    related_relation_ids:
+      - MemoryEviction-is_a-MemoryDispositionOperation
+
     source_claims:
-      - claim-memory-eviction-004
-      - claim-memory-eviction-005
+      - claim-memory-eviction-policy
+      - claim-memory-eviction-activity
+  - id: MemoryEviction-example-instance-lru-cache
+
+    labels:
+      zh: LRU 热层驱逐实例
+      en: LRU hot-tier eviction instance
+      ja: LRU ホット層追い出しインスタンス
+
+    descriptions:
+      zh: MemGPT core_memory_replace(key="human", old="Bob", new="Alice")；Generative Agents reflection importance threshold=150 触发。
+      en: MemGPT core_memory_replace(key="human", old="Bob", new="Alice"); Generative Agents reflection importance threshold=150 triggers.
+      ja: MemGPT core_memory_replace。Generative Agents reflection importance threshold=150 トリガー。
+    field_values:
+      operation_id: mem-op-evict-2703
+      operation_kind: disposition
+      status: succeeded
+      started_at: "2026-07-18T22:50:00Z"
+      ended_at: "2026-07-18T22:50:00.078Z"
+      actor_ref: index-tier-manager-1
+      target_record_ref: record-2703-v1
+      target_record_refs:
+        - record-2703-v1
+      disposition_kind: eviction
+      disposition_basis: capacity_pressure
+      disposition_effect: active_tier_removed
+      active_tier_ref: tier-hot-index-west
+      eviction_policy: lru
+      trigger_measurement: used_memory_bytes=52428801>maxmemory_bytes=52428800
+      durable_source_ref: store-durable-west/records/record-2703-v1
+      eviction_evidence_digest: sha256:39e3fbcf3b5b16ddc7ae59e174f4df583b4b856b0345bfde191943bbb49a30cd
+      disposition_evidence_digest: sha256:39e3fbcf3b5b16ddc7ae59e174f4df583b4b856b0345bfde191943bbb49a30cd
+      evicted_at: "2026-07-18T22:50:00.052Z"
+      disposed_at: "2026-07-18T22:50:00.052Z"
+      active_tier_residency_after: false
+      durable_source_state: readable
+      record_validity: valid
+    related_node_ids:
+      - MemoryEviction
+      - MemoryDispositionOperation
+      - MemoryRecord
+      - MemoryOperationResult
+      - MemoryAuditEvent
+    related_relation_ids:
+      - MemoryEviction-is_a-MemoryDispositionOperation
+      - MemoryEviction-evicts-MemoryRecord
+      - MemoryOperation-acts_on-MemoryRecord
+      - MemoryOperation-has_result-MemoryOperationResult
+      - MemoryOperation-has_audit_event-MemoryAuditEvent
+
+    source_claims:
+      - claim-memory-eviction-policy
+      - claim-memory-eviction-effect
+      - claim-memory-eviction-evidence
 parent_relation:
   id: MemoryEviction-is_a-MemoryDispositionOperation
   predicate: is_a
-  direction: target-to-source
+  direction: source-to-target
   relation_kind: hierarchy
   labels:
     zh: 是一种记忆处置操作
     en: is a memory disposition operation
-    ja: 記憶処分操作の一種
+    ja: 記憶処分操作の一種である
   definitions:
-    zh: MemoryEviction —is_a→ MemoryDispositionOperation 表示：容量或性能策略移除活动层驻留，而有效持久来源可以继续存在。
-    en: MemoryEviction —is_a→ MemoryDispositionOperation holds because capacity or performance policy removes active-tier residency while a valid durable source may remain
-    ja: MemoryEviction —is_a→ MemoryDispositionOperation は、capacity/performance policyがactive-tier residencyを除きvalid durable sourceが残り得るため成立します。
+    zh: MemoryEviction —is_a→ MemoryDispositionOperation 表示一次有据可查的容量或性能活动改变了既有有效记录在指定活动层中的驻留，而未使记录失效。
+    en: MemoryEviction —is_a→ MemoryDispositionOperation means a documented capacity or performance activity changes an existing valid record's residency in a named active tier without invalidating the record.
+    ja: MemoryEviction —is_a→ MemoryDispositionOperation は、記録された容量または性能活動が既存有効レコードの名前付きアクティブ層常駐を変更し、レコードを失効させないことを表します。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
-    en: The relation is decided per auditable fact; no uniform runtime cardinality is imposed at ontology level.
-    ja: このrelationはaudit可能fact単位で判定しontology層で全runtime instanceへ一律cardinalityを課しません。
+    zh: 分类关系表达类型成员资格，不限制一次驱逐活动可处理的记录批次数。
+    en: The classification relation expresses type membership and does not limit how many record batches one eviction activity may process.
+    ja: 分類関係は型メンバーシップを表し、一つの追い出し活動が処理できるレコードバッチ数を制限しません。
   inverse_reading:
-    predicate: part_of
+    predicate: has_eviction_subtype
     labels:
-      zh: 反向读取
-      en: inverse is a memory disposition operation
-      ja: 逆方向読取
+      zh: 具有驱逐子类
+      en: has eviction subtype
+      ja: 追い出しサブタイプを持つ
   conditions:
-    - id: MemoryEviction-is_a-MemoryDispositionOperation-condition-manual-001
+    - id: MemoryEviction-is_a-MemoryDispositionOperation-child-differentia
       severity: error
       expression_language: plain
-      expression: Assert only when the instance satisfies the child differentia—capacity or performance policy removes active-tier residency while a valid durable source may remain—and already meets the activity definition of MemoryDispositionOperation.
-      explanations:
-        zh: 仅当实例满足子类种差“容量或性能策略移除活动层驻留，而有效持久来源可以继续存在。”且已满足 MemoryDispositionOperation 的活动定义时建立该边。
-        en: Assert only when the instance satisfies the child differentia—capacity or performance policy removes active-tier residency while a valid durable source may remain—and already meets the activity definition of MemoryDispositionOperation.
-        ja: instanceがchild differentia「capacity/performance policyがactive-tier residencyを除きvalid durable sourceが残り得るため成立します。」を満たし、かつ MemoryDispositionOperation のactivity定義を満たす時だけassertします。
+      expression: "Assert only when an executed disposition removes an existing record's copy from a named active tier under a documented capacity or performance policy while retaining a usable or reloadable durable source and record validity."
+      explanation:
+        zh: 处置父类身份不足以证明驱逐；必须有指定层、真实触发与选择规则、实际移除以及保持的耐久来源和有效性。
+        en: Disposition-parent identity alone does not prove eviction; named tier, real trigger and selection rule, actual removal, and retained durable source and validity are all required.
+        ja: 処分親の識別だけでは追い出しを証明できません。名前付き層、実際のトリガーと選択規則、実際の除去、保持された耐久ソースと有効性のすべてが必要です。
       source_claims:
-        - claim-memory-eviction-001
+        - claim-memory-eviction-policy
+        - claim-memory-eviction-effect
+        - claim-memory-eviction-boundary
   temporal_scope: timeless
   boundary_context: null
   constraints: []
   examples:
-    - id: MemoryEviction-is_a-MemoryDispositionOperation-example-positive-manual-20260716
-      kind: positive
+    - id: MemoryEviction-is_a-MemoryDispositionOperation-example-positive
+
       labels:
-        zh: 是一种记忆处置操作正例
-        en: "Positive case: is a memory disposition operation"
-        ja: 記憶処分操作の一種正例
-      scenario_id: MemoryEviction-is_a-MemoryDispositionOperation:positive:20260716
+        zh: 缓存层移除属于处置
+        en: Cache-tier removal is disposition
+        ja: キャッシュ層除去は処分である
+
       descriptions:
-        zh: evict-1405 在 allkeys-lfu 策略触发后移除 cache-east 中 record-1405 的副本，而 durable-store 的同一记录仍有效可重载。
-        en: evict-1405 removes record-1405's copy from cache-east under allkeys-lfu while the same record remains valid and reloadable in durable-store.
-        ja: evict-1405 は allkeys-lfu により cache-east の record-1405 copy を除去しますが durable-store の同 record は valid で reload 可能です。
-      field_values: {}
+        zh: mem-op-evict-2701 以 LFU 规则从 tier-retrieval-cache-east 移除 record-2701-v2 的副本，同时保留耐久回退。
+        en: mem-op-evict-2701 removes the copy of record-2701-v2 from tier-retrieval-cache-east under LFU and retains durable fallback.
+        ja: mem-op-evict-2701 は LFU で tier-retrieval-cache-east から record-2701-v2 のコピーを除去し、耐久フォールバックを保持します。
+      field_values:
+        operation_id: mem-op-evict-2701
+        target_record_ref: record-2701-v2
+        active_tier_ref: tier-retrieval-cache-east
+        eviction_policy: lfu
+        durable_source_ref: store-durable-east/records/record-2701-v2
+        active_tier_residency_after: false
       related_node_ids:
         - MemoryEviction
         - MemoryDispositionOperation
       related_relation_ids:
         - MemoryEviction-is_a-MemoryDispositionOperation
-      expected_result:
-        zh: 将 evict-1405 归为 MemoryEviction，并记录被移除的活动层、容量策略和仍然有效的持久来源。
-        en: Classify evict-1405 as MemoryEviction and record the removed active tier, capacity policy, and still-valid durable source.
-        ja: evict-1405 を MemoryEviction に分類し、removed active tier・capacity policy・still-valid durable source を記録します。
-      why_valid_or_invalid:
-        zh: 处置改变的是特定活动层驻留而非全局有效性，符合 Redis 驱逐语义与 eviction 种差。
-        en: The disposition changes residency in a named active tier rather than global validity, matching Redis eviction semantics and the eviction differentia.
-        ja: named active tier の residency を変え global validity は変えないため、Redis eviction semantics と differentia に合致します。
-      synthetic: false
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+
       source_claims:
-        - claim-memory-eviction-001
-    - id: MemoryEviction-is_a-MemoryDispositionOperation-example-boundary-manual-20260716
-      kind: boundary
+        - claim-memory-eviction-policy
+        - claim-memory-eviction-boundary
+    - id: MemoryEviction-is_a-MemoryDispositionOperation-example-boundary-noeviction
+
       labels:
-        zh: 是一种记忆处置操作边界例
-        en: "Boundary case: is a memory disposition operation"
-        ja: 記憶処分操作の一種境界例
-      scenario_id: MemoryEviction-is_a-MemoryDispositionOperation:boundary:20260716
+        zh: 阈值拒绝不是驱逐子类
+        en: Threshold rejection is not the eviction subtype
+        ja: しきい値拒否は追い出しサブタイプではない
+
       descriptions:
-        zh: delete-1405 根据同意撤回使 durable-store 中唯一记录失效，所有缓存副本也不得再重载。
-        en: delete-1405 invalidates the sole durable-store record after consent withdrawal, and no cache copy may reload it.
-        ja: delete-1405 は consent withdrawal 後 durable-store の唯一 record を invalidation し、cache copy からの reload も禁止します。
-      field_values: {}
+        zh: write-rejected-2702 因 noeviction 被拒绝，既有活动层副本没有被移除。
+        en: write-rejected-2702 is rejected under noeviction and no existing active-tier copy is removed.
+        ja: write-rejected-2702 は noeviction で拒否され、既存アクティブ層コピーは除去されません。
+      field_values:
+        request_id: write-rejected-2702
+        configured_policy: noeviction
+        existing_copy_removed: false
+        operation_id: absent
+        evicted_at: absent
       related_node_ids:
         - MemoryEviction
         - MemoryDispositionOperation
       related_relation_ids:
         - MemoryEviction-is_a-MemoryDispositionOperation
-      expected_result:
-        zh: 拒绝 MemoryEviction 分类；这是影响记录有效性的 MemoryDelete，而非活动层容量管理。
-        en: Reject MemoryEviction classification; this is MemoryDelete affecting record validity, not active-tier capacity management.
-        ja: MemoryEviction 分類を拒否します。これは active-tier capacity management ではなく record validity を変える MemoryDelete です。
-      why_valid_or_invalid:
-        zh: 当持久来源本身被撤销且不可重载时，效果已经超出驱逐；是否保留有效来源是两类活动的决定性边界。
-        en: When the durable source itself is revoked and cannot be reloaded, the effect exceeds eviction; a surviving valid source is the decisive boundary.
-        ja: durable source 自体が revoked され reload 不可なら eviction を超え、valid source の存続が決定的境界です。
-      synthetic: false
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+
       source_claims:
-        - claim-memory-eviction-001
+        - claim-memory-eviction-activity
   source_claims:
-    - claim-memory-eviction-001
-  distinct_fact_rationale: null
+    - claim-memory-eviction-activity
+    - claim-memory-eviction-policy
+    - claim-memory-eviction-effect
+    - claim-memory-eviction-boundary
+  distinct_fact_rationale:
+    zh: 此主干关系只表达活动层驻留移除且保留耐久来源的处置属于 MemoryDispositionOperation；目标、层、策略、触发测量、证据、有效性、结果和审计由字段或独立关系表达。
+    en: This backbone relation only expresses that tier-residency removal with retained durable source belongs to MemoryDispositionOperation; target, tier, policy, trigger measurement, evidence, validity, result, and audit use fields or separate relations.
+    ja: この主幹関係は、耐久ソースを保持する層常駐除去が MemoryDispositionOperation に属することだけを表します。対象、層、ポリシー、トリガー測定、証跡、有効性、結果、監査はフィールドまたは別関係で表します。
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations:
   - id: MemoryEviction-evicts-MemoryRecord
@@ -294,152 +700,162 @@ relations:
     direction: source-to-target
     relation_kind: temporal
     labels:
-      zh: 从活动层驱逐记录
-      en: evicts record from active tier
-      ja: active tierからrecordを追出す
+      zh: 从活动层驱逐记忆记录
+      en: evicts memory record from active tier
+      ja: アクティブ層から記憶レコードを追い出す
     definitions:
-      zh: MemoryEviction —evicts→ MemoryRecord 表示容量或性能策略使记录不再驻留于指定活动缓存或检索层，而持久来源可能保持有效。
-      en: MemoryEviction —evicts→ MemoryRecord means a capacity or performance policy removes the record's residency from a named active cache or retrieval tier while a durable source may remain valid.
-      ja: MemoryEviction —evicts→ MemoryRecord はcapacity/performance policyがnamed active cache/retrieval tierのrecord residencyを除きdurable sourceがvalidに残り得ることを表します。
+      zh: MemoryEviction —evicts→ MemoryRecord 表示一次已执行驱逐从指定活动层移除该记录副本，同时保留该记录的耐久可用性。
+      en: MemoryEviction —evicts→ MemoryRecord means one executed eviction removes the record copy from a named active tier while retaining durable availability of the record.
+      ja: MemoryEviction —evicts→ MemoryRecord は、一つの実行済み追い出しが名前付きアクティブ層からレコードコピーを除去しつつ、レコードの耐久的可用性を保持することを表します。
     cardinality: null
     cardinality_not_applicable_reason:
-      zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
-      en: The relation is decided per auditable fact; no uniform runtime cardinality is imposed at ontology level.
-      ja: このrelationはaudit可能fact単位で判定しontology層で全runtime instanceへ一律cardinalityを課しません。
+      zh: 该关系表达每个驱逐事实对具体记录副本的层驻留效果，不对所有实现设定固定运行时基数。
+      en: This relation expresses each eviction fact's tier-residency effect on a concrete record copy and imposes no fixed runtime cardinality across implementations.
+      ja: この関係は各追い出し事実の具体レコードコピーに対する層常駐効果を表し、実装全体に固定ランタイム基数を課しません。
     inverse_reading:
-      predicate: inverse_evicts
+      predicate: is_evicted_from_active_tier_by
       labels:
-        zh: 反向读取
-        en: inverse evicts record from active tier
-        ja: 逆方向読取
+        zh: 被从活动层驱逐
+        en: is evicted from active tier by
+        ja: アクティブ層から追い出される
     conditions:
-      - id: MemoryEviction-evicts-MemoryRecord-condition-manual-001
+      - id: MemoryEviction-evicts-MemoryRecord-tier-target-and-fallback
         severity: error
         expression_language: plain
-        expression: Assert only when target_record_id and active_tier_id are explicit, the trigger is a capacity or performance policy, and queries to that tier no longer hit.
-        explanations:
-          zh: 仅当 eviction.target_record_id 和 active_tier_id 明确，触发原因是容量/性能策略且该层查询不再命中时成立。
-          en: Assert only when target_record_id and active_tier_id are explicit, the trigger is a capacity or performance policy, and queries to that tier no longer hit.
-          ja: target_record_id/active_tier_idが明示されtriggerがcapacity/performance policyでそのtier queryがhitしない時だけassertします。
+        expression: "Assert only when the relation target matches target_record_ref, the copy is absent from active_tier_ref after evicted_at, trigger_measurement and eviction_policy justify selection, durable_source_ref remains usable or reloadable, and eviction_evidence_digest covers the fact."
+        explanation:
+          zh: 驱逐关系必须指向实际目标并记录实际层移除、选择原因与耐久回退；不能把任何缓存未命中或全局失效写成该关系。
+          en: The eviction relation must target the actual record and record actual tier removal, selection reason, and durable fallback; neither an arbitrary cache miss nor global invalidation can be written as this relation.
+          ja: 追い出し関係は実際の対象を指し、実際の層除去、選択理由、耐久フォールバックを記録しなければなりません。恣意的なキャッシュミスや全体失効をこの関係として書けません。
         source_claims:
-          - claim-memory-eviction-001
+          - claim-memory-eviction-policy
+          - claim-memory-eviction-effect
+          - claim-memory-eviction-evidence
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
-      - id: MemoryEviction-evicts-MemoryRecord-example-positive-manual-20260716
-        kind: positive
+      - id: MemoryEviction-evicts-MemoryRecord-example-positive
+
         labels:
-          zh: 从活动层驱逐记录正例
-          en: "Positive case: evicts record from active tier"
-          ja: active tierからrecordを追出す正例
-        scenario_id: MemoryEviction-evicts-MemoryRecord:positive:20260716
+          zh: 从指定缓存层驱逐记录
+          en: Evicting record from named cache tier
+          ja: 名前付きキャッシュ層からのレコード追い出し
+
         descriptions:
-          zh: evict-1405 在 cache-east 达到 maxmemory 后按 allkeys-lfu 选择 record-1405，移除其活动层副本并记录 durable_uri 供重载。
-          en: When cache-east reaches maxmemory, evict-1405 selects record-1405 under allkeys-lfu, removes its active-tier copy, and records durable_uri for reload.
-          ja: cache-east が maxmemory 到達時 evict-1405 は allkeys-lfu で record-1405 を選び active-tier copy を除去し reload 用 durable_uri を記録します。
-        field_values: {}
+          zh: mem-op-evict-2701 以 LFU 从 tier-retrieval-cache-east 移除 record-2701-v2 的副本，且 durable_source_ref 仍能重载该记录。
+          en: mem-op-evict-2701 removes the copy of record-2701-v2 from tier-retrieval-cache-east under LFU, and durable_source_ref can still reload the record.
+          ja: mem-op-evict-2701 は LFU により tier-retrieval-cache-east から record-2701-v2 のコピーを除去し、durable_source_ref は引き続きレコードを再読込みできます。
+        field_values:
+          operation_id: mem-op-evict-2701
+          target_record_ref: record-2701-v2
+          active_tier_ref: tier-retrieval-cache-east
+          eviction_policy: lfu
+          active_tier_residency_after: false
+          durable_source_state: reloadable
         related_node_ids:
           - MemoryEviction
           - MemoryRecord
         related_relation_ids:
           - MemoryEviction-evicts-MemoryRecord
-        expected_result:
-          zh: 建立 evict-1405 evicts record-1405，并把触发容量、策略、被移除层和可重载来源同时记录。
-          en: Assert evict-1405 evicts record-1405 and record trigger capacity, policy, removed tier, and reloadable source together.
-          ja: evict-1405 evicts record-1405 を確立し trigger capacity・policy・removed tier・reloadable source を同時記録します。
-        why_valid_or_invalid:
-          zh: Redis 驱逐由容量与策略选择键；这里效果限定于命名缓存层，持久实体仍有效，符合关系方向。
-          en: Redis eviction selects keys under capacity policy; here the effect is limited to a named cache tier while the durable entity remains valid.
-          ja: Redis eviction は capacity policy で key を選び effect は named cache tier に限定され durable entity は valid のままです。
-        synthetic: false
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+
         source_claims:
-          - claim-memory-eviction-001
-      - id: MemoryEviction-evicts-MemoryRecord-example-boundary-manual-20260716
-        kind: boundary
+          - claim-memory-eviction-policy
+          - claim-memory-eviction-effect
+      - id: MemoryEviction-evicts-MemoryRecord-example-boundary-delete
+
         labels:
-          zh: 从活动层驱逐记录边界例
-          en: "Boundary case: evicts record from active tier"
-          ja: active tierからrecordを追出す境界例
-        scenario_id: MemoryEviction-evicts-MemoryRecord:boundary:20260716
+          zh: 删除不能伪装为驱逐关系
+          en: Deletion cannot masquerade as eviction relation
+          ja: 削除は追い出し関係に偽装できない
+
         descriptions:
-          zh: delete-1406 因用户撤回同意使 durable record-1406 无效，系统禁止从任何缓存或备份重新装载。
-          en: delete-1406 invalidates durable record-1406 after consent withdrawal and forbids reload from any cache or backup.
-          ja: delete-1406 は consent withdrawal で durable record-1406 を invalidation し cache/backup からの reload を禁止します。
-        field_values: {}
+          zh: mem-op-delete-2701 使 record-2701-v2 全局失效并产生 tombstone-2701，所有层禁止重载。
+          en: mem-op-delete-2701 globally invalidates record-2701-v2 and produces tombstone-2701; reload from all tiers is forbidden.
+          ja: mem-op-delete-2701 は record-2701-v2 を全体失効させ tombstone-2701 を生成し、すべての層からの再読込みを禁止します。
+        field_values:
+          operation_id: mem-op-delete-2701
+          target_record_ref: record-2701-v2
+          deletion_basis: user_erasure_request
+          durable_source_state: invalidated
+          tombstone_ref: tombstone-2701
         related_node_ids:
           - MemoryEviction
+          - MemoryDelete
           - MemoryRecord
         related_relation_ids:
           - MemoryEviction-evicts-MemoryRecord
-        expected_result:
-          zh: 拒绝将 delete-1406 表达为 evicts；建立 invalidates 和 tombstone 关系，反映全局有效性终止。
-          en: Reject expressing delete-1406 as evicts; use invalidates and tombstone production to represent global validity termination.
-          ja: delete-1406 を evicts とせず invalidates/tombstone production で global validity termination を表します。
-        why_valid_or_invalid:
-          zh: 驱逐保留可重载有效来源，删除则终止实体有效性；两者效果范围相反，不能共用同一边。
-          en: Eviction preserves a reloadable valid source while deletion ends entity validity; their effect scopes differ and cannot share this edge.
-          ja: eviction は reloadable valid source を保持し deletion は entity validity を終えるため effect scope が異なり同 edge を共有できません。
-        synthetic: false
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+          - MemoryDelete-invalidates-MemoryRecord
+
         source_claims:
-          - claim-memory-eviction-001
+          - claim-memory-eviction-boundary
     source_claims:
-      - claim-memory-eviction-001
-    distinct_fact_rationale: null
+      - claim-memory-eviction-policy
+      - claim-memory-eviction-effect
+      - claim-memory-eviction-evidence
+    distinct_fact_rationale:
+      zh: 此关系表达一次驱逐对具体记录在命名活动层的驻留效果，不表达处置类型成员资格、记录全局有效性、删除授权、保留资格、结果或审计事件。
+      en: This relation expresses one eviction's residency effect on a concrete record in a named active tier; it does not express disposition type membership, global record validity, deletion authorization, retention eligibility, result, or audit event.
+      ja: この関係は名前付きアクティブ層における一つの追い出しの具体レコードへの常駐効果を表し、処分型所属、全体レコード有効性、削除許可、保持適格性、結果、監査イベントを表しません。
     layout_role: cross-link
-    review_status: accepted
+    endpoint_order: source-to-target
     target: concept:MemoryRecord
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-lifecycle-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 该节点仅完成了从现行候选数据到唯一 YAML 树的无损转录；尚未逐项完成人工语义核验，不得据此宣称已审定。
-    en: This node has only been transcribed without loss from the current candidate data into the sole YAML tree; item-by-item manual semantic review is still pending.
-    ja: このノードは現行候補データから唯一の YAML ツリーへ欠落なく転記した段階であり、項目別の手動意味審査は未完了です。
-  sections:
-    semantics: pending
-    hierarchy: pending
-    relations: pending
-    structure: pending
-    examples: pending
-    source_claims: []
+sources:
+  - id: redis-key-eviction
+    title: Redis key eviction
+    source_type: official-doc
+    url: https://redis.io/docs/latest/develop/reference/eviction/
+    relevance: Documents maxmemory-triggered key eviction policies and distinguishes eviction policy behavior from noeviction errors.
+  - id: w3c-prov-o
+    title: "W3C PROV-O: The PROV Ontology"
+    source_type: standard
+    url: https://www.w3.org/TR/prov-o/
+    relevance: Defines activities, entities, agents, time, and provenance associations as distinct facts.
+  - id: nist-fips-180-4
+    title: FIPS 180-4 Secure Hash Standard
+    source_type: standard
+    url: https://csrc.nist.gov/pubs/fips/180/4/final
+    relevance: Specifies SHA-256 message digests used to bind auditable eviction evidence.
 source_claims:
-  - id: claim-memory-eviction-001
-    source: eng-cache-redis-eviction
-    supports: Redis documents capacity-driven eviction through maxmemory and specific LRU, LFU, random, TTL-aware, or no-eviction policies.
-    locator: Key eviction > maxmemory configuration and eviction policies
-    evidence_kind: design-inference
+  - id: claim-memory-eviction-activity
+    source: w3c-prov-o
+    supports: PROV-O distinguishes an executed Activity from entities and provenance facts around it. Moonweave records eviction as an executed operation with target, tier, actor, time, result, and audit evidence rather than a threshold setting or cache miss.
+    locator: "PROV-O sections 3.1 Activity, 3.2 Entity, and 3.4 Agent"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-eviction-002
-    source: eng-cache-redis-eviction
-    supports: MemoryEviction.eviction_operation_id records the stated operational datum so the concept instance can be identified or audited without changing the source model's own vocabulary.
-    locator: Key eviction > maxmemory configuration and eviction policies
-    evidence_kind: design-inference
+  - id: claim-memory-eviction-identity
+    source: w3c-prov-o
+    supports: PROV-O permits activities and related provenance facts to have stable independent identities. Moonweave uses one operation ID to join an eviction's target, tier, policy, trigger, evidence, result, and audit facts.
+    locator: "PROV-O Activity and Entity identifier model"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-eviction-003
-    source: eng-cache-redis-eviction
-    supports: MemoryEviction.eviction_policy records the stated operational datum so the concept instance can be identified or audited without changing the source model's own vocabulary.
-    locator: Key eviction > maxmemory configuration and eviction policies
-    evidence_kind: design-inference
+  - id: claim-memory-eviction-target
+    source: w3c-prov-o
+    supports: PROV-O distinguishes specific entities acted upon by an activity from nearby or later-generated entities. Moonweave identifies the exact existing memory record whose active-tier copy is removed.
+    locator: "PROV-O sections on prov:used and prov:wasGeneratedBy"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-eviction-004
-    source: eng-cache-redis-eviction
-    supports: Redis defines eviction through maxmemory configuration and eviction policies, so removal is triggered by capacity and policy rather than by an item's fixed expiry timestamp alone. Moonweave uses this trigger condition for MemoryEviction and separates it from MemoryExpiration.
-    locator: Key eviction > maxmemory configuration and eviction policies
-    evidence_kind: design-inference
+  - id: claim-memory-eviction-policy
+    source: redis-key-eviction
+    supports: Redis documents maxmemory-triggered eviction and configurable LRU, LFU, LRM, random, and TTL-related policies. Moonweave records both a threshold measurement and a concrete selection policy for an actual eviction.
+    locator: "Redis key eviction sections Using maxmemory and Eviction policies"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-eviction-005
-    source: eng-db-dynamodb-ttl
-    supports: DynamoDB TTL bases expiration on a per-item timestamp and separates expiry from the later deletion process. Moonweave uses that time-threshold semantics for MemoryExpiration, contrasting it with policy- or capacity-triggered MemoryEviction; DynamoDB does not define the shared taxonomy.
-    locator: Using time to live (TTL) > expired items pending deletion and TTL stream records
-    evidence_kind: design-inference
+  - id: claim-memory-eviction-effect
+    source: redis-key-eviction
+    supports: Redis describes evicting keys from a cache when memory limit is exceeded and notes that cache entries can be copies of persistently stored data. Moonweave models this case as removing named active-tier residency while a durable source remains reloadable.
+    locator: "Redis key eviction overview and maxmemory behavior"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
+  - id: claim-memory-eviction-evidence
+    source: nist-fips-180-4
+    supports: FIPS 180-4 specifies fixed-size secure message digests. Moonweave stores a SHA-256 digest over target version, tier, threshold measurement, selection policy, durable source state, and execution output to bind eviction evidence.
+    locator: "FIPS 180-4 abstract and SHA-256 specification"
+    evidence_kind: ontology-design-inference
+    confidence: high
+  - id: claim-memory-eviction-boundary
+    source: redis-key-eviction
+    supports: Redis distinguishes automatic eviction policies from noeviction behavior and describes cache entries as potentially reloadable copies. Moonweave keeps eviction distinct from global invalidation, deletion tombstones, score decay, expiry eligibility, and unexecuted capacity plans.
+    locator: "Redis key eviction overview and noeviction policy"
+    evidence_kind: ontology-design-inference
+    confidence: high

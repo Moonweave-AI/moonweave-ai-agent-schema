@@ -1,0 +1,380 @@
+schema: moonweave.ai/ontology-node/v1
+id: MemoryTombstone
+kind: concept
+status: accepted
+labels:
+  zh: 记忆墓碑
+  en: Memory Tombstone
+  ja: 記憶トゥームストーン
+semantics:
+  short_definition:
+    zh: 记录某一明确记忆记录版本已被逻辑删除的最小、可审计删除标记。
+    en: A minimal, auditable deletion marker recording that one explicit memory-record version was logically deleted.
+    ja: 一つの明示的な memory-record version が論理 delete されたことを記録する最小の audit 可能な deletion marker。
+  definition:
+    zh: >-
+      MemoryTombstone 是指向一个 target_record_ref 和 target_record_version 的持久删除标记，记录 tombstoned_at 和
+      产生该标记的 deletion_operation_ref。它使读路径能够抑制该特定记录版本，并在系统的保留期内保留最小删除来源
+      证据。它不包含或恢复原始内容，不是 MemoryRetentionPolicy，不是删除操作或操作结果本身，也不证明底层字节已被
+      物理擦除。物理清除、归档和可能的墓碑回收必须由独立、可审计操作处理；一个墓碑也不能自动删除同一记录的其他版本。
+    en: >-
+      A MemoryTombstone is a durable deletion marker pointing to one target_record_ref and target_record_version and
+      recording tombstoned_at and the deletion_operation_ref that produced it. It lets read paths suppress that particular
+      record version while retaining minimal deletion-provenance evidence for a system-defined retention period. It does
+      not contain or restore original content, is not MemoryRetentionPolicy, an operation, or an operation result itself,
+      and does not prove that underlying bytes were physically erased. Physical purge, archival, and possible tombstone
+      reclamation need separate auditable operations. One tombstone also cannot automatically delete other versions of a record.
+    ja: >-
+      MemoryTombstone は一つの target_record_ref と target_record_version を指す永続 deletion marker であり、
+      tombstoned_at とそれを生成した deletion_operation_ref を記録します。system-defined retention period の間に最小の
+      deletion-provenance evidence を保持しながら、read path がその特定 record version を suppress できるようにします。
+      original content を含まず復元もせず、MemoryRetentionPolicy、operation、operation result 自体ではなく、underlying bytes
+      が物理 erase されたことも証明しません。physical purge、archive、tombstone reclamation は別の audit 可能な operation が
+      必要です。一つの tombstone が record の他の version を自動 delete することもできません。
+  why_needed:
+    zh: >-
+      分布式或版本化存储需要在逻辑删除后向读取者传播“此版本不可见”的事实，同时仍可审计该状态由哪个操作产生。
+      单独的墓碑可防止旧副本在同步、合并或延迟读取时重新出现，而不会把策略、执行和物理回收混成同一事实。
+    en: >-
+      Distributed or versioned storage needs to propagate the fact that a version is not visible after logical deletion
+      while preserving an audit of which operation produced that state. A separate tombstone prevents old copies from
+      reappearing during synchronization, merge, or delayed reads without collapsing policy, execution, and physical
+      reclamation into one fact.
+    ja: >-
+      distributed 又は versioned storage では、論理 delete 後に version が visible でない fact を伝播しつつ、その state を
+      生成した operation の audit を残す必要があります。別の tombstone は、policy、execution、physical reclamation を一つの
+      fact にまとめずに、synchronization、merge、delayed read 時の古い copy の再出現を防ぎます。
+  includes:
+    - zh: 指向 record-v1 的删除标记，带有产生操作引用、删除时间和非敏感原因代码，并在读取时抑制该版本。
+      en: A deletion marker targeting record-v1 with producing-operation reference, deletion time, and non-sensitive reason code that suppresses that version on reads.
+      ja: producing-operation reference、deletion time、non-sensitive reason code を持ち、read 時に record-v1 を suppress する deletion marker。
+  excludes:
+    - zh: 保留策略、实际 delete/归档操作、物理擦除证明、原始内容副本、访问授权规则、错误事件或另一版本记录的删除。
+      en: A retention policy, actual delete or archive operation, proof of physical erasure, an original-content copy, an access rule, an error event, or deletion of another record version.
+      ja: retention policy、実際の delete 又は archive operation、physical erasure の証明、original-content copy、access rule、error event、別の record version の deletion。
+  semantic_kind: entity
+  aliases: [logical deletion marker, record deletion tombstone]
+engineering:
+  explanation:
+    zh: >-
+      生命周期执行器先验证目标记录版本和授权，再产生不可变 tombstone_id、目标引用、时间和操作引用。读取、同步或合并路径
+      可用这些字段抑制该版本；清除器可在满足保留和一致性条件后独立执行物理回收。Cassandra 说明删除标记作为写入的
+      tombstone 和后续 compaction 回收模式，但 Moonweave 的记录版本、操作引用和最小内容约束是本地审计建模。
+    en: >-
+      A lifecycle executor first verifies the target record version and authorization, then produces immutable tombstone_id,
+      target references, time, and operation reference. Read, synchronization, or merge paths can suppress that version
+      with these facts, while a purger may independently perform physical reclamation after retention and consistency
+      conditions are met. Cassandra illustrates deletion markers written as tombstones and later compaction reclamation;
+      Moonweave's record-version, operation-reference, and minimal-content constraints are local audit modeling.
+    ja: >-
+      lifecycle executor は最初に target record version と authorization を検証し、immutable な tombstone_id、target reference、
+      time、operation reference を生成します。read、synchronization、merge path はこれらの fact でその version を suppress でき、
+      purger は retention と consistency condition を満たした後に独立して physical reclamation を行えます。Cassandra は
+      tombstone として書かれる deletion marker と後の compaction reclamation を示し、Moonweave の record-version、
+      operation-reference、minimal-content constraint はローカルな audit modeling です。
+  typical_input:
+    - description: Logically delete one explicit record version
+      format: |
+        delete_request = {
+          "target_record_ref": "pref-u-123-v1",
+          "target_record_version": "v1",
+          "deletion_operation_ref": "memory-delete-op-77",
+          "reason_code": "user_requested"
+        }
+  typical_output:
+    - description: Tombstone evidence with no original content
+      format: |
+        {
+          "tombstone_id": "tombstone-pref-u-123-v1",
+          "target_record_ref": "pref-u-123-v1",
+          "target_record_version": "v1",
+          "tombstoned_at": "2026-07-18T10:00:00Z",
+          "deletion_operation_ref": "memory-delete-op-77",
+          "original_content_retained": false
+        }
+  reference_implementations:
+    - name: Apache Cassandra tombstones
+      url: https://cassandra.apache.org/doc/stable/cassandra/managing/operating/compaction/overview.html
+      description: Documents time-stamped deletion markers, read behavior, grace periods, and later safe compaction reclamation.
+    - name: W3C PROV-O
+      url: https://www.w3.org/TR/prov-o/
+      description: Defines entities and activities used to preserve the provenance of a state-changing operation.
+structure:
+  identity_keys: [tombstone_id]
+  fields:
+    - id: tombstone_id
+      labels:
+        zh: 墓碑标识
+        en: tombstone ID
+        ja: tombstone ID
+      definitions:
+        zh: 稳定标识一个不可变删除标记，而不是被删除记录的原始身份。
+        en: Stably identifies one immutable deletion marker rather than the original identity of the deleted record.
+        ja: delete された record の original identity ではなく、一つの immutable deletion marker を安定して識別する。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: null
+      example_value: tombstone-pref-u-123-v1
+      source_claims: [claim-memory-tombstone-marker]
+    - id: target_record_ref
+      labels:
+        zh: 目标记录引用
+        en: target record reference
+        ja: target record 参照
+      definitions:
+        zh: 引用被此删除标记抑制的一个具体 MemoryRecord，而不是命名空间、键前缀或所有同主题记录。
+        en: References the one concrete MemoryRecord suppressed by this deletion marker, not a namespace, key prefix, or all records on the same topic.
+        ja: この deletion marker が suppress する一つの具体的 MemoryRecord を参照する。namespace、key prefix、同じ topic の全 record ではない。
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: null
+      example_value: pref-u-123-v1
+      source_claims: [claim-memory-tombstone-target-version]
+    - id: target_record_version
+      labels:
+        zh: 目标记录版本
+        en: target record version
+        ja: target record version
+      definitions:
+        zh: 标识被逻辑删除的目标记录版本；同一记录标识的其他版本必须单独判断。
+        en: Identifies the target record version logically deleted; other versions with the same record identity must be judged separately.
+        ja: 論理 delete された target record version を識別する。同じ record identity の他 version は別途判定しなければならない。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: null
+      example_value: v1
+      source_claims: [claim-memory-tombstone-target-version]
+    - id: tombstoned_at
+      labels:
+        zh: 墓碑时间
+        en: tombstoned at
+        ja: tombstone 時刻
+      definitions:
+        zh: 记录逻辑删除标记被写入的时间，而不是原始记录创建时间或物理清除时间。
+        en: Records when the logical deletion marker was written, not original-record creation time or physical-purge time.
+        ja: 論理 deletion marker が書かれた時刻を記録する。original-record creation time や physical-purge time ではない。
+      datatype: datetime
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: null
+      example_value: '2026-07-18T10:00:00Z'
+      source_claims: [claim-memory-tombstone-marker]
+    - id: deletion_operation_ref
+      labels:
+        zh: 删除操作引用
+        en: deletion operation reference
+        ja: deletion operation 参照
+      definitions:
+        zh: 引用执行或确认该逻辑删除的独立 MemoryOperation，以保留删除来源而不是将其隐含在原因文本中。
+        en: References the independent MemoryOperation that executed or confirmed the logical deletion, retaining deletion provenance rather than implying it in reason text.
+        ja: 論理 deletion を実行又は確認した独立 MemoryOperation を参照する。reason text に暗黙化せず deletion provenance を保持する。
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: []
+      pattern: null
+      example_value: memory-delete-op-77
+      source_claims: [claim-memory-tombstone-execution-boundary]
+    - id: reason_code
+      labels:
+        zh: 删除原因代码
+        en: deletion reason code
+        ja: deletion reason code
+      definitions:
+        zh: 可选非敏感分类代码，用于解释删除路径；它不能替代操作来源或保存原始内容。
+        en: An optional non-sensitive classification code explaining the deletion path; it cannot replace operation provenance or retain original content.
+        ja: deletion path を説明する任意の non-sensitive classification code。operation provenance の代替や original content の保持にはならない。
+      datatype: string
+      required: false
+      cardinality: {min: 0, max: 1}
+      allowed_values: []
+      pattern: null
+      example_value: user_requested
+      source_claims: [claim-memory-tombstone-execution-boundary]
+    - id: purge_eligible_at
+      labels:
+        zh: 可清除时间
+        en: purge eligible at
+        ja: purge eligible 時刻
+      definitions:
+        zh: 可选记录在系统定义的保留和一致性窗口后可评估物理清除的最早时间；它不表示清除已经发生。
+        en: Optionally records the earliest time physical purge can be evaluated after system-defined retention and consistency windows; it does not mean purge occurred.
+        ja: system-defined retention と consistency window 後に physical purge を評価できる最も早い時刻を任意に記録する。purge が発生したことは意味しない。
+      datatype: datetime
+      required: false
+      cardinality: {min: 0, max: 1}
+      allowed_values: []
+      pattern: null
+      example_value: '2026-08-17T10:00:00Z'
+      source_claims: [claim-memory-tombstone-purge-boundary]
+  constraints:
+    - id: memory-tombstone-targeted-deletion
+      severity: error
+      expression_language: plain
+      expression: tombstone_id, target_record_ref, target_record_version, tombstoned_at, and deletion_operation_ref are required. target_record_ref and target_record_version must identify exactly one deleted record version. A tombstone must contain no original content payload and must not be inferred from a namespace, a key prefix, or a matching topic.
+      explanation:
+        zh: 删除标记必须精确、可追溯且最小化；模糊选择器或保留内容会扩大删除与隐私风险。
+        en: A deletion marker must be exact, traceable, and minimal; ambiguous selectors or retained content expand deletion and privacy risk.
+        ja: deletion marker は正確、traceable、minimal でなければならない。曖昧な selector や retained content は deletion と privacy risk を拡大する。
+      source_claims: [claim-memory-tombstone-marker, claim-memory-tombstone-target-version]
+    - id: memory-tombstone-execution-and-purge-boundary
+      severity: error
+      expression_language: plain
+      expression: A MemoryTombstone records a completed logical-deletion marker and its producing operation, but it is not the operation result, retention policy, or proof of physical erasure. purge_eligible_at only permits a later purge evaluation; physical purge requires separately recorded execution and must not be inferred from this tombstone.
+      explanation:
+        zh: 逻辑删除标记、执行结果和物理清除具有不同证据与时间边界，不能以一个墓碑代替全部审计事实。
+        en: Logical deletion marker, execution result, and physical purge have different evidence and time boundaries; one tombstone cannot replace all audit facts.
+        ja: 論理 deletion marker、execution result、physical purge には異なる evidence と time boundary があり、一つの tombstone がすべての audit fact を置き換えることはできない。
+      source_claims: [claim-memory-tombstone-execution-boundary, claim-memory-tombstone-purge-boundary]
+  required_relations: []
+examples:
+  - id: memory-tombstone-positive-example
+
+    labels:
+      zh: 精确记录版本的逻辑删除
+      en: Logical deletion of exact record version
+      ja: 正確な record version の論理 deletion
+
+    descriptions:
+      zh: Generative Agents Memory Stream + Reflection；MemGPT core_memory_append/archival_memory_insert；Redis SET EX TTL + FT.SEARCH vector eviction。
+      en: Generative Agents Memory Stream + Reflection; MemGPT core_memory_append/archival_memory_insert; Redis SET EX TTL + FT.SEARCH vector eviction.
+      ja: Generative Agents Memory Stream + Reflection。MemGPT core_memory_append/archival_memory_insert。Redis SET EX TTL + vector eviction。
+    field_values: {tombstone_id: tombstone-pref-u-123-v1, target_record_ref: pref-u-123-v1, target_record_version: v1, tombstoned_at: '2026-07-18T10:00:00Z', deletion_operation_ref: memory-delete-op-77, reason_code: user_requested}
+    related_node_ids: [MemoryTombstone, MemoryRecord, MemoryOperation]
+    related_relation_ids: [MemoryTombstone-marks_deletion_of-MemoryRecord]
+
+    source_claims: [claim-memory-tombstone-marker, claim-memory-tombstone-execution-boundary]
+  - id: memory-tombstone-boundary-example
+
+    labels:
+      zh: 同一记录的更新版本仍独立
+      en: Updated version of same record remains independent
+      ja: 同じ record の更新 version は独立したまま
+
+    descriptions:
+      zh: MemGPT main_context vs archival vs recall 生命周期阶段；Generative Agents importance 累计 vs MemoryDecay recency 衰减。
+      en: MemGPT main_context vs archival vs recall lifecycle stages; Generative Agents importance accumulation vs MemoryDecay recency decay.
+      ja: MemGPT main/recall/archival lifecycle 段階。Generative Agents importance 累計 vs MemoryDecay recency 減衰。
+    field_values: {tombstone_id: tombstone-pref-u-123-v1, target_record_ref: pref-u-123-v1, target_record_version: v1, tombstoned_at: '2026-07-18T10:00:00Z', deletion_operation_ref: memory-delete-op-77}
+    related_node_ids: [MemoryTombstone, MemoryRecord]
+    related_relation_ids: [MemoryTombstone-marks_deletion_of-MemoryRecord]
+
+    source_claims: [claim-memory-tombstone-target-version]
+  - id: memory-tombstone-counterexample-example
+
+    labels:
+      zh: 保留策略不是删除标记
+      en: Retention policy is not a deletion marker
+      ja: retention policy は deletion marker ではない
+
+    descriptions:
+      zh: 反例：ephemeral tool output 无 MemoryRetentionPolicy/Redis EX TTL 就永久 MemoryWrite。
+      en: Counterexample: ephemeral tool output MemoryWrite permanently without MemoryRetentionPolicy/Redis EX TTL.
+      ja: 反例：ephemeral tool output が MemoryRetentionPolicy/Redis EX TTL なしで永久 MemoryWrite。
+    field_values: {retention_policy_id: ttl-30d-tombstone, trigger_kind: ttl, duration: P30D, expiry_action: tombstone}
+    related_node_ids: [MemoryTombstone, MemoryRetentionPolicy, MemoryRecord]
+    related_relation_ids: []
+
+    source_claims: [claim-memory-tombstone-execution-boundary]
+  - id: memory-tombstone-instance-example
+
+    labels:
+      zh: 实例：项目政策记录墓碑
+      en: "Instance: project-policy record tombstone"
+      ja: "事例: project-policy record tombstone"
+
+    descriptions:
+      zh: MemGPT core_memory_replace(key="human", old="Bob", new="Alice")；Generative Agents reflection importance threshold=150 触发。
+      en: MemGPT core_memory_replace(key="human", old="Bob", new="Alice"); Generative Agents reflection importance threshold=150 triggers.
+      ja: MemGPT core_memory_replace。Generative Agents reflection importance threshold=150 トリガー。
+    field_values: {tombstone_id: tombstone-policy-p-88-v3, target_record_ref: policy-record-p-88-v3, target_record_version: v3, tombstoned_at: '2026-07-18T10:00:00Z', deletion_operation_ref: memory-delete-op-98, reason_code: superseded, purge_eligible_at: '2026-08-17T10:00:00Z'}
+    related_node_ids: [MemoryTombstone, MemoryRecord, MemoryOperation, MemoryRetentionPolicy]
+    related_relation_ids: [MemoryTombstone-marks_deletion_of-MemoryRecord]
+
+    source_claims: [claim-memory-tombstone-marker, claim-memory-tombstone-purge-boundary]
+parent_relation: null
+relations:
+  - id: MemoryTombstone-marks_deletion_of-MemoryRecord
+    predicate: marks_deletion_of
+    target: concept:MemoryRecord
+    endpoint_order: child-to-parent
+    direction: source-to-target
+    relation_kind: association
+    labels:
+      zh: 标记记忆记录版本的逻辑删除
+      en: marks logical deletion of memory-record version
+      ja: memory-record version の論理 deletion を mark する
+    definitions:
+      zh: 一个 MemoryTombstone 仅当目标记录引用和版本与 MemoryRecord 一致时，标记该具体版本已逻辑删除。
+      en: A MemoryTombstone marks one concrete MemoryRecord version as logically deleted only when its target record reference and version match that record.
+      ja: MemoryTombstone は target record reference と version が MemoryRecord に一致する場合にのみ、その具体的 version を論理 delete と mark する。
+    cardinality: {source: {min: 1, max: 1}, target: {min: 0, max: 1}}
+    cardinality_not_applicable_reason: null
+    inverse_reading:
+      predicate: has_deletion_tombstone
+      labels:
+        zh: 有删除墓碑
+        en: has deletion tombstone
+        ja: deletion tombstone を持つ
+    conditions:
+      - id: memory-tombstone-marks-record-condition
+        severity: error
+        expression_language: plain
+        expression: Assert only when tombstone.target_record_ref and tombstone.target_record_version exactly match the MemoryRecord identity and record_version, and deletion_operation_ref identifies a completed logical-deletion operation. Do not infer a match from namespace, key prefix, topic, or record-family identity.
+        explanation:
+          zh: 该关系需要精确目标版本与产生操作来源；近似关联会错误抑制无关或更新记录。
+          en: This relation needs exact target version and producing-operation provenance; approximate association would incorrectly suppress unrelated or updated records.
+          ja: この relation には正確な target version と producing-operation provenance が必要である。近似 association は無関係又は更新済み record を誤って suppress する。
+        source_claims: [claim-memory-tombstone-target-version, claim-memory-tombstone-execution-boundary]
+    temporal_scope: valid-time
+    boundary_context: A retention policy, target namespace, shared key prefix, or a later record version does not establish a tombstone-to-record deletion relation.
+    constraints: []
+    examples: []
+    source_claims: [claim-memory-tombstone-target-version]
+    distinct_fact_rationale: This relation records logical deletion of one version, whereas policy eligibility, lifecycle execution, physical purge, and storage membership are separate facts.
+    layout_role: primary-backbone
+sources:
+  - id: cassandra-tombstones
+    title: Apache Cassandra compaction and tombstones
+    url: https://cassandra.apache.org/doc/stable/cassandra/managing/operating/compaction/overview.html
+    type: official-doc
+    source_type: official-doc
+    relevance: Documents time-stamped deletion markers, tombstone reads, TTL-triggered tombstones, and later safe compaction reclamation.
+  - id: w3c-prov-o
+    title: "W3C PROV-O: The PROV Ontology"
+    url: https://www.w3.org/TR/prov-o/
+    type: standard
+    source_type: standard
+    relevance: Defines entities and activities used to preserve provenance of a state-changing operation.
+source_claims:
+  - id: claim-memory-tombstone-marker
+    source: cassandra-tombstones
+    supports: Cassandra documents deletion as insertion of a time-stamped tombstone marker and later treatment of that marker during reads and compaction. Moonweave uses a separately identified logical-deletion marker for memory-record versions.
+    locator: "Compaction overview: Tombstones, What are tombstones"
+    evidence_kind: ontology-design-inference
+    confidence: high
+  - id: claim-memory-tombstone-target-version
+    source: cassandra-tombstones
+    supports: Cassandra describes tombstones associated with deleted row or column values and time-stamped versions. Moonweave records an exact target record reference and version so a tombstone cannot suppress an unrelated or later memory-record version.
+    locator: "Compaction overview: tombstones, row versions, and read behavior"
+    evidence_kind: ontology-design-inference
+    confidence: medium
+  - id: claim-memory-tombstone-execution-boundary
+    source: w3c-prov-o
+    supports: PROV-O distinguishes entities from the activities that generate them. Moonweave preserves a deletion operation reference on a tombstone and keeps the marker, the operation, and its result as separate auditable entities.
+    locator: "PROV-O: Entity, Activity, generation, and derivation"
+    evidence_kind: ontology-design-inference
+    confidence: medium
+  - id: claim-memory-tombstone-purge-boundary
+    source: cassandra-tombstones
+    supports: Cassandra documents that tombstones can persist through a grace period and later be removed during safe compaction. Moonweave treats purge eligibility and actual physical purge as separate future evaluation and execution facts.
+    locator: "Compaction overview: tombstone grace period and compaction"
+    evidence_kind: ontology-design-inference
+    confidence: high

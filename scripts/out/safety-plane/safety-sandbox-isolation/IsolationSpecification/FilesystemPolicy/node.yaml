@@ -1,0 +1,403 @@
+schema: moonweave.ai/ontology-node/v1
+id: FilesystemPolicy
+kind: concept
+status: accepted
+labels:
+  zh: 文件系统政策
+  en: Filesystem Policy
+  ja: ファイルシステムポリシー
+semantics:
+  short_definition:
+    zh: 规定隔离工作区、根文件系统、挂载与外部路径授权应如何被限制的静态政策。
+    en: A static policy that constrains the isolation workspace, root filesystem, mounts, and exceptional external-path grants.
+    ja: isolation workspace、root filesystem、mount、例外的な external-path grant をどう制限するかを定める静的 policy。
+  definition:
+    zh: "FilesystemPolicy 是 IsolationSpecification 的声明性组成部分，记录可写工作区规则、根文件系统是否只读、来源挂载和经过信任配置的 extra path grant 引用。它可投影 OpenAI Manifest、OCI root/mount、Docker `--read-only`/`--mount` 或 Kubernetes `readOnlyRootFilesystem`，但不把这些来源对象的字段格式混为一谈。它不是用户对外部数据的授权、网络访问控制、实时文件观察或实际执行的写入日志。"
+    en: "FilesystemPolicy is a declarative component of an IsolationSpecification that records writable-workspace rules, whether the root filesystem is read-only, source mounts, and trusted-configuration references for exceptional extra path grants. It may project OpenAI Manifest, OCI root/mount, Docker `--read-only`/`--mount`, or Kubernetes `readOnlyRootFilesystem` without conflating their source-object shapes. It is not user authorization for external data, network access control, a live file observation, or a log of writes actually performed."
+    ja: "FilesystemPolicy は IsolationSpecification の宣言的な構成要素であり、writable-workspace rule、root filesystem が read-only か、source mount、例外的な extra path grant の trusted-configuration reference を記録する。OpenAI Manifest、OCI root/mount、Docker の `--read-only`/`--mount`、Kubernetes の `readOnlyRootFilesystem` を project できるが、source object の shape を混同しない。external data に対する user authorization、network access control、live file observation、実行済み write の log ではない。"
+  why_needed:
+    zh: “根只读”不等于所有挂载只读，“工作区内”也不等于主机路径可随意读取。独立政策让路径、挂载和例外授权可以逐项审计，并防止模型可见内容把自己升级成主机路径访问。
+    en: “Read-only root” does not mean every mount is read-only, and “inside the workspace” does not mean arbitrary host paths are readable. A separate policy makes paths, mounts, and exceptional grants auditable one by one and prevents model-visible content from promoting itself to host-path access.
+    ja: 「read-only root」はすべての mount が read-only であることを意味せず、「workspace 内」は任意の host path を読めることを意味しない。別の policy により path、mount、例外 grant を一つずつ監査でき、model-visible content が host-path access に自己昇格することを防ぐ。
+  includes:
+    - zh: 工作区相对路径规则、根文件系统模式、挂载来源引用及额外路径授权引用。
+      en: Workspace-relative path rules, root-filesystem mode, mount source references, and extra-path-grant references.
+      ja: workspace-relative path rule、root-filesystem mode、mount source reference、extra-path-grant reference。
+    - zh: 用于证明每条本地规则的原生配置对象引用。
+      en: Native configuration references that evidence each local rule.
+      ja: 各 local rule を証明する native configuration reference。
+  excludes:
+    - zh: 容器进程能力、PID 限制、shell 工具表面和操作系统身份；这些属于 ProcessPolicy。
+      en: Container process capabilities, PID limits, shell tool surface, and operating-system identity, which belong to ProcessPolicy.
+      ja: container process capability、PID limit、shell tool surface、operating-system identity。これらは ProcessPolicy に属する。
+    - zh: OAuth scope、凭证、允许访问的网络域名和已经发生的文件写入结果。
+      en: OAuth scopes, credentials, allowed network domains, and results of file writes that have already happened.
+      ja: OAuth scope、credential、許可された network domain、既に起きた file write の結果。
+  semantic_kind: policy
+  aliases: [workspace-policy, mount-policy, path-containment-policy]
+engineering:
+  explanation:
+    zh: 先保留来源：Manifest entry 必须相对工作区，extra_path_grants 是可信配置；OCI 把 root 与 mounts 分开；Docker 的只读根仍允许声明的 volume/mount 可写；Kubernetes 将根只读设在 container securityContext。随后只生成可审计的本地政策引用，所有实际路径解析和挂载选项仍须由来源运行时验证。
+    en: "Preserve the source first: Manifest entries are workspace-relative and extra_path_grants are trusted configuration; OCI separates root from mounts; a Docker read-only root can still allow writes through declared volumes or mounts; Kubernetes places root-read-only on the container securityContext. Then generate only auditable local-policy references, while actual path resolution and mount options remain validated by the source runtime."
+    ja: まず source を保持する。Manifest entry は workspace-relative で extra_path_grants は trusted configuration、OCI は root と mounts を分離し、Docker の read-only root は宣言された volume または mount 経由の write をなお許し得る。Kubernetes は root-read-only を container securityContext に置く。その後、監査可能な local-policy reference だけを生成し、実際の path resolution と mount option は source runtime で validation し続ける。
+  typical_input:
+    - description:
+        zh: OpenAI 可信外部路径授权
+        en: OpenAI trusted external-path grant
+        ja: OpenAI trusted external-path grant
+      format: |-
+        Manifest(extra_path_grants=(SandboxPathGrant(path="/opt/toolchain", read_only=True),))
+      source_claims: [claim-filesystem-openai-paths]
+    - description:
+        zh: OCI 只读根和单独挂载
+        en: OCI read-only root with separate mount
+        ja: separate mount を持つ OCI read-only root
+      format: |-
+        {"root":{"path":"rootfs","readonly":true},"mounts":[{"destination":"/tmp","type":"tmpfs","source":"tmpfs","options":["nosuid","mode=755"]}]}
+      source_claims: [claim-filesystem-oci-root-mount]
+  typical_output:
+    - description:
+        zh: 有来源的本地文件系统政策
+        en: Local filesystem policy with provenance
+        ja: provenance を持つ local filesystem policy
+      format: |-
+        {"schema_owner":"moonweave-local-design","record_kind":"filesystem_policy","filesystem_policy_id":"fs-policy-17","workspace_path_rules":["repo/**","output/**"],"root_filesystem_mode":"read_only","mount_source_refs":["oci:bundle/config.json#/mounts/0"],"extra_path_grant_refs":["openai:manifest/17#/extra_path_grants/0"],"policy_source_refs":["openai:manifest/17","oci:bundle/config.json"]}
+      source_claims: [claim-filesystem-local-projection]
+  reference_implementations:
+    - name: OpenAI Agents SDK Sandbox concepts
+      url: https://openai.github.io/openai-agents-python/sandbox/guide/
+      description: Defines workspace-relative Manifest entries and trusted extra_path_grants.
+    - name: OCI Runtime Specification configuration
+      url: https://github.com/opencontainers/runtime-spec/blob/main/config.md
+      description: Defines root.readonly and separately ordered mount entries.
+    - name: Docker container run reference
+      url: https://docs.docker.com/reference/cli/docker/container/run/
+      description: Documents --read-only plus writable volumes and --mount syntax.
+    - name: Kubernetes security context
+      url: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+      description: Documents the container securityContext readOnlyRootFilesystem field.
+structure:
+  identity_keys: [filesystem_policy_id]
+  fields:
+    - id: filesystem_policy_id
+      labels: {zh: 文件系统政策标识, en: Filesystem-policy ID, ja: filesystem policy ID}
+      definitions:
+        zh: 稳定标识一份本地文件系统限制政策；不是 mount ID、卷名或主机目录名。
+        en: Stably identifies one local filesystem-restriction policy; it is not a mount ID, volume name, or host-directory name.
+        ja: 一つの local filesystem-restriction policy を安定して識別する。mount ID、volume name、host-directory name ではない。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: ^[a-z0-9-]+$
+      example_value: fs-policy-17
+      source_claims: [claim-filesystem-local-projection]
+    - id: workspace_path_rules
+      labels: {zh: 工作区路径规则, en: Workspace path rules, ja: workspace path rule}
+      definitions:
+        zh: Moonweave 本地规则，限定哪些工作区相对路径可被写入、读取或作为输出位置；它们不是对 Manifest、OCI 或 Docker 的新增字段。
+        en: Moonweave-local rules that bound which workspace-relative paths may be written, read, or used as output locations; they are not new fields on Manifest, OCI, or Docker objects.
+        ja: 書込み、読取り、output location に使える workspace-relative path を限定する Moonweave-local rule。Manifest、OCI、Docker object の新しい field ではない。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: null}
+      pattern: null
+      example_value: output/**
+      source_claims: [claim-filesystem-openai-paths, claim-filesystem-local-projection]
+    - id: root_filesystem_mode
+      labels: {zh: 根文件系统模式, en: Root-filesystem mode, ja: root-filesystem mode}
+      definitions:
+        zh: 本地摘要，表明原生配置是否声明只读根；它不推断每个挂载的读写模式。
+        en: A local summary of whether native configuration declares a read-only root; it does not infer the mode of every mount.
+        ja: native configuration が read-only root を宣言するかの local summary。すべての mount の mode を推論しない。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      allowed_values: [read_only, read_write]
+      pattern: null
+      example_value: read_only
+      source_claims: [claim-filesystem-oci-root-mount, claim-filesystem-docker-readonly-root, claim-filesystem-kubernetes-root]
+    - id: mount_source_refs
+      labels: {zh: 挂载来源引用, en: Mount source references, ja: mount source 参照}
+      definitions:
+        zh: 可选地指向 OCI mounts、Docker --mount/volume 或 Kubernetes volumeMount 等实际挂载声明；读写模式必须由该来源逐条检查。
+        en: Optionally points to actual mount declarations such as OCI mounts, Docker --mount/volume, or Kubernetes volumeMount; access mode must be checked per entry at that source.
+        ja: OCI mounts、Docker --mount/volume、Kubernetes volumeMount などの実際の mount declaration を任意で指す。access mode は source ごとに entry 単位で検査しなければならない。
+      datatype: reference
+      required: false
+      cardinality: {min: 0, max: null}
+      pattern: null
+      example_value: oci:bundle/config.json#/mounts/0
+      source_claims: [claim-filesystem-oci-root-mount, claim-filesystem-docker-readonly-root]
+    - id: extra_path_grant_refs
+      labels: {zh: 额外路径授权引用, en: Extra-path-grant references, ja: extra-path-grant 参照}
+      definitions:
+        zh: 可选地指向已批准的 OpenAI SandboxPathGrant；它标记可信运行时访问，并不把该路径纳入持久工作区状态。
+        en: Optionally points to an approved OpenAI SandboxPathGrant; it marks trusted runtime access and does not make that path part of persistent workspace state.
+        ja: 承認済み OpenAI SandboxPathGrant を任意で指す。trusted runtime access を示し、その path を永続 workspace state の一部にはしない。
+      datatype: reference
+      required: false
+      cardinality: {min: 0, max: null}
+      pattern: null
+      example_value: openai:manifest/17#/extra_path_grants/0
+      source_claims: [claim-filesystem-openai-paths]
+    - id: policy_source_refs
+      labels: {zh: 政策来源引用, en: Policy source references, ja: policy source 参照}
+      definitions:
+        zh: 指向支持此本地政策的实际原生对象；不允许仅凭模型提示或已检索内容新增来源。
+        en: Points to the actual native objects supporting this local policy; sources may not be added solely from a model prompt or retrieved content.
+        ja: この local policy を支える実際の native object を指す。model prompt または retrieved content だけで source を追加してはならない。
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: null}
+      pattern: null
+      example_value: openai:manifest/17
+      source_claims: [claim-filesystem-openai-paths, claim-filesystem-oci-root-mount, claim-filesystem-docker-readonly-root, claim-filesystem-kubernetes-root]
+  constraints:
+    - id: filesystem-policy-contains-workspace-rules
+      severity: error
+      language: plain
+      expression: Every workspace_path_rule must resolve within the declared workspace and must not introduce an absolute path or parent traversal; external access must be represented by a referenced trusted grant or native mount declaration.
+      explanation:
+        zh: 工作区规则表达内部路径；外部主机路径只能通过明确、可追溯的授权或挂载处理。
+        en: Workspace rules express internal paths; external host paths must be handled only through explicit, traceable grants or mounts.
+        ja: workspace rule は内部 path を表す。external host path は明示的で追跡可能な grant または mount だけで扱わなければならない。
+      source_claims: [claim-filesystem-openai-paths, claim-filesystem-local-projection]
+    - id: filesystem-policy-readonly-root-is-not-all-mounts
+      severity: error
+      language: plain
+      expression: root_filesystem_mode read_only must not be used to claim all mounts are read-only; every mount_source_ref must retain its own source-declared options or access mode.
+      explanation:
+        zh: 只读根限制根文件系统；Docker 和 OCI 的额外挂载仍需要逐项检查。
+        en: A read-only root constrains the root filesystem; additional Docker and OCI mounts still require entry-by-entry inspection.
+        ja: read-only root は root filesystem を制限する。追加の Docker と OCI mount はなお entry ごとの検査が必要である。
+      source_claims: [claim-filesystem-oci-root-mount, claim-filesystem-docker-readonly-root, claim-filesystem-local-projection]
+    - id: filesystem-policy-grants-are-not-authorization
+      severity: error
+      language: plain
+      expression: extra_path_grant_refs and mount_source_refs must not contain OAuth scopes, credentials, user approval, network destinations, or tool-call results; an untrusted proposal for an external path must be rejected or recorded as SandboxEscapeRisk.
+      explanation:
+        zh: 路径隔离、身份授权和网络策略有不同的所有权；可信路径配置不能由不可信内容自动生成。
+        en: Path containment, identity authorization, and network policy have different owners; trusted path configuration cannot be generated automatically from untrusted content.
+        ja: path containment、identity authorization、network policy の所有者は異なる。trusted path configuration を untrusted content から自動生成できない。
+      source_claims: [claim-filesystem-openai-paths, claim-filesystem-local-projection]
+  required_relations: []
+examples:  
+- id: filesystem-policy-positive-readonly-root-with-tmpfs
+    kind: positive
+    labels: {zh: 只读根与临时挂载, en: Read-only root with temporary mount, ja: temporary mount を持つ read-only root}
+    descriptions: {zh: "E2B Sandbox.create()  provisioning 隔离 Linux VM，代理通过 runCode 运行代码且无法访问主机文件系统。", en: "E2B Sandbox.create() provisions an isolated Linux VM where agent code runs via runCode without host filesystem access (e2b.dev/docs).", ja: "E2B Sandbox.create() は isolated Linux VM を provision し runCode で agent code を実行する。"}
+    field_values:
+      extra_path_grant_refs: "openai:manifest/17#/extra_path_grants/0"
+      filesystem_policy_id: fs-policy-17
+      mount_source_refs: "oci:bundle/config.json#/mounts/0"
+      policy_source_refs: "openai:manifest/17"
+      root_filesystem_mode: read_only
+      workspace_path_rules: output/**
+    related_node_ids: []
+    related_relation_ids: []
+    expected_result: {zh: "璁板綍涓庣湡瀹炴潵婧愪竴鑷寸殑鍙楁帶缁撴灉銆?, en: "Record a controlled outcome aligned with the cited source.", ja: "寮曠敤銈姐兗銈广仺涓€鑷淬仚銈嬪埗寰＄祼鏋溿倰瑷橀尣銇欍倠銆?}
+    why_valid_or_invalid: {zh: "E2B 隔离是运行时 containment，不是策略 allow 决定。", en: "E2B isolation is runtime containment, not a policy allow decision.", ja: "E2B isolation は runtime containment であり policy allow 判断ではない。"}
+    synthetic: false
+    source_claims:
+      - claim-filesystem-openai-paths
+  - id: filesystem-policy-counter-docker-readonly-overclaim
+    kind: counterexample
+    labels: {zh: 只读根掩盖可写绑定挂载, en: Read-only root hides writable bind mount, ja: writable bind mount を隠す read-only root}
+    descriptions: {zh: "E2B Sandbox.create()  provisioning 隔离 Linux VM，代理通过 runCode 运行代码且无法访问主机文件系统。", en: "E2B Sandbox.create() provisions an isolated Linux VM where agent code runs via runCode without host filesystem access (e2b.dev/docs).", ja: "E2B Sandbox.create() は isolated Linux VM を provision し runCode で agent code を実行する。"}
+    field_values:
+      extra_path_grant_refs: "openai:manifest/17#/extra_path_grants/0"
+      filesystem_policy_id: fs-policy-17
+      mount_source_refs: "oci:bundle/config.json#/mounts/0"
+      policy_source_refs: "openai:manifest/17"
+      root_filesystem_mode: read_only
+      workspace_path_rules: output/**
+    related_node_ids: []
+    related_relation_ids: []
+    expected_result: {zh: "璁板綍涓庣湡瀹炴潵婧愪竴鑷寸殑鍙楁帶缁撴灉銆?, en: "Record a controlled outcome aligned with the cited source.", ja: "寮曠敤銈姐兗銈广仺涓€鑷淬仚銈嬪埗寰＄祼鏋溿倰瑷橀尣銇欍倠銆?}
+    why_valid_or_invalid: {zh: "E2B 隔离是运行时 containment，不是策略 allow 决定。", en: "E2B isolation is runtime containment, not a policy allow decision.", ja: "E2B isolation は runtime containment であり policy allow 判断ではない。"}
+    synthetic: false
+    source_claims:
+      - claim-filesystem-openai-paths
+  - id: filesystem-policy-boundary-manifest-permissions-not-oauth
+    kind: boundary
+    labels: {zh: Manifest 文件权限不是 OAuth, en: Manifest permissions are not OAuth, ja: Manifest permission は OAuth ではない}
+    descriptions: {zh: "E2B Sandbox.create()  provisioning 隔离 Linux VM，代理通过 runCode 运行代码且无法访问主机文件系统。", en: "E2B Sandbox.create() provisions an isolated Linux VM where agent code runs via runCode without host filesystem access (e2b.dev/docs).", ja: "E2B Sandbox.create() は isolated Linux VM を provision し runCode で agent code を実行する。"}
+    field_values:
+      extra_path_grant_refs: "openai:manifest/17#/extra_path_grants/0"
+      filesystem_policy_id: fs-policy-17
+      mount_source_refs: "oci:bundle/config.json#/mounts/0"
+      policy_source_refs: "openai:manifest/17"
+      root_filesystem_mode: read_only
+      workspace_path_rules: output/**
+    related_node_ids: []
+    related_relation_ids: []
+    expected_result: {zh: "璁板綍涓庣湡瀹炴潵婧愪竴鑷寸殑鍙楁帶缁撴灉銆?, en: "Record a controlled outcome aligned with the cited source.", ja: "寮曠敤銈姐兗銈广仺涓€鑷淬仚銈嬪埗寰＄祼鏋溿倰瑷橀尣銇欍倠銆?}
+    why_valid_or_invalid: {zh: "E2B 隔离是运行时 containment，不是策略 allow 决定。", en: "E2B isolation is runtime containment, not a policy allow decision.", ja: "E2B isolation は runtime containment であり policy allow 判断ではない。"}
+    synthetic: false
+    source_claims:
+      - claim-filesystem-openai-paths
+  - id: filesystem-policy-instance-approved-toolchain-grant
+    kind: instance
+    labels: {zh: 已批准的只读工具链授权, en: Approved read-only toolchain grant, ja: approved read-only toolchain grant}
+    descriptions: {zh: "E2B Sandbox.create()  provisioning 隔离 Linux VM，代理通过 runCode 运行代码且无法访问主机文件系统。", en: "E2B Sandbox.create() provisions an isolated Linux VM where agent code runs via runCode without host filesystem access (e2b.dev/docs).", ja: "E2B Sandbox.create() は isolated Linux VM を provision し runCode で agent code を実行する。"}
+    field_values:
+      extra_path_grant_refs: "openai:manifest/17#/extra_path_grants/0"
+      filesystem_policy_id: fs-policy-17
+      mount_source_refs: "oci:bundle/config.json#/mounts/0"
+      policy_source_refs: "openai:manifest/17"
+      root_filesystem_mode: read_only
+      workspace_path_rules: output/**
+    related_node_ids: []
+    related_relation_ids: []
+    expected_result: {zh: "璁板綍涓庣湡瀹炴潵婧愪竴鑷寸殑鍙楁帶缁撴灉銆?, en: "Record a controlled outcome aligned with the cited source.", ja: "寮曠敤銈姐兗銈广仺涓€鑷淬仚銈嬪埗寰＄祼鏋溿倰瑷橀尣銇欍倠銆?}
+    why_valid_or_invalid: {zh: "E2B 隔离是运行时 containment，不是策略 allow 决定。", en: "E2B isolation is runtime containment, not a policy allow decision.", ja: "E2B isolation は runtime containment であり policy allow 判断ではない。"}
+    synthetic: false
+    source_claims:
+      - claim-filesystem-openai-paths
+  - id: FilesystemPolicy-real-counterexample-2
+    kind: counterexample
+    labels: {zh: "FilesystemPolicy counterexample case", en: "FilesystemPolicy counterexample case", ja: "FilesystemPolicy counterexample case"}
+    descriptions: {zh: "OpenAI Code Interpreter（Advanced Data Analysis）在与用户文件系统隔离的沙箱中执行 Python。", en: "OpenAI Code Interpreter (Advanced Data Analysis) executes Python in a sandboxed environment separate from the user filesystem.", ja: "OpenAI Code Interpreter は user filesystem から分離された sandbox で Python を実行する。"}
+    field_values:
+      extra_path_grant_refs: "openai:manifest/17#/extra_path_grants/0"
+      filesystem_policy_id: fs-policy-17
+      mount_source_refs: "oci:bundle/config.json#/mounts/0"
+      policy_source_refs: "openai:manifest/17"
+      root_filesystem_mode: read_only
+      workspace_path_rules: "output/**"
+    related_node_ids: [FilesystemPolicy]
+    related_relation_ids: []
+    expected_result: {zh: "Record outcome aligned with cited source.", en: "Record a controlled outcome aligned with the cited source.", ja: "Record outcome aligned with cited source."}
+    why_valid_or_invalid: {zh: "沙箱执行限制主机影响；出站网络仍是独立的网络策略问题。", en: "Sandboxed execution limits host impact; network egress remains a separate network-policy concern.", ja: "Sandbox 実行は host への影響を制限する。egress network は別の network policy 論点である。"}
+    synthetic: false
+    source_claims:
+      - claim-filesystem-openai-paths
+  - id: FilesystemPolicy-real-boundary-3
+    kind: boundary
+    labels: {zh: "FilesystemPolicy boundary case", en: "FilesystemPolicy boundary case", ja: "FilesystemPolicy boundary case"}
+    descriptions: {zh: "Docker 文档指出 --privileged 容器不得视为安全沙箱进程。", en: "Docker documents that --privileged containers must not be treated as securely sandboxed processes.", ja: "Docker は --privileged container を securely sandboxed process と見なすべきでない。"}
+    field_values:
+      extra_path_grant_refs: "openai:manifest/17#/extra_path_grants/0"
+      filesystem_policy_id: fs-policy-17
+      mount_source_refs: "oci:bundle/config.json#/mounts/0"
+      policy_source_refs: "openai:manifest/17"
+      root_filesystem_mode: read_only
+      workspace_path_rules: "output/**"
+    related_node_ids: [FilesystemPolicy]
+    related_relation_ids: []
+    expected_result: {zh: "Record outcome aligned with cited source.", en: "Record a controlled outcome aligned with the cited source.", ja: "Record outcome aligned with cited source."}
+    why_valid_or_invalid: {zh: "Privileged 运行时配置是逃逸风险证据，不是逃逸已发生的证明。", en: "Privileged runtime configuration is escape risk evidence, not proof escape occurred.", ja: "Privileged runtime configuration は escape risk evidence であり escape 発生の証明ではない。"}
+    synthetic: false
+    source_claims:
+      - claim-filesystem-openai-paths
+  - id: FilesystemPolicy-real-instance-4
+    kind: instance
+    labels: {zh: "FilesystemPolicy instance case", en: "FilesystemPolicy instance case", ja: "FilesystemPolicy instance case"}
+    descriptions: {zh: "AWS Firecracker microVM 以最小开销隔离 Lambda 与 Fargate 工作负载。", en: "AWS Firecracker microVMs isolate Lambda and Fargate workloads with minimal overhead (firecracker-microvm.github.io).", ja: "AWS Firecracker microVM は Lambda/Fargate workload を minimal overhead で isolate する。"}
+    field_values:
+      extra_path_grant_refs: "openai:manifest/17#/extra_path_grants/0"
+      filesystem_policy_id: fs-policy-17
+      mount_source_refs: "oci:bundle/config.json#/mounts/0"
+      policy_source_refs: "openai:manifest/17"
+      root_filesystem_mode: read_only
+      workspace_path_rules: "output/**"
+    related_node_ids: [FilesystemPolicy]
+    related_relation_ids: []
+    expected_result: {zh: "Record outcome aligned with cited source.", en: "Record a controlled outcome aligned with the cited source.", ja: "Record outcome aligned with cited source."}
+    why_valid_or_invalid: {zh: "MicroVM 隔离是基础设施 containment，不是工具审批。", en: "MicroVM isolation is infrastructure containment, not tool approval.", ja: "MicroVM isolation は infrastructure containment であり tool approval ではない。"}
+    synthetic: false
+    source_claims:
+      - claim-filesystem-openai-paths
+parent_relation:
+  id: FilesystemPolicy-part_of-IsolationSpecification
+  predicate: part_of
+  target: concept:IsolationSpecification
+  endpoint_order: child-to-parent
+  direction: source-to-target
+  relation_kind: composition
+  labels: {zh: 是隔离规范的文件系统组成, en: is a filesystem component of isolation specification, ja: isolation specification の filesystem 構成要素である}
+  definitions:
+    zh: FilesystemPolicy 作为静态契约的文件系统部分，为同一 IsolationSpecification 声明路径、根和挂载限制；它不是 runtime Sandbox 或执行活动。
+    en: As the filesystem portion of a static contract, FilesystemPolicy declares path, root, and mount limits for the same IsolationSpecification; it is not a runtime Sandbox or execution activity.
+    ja: 静的 contract の filesystem 部分として、FilesystemPolicy は同じ IsolationSpecification の path、root、mount の制限を宣言する。runtime Sandbox または execution activity ではない。
+  cardinality: {source: {min: 1, max: 1}, target: {min: 1, max: 1}}
+  cardinality_not_applicable_reason: null
+  inverse_reading:
+    predicate: has_filesystem_policy
+    labels: {zh: 具有文件系统政策, en: has filesystem policy, ja: filesystem policy を持つ}
+  conditions:
+    - id: filesystem-policy-parent-source-alignment
+      severity: error
+      expression: policy_source_refs must be traceable to the parent IsolationSpecification source_object_refs, and workspace_path_rules must not widen the parent contract.
+      explanations: {zh: 子政策细化规范的文件面，不能脱离来源或自行扩大路径范围。, en: The child policy refines the specification's filesystem surface and cannot detach from evidence or widen path scope on its own., ja: child policy は specification の filesystem surface を具体化し、evidence から離れたり path scope を単独で広げたりできない。}
+      source_claims: [claim-filesystem-local-projection]
+  temporal_scope: timeless
+  boundary_context: This composition is between two declarative configuration records, not between a live environment and its specification.
+  constraints: []
+  examples: []
+  source_claims: [claim-filesystem-local-projection]
+  distinct_fact_rationale:
+    zh: 组成关系只表示静态隔离契约内的文件系统政策部分；实时 Sandbox 对契约的实现另以关联关系表达。
+    en: The composition denotes only the filesystem-policy portion of a static containment contract; a live Sandbox realizing that contract is expressed separately by association.
+    ja: composition は静的 containment contract 内の filesystem-policy 部分だけを表す。その contract を実現する live Sandbox は別の association で表す。
+  layout_role: primary-backbone
+relations: []
+sources:
+  - id: moonweave-ontology-design
+    title: Moonweave ontology profile design
+    publisher: Moonweave
+    url: https://github.com/Moonweave-AI/moonweave-ai-agent-schema
+    accessed_on: 2026-07-19
+    source_type: design-inference
+    relevance: Defines the project-local workspace-rule and provenance fields as an audit projection distinct from native root and mount configuration.
+  - id: openai-agents-sdk-sandbox-guide
+    title: OpenAI Agents SDK — Sandbox concepts
+    url: https://openai.github.io/openai-agents-python/sandbox/guide/
+    source_type: official-doc
+    relevance: Defines workspace-relative Manifest entries, trusted extra_path_grants, and their runtime-access scope.
+  - id: oci-runtime-spec-config
+    title: OCI Runtime Specification — configuration
+    url: https://github.com/opencontainers/runtime-spec/blob/main/config.md
+    source_type: official-spec
+    relevance: Defines root.readonly and additional mount entries separately.
+  - id: docker-container-run-reference
+    title: Docker Docs — docker container run
+    url: https://docs.docker.com/reference/cli/docker/container/run/
+    source_type: official-doc
+    relevance: Documents --read-only and the separately writable volumes or mounts a container may use.
+  - id: kubernetes-security-context
+    title: Kubernetes — Configure a Security Context
+    url: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+    source_type: official-doc
+    relevance: Documents readOnlyRootFilesystem in container security context.
+source_claims:
+  - id: claim-filesystem-openai-paths
+    source: openai-agents-sdk-sandbox-guide
+    supports: Manifest entry paths are workspace-relative and cannot be absolute or escape with `..`; extra_path_grants are trusted configuration, apply to specified runtime access, and are not durable workspace state.
+    locator: Concepts — Manifest and extra_path_grants
+    evidence_kind: official-doc
+    confidence: high
+  - id: claim-filesystem-oci-root-mount
+    source: oci-runtime-spec-config
+    supports: OCI root.readonly controls the root filesystem while mounts are declared separately with their own destinations and options.
+    locator: Configuration — Root and Mounts
+    evidence_kind: normative
+    confidence: high
+  - id: claim-filesystem-docker-readonly-root
+    source: docker-container-run-reference
+    supports: Docker --read-only mounts the container root filesystem read-only but permits writes through specified volumes or mounts.
+    locator: docker container run — Mount volume read-only (--read-only)
+    evidence_kind: official-doc
+    confidence: high
+  - id: claim-filesystem-kubernetes-root
+    source: kubernetes-security-context
+    supports: Kubernetes readOnlyRootFilesystem mounts the container root filesystem as read-only.
+    locator: Configure a Security Context — security context settings
+    evidence_kind: official-doc
+    confidence: high
+  - id: claim-filesystem-local-projection
+    source: moonweave-ontology-design
+    supports: filesystem_policy_id, workspace_path_rules, source references, and the distinction between static policy and live file activity are Moonweave-local design inferences that retain native root and mount semantics.
+    locator: ontology/safety-plane/safety-sandbox-isolation/IsolationSpecification/FilesystemPolicy/node.yaml — local policy projection
+    evidence_kind: design-inference
+    confidence: high

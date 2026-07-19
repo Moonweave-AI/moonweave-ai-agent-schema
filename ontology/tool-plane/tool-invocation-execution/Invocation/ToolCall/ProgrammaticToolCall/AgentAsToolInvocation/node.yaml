@@ -1,493 +1,368 @@
 schema: moonweave.ai/ontology-node/v1
 id: AgentAsToolInvocation
 kind: concept
-status: accepted
-labels:
-  zh: 智能体工具调用
-  en: Agent-as-Tool Invocation
-  ja: エージェントツール呼び出し
+labels: {zh: 代理即工具调用活动, en: Agent-as-tool invocation activity, ja: エージェントをツールとして呼び出す活動}
 semantics:
-  short_definition:
-    zh: 智能体工具调用是把另一个智能体暴露为可调用工具的一种程序化工具调用。
-    en: An Agent-as-Tool Invocation is a Programmatic Tool Call that exposes another agent as a callable tool.
-    ja: エージェントツール呼び出しは別 agent を callable tool として公開する Programmatic Tool Call です。
+  short_definition: {zh: 将专门代理作为可返回控制权工具执行的 ProgrammaticToolCall 活动, en: A ProgrammaticToolCall activity that invokes a specialized agent as a control-returning tool, ja: 専門エージェントを制御復帰型ツールとして実行する ProgrammaticToolCall 活動}
   definition:
-    zh: 智能体工具调用是一种 ProgrammaticToolCall，以被调用能力由另一个智能体实现、调用方生成输入并接收工具结果为种差；管理者保留会话控制与最终答案责任，被调用智能体不自动接管会话，因此该调用本身不是 DelegationProcess 或 Handoff。
-    en: An Agent-as-Tool Invocation is a ProgrammaticToolCall differentiated by another agent implementing the called capability while the caller generates input and receives a tool result. The manager retains conversation control and final-answer responsibility; the called agent does not automatically take over the conversation, so the call is not itself a DelegationProcess or Handoff.
-    ja: エージェントツール呼び出しは別 agent が called capability を実装し caller が input を生成して tool result を受け取る ProgrammaticToolCall です。manager は conversation control と final-answer responsibility を保持し、called agent は会話を自動引継ぎしないため DelegationProcess/Handoff ではありません。
+    zh: >-
+      AgentAsToolInvocation 是工具目标为代理适配器的本地 ProgrammaticToolCall 子类。嵌套工作返回后，父编排活动仍保留控制权；它不是 A2A SendMessage 请求、A2A Task、A2A Artifact 或 OpenAI Agents SDK 对象，这些可作为本地活动引用的原生证据。
+    en: >
+      An AgentAsToolInvocation is a local ProgrammaticToolCall subtype whose tool target is an agent
+      adapter. The parent orchestration activity retains control after the nested work returns. It is
+      not an A2A SendMessage request, A2A Task, A2A Artifact, or an OpenAI Agents SDK object; those
+      may be native evidence referenced by this local activity.
+    ja: >-
+      AgentAsToolInvocation は tool target が agent adapter であるローカル ProgrammaticToolCall subtype である。nested work が戻った後も親 orchestration activity が制御を保持する。A2A SendMessage request、A2A Task、A2A Artifact、OpenAI Agents SDK object そのものではなく、これらはローカル活動が参照する native evidence になり得る。
   why_needed:
-    zh: 该节点把‘调用智能体能力’与‘转移责任’明确分开，防止只因参与者是智能体就误判发生委派。
-    en: The node separates calling an agent capability from transferring responsibility, preventing agent participation alone from implying delegation.
-    ja: agent capability call と responsibility transfer を分離し agent participation だけで delegation と誤判しません。
+    zh: >-
+      “代理作为工具”与控制权移交具有不同的编排语义。将前者建模为本地工具调用活动，可保留调用方控制权，并让适配器关联 OpenAI agent-as-tool 运行或 A2A 交换，而不折叠不同的消息、任务和产物契约。
+    en: >
+      “Agent as tool” and control handoff have different orchestration semantics. Modeling the former
+      as a local tool-call activity preserves caller control and lets adapters correlate an OpenAI
+      agent-as-tool run or an A2A exchange without collapsing their different message, task, and
+      artifact contracts.
+    ja: >-
+      「agent as tool」と control handoff は異なる orchestration semantics を持つ。前者をローカル tool-call activity としてモデル化すると caller control を保ち、adapter は OpenAI agent-as-tool run または A2A exchange を相関でき、異なる message、task、artifact contract を一つに畳み込まない。
   includes:
-    - zh: 纳入调用方仍控制会话、生成输入并把被调用智能体返回值当作工具结果的程序化调用。
-      en: Includes programmatic calls where the caller retains conversation control, generates input, and treats the called agent's return as a tool result.
-      ja: caller が conversation control を保持し input を生成して called agent return を tool result とする programmatic call を含みます。
+    - {zh: 本地活动标识、父程序化调用引用、目标代理引用、适配器和控制返回模式, en: "Local activity ID, parent programmatic-call reference, target-agent reference, adapter, and control-return mode", ja: ローカル活動 ID、親プログラム型呼出し参照、対象エージェント参照、adapter、制御復帰モード}
   excludes:
-    - zh: 排除通过 DelegationContract 转移工作范围、权限或最终答案责任的委派，以及 Handoff 的会话控制转移。
-      en: Excludes delegation that transfers work scope, authority, or final-answer responsibility through a DelegationContract, and conversation-control transfer through Handoff.
-      ja: DelegationContract による work scope・authority・final-answer responsibility 移転と Handoff の conversation-control transfer を除きます。
+    - {zh: A2A SendMessage、Task 或 Artifact 对象, en: "An A2A SendMessage, Task, or Artifact object", ja: A2A SendMessage、Task、Artifact オブジェクト}
+    - {zh: 转移对话控制权的 handoff, en: A handoff that transfers conversation control, ja: 会話制御を移譲する handoff}
   semantic_kind: activity
-  aliases: []
+  aliases:
+    - {language: en, value: nested agent tool call, alias_kind: synonym}
+engineering:
+  explanation:
+    zh: >-
+      OpenAI Agents SDK 通过 agent.as_tool(tool_name, tool_description) 将代理作为可调用工具，并说明这避免完整 handoff。适配器使用 A2A 时，原生请求仍是带 Message 的 HTTP POST /message:send，响应仍是 Task 或 Message，任务 Artifact 仍为基于 Part 的输出；本地活动关联任一适配器但不重命名其原生对象。
+    en: >
+      The OpenAI Agents SDK exposes an agent as a callable tool with
+      agent.as_tool(tool_name, tool_description), and documents that this avoids a full handoff.
+      When an adapter uses A2A, its native request remains an HTTP POST to /message:send with a
+      Message; the response remains a Task or Message, and task Artifacts remain Part-based output.
+      The local activity correlates either adapter without renaming those native objects.
+    ja: >-
+      OpenAI Agents SDK は agent.as_tool(tool_name, tool_description) により agent を callable tool として公開し、完全な handoff を避けると説明している。adapter が A2A を使う場合、native request は Message を伴う HTTP POST /message:send のままで、response は Task または Message、task Artifact は Part-based output のままである。ローカル活動はどちらの adapter も相関するが native object を改名しない。
+  typical_input:
+    - description: OpenAI Agents SDK agent-as-tool registration.
+      format: 'translator_agent.as_tool(tool_name="translate_text", tool_description="Translate text between languages.")'
+      source_claims: [openai-agents-as-tool]
+    - description: Native A2A message send request referenced by an adapter.
+      format: '{"message":{"role":"ROLE_USER","parts":[{"text":"Summarize this report"}],"messageId":"msg-42"}}'
+      source_claims: [a2a-send-message]
+  typical_output:
+    - description: Local agent-as-tool activity record.
+      format: '{"local_agent_as_tool_invocation_id":"agent-tool-42","local_target_agent_ref":"agent:translator","local_agent_adapter":"openai_agents_sdk","local_control_return_mode":"return_to_caller"}'
+      source_claims: [moonweave-agent-as-tool]
+  reference_implementations:
+    - name: OpenAI Agents SDK Tools
+      url: https://openai.github.io/openai-agents-python/tools/
+      description: Documents Agent.as_tool and nested tool-agent behavior.
+    - name: A2A Protocol Specification
+      url: https://a2a-protocol.org/latest/specification/
+      description: Defines SendMessage, Task, Message, and Artifact contracts.
 structure:
-  identity_keys: []
+  identity_keys: [local_agent_as_tool_invocation_id]
   fields:
-    - id: agent_tool_ref
-      labels:
-        zh: 智能体工具引用
-        en: agent-tool reference
-        ja: agent-tool 参照
+    - id: local_agent_as_tool_invocation_id
+      labels: {zh: 本地代理工具调用标识, en: Local agent-as-tool invocation ID, ja: ローカル agent-as-tool 呼出し ID}
+      definitions: {zh: 主机分配给代理即工具活动的标识, en: Identifier assigned by the host to the agent-as-tool activity, ja: agent-as-tool 活動にホストが割り当てる識別子}
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 指向把智能体能力封装为工具的稳定定义。
-        en: References the stable definition wrapping an agent capability as a tool.
-        ja: agent capability を tool として包む stable definition を参照します。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
-      example_value: agent-tool:web-researcher@2
-      source_claims:
-        - claim-agent-as-tool-invocation-002
-    - id: generated_input
-      labels:
-        zh: 生成输入
-        en: generated input
-        ja: 生成入力
-      datatype: object
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 保存调用管理者为被调用智能体生成的结构化输入。
-        en: Stores structured input generated by the managing caller for the called agent.
-        ja: managing caller が called agent 用に生成した structured input を保存します。
+      example_value: agent-tool-42
       allowed_values: []
-      pattern: null
-      example_value:
-        query: MCP error semantics
-      source_claims:
-        - claim-agent-as-tool-invocation-003
-    - id: caller_agent_ref
-      labels:
-        zh: 调用智能体引用
-        en: caller-agent reference
-        ja: caller agent 参照
+      source_claims: [moonweave-agent-as-tool]
+    - id: local_target_agent_ref
+      labels: {zh: 本地目标代理引用, en: Local target-agent reference, ja: ローカル対象エージェント参照}
+      definitions: {zh: 被工具适配器调用的代理配置或可寻址代理标识, en: Addressable agent configuration or agent identifier invoked by the tool adapter, ja: ツール adapter が呼出すアドレス可能なエージェント設定またはエージェント識別子}
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 标识仍持有会话控制的调用方智能体。
-        en: Identifies the caller agent retaining conversation control.
-        ja: conversation control を保持する caller agent を識別します。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
-      example_value: agent:lead
-      source_claims:
-        - claim-agent-as-tool-invocation-004
-    - id: answer_owner_ref
-      labels:
-        zh: 最终答案责任引用
-        en: final-answer owner reference
-        ja: 最終回答責任参照
+      example_value: agent:translator
+      allowed_values: []
+      source_claims: [openai-agents-as-tool, moonweave-agent-as-tool]
+    - id: local_agent_adapter
+      labels: {zh: 本地代理适配器, en: Local agent adapter, ja: ローカルエージェント adapter}
+      definitions: {zh: 执行嵌套代理调用的适配器种类，不是 A2A 或 OpenAI 原生 type 字段, en: Adapter kind used to execute nested agent call and not an A2A or OpenAI native type field, ja: ネストしたエージェント呼出しを実行する adapter 種別であり A2A または OpenAI ネイティブ type 項目ではない}
       datatype: string
       required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 显式指向调用完成后仍承担最终答案责任的主体。
-        en: Explicitly identifies the actor retaining final-answer responsibility after the call.
-        ja: call 後も final-answer responsibility を保持する actor を明示します。
-      allowed_values: []
+      cardinality: {min: 1, max: 1}
       pattern: null
-      example_value: answer-owner:lead
-      source_claims:
-        - claim-agent-as-tool-invocation-005
-  constraints: []
-  required_relation_constraints: []
+      example_value: openai_agents_sdk
+      allowed_values: [openai_agents_sdk, a2a_adapter, local_agent_runtime]
+      source_claims: [openai-agents-as-tool, a2a-send-message, moonweave-agent-as-tool]
+    - id: local_control_return_mode
+      labels: {zh: 本地控制返回模式, en: Local control-return mode, ja: ローカル制御復帰モード}
+      definitions: {zh: 嵌套工作结束时的本地编排期望，不替代远端任务状态, en: Local orchestration expectation at nested-work completion and not a replacement for remote task state, ja: ネスト作業完了時のローカル編成期待でありリモート task 状態の置換ではない}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: return_to_caller
+      allowed_values: [return_to_caller]
+      source_claims: [openai-agents-as-tool, moonweave-agent-as-tool]
+    - id: local_a2a_send_message_ref
+      labels: {zh: A2A 发送消息引用, en: A2A SendMessage reference, ja: A2A SendMessage 参照}
+      definitions: {zh: 当适配器为 a2a_adapter 时，指向保留的原生 A2A SendMessage 请求的本地引用, en: Local reference to retained native A2A SendMessage request when adapter is a2a_adapter, ja: adapter が a2a_adapter の場合に保持されたネイティブ A2A SendMessage 要求へのローカル参照}
+      datatype: string
+      required: false
+      cardinality: {min: 0, max: 1}
+      pattern: null
+      example_value: a2a-http-42/message-send
+      allowed_values: []
+      source_claims: [a2a-send-message, moonweave-agent-as-tool]
+    - id: local_programmatic_tool_call_id
+      labels: {zh: 本地程序化调用标识, en: Local programmatic-call ID, ja: ローカルプログラム型呼出し ID}
+      definitions: {zh: 主机分配给程序化工具调用活动的标识, en: Identifier assigned by the host to the programmatic tool-call activity, ja: プログラム型ツール呼出し活動にホストが割り当てる識別子}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: programmatic-call-42
+      allowed_values: []
+      source_claims: [moonweave-agent-as-tool]
+    - id: local_caller_ref
+      labels: {zh: 本地调用方引用, en: Local caller reference, ja: ローカル caller 参照}
+      definitions: {zh: 发起该工具调用的运行时组件、工作流步骤或应用代码标识, en: "Identifier of the runtime component, workflow step, or application code that initiated the call", ja: 呼出しを開始したランタイム構成要素、ワークフローステップ、アプリケーションコードの識別子}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: workflow:pricing-step
+      allowed_values: []
+      source_claims: [moonweave-agent-as-tool]
+    - id: local_initiator_kind
+      labels: {zh: 本地发起方种类, en: Local initiator kind, ja: ローカル開始者種別}
+      definitions: {zh: 本地活动发起源分类，不是协议 type 字段, en: Classification of local activity initiator and not a protocol type field, ja: ローカル活動開始源の分類でありプロトコル type 項目ではない}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: runtime_orchestrator
+      allowed_values: [runtime_orchestrator, workflow_step, application_code, scheduler]
+      source_claims: [moonweave-agent-as-tool]
+    - id: local_tool_call_id
+      labels: {zh: 本地工具调用标识, en: Local tool-call ID, ja: ローカルツール呼出し ID}
+      definitions: {zh: 主机分配给该工具调用活动的稳定标识, en: Stable identifier assigned by the host to this tool-call activity, ja: このツール呼出し活動にホストが割り当てる安定識別子}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: tool-call-42
+      allowed_values: []
+      source_claims: [moonweave-agent-as-tool]
+    - id: local_source_surface
+      labels: {zh: 本地来源表面, en: Local source surface, ja: ローカルソース表面}
+      definitions: {zh: 拥有原生调用契约的 API 或协议表面，不是原生 type 字段, en: API or protocol surface that owns the native call contract and not a native type field, ja: ネイティブ呼出し契約を所有する API またはプロトコル表面でありネイティブ type 項目ではない}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: mcp_jsonrpc
+      allowed_values: [mcp_jsonrpc, openai_responses_function, openai_remote_mcp]
+      source_claims: [moonweave-agent-as-tool]
+    - id: local_tool_name
+      labels: {zh: 本地工具名称, en: Local tool name, ja: ローカルツール名}
+      definitions: {zh: 从来源特定调用对象映射用于审计的工具名称, en: Tool name mapped from the source-specific call object for audit, ja: 監査用にソース固有呼出しオブジェクトから対応付けたツール名}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: get_weather
+      allowed_values: []
+      source_claims: [moonweave-agent-as-tool]
+    - id: local_native_call_ref
+      labels: {zh: 原生调用引用, en: Native-call reference, ja: ネイティブ呼出し参照}
+      definitions: {zh: 指向保留的 MCP JSON-RPC 对象或 OpenAI Responses item 的可审计引用, en: Auditable reference to a retained MCP JSON-RPC object or OpenAI Responses item, ja: 保持された MCP JSON-RPC オブジェクトまたは OpenAI Responses item への監査可能参照}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: mcp-session-42#id-2
+      allowed_values: []
+      source_claims: [moonweave-agent-as-tool]
+    - id: local_approval_observation
+      labels: {zh: 本地审批观察, en: Local approval observation, ja: ローカル承認観測}
+      definitions: {zh: 主机对工具调用审批的局部观察，不替代来源协议的审批对象, en: Host-local observation of call approval and not a replacement for a source protocol approval object, ja: 呼出し承認に対するホストローカル観測でありソースプロトコル承認オブジェクトの置換ではない}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: approved
+      allowed_values: [not_required, pending, approved, denied]
+      source_claims: [moonweave-agent-as-tool]
+    - id: local_invocation_id
+      labels: {zh: 本地调用标识, en: Local invocation ID, ja: ローカル呼び出し ID}
+      definitions: {zh: 主机为一个本地执行活动分配的稳定标识, en: A stable identifier assigned by the host to one local execution activity, ja: 一つのローカル実行活動にホストが割り当てる安定識別子}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: inv-42
+      allowed_values: []
+      source_claims: [moonweave-agent-as-tool]
+    - id: local_surface
+      labels: {zh: 本地来源表面, en: Local source surface, ja: ローカルソース表面}
+      definitions: {zh: 主机选择适配器时记录的来源类型，非原生协议字段, en: The source category recorded by the host for adapter selection; not a native protocol field, ja: ホストがアダプター選択に記録するソース分類でありネイティブプロトコル項目ではない}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: mcp_tools_call
+      allowed_values: [mcp_tools_call, openai_responses_function, openai_responses_remote_mcp, a2a_send_message, local_command]
+      source_claims: [moonweave-agent-as-tool]
+    - id: local_target_ref
+      labels: {zh: 本地目标引用, en: Local target reference, ja: ローカル対象参照}
+      definitions: {zh: 指向要执行目标的本地或已发现引用, en: A local or discovered reference to the target being executed, ja: 実行対象へのローカルまたは発見済み参照}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: mcp:weather/get_weather
+      allowed_values: []
+      source_claims: [moonweave-agent-as-tool]
+    - id: local_lifecycle_state
+      labels: {zh: 本地生命周期状态, en: Local lifecycle state, ja: ローカルライフサイクル状態}
+      definitions: {zh: 主机对其本地追踪活动的状态，不重命名远程 TaskStatus, en: The host state of its local trace and not a renamed remote TaskStatus, ja: ホストによるローカル軌跡状態でありリモート TaskStatus の改名ではない}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: dispatched
+      allowed_values: [planned, dispatched, completed, failed, cancelled]
+      source_claims: [moonweave-agent-as-tool]
+  constraints:
+    - id: agent-as-tool-retains-caller-control
+      severity: error
+      expression_language: plain
+      expression: local_control_return_mode must be return_to_caller, and the activity must not assert a conversation-control handoff to local_target_agent_ref.
+      explanation: {zh: 代理即工具调用必须返回调用方控制权，不能声称是 handoff, en: An agent-as-tool invocation returns control to caller and cannot claim to be a handoff, ja: agent-as-tool 呼出しは caller に制御を返し handoff だと主張できない}
+      source_claims: [openai-agents-as-tool, moonweave-agent-as-tool]
+    - id: agent-as-tool-keeps-a2a-native-objects
+      severity: error
+      expression_language: plain
+      expression: When local_agent_adapter is a2a_adapter, local_a2a_send_message_ref identifies the native request and any returned Task, Message, or Artifact retains its A2A schema.
+      explanation: {zh: 使用 A2A 适配器时，本地引用必须指向原生请求，返回 Task、Message 或 Artifact 保留 A2A schema, en: "With an A2A adapter the local reference identifies native request and returned Task, Message, or Artifact retains A2A schema", ja: A2A adapter ではローカル参照がネイティブ要求を示し返却 Task、Message、Artifact は A2A schema を保つ}
+      source_claims: [a2a-send-message, a2a-task-artifact, moonweave-agent-as-tool]
+    - id: agent-as-tool-invocation-id-same-record-parent-identity
+      severity: error
+      expression_language: plain
+      expression: "local_agent_as_tool_invocation_id = local_programmatic_tool_call_id; both identify the same local ProgrammaticToolCall record and inherited parent fields belong to that one record."
+      explanation: {zh: "local_agent_as_tool_invocation_id 与 local_programmatic_tool_call_id 标识同一条本地 ProgrammaticToolCall 记录，继承的父字段属于该同一记录。", en: "The child and parent IDs are equal representations of one local record, not a link to a second parent record.", ja: "local_agent_as_tool_invocation_id と local_programmatic_tool_call_id は同じローカル ProgrammaticToolCall レコードを識別し、継承した親フィールドはその一つのレコードに属する。"}
+      source_claims: [moonweave-agent-as-tool]
+  required_relations: []
 examples:
-  - id: AgentAsToolInvocation-example-positive-manual-001
-    kind: positive
-    labels:
-      zh: 智能体工具调用正例
-      en: Agent-as-Tool Invocation positive case
-      ja: エージェントツール呼び出し正例
-    scenario_id: null
+  - id: agent-as-tool-positive-openai
+
+    labels: {zh: OpenAI 翻译代理工具, en: OpenAI translator agent tool, ja: OpenAI 翻訳エージェントツール}
+
     descriptions:
-      zh: 主智能体把 web-researcher 当作工具调用，生成限定查询；研究智能体返回摘要，主智能体继续组织并提交最终答案。
-      en: A lead agent calls web-researcher as a tool with generated scoped input; the researcher returns a summary and the lead agent still composes and submits the final answer.
-      ja: lead agent が web-researcher を tool として scoped input で呼出し、researcher は summary を返し lead agent が final answer を作成提出します。
-    field_values:
-      invocation_id: invocation:research-agent-12
-      specification_ref: invocation-spec:agent-tool-web-researcher@2
-      requested_by_ref: agent:lead
-      argument_digest: sha256:449e84a0ec2ca2360c7b6eb0ea3154596542553928527fb9987fd1ddd797314b
-      requested_at: 2026-07-16T01:55:00Z
-      call_id: call_research_agent_12
-      tool_definition_ref: tool-def:agent-web-researcher@2
-      operation_name: agent.web-researcher.invoke
-      arguments:
-        query: MCP error semantics
-      initiator_kind: runtime-orchestration
-      call_interface: function_call
-      agent_tool_ref: agent-tool:web-researcher@2
-      generated_input:
-        query: MCP error semantics
-      caller_agent_ref: agent:lead
-      answer_owner_ref: answer-owner:lead
-    related_node_ids:
-      - AgentAsToolInvocation
-      - ProgrammaticToolCall
-      - AnswerOwnership
-    related_relation_ids:
-      - AgentAsToolInvocation-is_a-ProgrammaticToolCall
-      - retains_answer_ownership
-    expected_result:
-      zh: 建立 AgentAsToolInvocation，并保留它与相邻规范、尝试或结果的独立身份。
-      en: Create AgentAsToolInvocation while preserving its identity from adjacent specifications, attempts, or results.
-      ja: AgentAsToolInvocation を作成し adjacent specification・attempt・result との separate identity を保持します。
-    why_valid_or_invalid:
-      zh: 纳入调用方仍控制会话、生成输入并把被调用智能体返回值当作工具结果的程序化调用。
-      en: Includes programmatic calls where the caller retains conversation control, generates input, and treats the called agent's return as a tool result.
-      ja: caller が conversation control を保持し input を生成して called agent return を tool result とする programmatic call を含みます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
-    source_claims:
-      - claim-agent-as-tool-invocation-006
-  - id: AgentAsToolInvocation-example-boundary-manual-001
-    kind: boundary
-    labels:
-      zh: 智能体工具调用边界例
-      en: Agent-as-Tool Invocation boundary case
-      ja: エージェントツール呼び出し境界例
-    scenario_id: null
+      zh: ReAct (Yao 2023) Action: Search[entity]/Lookup[term]/Finish[answer]；Anthropic content:[{type:"tool_use",id:"toolu_01",name:"get_weather",input:{location:"Paris"}}]；Vercel AI SDK generateText({tools:{weather:tool({execute:async({city})=>...)}})。
+      en: ReAct (Yao 2023) Action: Search[entity]/Lookup[term]/Finish[answer]; Anthropic content:[{type:"tool_use",id:"toolu_01",name:"get_weather",input:{location:"Paris"}}]; Vercel AI SDK generateText({tools:{weather:tool({execute:async({city})=>...)}}).
+      ja: ReAct (Yao 2023) Action: Search[entity]/Lookup[term]/Finish[answer]。Anthropic tool_use。Vercel AI SDK generateText({tools:{weather:tool({execute:async({city})=>...)}})。
+    field_values: {local_agent_as_tool_invocation_id: agent-tool-42, local_target_agent_ref: agent:translator, local_agent_adapter: openai_agents_sdk, local_control_return_mode: return_to_caller}
+    related_node_ids: [AgentAsToolInvocation, ProgrammaticToolCall]
+    related_relation_ids: [AgentAsToolInvocation-is_a-ProgrammaticToolCall]
+
+    source_claims: [openai-agents-as-tool, moonweave-agent-as-tool]
+  - id: agent-as-tool-counterexample-a2a-task-object
+
+    labels: {zh: 将 A2A Task 冒充本地活动, en: A2A Task masquerading as local activity, ja: ローカル活動を装う A2A Task}
+
     descriptions:
-      zh: 协调者把客户案例、权限和交付责任按 DelegationContract 交给专家，专家直接向用户负责；这是委派而非工具调用。
-      en: A coordinator transfers the customer case, authority, and delivery responsibility to a specialist under a DelegationContract, and the specialist answers the user directly; this is delegation, not a tool call.
-      ja: coordinator が case・authority・delivery responsibility を DelegationContract で specialist へ移し specialist が user に直接責任を持つため delegation で tool call ではありません。
-    field_values:
-      call_id: call_research_agent_12
-    related_node_ids:
-      - AgentAsToolInvocation
-      - ProgrammaticToolCall
-    related_relation_ids:
-      - AgentAsToolInvocation-is_a-ProgrammaticToolCall
-    expected_result:
-      zh: 不建立 AgentAsToolInvocation；按边界例所示保留在更准确的概念中。
-      en: Do not create AgentAsToolInvocation; keep the record in the more accurate concept identified by the boundary.
-      ja: AgentAsToolInvocation を作らず boundary が示す accurate concept に保持します。
-    why_valid_or_invalid:
-      zh: 排除通过 DelegationContract 转移工作范围、权限或最终答案责任的委派，以及 Handoff 的会话控制转移。
-      en: Excludes delegation that transfers work scope, authority, or final-answer responsibility through a DelegationContract, and conversation-control transfer through Handoff.
-      ja: DelegationContract による work scope・authority・final-answer responsibility 移転と Handoff の conversation-control transfer を除きます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
-    source_claims:
-      - claim-agent-as-tool-invocation-007
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      zh: 反例：ReAct Action 无对应 Observation 就继续推理；Anthropic tool_use 缺少配对 tool_result(tool_use_id)；Vercel AI SDK execute 抛错未捕获。
+      en: Counterexample: ReAct continues reasoning without Observation for Action; Anthropic tool_use missing paired tool_result(tool_use_id); Vercel AI SDK execute error uncaught.
+      ja: 反例：ReAct Action に Observation なしで reasoning 継続。Anthropic tool_use に tool_result ペア欠落。Vercel AI SDK execute エラー未捕捉。
+    field_values: {local_agent_as_tool_invocation_id: agent-tool-bad, local_target_agent_ref: agent:researcher, local_agent_adapter: a2a_adapter, local_control_return_mode: return_to_caller}
+    related_node_ids: [AgentAsToolInvocation]
+    related_relation_ids: [AgentAsToolInvocation-is_a-ProgrammaticToolCall]
+
+    source_claims: [a2a-send-message, a2a-task-artifact, moonweave-agent-as-tool]
+  - id: agent-as-tool-boundary-a2a-message
+
+    labels: {zh: A2A 消息与本地活动边界, en: A2A message versus local-activity boundary, ja: A2A メッセージとローカル活動の境界}
+
+    descriptions:
+      zh: ReAct 文本 Action 标记 vs Anthropic structured tool_use vs Vercel AI SDK Zod schema tool 的 wire 契约边界；本地 Invocation 活动非原生封包。
+      en: Wire contract boundary among ReAct text Action markers, Anthropic structured tool_use, Vercel AI SDK Zod schema tools; local Invocation activity is not native envelope.
+      ja: ReAct テキスト Action marker、Anthropic structured tool_use、Vercel AI SDK Zod schema tool の wire 契約境界。ローカル Invocation 活動はネイティブ envelope ではない。
+    field_values: {local_agent_as_tool_invocation_id: agent-tool-a2a-1, local_target_agent_ref: agent:researcher, local_agent_adapter: a2a_adapter, local_control_return_mode: return_to_caller, local_a2a_send_message_ref: a2a-http-42/message-send}
+    related_node_ids: [AgentAsToolInvocation, ProgrammaticToolCall]
+    related_relation_ids: [AgentAsToolInvocation-is_a-ProgrammaticToolCall]
+
+    source_claims: [a2a-send-message, a2a-task-artifact, moonweave-agent-as-tool]
+  - id: agent-as-tool-instance-research
+
+    labels: {zh: 研究代理工具实例, en: Research-agent tool instance, ja: 研究エージェントツール実例}
+
+    descriptions:
+      zh: ReAct HotpotQA 实例：Thought→Action: Search[Arthur's Magazine]→Observation→Action: Lookup[Arthur's Magazine]→Finish[1850]；Anthropic tool_use_id=toolu_01A09q90qw90 配对 tool_result。
+      en: ReAct HotpotQA instance: Thought→Action: Search[Arthur's Magazine]→Observation→Action: Lookup→Finish[1850]; Anthropic tool_use_id=toolu_01A09q90qw90 paired with tool_result.
+      ja: ReAct HotpotQA 実例：Thought→Action: Search→Observation→Lookup→Finish[1850]。Anthropic tool_use_id=toolu_01A09q90qw90 が tool_result とペア。
+    field_values: {local_agent_as_tool_invocation_id: agent-tool-research-1, local_target_agent_ref: agent:researcher, local_agent_adapter: local_agent_runtime, local_control_return_mode: return_to_caller}
+    related_node_ids: [AgentAsToolInvocation, ProgrammaticToolCall, ToolResult]
+    related_relation_ids: [AgentAsToolInvocation-is_a-ProgrammaticToolCall]
+
+    source_claims: [openai-agents-as-tool, moonweave-agent-as-tool]
 parent_relation:
   id: AgentAsToolInvocation-is_a-ProgrammaticToolCall
   predicate: is_a
-  direction: target-to-source
-  relation_kind: hierarchy
-  labels:
-    zh: 属于
-    en: is a
-    ja: 一種である
-  definitions:
-    zh: AgentAsToolInvocation 继承 ProgrammaticToolCall 的结构化调用身份，并把工具实现限定为另一个智能体。
-    en: AgentAsToolInvocation inherits ProgrammaticToolCall structure and restricts tool implementation to another agent.
-    ja: AgentAsToolInvocation は ProgrammaticToolCall structure を継承し tool implementation を別 agent に限定します。
-  cardinality: null
-  cardinality_not_applicable_reason:
-    zh: 分类继承不使用实例关系基数。
-    en: Taxonomic inheritance does not use instance-relation cardinality.
-    ja: 分類継承には instance relation cardinality を使いません。
-  inverse_reading:
-    predicate: part_of
-    labels:
-      zh: 反向 is_a
-      en: inverse is_a
-      ja: 逆 is_a
-  conditions: []
-  temporal_scope: timeless
-  boundary_context: null
-  constraints: []
-  examples:
-    - id: AgentAsToolInvocation-is_a-ProgrammaticToolCall-example-positive-manual-001
-      kind: positive
-      labels:
-        zh: AgentAsToolInvocation-is_a-ProgrammaticToolCall 正例
-        en: AgentAsToolInvocation-is_a-ProgrammaticToolCall positive case
-        ja: AgentAsToolInvocation-is_a-ProgrammaticToolCall 正例
-      scenario_id: null
-      descriptions:
-        zh: 主智能体把 web-researcher 当作工具调用，生成限定查询；研究智能体返回摘要，主智能体继续组织并提交最终答案。
-        en: A lead agent calls web-researcher as a tool with generated scoped input; the researcher returns a summary and the lead agent still composes and submits the final answer.
-        ja: lead agent が web-researcher を tool として scoped input で呼出し、researcher は summary を返し lead agent が final answer を作成提出します。
-      field_values: {}
-      related_node_ids:
-        - AgentAsToolInvocation
-        - ProgrammaticToolCall
-      related_relation_ids:
-        - AgentAsToolInvocation-is_a-ProgrammaticToolCall
-      expected_result:
-        zh: 建立 AgentAsToolInvocation —is_a→ ProgrammaticToolCall，并保持规范方向。
-        en: Assert AgentAsToolInvocation —is_a→ ProgrammaticToolCall in the reviewed direction.
-        ja: AgentAsToolInvocation —is_a→ ProgrammaticToolCall を reviewed direction で成立させます。
-      why_valid_or_invalid:
-        zh: 正例同时满足两个端点身份和该谓词的成立条件。
-        en: The positive case satisfies both endpoint identities and the predicate's conditions.
-        ja: positive case は両 endpoint identity と predicate condition を満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
-      source_claims:
-        - claim-agent-as-tool-invocation-008
-    - id: AgentAsToolInvocation-is_a-ProgrammaticToolCall-example-boundary-manual-001
-      kind: boundary
-      labels:
-        zh: AgentAsToolInvocation-is_a-ProgrammaticToolCall 边界例
-        en: AgentAsToolInvocation-is_a-ProgrammaticToolCall boundary case
-        ja: AgentAsToolInvocation-is_a-ProgrammaticToolCall 境界例
-      scenario_id: null
-      descriptions:
-        zh: 协调者把客户案例、权限和交付责任按 DelegationContract 交给专家，专家直接向用户负责；这是委派而非工具调用。
-        en: A coordinator transfers the customer case, authority, and delivery responsibility to a specialist under a DelegationContract, and the specialist answers the user directly; this is delegation, not a tool call.
-        ja: coordinator が case・authority・delivery responsibility を DelegationContract で specialist へ移し specialist が user に直接責任を持つため delegation で tool call ではありません。
-      field_values: {}
-      related_node_ids:
-        - AgentAsToolInvocation
-        - ProgrammaticToolCall
-      related_relation_ids:
-        - AgentAsToolInvocation-is_a-ProgrammaticToolCall
-      expected_result:
-        zh: 不建立该边；边界例缺少 is_a 所要求的事实。
-        en: Do not assert the edge because the boundary case lacks the fact required by is_a.
-        ja: boundary case は is_a required fact がなく edge を成立させません。
-      why_valid_or_invalid:
-        zh: 端点共现、类型相近或时间相邻都不足以推断该关系。
-        en: Endpoint co-occurrence, similar types, or temporal proximity alone cannot infer this relation.
-        ja: endpoint co-occurrence・similar type・temporal proximity だけでは relation を推論できません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
-      source_claims:
-        - claim-agent-as-tool-invocation-009
-  source_claims:
-    - claim-agent-as-tool-invocation-010
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: accepted
+  target: concept:ProgrammaticToolCall
   endpoint_order: child-to-parent
-relations:
-  - id: retains_answer_ownership
-    predicate: retains_answer_ownership
-    direction: source-to-target
-    relation_kind: governance
-    labels:
-      zh: 保留答案责任
-      en: retains answer ownership
-      ja: 回答責任を保持する
-    definitions:
-      zh: AgentAsToolInvocation 通过 retains_answer_ownership 指明调用管理者仍拥有最终答案责任；该事实将其与委派和 Handoff 区分。
-      en: AgentAsToolInvocation retains_answer_ownership to state that the managing caller keeps final-answer responsibility, distinguishing it from delegation and handoff.
-      ja: AgentAsToolInvocation が managing caller の final-answer responsibility 保持を retains_answer_ownership で示し delegation/handoff と区別します。
-    cardinality:
-      source:
-        min: 0
-        max: null
-      target:
-        min: 0
-        max: null
-    cardinality_not_applicable_reason: null
-    inverse_reading:
-      predicate: is_target_of_retains_answer_ownership
-      labels:
-        zh: 反向：retains answer ownership
-        en: is target of retains answer ownership
-        ja: 逆方向：retains answer ownership
-    conditions: []
-    temporal_scope: valid-time
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: retains_answer_ownership-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: retains_answer_ownership 正例
-          en: retains_answer_ownership positive case
-          ja: retains_answer_ownership 正例
-        scenario_id: null
-        descriptions:
-          zh: 研究智能体返回摘要后，主智能体仍编辑并提交最终回答。
-          en: After the researcher returns a summary, the lead agent still edits and submits the final response.
-          ja: researcher summary 後 lead agent が final response を編集提出します。
-        field_values: {}
-        related_node_ids:
-          - AgentAsToolInvocation
-          - AnswerOwnership
-        related_relation_ids:
-          - retains_answer_ownership
-        expected_result:
-          zh: 建立 AgentAsToolInvocation —retains_answer_ownership→ AnswerOwnership，并保持规范方向。
-          en: Assert AgentAsToolInvocation —retains_answer_ownership→ AnswerOwnership in the reviewed direction.
-          ja: AgentAsToolInvocation —retains_answer_ownership→ AnswerOwnership を reviewed direction で成立させます。
-        why_valid_or_invalid:
-          zh: 正例同时满足两个端点身份和该谓词的成立条件。
-          en: The positive case satisfies both endpoint identities and the predicate's conditions.
-          ja: positive case は両 endpoint identity と predicate condition を満たします。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
-        source_claims:
-          - claim-agent-as-tool-invocation-011
-      - id: retains_answer_ownership-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: retains_answer_ownership 边界例
-          en: retains_answer_ownership boundary case
-          ja: retains_answer_ownership 境界例
-        scenario_id: null
-        descriptions:
-          zh: 专家通过委派契约直接承担交付责任时，不能声称调用方保留答案所有权。
-          en: When a specialist assumes delivery responsibility under a delegation contract, the caller cannot claim retained answer ownership.
-          ja: specialist が delegation contract で delivery responsibility を担う場合 caller retained answer ownership は主張できません。
-        field_values: {}
-        related_node_ids:
-          - AgentAsToolInvocation
-          - AnswerOwnership
-        related_relation_ids:
-          - retains_answer_ownership
-        expected_result:
-          zh: 不建立该边；边界例缺少 retains_answer_ownership 所要求的事实。
-          en: Do not assert the edge because the boundary case lacks the fact required by retains_answer_ownership.
-          ja: boundary case は retains_answer_ownership required fact がなく edge を成立させません。
-        why_valid_or_invalid:
-          zh: 端点共现、类型相近或时间相邻都不足以推断该关系。
-          en: Endpoint co-occurrence, similar types, or temporal proximity alone cannot infer this relation.
-          ja: endpoint co-occurrence・similar type・temporal proximity だけでは relation を推論できません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
-        source_claims:
-          - claim-agent-as-tool-invocation-012
-    source_claims:
-      - claim-agent-as-tool-invocation-013
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:AnswerOwnership
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-tool-spec-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 MCP 2025-11-25、OpenAI function calling、Anthropic tool use 与 OpenAI Agents SDK 逐项核验概念定义、字段、关系与层级位置。
-    en: Verified concept definitions, fields, relations, and hierarchy placement against MCP 2025-11-25, OpenAI function calling, Anthropic tool use, and the OpenAI Agents SDK.
-    ja: MCP 2025-11-25、OpenAI function calling、Anthropic tool use、OpenAI Agents SDK に照らし概念定義・フィールド・関係・階層位置を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+  direction: source-to-target
+  relation_kind: hierarchy
+  labels: {zh: 是以代理为目标的程序化工具调用, en: is a programmatic tool call targeting an agent, ja: エージェントを対象とするプログラム型 ToolCall である}
+  definition: {zh: 每个 AgentAsToolInvocation 都是目标经代理适配器执行且控制返回调用方的 ProgrammaticToolCall, en: Every AgentAsToolInvocation is a ProgrammaticToolCall that executes through an agent adapter and returns control to caller, ja: すべての AgentAsToolInvocation はエージェント adapter で実行され caller に制御を戻す ProgrammaticToolCall である}
+  cardinality: {source: {min: 0, max: null}, target: {min: 1, max: 1}}
+  cardinality_not_applicable_reason: null
+  inverse_reading: {predicate: has_subtype, labels: {zh: 具有子类, en: has subtype, ja: 下位型を持つ}}
+  conditions: []
+  temporal_scope: execution
+  boundary_context: The hierarchy classifies a local control-returning activity and never asserts A2A requests, Tasks, or Artifacts are tool-call activities.
+  constraints: []
+  examples: []
+  source_claims: [moonweave-agent-as-tool]
+  distinct_fact_rationale: AgentAsToolInvocation narrows ProgrammaticToolCall by its callable-agent target and control-return behavior, not by native transport schema. It uses one same-record identity in which local_agent_as_tool_invocation_id identifies the same local ProgrammaticToolCall record, so a second ProgrammaticToolCall reference field is not permitted.
+relations: []
+sources:
+  - id: openai-agents-sdk-tools
+    title: OpenAI Agents SDK - Tools
+    url: https://openai.github.io/openai-agents-python/tools/
+    source_type: official-documentation
+    locator: "Agents as tools; Customizing tool-agents"
+    relevance: Defines Agent.as_tool, control behavior, structured input, and approvals.
+  - id: a2a-protocol-specification
+    title: A2A Protocol Specification
+    url: https://a2a-protocol.org/latest/specification/
+    source_type: official-specification
+    locator: "3.1.1 Send Message; 4.1.1 Task; 4.1.7 Artifact"
+    relevance: Defines A2A request, task, and artifact contracts.
 source_claims:
-  - id: claim-agent-as-tool-invocation-001
-    source: eng-fw-openai-agents-tools
-    supports: OpenAI Agents SDK distinguishes ordinary function-tool calls from agents-as-tools and states that the manager retains control when an agent is exposed as a tool. Moonweave uses this primary evidence to delimit AgentAsToolInvocation as activity with the reviewed boundary stated in its definition.
-    locator: Tools > Function tools; Agents as tools; Handling errors in function tools
+  - id: openai-agents-as-tool
+    source: openai-agents-sdk-tools
+    supports: OpenAI Agents SDK exposes Agent.as_tool for a central agent to call specialized agents as tools without a full handoff, with configurable nested-run options and approval support.
+    locator: "Agents as tools; Customizing tool-agents; Approval gates for tool-agents"
+    evidence_kind: official
+    confidence: high
+  - id: a2a-send-message
+    source: a2a-protocol-specification
+    supports: A2A SendMessage accepts a Message and returns a Task or Message through the A2A protocol.
+    locator: "3.1.1 Send Message"
+    evidence_kind: normative
+    confidence: high
+  - id: a2a-task-artifact
+    source: a2a-protocol-specification
+    supports: An A2A Task is a distinct remote task resource and an Artifact is a Part-based task output, not a generic local tool-call object.
+    locator: "4.1.1 Task; 4.1.7 Artifact"
+    evidence_kind: normative
+    confidence: high
+  - id: moonweave-agent-as-tool
+    source: openai-agents-sdk-tools
+    supports: Moonweave AgentAsToolInvocation is a local programmatic tool-call activity that can reference an agent adapter while keeping native transport objects distinct.
+    locator: "Agents as tools"
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-agent-as-tool-invocation-002
-    source: eng-fw-openai-agents-tools
-    supports: "OpenAI Agents SDK distinguishes ordinary function-tool calls from agents-as-tools and states that the manager retains control when an agent is exposed as a tool. Moonweave stores AgentAsToolInvocation.agent_tool_ref because this field specifically records: References the stable definition wrapping an agent capability as a tool."
-    locator: Tools > Function tools; Agents as tools; Handling errors in function tools
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-agent-as-tool-invocation-003
-    source: eng-fw-openai-agents-tools
-    supports: "OpenAI Agents SDK distinguishes ordinary function-tool calls from agents-as-tools and states that the manager retains control when an agent is exposed as a tool. Moonweave stores AgentAsToolInvocation.generated_input because this field specifically records: Stores structured input generated by the managing caller for the called agent."
-    locator: Tools > Function tools; Agents as tools; Handling errors in function tools
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-agent-as-tool-invocation-004
-    source: eng-fw-openai-agents-tools
-    supports: "OpenAI Agents SDK distinguishes ordinary function-tool calls from agents-as-tools and states that the manager retains control when an agent is exposed as a tool. Moonweave stores AgentAsToolInvocation.caller_agent_ref because this field specifically records: Identifies the caller agent retaining conversation control."
-    locator: Tools > Function tools; Agents as tools; Handling errors in function tools
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-agent-as-tool-invocation-005
-    source: eng-fw-openai-agents-tools
-    supports: "OpenAI Agents SDK distinguishes ordinary function-tool calls from agents-as-tools and states that the manager retains control when an agent is exposed as a tool. Moonweave stores AgentAsToolInvocation.answer_owner_ref because this field specifically records: Explicitly identifies the actor retaining final-answer responsibility after the call."
-    locator: Tools > Function tools; Agents as tools; Handling errors in function tools
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-agent-as-tool-invocation-006
-    source: eng-fw-openai-agents-tools
-    supports: OpenAI Agents SDK distinguishes ordinary function-tool calls from agents-as-tools and states that the manager retains control when an agent is exposed as a tool. The AgentAsToolInvocation positive case applies that documented distinction to the concrete occurrence described here.
-    locator: Tools > Function tools; Agents as tools; Handling errors in function tools
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-agent-as-tool-invocation-007
-    source: eng-fw-openai-agents-tools
-    supports: OpenAI Agents SDK distinguishes ordinary function-tool calls from agents-as-tools and states that the manager retains control when an agent is exposed as a tool. The AgentAsToolInvocation boundary case applies that documented distinction to the concrete occurrence described here.
-    locator: Tools > Function tools; Agents as tools; Handling errors in function tools
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-agent-as-tool-invocation-008
-    source: eng-fw-openai-agents-tools
-    supports: OpenAI Agents SDK distinguishes ordinary function-tool calls from agents-as-tools and states that the manager retains control when an agent is exposed as a tool. The AgentAsToolInvocation-is_a-ProgrammaticToolCall positive case applies the documented distinction to the concrete endpoints and direction described here.
-    locator: Tools > Function tools; Agents as tools; Handling errors in function tools
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-agent-as-tool-invocation-009
-    source: eng-fw-openai-agents-tools
-    supports: OpenAI Agents SDK distinguishes ordinary function-tool calls from agents-as-tools and states that the manager retains control when an agent is exposed as a tool. The AgentAsToolInvocation-is_a-ProgrammaticToolCall boundary case applies the documented distinction to the concrete endpoints and direction described here.
-    locator: Tools > Function tools; Agents as tools; Handling errors in function tools
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-agent-as-tool-invocation-010
-    source: eng-fw-openai-agents-tools
-    supports: OpenAI Agents SDK distinguishes ordinary function-tool calls from agents-as-tools and states that the manager retains control when an agent is exposed as a tool. Moonweave uses that primary evidence to justify AgentAsToolInvocation —is_a→ ProgrammaticToolCall with the reviewed direction and boundary.
-    locator: Tools > Function tools; Agents as tools; Handling errors in function tools
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-agent-as-tool-invocation-011
-    source: eng-fw-openai-agents-tools
-    supports: OpenAI Agents SDK distinguishes ordinary function-tool calls from agents-as-tools and states that the manager retains control when an agent is exposed as a tool. The retains_answer_ownership positive case applies the documented distinction to the concrete endpoints and direction described here.
-    locator: Tools > Function tools; Agents as tools; Handling errors in function tools
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-agent-as-tool-invocation-012
-    source: eng-fw-openai-agents-tools
-    supports: OpenAI Agents SDK distinguishes ordinary function-tool calls from agents-as-tools and states that the manager retains control when an agent is exposed as a tool. The retains_answer_ownership boundary case applies the documented distinction to the concrete endpoints and direction described here.
-    locator: Tools > Function tools; Agents as tools; Handling errors in function tools
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-agent-as-tool-invocation-013
-    source: eng-fw-openai-agents-tools
-    supports: OpenAI Agents SDK distinguishes ordinary function-tool calls from agents-as-tools and states that the manager retains control when an agent is exposed as a tool. Moonweave uses that primary evidence to justify AgentAsToolInvocation —retains_answer_ownership→ AnswerOwnership with the reviewed direction and boundary.
-    locator: Tools > Function tools; Agents as tools; Handling errors in function tools
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high

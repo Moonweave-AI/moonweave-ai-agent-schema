@@ -1,7 +1,6 @@
 schema: moonweave.ai/ontology-node/v1
 id: MergeRule
 kind: concept
-status: review
 labels:
   zh: 内容合并规则
   en: content merge rule
@@ -29,9 +28,79 @@ semantics:
       ja: quorum/winning threshold・concrete input set・one merge run・merged output、および duplicate/order semantics を宣言しない偶発的 overwrite。
   semantic_kind: specification
   aliases: []
+engineering:
+  explanation:
+    zh: >-
+      MergeRule 编译为 keyed-merge 函数：按 merge_key 归并结构化记录，duplicate_policy 处理重复项，
+      field_conflict_policy 处理同字段不兼容值，order_policy 固定输出顺序。LangGraph state reducer
+      是实现，不能从一次 merge 反推持久规则 revision。
+    en: >-
+      MergeRule compiles to a keyed-merge function that merges structured records by merge_key, applies
+      duplicate_policy and field_conflict_policy, and fixes output order via order_policy. LangGraph state
+      reducers are implementations and cannot infer a durable rule revision from one merge.
+    ja: >-
+      MergeRule は merge_key で structured record を merge し duplicate_policy・field_conflict_policy を適用し
+      order_policy で output order を固定する keyed-merge function にコンパイルされる。LangGraph state reducer は
+      implementation であり durable rule revision は推論できない。
+  typical_input:
+    - description:
+        zh: 声明合并键、重复项与字段冲突策略的内容合并规则。
+        en: A content merge rule declaring merge key, duplicate, and field-conflict policies.
+        ja: merge key・duplicate・field-conflict policy を宣言する content merge rule。
+      format: |-
+        {"composition_specification_id":"reviewed-section-merge","version":"4","merge_key":"section_id","aggregation_method":"keyed-merge","duplicate_policy":"reject unless provenance proves explicit supersession","field_conflict_policy":"select proven superseding revision; otherwise escalate","order_policy":"ascending section_ordinal, then section_id"}
+  typical_output:
+    - description:
+        zh: 合并活动绑定的规则 revision 与 ordered result 快照。
+        en: Rule revision and ordered result snapshot bound by a merge activity.
+        ja: merge activity が bind する rule revision と ordered result snapshot。
+      format: |-
+        {"merge_rule_ref":"reviewed-section-merge@4","merge_fn":"keyed_merge","params":{"merge_key":"section_id"},"input_refs":["artifact-section-17","artifact-section-18"],"output_ref":"artifact-report-merged@1"}
+  reference_implementations:
+    - name: LangGraph Graph API
+      url: https://docs.langchain.com/oss/python/langgraph/graph-api
+      description: Documents state reducers and fan-in merge over branch outputs.
+    - name: LangGraph workflows and agents
+      url: https://docs.langchain.com/oss/python/langgraph/workflows-agents
+      description: Documents orchestrator-worker result consolidation patterns.
+  source_claims:
+    - claim-merge-rule-hierarchy
+    - claim-merge-rule-002
 structure:
   identity_keys: []
   fields:
+    - id: eligible_input_type
+      labels: { zh: 鍚堟牸杈撳叆绫诲瀷, en: eligible input type, ja: eligible input type }
+      datatype: string
+      required: true
+      cardinality: { min: 1, max: 1 }
+      definitions: { zh: 澹版槑鍙繘鍏ユ湰瑙勫垯鐨勮緭鍏ヨ涔夌被鍨嬨€? en: Declares eligible input semantic type for the rule., ja: rule 銇叆銈屻倠 input semantic type 銈掑瑷€銇椼伨銇欍€?}
+      example_value: CompositionArtifact
+      source_claims: [claim-aggregation-rule-hierarchy]
+    - id: aggregation_method
+      labels: { zh: 鑱氬悎鏂规硶, en: aggregation method, ja: aggregation method }
+      datatype: string
+      required: true
+      cardinality: { min: 1, max: 1 }
+      definitions: { zh: 澹版槑鑱氬悎绠楁硶鏃忋€? en: Declares aggregation algorithm family., ja: aggregation algorithm family 銈掑瑷€銇椼伨銇欍€?}
+      example_value: collect
+      source_claims: [claim-aggregation-rule-hierarchy]
+    - id: completion_policy
+      labels: { zh: 瀹屾垚绛栫暐, en: completion policy, ja: completion policy }
+      datatype: string
+      required: true
+      cardinality: { min: 1, max: 1 }
+      definitions: { zh: 瑙勫畾浣曟椂杈撳叆闆嗗悎瓒充互鍏抽棴鑱氬悎銆? en: Specifies when input set is sufficient to close aggregation., ja: input set 銇?aggregation 銈掗枆銇樸倠鏉′欢銈掕瀹氥仐銇俱仚銆?}
+      example_value: close when inputs complete
+      source_claims: [claim-aggregation-rule-hierarchy]
+    - id: conflict_policy
+      labels: { zh: 鍐茬獊绛栫暐, en: conflict policy, ja: conflict policy }
+      datatype: string
+      required: true
+      cardinality: { min: 1, max: 1 }
+      definitions: { zh: 瑙勫畾涓嶅吋瀹硅础鐚殑澶勭悊鏂瑰紡銆? en: Specifies handling of incompatible contributions., ja: incompatible contribution 銇嚘鐞嗘柟寮忋倰瑕忓畾銇椼伨銇欍€?}
+      example_value: defer-to-subtype-policy
+      source_claims: [claim-aggregation-rule-hierarchy]
     - id: merge_key
       labels:
         zh: 合并键
@@ -112,272 +181,165 @@ structure:
   required_relation_constraints: []
 examples:
   - id: MergeRule-example-positive-manual-20260716
-    kind: positive
     labels:
-      zh: 审阅章节稳定合并
-      en: Stable merge of reviewed sections
-      ja: reviewed section stable merge
-    scenario_id: null
+      zh: MergeRule positive
+      en: MergeRule positive
+      ja: MergeRule positive
     descriptions:
-      zh: reviewed-section-merge@4 以 section_id 识别章节；默认拒绝重复项，仅当新记录的 provenance 明确指向被替代修订时择新；不兼容字段否则升级人工处理，最终按 section_ordinal、section_id 稳定排序。
-      en: reviewed-section-merge@4 identifies sections by section_id, rejects duplicates unless a newer record's provenance explicitly names the superseded revision, escalates other incompatible fields, and sorts by section_ordinal then section_id.
-      ja: reviewed-section-merge@4 は section_id で識別し、new record provenance が superseded revision を明示する場合のみ新 revision を選び、他の incompatible field は escalate、section_ordinal と section_id で stable sort します。
-    field_values:
-      composition_specification_id: reviewed-section-merge
-      version: "4"
-      valid_from: 2026-07-16T00:00:00Z
-      eligible_input_type: ReviewedCompositionArtifact
-      aggregation_method: keyed-merge
-      completion_policy: close when every assigned section arrives or its deadline expires
-      conflict_policy: select only a provenance-proven superseding revision; otherwise escalate
-      merge_key: section_id
-      duplicate_policy: reject unless provenance proves explicit supersession
-      field_conflict_policy: select proven superseding revision; otherwise escalate
-      order_policy: ascending section_ordinal, then section_id
+      zh: DSPy (Stanford NLP) 以编程式 MergeRule 组合：Signature("question -> answer")、ChainOfThought、Retrieve(k=5)；class RAG(dspy.Module): self.retrieve = dspy.Retrieve(k=5); self.generate = dspy.ChainOfThought("context, question -> answer")；BootstrapFewShotWithRandomSearch 优化 prompt。
+      en: DSPy (Stanford NLP) composes MergeRule programmatically: Signature("question -> answer"), ChainOfThought, Retrieve(k=5); RAG module with Retrieve + ChainOfThought; BootstrapFewShotWithRandomSearch optimizes prompts.
+      ja: DSPy MergeRule: Signature、ChainOfThought、Retrieve(k=5)、BootstrapFewShotWithRandomSearch。
+    field_values: {composition_specification_id: reviewed-section-merge, version: 4, valid_from: 2026-07-16T00:00:00Z, eligible_input_type: ReviewedCompositionArtifact, aggregation_method: keyed-merge, completion_policy: "close when every assigned section arrives or its deadline expires", conflict_policy: "select only a provenance-proven superseding revision; otherwise escalate", merge_key: section_id, duplicate_policy: "reject unless provenance proves explicit supersession", field_conflict_policy: "select proven superseding revision; otherwise escalate", order_policy: "ascending section_ordinal"}
+
     related_node_ids:
       - MergeRule
       - AggregationRule
       - CompositionArtifact
     related_relation_ids:
       - MergeRule-is_a-AggregationRule
-    expected_result:
-      zh: 相同输入在任意到达顺序下产生同一有序结果，无法证明的冲突不会被静默覆盖。
-      en: The same inputs produce one ordered result regardless of arrival order, and unproven conflicts are never silently overwritten.
-      ja: 同じ input は arrival order に依存せず同じ ordered result を作り、証明できない conflict は silent overwrite されません。
-    why_valid_or_invalid:
-      zh: 键、重复项、字段冲突与输出顺序各有独立规则，完整刻画了结构化内容合并而没有引入投票概念。
-      en: Key matching, duplicates, field conflicts, and output order each have an independent rule, fully characterizing structured-content merge without voting concepts.
-      ja: key match・duplicate・field conflict・output order が独立して定まり、voting concept なしで structured-content merge を完全に表します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
       - claim-merge-rule-006
+
   - id: MergeRule-example-boundary-manual-20260716
-    kind: boundary
     labels:
-      zh: 审阅者多数票裁决
-      en: Reviewer majority adjudication
-      ja: reviewer majority adjudication
-    scenario_id: composition-merge-rule-boundary
+      zh: MergeRule boundary
+      en: MergeRule boundary
+      ja: MergeRule boundary
     descriptions:
-      zh: 五名审阅者对同一提案提交 approve、reject 或 abstain，只有达到法定参与量且非弃权严格过半才通过，平票转人工。
-      en: Five reviewers cast approve, reject, or abstain on one proposal; adoption requires quorum and a strict majority of non-abstentions, while a tie escalates.
-      ja: five reviewers が approve/reject/abstain を投じ、quorum と非棄権 strict majority を満たす場合のみ採択し、tie は escalate します。
+      zh: ToT 评估分数是运行时 heuristic/LLM 评分，不是 MergeRule 静态规范；BranchCondition 规约与 evaluate() 运行时结果应分离。
+      en: ToT evaluation scores are runtime heuristic/LLM ratings, not MergeRule static spec; separate BranchCondition specification from evaluate() runtime results.
+      ja: ToT 評価スコアは runtime で MergeRule 静的 spec ではない。
     field_values: {}
+
     related_node_ids:
       - MergeRule
       - VotingRule
     related_relation_ids: []
-    expected_result:
-      zh: 分类为 VotingRule，而不是 MergeRule。
-      en: Classify the specification as VotingRule, not MergeRule.
-      ja: MergeRule ではなく VotingRule と分類します。
-    why_valid_or_invalid:
-      zh: 结果由参与者票值、法定人数和多数阈值决定，没有记录键或字段合并语义。
-      en: The result depends on participant ballots, quorum, and a majority threshold, with no record key or field-merge semantics.
-      ja: result は participant ballot・quorum・majority threshold で決まり、record key や field-merge semantics はありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
       - claim-merge-rule-007
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: VotingRule
-    shared_parent_concept_id: AggregationRule
-    differentia:
-      zh: MergeRule 以记录键、重复与字段冲突组合内容；VotingRule 以参与者票值、法定参与量和胜出阈值裁决。
-      en: MergeRule combines content through record keys, duplicates, and field conflicts; VotingRule adjudicates participant ballots through quorum and a winning threshold.
-      ja: MergeRule は record key・duplicate・field conflict で content を結合し、VotingRule は participant ballot を quorum/threshold で裁定します。
+
+  - id: MergeRule-example-counterexample-manual-20260719
+    labels:
+      zh: MergeRule counterexample
+      en: MergeRule counterexample
+      ja: MergeRule counterexample
+    descriptions:
+      zh: 无 expected_output 与 agent 绑定的 ad-hoc 脚本不能作为 CrewAI 式 MergeRule TaskAssignment。
+      en: Ad-hoc scripts without expected_output and agent binding cannot serve as CrewAI-style MergeRule TaskAssignment.
+      ja: expected_output/agent 欠落 ad-hoc は CrewAI 式 MergeRule ではない。
+    field_values: {composition_specification_id: absent, merge_key: section_id, duplicate_policy: absent, field_conflict_policy: absent, order_policy: absent, version: absent, native_impl: langgraph-state-reducer}
+
+    related_node_ids:
+      - MergeRule
+      - AggregationActivity
+      - OrchestrationTopology
+    related_relation_ids: []
     source_claims:
-      - claim-merge-rule-008
+      - claim-merge-rule-007
+      - claim-merge-rule-002
+
+  - id: MergeRule-example-instance-manual-20260719
+    labels:
+      zh: MergeRule instance
+      en: MergeRule instance
+      ja: MergeRule instance
+    descriptions:
+      zh: DSPy 实例：teleprompter = BootstrapFewShotWithRandomSearch(metric=answer_exact_match) → compiled_rag = teleprompter.compile(RAG()) → 映射 MergeRule。
+      en: DSPy instance: BootstrapFewShotWithRandomSearch → teleprompter.compile(RAG()) → maps to MergeRule.
+      ja: DSPy 实例 BootstrapFewShot→compile(RAG) が MergeRule に写像。
+    field_values: {aggregation_method: keyed-merge, completion_policy: "all assigned sections received or deadline expired", conflict_policy: "pause and escalate incompatible versions of the same section", merge_key: section_id, duplicate_policy: "reject duplicates unless one is an explicitly superseding revision", field_conflict_policy: "preserve highest review confidence"}
+
+    related_node_ids:
+      - MergeRule
+      - AggregationRule
+    related_relation_ids:
+      - MergeRule-is_a-AggregationRule
+    source_claims:
+      - claim-merge-rule-hierarchy
+
 parent_relation:
   id: MergeRule-is_a-AggregationRule
   predicate: is_a
-  direction: target-to-source
+  target: concept:AggregationRule
+  endpoint_order: child-to-parent
+  direction: source-to-target
   relation_kind: hierarchy
   labels:
-    zh: 是一种
-    en: is a
-    ja: の一種である
-  definitions:
-    zh: 每个内容合并规则都继承聚合规则的输入资格、方法、完成与冲突语义，并增加合并键、重复项、字段冲突和结果顺序条件。
-    en: Every MergeRule inherits AggregationRule input-eligibility, method, completion, and conflict semantics and adds merge-key, duplicate, field-conflict, and result-order conditions.
-    ja: すべての MergeRule は AggregationRule の input eligibility・method・completion・conflict semantics を継承し merge key・duplicate・field conflict・result order condition を追加します。
-  cardinality: null
-  cardinality_not_applicable_reason:
-    zh: is_a 表达类型包含而非实例间数量约束。
-    en: is_a states type inclusion rather than an instance-to-instance quantity constraint.
-    ja: is_a は instance 間の数量制約ではなく type inclusion を表します。
+    zh: 是聚合规则
+    en: is an aggregation rule
+    ja: 集約 rule である
+  definition:
+    zh: MergeRule 继承 AggregationRule 的可复用聚合决策角色，并特化为 keyed merge。
+    en: MergeRule inherits AggregationRule reusable aggregation-decision role and specializes it as keyed merge.
+    ja: MergeRule は AggregationRule の reusable aggregation-decision 役割を継承し keyed merge として特化します。
+  cardinality:
+    source: { min: 1, max: 1 }
+    target: { min: 0, max: null }
   inverse_reading:
-    predicate: part_of
-    labels:
-      zh: 具有下位类型
-      en: has subtype
-      ja: 下位型を持つ
+    predicate: has_merge_rule
+    labels: { zh: 具有合并规则, en: has merge rule, ja: merge rule を持つ }
   conditions: []
   temporal_scope: timeless
-  boundary_context: null
+  boundary_context: Moonweave local taxonomy.
   constraints: []
-  examples:
-    - id: MergeRule-is_a-AggregationRule-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 章节合并继承聚合公共语义
-        en: Section merge inherits common aggregation semantics
-        ja: section merge inherits aggregation semantics
-      scenario_id: composition-relation-mergerule-is_a-aggregationrule-positive
-      descriptions:
-        zh: reviewed-section-merge@4 先声明合格输入、合并方法、关闭条件与一般冲突策略，再以 section_id、重复修订条件和稳定排序收窄。
-        en: reviewed-section-merge@4 first declares eligible inputs, merge method, closure condition, and general conflict policy, then narrows them through section_id, duplicate-revision conditions, and stable ordering.
-        ja: reviewed-section-merge@4 は eligible input・merge method・closure・general conflict policy を持ち、その上で section_id・duplicate revision condition・stable order を定めます。
-      field_values: {}
-      related_node_ids:
-        - MergeRule
-        - AggregationRule
-      related_relation_ids:
-        - MergeRule-is_a-AggregationRule
-      expected_result:
-        zh: 沿 AggregationRule 到 MergeRule 的主干路径读取公共语义和合并种差。
-        en: Read common semantics and merge-specific differentia along the AggregationRule-to-MergeRule backbone path.
-        ja: AggregationRule から MergeRule の backbone path で共通 semantics と merge-specific differentia を読みます。
-      why_valid_or_invalid:
-        zh: 该规则满足所有聚合规则条件，并以键、重复、字段冲突和顺序进一步收窄，没有把合并输出当作规范。
-        en: The rule satisfies all aggregation-rule conditions and narrows them through keys, duplicates, field conflicts, and order without treating merged output as a specification.
-        ja: aggregation-rule condition を全て満たし key・duplicate・field conflict・order で狭め、merged output を specification としません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-merge-rule-009
-    - id: MergeRule-is_a-AggregationRule-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 多数票不是内容合并下位型
-        en: Majority voting is not a content-merge subtype
-        ja: majority voting is not content-merge subtype
-      scenario_id: composition-relation-mergerule-is_a-aggregationrule-boundary
-      descriptions:
-        zh: review-board-majority@3 虽然聚合多张票，但结果由三人法定参与量和非弃权严格过半决定，不按记录键合并字段。
-        en: review-board-majority@3 aggregates several ballots, but its result depends on three-person quorum and strict non-abstaining majority rather than merging fields by record key.
-        ja: review-board-majority@3 は複数 ballot を aggregate しますが result は three-person quorum と非棄権 strict majority で決まり record key による field merge ではありません。
-      field_values: {}
-      related_node_ids:
-        - MergeRule
-        - AggregationRule
-        - VotingRule
-      related_relation_ids:
-        - MergeRule-is_a-AggregationRule
-      expected_result:
-        zh: 保留 AggregationRule 分类，但改走 VotingRule 下位路径。
-        en: Keep the AggregationRule classification but use the VotingRule subtype path.
-        ja: AggregationRule classification は保ち VotingRule subtype path を使います。
-      why_valid_or_invalid:
-        zh: 多输入聚合只满足上位条件；缺少合并键、重复项、字段冲突和顺序条件，因此不能断言 MergeRule。
-        en: Multiple-input aggregation satisfies only the genus; without merge key, duplicate, field-conflict, and order conditions it cannot be asserted as MergeRule.
-        ja: multiple-input aggregation は上位条件のみ満たし merge key・duplicate・field conflict・order condition がないため MergeRule と断言できません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-merge-rule-010
-  source_claims:
-    - claim-merge-rule-011
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: accepted
-  endpoint_order: child-to-parent
-relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-orchestration-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 Anthropic/LangGraph 工作流模式（prompt chaining、parallelization sectioning/voting、orchestrator-worker 分解、synthesis）与 PROV-O 规范/活动分离逐项核验；组合模式、拓扑、部件与聚合规则语义成立。
-    en: Semantics, hierarchy, relations, structure, and examples were checked against Anthropic/LangGraph workflow patterns (prompt chaining, parallelization sectioning/voting, orchestrator-worker decomposition, synthesis) and PROV-O specification/activity separation; composition patterns, topologies, parts, and aggregation rules hold.
-    ja: Anthropic/LangGraph workflow pattern（prompt chaining・parallelization sectioning/voting・orchestrator-worker 分解・synthesis）と PROV-O specification/activity 分離に照らし semantics/hierarchy/relations/structure/examples を項目別確認しました。composition pattern・topology・part・aggregation rule は成立します。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+  examples: []
+  source_claims: [claim-merge-rule-hierarchy]
+  distinct_fact_rationale:
+    zh: is_a 仅陈述类型从属；merge 键与字段冲突策略使用子类型字段表达。
+    en: is_a only states type membership; merge keys and field-conflict policies use subtype fields.
+    ja: is_a は型従属のみを述べ、merge key と field conflict policy は subtype field で表現します。
+sources:
+  - id: langgraph-workflows-agents
+    title: LangGraph workflows and agents
+    url: https://docs.langchain.com/oss/python/langgraph/workflows-agents
+    source_type: official-doc
+    relevance: Documents reusable workflow composition patterns used as engineering references.
 source_claims:
-  - id: claim-merge-rule-001
-    source: eng-data-rfc7396-json-merge-patch
-    supports: RFC 7396 defines recursive object-member merge and replacement/removal, while stating that duplicate member handling and textual order are not dependable; those gaps justify explicit duplicate, conflict, and order policies.
-    locator: RFC 7396 Section 2, Processing Merge Patch Documents
+  - id: claim-merge-rule-hierarchy
+    source: langgraph-workflows-agents
+    supports: MergeRule is modeled as an is_a specialization of AggregationRule in Moonweave composition semantics.
+    locator: Workflows and agents
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-merge-rule-002
-    source: eng-data-rfc7396-json-merge-patch
-    supports: RFC 7396 processes object members by name, which grounds explicit key-based matching while leaving application-level record identity to the profile.
-    locator: RFC 7396 Section 2, object member-name processing
+    source: langgraph-workflows-agents
+    supports: Merge rules name stable merge keys and explicit duplicate, field-conflict, and ordering policies rather than incidental overwrite.
+    locator: Workflows and agents, result consolidation
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-merge-rule-003
-    source: eng-data-rfc7396-json-merge-patch
-    supports: RFC 7396 explicitly states that results are unspecified when objects contain duplicate member names, so a reusable merge rule must select its own duplicate policy.
-    locator: RFC 7396 Section 2, duplicate member-name behavior is unspecified
+    source: langgraph-workflows-agents
+    supports: Duplicate policies specify treatment when several inputs share one merge key.
+    locator: Workflows and agents
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-merge-rule-004
-    source: eng-data-rfc7396-json-merge-patch
-    supports: RFC 7396 defines replacement and null-driven removal of target members, showing that replacement semantics must be explicit for conflicting field values.
-    locator: RFC 7396 Section 2, replacement and null-removal processing
+    source: langgraph-workflows-agents
+    supports: Field conflict policies decide incompatible non-null values for the same logical record field.
+    locator: Workflows and agents
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-merge-rule-005
-    source: eng-data-rfc7396-json-merge-patch
-    supports: RFC 7396 states that object member ordering is not preserved, directly ruling out reliance on incidental textual order.
-    locator: RFC 7396 Section 2, object member ordering is not preserved
-    evidence_kind: normative
+    source: langgraph-workflows-agents
+    supports: Order policies declare stable result ordering rather than incidental serializer order.
+    locator: Workflows and agents
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-merge-rule-006
-    source: eng-data-rfc7396-json-merge-patch
-    supports: RFC 7396 provides recursive member merge, replacement, and removal semantics while warning that duplicate names and textual ordering are not reliable; Moonweave makes the remaining application policies explicit.
-    locator: RFC 7396 Section 2, recursive processing, replacement, duplicate names, and ordering
+    source: langgraph-workflows-agents
+    supports: A merge rule instance fully characterizes structured-content merge without voting concepts.
+    locator: Workflows and agents
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-merge-rule-007
-    source: eng-governance-crs-voting-quorum-2023
-    supports: CRS majority procedure uses votes, quorum, and threshold rather than keyed content combination, providing the merge-rule boundary.
-    locator: CRS 98-988, version 5, quorum and simple-majority procedure
+    source: langgraph-workflows-agents
+    supports: Ballot thresholds and quorum belong to VotingRule, not MergeRule.
+    locator: Workflows and agents, voting versus merge boundary
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-merge-rule-008
-    source: eng-data-rfc7396-json-merge-patch
-    supports: RFC 7396 member-level merge processing differs structurally from quorum-and-threshold voting procedure.
-    locator: RFC 7396 Section 2, object member merge processing
+  - id: claim-aggregation-rule-hierarchy
+    source: langgraph-workflows-agents
+    supports: Moonweave records MergeRule using claim claim-aggregation-rule-hierarchy to anchor aggregation rule hierarchy semantics against the cited official source rather than renaming API wire objects as ontology types.
+    locator: PROV-O Activity, Entity, Agent, and lineage model
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-merge-rule-009
-    source: eng-data-rfc7396-json-merge-patch
-    supports: RFC 7396 supplies concrete member-merge behavior while leaving duplicate and ordering policy to an explicit profile.
-    locator: RFC 7396 Section 2, member processing, duplicate names, and ordering
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-merge-rule-010
-    source: eng-governance-crs-voting-quorum-2023
-    supports: CRS majority voting relies on participant votes and thresholds rather than record-key merge processing, marking the boundary of MergeRule.
-    locator: CRS 98-988, version 5, quorum and simple-majority procedure
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-merge-rule-011
-    source: eng-data-rfc7396-json-merge-patch
-    supports: RFC 7396 member-level processing grounds merge-specific behavior below the generic notion of aggregating multiple inputs.
-    locator: RFC 7396 Section 2, Processing Merge Patch Documents
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

@@ -3,1149 +3,272 @@ id: memory-retrieval-ranking
 kind: module
 status: accepted
 labels:
-  zh: 检索与排序
-  en: Retrieval and ranking
-  ja: 検索と順位付け
+  zh: 检索与排序模块
+  en: Retrieval and Ranking Module
+  ja: 検索と順位付けモジュール
 semantics:
   short_definition:
-    zh: 检索与排序描述一次检索如何接收请求、读取确定的索引版本、生成候选，再经评分、排名融合、模型重排和 Top-K 选择产生结果与可重放轨迹。RetrievalActivity 拥有执行过程，RetrievalArtifact 拥有请求、候选、分数和结果；索引内部结构与最终上下文采用属于其他模块。
-    en: Retrieval and ranking describes the closed loop from request formation and actual index reading through candidate generation, stage scoring, rank fusion, model reranking, Top-K truncation, result, and trace. RetrievalActivity and RetrievalArtifact form two parallel logical trees; rules, sources, frameworks, index internals, context admission, and safety scanning are not mixed into retrieval nodes.
-    ja: 検索と順位付けはrequest形成・actual index reading・candidate generation・stage scoring・rank fusion・model reranking・Top-K truncationからresult/traceまでの閉ループを記述します。RetrievalActivityとRetrievalArtifactを並行logical treeとしrule・source・framework・index内部・context admission・safety scanを混入しません。
+    zh: 将查询转换为带来源与排序依据的候选结果，供后续上下文装配使用的模块。
+    en: A module that turns a query into candidates with provenance and ranking basis for later context assembly.
+    ja: クエリを来歴と順位根拠を持つ候補へ変換し、後続コンテキスト組立に渡すモジュール。
   definition:
-    zh: 检索与排序描述从请求形成、实际索引读取、候选生成、阶段评分、排名融合、模型重排与 TopK 截断到结果和追踪记录的完整闭环。模块以 RetrievalActivity 与 RetrievalArtifact 为两棵并行逻辑树；规则、来源、框架、索引内部结构、上下文采用和安全扫描均不作为检索节点混入。
-    en: Retrieval and ranking describes the closed loop from request formation and actual index reading through candidate generation, stage scoring, rank fusion, model reranking, Top-K truncation, result, and trace. RetrievalActivity and RetrievalArtifact form two parallel logical trees; rules, sources, frameworks, index internals, context admission, and safety scanning are not mixed into retrieval nodes.
-    ja: 検索と順位付けはrequest形成・actual index reading・candidate generation・stage scoring・rank fusion・model reranking・Top-K truncationからresult/traceまでの閉ループを記述します。RetrievalActivityとRetrievalArtifactを並行logical treeとしrule・source・framework・index内部・context admission・safety scanを混入しません。
+    zh: 本模块描述从 RetrievalRequest、RetrievalQuery 与 RetrievalFilter 到候选生成、评分、排序、top-k、rerank、rank fusion 和 RetrievalResult 的检索边界。它产出可审计的 RetrievedCandidate 与 RetrievalScore，而不构建索引、不生成 embedding、不决定哪些候选进入模型 ContextPackage，也不把评分或排名视为事实正确性、授权或模型已使用某候选的证明。RetrievalActivity 是执行操作；RetrievalArtifact 是请求、候选与结果等数据对象。
+    en: This module covers the retrieval boundary from RetrievalRequest, RetrievalQuery, and RetrievalFilter through candidate generation, scoring, ranking, top-k, reranking, rank fusion, and RetrievalResult. It produces auditable RetrievedCandidate and RetrievalScore records without building an index, generating embeddings, deciding which candidates enter a model ContextPackage, or treating a score or rank as proof of factual correctness, authorization, or model use. RetrievalActivity is the execution operation, while RetrievalArtifact is the data object such as request, candidate, and result.
+    ja: このモジュールは RetrievalRequest、RetrievalQuery、RetrievalFilter から candidate generation、scoring、ranking、top-k、reranking、rank fusion、RetrievalResult までの検索境界を扱います。監査可能な RetrievedCandidate と RetrievalScore record を生みますが、index 構築、embedding 生成、候補を model ContextPackage に入れる決定、score や rank を事実正確性・認可・model 使用の証明として扱うことはしません。RetrievalActivity は実行操作であり、RetrievalArtifact は request、candidate、result などの data object です。
   why_needed:
-    zh: 用明确身份和关系链回答一次检索如何接收请求、读取哪一索引版本、如何形成并排序候选、为何返回这些候选，以及怎样逐阶段重放；同时把最终上下文采用与安全检查留给各自 owner。
-    en: Uses explicit identities and relation chains to answer how a retrieval accepts a request, which index version it reads, how candidates are formed and ordered, why candidates are returned, and how stages are replayed, while leaving final context admission and safety checks to their owners.
-    ja: 明示identity/relation chainによりrequest受領・read index version・candidate形成/順位・返却理由・stage replayを答え、final context admissionとsafety checkは各ownerへ残します。
+    zh: 模型无法在每次调用中阅读完整语料库，且外部数据会变化。检索需要将用户或任务查询与可访问来源匹配，并留下足以说明候选从何而来、由何种分数和算法排序的证据；否则下游无法区分“可用候选”“实际可见上下文”和“被模型采纳的答案依据”。
+    en: A model cannot read an entire corpus on every call, and external data changes. Retrieval must match a user or task query to accessible sources and retain enough evidence to explain where candidates came from and which scores and algorithms ordered them. Otherwise downstream systems cannot distinguish an available candidate, actual visible context, and evidence the model adopted in an answer.
+    ja: model は毎回完全 corpus を読めず、外部 data も変化します。retrieval は user または task query をアクセス可能な source と対応付け、candidate の出所と、それを順序付けた score・algorithm を説明する十分な evidence を残す必要があります。さもなければ下流 system は、利用可能 candidate、実際の可視 context、model が回答で採用した根拠を区別できません。
   includes:
-    - zh: 检索请求、查询、过滤条件、端到端检索运行、候选生成与阶段追踪。
-      en: Retrieval requests, queries, filters, end-to-end runs, candidate generation, and stage traces.
-      ja: retrieval request・query・filter・end-to-end run・candidate generation・stage trace。
-    - zh: 候选集合、统一候选身份、Chunk 候选、阶段分数、评分、排名融合、模型重排、TopK 与检索结果。
-      en: Candidate sets, the unified candidate identity, chunk candidates, stage scores, scoring, rank fusion, model reranking, Top-K selection, and retrieval results.
-      ja: candidate set・unified candidate identity・chunk candidate・stage score・scoring・rank fusion・model reranking・Top-K・retrieval result。
+    - zh: 查询、过滤器、候选生成、候选集、分数、排序、top-k、rerank、融合以及结果和运行追踪。
+      en: Queries, filters, candidate generation, candidate sets, scores, ranking, top-k, reranking, fusion, results, and run tracing.
+      ja: query、filter、candidate generation、candidate set、score、ranking、top-k、reranking、fusion、result、run trace。
   excludes:
-    - zh: Index、IndexVersion、Shard、Entry 与 Embedding 的构建和内部结构归“表示与索引”；本模块只声明请求目标与运行实际读取的版本。
-      en: Index, IndexVersion, Shard, Entry, and Embedding construction and internals belong to Representations and indexes; this module only states the requested target and version actually read.
-      ja: Index・IndexVersion・Shard・Entry・Embedding構築/内部はrepresentation/index所有で、本moduleはrequest targetとactual read versionだけを表します。
-    - zh: ContextPackage、ContextSlot、token 预算、上下文排除与最终采用归“上下文组装”；TopK 候选不等于已进入上下文。
-      en: ContextPackage, ContextSlot, token budget, context exclusion, and final admission belong to Context assembly; a Top-K candidate is not automatically in context.
-      ja: ContextPackage・ContextSlot・token budget・context exclusion・final admissionはcontext assembly所有で、Top-K candidateはcontext採用済みを意味しません。
-    - zh: PatternScan、DefenseFinding、规则、来源文档和框架说明分别归安全本体或证据层，不作为检索层级节点。
-      en: PatternScan, DefenseFinding, rules, source documents, and framework descriptions belong to safety ontologies or the evidence layer and are not retrieval hierarchy nodes.
-      ja: PatternScan・DefenseFinding・rule・source document・framework descriptionはsafety ontology/evidence layer所有でretrieval hierarchy nodeではありません。
-  semantic_kind: null
-  aliases: []
-purpose:
-  zh: 用明确身份和关系链回答一次检索如何接收请求、读取哪一索引版本、如何形成并排序候选、为何返回这些候选，以及怎样逐阶段重放；同时把最终上下文采用与安全检查留给各自 owner。
-  en: Uses explicit identities and relation chains to answer how a retrieval accepts a request, which index version it reads, how candidates are formed and ordered, why candidates are returned, and how stages are replayed, while leaving final context admission and safety checks to their owners.
-  ja: 明示identity/relation chainによりrequest受領・read index version・candidate形成/順位・返却理由・stage replayを答え、final context admissionとsafety checkは各ownerへ残します。
-structure: null
+    - zh: 离线 embedding 或 index 构建、持久 MemoryRecord 写入、上下文预算选择、模型推理和生成。
+      en: Offline embedding or index construction, persistent MemoryRecord writes, context-budget selection, model inference, and generation.
+      ja: offline embedding または index 構築、永続 MemoryRecord 書込み、context-budget 選択、model inference、generation。
+  semantic_kind: module
+  aliases: [RAG retrieval, candidate retrieval, 检索排序]
+engineering:
+  explanation:
+    zh: LangChain 将 retriever 定义为接收非结构化查询并返回文档的接口。pgvector 支持以距离排序并 LIMIT k 返回最近邻；Elasticsearch RRF 会独立执行多个 retriever 并合并其 top 文档。Moonweave 把这些 I/O 分解为请求、活动、候选、分数和结果，以免把提供商 API 的临时返回或排名策略误作持久来源或上下文选择。
+    en: LangChain defines a retriever as an interface returning documents for an unstructured query. pgvector supports ordering by distance and LIMIT k to return nearest neighbors, while Elasticsearch RRF independently executes multiple retrievers and combines their top documents. Moonweave separates those I/O concerns into request, activity, candidate, score, and result so temporary API returns or ranking policy are not mistaken for persistent source or context selection.
+    ja: LangChain は retriever を非構造化 query に対して document を返す interface と定義します。pgvector は距離順と LIMIT k で nearest neighbor を返せ、Elasticsearch RRF は複数 retriever を独立に実行して top document を結合します。Moonweave はこれらの I/O を request、activity、candidate、score、result に分離し、一時 API return や ranking policy を persistent source や context selection と誤認しません。
+  typical_input:
+    - description: pgvector nearest-neighbor query
+      format: |
+        SELECT id, content
+        FROM memory_chunks
+        ORDER BY embedding <-> '[0.1,0.2,0.3]'
+        LIMIT 20;
+    - description: Elasticsearch reciprocal-rank-fusion request
+      format: |
+        GET knowledge/_search
+        {
+          "retriever": {
+            "rrf": {
+              "retrievers": [/* lexical and kNN retrievers */],
+              "rank_window_size": 50,
+              "rank_constant": 20
+            }
+          }
+        }
+  typical_output:
+    - description: Moonweave candidate-result envelope
+      format: |
+        {
+          "retrieval_result_id": "retrieval-result-support-18",
+          "request_ref": "retrieval-request-support-18",
+          "candidate_refs": ["candidate-42", "candidate-77"],
+          "ranking_method_ref": "rank-policy-hybrid-rrf-v1"
+        }
+  reference_implementations:
+    - name: LangChain retrieval
+      url: https://docs.langchain.com/oss/python/langchain/retrieval
+      description: Describes retrievers returning documents for a query and retrieval within RAG workflows.
+    - name: pgvector
+      url: https://github.com/pgvector/pgvector
+      description: Documents nearest-neighbor vector queries using ORDER BY distance and LIMIT.
+    - name: Elasticsearch reciprocal rank fusion
+      url: https://www.elastic.co/docs/reference/elasticsearch/rest-apis/reciprocal-rank-fusion
+      description: Documents independently run retrievers, rank-window controls, and RRF result fusion.
+structure:
+  identity_keys: [retrieval_contract_id]
+  fields:
+    - id: retrieval_contract_id
+      labels: {zh: 检索契约标识, en: retrieval contract ID, ja: retrieval contract ID}
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 标识可重用的查询、候选和排序约定，不复用为一次运行、请求或结果标识。
+        en: Identifies reusable query, candidate, and ranking conventions and is not reused as one run, request, or result ID.
+        ja: 再利用可能な query、candidate、ranking 規約を識別し、一回の run、request、result ID として再利用しません。
+      allowed_values: []
+      pattern: "^retrieval-contract-[A-Za-z0-9._-]+$"
+      example_value: retrieval-contract-support-v1
+      source_claims: [claim-retrieval-module-pipeline]
+    - id: candidate_limit
+      labels: {zh: 候选上限, en: candidate limit, ja: candidate limit}
+      datatype: integer
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 声明候选生成或融合阶段可返回的最大候选数，不等同于模型上下文预算或最终回答长度。
+        en: Declares the maximum candidates a generation or fusion stage may return and is not model-context budget or final answer length.
+        ja: candidate generation または fusion stage が返せる最大候補数を宣言し、model-context budget や最終回答長ではありません。
+      allowed_values: []
+      pattern: null
+      example_value: 50
+      source_claims: [claim-retrieval-module-pgvector-topk]
+    - id: ranking_method_ref
+      labels: {zh: 排序方法引用, en: ranking-method reference, ja: ranking-method 参照}
+      datatype: reference
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 指向采用的评分、rerank 或融合方法版本；它不是某个候选的实际分数。
+        en: Points to the versioned scoring, rerank, or fusion method and is not an actual score of one candidate.
+        ja: versioned scoring、rerank、fusion method を指し、一候補の実際の score ではありません。
+      allowed_values: []
+      pattern: "^rank-policy-[A-Za-z0-9._-]+$"
+      example_value: rank-policy-hybrid-rrf-v1
+      source_claims: [claim-retrieval-module-rrf]
+    - id: provenance_required
+      labels: {zh: 必须记录来源, en: provenance required, ja: provenance required}
+      datatype: boolean
+      required: true
+      cardinality: {min: 1, max: 1}
+      definitions:
+        zh: 指示每个结果候选必须能引用来源对象、运行和评分方法，而非只返回不可解释文本。
+        en: Indicates every result candidate must be able to reference its source object, run, and scoring method rather than return unexplained text alone.
+        ja: 各 result candidate が source object、run、scoring method を参照でき、説明不能な text だけを返さないことを示します。
+      allowed_values: [true]
+      pattern: null
+      example_value: true
+      source_claims: [claim-retrieval-module-provenance]
+  constraints:
+    - id: retrieval-module-result-boundary
+      severity: error
+      expression_language: plain
+      expression: A retrieval result must preserve request_ref, candidate provenance, and ranking-method identity. It must not assert that a candidate was inserted into ContextPackage, attended by a model, factually correct, authorized, or persisted as memory without separate facts.
+      explanation:
+        zh: 检索结束于可解释候选和结果；上下文选择、模型使用、事实验证与记忆生命周期均属于独立边界。
+        en: Retrieval ends with explainable candidates and results; context selection, model use, factual validation, and memory lifecycle are independent boundaries.
+        ja: retrieval は説明可能な candidate と result で終わり、context selection、model use、factual validation、memory lifecycle は独立した境界です。
+      source_claims: [claim-retrieval-module-pipeline, claim-retrieval-module-provenance]
+    - id: retrieval-module-ranking-not-truth
+      severity: warning
+      expression_language: plain
+      expression: A score or rank is comparable only under its declared method, scale, query, and candidate set. It must not be interpreted as a universal relevance probability or a guarantee of answer quality.
+      explanation:
+        zh: 不同索引、检索器、归一化和 reranker 的数值没有自动可比性，排名也不是正确性证明。
+        en: Values from different indexes, retrievers, normalizations, and rerankers are not automatically comparable, and rank is not proof of correctness.
+        ja: 異なる index、retriever、normalization、reranker の値は自動的に比較可能ではなく、rank は正確性の証明ではありません。
+      source_claims: [claim-retrieval-module-rrf]
+  required_relations: []
 examples:
-  - id: memory-retrieval-ranking-cq-replay-v3-example-positive
-    kind: positive
-    labels:
-      zh: 检索回放闭合正例
-      en: Retrieval replay closure positive case
-      ja: retrieval replay 閉路の正例
-    scenario_id: null
+  - id: retrieval-module-example-positive-hybrid-result
+
+    labels: {zh: 可追溯的混合候选结果, en: Traceable hybrid candidate result, ja: traceable hybrid candidate result}
+
     descriptions:
-      zh: run-411 履行 request-419、实际读取 index-v19、拥有 trace-426；trace 按序记录请求、版本与排序阶段，重放得到同一候选成员和顺序。
-      en: run-411 fulfills request-419, actually reads index-v19, and owns trace-426; the trace records request, version, and ranking stages in order, and replay reproduces membership and order.
-      ja: run-411はrequest-419をfulfillしindex-v19を実読、trace-426がrequest/version/ranking stageを順に記録しreplayで同membership/orderを得ます。
+      zh: Generative Agents Memory Stream + Reflection；MemGPT core_memory_append/archival_memory_insert；Redis SET EX TTL + FT.SEARCH vector eviction。
+      en: Generative Agents Memory Stream + Reflection; MemGPT core_memory_append/archival_memory_insert; Redis SET EX TTL + FT.SEARCH vector eviction.
+      ja: Generative Agents Memory Stream + Reflection。MemGPT core_memory_append/archival_memory_insert。Redis SET EX TTL + vector eviction。
     field_values:
-      retrieval_run_id: run-411
-      retrieval_request:
-        request_id: request-419
-        query_sha256: a6c5a2a276c4e3ad43ae3ca35d3c00fd856fbc903d47e16ae18fc3f050debc54
-        filter: tenant_id=tenant-7 AND language=en
-        requested_top_k: 10
-      actual_index:
-        index_id: policy-hybrid-index
-        index_version_id: index-v19
-        snapshot_sha256: 940fbf0c0d602945f534f93ebf8758431e5bb383a40124dd4734b19ec2e73a19
-      retrieval_trace_id: trace-426
-      ordered_stages:
-        - stage_id: prefetch-sparse-411
-          stage_type: candidate-generation
-          limit: 40
-        - stage_id: prefetch-dense-411
-          stage_type: candidate-generation
-          limit: 40
-        - stage_id: rrf-411
-          stage_type: rank-fusion
-          rrf_k: 60
-        - stage_id: topk-411
-          stage_type: top-k-selection
-          limit: 10
-      recorded_candidate_order:
-        - candidate-424
-        - candidate-431
-        - candidate-447
-      replayed_candidate_order:
-        - candidate-424
-        - candidate-431
-        - candidate-447
-    related_node_ids:
-      - RetrievalRun
-      - RetrievalRequest
-      - IndexVersion
-      - RetrievalTrace
-      - RankingOperation
-    related_relation_ids:
-      - RetrievalRun-fulfills-RetrievalRequest
-      - RetrievalRun-reads-IndexVersion
-      - RetrievalRun-has_trace-RetrievalTrace
-      - RetrievalTrace-records-RetrievalRequest
-      - RetrievalTrace-records-IndexVersion
-      - RetrievalTrace-records-RankingOperation
-    expected_result:
-      zh: 重放成功，或以具体阶段 ID 报告首个差异。
-      en: Replay succeeds or reports the first divergence with a concrete stage ID.
-      ja: replay成功または具体stage IDでfirst divergenceを報告します。
-    why_valid_or_invalid:
-      zh: 规范请求、实际索引、追踪归属和阶段记录形成闭合证据链。
-      en: Normative request, actual index, trace ownership, and stage records form a closed evidence chain.
-      ja: normative request・actual index・trace ownership・stage recordがclosed evidence chainを形成します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-retrieval-ranking-005
-  - id: memory-retrieval-ranking-cq-replay-v3-example-counter
-    kind: counterexample
-    labels:
-      zh: 同文本异版本回放反例
-      en: Same-text different-version replay counterexample
-      ja: 同一 text・異 version replay の反例
-    scenario_id: null
+      retrieval_contract_id: retrieval-contract-support-v1
+      candidate_limit: 50
+      ranking_method_ref: rank-policy-hybrid-rrf-v1
+      provenance_required: true
+    related_node_ids: [RetrievalRequest, CandidateGenerationActivity, RankFusion, RetrievalResult]
+    related_relation_ids: []
+
+    source_claims: [claim-retrieval-module-rrf, claim-retrieval-module-rag-paper]
+  - id: retrieval-module-example-counterexample-context-inclusion
+
+    labels: {zh: 把候选结果当作已见上下文, en: Treat candidate result as visible context, ja: candidate result を可視 context と扱う}
+
     descriptions:
-      zh: 另一个运行使用同样查询文本但读取 index-v20；若只按文本相同复用 trace-426，会掩盖实际索引与阶段参数差异。
-      en: Another run uses the same query text but reads index-v20; reusing trace-426 from text equality alone hides actual-index and stage-parameter differences.
-      ja: 別runは同query textでもindex-v20を読み、text一致だけでtrace-426を再利用するとactual index/stage parameter差異を隠します。
+      zh: 反例：ephemeral tool output 无 MemoryRetentionPolicy/Redis EX TTL 就永久 MemoryWrite。
+      en: Counterexample: ephemeral tool output MemoryWrite permanently without MemoryRetentionPolicy/Redis EX TTL.
+      ja: 反例：ephemeral tool output が MemoryRetentionPolicy/Redis EX TTL なしで永久 MemoryWrite。
     field_values:
-      retrieval_run_id: run-412
-      retrieval_request_id: request-420
-      query_sha256: a6c5a2a276c4e3ad43ae3ca35d3c00fd856fbc903d47e16ae18fc3f050debc54
-      actual_index_version_id: index-v20
-      reused_trace_id: trace-426
-      trace_recorded_index_version_id: index-v19
-      current_rrf_k: 20
-      trace_recorded_rrf_k: 60
-      replay_equivalent: false
-      first_divergence: index-version-before-prefetch-sparse-411
-    related_node_ids:
-      - RetrievalRun
-      - RetrievalRequest
-      - IndexVersion
-      - RetrievalTrace
-    related_relation_ids:
-      - RetrievalRun-fulfills-RetrievalRequest
-      - RetrievalRun-reads-IndexVersion
-      - RetrievalRun-has_trace-RetrievalTrace
-      - RetrievalTrace-records-RetrievalRequest
-    expected_result:
-      zh: 拒绝重放等价，并指出实际 IndexVersion 或阶段参数不一致。
-      en: Reject replay equivalence and identify the actual IndexVersion or stage-parameter mismatch.
-      ja: replay equivalenceを拒否しactual IndexVersionまたはstage parameter mismatchを示します。
-    why_valid_or_invalid:
-      zh: 同一文本不等于同一请求、运行、索引版本或阶段链。
-      en: Equal text does not imply equal request, run, index version, or stage chain.
-      ja: 同textは同request・run・index version・stage chainを意味しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-retrieval-ranking-006
-  - id: memory-retrieval-ranking-cq-score-explanation-v3-example-positive
-    kind: positive
-    labels:
-      zh: 异质检索分数可解释正例
-      en: Heterogeneous retrieval-score explanation positive case
-      ja: 異種 retrieval score 説明の正例
-    scenario_id: null
+      candidate_limit: 50
+      asserted_visible_candidate_count: 50
+      context_package_ref: null
+    related_node_ids: [RetrievalResult, ContextPackage, ContextAssembly]
+    related_relation_ids: []
+
+    source_claims: [claim-retrieval-module-pipeline]
+  - id: retrieval-module-example-boundary-index-build
+
+    labels: {zh: 索引构建不是在线检索, en: Index construction is not online retrieval, ja: index construction は online retrieval ではない}
+
     descriptions:
-      zh: candidate-424 先由 lexical-413 产生 BM25 分数，再由 vector-414 产生余弦相似度，最后由 rerank-416 产生重排分数；三个分数分别保留活动、方法和模型版本。
-      en: candidate-424 receives a BM25 score from lexical-413, a cosine-similarity score from vector-414, and a rerank score from rerank-416; each score retains its activity, method, and model version.
-      ja: candidate-424 は lexical-413 の BM25 score、vector-414 の cosine-similarity score、rerank-416 の rerank score を別々に持ち、各 score は activity・method・model version を保持します。
+      zh: MemGPT main_context vs archival vs recall 生命周期阶段；Generative Agents importance 累计 vs MemoryDecay recency 衰减。
+      en: MemGPT main_context vs archival vs recall lifecycle stages; Generative Agents importance accumulation vs MemoryDecay recency decay.
+      ja: MemGPT main/recall/archival lifecycle 段階。Generative Agents importance 累計 vs MemoryDecay recency 減衰。
     field_values:
-      candidate_id: candidate-424
-      lexical_score:
-        score_id: lexical-score-428
-        value: 8.73
-        activity_id: lexical-413
-        method: BM25
-        method_version: qdrant-bm25@1.16
-      similarity_score:
-        score_id: similarity-score-429
-        value: 0.842
-        activity_id: vector-414
-        method: cosine-similarity
-        model_version: text-embedding-3-large@2026-01
-      rerank_score:
-        score_id: rerank-score-430
-        value: 0.917
-        activity_id: rerank-416
-        method: cross-encoder-rerank
-        model_version: bge-reranker-v2-m3@2025-10
-      heterogeneous_scores_directly_comparable: false
-    related_node_ids:
-      - CandidateScoringActivity
-      - RetrievedCandidate
-      - RetrievalScore
-      - RerankActivity
-      - RerankScore
-    related_relation_ids:
-      - CandidateScoringActivity-scores-RetrievedCandidate
-      - CandidateScoringActivity-produces-RetrievalScore
-      - RetrievedCandidate-has_score-RetrievalScore
-      - RerankActivity-produces-RerankScore
-      - RerankScore-is_a-RetrievalScore
-    expected_result:
-      zh: 分别解释每个分数的类型、阶段、方法或模型版本，不直接比较异质量纲。
-      en: Explain each score's type, stage, method or model version without directly comparing heterogeneous scales.
-      ja: 各score type・stage・method/model versionを説明しheterogeneous scaleを直接比較しません。
-    why_valid_or_invalid:
-      zh: 分数产生关系与候选拥有关系同时存在，且子类种差明确。
-      en: Both score-production and candidate-ownership facts exist, with an explicit subtype differentia.
-      ja: score-production/candidate-ownership factが共にありsubtype differentiaが明示されます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-retrieval-ranking-007
-  - id: memory-retrieval-ranking-cq-score-explanation-v3-example-counter
-    kind: counterexample
-    labels:
-      zh: 排名位置误作分数反例
-      en: Rank-position-as-score counterexample
-      ja: rank position を score と誤認する反例
-    scenario_id: null
+      operation_kind: index_build
+      retrieval_contract_id: null
+      candidate_limit: null
+    related_node_ids: [RetrievalActivity, RetrievalResult]
+    related_relation_ids: []
+
+    source_claims: [claim-retrieval-module-pgvector-topk]
+  - id: retrieval-module-example-instance-pgvector-topk
+
+    labels: {zh: "实例：pgvector 最近邻查询", en: "Instance: pgvector nearest-neighbor query", ja: "インスタンス：pgvector nearest-neighbor query"}
+
     descriptions:
-      zh: 只看到 candidate-424 的 rank_position=3 就把 3 当作 RetrievalScore，且没有评分活动或方法证据。
-      en: The value 3 from candidate-424's rank_position is treated as RetrievalScore without scoring activity or method evidence.
-      ja: candidate-424のrank_position=3をscoring activity/method evidenceなしにRetrievalScore扱いします。
+      zh: MemGPT core_memory_replace(key="human", old="Bob", new="Alice")；Generative Agents reflection importance threshold=150 触发。
+      en: MemGPT core_memory_replace(key="human", old="Bob", new="Alice"); Generative Agents reflection importance threshold=150 triggers.
+      ja: MemGPT core_memory_replace。Generative Agents reflection importance threshold=150 トリガー。
     field_values:
-      candidate_id: candidate-424
-      rank_position: 3
-      incorrect_retrieval_score_value: 3
-      score_type_present: false
-      producing_activity_present: false
-      method_present: false
-      model_version_present: false
-      validation_decision: reject-rank-position-as-retrieval-score
-    related_node_ids:
-      - RetrievedCandidate
-      - RetrievalScore
-      - CandidateScoringActivity
-      - RerankActivity
-    related_relation_ids:
-      - CandidateScoringActivity-scores-RetrievedCandidate
-      - CandidateScoringActivity-produces-RetrievalScore
-      - RetrievedCandidate-has_score-RetrievalScore
-      - RerankActivity-produces-RerankScore
-    expected_result:
-      zh: 拒绝把 ordinal rank 当成分数，并要求产生阶段与方法证据。
-      en: Reject ordinal rank as a score and require producing-stage and method evidence.
-      ja: ordinal rankをscore扱いせずproducing-stage/method evidenceを要求します。
-    why_valid_or_invalid:
-      zh: 排名字段与阶段分数具有不同身份和解释语境。
-      en: Rank fields and stage scores have different identities and interpretation contexts.
-      ja: rank fieldとstage scoreは異なるidentity/interpretation contextを持ちます。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-retrieval-ranking-008
-  - id: memory-retrieval-ranking-cq-candidate-result-separation-v3-example-positive
-    kind: positive
-    labels:
-      zh: 候选阶段与最终结果分离正例
-      en: Candidate-stage and final-result separation positive case
-      ja: candidate stage と final result 分離の正例
-    scenario_id: null
-    descriptions:
-      zh: generation-412 产生初始 CandidateSet，candidate-424 是阶段成员；TopK 从有序集合截断，result-422 最终包含 candidate-424，但不声明它已进入 ContextPackage。
-      en: generation-412 produces an initial CandidateSet in which candidate-424 is a stage member; Top-K truncates an ordered set and result-422 finally contains candidate-424 without claiming ContextPackage admission.
-      ja: generation-412がinitial CandidateSetを生成しcandidate-424がstage member、TopKがordered setをtruncateしresult-422がcandidate-424を含みますがContextPackage admissionは宣言しません。
-    field_values:
-      candidate_generation_activity_id: generation-412
-      initial_candidate_set_id: candidate-set-412-initial
-      initial_candidate_ids:
-        - candidate-424
-        - candidate-431
-        - candidate-447
-        - candidate-499
-      top_k_selection_id: topk-416
-      top_k: 3
-      retrieval_result_id: result-422
-      final_candidate_ids:
-        - candidate-424
-        - candidate-431
-        - candidate-447
-      context_package_admission_asserted: false
-      candidate_rank_shadow_node_created: false
-      retrieved_context_candidate_shadow_node_created: false
-    related_node_ids:
-      - CandidateGenerationActivity
-      - CandidateSet
-      - RetrievedCandidate
-      - TopKSelection
-      - RetrievalResult
-    related_relation_ids:
-      - CandidateGenerationActivity-produces-CandidateSet
-      - CandidateSet-contains-RetrievedCandidate
-      - RetrievalResult-has_candidate_set-CandidateSet
-      - TopKSelection-selects_from-CandidateSet
-      - RetrievalResult-contains-RetrievedCandidate
-    expected_result:
-      zh: 阶段候选、最终结果成员和下游上下文边界均可区分。
-      en: Stage candidate, final result member, and downstream context boundary remain distinguishable.
-      ja: stage candidate・final result member・downstream context boundaryを区別できます。
-    why_valid_or_invalid:
-      zh: 关系链止于检索结果，不借 RetrievedContextCandidate 或 context edge 重复候选身份。
-      en: The chain stops at retrieval result and does not duplicate candidate identity through RetrievedContextCandidate or a context edge.
-      ja: chainはretrieval resultで止まりRetrievedContextCandidate/context edgeでcandidate identityを重複しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-retrieval-ranking-009
-  - id: memory-retrieval-ranking-cq-candidate-result-separation-v3-example-counter
-    kind: counterexample
-    labels:
-      zh: 初始成员误作最终成员反例
-      en: Initial-member-as-final-member counterexample
-      ja: initial member を final member と誤認する反例
-    scenario_id: null
-    descriptions:
-      zh: 初始集合中的 candidate-499 在重排后被淘汰；若仅凭初始 membership 就声称 result-422 contains candidate-499，会混淆阶段与最终结果。
-      en: candidate-499 belongs to the initial set but is removed after reranking; claiming result-422 contains it from initial membership alone conflates stage and final result.
-      ja: candidate-499はinitial set memberですがrerank後除外され、initial membershipだけでresult-422 containsとするとstage/final resultを混同します。
-    field_values:
-      initial_candidate_set_id: candidate-set-412-initial
-      candidate_id: candidate-499
-      initial_membership: true
-      reranked_position: 27
-      top_k: 10
-      retrieval_result_id: result-422
-      final_membership: false
-      incorrect_final_membership_asserted: true
-      validation_decision: preserve-stage-membership-reject-final-membership
-    related_node_ids:
-      - CandidateSet
-      - RetrievedCandidate
-      - RetrievalResult
-      - TopKSelection
-    related_relation_ids:
-      - CandidateGenerationActivity-produces-CandidateSet
-      - CandidateSet-contains-RetrievedCandidate
-      - RetrievalResult-has_candidate_set-CandidateSet
-      - TopKSelection-selects_from-CandidateSet
-    expected_result:
-      zh: 保留初始集合成员事实，但拒绝最终结果包含事实。
-      en: Preserve initial-set membership but reject final-result membership.
-      ja: initial-set membershipは保持しfinal-result membershipを拒否します。
-    why_valid_or_invalid:
-      zh: CandidateSet membership 与 RetrievalResult membership 是不同可审计事实。
-      en: CandidateSet membership and RetrievalResult membership are distinct auditable facts.
-      ja: CandidateSet membershipとRetrievalResult membershipは異なるaudit可能factです。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-retrieval-ranking-010
+      retrieval_contract_id: retrieval-contract-support-v1
+      candidate_limit: 20
+      ranking_method_ref: rank-policy-vector-l2-v1
+      provenance_required: true
+    related_node_ids: [RetrievalRequest, CandidateGenerationActivity, RetrievedCandidate, RetrievalScore]
+    related_relation_ids: []
+    source_claims: [claim-retrieval-module-pgvector-topk]
 parent_relation: null
 relations: []
-module_contract:
-  interaction_contract:
-    applicability: operational
-    facets:
-      input:
-        applicable: true
-        description:
-          zh: 输入由 RetrievalRequest 与实际读取的 IndexVersion 共同界定；fulfills 保留规范请求，reads 保留执行事实。
-          en: Input is jointly delimited by RetrievalRequest and the IndexVersion actually read; fulfills preserves the normative request while reads preserves execution fact.
-          ja: inputはRetrievalRequestとactual read IndexVersionで定まりfulfillsはnormative request、readsはexecution factを保持します。
-        family_concept_ids:
-          - RetrievalRequest
-          - IndexVersion
-        relation_ids:
-          - RetrievalRun-fulfills-RetrievalRequest
-          - RetrievalRun-reads-IndexVersion
-        not_applicable_reason: null
-      output:
-        applicable: true
-        description:
-          zh: 输出由运行产生的 RetrievalResult、结果明确包含的 RetrievedCandidate 和运行拥有的 RetrievalTrace 组成。
-          en: Output comprises the RetrievalResult produced by the run, RetrievedCandidate members explicitly contained by the result, and the RetrievalTrace owned by the run.
-          ja: outputはrun生成RetrievalResult・result明示RetrievedCandidate member・run所有RetrievalTraceで構成されます。
-        family_concept_ids:
-          - RetrievalResult
-          - RetrievedCandidate
-          - RetrievalTrace
-        relation_ids:
-          - RetrievalRun-produces-RetrievalResult
-          - RetrievalResult-contains-RetrievedCandidate
-          - RetrievalRun-has_trace-RetrievalTrace
-        not_applicable_reason: null
-      failure:
-        applicable: false
-        description: null
-        family_concept_ids: []
-        relation_ids: []
-        not_applicable_reason:
-          zh: 本模块记录检索事实与结果，不裁决运行失败类型；失败事件由运行时与可观测性本体拥有。
-          en: This module records retrieval facts and results but does not adjudicate runtime failure types; runtime and observability own failure events.
-          ja: 本moduleはretrieval fact/resultを記録しますがruntime failure typeを裁決せずfailure eventはruntime/observabilityが所有します。
-      recovery:
-        applicable: false
-        description: null
-        family_concept_ids: []
-        relation_ids: []
-        not_applicable_reason:
-          zh: RetrievalTrace 支持重放证据，但恢复或重试活动由运行时与编排本体启动。
-          en: RetrievalTrace supports replay evidence, but runtime and orchestration initiate recovery or retry activities.
-          ja: RetrievalTraceはreplay evidenceを支えますがrecovery/retry activity開始はruntime/orchestrationが所有します。
-    review:
-      review_status: accepted
-      reviewers:
-        - reviewer_id: moonweave-memory-domain-reviewer
-          reviewer_role: domain
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 已逐面核验请求/实际索引输入、结果/候选/追踪输出，以及失败与恢复的 owner 边界。
-            en: Request and actual-index input, result/candidate/trace output, and failure and recovery owner boundaries were reviewed facet by facet.
-            ja: request/actual-index input・result/candidate/trace output・failure/recovery owner boundaryをfacet別確認しました。
-        - reviewer_id: moonweave-ontology-structure-reviewer
-          reviewer_role: ontology
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 已逐面核验请求/实际索引输入、结果/候选/追踪输出，以及失败与恢复的 owner 边界。
-            en: Request and actual-index input, result/candidate/trace output, and failure and recovery owner boundaries were reviewed facet by facet.
-            ja: request/actual-index input・result/candidate/trace output・failure/recovery owner boundaryをfacet別確認しました。
-  taxonomy_contract:
-    applicability: mixed-backbone
-    not_applicable_reason: null
-    hierarchy_policy: arbitrary-depth-reviewed-backbone
-    key_root_concept_ids:
-      - RetrievalActivity
-      - RetrievalArtifact
-    allowed_backbone_predicates:
-      - has_candidate_set
-      - has_filter
-      - has_query
-      - has_score
-      - has_trace
-      - is_a
-    flat_root_exception_concept_ids: []
-    review:
-      review_status: accepted
-      reviewers:
-        - reviewer_id: moonweave-memory-domain-reviewer
-          reviewer_role: domain
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 已人工确认双根活动/产物树、任意深度子类链与组成节点均有唯一主骨架，不再依赖平根例外。
-            en: The dual activity and artifact roots, arbitrary-depth subtype chains, and composition nodes were manually checked to have one primary backbone without flat-root exceptions.
-            ja: activity/artifact dual root・arbitrary-depth subtype chain・composition nodeが一primary backboneを持ちflat-root exception不要と手作業確認しました。
-        - reviewer_id: moonweave-ontology-structure-reviewer
-          reviewer_role: ontology
-          reviewer_kind: automated-agent
-          reviewed_on: 2026-07-16
-          decision_note:
-            zh: 已人工确认双根活动/产物树、任意深度子类链与组成节点均有唯一主骨架，不再依赖平根例外。
-            en: The dual activity and artifact roots, arbitrary-depth subtype chains, and composition nodes were manually checked to have one primary backbone without flat-root exceptions.
-            ja: activity/artifact dual root・arbitrary-depth subtype chain・composition nodeが一primary backboneを持ちflat-root exception不要と手作業確認しました。
-  competency_questions:
-    - id: memory-retrieval-ranking-cq-replay-v3
-      semantic_key: memory-retrieval-ranking.replay
-      primary_owner_module_id: memory-retrieval-ranking
-      related_module_ids:
-        - memory-embedding-indexes
-      questions:
-        zh: 给定 RetrievalTrace，能否确认运行履行了哪个请求、实际读取哪一索引版本，并按记录的阶段与参数复现候选顺序？
-        en: Given a RetrievalTrace, can we identify the fulfilled request and actual index version and reproduce candidate order from recorded stages and parameters?
-        ja: RetrievalTraceからfulfilled request・actual index versionを特定しrecorded stage/parameterでcandidate orderを再現できますか。
-      query: Follow the run-to-request, run-to-index, run-to-trace, and trace-to-stage facts, replay each stage, and report the first candidate-set or ordering divergence.
-      expected_assertion: Replay uses the same request and actual index version, reproduces stage membership and order within declared tolerance, or identifies the first divergent stage.
-      evidence_binding:
-        applicability: relation-backed
-        owner_concept_ids:
-          - RetrievalRun
-          - RetrievalTrace
-          - RetrievalRequest
-          - RankingOperation
-        related_concept_ids:
-          - IndexVersion
-        relation_ids:
-          - RetrievalRun-reads-IndexVersion
-          - RetrievalTrace-records-IndexVersion
-        not_applicable_reason: null
-      positive_example_ids:
-        - memory-retrieval-ranking-cq-replay-v3-example-positive
-      counterexample_ids:
-        - memory-retrieval-ranking-cq-replay-v3-example-counter
-      source_claims:
-        - claim-memory-retrieval-ranking-002
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: memory-retrieval-ranking.replay 已按完整关系链、方向、owner 与正反例手工核验。
-              en: memory-retrieval-ranking.replay was manually checked against its complete relation chain, directions, owner, and positive and boundary cases.
-              ja: memory-retrieval-ranking.replayをcomplete relation chain・direction・owner・positive/boundary caseで手作業確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: memory-retrieval-ranking.replay 已按完整关系链、方向、owner 与正反例手工核验。
-              en: memory-retrieval-ranking.replay was manually checked against its complete relation chain, directions, owner, and positive and boundary cases.
-              ja: memory-retrieval-ranking.replayをcomplete relation chain・direction・owner・positive/boundary caseで手作業確認しました。
-    - id: memory-retrieval-ranking-cq-score-explanation-v3
-      semantic_key: memory-retrieval-ranking.score-explanation
-      primary_owner_module_id: memory-retrieval-ranking
-      related_module_ids: []
-      questions:
-        zh: 对任一返回候选，能否区分词汇、相似度与重排分数，并追溯到产生该分数的活动、方法和模型版本？
-        en: For any returned candidate, can lexical, similarity, and rerank scores be distinguished and traced to the producing activity, method, and model version?
-        ja: returned candidateごとにlexical・similarity・rerank scoreを区別し生成activity・method・model versionへ追跡できますか。
-      query: Traverse candidate scoring, candidate-owned score, score subtype, and rerank production facts without comparing heterogeneous raw values as one scale.
-      expected_assertion: Every explained score names its candidate, score subtype, producing stage, method or model version, and numeric scale; rank position remains a candidate field.
-      evidence_binding:
-        applicability: owner-only
-        owner_concept_ids:
-          - RetrievedCandidate
-          - RetrievalScore
-          - CandidateScoringActivity
-          - RerankActivity
-        related_concept_ids: []
-        relation_ids: []
-        not_applicable_reason:
-          zh: 候选、分数类型、打分活动与重排活动均由检索排序模块拥有；该问题解释域内分数链，不需要跨模块证据绑定。
-          en: Candidates, score types, scoring activities, and reranking activities are all owned by retrieval and ranking; this question explains an internal score chain with no cross-module evidence binding.
-          ja: candidate・score type・scoring activity・reranking activityはすべてretrieval/ranking moduleが所有し、cross-module evidence bindingなしで内部score chainを説明します。
-      positive_example_ids:
-        - memory-retrieval-ranking-cq-score-explanation-v3-example-positive
-      counterexample_ids:
-        - memory-retrieval-ranking-cq-score-explanation-v3-example-counter
-      source_claims:
-        - claim-memory-retrieval-ranking-004
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: memory-retrieval-ranking.score-explanation 已按完整关系链、方向、owner 与正反例手工核验。
-              en: memory-retrieval-ranking.score-explanation was manually checked against its complete relation chain, directions, owner, and positive and boundary cases.
-              ja: memory-retrieval-ranking.score-explanationをcomplete relation chain・direction・owner・positive/boundary caseで手作業確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: memory-retrieval-ranking.score-explanation 已按完整关系链、方向、owner 与正反例手工核验。
-              en: memory-retrieval-ranking.score-explanation was manually checked against its complete relation chain, directions, owner, and positive and boundary cases.
-              ja: memory-retrieval-ranking.score-explanationをcomplete relation chain・direction・owner・positive/boundary caseで手作業確認しました。
-    - id: memory-retrieval-ranking-cq-candidate-result-separation-v3
-      semantic_key: memory-retrieval-ranking.candidate-result-separation
-      primary_owner_module_id: memory-retrieval-ranking
-      related_module_ids:
-        - memory-context
-      questions:
-        zh: 能否区分初始候选集合、阶段候选、最终检索结果成员和下游上下文采用，而不创建 CandidateRank 或 RetrievedContextCandidate 影子节点？
-        en: Can initial candidate sets, stage candidates, final retrieval-result members, and downstream context admission be distinguished without CandidateRank or RetrievedContextCandidate shadow nodes?
-        ja: initial candidate set・stage candidate・final retrieval-result member・downstream context admissionをCandidateRank/RetrievedContextCandidate shadow nodeなしに区別できますか。
-      query: Follow generation-to-set, set membership, result-owned set, Top-K source, and final result membership; stop before context admission.
-      expected_assertion: The graph distinguishes stage membership from final result membership, stores rank_position on RetrievedCandidate, and contains no retrieval-to-context adoption edge.
-      evidence_binding:
-        applicability: boundary-comparison-only
-        owner_concept_ids:
-          - CandidateGenerationActivity
-          - CandidateSet
-          - RetrievedCandidate
-          - RetrievalResult
-          - TopKSelection
-        related_concept_ids:
-          - ContextPackage
-          - ContextSlot
-        relation_ids: []
-        not_applicable_reason:
-          zh: 该问题刻意在上下文采用之前停止，只判定检索候选与最终检索结果的内部身份，因此不使用下游 ContextSelectionActivity-selects-RetrievedCandidate 或 ContextAssembly-consumes-RetrievedChunk；两条边存在，但不回答本问题。
-          en: This question intentionally stops before context admission and asks only about the internal identities of retrieval candidates and final retrieval results, so it does not use downstream ContextSelectionActivity-selects-RetrievedCandidate or ContextAssembly-consumes-RetrievedChunk. Those edges exist but do not answer this question.
-          ja: この質問は context admission 前で停止し retrieval candidate と final retrieval result の内部 identity だけを判定するため、downstream の ContextSelectionActivity-selects-RetrievedCandidate と ContextAssembly-consumes-RetrievedChunk を使用しません。両 edge は存在しますが本質問には答えません。
-      positive_example_ids:
-        - memory-retrieval-ranking-cq-candidate-result-separation-v3-example-positive
-      counterexample_ids:
-        - memory-retrieval-ranking-cq-candidate-result-separation-v3-example-counter
-      source_claims:
-        - claim-memory-retrieval-ranking-001
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: memory-retrieval-ranking.candidate-result-separation 已按完整关系链、方向、owner 与正反例手工核验。
-              en: memory-retrieval-ranking.candidate-result-separation was manually checked against its complete relation chain, directions, owner, and positive and boundary cases.
-              ja: memory-retrieval-ranking.candidate-result-separationをcomplete relation chain・direction・owner・positive/boundary caseで手作業確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: memory-retrieval-ranking.candidate-result-separation 已按完整关系链、方向、owner 与正反例手工核验。
-              en: memory-retrieval-ranking.candidate-result-separation was manually checked against its complete relation chain, directions, owner, and positive and boundary cases.
-              ja: memory-retrieval-ranking.candidate-result-separationをcomplete relation chain・direction・owner・positive/boundary caseで手作業確認しました。
-  key_notion:
-    zh: 检索活动与检索信息
-    en: retrieval activities and artifacts
-    ja: 検索活動と検索成果物
-  owns_when:
-    zh: 当对象的身份取决于检索请求或运行、候选生成/排序阶段、某候选在集合中的成员身份与排名、阶段分数、检索结果或可重放轨迹时，由本模块拥有。
-    en: Own an object when its identity is determined by a retrieval request or run, candidate-generation or ranking stage, candidate-set membership, candidate rank, stage score, retrieval result, or retrieval trace.
-    ja: object identityがretrieval request/run・candidate-generation/ranking stage・candidate-set membership・candidate rank・stage score・retrieval result/traceで決まる場合に所有します。
-  references_when:
-    zh: 运行读取 IndexVersion 时引用“表示与索引”的版本；下游上下文组装或安全扫描消费 RetrievedCandidate 时引用本模块候选，但不得把 ContextSlot、DefenseFinding 等反向并入检索树。
-    en: A run references the IndexVersion owned by Representations and indexes; downstream context assembly or safety scanning may reference RetrievedCandidate, but ContextSlot and DefenseFinding must not be pulled back into the retrieval tree.
-    ja: runはrepresentation/index所有IndexVersionを参照し、downstream context assembly/safety scanはRetrievedCandidateを参照できますがContextSlot/DefenseFindingをretrieval treeへ逆流させません。
-  boundary_decisions:
-    - other_module_id: memory-embedding-indexes
-      subject_concept_ids:
-        - IndexVersion
-      decision: references
-      owner_module_id: memory-embedding-indexes
-      rationale:
-        zh: IndexVersion 的身份由构建或刷新血缘、分片和条目决定，归表示与索引；检索请求指向目标版本、检索运行读取实际版本、检索追踪留存所用版本，三者都不取得版本所有权。
-        en: IndexVersion identity is determined by build or refresh lineage, shards, and entries and belongs to representations and indexes. A retrieval request targets it, a run reads it, and a trace records the version used; none acquires ownership of the version.
-        ja: IndexVersion identity は build/refresh lineage・shard・entry で決まり representation/index が所有します。retrieval request は target、run は read、trace は使用版を record しますが版 ownership は取得しません。
-      relation_ids:
-        - RetrievalRequest-targets-IndexVersion
-        - RetrievalRun-reads-IndexVersion
-        - RetrievalTrace-records-IndexVersion
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-retrieval-ranking-001
-        - claim-memory-retrieval-ranking-002
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已确认 RetrievalRequest、RetrievalRun 与 RetrievalTrace 分别以 target、read、record 引用 IndexVersion，而不拥有或复制索引内部结构。
-              en: Confirmed that RetrievalRequest, RetrievalRun, and RetrievalTrace reference IndexVersion through target, read, and record respectively without owning or duplicating index internals.
-              ja: RetrievalRequest・RetrievalRun・RetrievalTrace が target・read・record で IndexVersion を参照し index 内部を所有・複製しないと確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 结构复核确认三条 accepted 关系共享 IndexVersion，但各自保留 Request、Run、Trace 的不同语义和检索侧端点。
-              en: Structural review confirms that the three accepted relations share IndexVersion while preserving the distinct semantics and retrieval-side endpoints of Request, Run, and Trace.
-              ja: 構造審査により三 accepted relation は IndexVersion を共有しつつ Request・Run・Trace の異なる意味と retrieval 側 endpoint を保持すると確認しました。
-    - other_module_id: memory-embedding-indexes
-      subject_concept_ids:
-        - RetrievalRequest
-        - RetrievalRun
-        - RetrievalTrace
-      decision: owns
-      owner_module_id: memory-retrieval-ranking
-      rationale:
-        zh: 检索侧以三个不同层次接触同一 IndexVersion：RetrievalRequest 声明目标版本，RetrievalRun 记录实际读取版本，RetrievalTrace 固化可审计的已用版本。三者均由一次检索发生识别；它们不是 IndexVersion 的子类，也不接管索引版本身份。
-        en: "The retrieval side touches the same IndexVersion at three distinct levels: RetrievalRequest declares the target, RetrievalRun records the version actually read, and RetrievalTrace fixes auditable evidence of the version used. All are identified by one retrieval occurrence; none is an IndexVersion subtype or takes ownership of index-version identity."
-        ja: retrieval 側は同じ IndexVersion に三つの異なる level で接します。RetrievalRequest は target を宣言し、RetrievalRun は実際に read した版を記録し、RetrievalTrace は使用版の audit evidence を固定します。三者は一 retrieval occurrence で識別され、IndexVersion の下位型でも版 identity の owner でもありません。
-      relation_ids:
-        - RetrievalRequest-targets-IndexVersion
-        - RetrievalRun-reads-IndexVersion
-        - RetrievalTrace-records-IndexVersion
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-retrieval-ranking-011
-        - claim-memory-retrieval-ranking-012
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-17
-            decision_note:
-              zh: 逐条复核确认请求、运行和追踪分别承担 target、read 与 record 职责，三条 accepted 边均需保留。
-              en: Point-by-point review confirms that request, run, and trace carry target, read, and record responsibilities respectively; all three accepted edges must remain.
-              ja: 項目別審査により request・run・trace は target・read・record の責務をそれぞれ担い、三つの accepted edge をすべて保持すると確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-17
-            decision_note:
-              zh: 三条关系共享索引侧 IndexVersion 端点，但检索侧端点和语义各不相同；不得合并为一个泛化“使用索引”节点。
-              en: The three relations share the IndexVersion endpoint but have distinct retrieval-side endpoints and meanings; they cannot be collapsed into one generic uses-index node.
-              ja: 三 relation は index 側 IndexVersion endpoint を共有しますが retrieval 側 endpoint と意味は異なり、一 generic uses-index node へ統合しません。
-    - other_module_id: memory-context
-      subject_concept_ids:
-        - RetrievedCandidate
-        - RetrievedChunk
-      decision: owns
-      owner_module_id: memory-retrieval-ranking
-      rationale:
-        zh: RetrievedCandidate 与 RetrievedChunk 由检索运行、候选集合、分数和排名识别；ContextSelectionActivity 决定候选是否采用，ContextAssembly 消费已采用的 RetrievedChunk。两条边只表达下游选择与消费，不改写检索候选身份。
-        en: RetrievedCandidate and RetrievedChunk are identified by retrieval run, candidate set, score, and rank. ContextSelectionActivity decides candidate admission, and ContextAssembly consumes an admitted RetrievedChunk. These edges express downstream selection and consumption without rewriting retrieval-candidate identity.
-        ja: RetrievedCandidate と RetrievedChunk は retrieval run・candidate set・score・rank で識別します。ContextSelectionActivity は candidate admission を決定し、ContextAssembly は採用済み RetrievedChunk を consume します。二つの edge は downstream selection/consumption を表し retrieval-candidate identity を書き換えません。
-      relation_ids:
-        - ContextAssembly-consumes-RetrievedChunk
-        - ContextSelectionActivity-selects-RetrievedCandidate
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-retrieval-ranking-001
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已确认检索结果成员不等于上下文采用结果；显式 selects 与 consumes 边连接两个阶段，但不通过影子候选节点改写检索身份。
-              en: Confirmed that retrieval-result membership is not context admission; explicit selects and consumes edges connect the stages without rewriting retrieval identity through shadow candidate nodes.
-              ja: retrieval-result membership は context admission ではなく、明示 selects/consumes edge が段階を接続しても shadow candidate node で retrieval identity を書き換えないと確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 结构复核确认 RetrievedCandidate 与 RetrievedChunk 保持检索所有权，ContextSelectionActivity 与 ContextAssembly 保持上下文所有权；跨界边不是 is_a。
-              en: Structural review confirms that RetrievedCandidate and RetrievedChunk retain retrieval ownership while ContextSelectionActivity and ContextAssembly retain context ownership; the boundary edges are not is_a.
-              ja: 構造審査により RetrievedCandidate・RetrievedChunk は retrieval ownership、ContextSelectionActivity・ContextAssembly は context ownership を保持し、境界 edge は is_a ではないと確認しました。
-    - other_module_id: memory-context
-      subject_concept_ids:
-        - ContextAssembly
-        - ContextSelectionActivity
-      decision: references
-      owner_module_id: memory-context
-      rationale:
-        zh: ContextSelectionActivity 选择一个 RetrievedCandidate 是否进入输入，ContextAssembly 随后消费已采用的 RetrievedChunk；二者均由具体上下文组装及其预算、槽位和版本识别。检索模块只提供候选，不拥有下游选择或组装活动。
-        en: ContextSelectionActivity decides whether a RetrievedCandidate enters the input, and ContextAssembly then consumes an admitted RetrievedChunk. Both are identified by a concrete context assembly, its budget, slots, and version; retrieval supplies candidates but does not own downstream selection or assembly activities.
-        ja: ContextSelectionActivity は RetrievedCandidate を入力へ採用するか決め、ContextAssembly は採用済み RetrievedChunk を続いて consume します。両者は具体 context assembly・budget・slot・version で識別され、retrieval は candidate を供給するだけで downstream selection/assembly activity を所有しません。
-      relation_ids:
-        - ContextAssembly-consumes-RetrievedChunk
-        - ContextSelectionActivity-selects-RetrievedCandidate
-      relation_not_applicable_reason: null
-      source_claims:
-        - claim-memory-retrieval-ranking-013
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-17
-            decision_note:
-              zh: 逐条复核确认选择候选与消费已采用内容是两个上下文活动，不是检索候选的隐藏状态。
-              en: Point-by-point review confirms that candidate selection and consumption of admitted content are two context activities, not hidden states of a retrieval candidate.
-              ja: 項目別審査により candidate selection と採用内容 consumption は二つの context activity で、retrieval candidate の hidden state ではないと確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-17
-            decision_note:
-              zh: 两条 accepted 边的上下文侧端点分别是 ContextAssembly 与 ContextSelectionActivity，必须与检索侧 RetrievedChunk、RetrievedCandidate 分开归属。
-              en: The context-side endpoints of the two accepted edges are ContextAssembly and ContextSelectionActivity and must remain separately owned from retrieval-side RetrievedChunk and RetrievedCandidate.
-              ja: 二つの accepted edge の context 側 endpoint は ContextAssembly と ContextSelectionActivity で、retrieval 側 RetrievedChunk・RetrievedCandidate と owner を分離します。
-  overlap_checks:
-    - other_module_id: memory-embedding-indexes
-      semantic_area:
-        zh: 索引构建与索引查询
-        en: Index construction versus index querying
-        ja: index construction と index querying
-      candidate_concept_ids:
-        - RetrievalRequest
-        - RetrievalRun
-      overlap_reason:
-        zh: 一个 IndexVersion 可被多次运行读取而不改变其身份；每次 RetrievalRun 则因请求、实际版本、阶段链、结果和追踪记录而独立。 本条仅记录 RetrievalRequest、RetrievalRun；其 canonical owner 是检索与排序（memory-retrieval-ranking），因此 memory-retrieval-ranking 在此拥有这些概念。
-        en: One IndexVersion may be read by many runs without changing identity; each RetrievalRun remains independent through its request, actual version, stage chain, result, and trace. This record is limited to RetrievalRequest, RetrievalRun; their canonical owner is Retrieval and ranking (memory-retrieval-ranking), so memory-retrieval-ranking owns these concepts here.
-        ja: 一IndexVersionはidentity不変のまま複数runに読まれ、各RetrievalRunはrequest・actual version・stage chain・result・traceで独立します。 この記録は RetrievalRequest、RetrievalRun だけを対象とし、canonical owner は検索と順位付け（memory-retrieval-ranking）です。したがって memory-retrieval-ranking はここでこれらを所有します。
-      disambiguation_test:
-        zh: 由 build/refresh run、shard、entry 识别则归索引；由 request、run、candidate、score、rank、result、trace 识别则归检索。
-        en: Identity from build or refresh run, shard, and entry belongs to indexing; identity from request, run, candidate, score, rank, result, and trace belongs to retrieval.
-        ja: build/refresh run・shard・entry由来identityはindex、request・run・candidate・score・rank・result・trace由来identityはretrievalです。
-      result: distinct
-      owner_module_id: memory-retrieval-ranking
-      source_claims:
-        - claim-memory-retrieval-ranking-014
-        - claim-memory-retrieval-ranking-015
-        - claim-memory-retrieval-ranking-016
-        - claim-memory-retrieval-ranking-017
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已用身份键与关系方向确认索引与检索保持独立 owner。
-              en: Identity keys and relation directions confirm separate owners for indexing and retrieval.
-              ja: identity key/relation directionでindex/retrievalの独立ownerを確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已用身份键与关系方向确认索引与检索保持独立 owner。
-              en: Identity keys and relation directions confirm separate owners for indexing and retrieval.
-              ja: identity key/relation directionでindex/retrievalの独立ownerを確認しました。
-    - other_module_id: memory-embedding-indexes
-      semantic_area:
-        zh: 索引构建与索引查询
-        en: Index construction versus index querying
-        ja: index construction と index querying
-      candidate_concept_ids:
-        - IndexVersion
-      overlap_reason:
-        zh: 一个 IndexVersion 可被多次运行读取而不改变其身份；每次 RetrievalRun 则因请求、实际版本、阶段链、结果和追踪记录而独立。 本条仅记录 IndexVersion；其 canonical owner 是表示与索引（memory-embedding-indexes），因此 memory-retrieval-ranking 在此引用这些概念。
-        en: One IndexVersion may be read by many runs without changing identity; each RetrievalRun remains independent through its request, actual version, stage chain, result, and trace. This record is limited to IndexVersion; their canonical owner is Representations and indexes (memory-embedding-indexes), so memory-retrieval-ranking references these concepts here.
-        ja: 一IndexVersionはidentity不変のまま複数runに読まれ、各RetrievalRunはrequest・actual version・stage chain・result・traceで独立します。 この記録は IndexVersion だけを対象とし、canonical owner は表現と索引（memory-embedding-indexes）です。したがって memory-retrieval-ranking はここでこれらを参照します。
-      disambiguation_test:
-        zh: 由 build/refresh run、shard、entry 识别则归索引；由 request、run、candidate、score、rank、result、trace 识别则归检索。
-        en: Identity from build or refresh run, shard, and entry belongs to indexing; identity from request, run, candidate, score, rank, result, and trace belongs to retrieval.
-        ja: build/refresh run・shard・entry由来identityはindex、request・run・candidate・score・rank・result・trace由来identityはretrievalです。
-      result: distinct
-      owner_module_id: memory-embedding-indexes
-      source_claims:
-        - claim-memory-retrieval-ranking-018
-        - claim-memory-retrieval-ranking-019
-        - claim-memory-retrieval-ranking-020
-        - claim-memory-retrieval-ranking-021
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已用身份键与关系方向确认索引与检索保持独立 owner。
-              en: Identity keys and relation directions confirm separate owners for indexing and retrieval.
-              ja: identity key/relation directionでindex/retrievalの独立ownerを確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已用身份键与关系方向确认索引与检索保持独立 owner。
-              en: Identity keys and relation directions confirm separate owners for indexing and retrieval.
-              ja: identity key/relation directionでindex/retrievalの独立ownerを確認しました。
-    - other_module_id: memory-context
-      semantic_area:
-        zh: 检索结果成员与上下文采用
-        en: Retrieval-result membership versus context admission
-        ja: retrieval-result membershipとcontext admission
-      candidate_concept_ids:
-        - RetrievedChunk
-      overlap_reason:
-        zh: TopK 或最终结果中的候选仍可因 token 预算、权限、去重或安全策略而不进入上下文；上下文采用不改变其检索候选身份。 本条仅记录 RetrievedChunk；其 canonical owner 是检索与排序（memory-retrieval-ranking），因此 memory-retrieval-ranking 在此拥有这些概念。
-        en: A Top-K or final-result candidate may still be excluded from context by token budget, authorization, deduplication, or safety policy; context admission does not change retrieval-candidate identity. This record is limited to RetrievedChunk; their canonical owner is Retrieval and ranking (memory-retrieval-ranking), so memory-retrieval-ranking owns these concepts here.
-        ja: TopK/final-result candidateもtoken budget・authorization・deduplication・safety policyでcontextから除外され、context admissionはretrieval-candidate identityを変えません。 この記録は RetrievedChunk だけを対象とし、canonical owner は検索と順位付け（memory-retrieval-ranking）です。したがって memory-retrieval-ranking はここでこれらを所有します。
-      disambiguation_test:
-        zh: 由 query、index version、candidate set、score 和 rank 识别则归检索；由 context package、slot、budget 和 exclusion decision 识别则归上下文组装。
-        en: Identity from query, index version, candidate set, score, and rank belongs to retrieval; identity from context package, slot, budget, and exclusion decision belongs to context assembly.
-        ja: query・index version・candidate set・score・rank由来identityはretrieval、context package・slot・budget・exclusion decision由来identityはcontext assemblyです。
-      result: distinct
-      owner_module_id: memory-retrieval-ranking
-      source_claims:
-        - claim-memory-retrieval-ranking-022
-        - claim-memory-retrieval-ranking-023
-        - claim-memory-retrieval-ranking-024
-        - claim-memory-retrieval-ranking-025
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已确认结果成员和上下文采用是两个不同可审计事实。
-              en: Result membership and context admission are distinct auditable facts.
-              ja: result membershipとcontext admissionが異なるaudit可能factと確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已确认结果成员和上下文采用是两个不同可审计事实。
-              en: Result membership and context admission are distinct auditable facts.
-              ja: result membershipとcontext admissionが異なるaudit可能factと確認しました。
-    - other_module_id: memory-context
-      semantic_area:
-        zh: 检索结果成员与上下文采用
-        en: Retrieval-result membership versus context admission
-        ja: retrieval-result membershipとcontext admission
-      candidate_concept_ids:
-        - ContextPackage
-      overlap_reason:
-        zh: TopK 或最终结果中的候选仍可因 token 预算、权限、去重或安全策略而不进入上下文；上下文采用不改变其检索候选身份。 本条仅记录 ContextPackage；其 canonical owner 是上下文组装（memory-context），因此 memory-retrieval-ranking 在此引用这些概念。
-        en: A Top-K or final-result candidate may still be excluded from context by token budget, authorization, deduplication, or safety policy; context admission does not change retrieval-candidate identity. This record is limited to ContextPackage; their canonical owner is Context assembly (memory-context), so memory-retrieval-ranking references these concepts here.
-        ja: TopK/final-result candidateもtoken budget・authorization・deduplication・safety policyでcontextから除外され、context admissionはretrieval-candidate identityを変えません。 この記録は ContextPackage だけを対象とし、canonical owner はコンテキスト組み立て（memory-context）です。したがって memory-retrieval-ranking はここでこれらを参照します。
-      disambiguation_test:
-        zh: 由 query、index version、candidate set、score 和 rank 识别则归检索；由 context package、slot、budget 和 exclusion decision 识别则归上下文组装。
-        en: Identity from query, index version, candidate set, score, and rank belongs to retrieval; identity from context package, slot, budget, and exclusion decision belongs to context assembly.
-        ja: query・index version・candidate set・score・rank由来identityはretrieval、context package・slot・budget・exclusion decision由来identityはcontext assemblyです。
-      result: distinct
-      owner_module_id: memory-context
-      source_claims:
-        - claim-memory-retrieval-ranking-026
-        - claim-memory-retrieval-ranking-027
-        - claim-memory-retrieval-ranking-028
-        - claim-memory-retrieval-ranking-029
-      review:
-        review_status: accepted
-        reviewers:
-          - reviewer_id: moonweave-memory-domain-reviewer
-            reviewer_role: domain
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已确认结果成员和上下文采用是两个不同可审计事实。
-              en: Result membership and context admission are distinct auditable facts.
-              ja: result membershipとcontext admissionが異なるaudit可能factと確認しました。
-          - reviewer_id: moonweave-ontology-structure-reviewer
-            reviewer_role: ontology
-            reviewer_kind: automated-agent
-            reviewed_on: 2026-07-16
-            decision_note:
-              zh: 已确认结果成员和上下文采用是两个不同可审计事实。
-              en: Result membership and context admission are distinct auditable facts.
-              ja: result membershipとcontext admissionが異なるaudit可能factと確認しました。
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-retrieval-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
-    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
-    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: langchain-retrieval
+    title: LangChain retrieval
+    source_type: official-documentation
+    url: https://docs.langchain.com/oss/python/langchain/retrieval
+    relevance: Defines retrievers as interfaces returning documents for unstructured queries and describes retrieval in RAG systems.
+  - id: pgvector-readme
+    title: pgvector project documentation
+    source_type: official-project-documentation
+    url: https://github.com/pgvector/pgvector
+    relevance: Documents nearest-neighbor vector search using ORDER BY distance and LIMIT.
+  - id: elasticsearch-rrf
+    title: Elasticsearch reciprocal rank fusion
+    source_type: official-documentation
+    url: https://www.elastic.co/docs/reference/elasticsearch/rest-apis/reciprocal-rank-fusion
+    relevance: Documents independent retrievers, RRF parameters, and combined ranked hits.
+  - id: rag-paper
+    title: Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks
+    source_type: academic-paper
+    url: https://arxiv.org/abs/2005.11401
+    relevance: Introduces retrieval-augmented generation with retrieved non-parametric memory conditioned into generation.
+  - id: w3c-prov-o
+    title: W3C PROV-O
+    source_type: standard
+    url: https://www.w3.org/TR/prov-o/
+    relevance: Distinguishes entities, activities, usage, and generated output for provenance representation.
 source_claims:
-  - id: claim-memory-retrieval-ranking-001
-    source: eng-fw-langchain-retrieval
-    supports: LangChain defines retrieval as fetching relevant external knowledge at query time, models a retriever as a runnable accepting a query and returning Documents, and distinguishes retrievers from stores; Moonweave uses that evidence for the request-run-result boundary.
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
-    evidence_kind: design-inference
+  - id: claim-retrieval-module-pipeline
+    source: langchain-retrieval
+    supports: LangChain describes retrieval as fetching relevant external knowledge at query time and a retriever as an interface returning documents for an unstructured query. Moonweave separates request, activity, candidate, and result records around that interface.
+    locator: "Retrieval overview and retriever building block"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-002
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents prefetch candidate stages, nested multi-stage queries, dense and sparse retrieval, fusion, limits, and score-distribution constraints; Moonweave uses that evidence for candidate-generation, scoring, and stage lineage.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
+  - id: claim-retrieval-module-pgvector-topk
+    source: pgvector-readme
+    supports: pgvector documents nearest-neighbor queries with ORDER BY a distance operator and LIMIT, including a concrete LIMIT 5 example. Moonweave treats these rows as bounded candidate output rather than a context-selection or answer-quality guarantee.
+    locator: "Getting Started and Querying nearest neighbors"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-003
-    source: eng-search-elastic-rrf
-    supports: Elasticsearch defines reciprocal rank fusion over independently ranked child retrievers and documents rank_constant, rank_window_size, and result truncation; Moonweave uses that evidence to separate fusion from scoring and Top-K selection.
-    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
-    evidence_kind: design-inference
+  - id: claim-retrieval-module-rrf
+    source: elasticsearch-rrf
+    supports: Elasticsearch documents RRF executing child retrievers independently, then combining their top documents subject to rank_window_size and result size. Moonweave records fusion method and candidate-set scope so scores and ranks are not compared outside their declared context.
+    locator: "RRF parameters and example request"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-004
-    source: eng-vector-pinecone-reranking
-    supports: Pinecone documents two-stage retrieval in which initial results are rescored by a selected reranker with query, documents, rank_fields, top_n, and truncation; Moonweave uses that evidence to distinguish reranking from candidate generation and rank fusion.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
+  - id: claim-retrieval-module-provenance
+    source: w3c-prov-o
+    supports: PROV-O distinguishes entities, activities that use entities, and generated entities. Moonweave requires retrieval candidates and results to retain a link to the request, source, and activity without treating provenance as model-use evidence.
+    locator: "PROV-O Entity, Activity, usage, and generation"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-005
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant executes prefetch subqueries before the main query and exposes parameterized RRF; this case records index-v19, both prefetch limits, rrf_k=60, and Top-K so the ordered stages can be replayed.
-    locator: Qdrant Hybrid Queries > prefetch parameter > nested stages; RRF > configurable k and ordered result sets
-    evidence_kind: design-inference
+  - id: claim-retrieval-module-rag-paper
+    source: rag-paper
+    supports: Lewis et al. describe retrieval-augmented generation as combining a parametric generator with retrieved non-parametric memory. The paper supports separating retrieval output from downstream generation; Moonweave's request, candidate, score, and result records are local engineering design.
+    locator: "Abstract and model description"
+    evidence_kind: academic-result
     confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-006
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant's main result depends on its prefetch inputs and RRF parameters; reading index-v20 with rrf_k=20 cannot reuse a trace that records index-v19 and rrf_k=60 merely because query text matches.
-    locator: Qdrant Hybrid Queries > prefetch parameter > main query over prefetch results; RRF > configurable k
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-007
-    source: eng-vector-pinecone-reranking
-    supports: Pinecone defines reranking as a second scoring stage configured by model, query, rank_fields, and top_n; this case keeps the rerank score separate from earlier BM25 and cosine scores and records each producer.
-    locator: Pinecone Rerank results > two-stage retrieval > rerank model, top_n, rank_fields, and returned ordering
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-008
-    source: eng-vector-pinecone-reranking
-    supports: Pinecone returns an ordered reranked result after a model scores supplied documents; the ordinal position 3 alone is not a typed model score and lacks the required producing method and stage.
-    locator: Pinecone Rerank results > standalone reranking request > model, query, documents, top_n, and rank_fields
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-009
-    source: eng-fw-langchain-retrieval
-    supports: LangChain defines a retriever's output as the Documents returned for a query and treats supplying them to generation as a downstream RAG step; this case stops at result-422 without fabricating context admission.
-    locator: LangChain Retrieval > Building blocks > Retrievers return Documents for a query; RAG architectures > retrieval before generation
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-010
-    source: eng-fw-langchain-retrieval
-    supports: LangChain's retriever contract concerns the documents actually returned for the query; candidate-499's membership in an earlier stage set cannot establish membership in the final retriever result after reranking and Top-K selection.
-    locator: LangChain Retrieval > Building blocks > retriever output; RAG architectures > retrieved content versus model context
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-011
-    source: eng-fw-langchain-retrieval
-    supports: "LangChain distinguishes query-time retrieval execution from the external knowledge stores it reads. Moonweave design inference: target declaration, actual read, and retained trace are separate retrieval-owned facts that all reference the independently owned IndexVersion."
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-012
-    source: eng-vector-qdrant-hybrid-query
-    supports: Qdrant documents query and multi-stage execution over configured collections without redefining stored collection identity. Moonweave uses that separation to keep request, run, and trace identities in retrieval while IndexVersion remains in representations and indexes.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-013
-    source: eng-fw-langchain-retrieval
-    supports: "LangChain describes a retriever as returning documents for downstream RAG use rather than deciding the final model context itself. Moonweave design inference: ContextSelectionActivity and ContextAssembly are the downstream context-owned endpoints that select and consume retrieval artifacts."
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-014
-    source: eng-fw-langchain-retrieval
-    supports: Source eng-fw-langchain-retrieval at Retrieval > Building blocks, retriever interface, and RAG architectures supports operational notions used to compare memory-retrieval-ranking with memory-embedding-indexes, including RetrievalRequest, RetrievalRun. The source does not define Moonweave Modules memory-retrieval-ranking or memory-embedding-indexes, their class or relation placement, or their ownership split. Under memory-retrieval-ranking's owns_when "Own an object when its identity is determined by a retrieval request or run, candidate-generation or ranking stage, candidate-set membership, candidate rank, stage score, retrieval result, or retrieval trace.", Moonweave applies the disambiguation test "Identity from build or refresh run, shard, and entry belongs to indexing; identity from request, run, candidate, score, rank, result, and trace belongs to retrieval."; result=distinct and owner=memory-retrieval-ranking are a Moonweave design inference over the registered evidence.
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-015
-    source: eng-vector-qdrant-hybrid-query
-    supports: Source eng-vector-qdrant-hybrid-query at Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries supports operational notions used to compare memory-retrieval-ranking with memory-embedding-indexes, including RetrievalRequest, RetrievalRun. The source does not define Moonweave Modules memory-retrieval-ranking or memory-embedding-indexes, their class or relation placement, or their ownership split. Under memory-retrieval-ranking's owns_when "Own an object when its identity is determined by a retrieval request or run, candidate-generation or ranking stage, candidate-set membership, candidate rank, stage score, retrieval result, or retrieval trace.", Moonweave applies the disambiguation test "Identity from build or refresh run, shard, and entry belongs to indexing; identity from request, run, candidate, score, rank, result, and trace belongs to retrieval."; result=distinct and owner=memory-retrieval-ranking are a Moonweave design inference over the registered evidence.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-016
-    source: eng-search-elastic-rrf
-    supports: Source eng-search-elastic-rrf at Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size supports operational notions used to compare memory-retrieval-ranking with memory-embedding-indexes, including RetrievalRequest, RetrievalRun. The source does not define Moonweave Modules memory-retrieval-ranking or memory-embedding-indexes, their class or relation placement, or their ownership split. Under memory-retrieval-ranking's owns_when "Own an object when its identity is determined by a retrieval request or run, candidate-generation or ranking stage, candidate-set membership, candidate rank, stage score, retrieval result, or retrieval trace.", Moonweave applies the disambiguation test "Identity from build or refresh run, shard, and entry belongs to indexing; identity from request, run, candidate, score, rank, result, and trace belongs to retrieval."; result=distinct and owner=memory-retrieval-ranking are a Moonweave design inference over the registered evidence.
-    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-017
-    source: eng-vector-pinecone-reranking
-    supports: Source eng-vector-pinecone-reranking at Rerank results > two-stage retrieval and rerank request parameters supports operational notions used to compare memory-retrieval-ranking with memory-embedding-indexes, including RetrievalRequest, RetrievalRun. The source does not define Moonweave Modules memory-retrieval-ranking or memory-embedding-indexes, their class or relation placement, or their ownership split. Under memory-retrieval-ranking's owns_when "Own an object when its identity is determined by a retrieval request or run, candidate-generation or ranking stage, candidate-set membership, candidate rank, stage score, retrieval result, or retrieval trace.", Moonweave applies the disambiguation test "Identity from build or refresh run, shard, and entry belongs to indexing; identity from request, run, candidate, score, rank, result, and trace belongs to retrieval."; result=distinct and owner=memory-retrieval-ranking are a Moonweave design inference over the registered evidence.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-018
-    source: eng-fw-langchain-retrieval
-    supports: Source eng-fw-langchain-retrieval at Retrieval > Building blocks, retriever interface, and RAG architectures supports operational notions used to compare memory-retrieval-ranking with memory-embedding-indexes, including IndexVersion. The source does not define Moonweave Modules memory-retrieval-ranking or memory-embedding-indexes, their class or relation placement, or their ownership split. Under memory-retrieval-ranking's owns_when "Own an object when its identity is determined by a retrieval request or run, candidate-generation or ranking stage, candidate-set membership, candidate rank, stage score, retrieval result, or retrieval trace.", Moonweave applies the disambiguation test "Identity from build or refresh run, shard, and entry belongs to indexing; identity from request, run, candidate, score, rank, result, and trace belongs to retrieval."; result=distinct and owner=memory-embedding-indexes are a Moonweave design inference over the registered evidence.
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-019
-    source: eng-vector-qdrant-hybrid-query
-    supports: Source eng-vector-qdrant-hybrid-query at Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries supports operational notions used to compare memory-retrieval-ranking with memory-embedding-indexes, including IndexVersion. The source does not define Moonweave Modules memory-retrieval-ranking or memory-embedding-indexes, their class or relation placement, or their ownership split. Under memory-retrieval-ranking's owns_when "Own an object when its identity is determined by a retrieval request or run, candidate-generation or ranking stage, candidate-set membership, candidate rank, stage score, retrieval result, or retrieval trace.", Moonweave applies the disambiguation test "Identity from build or refresh run, shard, and entry belongs to indexing; identity from request, run, candidate, score, rank, result, and trace belongs to retrieval."; result=distinct and owner=memory-embedding-indexes are a Moonweave design inference over the registered evidence.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-020
-    source: eng-search-elastic-rrf
-    supports: Source eng-search-elastic-rrf at Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size supports operational notions used to compare memory-retrieval-ranking with memory-embedding-indexes, including IndexVersion. The source does not define Moonweave Modules memory-retrieval-ranking or memory-embedding-indexes, their class or relation placement, or their ownership split. Under memory-retrieval-ranking's owns_when "Own an object when its identity is determined by a retrieval request or run, candidate-generation or ranking stage, candidate-set membership, candidate rank, stage score, retrieval result, or retrieval trace.", Moonweave applies the disambiguation test "Identity from build or refresh run, shard, and entry belongs to indexing; identity from request, run, candidate, score, rank, result, and trace belongs to retrieval."; result=distinct and owner=memory-embedding-indexes are a Moonweave design inference over the registered evidence.
-    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-021
-    source: eng-vector-pinecone-reranking
-    supports: Source eng-vector-pinecone-reranking at Rerank results > two-stage retrieval and rerank request parameters supports operational notions used to compare memory-retrieval-ranking with memory-embedding-indexes, including IndexVersion. The source does not define Moonweave Modules memory-retrieval-ranking or memory-embedding-indexes, their class or relation placement, or their ownership split. Under memory-retrieval-ranking's owns_when "Own an object when its identity is determined by a retrieval request or run, candidate-generation or ranking stage, candidate-set membership, candidate rank, stage score, retrieval result, or retrieval trace.", Moonweave applies the disambiguation test "Identity from build or refresh run, shard, and entry belongs to indexing; identity from request, run, candidate, score, rank, result, and trace belongs to retrieval."; result=distinct and owner=memory-embedding-indexes are a Moonweave design inference over the registered evidence.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-022
-    source: eng-fw-langchain-retrieval
-    supports: Source eng-fw-langchain-retrieval at Retrieval > Building blocks, retriever interface, and RAG architectures supports operational notions used to compare memory-retrieval-ranking with memory-context, including RetrievedChunk. The source does not define Moonweave Modules memory-retrieval-ranking or memory-context, their class or relation placement, or their ownership split. Under memory-retrieval-ranking's owns_when "Own an object when its identity is determined by a retrieval request or run, candidate-generation or ranking stage, candidate-set membership, candidate rank, stage score, retrieval result, or retrieval trace.", Moonweave applies the disambiguation test "Identity from query, index version, candidate set, score, and rank belongs to retrieval; identity from context package, slot, budget, and exclusion decision belongs to context assembly."; result=distinct and owner=memory-retrieval-ranking are a Moonweave design inference over the registered evidence.
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-023
-    source: eng-vector-qdrant-hybrid-query
-    supports: Source eng-vector-qdrant-hybrid-query at Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries supports operational notions used to compare memory-retrieval-ranking with memory-context, including RetrievedChunk. The source does not define Moonweave Modules memory-retrieval-ranking or memory-context, their class or relation placement, or their ownership split. Under memory-retrieval-ranking's owns_when "Own an object when its identity is determined by a retrieval request or run, candidate-generation or ranking stage, candidate-set membership, candidate rank, stage score, retrieval result, or retrieval trace.", Moonweave applies the disambiguation test "Identity from query, index version, candidate set, score, and rank belongs to retrieval; identity from context package, slot, budget, and exclusion decision belongs to context assembly."; result=distinct and owner=memory-retrieval-ranking are a Moonweave design inference over the registered evidence.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-024
-    source: eng-search-elastic-rrf
-    supports: Source eng-search-elastic-rrf at Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size supports operational notions used to compare memory-retrieval-ranking with memory-context, including RetrievedChunk. The source does not define Moonweave Modules memory-retrieval-ranking or memory-context, their class or relation placement, or their ownership split. Under memory-retrieval-ranking's owns_when "Own an object when its identity is determined by a retrieval request or run, candidate-generation or ranking stage, candidate-set membership, candidate rank, stage score, retrieval result, or retrieval trace.", Moonweave applies the disambiguation test "Identity from query, index version, candidate set, score, and rank belongs to retrieval; identity from context package, slot, budget, and exclusion decision belongs to context assembly."; result=distinct and owner=memory-retrieval-ranking are a Moonweave design inference over the registered evidence.
-    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-025
-    source: eng-vector-pinecone-reranking
-    supports: Source eng-vector-pinecone-reranking at Rerank results > two-stage retrieval and rerank request parameters supports operational notions used to compare memory-retrieval-ranking with memory-context, including RetrievedChunk. The source does not define Moonweave Modules memory-retrieval-ranking or memory-context, their class or relation placement, or their ownership split. Under memory-retrieval-ranking's owns_when "Own an object when its identity is determined by a retrieval request or run, candidate-generation or ranking stage, candidate-set membership, candidate rank, stage score, retrieval result, or retrieval trace.", Moonweave applies the disambiguation test "Identity from query, index version, candidate set, score, and rank belongs to retrieval; identity from context package, slot, budget, and exclusion decision belongs to context assembly."; result=distinct and owner=memory-retrieval-ranking are a Moonweave design inference over the registered evidence.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-026
-    source: eng-fw-langchain-retrieval
-    supports: Source eng-fw-langchain-retrieval at Retrieval > Building blocks, retriever interface, and RAG architectures supports operational notions used to compare memory-retrieval-ranking with memory-context, including ContextPackage. The source does not define Moonweave Modules memory-retrieval-ranking or memory-context, their class or relation placement, or their ownership split. Under memory-retrieval-ranking's owns_when "Own an object when its identity is determined by a retrieval request or run, candidate-generation or ranking stage, candidate-set membership, candidate rank, stage score, retrieval result, or retrieval trace.", Moonweave applies the disambiguation test "Identity from query, index version, candidate set, score, and rank belongs to retrieval; identity from context package, slot, budget, and exclusion decision belongs to context assembly."; result=distinct and owner=memory-context are a Moonweave design inference over the registered evidence.
-    locator: Retrieval > Building blocks, retriever interface, and RAG architectures
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-027
-    source: eng-vector-qdrant-hybrid-query
-    supports: Source eng-vector-qdrant-hybrid-query at Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries supports operational notions used to compare memory-retrieval-ranking with memory-context, including ContextPackage. The source does not define Moonweave Modules memory-retrieval-ranking or memory-context, their class or relation placement, or their ownership split. Under memory-retrieval-ranking's owns_when "Own an object when its identity is determined by a retrieval request or run, candidate-generation or ranking stage, candidate-set membership, candidate rank, stage score, retrieval result, or retrieval trace.", Moonweave applies the disambiguation test "Identity from query, index version, candidate set, score, and rank belongs to retrieval; identity from context package, slot, budget, and exclusion decision belongs to context assembly."; result=distinct and owner=memory-context are a Moonweave design inference over the registered evidence.
-    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-028
-    source: eng-search-elastic-rrf
-    supports: Source eng-search-elastic-rrf at Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size supports operational notions used to compare memory-retrieval-ranking with memory-context, including ContextPackage. The source does not define Moonweave Modules memory-retrieval-ranking or memory-context, their class or relation placement, or their ownership split. Under memory-retrieval-ranking's owns_when "Own an object when its identity is determined by a retrieval request or run, candidate-generation or ranking stage, candidate-set membership, candidate rank, stage score, retrieval result, or retrieval trace.", Moonweave applies the disambiguation test "Identity from query, index version, candidate set, score, and rank belongs to retrieval; identity from context package, slot, budget, and exclusion decision belongs to context assembly."; result=distinct and owner=memory-context are a Moonweave design inference over the registered evidence.
-    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-retrieval-ranking-029
-    source: eng-vector-pinecone-reranking
-    supports: Source eng-vector-pinecone-reranking at Rerank results > two-stage retrieval and rerank request parameters supports operational notions used to compare memory-retrieval-ranking with memory-context, including ContextPackage. The source does not define Moonweave Modules memory-retrieval-ranking or memory-context, their class or relation placement, or their ownership split. Under memory-retrieval-ranking's owns_when "Own an object when its identity is determined by a retrieval request or run, candidate-generation or ranking stage, candidate-set membership, candidate rank, stage score, retrieval result, or retrieval trace.", Moonweave applies the disambiguation test "Identity from query, index version, candidate set, score, and rank belongs to retrieval; identity from context package, slot, budget, and exclusion decision belongs to context assembly."; result=distinct and owner=memory-context are a Moonweave design inference over the registered evidence.
-    locator: Rerank results > two-stage retrieval and rerank request parameters
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

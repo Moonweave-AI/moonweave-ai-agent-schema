@@ -68,7 +68,23 @@ describe("unified graph UI contract", () => {
     ]));
     expect(uiText.en.logicalPosition).toBe("Logical position");
     expect(uiText.ja.structureConstraints).toBe("構造と制約");
+    expect(uiText.en.sourcesAndReferences).toBe("Sources & citations");
+    expect(uiText.ja.sourcesAndReferences).toBe("出典と引用");
+    expect(Object.keys(uiText.en)).not.toEqual(expect.arrayContaining([
+      "validationRules",
+      "externalMappings",
+      "maturityChanges",
+      "status",
+      "review",
+      "reviewers",
+      "deprecated",
+      "replacements",
+      "changeNote",
+    ]));
     expect(JSON.stringify(uiText)).not.toMatch(/AuthorityScope|AgentRun|ToolCall/);
+    expect(JSON.stringify(uiText)).not.toMatch(
+      /Axioms and validation|External mappings|Maturity and change history|Replaces deprecated concepts/u,
+    );
   });
 
   it("keeps App as composition only and removes the legacy parallel presentation chain", () => {
@@ -96,6 +112,7 @@ describe("unified graph UI contract", () => {
     expect(uiSources).not.toMatch(/\bselectedRef\b|maturityForClass|maturityForPlane|GraphView/);
     expect(graphSource).not.toMatch(/readonly view:|graphRootRef|layoutDirection|layoutMode/);
     expect(uiSources).not.toMatch(/inspector-panel|catalog-section|abox-|tbox-/);
+    expect(uiSources).not.toMatch(/text\.status|ReviewSummary|review_status|path\.review/u);
     expect(runtimeSource).toContain('import("vis-network")');
     expect(runtimeSource).toContain('network.once("stabilizationIterationsDone"');
     expect(runtimeSource).toContain("network.stabilize(");
@@ -198,7 +215,7 @@ describe("unified graph UI contract", () => {
     expect(html).not.toMatch(/Logical hierarchy|Relation exploration|layout-direction/u);
   });
 
-  it("keeps the same twelve-row detail table and discloses every collapsed list total", () => {
+  it("keeps a nine-row detail table without obsolete validation, mapping, or maturity sections", () => {
     const { index, state, view } = buildFixture();
     const html = renderToStaticMarkup(
       <OntologyCharacteristics
@@ -217,14 +234,18 @@ describe("unified graph UI contract", () => {
       />,
     );
 
-    expect((html.match(/data-detail-row=/g) ?? [])).toHaveLength(12);
+    expect((html.match(/data-detail-row=/g) ?? [])).toHaveLength(9);
     expect(html).toContain("已显示 5 / 共 7 项");
     expect(html).toContain("展开全部（共 7 项）");
     expect(html).toContain("已显示 5 / 共 9 项");
     expect(html).not.toContain("Schema view");
+    expect(html).not.toContain("\u516c\u7406\u4e0e\u9a8c\u8bc1");
+    expect(html).not.toContain("\u9002\u914d\u6620\u5c04");
+    expect(html).not.toContain("\u6210\u719f\u5ea6\u4e0e\u53d8\u66f4");
+    expect(html).toContain("\u6765\u6e90\u4e0e\u5f15\u7528");
   });
 
-  it("uses the same twelve rows for relation focus and distinguishes canonical relation data", () => {
+  it("uses the same nine rows for relation focus and distinguishes canonical relation data", () => {
     const { index, state } = buildFixture();
     const relationState = {
       ...state,
@@ -248,10 +269,13 @@ describe("unified graph UI contract", () => {
       />,
     );
 
-    expect((html.match(/data-detail-row=/g) ?? [])).toHaveLength(12);
+    expect((html.match(/data-detail-row=/g) ?? [])).toHaveLength(9);
     expect(html).toContain("AgentRun-produces-RunResult");
     expect(html).toContain("AgentRun — produces → RunResult");
     expect(html).toContain("Back to node details");
+    expect(html).not.toMatch(/Axioms and validation|External mappings|Maturity and change history/u);
+    expect(html).not.toContain("<dt>Status</dt>");
+    expect(html).toContain("Sources &amp; citations");
 
     const graphHtml = renderToStaticMarkup(
       <OntologyGraph
@@ -293,16 +317,16 @@ describe("unified graph UI contract", () => {
       />,
     );
 
-    expect((html.match(/data-detail-row=/g) ?? [])).toHaveLength(12);
+    expect((html.match(/data-detail-row=/g) ?? [])).toHaveLength(9);
     expect(html).toContain("本节点为领域/模块组织节点，不适用实例说明");
   });
 
-  it("shows local and inherited fields in the same node details for AssistantMessage and AudioBlock", () => {
+  it("shows local and inherited fields in the same node details for AssistantMessage and AudioContent", () => {
     const index = buildOntologyIndex(
       inheritanceProjectionFixture as unknown as Parameters<typeof buildOntologyIndex>[0],
       sourceIndex,
     );
-    const renderConcept = (id: "AssistantMessage" | "AudioBlock") => {
+    const renderConcept = (id: "AssistantMessage" | "AudioContent") => {
       const ref = `concept:${id}` as const;
       const state = createOntologyViewState(index, {
         graphRootRef: ref,
@@ -335,19 +359,39 @@ describe("unified graph UI contract", () => {
     expect(assistant).toContain("Inheritance depth");
     expect(assistant).toMatch(/&quot;assistant_role&quot;:[\s\S]*&quot;message_id&quot;/);
 
-    const audio = renderConcept("AudioBlock");
-    expect(audio).toContain("AudioBlock sample_rate_hz");
-    expect(audio).toContain("MediaBlock media_type");
+    const audio = renderConcept("AudioContent");
+    expect(audio).toContain("AudioContent sample_rate_hz");
+    expect(audio).toContain("MediaContent media_type");
     expect(audio).toContain("&quot;media_type&quot;");
   });
 
-  it("renders real multi-target mappings and does not infer engineering I/O from arbitrary edges", () => {
+  it("renders authored engineering content without mapping or relation-derived I/O", () => {
     const ontology = {
       ...ontologyViewModelFixture,
       classes: ontologyViewModelFixture.classes.map((concept) =>
         concept.id === "AgentRun"
-          ? {
+            ? {
               ...concept,
+              engineering: {
+                explanation: {
+                  zh: "\u5de5\u7a0b\u8bf4\u660e\u6765\u81ea\u5df2\u5ba1\u6838\u7684\u534f\u8bae\u8f93\u5165\u8f93\u51fa\u3002",
+                  en: "Engineering guidance comes from the reviewed protocol contract.",
+                  ja: "\u5de5\u5b66\u7684\u8aac\u660e\u306f\u30ec\u30d3\u30e5\u30fc\u6e08\u307f\u30d7\u30ed\u30c8\u30b3\u30eb\u5951\u7d04\u306b\u57fa\u3065\u304d\u307e\u3059\u3002",
+                },
+                typical_input: [{
+                  description: "MCP tools/list request",
+                  format: '{"jsonrpc":"2.0","method":"tools/list","params":{}}',
+                }],
+                typical_output: [{
+                  description: "MCP tools/list response",
+                  format: '{"result":{"tools":[]}}',
+                }],
+                reference_implementations: [{
+                  name: "MCP Tools Specification",
+                  url: "https://modelcontextprotocol.io/specification/server/tools",
+                  description: "Defines the tools/list request and response contract.",
+                }],
+              },
               external_mappings: [{
                 id: "mapping-multi-target",
                 system: "external-system",
@@ -395,26 +439,20 @@ describe("unified graph UI contract", () => {
         onHighlightScenario={vi.fn()}
       />,
     );
-    const mappingSection = html.match(/data-detail-row="10"[\s\S]*?data-detail-row="11"/)?.[0] ?? "";
-
-    expect(mappingSection).toContain('data-disclosure-id="mapping-multi-target-targets"');
-    expect(mappingSection).toContain(">RunResult</button>");
-    expect(mappingSection).toContain(">Tool</button>");
-    expect(mappingSection).toContain("2026.1");
-    expect(mappingSection).toContain("Run results and tools");
-    expect(mappingSection).toContain("bidirectional");
-    expect(mappingSection).toContain("lossy");
-    expect(mappingSection).toContain("External enums are normalized");
-    expect(mappingSection).toContain("contract-tested");
-    expect(mappingSection).toContain("mapping-contract-2026-1");
-    expect(mappingSection).toContain("Contract fixture validation");
     const engineeringSection = html.match(
       /data-detail-row="4"[\s\S]*?data-detail-row="5"/,
     )?.[0] ?? "";
+    expect(engineeringSection).toContain("Engineering guidance comes from the reviewed protocol contract.");
     expect(engineeringSection).toContain("<dt>Typical input</dt>");
+    expect(engineeringSection).toContain("MCP tools/list request");
+    expect(engineeringSection).toContain("&quot;method&quot;:&quot;tools/list&quot;");
     expect(engineeringSection).toContain("<dt>Typical output</dt>");
-    expect((engineeringSection.match(/>Not applicable<\/p>/g) ?? [])).toHaveLength(2);
+    expect(engineeringSection).toContain("MCP tools/list response");
+    expect(engineeringSection).toContain("MCP Tools Specification");
+    expect(engineeringSection).toContain("https://modelcontextprotocol.io/specification/server/tools");
     expect(engineeringSection).not.toMatch(/describes|produces|finalizes/);
+    expect(html).not.toContain("ExternalRecord");
+    expect(html).not.toContain("External mappings");
   });
 
   it("counts hidden case steps once and disables a case path with broken references", () => {

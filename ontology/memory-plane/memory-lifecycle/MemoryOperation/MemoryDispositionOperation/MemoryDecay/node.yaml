@@ -8,303 +8,719 @@ labels:
   ja: 記憶減衰
 semantics:
   short_definition:
-    zh: 降低记录的强度、相关性权重或召回优先级而不立即移除它的处置操作。
-    en: A disposition operation lowering a record's strength, relevance weight, or recall priority without immediately removing it.
-    ja: recordのstrength・relevance weight・recall priorityを下げ即時除去しないdisposition operationです。
+    zh: 在保留记录身份和可寻址性的前提下，降低既有记忆记录检索强度的处置操作。
+    en: A disposition operation that lowers an existing memory record's retrieval strength while retaining its identity and addressability.
+    ja: レコードの識別とアドレス可能性を保持したまま、既存記憶レコードの検索強度を下げる処分操作です。
   definition:
-    zh: MemoryDecay 改变 MemoryRecord 的可检索权重或激活强度，同时保留记录身份和访问可能性；真正移出活动层是 Eviction，达到时间资格是 Expiration。
-    en: MemoryDecay changes a MemoryRecord's retrieval weight or activation strength while preserving its identity and accessibility. Removal from an active tier is Eviction; reaching a time-based eligibility threshold is Expiration.
-    ja: MemoryDecay はMemoryRecordのretrieval weight/activation strengthを変えrecord identityとaccessibilityを保持します。active tierからの除去はEviction、time-based threshold到達はExpirationです。
+    zh: MemoryDecay 是一种已执行的 MemoryDispositionOperation：它根据明确的时间、非使用或优先级规则，对既有 MemoryRecord 的检索强度施加可证实的下降，并记录下降前后值、依据、时间和证据。衰减并不使记录无效、不会将其移出活动层，也不会创建新内容版本；完全移出活动层是 MemoryEviction，保留资格变化是 MemoryExpiration，永久或逻辑无效化是 MemoryDelete。
+    en: MemoryDecay is an executed MemoryDispositionOperation that applies a demonstrable decrease to an existing MemoryRecord's retrieval strength under an explicit time, non-use, or priority rule and records the before-and-after values, basis, time, and evidence. Decay neither invalidates the record nor removes it from the active tier or creates a new content version; complete active-tier removal is MemoryEviction, retention-eligibility change is MemoryExpiration, and permanent or logical invalidation is MemoryDelete.
+    ja: MemoryDecay は、明示的な時間、未使用、または優先度規則に従って既存 MemoryRecord の検索強度を証明可能に低下させ、前後値、根拠、時刻、証跡を記録する実行済み MemoryDispositionOperation です。減衰はレコードを無効化せず、アクティブ層から除去せず、新しい内容バージョンも作成しません。アクティブ層からの完全除去は MemoryEviction、保持適格性の変更は MemoryExpiration、恒久的または論理的無効化は MemoryDelete です。
   why_needed:
-    zh: 把连续权重变化与离散移除事件分开。
-    en: Separates continuous weight change from discrete removal events.
-    ja: continuous weight changeをdiscrete removal eventから分けます。
+    zh: 连续的检索优先级变化与离散的删除、到期或缓存驱逐有不同的恢复行为和审计含义；把它们压缩为“不可见”会丢失实际发生的生命周期效果。
+    en: Continuous retrieval-priority change has different recovery behavior and audit meaning from discrete deletion, expiry, or cache eviction; collapsing them into "not visible" loses the lifecycle effect that actually happened.
+    ja: 連続的な検索優先度変更は、離散的な削除、期限切れ、キャッシュ追い出しとは回復挙動と監査上の意味が異なります。それらを「見えない」に圧縮すると、実際に起きたライフサイクル効果が失われます。
   includes:
-    - zh: 纳入随时间、低复用率或低重要性降低检索权重。
-      en: Includes lowering retrieval weight because of time, low reuse, or low importance.
-      ja: time・low reuse・low importanceによるretrieval weight低下を含みます。
+    - zh: 基于已过去时间、低使用频率或明确优先级规则的已执行权重下降，且目标记录仍可按其稳定标识读取。
+      en: Executed weight decreases based on elapsed time, low use frequency, or an explicit priority rule where the target record remains readable by its stable identity.
+      ja: 経過時間、低使用頻度、または明示的優先度規則に基づく実行済み重み低下で、対象レコードが安定識別子で引き続き読めるものを含みます。
   excludes:
-    - zh: 排除物理删除、缓存驱逐和 TTL 到期资格。
-      en: Excludes physical deletion, cache eviction, and TTL expiration eligibility.
-      ja: physical delete・cache eviction・TTL expiration eligibilityを除外します。
+    - zh: 将活动层副本移出、使记录失效或删除、仅标记保留到期、变更内容字段或版本、只显示分数但没有执行活动，以及尚未执行的衰减计划。
+      en: Removing an active-tier copy, invalidating or deleting a record, merely marking retention expiry, changing content fields or version, displaying a score without an executed activity, and an unexecuted decay plan.
+      ja: アクティブ層コピーの除去、レコードの無効化または削除、保持期限切れの印付けだけ、内容フィールドまたはバージョン変更、実行活動なしのスコア表示、未実行の減衰計画を除外します。
   semantic_kind: activity
   aliases: []
+engineering:
+  explanation:
+    zh: 将衰减实现为保存同一记录标识的可审计重加权活动：输入包含旧强度和适用规则，输出包含较低的新强度、发生时间及证据摘要。若记录从层中消失、被无效化或得到后继内容版本，应分别调用驱逐、删除或修订模型。
+    en: "Implement decay as an auditable reweighting activity that preserves the same record identity: input contains the prior strength and applicable rule, and output contains a lower new strength, occurrence time, and evidence digest. If a record disappears from a tier, is invalidated, or receives a successor content version, use eviction, deletion, or revision models respectively."
+    ja: 減衰は同じレコード識別を保つ監査可能な再重み付け活動として実装します。入力には旧強度と適用規則を含め、出力にはより低い新強度、発生時刻、証跡ダイジェストを含めます。レコードが層から消える、無効化される、または後継内容バージョンを得る場合は、それぞれ追い出し、削除、改訂モデルを使います。
+  typical_input:
+    - description: An existing record reference with its prior normalized strength, an explicit decay rule and basis, executor identity, and operation start time.
+      format: "{operation_id, target_record_ref, strength_before, decay_basis, decay_rule_ref, actor_ref, started_at}"
+  typical_output:
+    - description: A lower retained strength for the same record, with an evidence digest, application time, result, and audit event.
+      format: "{operation_id, strength_after, strength_delta, decay_evidence_digest, decayed_at, result_ref?, audit_event_ref?}"
+  reference_implementations:
+    - name: Elasticsearch function score query
+      url: https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-function-score-query.html
+      description: Documents score functions and decay functions that adjust ranking without changing indexed document identity.
+    - name: W3C PROV-O
+      url: https://www.w3.org/TR/prov-o/
+      description: Distinguishes executed activities, entities, agents, time, and provenance associations.
+    - name: FIPS 180-4 Secure Hash Standard
+      url: https://csrc.nist.gov/pubs/fips/180/4/final
+      description: Specifies SHA-256 digests that can bind an auditable evidence snapshot.
+  source_claims:
+    - claim-memory-decay-activity
+    - claim-memory-decay-boundary
 structure:
   identity_keys:
-    - decay_operation_id
+    - operation_id
   fields:
-    - id: decay_operation_id
+    - id: operation_id
       labels:
-        zh: 衰减操作标识
-        en: decay operation ID
-        ja: decay operation ID
+        zh: 操作标识
+        en: operation ID
+        ja: 操作 ID
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
       definitions:
-        zh: 标识一次权重衰减活动。
-        en: Identifies one weight-decay activity.
-        ja: 一weight-decay activityを識別します。
+        zh: 复用父类 MemoryOperation 的稳定标识，以关联一次衰减的目标、旧新强度、证据、结果和审计事实。
+        en: Reuses the stable MemoryOperation identity to join one decay's target, before-and-after strength, evidence, result, and audit facts.
+        ja: 親 MemoryOperation の安定識別子を再利用し、一つの減衰の対象、前後強度、証跡、結果、監査事実を結びます。
+      allowed_values: []
+      pattern: '^mem-op-[a-z0-9][a-z0-9-]*$'
+      example_value: mem-op-decay-2501
+      source_claims:
+        - claim-memory-decay-identity
+    - id: operation_kind
+      labels:
+        zh: 操作类别
+        en: operation kind
+        ja: 操作種別
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 固定为 disposition，说明衰减是对既有记录可用强度的处置活动，不是内容修订。
+        en: Narrows the inherited operation kind to disposition and identifies decay as an eligibility-strength action on an existing record, not content revision.
+        ja: 継承した操作種別を disposition に限定し、減衰を既存レコードの利用強度への処置活動として識別し、内容修訂とは区別します。
+      allowed_values:
+        - disposition
+      pattern: null
+      example_value: disposition
+      source_claims:
+        - claim-memory-decay-activity
+    - id: status
+      labels:
+        zh: 运行状态
+        en: runtime status
+        ja: 実行状態
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 记录衰减活动的运行状态，区别于衰减后强度的数值。
+        en: Records the runtime state of the decay activity, distinct from the numeric strength after decay.
+        ja: 減衰活動の実行状態を記録し、減衰後の数値的な強度とは区別します。
+      allowed_values:
+        - running
+        - succeeded
+        - failed
+        - partially_succeeded
+        - rejected
+        - cancelled
+      pattern: null
+      example_value: succeeded
+      source_claims:
+        - claim-memory-decay-activity
+    - id: started_at
+      labels:
+        zh: 开始时间
+        en: started at
+        ja: 開始時刻
+      datatype: date-time
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 记录实际开始应用衰减规则的时间，不能以被评估的最后访问时间替代。
+        en: Records when application of the decay rule actually began, not the last-access time being evaluated.
+        ja: 減衰規則の適用を実際に始めた時刻を記録し、評価対象の最終アクセス時刻では代用しません。
       allowed_values: []
       pattern: null
-      example_value: decay-1202
+      example_value: "2026-07-18T21:30:00Z"
       source_claims:
-        - claim-memory-decay-002
-    - id: strength_after
+        - claim-memory-decay-activity
+    - id: actor_ref
       labels:
-        zh: 衰减后强度
-        en: strength after
-        ja: 減衰後strength
+        zh: 执行主体引用
+        en: executor reference
+        ja: 実行主体参照
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 引用实际运行该衰减规则的主体，而不是规则的定义者。
+        en: References the actor that runs this decay rule rather than the author of the rule.
+        ja: 規則の作成者ではなく、この減衰規則を実行する主体を参照します。
+      allowed_values: []
+      pattern: "^[A-Za-z0-9][A-Za-z0-9._:@/-]*$"
+      example_value: memory-decay-worker-1
+      source_claims:
+        - claim-memory-decay-activity
+    - id: target_record_refs
+      labels:
+        zh: 处置目标记录引用
+        en: disposition target record references
+        ja: 処置対象レコード参照
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: null
+      definitions:
+        zh: 保留父类可处理多个目标的记录集合；衰减子类每次将其与单一的 target_record_ref 对齐。
+        en: Retains the parent collection of disposition targets; this decay subtype aligns it with its single target_record_ref for each execution.
+        ja: 親の処置対象集合を保持し、この減衰サブタイプでは各実行で単一の target_record_ref と整合させます。
+      allowed_values: []
+      pattern: "^record-[A-Za-z0-9._-]+$"
+      example_value:
+        - record-2501-v1
+      source_claims:
+        - claim-memory-decay-target
+    - id: disposition_kind
+      labels:
+        zh: 处置类别
+        en: disposition kind
+        ja: 処置種別
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 固定为 decay，以便跨实现区分降低强度与驱逐、到期或删除。
+        en: Narrows the parent disposition kind to decay so cross-implementation consumers distinguish strength reduction from eviction, expiration, or deletion.
+        ja: 親の処置種別を decay に限定し、実装間で強度低下を追い出し、期限切れ、削除から区別します。
+      allowed_values:
+        - decay
+      pattern: null
+      example_value: decay
+      source_claims:
+        - claim-memory-decay-activity
+    - id: disposition_basis
+      labels:
+        zh: 处置依据
+        en: disposition basis
+        ja: 処置根拠
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 固定为 decay_policy，表示具体 inactivity 或 elapsed_time 触发条件由本地 decay_basis 细化。
+        en: Narrows the parent basis to decay_policy; the local decay_basis further states whether inactivity or elapsed time triggered it.
+        ja: 親の根拠を decay_policy に限定し、ローカルの decay_basis が inactivity か elapsed time かをさらに示します。
+      allowed_values:
+        - decay_policy
+      pattern: null
+      example_value: decay_policy
+      source_claims:
+        - claim-memory-decay-basis
+    - id: disposition_effect
+      labels:
+        zh: 处置效果
+        en: disposition effect
+        ja: 処置効果
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 固定为 strength_reduced，说明衰减降低强度而不使记录失效或移出活跃层。
+        en: Narrows the parent effect to strength_reduced and states that decay lowers strength without invalidating or evicting the record.
+        ja: 親の効果を strength_reduced に限定し、減衰がレコードを無効化または追い出すことなく強度を下げることを示します。
+      allowed_values:
+        - strength_reduced
+      pattern: null
+      example_value: strength_reduced
+      source_claims:
+        - claim-memory-decay-strength
+    - id: disposition_evidence_digest
+      labels:
+        zh: 处置证据摘要
+        en: disposition evidence digest
+        ja: 処置証跡ダイジェスト
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 固定父类处置依据和效果的证据包；在衰减中它与 decay_evidence_digest 指向同一规则执行证据。
+        en: Fixes the evidence package for the parent disposition basis and effect; in decay it names the same rule-execution evidence as decay_evidence_digest.
+        ja: 親処置の根拠と効果の証跡パッケージを固定し、減衰では decay_evidence_digest と同じ規則実行証跡を指します。
+      allowed_values: []
+      pattern: "^sha256:[a-f0-9]{64}$"
+      example_value: sha256:55ae9b2e7bf2fc234a6b9f3963dbf283ccd62955e016a7bf433bb205c30dd91a
+      source_claims:
+        - claim-memory-decay-evidence
+    - id: disposed_at
+      labels:
+        zh: 处置生效时间
+        en: disposition effective time
+        ja: 処置有効時刻
+      datatype: date-time
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 记录父类处置效果生效的时间；在衰减中它与 decayed_at 是同一个强度变更事件。
+        en: Records when the parent disposition effect takes hold; for decay it is the same strength-change event as decayed_at.
+        ja: 親処置の効果が有効になった時刻を記録し、減衰では decayed_at と同じ強度変更イベントです。
+      allowed_values: []
+      pattern: null
+      example_value: "2026-07-18T21:30:00.071Z"
+      source_claims:
+        - claim-memory-decay-activity
+    - id: target_record_ref
+      labels:
+        zh: 目标记录引用
+        en: target record reference
+        ja: 対象レコード参照
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 引用实际被重加权的既有 MemoryRecord；共享相似内容、同一命名空间或同一追踪并不能证明它是目标。
+        en: References the existing MemoryRecord actually reweighted; similar content, a shared namespace, or the same trace does not prove it is the target.
+        ja: 実際に再重み付けされる既存 MemoryRecord を参照します。類似内容、共有名前空間、同じトレースだけでは対象を証明できません。
+      allowed_values: []
+      pattern: '^record-[A-Za-z0-9._-]+$'
+      example_value: record-2501-v1
+      source_claims:
+        - claim-memory-decay-target
+    - id: strength_before
+      labels:
+        zh: 衰减前强度
+        en: strength before decay
+        ja: 減衰前強度
       datatype: number
       required: true
       cardinality:
         min: 1
         max: 1
       definitions:
-        zh: 记录处置后仍可访问记录的强度值。
-        en: Records the retained record's strength after disposition.
-        ja: disposition後もaccess可能なrecordのstrength値を記録します。
+        zh: 记录在此次衰减生效前针对同一目标记录使用的标准化检索强度。
+        en: Records the normalized retrieval strength used for the same target record before this decay takes effect.
+        ja: この減衰が有効になる前に同じ対象レコードに使われた正規化検索強度を記録します。
+      allowed_values: []
+      pattern: null
+      example_value: 0.80
+      source_claims:
+        - claim-memory-decay-strength
+    - id: strength_after
+      labels:
+        zh: 衰减后强度
+        en: strength after decay
+        ja: 減衰後強度
+      datatype: number
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 记录此次衰减生效后同一目标记录保留的标准化检索强度，而非零值删除标记或另一个记录的分数。
+        en: Records the normalized retrieval strength retained by the same target record after this decay takes effect, not a zero-value deletion marker or another record's score.
+        ja: この減衰後に同じ対象レコードが保持する正規化検索強度を記録します。ゼロ値の削除印や別レコードのスコアではありません。
       allowed_values: []
       pattern: null
       example_value: 0.35
       source_claims:
-        - claim-memory-decay-003
-  constraints: []
+        - claim-memory-decay-strength
+    - id: decay_basis
+      labels:
+        zh: 衰减依据
+        en: decay basis
+        ja: 減衰根拠
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 记录导致此次权重下降的实际可审计输入维度，不能使用没有规则或观察值支持的笼统“低价值”标签。
+        en: Records the actual auditable input dimension that led to this weight decrease and cannot use a generic "low value" label without a rule or observation.
+        ja: この重み低下を導いた実際に監査可能な入力次元を記録し、規則または観測値のない一般的な「低価値」ラベルは使えません。
+      allowed_values:
+        - elapsed_time
+        - inactivity
+        - explicit_priority_policy
+      pattern: null
+      example_value: inactivity
+      source_claims:
+        - claim-memory-decay-basis
+    - id: decay_rule_ref
+      labels:
+        zh: 衰减规则引用
+        en: decay rule reference
+        ja: 減衰規則参照
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 指向本次衰减使用的版本化规则或配置，使相同的旧值、观察输入和规则能重现新值。
+        en: Points to the versioned rule or configuration used for this decay so the same prior value, observed inputs, and rule can reproduce the new value.
+        ja: この減衰で使われたバージョン付き規則または設定を指し、同じ旧値、観測入力、規則から新値を再現できるようにします。
+      allowed_values: []
+      pattern: '^decay-rule-[A-Za-z0-9._-]+$'
+      example_value: decay-rule-inactivity-v3
+      source_claims:
+        - claim-memory-decay-basis
+    - id: decay_evidence_digest
+      labels:
+        zh: 衰减证据摘要
+        en: decay evidence digest
+        ja: 減衰証跡ダイジェスト
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 固定目标版本、旧新强度、规则版本和观测输入摘要，使以后可以验证一次实际的重加权。
+        en: Fixes a digest of target version, before-and-after strength, rule version, and observed inputs so one actual reweighting can later be verified.
+        ja: 対象バージョン、前後強度、規則バージョン、観測入力のダイジェストを固定し、一つの実際の再重み付けを後から検証できるようにします。
+      allowed_values: []
+      pattern: '^sha256:[a-f0-9]{64}$'
+      example_value: sha256:55ae9b2e7bf2fc234a6b9f3963dbf283ccd62955e016a7bf433bb205c30dd91a
+      source_claims:
+        - claim-memory-decay-evidence
+    - id: decayed_at
+      labels:
+        zh: 衰减发生时间
+        en: decayed at
+        ja: 減衰発生時刻
+      datatype: date-time
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 记录新强度实际替代旧强度的事件时间，不能用规则创建、分数显示或计划批处理时间替代。
+        en: Records the event time at which new strength actually replaces old strength and cannot be substituted by rule-creation, score-display, or scheduled-batch time.
+        ja: 新強度が実際に旧強度を置き換えたイベント時刻を記録し、規則作成、スコア表示、予定バッチ時刻では代替できません。
+      allowed_values: []
+      pattern: null
+      example_value: "2026-07-18T21:30:00.071Z"
+      source_claims:
+        - claim-memory-decay-activity
+  constraints:
+    - id: MemoryDecay-inherited-disposition-envelope
+      expression: "operation_kind = disposition, target_record_refs = [target_record_ref], disposition_kind = decay, disposition_basis = decay_policy, disposition_effect = strength_reduced, disposition_evidence_digest = decay_evidence_digest, and disposed_at = decayed_at."
+      explanation:
+        zh: 衰减的专用强度字段不会取代通用处置合同；两套字段必须描述同一个目标、证据和生效事件。
+        en: Decay-specific strength fields do not replace the generic disposition contract; both field sets must describe one target, evidence package, and effective event.
+        ja: 減衰固有の強度フィールドは汎用処置契約を置き換えず、両方のフィールド群が一つの対象、証跡パッケージ、有効化イベントを記述しなければなりません。
+      source_claims:
+        - claim-memory-decay-activity
+        - claim-memory-decay-basis
+        - claim-memory-decay-evidence
+    - id: MemoryDecay-strength-decreases-within-scale
+      expression: "strength_before and strength_after are normalized values in the closed interval [0, 1], and strength_after is strictly less than strength_before for the same target_record_ref."
+      explanation:
+        zh: 没有可比较的前后值或新值不低于旧值时，不能证明发生了衰减；把零值当成删除标记也应改用删除模型。
+        en: Without comparable before-and-after values, or when the new value is not lower, decay is unproven; treating zero as a deletion marker must use the deletion model instead.
+        ja: 比較可能な前後値がない、または新値が低くない場合、減衰は証明されません。ゼロを削除印として扱う場合も削除モデルを使う必要があります。
+      source_claims:
+        - claim-memory-decay-strength
+    - id: MemoryDecay-record-remains-addressable
+      expression: "target_record_ref retains the same stable record identity and remains addressable after decayed_at; loss of active-tier residency, invalidation, or a successor content version violates the decay boundary."
+      explanation:
+        zh: 衰减降低检索优先级而不是消除记录存在；如果寻址能力或身份已断裂，应该分别记录驱逐、删除或修订。
+        en: Decay lowers retrieval priority rather than removing record existence; if addressability or identity is broken, record eviction, deletion, or revision separately.
+        ja: 減衰は検索優先度を下げるのであり、レコード存在を除去するものではありません。アドレス可能性または識別が失われた場合は、追い出し、削除、改訂を別々に記録します。
+      source_claims:
+        - claim-memory-decay-target
+        - claim-memory-decay-boundary
+    - id: MemoryDecay-rule-and-evidence-consistency
+      expression: "decay_basis, decay_rule_ref, prior and new strength, target version, and observed inputs are covered by decay_evidence_digest; an unexplained score overwrite is not a MemoryDecay operation."
+      explanation:
+        zh: 规则、观察输入和结果必须可追溯，才能把一次分数变化归因于衰减而不是手工编辑、故障或未知过程。
+        en: Rule, observed inputs, and result need traceability before a score change can be attributed to decay rather than manual editing, failure, or an unknown process.
+        ja: スコア変化を手作業編集、障害、未知過程ではなく減衰に帰属するには、規則、観測入力、結果の追跡可能性が必要です。
+      source_claims:
+        - claim-memory-decay-basis
+        - claim-memory-decay-evidence
+    - id: MemoryDecay-time-consistency
+      expression: "decayed_at is on or after started_at, and a terminal parent operation has ended_at on or after decayed_at."
+      explanation:
+        zh: 衰减效果不能早于活动开始，也不能被事后写回成已结束活动的一部分。
+        en: A decay effect cannot predate activity start or be written back later as part of an already terminated activity.
+        ja: 減衰効果は活動開始より前にはならず、すでに終了した活動の一部として後から書き戻すこともできません。
+      source_claims:
+        - claim-memory-decay-activity
   required_relation_constraints: []
 examples:
-  - id: MemoryDecay-example-positive-manual-20260716
-    kind: positive
+  - id: MemoryDecay-example-positive-inactivity
+
     labels:
-      zh: 记忆衰减正例
-      en: "Positive case: Memory decay"
-      ja: 記憶減衰正例
-    scenario_id: null
+      zh: 未使用后的检索强度衰减
+      en: Retrieval-strength decay after inactivity
+      ja: 未使用後の検索強度減衰
+
     descriptions:
-      zh: memory-op-decay-001 在九十天无命中后把 record-1202 的 retrieval_strength 从 0.80 调整为 0.35，同时保留记录身份、内容和按键读取能力。
-      en: memory-op-decay-001 changes record-1202 retrieval_strength from 0.80 to 0.35 after ninety days without a hit while retaining identity, content, and key-based access.
-      ja: memory-op-decay-001 は九十日間ヒットがない record-1202 の retrieval_strength を 0.80 から 0.35 へ変更し、同一性・内容・キー参照を保持します。
+      zh: Generative Agents 检索 score 中 recency 衰减：score=α·recency+β·importance+γ·relevance；Redis maxmemory-policy allkeys-lru 驱逐；SET key EX 3600 TTL 过期。
+      en: Generative Agents retrieval recency decay in score=α·recency+β·importance+γ·relevance; Redis maxmemory-policy allkeys-lru eviction; SET key EX 3600 TTL expiration.
+      ja: Generative Agents score=α·recency+β·importance+γ·relevance。Redis allkeys-lru。SET key EX 3600 TTL。
     field_values:
-      decay_operation_id: memory-op-decay-001
+      operation_id: mem-op-decay-2501
+      operation_kind: disposition
+      status: succeeded
+      started_at: "2026-07-18T21:30:00Z"
+      ended_at: "2026-07-18T21:30:00.090Z"
+      actor_ref: memory-decay-worker-1
+      target_record_refs:
+        - record-2501-v1
+      disposition_kind: decay
+      disposition_basis: decay_policy
+      disposition_effect: strength_reduced
+      disposition_evidence_digest: sha256:55ae9b2e7bf2fc234a6b9f3963dbf283ccd62955e016a7bf433bb205c30dd91a
+      disposed_at: "2026-07-18T21:30:00.071Z"
+      target_record_ref: record-2501-v1
+      strength_before: 0.80
       strength_after: 0.35
-      operation_id: memory-op-decay-001
-      reason: retrieval weight is reduced after the freshness threshold elapsed
-      disposition_operation_id: memory-op-decay-001
-      target_record_id: record-1202
-      started_at: 2026-07-16T14:01:00Z
-    related_node_ids:
-      - MemoryDecay
-      - MemoryDispositionOperation
-    related_relation_ids:
-      - MemoryDecay-is_a-MemoryDispositionOperation
-    expected_result:
-      zh: 把 decay-1202 认定为 MemoryDecay，记录衰减前后权重与依据，同时继续允许按身份读取该 MemoryRecord。
-      en: Treat decay-1202 as MemoryDecay, record its before-and-after weights and rationale, and continue allowing direct retrieval of the same MemoryRecord.
-      ja: decay-1202 を MemoryDecay と認定し before/after weight と rationale を記録して同じ MemoryRecord の direct retrieval を許可し続けます。
-    why_valid_or_invalid:
-      zh: 活动只连续调低召回排序强度，没有改变记录身份或检索资格，因而是衰减而非驱逐、到期或删除。
-      en: The activity continuously lowers recall ranking strength without changing record identity or eligibility, which distinguishes decay from eviction, expiration, and deletion.
-      ja: activity は record identity や eligibility を変えず recall ranking strength のみ連続低下させるため eviction・expiration・deletion と異なります。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-    source_claims:
-      - claim-memory-decay-001
-  - id: MemoryDecay-example-instance-manual-20260716
-    kind: instance
-    labels:
-      zh: 检索权重衰减实例
-      en: Retrieval-weight decay instance
-      ja: 検索重み減衰インスタンス
-    scenario_id: MemoryDecay:instance:memory-op-decay-001
-    descriptions:
-      zh: memory-op-decay-001 在九十天无命中后把 record-1202 的 retrieval_strength 从 0.80 调整为 0.35，同时保留记录身份、内容和按键读取能力。
-      en: memory-op-decay-001 changes record-1202 retrieval_strength from 0.80 to 0.35 after ninety days without a hit while retaining identity, content, and key-based access.
-      ja: memory-op-decay-001 は九十日間ヒットがない record-1202 の retrieval_strength を 0.80 から 0.35 へ変更し、同一性・内容・キー参照を保持します。
-    field_values:
-      decay_operation_id: memory-op-decay-001
-      strength_after: 0.35
-      operation_id: memory-op-decay-001
-      reason: retrieval weight is reduced after the freshness threshold elapsed
+      decay_basis: inactivity
+      decay_rule_ref: decay-rule-inactivity-v3
+      decay_evidence_digest: sha256:55ae9b2e7bf2fc234a6b9f3963dbf283ccd62955e016a7bf433bb205c30dd91a
+      decayed_at: "2026-07-18T21:30:00.071Z"
     related_node_ids:
       - MemoryDecay
       - MemoryDispositionOperation
       - MemoryRecord
+      - MemoryOperationResult
+      - MemoryAuditEvent
     related_relation_ids:
       - MemoryDecay-is_a-MemoryDispositionOperation
       - MemoryDecay-reweights-MemoryRecord
-    expected_result:
-      zh: 查询显示同一 MemoryRecord 仍然有效且可读取，只是检索权重被该 Decay 活动下调。
-      en: The query shows that the same MemoryRecord remains valid and readable while this Decay activity lowers only its retrieval weight.
-      ja: 同じ MemoryRecord が有効で読取り可能なまま、この Decay 活動だけが検索重みを下げたことを示します。
-    why_valid_or_invalid:
-      zh: 活动不删除、不驱逐也不标记到期，只改变激活强度，因此属于 Decay。
-      en: The activity neither deletes, evicts, nor marks expiry; it changes only activation strength and is therefore Decay.
-      ja: 削除・退去・期限切れ化を行わず活性強度だけを変えるため Decay です。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.4.0/
+      - MemoryOperation-acts_on-MemoryRecord
+      - MemoryOperation-has_result-MemoryOperationResult
+      - MemoryOperation-has_audit_event-MemoryAuditEvent
+
     source_claims:
-      - claim-memory-decay-001
-  - id: MemoryDecay-example-boundary-manual-20260716
-    kind: boundary
+      - claim-memory-decay-activity
+      - claim-memory-decay-strength
+      - claim-memory-decay-evidence
+  - id: MemoryDecay-example-counterexample-eviction
+
     labels:
-      zh: 记忆衰减边界例
-      en: "Boundary case: Memory decay"
-      ja: 記憶減衰境界例
-    scenario_id: MemoryDecay:boundary:20260716
+      zh: 移出活动层不是衰减
+      en: Removing from active tier is not decay
+      ja: アクティブ層からの除去は減衰ではない
+
     descriptions:
-      zh: evict-1203 在 Redis 达到 maxmemory 时把 record-1203 从活动缓存层移出，持久存储仍保留有效副本，且没有写入新的 retrieval_strength。
-      en: evict-1203 removes record-1203 from the active Redis tier when maxmemory is reached; durable storage keeps a valid copy and no new retrieval_strength is written.
-      ja: evict-1203 は Redis maxmemory 到達時に record-1203 を active cache tier から除き、durable storage は valid copy を保ち新 retrieval_strength は書きません。
-    field_values: {}
+      zh: 反例：无 recency 权重或 TTL 就把全部 Memory Stream 条目等权检索，违反 Generative Agents 时间衰减设计。
+      en: Counterexample: equal-weight retrieval of all Memory Stream entries without recency weight or TTL.
+      ja: 反例：recency 重み/TTL なし等重検索。
+    field_values:
+      operation_id: mem-op-evict-2501
+      operation_kind: disposition
+      target_record_ref: record-2501-v1
+      disposition_kind: eviction
+      disposition_basis: capacity_pressure
+      disposition_effect: active_tier_removed
+      strength_before: 0.35
+      strength_after: absent
+      active_tier_addressable: false
     related_node_ids:
       - MemoryDecay
-    related_relation_ids: []
-    expected_result:
-      zh: 不要把 evict-1203 计作 MemoryDecay；应记录为 MemoryEviction 的离散驻留变化，并保留从持久层重新装载的能力。
-      en: Keep evict-1203 out of MemoryDecay; record the discrete residency change as MemoryEviction and preserve reload capability from durable storage.
-      ja: evict-1203 を MemoryDecay から除外し discrete residency change を MemoryEviction として記録して durable storage からの reload capability を保ちます。
-    why_valid_or_invalid:
-      zh: 从活动层移除是缓存驻留状态的离散变化，而不是连续权重调整；把它误写为衰减会掩盖实际容量驱逐原因。
-      en: Removal from an active tier is a discrete cache-residency transition rather than a continuous weight adjustment; calling it decay would hide the capacity-eviction cause.
-      ja: active tier からの removal は continuous weight adjustment ではなく discrete cache-residency transition で、decay とすると capacity-eviction cause を隠します。
-    synthetic: false
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - MemoryEviction
+      - MemoryRecord
+    related_relation_ids:
+      - MemoryDecay-is_a-MemoryDispositionOperation
+      - MemoryEviction-is_a-MemoryDispositionOperation
+      - MemoryEviction-evicts-MemoryRecord
+
     source_claims:
-      - claim-memory-decay-001
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: MemoryDelete
-    shared_parent_concept_id: MemoryDispositionOperation
-    differentia:
-      zh: 端点特定对照：父节点 MemoryDispositionOperation：MemoryDecay（semantic kind=activity，骨架 MemoryDecay-is_a-MemoryDispositionOperation）；MemoryDelete（semantic kind=activity，骨架 MemoryDelete-is_a-MemoryDispositionOperation）。双端条件：MemoryDecay 条件：“降低记录的强度、相关性权重或召回优先级而不立即移除它的处置操作”；MemoryDelete 条件：“基于显式用户、法律、策略或无效化依据撤销既有记录的处置操作”。条件不得互借；各自成立后方可归类。
-      en: "Endpoint-specific contrast: parent MemoryDispositionOperation: MemoryDecay (semantic kind=activity, backbone MemoryDecay-is_a-MemoryDispositionOperation); MemoryDelete (semantic kind=activity, backbone MemoryDelete-is_a-MemoryDispositionOperation). Endpoint conditions: MemoryDecay condition: “A disposition operation lowering a record's strength, relevance weight, or recall priority without immediately removing it”; MemoryDelete condition: “A disposition operation invalidating an existing record under an explicit user, legal, policy, or invalidation basis”. Conditions cannot be borrowed; classify each endpoint only from its own evidence."
-      ja: 端点別対照：親 MemoryDispositionOperation：MemoryDecay（semantic kind=activity、バックボーン MemoryDecay-is_a-MemoryDispositionOperation）；MemoryDelete（semantic kind=activity、バックボーン MemoryDelete-is_a-MemoryDispositionOperation）。両端条件：MemoryDecay の条件：「recordのstrength・relevance weight・recall priorityを下げ即時除去しないdisposition operationです」；MemoryDelete の条件：「explicit user・legal・policy・invalidation basisにより既存recordを無効化するdisposition operationです」。条件を流用せず、各端を固有の証拠で分類します。
+      - claim-memory-decay-boundary
+  - id: MemoryDecay-example-boundary-score-display
+
+    labels:
+      zh: 没有执行事实的分数显示
+      en: Score display without execution fact
+      ja: 実行事実のないスコア表示
+
+    descriptions:
+      zh: MemoryDecay 渐进降权 vs MemoryDelete 硬删除；Generative Agents recency 是检索分数而非存储删除。
+      en: MemoryDecay gradual de-weighting vs MemoryDelete hard removal; Generative Agents recency is retrieval score not storage deletion.
+      ja: MemoryDecay 漸進降重 vs MemoryDelete 硬削除。
+    field_values:
+      widget_id: score-widget-2502
+      target_record_ref: record-2502-v1
+      displayed_strength: 0.35
+      operation_id: absent
+      strength_before: absent
+      decay_rule_ref: absent
+      decayed_at: absent
+    related_node_ids:
+      - MemoryDecay
+      - MemoryRecord
+    related_relation_ids:
+      - MemoryDecay-is_a-MemoryDispositionOperation
+
     source_claims:
-      - claim-memory-decay-004
-      - claim-memory-decay-005
-  - sibling_concept_id: MemoryEviction
-    shared_parent_concept_id: MemoryDispositionOperation
-    differentia:
-      zh: 端点特定对照：父节点 MemoryDispositionOperation：MemoryDecay（semantic kind=activity，骨架 MemoryDecay-is_a-MemoryDispositionOperation）；MemoryEviction（semantic kind=activity，骨架 MemoryEviction-is_a-MemoryDispositionOperation）。双端条件：MemoryDecay 条件：“降低记录的强度、相关性权重或召回优先级而不立即移除它的处置操作”；MemoryEviction 条件：“因容量或性能策略把记录从活动缓存或检索层移除的处置操作”。条件不得互借；各自成立后方可归类。
-      en: "Endpoint-specific contrast: parent MemoryDispositionOperation: MemoryDecay (semantic kind=activity, backbone MemoryDecay-is_a-MemoryDispositionOperation); MemoryEviction (semantic kind=activity, backbone MemoryEviction-is_a-MemoryDispositionOperation). Endpoint conditions: MemoryDecay condition: “A disposition operation lowering a record's strength, relevance weight, or recall priority without immediately removing it”; MemoryEviction condition: “A disposition operation removing a record from an active cache or retrieval tier because of capacity or performance policy”. Conditions cannot be borrowed; classify each endpoint only from its own evidence."
-      ja: 端点別対照：親 MemoryDispositionOperation：MemoryDecay（semantic kind=activity、バックボーン MemoryDecay-is_a-MemoryDispositionOperation）；MemoryEviction（semantic kind=activity、バックボーン MemoryEviction-is_a-MemoryDispositionOperation）。両端条件：MemoryDecay の条件：「recordのstrength・relevance weight・recall priorityを下げ即時除去しないdisposition operationです」；MemoryEviction の条件：「capacity/performance policyによりrecordをactive cache/retrieval tierから除去するdisposition operationです」。条件を流用せず、各端を固有の証拠で分類します。
+      - claim-memory-decay-activity
+      - claim-memory-decay-basis
+  - id: MemoryDecay-example-instance-time-decay
+
+    labels:
+      zh: 时间规则衰减实例
+      en: Time-rule decay instance
+      ja: 時間規則による減衰インスタンス
+
+    descriptions:
+      zh: Redis FT.SEARCH idx "*=>[KNN 10 @vec $q]" 配合 volatile-ttl 优先驱逐；Generative Agents recency=0.995^hours_since_last_access。
+      en: Redis FT.SEARCH with volatile-ttl priority eviction; Generative Agents recency=0.995^hours_since_last_access.
+      ja: Redis FT.SEARCH + volatile-ttl。Generative Agents recency=0.995^hours。
+    field_values:
+      operation_id: mem-op-decay-2503
+      operation_kind: disposition
+      status: succeeded
+      started_at: "2026-07-18T21:40:00Z"
+      ended_at: "2026-07-18T21:40:00.069Z"
+      actor_ref: memory-decay-worker-1
+      target_record_refs:
+        - record-2503-v2
+      disposition_kind: decay
+      disposition_basis: decay_policy
+      disposition_effect: strength_reduced
+      disposition_evidence_digest: sha256:eb0d7cc95eaa706ff3b8c825fb1d8e1b667ff28544c34df5a88d77de00685051
+      disposed_at: "2026-07-18T21:40:00.042Z"
+      target_record_ref: record-2503-v2
+      strength_before: 0.62
+      strength_after: 0.51
+      decay_basis: elapsed_time
+      decay_rule_ref: decay-rule-recency-v2
+      decay_evidence_digest: sha256:eb0d7cc95eaa706ff3b8c825fb1d8e1b667ff28544c34df5a88d77de00685051
+      decayed_at: "2026-07-18T21:40:00.042Z"
+      active_tier_addressable: true
+      record_validity: valid
+    related_node_ids:
+      - MemoryDecay
+      - MemoryDispositionOperation
+      - MemoryRecord
+      - MemoryOperationResult
+    related_relation_ids:
+      - MemoryDecay-is_a-MemoryDispositionOperation
+      - MemoryDecay-reweights-MemoryRecord
+      - MemoryOperation-acts_on-MemoryRecord
+      - MemoryOperation-has_result-MemoryOperationResult
+
     source_claims:
-      - claim-memory-decay-006
-      - claim-memory-decay-007
-  - sibling_concept_id: MemoryExpiration
-    shared_parent_concept_id: MemoryDispositionOperation
-    differentia:
-      zh: 端点特定对照：父节点 MemoryDispositionOperation：MemoryDecay（semantic kind=activity，骨架 MemoryDecay-is_a-MemoryDispositionOperation）；MemoryExpiration（semantic kind=activity，骨架 MemoryExpiration-is_a-MemoryDispositionOperation）。双端条件：MemoryDecay 条件：“降低记录的强度、相关性权重或召回优先级而不立即移除它的处置操作”；MemoryExpiration 条件：“记录达到时间、同意或作用域期限并改变保留资格的处置操作”。条件不得互借；各自成立后方可归类。
-      en: "Endpoint-specific contrast: parent MemoryDispositionOperation: MemoryDecay (semantic kind=activity, backbone MemoryDecay-is_a-MemoryDispositionOperation); MemoryExpiration (semantic kind=activity, backbone MemoryExpiration-is_a-MemoryDispositionOperation). Endpoint conditions: MemoryDecay condition: “A disposition operation lowering a record's strength, relevance weight, or recall priority without immediately removing it”; MemoryExpiration condition: “A disposition operation marking that a record has reached a time, consent, or scope deadline and changing retention eligibility”. Conditions cannot be borrowed; classify each endpoint only from its own evidence."
-      ja: 端点別対照：親 MemoryDispositionOperation：MemoryDecay（semantic kind=activity、バックボーン MemoryDecay-is_a-MemoryDispositionOperation）；MemoryExpiration（semantic kind=activity、バックボーン MemoryExpiration-is_a-MemoryDispositionOperation）。両端条件：MemoryDecay の条件：「recordのstrength・relevance weight・recall priorityを下げ即時除去しないdisposition operationです」；MemoryExpiration の条件：「recordがtime・consent・scope deadlineへ達しretention eligibilityを変えるdisposition operationです」。条件を流用せず、各端を固有の証拠で分類します。
-    source_claims:
-      - claim-memory-decay-008
-      - claim-memory-decay-009
+      - claim-memory-decay-activity
+      - claim-memory-decay-strength
+      - claim-memory-decay-boundary
 parent_relation:
   id: MemoryDecay-is_a-MemoryDispositionOperation
   predicate: is_a
-  direction: target-to-source
+  direction: source-to-target
   relation_kind: hierarchy
   labels:
     zh: 是一种记忆处置操作
     en: is a memory disposition operation
-    ja: 記憶処分操作の一種
+    ja: 記憶処分操作の一種である
   definitions:
-    zh: MemoryDecay —is_a→ MemoryDispositionOperation 表示：记录仍可访问，但检索强度、相关性权重或召回优先级下降。
-    en: MemoryDecay —is_a→ MemoryDispositionOperation holds because the record remains accessible while retrieval strength, relevance weight, or recall priority decreases
-    ja: MemoryDecay —is_a→ MemoryDispositionOperation は、recordはaccess可能のままretrieval strength・relevance weight・recall priorityが下がるため成立します。
+    zh: MemoryDecay —is_a→ MemoryDispositionOperation 表示对既有可寻址记录应用了有依据的强度下降效果，而没有改变其有效性、活动层驻留或内容版本。
+    en: MemoryDecay —is_a→ MemoryDispositionOperation means a grounded strength-decrease effect is applied to an existing addressable record without changing its validity, active-tier residency, or content version.
+    ja: MemoryDecay —is_a→ MemoryDispositionOperation は、既存でアドレス可能なレコードに、妥当な根拠を持つ強度低下効果を適用し、その有効性、アクティブ層常駐、内容バージョンを変更しないことを表します。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
-    en: The relation is decided per auditable fact; no uniform runtime cardinality is imposed at ontology level.
-    ja: このrelationはaudit可能fact単位で判定しontology層で全runtime instanceへ一律cardinalityを課しません。
+    zh: 分类关系表达类型成员资格，不限制一次衰减活动能处理的记录批次数。
+    en: The classification relation expresses type membership and does not limit how many record batches one decay activity may process.
+    ja: 分類関係は型メンバーシップを表し、一つの減衰活動が処理できるレコードバッチ数を制限しません。
   inverse_reading:
-    predicate: part_of
+    predicate: has_decay_subtype
     labels:
-      zh: 反向读取
-      en: inverse is a memory disposition operation
-      ja: 逆方向読取
+      zh: 具有衰减子类
+      en: has decay subtype
+      ja: 減衰サブタイプを持つ
   conditions:
-    - id: MemoryDecay-is_a-MemoryDispositionOperation-condition-manual-001
+    - id: MemoryDecay-is_a-MemoryDispositionOperation-child-differentia
       severity: error
       expression_language: plain
-      expression: Assert only when the instance satisfies the child differentia—the record remains accessible while retrieval strength, relevance weight, or recall priority decreases—and already meets the activity definition of MemoryDispositionOperation.
-      explanations:
-        zh: 仅当实例满足子类种差“记录仍可访问，但检索强度、相关性权重或召回优先级下降。”且已满足 MemoryDispositionOperation 的活动定义时建立该边。
-        en: Assert only when the instance satisfies the child differentia—the record remains accessible while retrieval strength, relevance weight, or recall priority decreases—and already meets the activity definition of MemoryDispositionOperation.
-        ja: instanceがchild differentia「recordはaccess可能のままretrieval strength・relevance weight・recall priorityが下がるため成立します。」を満たし、かつ MemoryDispositionOperation のactivity定義を満たす時だけassertします。
+      expression: "Assert only when an executed disposition applies a documented strictly lower retrieval strength to the same existing and addressable record, without eviction, invalidation, expiry effect, or content revision."
+      explanation:
+        zh: 处置父类身份不足以证明衰减；需要同一既有目标、严格下降的强度和保留的可寻址性。
+        en: Disposition-parent identity alone does not prove decay; the same existing target, strictly lower strength, and retained addressability are required.
+        ja: 処分親の識別だけでは減衰を証明できません。同じ既存対象、厳密に低い強度、保持されたアドレス可能性が必要です。
       source_claims:
-        - claim-memory-decay-001
+        - claim-memory-decay-strength
+        - claim-memory-decay-boundary
   temporal_scope: timeless
   boundary_context: null
   constraints: []
   examples:
-    - id: MemoryDecay-is_a-MemoryDispositionOperation-example-positive-manual-20260716
-      kind: positive
+    - id: MemoryDecay-is_a-MemoryDispositionOperation-example-positive
+
       labels:
-        zh: 是一种记忆处置操作正例
-        en: "Positive case: is a memory disposition operation"
-        ja: 記憶処分操作の一種正例
-      scenario_id: MemoryDecay-is_a-MemoryDispositionOperation:positive:20260716
+        zh: 可寻址记录的强度下降属于处置
+        en: Strength decrease of an addressable record is disposition
+        ja: アドレス可能レコードの強度低下は処分である
+
       descriptions:
-        zh: decay-1202 将 record-1202 的 retrieval_strength 从 0.80 降到 0.35，但按 namespace 与 key 直接读取仍返回同一记录。
-        en: decay-1202 lowers record-1202 retrieval_strength from 0.80 to 0.35 while direct namespace-and-key lookup still returns the same record.
-        ja: decay-1202 は record-1202 の retrieval_strength を 0.80 から 0.35 に下げますが namespace/key 直接 lookup は同じ record を返します。
-      field_values: {}
+        zh: mem-op-decay-2501 对 record-2501-v1 应用可重放规则，把强度从 0.80 降到 0.35，但保留同一记录身份和读取能力。
+        en: mem-op-decay-2501 applies a replayable rule to record-2501-v1, lowers strength from 0.80 to 0.35, and retains the same record identity and read access.
+        ja: mem-op-decay-2501 は record-2501-v1 に再実行可能な規則を適用し、強度を 0.80 から 0.35 に下げますが、同じレコード識別と読取りアクセスを保持します。
+      field_values:
+        operation_id: mem-op-decay-2501
+        target_record_ref: record-2501-v1
+        strength_before: 0.80
+        strength_after: 0.35
+        decay_rule_ref: decay-rule-inactivity-v3
+        decayed_at: "2026-07-18T21:30:00.071Z"
       related_node_ids:
         - MemoryDecay
         - MemoryDispositionOperation
       related_relation_ids:
         - MemoryDecay-is_a-MemoryDispositionOperation
-      expected_result:
-        zh: 将 decay-1202 归为 MemoryDecay，并保留同一记录身份、旧新权重和衰减依据。
-        en: Classify decay-1202 as MemoryDecay and retain the unchanged record identity, old and new weights, and decay basis.
-        ja: decay-1202 を MemoryDecay に分類し、同一 record identity・old/new weight・decay basis を保持します。
-      why_valid_or_invalid:
-        zh: 效果是连续降低召回优先级而非移除或失效，记录仍可寻址，精确满足 decay 的可访问性边界。
-        en: The effect continuously lowers recall priority without removal or invalidation, and the record remains addressable, matching the decay boundary.
-        ja: effect は removal/invalidation なしで recall priority を連続低下させ record は addressable のため decay 境界に合致します。
-      synthetic: false
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+
       source_claims:
-        - claim-memory-decay-001
-    - id: MemoryDecay-is_a-MemoryDispositionOperation-example-boundary-manual-20260716
-      kind: boundary
+        - claim-memory-decay-strength
+        - claim-memory-decay-boundary
+    - id: MemoryDecay-is_a-MemoryDispositionOperation-example-boundary-eviction
+
       labels:
-        zh: 是一种记忆处置操作边界例
-        en: "Boundary case: is a memory disposition operation"
-        ja: 記憶処分操作の一種境界例
-      scenario_id: MemoryDecay-is_a-MemoryDispositionOperation:boundary:20260716
+        zh: 活动层移除不是衰减子类
+        en: Active-tier removal is not the decay subtype
+        ja: アクティブ層除去は減衰サブタイプではない
+
       descriptions:
-        zh: evict-1202 从 active-cache 删除 record-1202 的驻留副本，之后按缓存键无法读取，只能从 durable store 重载。
-        en: evict-1202 removes record-1202's active-cache copy; cache-key lookup then fails and only the durable store can reload it.
-        ja: evict-1202 は record-1202 の active-cache copy を削除し cache-key lookup は失敗、durable store からのみ reload できます。
-      field_values: {}
+        zh: mem-op-evict-2501 移出 record-2501-v1 的活动层副本，导致该层不再能寻址它。
+        en: mem-op-evict-2501 removes the active-tier copy of record-2501-v1 and makes it no longer addressable in that tier.
+        ja: mem-op-evict-2501 は record-2501-v1 のアクティブ層コピーを除去し、その層でアドレス可能でなくします。
+      field_values:
+        operation_id: mem-op-evict-2501
+        target_record_ref: record-2501-v1
+        disposition_kind: eviction
+        disposition_effect: active_tier_removed
+        active_tier_addressable: false
       related_node_ids:
         - MemoryDecay
         - MemoryDispositionOperation
+        - MemoryEviction
       related_relation_ids:
         - MemoryDecay-is_a-MemoryDispositionOperation
-      expected_result:
-        zh: 拒绝 MemoryDecay 分类；把该离散驻留变化建模为 MemoryEviction。
-        en: Reject MemoryDecay classification and model the discrete residency change as MemoryEviction.
-        ja: MemoryDecay 分類を拒否し、離散的 residency change を MemoryEviction とします。
-      why_valid_or_invalid:
-        zh: 记录从活动层完全消失不是权重下降；可寻址性断裂说明效果已经越过 decay 与 eviction 的边界。
-        en: Complete disappearance from the active tier is not reweighting; loss of addressability crosses the decay-to-eviction boundary.
-        ja: active tier から完全に消えるのは reweighting ではなく、addressability 喪失は decay と eviction の境界を越えます。
-      synthetic: false
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        - MemoryEviction-is_a-MemoryDispositionOperation
+
       source_claims:
-        - claim-memory-decay-001
+        - claim-memory-decay-boundary
   source_claims:
-    - claim-memory-decay-001
-  distinct_fact_rationale: null
+    - claim-memory-decay-activity
+    - claim-memory-decay-strength
+    - claim-memory-decay-boundary
+  distinct_fact_rationale:
+    zh: 此主干关系只表达有保留可寻址性的重加权处置属于 MemoryDispositionOperation；目标记录、具体权重、规则、证据和产生的结果由字段或独立关系表达。
+    en: This backbone relation only expresses that a reweighting disposition which retains addressability belongs to MemoryDispositionOperation; target record, concrete strengths, rule, evidence, and result are expressed by fields or separate relations.
+    ja: この主幹関係は、アドレス可能性を保持する再重み付け処分が MemoryDispositionOperation に属することだけを表します。対象レコード、具体的強度、規則、証跡、結果はフィールドまたは別関係で表します。
   layout_role: primary-backbone
-  review_status: accepted
   endpoint_order: child-to-parent
 relations:
   - id: MemoryDecay-reweights-MemoryRecord
@@ -312,180 +728,160 @@ relations:
     direction: source-to-target
     relation_kind: temporal
     labels:
-      zh: 调整记忆记录权重
+      zh: 重加权记忆记录
       en: reweights memory record
-      ja: memory recordをreweightする
+      ja: 記憶レコードを再重み付けする
     definitions:
-      zh: MemoryDecay —reweights→ MemoryRecord 表示处置降低该记录的检索强度或召回优先级，但保留其记录身份和按键可访问性。
-      en: MemoryDecay —reweights→ MemoryRecord means the disposition lowers retrieval strength or recall priority while preserving record identity and key-based accessibility.
-      ja: MemoryDecay —reweights→ MemoryRecord はretrieval strength/recall priorityを下げrecord identity/key accessibilityを保持することを表します。
+      zh: MemoryDecay —reweights→ MemoryRecord 表示一次已执行衰减将同一既有且可寻址记录的检索强度降低。
+      en: MemoryDecay —reweights→ MemoryRecord means one executed decay lowers the retrieval strength of the same existing and addressable record.
+      ja: MemoryDecay —reweights→ MemoryRecord は、一つの実行済み減衰が同じ既存でアドレス可能なレコードの検索強度を下げることを表します。
     cardinality: null
     cardinality_not_applicable_reason:
-      zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
-      en: The relation is decided per auditable fact; no uniform runtime cardinality is imposed at ontology level.
-      ja: このrelationはaudit可能fact単位で判定しontology層で全runtime instanceへ一律cardinalityを課しません。
+      zh: 该关系表达每个衰减事实对具体目标的作用，不对所有实现设定固定运行时基数。
+      en: This relation expresses each decay fact's effect on a concrete target and imposes no fixed runtime cardinality across implementations.
+      ja: この関係は各減衰事実の具体対象への効果を表し、実装全体に固定ランタイム基数を課しません。
     inverse_reading:
-      predicate: inverse_reweights
+      predicate: is_reweighted_by
       labels:
-        zh: 反向读取
-        en: inverse reweights memory record
-        ja: 逆方向読取
+        zh: 被衰减重加权
+        en: is reweighted by decay
+        ja: 減衰により再重み付けされる
     conditions:
-      - id: MemoryDecay-reweights-MemoryRecord-condition-manual-001
+      - id: MemoryDecay-reweights-MemoryRecord-same-target-and-lower-strength
         severity: error
         expression_language: plain
-        expression: Assert only when the target record ID is unchanged, strength_after is below strength_before, and the record remains accessible.
-        explanations:
-          zh: 仅当目标 record_id 不变、strength_after 小于 strength_before 且记录仍可访问时成立。
-          en: Assert only when the target record ID is unchanged, strength_after is below strength_before, and the record remains accessible.
-          ja: target record IDが不変でstrength_after<strength_beforeかつrecordがaccess可能な時だけassertします。
+        expression: "Assert only when the relation target matches target_record_ref, strength_after is strictly lower than strength_before, the record remains addressable, and decay_evidence_digest covers the values and rule."
+        explanation:
+          zh: 关系必须指向实际被重加权的同一记录，并以较低强度、持续可寻址性和证据支持；不能用邻近记录或零值删除替代。
+          en: The relation must point to the same record actually reweighted and be supported by lower strength, retained addressability, and evidence; a nearby record or zero-value deletion cannot substitute.
+          ja: 関係は実際に再重み付けされた同じレコードを指し、より低い強度、保持されたアドレス可能性、証跡で支えられなければなりません。近接レコードやゼロ値削除では代替できません。
         source_claims:
-          - claim-memory-decay-001
+          - claim-memory-decay-strength
+          - claim-memory-decay-evidence
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
     examples:
-      - id: MemoryDecay-reweights-MemoryRecord-example-positive-manual-20260716
-        kind: positive
+      - id: MemoryDecay-reweights-MemoryRecord-example-positive
+
         labels:
-          zh: 调整记忆记录权重正例
-          en: "Positive case: reweights memory record"
-          ja: memory recordをreweightする正例
-        scenario_id: MemoryDecay-reweights-MemoryRecord:positive:20260716
+          zh: 同一记录的重加权
+          en: Reweighting the same record
+          ja: 同じレコードの再重み付け
+
         descriptions:
-          zh: decay-1202 对 record-1202 应用 recency-strength 规则，把 retrieval_weight 从 0.80 调到 0.35，record_id 和键读取能力保持不变。
-          en: decay-1202 applies a recency-strength rule to record-1202, changing retrieval_weight from 0.80 to 0.35 while record_id and key lookup remain unchanged.
-          ja: decay-1202 は record-1202 に recency-strength rule を適用し retrieval_weight を 0.80 から 0.35 に変え record_id/key lookup は不変です。
-        field_values: {}
+          zh: mem-op-decay-2501 将 record-2501-v1 从 0.80 降为 0.35，记录保持可读且证据摘要覆盖规则和两项值。
+          en: mem-op-decay-2501 lowers record-2501-v1 from 0.80 to 0.35, the record remains readable, and the evidence digest covers the rule and both values.
+          ja: mem-op-decay-2501 は record-2501-v1 を 0.80 から 0.35 に下げ、レコードは読取り可能なままで、証跡ダイジェストは規則と両値をカバーします。
+        field_values:
+          operation_id: mem-op-decay-2501
+          target_record_ref: record-2501-v1
+          strength_before: 0.80
+          strength_after: 0.35
+          decay_rule_ref: decay-rule-inactivity-v3
+          active_tier_addressable: true
         related_node_ids:
           - MemoryDecay
           - MemoryRecord
         related_relation_ids:
           - MemoryDecay-reweights-MemoryRecord
-        expected_result:
-          zh: 建立 decay-1202 reweights record-1202，并保存旧权重、新权重、计算时刻和衰减依据。
-          en: Assert decay-1202 reweights record-1202 and retain old weight, new weight, calculation time, and decay basis.
-          ja: decay-1202 reweights record-1202 を確立し old/new weight・calculation time・decay basis を保持します。
-        why_valid_or_invalid:
-          zh: 同一记录仍可直接访问，唯一效果是召回强度下降，符合 LangMem 对 relevance、importance 与 strength 的区分。
-          en: The same record remains directly accessible and only recall strength changes, matching LangMem's distinction among relevance, importance, and strength.
-          ja: 同 record は direct accessible のままで recall strength のみ変化し LangMem の relevance・importance・strength 区別に合致します。
-        synthetic: false
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+
         source_claims:
-          - claim-memory-decay-001
-      - id: MemoryDecay-reweights-MemoryRecord-example-boundary-manual-20260716
-        kind: boundary
+          - claim-memory-decay-strength
+          - claim-memory-decay-evidence
+      - id: MemoryDecay-reweights-MemoryRecord-example-boundary-eviction
+
         labels:
-          zh: 调整记忆记录权重边界例
-          en: "Boundary case: reweights memory record"
-          ja: memory recordをreweightする境界例
-        scenario_id: MemoryDecay-reweights-MemoryRecord:boundary:20260716
+          zh: 驱逐不能伪装为重加权
+          en: Eviction cannot masquerade as reweighting
+          ja: 追い出しは再重み付けに偽装できない
+
         descriptions:
-          zh: evict-1202 从 active-vector-cache 完全移除记录副本，之后该层按 key 和向量搜索都无法返回它。
-          en: evict-1202 completely removes the record copy from active-vector-cache, after which neither key nor vector lookup in that tier returns it.
-          ja: evict-1202 は active-vector-cache から record copy を完全除去し、その tier の key/vector lookup は返しません。
-        field_values: {}
+          zh: mem-op-evict-2501 将 record-2501-v1 从活动层移出，活动层查询无法返回该记录，也没有较低的新强度。
+          en: mem-op-evict-2501 removes record-2501-v1 from the active tier, active-tier queries cannot return it, and no lower retained strength exists.
+          ja: mem-op-evict-2501 は record-2501-v1 をアクティブ層から除去し、アクティブ層クエリは返せず、より低く保持された強度もありません。
+        field_values:
+          operation_id: mem-op-evict-2501
+          target_record_ref: record-2501-v1
+          disposition_kind: eviction
+          active_tier_addressable: false
+          strength_after: absent
         related_node_ids:
           - MemoryDecay
+          - MemoryEviction
           - MemoryRecord
         related_relation_ids:
           - MemoryDecay-reweights-MemoryRecord
-        expected_result:
-          zh: 拒绝 decay-1202 reweights 这一解释；把离散移除建模为 MemoryEviction，而不是写一个虚假的零权重。
-          en: Reject interpreting the removal as reweighting; model it as MemoryEviction rather than inventing a zero weight.
-          ja: removal の reweighting 解釈を拒否し fake zero weight ではなく MemoryEviction とします。
-        why_valid_or_invalid:
-          zh: 不可寻址的离散移除不再是连续权重变化；用零权重掩盖驱逐会丢失活动层驻留事实。
-          en: A discrete, non-addressable removal is no longer a continuous weight change; hiding eviction as zero weight loses residency semantics.
-          ja: discrete non-addressable removal は continuous weight change でなく zero weight で eviction を隠すと residency semantics を失います。
-        synthetic: false
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+          - MemoryEviction-evicts-MemoryRecord
+
         source_claims:
-          - claim-memory-decay-001
+          - claim-memory-decay-boundary
     source_claims:
-      - claim-memory-decay-001
-    distinct_fact_rationale: null
+      - claim-memory-decay-strength
+      - claim-memory-decay-evidence
+    distinct_fact_rationale:
+      zh: 此关系表达一次衰减对特定记录的数值效果，不表达处置类型成员资格、记录有效性、缓存驻留、保留资格、结果或审计。
+      en: This relation expresses one decay's numeric effect on a particular record; it does not express disposition type membership, record validity, cache residency, retention eligibility, result, or audit.
+      ja: この関係は一つの減衰の特定レコードへの数値効果を表し、処分型所属、レコード有効性、キャッシュ常駐、保持適格性、結果、監査を表しません。
     layout_role: cross-link
-    review_status: accepted
+    endpoint_order: source-to-target
     target: concept:MemoryRecord
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-lifecycle-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 该节点仅完成了从现行候选数据到唯一 YAML 树的无损转录；尚未逐项完成人工语义核验，不得据此宣称已审定。
-    en: This node has only been transcribed without loss from the current candidate data into the sole YAML tree; item-by-item manual semantic review is still pending.
-    ja: このノードは現行候補データから唯一の YAML ツリーへ欠落なく転記した段階であり、項目別の手動意味審査は未完了です。
-  sections:
-    semantics: pending
-    hierarchy: pending
-    relations: pending
-    structure: pending
-    examples: pending
-    source_claims: []
+sources:
+  - id: elasticsearch-function-score
+    title: Elasticsearch function score query
+    source_type: official-doc
+    url: https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-function-score-query.html
+    relevance: Documents decay-style score functions that adjust ranking while keeping the indexed document identity intact.
+  - id: w3c-prov-o
+    title: "W3C PROV-O: The PROV Ontology"
+    source_type: standard
+    url: https://www.w3.org/TR/prov-o/
+    relevance: Defines activities, entities, agents, time, and provenance associations as distinct facts.
+  - id: nist-fips-180-4
+    title: FIPS 180-4 Secure Hash Standard
+    source_type: standard
+    url: https://csrc.nist.gov/pubs/fips/180/4/final
+    relevance: Specifies SHA-256 message digests used to bind auditable decay evidence.
 source_claims:
-  - id: claim-memory-decay-001
-    source: eng-fw-langmem-memory-management
-    supports: LangMem exposes distinct insert, update, and delete controls and describes collection reconciliation and consolidation; Moonweave makes their lifecycle boundaries explicit.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
-    evidence_kind: design-inference
+  - id: claim-memory-decay-activity
+    source: w3c-prov-o
+    supports: PROV-O distinguishes an executed Activity from the entities it uses and related provenance facts. Moonweave records decay as an executed activity with target, actor, time, result, and audit evidence rather than a displayed score or future policy.
+    locator: "PROV-O sections 3.1 Activity, 3.2 Entity, and 3.4 Agent"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-decay-002
-    source: eng-fw-langmem-memory-management
-    supports: MemoryDecay.decay_operation_id records the stated operational datum so the concept instance can be identified or audited without changing the source model's own vocabulary.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
-    evidence_kind: design-inference
+  - id: claim-memory-decay-identity
+    source: w3c-prov-o
+    supports: PROV-O allows activities and provenance facts to have stable independent identities. Moonweave uses one operation ID to join a decay's target, strengths, evidence, result, and audit facts.
+    locator: "PROV-O Activity and Entity identifier model"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-decay-003
-    source: eng-fw-langmem-memory-management
-    supports: MemoryDecay.strength_after records the stated operational datum so the concept instance can be identified or audited without changing the source model's own vocabulary.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
-    evidence_kind: design-inference
+  - id: claim-memory-decay-target
+    source: w3c-prov-o
+    supports: PROV-O distinguishes the existing entities used by an activity from entities generated later. Moonweave reweights the same existing memory record and does not replace it with a candidate or successor output.
+    locator: "PROV-O sections on prov:used and prov:wasGeneratedBy"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-decay-004
-    source: eng-fw-langmem-memory-management
-    supports: LangMem distinguishes updating a stored semantic-memory item from deleting it. Moonweave uses the non-destructive update side as operational precedent for MemoryDecay, which lowers strength or relevance without invalidating the record; LangMem does not define decay as a named lifecycle class.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
-    evidence_kind: design-inference
+  - id: claim-memory-decay-strength
+    source: elasticsearch-function-score
+    supports: Elasticsearch documents score and decay functions that modify ranking values while the indexed document remains the same entity. Moonweave represents decay as a strictly lower before-and-after retrieval strength for the same addressable record.
+    locator: "Elasticsearch function score query decay functions and score calculation"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-decay-005
-    source: eng-ont-prov-o
-    supports: PROV-O defines wasInvalidatedBy for an Entity that ceases to be available because of an Activity. Moonweave uses that provenance meaning for MemoryDelete and keeps it distinct from non-invalidating MemoryDecay; PROV-O does not prescribe the sibling classes.
-    locator: PROV-O Recommendation > Starting Point Terms > Entity, Activity, Agent, used, wasGeneratedBy, and wasInvalidatedBy
-    evidence_kind: design-inference
+  - id: claim-memory-decay-basis
+    source: elasticsearch-function-score
+    supports: Elasticsearch parameterizes score adjustment with explicit functions and inputs. Moonweave records elapsed-time, inactivity, or priority basis together with a versioned rule rather than an unexplained low score.
+    locator: "Elasticsearch function score query function parameters"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-decay-006
-    source: eng-fw-langmem-memory-management
-    supports: LangMem permits updates to retained semantic-memory items, supporting the operational possibility that a record's retrieval weight or strength changes while the item remains stored. Moonweave names that gradual change MemoryDecay and distinguishes it from cache-oriented eviction.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
-    evidence_kind: design-inference
+  - id: claim-memory-decay-evidence
+    source: nist-fips-180-4
+    supports: FIPS 180-4 specifies fixed-size secure message digests. Moonweave stores a SHA-256 digest over target version, strengths, rule, and observed inputs to bind decay evidence.
+    locator: "FIPS 180-4 abstract and SHA-256 specification"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-decay-007
-    source: eng-cache-redis-eviction
-    supports: Redis documents eviction as removal of keys when configured memory limits are reached, according to a selected eviction policy. Moonweave models that capacity- or policy-triggered removal as MemoryEviction and keeps it separate from gradual MemoryDecay; Redis does not define the Moonweave hierarchy.
-    locator: Key eviction > maxmemory configuration and eviction policies
-    evidence_kind: design-inference
+  - id: claim-memory-decay-boundary
+    source: elasticsearch-function-score
+    supports: Score adjustment changes ranking rather than deleting or invalidating the indexed document. Moonweave keeps reweighting distinct from active-tier eviction, retention expiry, deletion, and content revision.
+    locator: "Elasticsearch function score query scoring behavior"
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-memory-decay-008
-    source: eng-fw-langmem-memory-management
-    supports: LangMem's update operations allow retained semantic memory to change without immediate deletion. Moonweave treats MemoryDecay as such a gradual strength or relevance change and distinguishes it from MemoryExpiration, whose defining condition is reaching a time or lifecycle threshold.
-    locator: Conceptual guide > semantic memory > collection management; API reference > inserts, updates, and deletes
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-memory-decay-009
-    source: eng-db-dynamodb-ttl
-    supports: DynamoDB TTL marks an item as expired when its per-item timestamp is in the past, while physical deletion may occur later and can be observed in Streams. Moonweave uses this threshold-crossing semantics for MemoryExpiration and keeps it distinct from gradual decay; the ontology placement is Moonweave-specific.
-    locator: Using time to live (TTL) > expired items pending deletion and TTL stream records
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

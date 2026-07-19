@@ -1,0 +1,277 @@
+schema: moonweave.ai/ontology-node/v1
+id: safety-tool-approval-execution
+kind: module
+status: accepted
+labels:
+  zh: 工具审批与执行证据
+  en: Tool Approval and Execution Evidence
+  ja: ツール承認と実行証拠
+semantics:
+  short_definition:
+    zh: 记录工具审批决定及其后续执行证据的项目本地模块。
+    en: A project-local module that records tool-approval decisions and subsequent execution evidence.
+    ja: ツール承認の決定と、その後の実行証拠を記録するプロジェクト固有のモジュール。
+  definition:
+    zh: 工具审批与执行证据是围绕 OpenAI Agents SDK 人在回路流程及后续工具执行证据的项目本地审计模型。它比一般授权更窄：授权决定回答是否允许访问，而该模型记录某一次工具调用是被批准还是被拒绝，以及执行后发生了什么。它不定义 OpenAI SDK 或 MCP 的原生模式。
+    en: "Tool Approval and Execution Evidence is a project-local audit model around the OpenAI Agents SDK human-in-the-loop flow and subsequent tool-execution evidence. It is narrower than general authorization: an authorization decision answers whether access is permitted, while this model records whether one tool call was approved or rejected and what happened after it ran. It does not define a native OpenAI SDK or MCP schema."
+    ja: ツール承認と実行証拠は、OpenAI Agents SDK のヒューマン・イン・ザ・ループの流れと、その後のツール実行証拠を対象とするプロジェクト固有の監査モデルです。一般的な認可より範囲が狭く、認可がアクセス可否を答えるのに対し、このモデルは一回のツール呼び出しが承認されたか拒否されたか、および実行後に何が起きたかを記録します。OpenAI SDK または MCP のネイティブスキーマを定義するものではありません。
+  why_needed:
+    zh: 即使已有有效权限，不可逆或高影响操作仍可能需要再次确认。记录请求、决定和回执可使重试与用户意图更安全。
+    en: A valid permission can still require confirmation for an irreversible or high-impact operation. Recording the request, decision, and receipt makes retries and user intent safer.
+    ja: 有効な権限があっても、不可逆または影響の大きい操作には追加の確認が必要になることがあります。要求、決定、回執を記録することで、再試行と利用者の意図をより安全に扱えます。
+  includes:
+    - zh: 待审批工具调用、批准和拒绝决定、副作用以及工具结果记录。
+      en: Pending tool calls, approval and rejection decisions, side effects, and tool result records.
+      ja: 承認待ちツール呼び出し、承認および却下の決定、副作用、ならびにツール結果記録。
+    - zh: 针对敏感工具执行的逐调用人在回路暂停。
+      en: Per-call human-in-the-loop pauses for sensitive tool execution.
+      ja: 機微なツール実行に対する呼び出し単位のヒューマン・イン・ザ・ループ停止。
+  excludes:
+    - zh: 内容脱敏和披露过滤。
+      en: Content redaction and disclosure filtering.
+      ja: 内容のマスキングおよび開示フィルタリング。
+    - zh: 在特定副作用闸门之前授予能力的策略决定。
+      en: The policy decision that grants a capability before an effect-specific gate.
+      ja: 特定の副作用ゲートより前に能力を付与するポリシー決定。
+  semantic_kind: null
+  aliases:
+    - safety-commit-redaction
+    - tool-approval-audit
+    - commit-gate
+    - side-effect-approval
+    - effect-receipt
+engineering:
+  explanation:
+    zh: 在策略评估之后、实际执行之前使用逐调用审批闸门。在 OpenAI Agents SDK 中，工具可声明 needs_approval；运行会以工具名称和参数呈现中断，随后 state.approve 或 state.reject 仅为该次调用解决中断，之后运行器才恢复。审批限定于该调用，既不是身份验证，也不是授权授予。
+    en: Use a per-call approval gate after policy evaluation and before execution. In the OpenAI Agents SDK, a tool can declare needs_approval; the run surfaces an interruption with tool name and arguments, then state.approve or state.reject resolves that specific call before the runner resumes. Approval is scoped to the call; it is neither authentication nor an authorization grant.
+    ja: ポリシー評価の後、実行の前に、呼び出し単位の承認ゲートを使用します。OpenAI Agents SDK ではツールが needs_approval を宣言でき、実行はツール名と引数を伴う中断を提示します。その後、state.approve または state.reject がその呼び出しだけの中断を解決してからランナーが再開します。承認の対象はその呼び出しに限られ、認証でも認可付与でもありません。
+  typical_input:
+    - description:
+        zh: 待处理的工具审批中断
+        en: Pending tool approval interruption
+        ja: 保留中のツール承認中断
+      format: 'result.interruptions[0]  # ToolApprovalItem: tool_name="cancel_order", arguments="{"order_id":17}"'
+      source_claims:
+        - claim-openai-hitl-flow
+  typical_output:
+    - description:
+        zh: 已解决的工具审批与结果证据
+        en: Resolved tool approval with result evidence
+        ja: 解決済みのツール承認と結果証拠
+      format: |
+        {"tool_call_id":"call-42","approval":"approved","tool_result_record":{"outcome":"succeeded"}}
+      source_claims:
+        - claim-openai-hitl
+  reference_implementations:
+    - name: OpenAI Agents SDK Human-in-the-loop
+      url: https://openai.github.io/openai-agents-python/human_in_the_loop/
+      description: Defines per-tool approval interruptions, approve/reject, and runner resume.
+structure:
+  identity_keys:
+    - pending_tool_call_id
+  fields:
+    - id: pending_tool_call_id
+      labels:
+        zh: 待审批工具调用标识
+        en: Pending tool call ID
+        ja: 承認待ちツール呼び出しID
+      definitions:
+        zh: 拟议状态变更副作用的稳定标识。
+        en: Stable identifier for a proposed state-changing effect.
+        ja: 提案された状態変更副作用を識別する安定したID。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      pattern: ^[a-z0-9-]+$
+      example_value: pending-call-42
+      allowed_values: []
+      source_claims:
+        - claim-openai-hitl
+    - id: effect_class
+      labels:
+        zh: 副作用类别
+        en: Effect class
+        ja: 副作用クラス
+      definitions:
+        zh: 预期外部状态变更的声明类别。
+        en: Declared category of the intended external state change.
+        ja: 意図した外部状態変更の宣言済みカテゴリ。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      pattern: null
+      example_value: cancel_order
+      allowed_values: []
+      source_claims:
+        - claim-openai-hitl
+    - id: tool_call_id
+      labels:
+        zh: 工具调用标识
+        en: Tool call identifier
+        ja: ツール呼出し識別子
+      definitions:
+        zh: HITL 中断中待决调用的稳定标识；批准、拒绝和执行证据必须引用同一值。
+        en: Stable identifier of the pending call from the HITL interruption; approval, denial, and execution evidence must cite the same value.
+        ja: HITL 中断内の保留呼出しの安定識別子。承認、拒否、実行証拠は同じ値を参照しなければならない。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: '^[A-Za-z0-9._:-]{3,128}$'
+      example_value: call-cancel-order-42
+      allowed_values: []
+      source_claims: [claim-openai-hitl]
+    - id: arguments_digest
+      labels:
+        zh: 参数摘要
+        en: Arguments digest
+        ja: 引数ダイジェスト
+      definitions:
+        zh: 对呈送审批的规范化工具参数计算的 SHA-256 摘要，用于防止批准后替换参数。
+        en: SHA-256 digest of the normalized tool arguments presented for approval; it prevents argument substitution after approval.
+        ja: 承認提示された正規化ツール引数の SHA-256 ダイジェスト。承認後の引数置換を防ぐ。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: '^sha256:[a-f0-9]{64}$'
+      example_value: sha256:9f6a65d7c61893f0c7f72b0c5caf0b0f3fc6f3c6387cad0b2ae9ef85d2a6d794
+      allowed_values: []
+      source_claims: [claim-openai-hitl]
+    - id: resolution
+      labels:
+        zh: 门控决议
+        en: Gate resolution
+        ja: ゲート解決結果
+      definitions:
+        zh: 该具体调用在执行前的当前门控结果，不是通用资源授权。
+        en: Current gate result for this concrete call before execution; it is not a general resource authorization.
+        ja: 実行前のこの具体的な呼出しの現在のゲート結果。一般的なリソース認可ではない。
+      datatype: string
+      required: true
+      cardinality: {min: 1, max: 1}
+      pattern: null
+      example_value: approved
+      allowed_values: [pending, approved, denied]
+      source_claims: [claim-openai-hitl]
+  constraints:
+    - id: tool-approval-before-execution
+      severity: error
+      expression_language: plain
+      expression: A request requiring approval must not create a SideEffect until its matching call-level approval is approved.
+      explanations:
+        zh: 审批闸门控制执行时机，而不替代底层的授权授予。
+        en: An approval gate controls execution timing, not the underlying authorization grant.
+        ja: 承認ゲートは実行の時点を制御するものであり、基盤となる認可付与を置き換えるものではありません。
+      explanation:
+        zh: 审批闸门控制执行时机，而不替代底层的授权授予。
+        en: An approval gate controls execution timing, not the underlying authorization grant.
+        ja: 承認ゲートは実行の時点を制御するものであり、基盤となる認可付与を置き換えるものではありません。
+      source_claims:
+        - claim-openai-hitl
+    - id: tool-approval-resolution-binds-call-and-arguments
+      severity: error
+      expression_language: plain
+      expression: An approved resolution may release only the exact tool_call_id and arguments_digest recorded on this pending tool call; any changed call ID or digest requires a new pending tool call and decision.
+      explanation:
+        zh: 批准的是一个具体调用及其参数，而不是同一工具的未来调用。
+        en: Approval covers one concrete call and its arguments rather than future calls to the same tool.
+        ja: 承認は一つの具体的な呼出しとその引数を対象とし、同じツールへの将来の呼出しを対象としない。
+      source_claims: [claim-openai-hitl]
+  required_relations: []
+examples:
+  - id: safety-tool-approval-execution-openai_hitl
+    labels:
+      zh: 工具审批与执行证据 - OpenAI Agents SDK 人工审批
+      en: Tool Approval and Execution Evidence - OpenAI Agents SDK human approval
+      ja: ツール承認と実行証拠 - OpenAI Agents SDK 人手承認
+    descriptions: {zh: "工具审批与执行证据(safety-tool-approval-execution) [safety-tool-approval-execution]: 记录工具审批决定及其后续执行证据的项目本地模块。. OpenAI Agents SDK：cancel_order 设置 needsApproval: true 时运行暂停，result.interruptions 出现 RunToolApprovalItem，直至 state.approve(interruption)。 Fields: tool_call_id, arguments_digest, resolution.", en: "Tool Approval and Execution Evidence (safety-tool-approval-execution) [safety-tool-approval-execution]: A project-local module that records tool-approval decisions and subsequent execution evidence.. OpenAI Agents SDK: cancel_order with needsApproval: true pauses the run and surfaces RunToolApprovalItem in result.interruptions until state.approve(interruption) (openai.github.io/openai-agents-js/guides/human-in-the-loop/). Fields include tool_call_id, arguments_digest, resolution.", ja: "ツール承認と実行証拠(safety-tool-approval-execution) [safety-tool-approval-execution]: ツール承認の決定と、その後の実行証拠を記録するプロジェクト固有のモジュール。. OpenAI Agents SDK：needsApproval: true の cancel_order は RunToolApprovalItem を返し state.approve まで pause する。 Fields: tool_call_id, arguments_digest, resolution."}
+    field_values:
+      arguments_digest: "sha256:9f6a65d7c61893f0c7f72b0c5caf0b0f3fc6f3c6387cad0b2ae9ef85d2a6d794"
+      effect_class: cancel_order
+      pending_tool_call_id: pending-call-42
+      resolution: approved
+      tool_call_id: call-cancel-order-42
+    related_node_ids:
+      - safety-tool-approval-execution
+    related_relation_ids: []
+    example_source: OpenAI Agents SDK HITL
+    source_claims:
+      - claim-openai-hitl
+  - id: safety-tool-approval-execution-langgraph_interrupt
+    labels:
+      zh: 工具审批与执行证据 - LangGraph 人工中断
+      en: Tool Approval and Execution Evidence - LangGraph human interrupt
+      ja: ツール承認と実行証拠 - LangGraph 人手 interrupt
+    descriptions: {zh: "工具审批与执行证据(safety-tool-approval-execution) [safety-tool-approval-execution]: 记录工具审批决定及其后续执行证据的项目本地模块。. LangGraph interrupt() 暂停图执行供人工审查；Command(resume=...) 在 approve/edit/reject 后继续。 Fields: tool_call_id, arguments_digest, resolution.", en: "Tool Approval and Execution Evidence (safety-tool-approval-execution) [safety-tool-approval-execution]: A project-local module that records tool-approval decisions and subsequent execution evidence.. LangGraph interrupt() pauses graph execution for human review; Command(resume=...) continues after approve/edit/reject (docs.langchain.com/langgraph/interrupts). Fields include tool_call_id, arguments_digest, resolution.", ja: "ツール承認と実行証拠(safety-tool-approval-execution) [safety-tool-approval-execution]: ツール承認の決定と、その後の実行証拠を記録するプロジェクト固有のモジュール。. LangGraph interrupt() は human review のため graph を pause し Command(resume=...) で再開する。 Fields: tool_call_id, arguments_digest, resolution."}
+    field_values:
+      arguments_digest: "sha256:9f6a65d7c61893f0c7f72b0c5caf0b0f3fc6f3c6387cad0b2ae9ef85d2a6d794"
+      effect_class: cancel_order
+      pending_tool_call_id: pending-call-42
+      resolution: approved
+      tool_call_id: call-cancel-order-42
+    related_node_ids:
+      - safety-tool-approval-execution
+    related_relation_ids: []
+    example_source: LangGraph interrupt
+    source_claims:
+      - claim-openai-hitl
+  - id: safety-tool-approval-execution-anthropic_cai
+    labels:
+      zh: 工具审批与执行证据 - Anthropic Constitutional AI
+      en: Tool Approval and Execution Evidence - Anthropic Constitutional AI
+      ja: ツール承認と実行証拠 - Anthropic Constitutional AI
+    descriptions: {zh: "工具审批与执行证据(safety-tool-approval-execution) [safety-tool-approval-execution]: 记录工具审批决定及其后续执行证据的项目本地模块。. Bai 等（2022）Constitutional AI：RLAIF 用 AI 根据宪法原则（如\"选择危害更小的回复\"）评估输出；训练流程 SL-CAI → RL-CAI（arxiv.org/abs/2212.08073）。 Fields: tool_call_id, arguments_digest, resolution.", en: "Tool Approval and Execution Evidence (safety-tool-approval-execution) [safety-tool-approval-execution]: A project-local module that records tool-approval decisions and subsequent execution evidence.. Bai et al. (2022) Constitutional AI: RLAIF uses AI feedback on constitutional principles (e.g. \"Choose the less harmful response\"); training flows SL-CAI then RL-CAI (arxiv.org/abs/2212.08073). Fields include tool_call_id, arguments_digest, resolution.", ja: "ツール承認と実行証拠(safety-tool-approval-execution) [safety-tool-approval-execution]: ツール承認の決定と、その後の実行証拠を記録するプロジェクト固有のモジュール。. Bai ほか（2022）Constitutional AI：RLAIF は憲法原則（例「より有害でない応答を選ぶ」）で AI feedback；SL-CAI → RL-CAI（arxiv.org/abs/2212.08073）。 Fields: tool_call_id, arguments_digest, resolution."}
+    field_values:
+      arguments_digest: "sha256:9f6a65d7c61893f0c7f72b0c5caf0b0f3fc6f3c6387cad0b2ae9ef85d2a6d794"
+      effect_class: cancel_order
+      pending_tool_call_id: pending-call-42
+      resolution: approved
+      tool_call_id: call-cancel-order-42
+    related_node_ids:
+      - safety-tool-approval-execution
+    related_relation_ids: []
+    example_source: Anthropic Constitutional AI
+    source_claims:
+      - claim-openai-hitl
+  - id: safety-tool-approval-execution-cedar
+    labels:
+      zh: 工具审批与执行证据 - Cedar 授权评估
+      en: Tool Approval and Execution Evidence - Cedar authorization evaluation
+      ja: ツール承認と実行証拠 - Cedar 認可評価
+    descriptions: {zh: "工具审批与执行证据(safety-tool-approval-execution) [safety-tool-approval-execution]: 记录工具审批决定及其后续执行证据的项目本地模块。. Amazon Cedar 策略：permit(principal == User::\"alice\", action == Action::\"read\", resource == Document::\"report\") when { principal.department == \"engineering\" }；permit/forbid + when/unless 语法。 Fields: tool_call_id, arguments_digest, resolution.", en: "Tool Approval and Execution Evidence (safety-tool-approval-execution) [safety-tool-approval-execution]: A project-local module that records tool-approval decisions and subsequent execution evidence.. Amazon Cedar policy: permit(principal == User::\"alice\", action == Action::\"read\", resource == Document::\"report\") when { principal.department == \"engineering\" }; forbid/permit + when/unless syntax (docs.cedarpolicy.com). Fields include tool_call_id, arguments_digest, resolution.", ja: "ツール承認と実行証拠(safety-tool-approval-execution) [safety-tool-approval-execution]: ツール承認の決定と、その後の実行証拠を記録するプロジェクト固有のモジュール。. Amazon Cedar：permit(principal == User::\"alice\", action == Action::\"read\", resource == Document::\"report\") when { principal.department == \"engineering\" }；permit/forbid + when/unless 構文。 Fields: tool_call_id, arguments_digest, resolution."}
+    field_values:
+      arguments_digest: "sha256:9f6a65d7c61893f0c7f72b0c5caf0b0f3fc6f3c6387cad0b2ae9ef85d2a6d794"
+      effect_class: cancel_order
+      pending_tool_call_id: pending-call-42
+      resolution: approved
+      tool_call_id: call-cancel-order-42
+    related_node_ids:
+      - safety-tool-approval-execution
+    related_relation_ids: []
+    example_source: Amazon Cedar
+    source_claims:
+      - claim-openai-hitl
+parent_relation: null
+relations: []
+sources:
+  - id: openai-hitl
+    title: OpenAI Agents SDK Human-in-the-loop
+    url: https://openai.github.io/openai-agents-python/human_in_the_loop/
+    source_type: official-doc
+    relevance: Defines tool approval, interruption, decision, and resumption behavior.
+source_claims:
+  - id: claim-openai-hitl
+    source: openai-hitl
+    supports: This ontology defines project-local audit records that bind a pending tool-approval interruption to a pending-tool-call identifier, argument digest, recorded decision, and later tool-result evidence; those record fields are not OpenAI SDK API fields.
+    locator: Local ontology design boundary; informed by Human-in-the-loop > How the approval flow works
+    evidence_kind: design-inference
+    confidence: high
+  - id: claim-openai-hitl-flow
+    source: openai-hitl
+    supports: Tools can declare needs_approval; pending approvals surface as ToolApprovalItem interruptions, and state.approve or state.reject resolves an interruption before Runner resumes the paused run.
+    locator: Human-in-the-loop > Marking tools that need approval; How the approval flow works
+    evidence_kind: official-doc
+    confidence: high

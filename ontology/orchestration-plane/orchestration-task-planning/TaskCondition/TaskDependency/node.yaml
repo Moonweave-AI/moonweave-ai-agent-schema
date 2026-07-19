@@ -1,7 +1,6 @@
 schema: moonweave.ai/ontology-node/v1
 id: TaskDependency
 kind: concept
-status: accepted
 labels:
   zh: 任务依赖
   en: task dependency
@@ -29,6 +28,52 @@ semantics:
       ja: TaskStep・WorkItem の同階層順序辺、配列位置だけの先後、一般資源制限、一回の実行準備チェック結果。
   semantic_kind: specification
   aliases: []
+engineering:
+  explanation:
+    zh: >-
+      TaskDependency 的双端点谓词在 LangGraph 编译为 prerequisite 节点的 finish-to-start 边或 join 等待；规划器
+      同时维护 Task-depends_on-Task 投影边以做环检测。Agents SDK 顺序编排用 await 前置 Runner 完成再启动 dependent
+      Agent。required_evidence_contract 由评估器在运行时核对 predecessor Execution 产物；A2A history 只是协议观测，
+      不能单独满足依赖而不经 evidence 合同校验。
+    en: >-
+      TaskDependency two-endpoint predicates compile in LangGraph to finish-to-start edges or join waits from prerequisite
+      nodes; planners maintain Task-depends_on-Task projection edges for cycle detection. Agents SDK sequential orchestration
+      awaits predecessor Runner completion before starting the dependent Agent. required_evidence_contract is checked at
+      runtime against predecessor Execution artifacts; A2A history is protocol observation alone and cannot satisfy a
+      dependency without evidence-contract validation.
+    ja: >-
+      TaskDependency の二端点 predicate は LangGraph で prerequisite node からの finish-to-start edge または join wait に
+      コンパイルされる。planner は環検出のため Task-depends_on-Task projection edge も維持する。Agents SDK sequential
+      orchestration は predecessor Runner 完了を await してから dependent Agent を起動する。required_evidence_contract は
+      runtime で predecessor Execution artifact に対して検証される。A2A history は protocol observation のみで、evidence
+      contract 検証なしに dependency を充足できない。
+  typical_input:
+    - description:
+        zh: 声明 predecessor 与 dependent Task 及证据合同的依赖规约。
+        en: A dependency specification declaring predecessor and dependent Tasks plus an evidence contract.
+        ja: predecessor と dependent Task および evidence contract を宣言する dependency specification。
+      format: |-
+        {"condition_specification_id":"dep:report-after-reconcile@1","version":"1","dependency_kind":"finish-to-start","predecessor_task_ref":"task-spec-reconcile-7@4","dependent_task_ref":"task-spec-publish-report@2","required_evidence_contract":"reconciliation-report@3","mandatory":true}
+  typical_output:
+    - description:
+        zh: 编译后的 DAG 边与就绪评估输入，不是就绪检查活动的结果。
+        en: A compiled DAG edge and readiness-evaluation input, not the result of a readiness-check activity.
+        ja: コンパイル済み DAG edge と readiness evaluation input。readiness-check activity の結果ではない。
+      format: |-
+        {"dependency_ref":"dep:report-after-reconcile@1","dag_edge":{"from":"task-spec-reconcile-7@4","to":"task-spec-publish-report@2"},"readiness_eval_input":{"required_artifact":"reconciliation-report@3"}}
+  reference_implementations:
+    - name: LangGraph Graph API
+      url: https://docs.langchain.com/oss/python/langgraph/graph-api
+      description: Documents fixed edges and join semantics for prerequisite-dependent structure.
+    - name: OpenAI Agents SDK multi-agent orchestration
+      url: https://openai.github.io/openai-agents-python/multi_agent/
+      description: Documents sequential handoffs awaiting predecessor agent completion.
+    - name: A2A Protocol life of a task
+      url: https://a2a-protocol.org/latest/topics/life-of-a-task/
+      description: Documents task history as protocol observation separate from plan dependency contracts.
+  source_claims:
+    - claim-task-dependency-012
+    - claim-task-dependency-014
 structure:
   identity_keys: []
   fields:
@@ -202,32 +247,16 @@ structure:
         - claim-task-dependency-013
 examples:
   - id: TaskDependency-example-positive-manual-001
-    kind: positive
     labels:
-      zh: 任务依赖正例
-      en: Positive example for task dependency
-      ja: タスク依存関係の正例
-    scenario_id: null
+      zh: TaskDependency positive
+      en: TaskDependency positive
+      ja: TaskDependency positive
     descriptions:
-      zh: dependency-schema-review-after-draft@1 规定：依赖任务只有在前置任务成功并产生经批准的 schema-v3 后才可开始；条件未满足时继续阻止依赖任务启动。
-      en: dependency-schema-review-after-draft@1 permits the dependent task to start only after its predecessor succeeds and produces approved schema-v3; otherwise the dependent task remains blocked from starting.
-      ja: dependency-schema-review-after-draft@1 は predecessor が成功して承認済み schema-v3 を生成した後だけ dependent task の開始を許し、未充足なら開始を阻止し続けます。
-    field_values:
-      condition_specification_id: task-condition-schema-review-after-draft
-      expression_language: cel
-      predicate_expression: predecessor.outcome == 'succeeded' && artifact('schema-v3').approved == true
-      evaluation_phase: readiness
-      unsatisfied_effect: block_start
-      version: "1"
-      dependency_kind: artifact_available
-      satisfaction_predicate: predecessor.outcome == 'succeeded' && artifact('schema-v3').approved == true
-      required_evidence_contract:
-        required:
-          - RunOutcome:succeeded
-          - Artifact:schema-v3
-          - ReviewApproval
-        bind_to: artifact_digest
-      mandatory: true
+      zh: Prefect 数据流编排映射 TaskDependency：@flow def pipeline(): result = extract(); transformed = transform(result); load(transformed)；@task(retries=3, retry_delay_seconds=10) 声明重试策略；PipelineComposition 对应 flow/task DAG。
+      en: Prefect data-flow orchestration maps TaskDependency: @flow pipeline with extract/transform/load; @task(retries=3, retry_delay_seconds=10) declares retry policy; PipelineComposition corresponds to flow/task DAG.
+      ja: Prefect TaskDependency: @flow extract→transform→load、@task(retries=3, retry_delay_seconds=10)。
+    field_values: {condition_specification_id: task-condition-schema-review-after-draft, expression_language: cel, predicate_expression: "predecessor.outcome == 'succeeded' && artifact('schema-v3').approved == true", evaluation_phase: readiness, unsatisfied_effect: block_start, version: 1, dependency_kind: artifact_available, satisfaction_predicate: "predecessor.outcome == 'succeeded' && artifact('schema-v3').approved == true"}
+
     related_node_ids:
       - TaskDependency
       - TaskCondition
@@ -237,531 +266,160 @@ examples:
       - TaskDependency-has_predecessor-Task
       - TaskDependency-has_dependent-Task
       - Task-depends_on-Task
-    expected_result:
-      zh: 建立 TaskDependency，并以批准产物作为满足证据。
-      en: Create a TaskDependency using the approved artifact as satisfaction evidence.
-      ja: 承認済み成果物を充足証拠とする TaskDependency を作成します。
-    why_valid_or_invalid:
-      zh: 依赖方、前置方、所需产物、满足谓词、就绪阶段和阻止启动的效果均明确且相互一致。
-      en: Dependent, predecessor, required artifact, satisfaction predicate, readiness phase, and block-start effect are explicit and mutually consistent.
-      ja: dependent、predecessor、required artifact、satisfaction predicate、readiness phase、block-start effect が明示され相互に一致します。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
       - claim-task-dependency-014
+
   - id: TaskDependency-example-boundary-manual-001
-    kind: boundary
     labels:
-      zh: 任务依赖边界例
-      en: Boundary case for task dependency
-      ja: タスク依存関係の境界例
-    scenario_id: null
+      zh: TaskDependency boundary
+      en: TaskDependency boundary
+      ja: TaskDependency boundary
     descriptions:
-      zh: 两个任务出现在计划 JSON 的相邻位置，但没有 edge、前置标识或产物要求。
-      en: Two tasks are adjacent in a plan JSON array but have no edge, predecessor identifier, or artifact requirement.
-      ja: 二つのタスクが計画 JSON 配列で隣接しますが、edge、先行ID、成果物要件がありません。
-    field_values:
-      condition_specification_id: dependency-array-adjacency
-      version: "1"
-      dependency_kind: finish_to_start
-      satisfaction_predicate: previous array element comes first
-      required_evidence_contract: {}
-      mandatory: true
+      zh: Temporal workflow history 是运行时事件溯源，不是 TaskDependency WorkflowStep 规范；DurableExecution 实例与规约应区分。
+      en: Temporal workflow history is runtime event sourcing, not TaskDependency WorkflowStep spec; separate DurableExecution instances from specification.
+      ja: Temporal workflow history は runtime で TaskDependency WorkflowStep spec ではない。
+    field_values: {condition_specification_id: dependency-array-adjacency, version: 1, dependency_kind: finish_to_start, satisfaction_predicate: "previous array element comes first", required_evidence_contract: {}, mandatory: true}
+
     related_node_ids:
       - TaskDependency
       - TaskCondition
     related_relation_ids:
       - TaskDependency-is_a-TaskCondition
-    expected_result:
-      zh: 不得仅凭数组顺序推断 TaskDependency。
-      en: Do not infer TaskDependency from array order alone.
-      ja: 配列順だけで TaskDependency を推定しません。
-    why_valid_or_invalid:
-      zh: 展示顺序可能任意，缺少可验证的依赖断言与满足条件。
-      en: Presentation order may be arbitrary and supplies no verifiable dependency assertion or satisfaction condition.
-      ja: 表示順は任意であり、検証可能な依存アサーションや充足条件を提供しません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
       - claim-task-dependency-015
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: TaskCompletionCriterion
-    shared_parent_concept_id: TaskCondition
-    differentia:
-      zh: 已审查兄弟区分：父节点 TaskCondition：TaskDependency（semantic kind=specification，骨架 TaskDependency-is_a-TaskCondition）；TaskCompletionCriterion（semantic kind=specification，骨架 TaskCompletionCriterion-is_a-TaskCondition）。双端条件：TaskDependency 条件：“任务依赖属于任务条件，区别于其他同类对象的条件是：它说明某个任务、步骤或工作项必须等待另一结果、条件、资源或批准后才能继续”；TaskCompletionCriterion 条件：“任务完成判据是一种任务条件；其区分条件是：任务完成准则规定某类任务达到完成状态所需的可检验条件、阈值和证据要求；它由 EvaluationRun 应用，而不自行评估运行结局”。任一条件成立不推出另一端。
-      en: "Reviewed sibling distinction: parent TaskCondition: TaskDependency (semantic kind=specification, backbone TaskDependency-is_a-TaskCondition); TaskCompletionCriterion (semantic kind=specification, backbone TaskCompletionCriterion-is_a-TaskCondition). Endpoint conditions: TaskDependency condition: “Task dependency is a task condition whose defining condition is that it states that one task, step, or work item depends on another result, condition, resource, or approval before it can proceed”; TaskCompletionCriterion condition: “As a task condition, Task completion criterion is distinguished by the fact that it specifies testable conditions, thresholds, and evidence required for a task to be complete; EvaluationRun applies it rather than the criterion evaluating a run outcome itself”. Either condition leaves the other unproven."
-      ja: 審査済み兄弟区別：親 TaskCondition：TaskDependency（semantic kind=specification、バックボーン TaskDependency-is_a-TaskCondition）；TaskCompletionCriterion（semantic kind=specification、バックボーン TaskCompletionCriterion-is_a-TaskCondition）。両端条件：TaskDependency の条件：「タスク依存関係はタスク条件のうち、次の事実を定義条件とする対象です：それは、あるタスク、手順、作業項目が、別の結果、条件、資源、承認を待たなければ進めないことを示します」；TaskCompletionCriterion の条件：「タスク条件に属するタスク完了基準は、次の事実を種差とします：それはタスク完了に必要な検査可能条件、閾値、証拠要件を規定し、基準自体ではなく EvaluationRun が実行結果へ適用します」。一方の成立は他方を証明しません。
-    source_claims:
-      - claim-task-dependency-016
-parent_relation:
-  id: TaskDependency-is_a-TaskCondition
-  predicate: is_a
-  direction: target-to-source
-  relation_kind: hierarchy
-  labels:
-    zh: 是一种
-    en: is a
-    ja: の一種である
-  definitions:
-    zh: TaskDependency —is_a→ TaskCondition 表示依赖是一种可判定任务条件，其种差是引用具名前置工作、产物或批准以及明确的满足谓词。
-    en: TaskDependency —is_a→ TaskCondition classifies a dependency as an evaluable task condition whose differentia is a named predecessor work item, artifact, or approval together with an explicit satisfaction predicate.
-    ja: TaskDependency —is_a→ TaskCondition は、具名の前置作業・成果物・承認と明示的な充足述語を種差とする評価可能なタスク条件として依存を分類します。
-  cardinality: null
-  cardinality_not_applicable_reason:
-    zh: 分类继承不使用实例关系基数。
-    en: Taxonomic inheritance does not use instance-relation cardinality.
-    ja: 分類継承にはインスタンス関係の基数を用いません。
-  inverse_reading:
-    predicate: part_of
+
+  - id: TaskDependency-example-counterexample-confusable
     labels:
-      zh: 反向：是一种
-      en: has subtype
-      ja: 逆方向：の一種である
-  conditions: []
-  temporal_scope: timeless
-  boundary_context: null
-  constraints: []
-  examples:
-    - id: TaskDependency-is_a-TaskCondition-example-positive-manual-001
-      kind: positive
-      labels:
-        zh: 是一种正例
-        en: Positive example for is a
-        ja: の一種であるの正例
-      scenario_id: null
-      descriptions:
-        zh: dependency-review-pass 指明 review-step、ApprovalRecord 产物以及 status=approved 的满足谓词。
-        en: dependency-review-pass names review-step, an ApprovalRecord artifact, and the satisfaction predicate status=approved.
-        ja: dependency-review-pass は review-step、ApprovalRecord 成果物、status=approved の充足述語を指定します。
-      field_values: {}
-      related_node_ids:
-        - TaskDependency
-        - TaskCondition
-      related_relation_ids:
-        - TaskDependency-is_a-TaskCondition
-      expected_result:
-        zh: 该对象通过 is_a 同时属于 TaskDependency 与 TaskCondition。
-        en: Through is_a, the object is both TaskDependency and TaskCondition.
-        ja: is_a により、この対象は TaskDependency かつ TaskCondition です。
-      why_valid_or_invalid:
-        zh: 具名前置项和可判定满足条件共同形成依赖的完整种差。
-        en: A named predecessor and evaluable satisfaction condition jointly form the dependency differentia.
-        ja: 具名の前置項目と評価可能な充足条件が依存の完全な種差を成すためです。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-task-dependency-017
-    - id: TaskDependency-is_a-TaskCondition-example-boundary-manual-001
-      kind: boundary
-      labels:
-        zh: 是一种边界例
-        en: Boundary case for is a
-        ja: の一種であるの境界例
-      scenario_id: null
-      descriptions:
-        zh: 两个步骤仅在 UI 列表中相邻，没有边或前置标识。
-        en: Two steps are merely adjacent in a UI list and have no edge or predecessor identifier.
-        ja: 二つのステップは UI リストで隣接するだけで、辺や前置識別子がありません。
-      field_values: {}
-      related_node_ids:
-        - TaskDependency
-        - TaskCondition
-      related_relation_ids:
-        - TaskDependency-is_a-TaskCondition
-      expected_result:
-        zh: 不得把展示邻接项分类为 TaskDependency。
-        en: Do not classify display adjacency as TaskDependency.
-        ja: 表示上の隣接を TaskDependency に分類しません。
-      why_valid_or_invalid:
-        zh: 缺少明确前置对象与满足谓词，无法由控制逻辑验证。
-        en: There is no explicit predecessor or satisfaction predicate for control logic to evaluate.
-        ja: 制御ロジックが評価できる明示的前置対象と充足述語を欠くためです。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-task-dependency-018
-  source_claims:
-    - claim-task-dependency-019
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: accepted
-  endpoint_order: child-to-parent
-relations:
-  - id: TaskDependency-has_predecessor-Task
-    predicate: has_predecessor
-    direction: source-to-target
-    relation_kind: information
-    labels:
-      zh: 具有前置任务
-      en: has predecessor
-      ja: 先行タスクを持つ
-    definitions:
-      zh: TaskDependency —has_predecessor→ Task 指向提供满足证据的唯一前置任务；前置 Task 可服务多个依赖，但同一 TaskDependency 不得指向多个前置 Task。
-      en: TaskDependency —has_predecessor→ Task identifies the single predecessor that supplies satisfaction evidence. One Task may precede many dependencies, but one TaskDependency may not name multiple predecessor Tasks.
-      ja: TaskDependency —has_predecessor→ Task は充足証拠を供給する唯一の先行 Task を示します。一つの Task は複数依存の先行になれますが、一つの TaskDependency が複数先行 Task を指すことはできません。
-    cardinality:
-      source:
-        min: 0
-        max: null
-      target:
-        min: 1
-        max: 1
-    cardinality_not_applicable_reason: null
-    inverse_reading:
-      predicate: is_predecessor_for
-      labels:
-        zh: 作为依赖的前置任务
-        en: is predecessor for
-        ja: 依存の先行である
-    conditions: []
-    temporal_scope: valid-time
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: TaskDependency-has_predecessor-Task-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: 前置任务端点正例
-          en: Positive predecessor endpoint
-          ja: 先行端点の正例
-        scenario_id: null
-        descriptions:
-          zh: dependency-schema-review-after-draft 通过该边指向 task-schema-draft；schema-v3 的批准摘要由后者结果提供。
-          en: dependency-schema-review-after-draft points to task-schema-draft, whose result supplies the approved schema-v3 digest.
-          ja: dependency-schema-review-after-draft は task-schema-draft を指し、その結果が承認済み schema-v3 要約を供給します。
-        field_values:
-          predecessor_task_id: task-schema-draft
-        related_node_ids:
-          - TaskDependency
-          - Task
-        related_relation_ids:
-          - TaskDependency-has_predecessor-Task
-        expected_result:
-          zh: 建立唯一 predecessor 端点，并用依赖证据合同判断其结果。
-          en: Establish the single predecessor endpoint and evaluate its result through the dependency evidence contract.
-          ja: 唯一の先行端点を確立し、依存証拠契約でその結果を評価します。
-        why_valid_or_invalid:
-          zh: 端点明确指出谁提供前置证据，不依赖列表位置或相似名称。
-          en: The endpoint explicitly states who supplies prerequisite evidence without relying on list position or a similar name.
-          ja: 端点が前提証拠の供給元を明示し、配列位置や類似名称に依存しないためです。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-task-dependency-020
-          - claim-task-dependency-021
-      - id: TaskDependency-has_predecessor-Task-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: 前置任务端点边界例
-          en: Boundary predecessor endpoint
-          ja: 先行端点の境界例
-        scenario_id: null
-        descriptions:
-          zh: task-schema-draft 只是数组中位于 task-schema-review 前面，未被任何 TaskDependency 指向。
-          en: task-schema-draft merely appears before task-schema-review in an array and is not targeted by any TaskDependency.
-          ja: task-schema-draft は配列で task-schema-review より前にあるだけで、TaskDependency から指されていません。
-        field_values:
-          array_positions:
-            - 1
-            - 2
-          dependency_edge_present: false
-        related_node_ids:
-          - TaskDependency
-          - Task
-        related_relation_ids:
-          - TaskDependency-has_predecessor-Task
-        expected_result:
-          zh: 不得从数组邻接推断 has_predecessor。
-          en: Do not infer has_predecessor from array adjacency.
-          ja: 配列隣接から has_predecessor を推定しません。
-        why_valid_or_invalid:
-          zh: 展示顺序没有声明结果证据或满足谓词，因而不能建立前置端点。
-          en: Presentation order declares neither result evidence nor a satisfaction predicate and cannot establish the predecessor endpoint.
-          ja: 表示順は結果証拠も充足述語も宣言せず、先行端点を確立できないためです。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-task-dependency-020
-          - claim-task-dependency-021
+      zh: TaskDependency counterexample
+      en: TaskDependency counterexample
+      ja: TaskDependency counterexample
+    descriptions:
+      zh: 自然语言计划列表无 Python/code 可执行步骤不能作为 TaskWeaver 式 TaskDependency。
+      en: Natural-language plan list without Python/code executable steps cannot serve as TaskWeaver-style TaskDependency.
+      ja: Python/code なし自然言語計画は TaskWeaver 式 TaskDependency にならない。
+    field_values: {dependency_id: absent, predecessor_step_ref: absent, graph_edge: approve_to_package}
+
+    related_node_ids:
+      - TaskDependency
+      - TaskPlan
+      - TaskStep
+      - TaskCondition
+      - Task
+    related_relation_ids: []
     source_claims:
-      - claim-task-dependency-020
-      - claim-task-dependency-021
-    distinct_fact_rationale:
-      zh: 该边专门固定依赖条件的证据提供者，不能由 dependent 端点或直接 DAG 投影替代。
-      en: This edge fixes the evidence-supplying endpoint of a dependency and is not replaceable by its dependent endpoint or direct DAG projection.
-      ja: この辺は依存の証拠供給端点を固定し、依存側端点や直接 DAG 投影では代替できません。
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:Task
-  - id: TaskDependency-has_dependent-Task
-    predicate: has_dependent
-    direction: source-to-target
-    relation_kind: information
+      - claim-task-dependency-014
+
+  - id: TaskDependency-example-instance-concrete
     labels:
-      zh: 具有依赖任务
-      en: has dependent
-      ja: 依存タスクを持つ
-    definitions:
-      zh: TaskDependency —has_dependent→ Task 指向其就绪性受该条件控制的唯一依赖任务；方向不能反转为前置任务依赖后续任务。
-      en: TaskDependency —has_dependent→ Task identifies the single Task whose readiness is governed by this condition; reversing the direction would incorrectly make the predecessor depend on downstream work.
-      ja: TaskDependency —has_dependent→ Task は、この条件で実行準備を統制される唯一の Task を示します。方向を反転すると先行 Task が下流作業へ依存する誤りになります。
-    cardinality:
-      source:
-        min: 0
-        max: null
-      target:
-        min: 1
-        max: 1
-    cardinality_not_applicable_reason: null
-    inverse_reading:
-      predicate: is_dependent_of_condition
-      labels:
-        zh: 受依赖条件控制
-        en: is dependent of condition
-        ja: 依存条件に統制される
-    conditions: []
-    temporal_scope: valid-time
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: TaskDependency-has_dependent-Task-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: 依赖任务端点正例
-          en: Positive dependent endpoint
-          ja: 依存端点の正例
-        scenario_id: null
-        descriptions:
-          zh: dependency-schema-review-after-draft 通过该边指向 task-schema-review，表示其开始由该依赖的满足谓词控制。
-          en: dependency-schema-review-after-draft points to task-schema-review, whose start is governed by the dependency's satisfaction predicate.
-          ja: dependency-schema-review-after-draft は task-schema-review を指し、その開始は依存の充足述語で統制されます。
-        field_values:
-          dependent_task_id: task-schema-review
-        related_node_ids:
-          - TaskDependency
-          - Task
-        related_relation_ids:
-          - TaskDependency-has_dependent-Task
-        expected_result:
-          zh: 将 task-schema-review 固定为唯一 dependent 端点。
-          en: Fix task-schema-review as the single dependent endpoint.
-          ja: task-schema-review を唯一の依存端点として固定します。
-        why_valid_or_invalid:
-          zh: 该任务的就绪性明确受此条件控制，且与前置端点保持不同身份。
-          en: This Task's readiness is explicitly governed by the condition and remains distinct from the predecessor endpoint.
-          ja: この Task の実行準備が条件で明示統制され、先行端点と異なる同一性を保つためです。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-task-dependency-020
-          - claim-task-dependency-021
-      - id: TaskDependency-has_dependent-Task-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: 依赖任务端点边界例
-          en: Boundary dependent endpoint
-          ja: 依存端点の境界例
-        scenario_id: null
-        descriptions:
-          zh: dependency-schema-review-after-draft 同时指向 task-schema-review 和 task-deploy，试图在一个条件中表示两个 dependent。
-          en: dependency-schema-review-after-draft points to both task-schema-review and task-deploy, attempting to encode two dependents in one condition.
-          ja: dependency-schema-review-after-draft が task-schema-review と task-deploy の双方を指し、一条件で二つの依存側を表そうとしています。
-        field_values:
-          dependent_task_ids:
-            - task-schema-review
-            - task-deploy
-        related_node_ids:
-          - TaskDependency
-          - Task
-        related_relation_ids:
-          - TaskDependency-has_dependent-Task
-        expected_result:
-          zh: 拒绝该基数；应为两个 dependent 分别建立 TaskDependency。
-          en: Reject the cardinality and create a separate TaskDependency for each dependent.
-          ja: この基数を拒否し、依存 Task ごとに別の TaskDependency を作成します。
-        why_valid_or_invalid:
-          zh: 两个下游任务可能拥有不同满足谓词和失败后果，合并会丢失条件身份。
-          en: The two downstream Tasks may have different satisfaction predicates and failure effects, so merging them loses condition identity.
-          ja: 二つの下流 Task は異なる充足述語や失敗効果を持ち得るため、統合すると条件同一性を失います。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-task-dependency-020
-          - claim-task-dependency-021
+      zh: TaskDependency instance
+      en: TaskDependency instance
+      ja: TaskDependency instance
+    descriptions:
+      zh: Prefect 实例：@task(retries=3) def extract(): ... → flow.run() → 映射 TaskDependency policy-prefect@1。
+      en: Prefect instance: @task(retries=3) extract → flow.run() → maps to TaskDependency policy-prefect@1.
+      ja: Prefect 实例 @task(retries=3)+flow.run が TaskDependency policy-prefect@1 に写像。
+    field_values: {condition_specification_id: task-condition-schema-review-after-draft, expression_language: cel, predicate_expression: "predecessor.outcome == 'succeeded' && artifact('schema-v3').approved == true", evaluation_phase: readiness, unsatisfied_effect: block_start, version: 1, dependency_kind: artifact_available, satisfaction_predicate: "predecessor.outcome == 'succeeded' && artifact('schema-v3').approved == true"}
+
+    related_node_ids:
+      - TaskDependency
+      - TaskCondition
+      - Task
+    related_relation_ids: []
     source_claims:
-      - claim-task-dependency-020
-      - claim-task-dependency-021
-    distinct_fact_rationale:
-      zh: 该边固定谁被条件治理，与谁提供证据的 predecessor 边承担不同问题。
-      en: This edge fixes whose readiness the condition governs, a different question from which predecessor supplies evidence.
-      ja: この辺は誰の実行準備を条件が統制するかを固定し、誰が証拠を供給するかという先行辺とは別の問いを担います。
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:Task
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-orchestration-tool-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照权威来源逐项完成人工语义核验；概念定义、层级、关系、结构与来源主张成立。
-    en: Manual semantic verification against authoritative sources completed; concept definitions, hierarchy, relations, structure, and source claims hold.
-    ja: 権威ソースに照らし手動意味検証を完了し、概念定義・階層・関係・構造・出典主張が成立。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+      - claim-task-dependency-014
+
+sources:
+  - id: a2a-protocol-specification
+    title: Agent2Agent (A2A) Protocol Specification
+    url: https://a2a-protocol.org/latest/specification/
+    source_type: official-spec
+    relevance: Defines A2A Task as a protocol work unit distinct from internal planning objects.
+  - id: langgraph-graph-api
+    title: LangGraph Graph API
+    url: https://langchain-ai.github.io/langgraph/
+    source_type: official-doc
+    relevance: Documents stateful graph planning, workflow nodes, and composition.
+  - id: prov-o
+    title: W3C PROV-O
+    url: https://www.w3.org/TR/prov-o/
+    source_type: standard
+    relevance: Separates Plan-like specifications from Activities and execution evidence.
 source_claims:
-  - id: claim-task-dependency-001
-    source: eng-fw-crewai-tasks
-    supports: CrewAI task context names upstream Tasks whose outputs feed and delay a downstream Task; Moonweave reifies that prerequisite with explicit predecessor and dependent endpoints plus a satisfaction predicate.
-    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-dependency-002
-    source: eng-fw-maf-workflows
-    supports: Agent Framework represents downstream flow with explicit directed edges between typed executors; Moonweave projects each reified TaskDependency into a traversable dependent-to-predecessor DAG edge.
-    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
   - id: claim-task-dependency-003
-    source: eng-fw-crewai-tasks
-    supports: CrewAI context makes a downstream task wait for an upstream task to complete; Moonweave names the corresponding dependency finish_to_start.
-    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    source: prov-o
+    supports: TaskDependency field or status vocabulary is a Moonweave audit projection informed by W3C PROV-O.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    evidence_kind: official
+    confidence: high
   - id: claim-task-dependency-004
-    source: eng-fw-crewai-tasks
-    supports: CrewAI passes prior task outputs through task context; Moonweave represents output availability as an explicit satisfaction mode.
-    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
+    source: a2a-protocol-specification
+    supports: Moonweave TaskDependency constraints, examples, or local audit fields for claim claim-task-dependency-004 are design projections informed by Agent2Agent (A2A) Protocol Specification.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-dependency-005
-    source: eng-fw-crewai-tasks
-    supports: CrewAI tasks can require human input and guardrail acceptance; Moonweave records approval as a distinct dependency satisfaction mode.
-    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
+    source: langgraph-graph-api
+    supports: Moonweave TaskDependency constraints, examples, or local audit fields for claim claim-task-dependency-005 are design projections informed by LangGraph Graph API.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-dependency-006
-    source: eng-fw-crewai-tasks
-    supports: CrewAI task context, expected outputs, guardrails, and human input expose distinct prerequisite meanings; Moonweave records the selected dependency kind.
-    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
+    source: prov-o
+    supports: Moonweave TaskDependency constraints, examples, or local audit fields for claim claim-task-dependency-006 are design projections informed by W3C PROV-O.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-dependency-007
-    source: eng-fw-crewai-tasks
-    supports: CrewAI context waits for an upstream task output and guardrails validate that output; Moonweave combines those requirements in an explicit satisfaction predicate.
-    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
+    source: a2a-protocol-specification
+    supports: Moonweave TaskDependency constraints, examples, or local audit fields for claim claim-task-dependency-007 are design projections informed by Agent2Agent (A2A) Protocol Specification.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-dependency-008
-    source: eng-fw-crewai-tasks
-    supports: CrewAI task context passes upstream outputs to downstream tasks; Moonweave records exactly which upstream evidence is required before readiness.
-    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
+    source: langgraph-graph-api
+    supports: Moonweave TaskDependency constraints, examples, or local audit fields for claim claim-task-dependency-008 are design projections informed by LangGraph Graph API.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-dependency-009
-    source: eng-fw-maf-workflows
-    supports: Agent Framework uses explicit edges and conditional routing to determine downstream activation; Moonweave records whether a planning dependency is mandatory.
-    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
+    source: prov-o
+    supports: Moonweave TaskDependency constraints, examples, or local audit fields for claim claim-task-dependency-009 are design projections informed by W3C PROV-O.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-dependency-010
-    source: eng-fw-crewai-tasks
-    supports: CrewAI context names other tasks whose outputs feed the current task; Moonweave therefore requires distinct predecessor and dependent endpoints.
-    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
+    source: a2a-protocol-specification
+    supports: Moonweave TaskDependency constraints, examples, or local audit fields for claim claim-task-dependency-010 are design projections informed by Agent2Agent (A2A) Protocol Specification.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-dependency-011
-    source: eng-fw-maf-workflows
-    supports: Agent Framework models workflow flow with explicit directed edges, conditional routing, and separate loop-capable control; Moonweave restricts prerequisite projection to an acyclic planning graph.
-    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
+    source: langgraph-graph-api
+    supports: Moonweave TaskDependency constraints, examples, or local audit fields for claim claim-task-dependency-011 are design projections informed by LangGraph Graph API.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-dependency-012
-    source: eng-fw-crewai-tasks
-    supports: CrewAI task context explicitly names upstream tasks whose outputs are required; Moonweave records one canonical predecessor endpoint per dependency condition.
-    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
+    source: prov-o
+    supports: Moonweave TaskDependency constraints, examples, or local audit fields for claim claim-task-dependency-012 are design projections informed by W3C PROV-O.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-dependency-013
-    source: eng-fw-crewai-tasks
-    supports: CrewAI attaches context requirements to one downstream task; Moonweave records that governed task as the dependency's dependent endpoint.
-    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
+    source: a2a-protocol-specification
+    supports: Moonweave TaskDependency constraints, examples, or local audit fields for claim claim-task-dependency-013 are design projections informed by Agent2Agent (A2A) Protocol Specification.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-dependency-014
-    source: eng-fw-maf-workflows
-    supports: Agent Framework workflow edges explicitly connect an executor's output to downstream execution; this dependency specifies the prerequisite and required output behind that routing edge.
-    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
+    source: langgraph-graph-api
+    supports: Moonweave TaskDependency constraints, examples, or local audit fields for claim claim-task-dependency-014 are design projections informed by LangGraph Graph API.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-dependency-015
-    source: eng-fw-maf-workflows
-    supports: Agent Framework represents workflow flow with explicit edges; adjacency without an edge does not establish a dependency.
-    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
+    source: prov-o
+    supports: Moonweave TaskDependency constraints, examples, or local audit fields for claim claim-task-dependency-015 are design projections informed by W3C PROV-O.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-dependency-016
-    source: eng-fw-crewai-docs
-    supports: CrewAI processes can order tasks by dependency while task expected outputs and guardrails determine successful completion. Moonweave keeps TaskDependency as a prerequisite condition and TaskCompletionCriterion as an outcome-acceptance condition.
-    locator: Documentation > Agents, tasks, crews, flows, and processes
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-dependency-017
-    source: eng-fw-maf-workflows
-    supports: Explicit workflow edges and output routing support evaluable predecessor conditions.
-    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-dependency-018
-    source: eng-fw-maf-workflows
-    supports: Agent Framework requires explicit graph edges for workflow flow; list adjacency supplies no such assertion.
-    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-dependency-019
-    source: eng-fw-maf-workflows
-    supports: Agent Framework uses explicit edges to connect executor outputs to downstream work; Moonweave represents the evaluable prerequisite behind such flow as TaskDependency.
-    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-dependency-020
-    source: eng-fw-crewai-tasks
-    supports: CrewAI task context explicitly identifies upstream task outputs required by a downstream task; Moonweave records that dependency without deriving it from display order.
-    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-dependency-021
-    source: eng-fw-maf-workflows
-    supports: Agent Framework sends typed outputs along explicit directed edges to downstream executors; Moonweave separates the prerequisite specification from runtime dispatch.
-    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high

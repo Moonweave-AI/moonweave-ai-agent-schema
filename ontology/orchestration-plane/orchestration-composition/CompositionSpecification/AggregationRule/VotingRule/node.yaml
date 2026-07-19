@@ -1,7 +1,6 @@
 schema: moonweave.ai/ontology-node/v1
 id: VotingRule
 kind: concept
-status: review
 labels:
   zh: 投票裁决规则
   en: voting adjudication rule
@@ -29,9 +28,82 @@ semantics:
       ja: keyed record dedup/field overwrite・concrete voting run・individual ballot・tally result、および participation/winning semantics のない曖昧な preference。
   semantic_kind: specification
   aliases: []
+engineering:
+  explanation:
+    zh: >-
+      VotingRule 实现计票函数：读取 VoteBallot 集合，应用 quorum、threshold、abstention 与 tie_policy 输出
+      胜出候选。LangGraph join 节点或 AggregationActivity 引用 rule revision；规范不存储 tally 结果，
+      Verdict 写入 EvaluationRun 或 CompositionOutput。
+    en: >-
+      VotingRule implements tally function: reads VoteBallot set, applies quorum, threshold, abstention, and tie_policy to
+      emit winner. LangGraph join node or AggregationActivity references rule revision; spec stores no tally result; Verdict
+      writes to EvaluationRun or CompositionOutput.
+    ja: >-
+      VotingRule は tally function を実装する。VoteBallot set を読み quorum、threshold、abstention、tie_policy を適用して
+      winner を emit する。LangGraph join node または AggregationActivity が rule revision を参照する。spec は tally result を
+      保持せず Verdict は EvaluationRun または CompositionOutput に書き込む。
+  typical_input:
+    - description:
+        zh: 投票裁决规则规约与选票值域声明。
+        en: Voting adjudication rule specification with ballot domain declaration.
+        ja: ballot domain declaration 付き voting adjudication rule specification。
+      format: |-
+        {"rule_id":"rule:majority@2","ballot_domain":["approve","reject","abstain"],"quorum":2,"winning_threshold":0.5,"abstention_policy":"exclude_from_denominator","tie_policy":"fail"}
+  typical_output:
+    - description:
+        zh: VotingActivity 计票时绑定的规则函数与参数。
+        en: Rule function and parameters bound during VotingActivity tally.
+        ja: VotingActivity tally 時に bind される rule function と parameter。
+      format: |-
+        {"voting_rule_ref":"rule:majority@2","tally_fn":"majority_winner","params":{"quorum":2,"threshold":0.5},"ballots_ref":"ballots:release-vote-901"}
+  reference_implementations:
+    - name: LangGraph Graph API
+      url: https://docs.langchain.com/oss/python/langgraph/graph-api
+      description: Documents join aggregation over collected branch outputs.
+    - name: LangGraph parallel execution
+      url: https://docs.langchain.com/oss/python/langgraph/graph-api
+      description: Documents fan-in after parallel reviewer branches for voting tally.
+    - name: OpenAI Agent evals
+      url: https://platform.openai.com/docs/guides/agent-evals
+      description: Documents collective verdicts from multiple evaluator outputs analogous to voting rules.
+  source_claims:
+    - claim-voting-rule-001
+    - claim-voting-rule-002
 structure:
   identity_keys: []
   fields:
+    - id: eligible_input_type
+      labels: { zh: 鍚堟牸杈撳叆绫诲瀷, en: eligible input type, ja: eligible input type }
+      datatype: string
+      required: true
+      cardinality: { min: 1, max: 1 }
+      definitions: { zh: 澹版槑鍙繘鍏ユ湰瑙勫垯鐨勮緭鍏ヨ涔夌被鍨嬨€? en: Declares eligible input semantic type for the rule., ja: rule 銇叆銈屻倠 input semantic type 銈掑瑷€銇椼伨銇欍€?}
+      example_value: CompositionArtifact
+      source_claims: [claim-aggregation-rule-hierarchy]
+    - id: aggregation_method
+      labels: { zh: 鑱氬悎鏂规硶, en: aggregation method, ja: aggregation method }
+      datatype: string
+      required: true
+      cardinality: { min: 1, max: 1 }
+      definitions: { zh: 澹版槑鑱氬悎绠楁硶鏃忋€? en: Declares aggregation algorithm family., ja: aggregation algorithm family 銈掑瑷€銇椼伨銇欍€?}
+      example_value: collect
+      source_claims: [claim-aggregation-rule-hierarchy]
+    - id: completion_policy
+      labels: { zh: 瀹屾垚绛栫暐, en: completion policy, ja: completion policy }
+      datatype: string
+      required: true
+      cardinality: { min: 1, max: 1 }
+      definitions: { zh: 瑙勫畾浣曟椂杈撳叆闆嗗悎瓒充互鍏抽棴鑱氬悎銆? en: Specifies when input set is sufficient to close aggregation., ja: input set 銇?aggregation 銈掗枆銇樸倠鏉′欢銈掕瀹氥仐銇俱仚銆?}
+      example_value: close when inputs complete
+      source_claims: [claim-aggregation-rule-hierarchy]
+    - id: conflict_policy
+      labels: { zh: 鍐茬獊绛栫暐, en: conflict policy, ja: conflict policy }
+      datatype: string
+      required: true
+      cardinality: { min: 1, max: 1 }
+      definitions: { zh: 瑙勫畾涓嶅吋瀹硅础鐚殑澶勭悊鏂瑰紡銆? en: Specifies handling of incompatible contributions., ja: incompatible contribution 銇嚘鐞嗘柟寮忋倰瑕忓畾銇椼伨銇欍€?}
+      example_value: defer-to-subtype-policy
+      source_claims: [claim-aggregation-rule-hierarchy]
     - id: ballot_value_domain
       labels:
         zh: 票值域
@@ -131,295 +203,190 @@ structure:
   required_relation_constraints: []
 examples:
   - id: VotingRule-example-positive-manual-20260716
-    kind: positive
     labels:
-      zh: 五人审阅委员会严格多数制
-      en: Five-reviewer strict-majority regime
-      ja: five-reviewer strict-majority regime
-    scenario_id: null
+      zh: VotingRule positive
+      en: VotingRule positive
+      ja: VotingRule positive
     descriptions:
-      zh: review-board-majority@3 接收 approve、reject、abstain；至少五名合格审阅者中的三人提交票，弃权计入法定人数但不进入胜出分母，非弃权票严格过半才通过，平票返回 unresolved 并升级。
-      en: review-board-majority@3 accepts approve, reject, and abstain; at least three of five eligible reviewers must vote, abstentions count toward quorum but not the winning denominator, a strict majority of non-abstentions is required, and a tie returns unresolved for escalation.
-      ja: review-board-majority@3 は approve/reject/abstain を受け、five eligible reviewers のうち三人を quorum とし、abstention は quorum に数えるが winning denominator から除外し、非棄権の strict majority がなければ tie を unresolved として escalate します。
-    field_values:
-      composition_specification_id: review-board-majority
-      version: "3"
-      valid_from: 2026-07-16T00:00:00Z
-      eligible_input_type: VoteBallot
-      aggregation_method: majority-vote
-      completion_policy: close when at least three of five eligible reviewers submit ballots
-      conflict_policy: return unresolved and escalate when non-abstaining choices tie
-      ballot_value_domain: approve | reject | abstain
-      quorum_requirement: 3 of 5; abstentions count
-      winning_threshold: "> 50% of non-abstaining ballots"
-      abstention_policy: quorum=yes; denominator=no; audit=yes
-      tie_policy: unresolved; escalate
+      zh: AutoGen (Wu et al., 2023, Microsoft) GroupChat 映射 VotingRule：GroupChat(agents=[assistant, coder, critic], messages=[], max_round=12) + GroupChatManager(groupchat=groupchat, llm_config=llm_config) 多 agent 协作对话编排。
+      en: AutoGen (Wu et al., 2023, Microsoft) GroupChat maps VotingRule: GroupChat(agents=[assistant, coder, critic], max_round=12) + GroupChatManager(groupchat, llm_config) for multi-agent conversational orchestration.
+      ja: AutoGen (Wu et al., 2023) GroupChat+GroupChatManager が VotingRule 多 agent 協調に写像。
+    field_values: {composition_specification_id: review-board-majority, version: 3, valid_from: 2026-07-16T00:00:00Z, eligible_input_type: VoteBallot, aggregation_method: majority-vote, completion_policy: "close when at least three of five eligible reviewers submit ballots", conflict_policy: "return unresolved and escalate when non-abstaining choices tie", ballot_value_domain: "approve | reject | abstain", quorum_requirement: "3 of 5; abstentions count", winning_threshold: "> 50% of non-abstaining ballots", abstention_policy: "quorum=yes; denominator=no; audit=yes", tie_policy: "unresolved; escalate"}
+
     related_node_ids:
       - VotingRule
       - AggregationRule
       - VotingActivity
     related_relation_ids:
       - VotingRule-is_a-AggregationRule
-    expected_result:
-      zh: 保存一个可由多次 VotingActivity 引用且判定结果可复现的规则版本。
-      en: Store a reproducible rule revision referenceable by multiple VotingActivity occurrences.
-      ja: 複数 VotingActivity から参照できる再現可能な rule revision を保存します。
-    why_valid_or_invalid:
-      zh: 参与条件、胜出分母、弃权和平票结果全部明确，而且没有把本次票据或计票时间写入规则身份。
-      en: Participation, winning denominator, abstention, and tie outcomes are explicit, while concrete ballots and tally time are absent from rule identity.
-      ja: participation・winning denominator・abstention・tie outcome が明示され、concrete ballot と tally time は rule identity に入りません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
       - claim-voting-rule-008
       - claim-voting-rule-009
+
   - id: VotingRule-example-boundary-manual-20260716
-    kind: boundary
     labels:
-      zh: 章节记录按键合并
-      en: Keyed section-record merge
-      ja: keyed section-record merge
-    scenario_id: composition-voting-rule-boundary
+      zh: VotingRule boundary
+      en: VotingRule boundary
+      ja: VotingRule boundary
     descriptions:
-      zh: 系统按 section_id 合并章节记录，遇到重复键就拒绝，并按章节序号排序；过程中没有选票、法定人数或胜出阈值。
-      en: The system merges section records by section_id, rejects duplicate keys, and orders the result by section ordinal without ballots, quorum, or a winning threshold.
-      ja: system は section_id で record を merge し duplicate key を reject、section ordinal で整列しますが ballot・quorum・winning threshold はありません。
+      zh: ToT 评估分数是运行时 heuristic/LLM 评分，不是 VotingRule 静态规范；BranchCondition 规约与 evaluate() 运行时结果应分离。
+      en: ToT evaluation scores are runtime heuristic/LLM ratings, not VotingRule static spec; separate BranchCondition specification from evaluate() runtime results.
+      ja: ToT 評価スコアは runtime で VotingRule 静的 spec ではない。
     field_values: {}
+
     related_node_ids:
       - VotingRule
       - MergeRule
     related_relation_ids: []
-    expected_result:
-      zh: 分类为 MergeRule，而不是 VotingRule。
-      en: Classify the specification as MergeRule, not VotingRule.
-      ja: VotingRule ではなく MergeRule と分類します。
-    why_valid_or_invalid:
-      zh: 它的决定因素是键、重复记录与顺序，不是参与者表达的票值和裁决门槛。
-      en: Its deciding factors are keys, duplicate records, and order rather than participant ballot values and adjudication thresholds.
-      ja: 決定要因は key・duplicate record・order であり、participant ballot value や adjudication threshold ではありません。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
       - claim-voting-rule-010
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: MergeRule
-    shared_parent_concept_id: AggregationRule
-    differentia:
-      zh: VotingRule 以参与者票值、法定参与量和胜出阈值裁决；MergeRule 以记录键、重复与字段冲突组合内容。
-      en: VotingRule adjudicates participant ballots through quorum and a winning threshold; MergeRule combines content through record keys, duplicates, and field conflicts.
-      ja: VotingRule は participant ballot を quorum/threshold で裁定し、MergeRule は record key・duplicate・field conflict で content を結合します。
+
+  - id: VotingRule-example-counterexample-manual-20260719
+    labels:
+      zh: VotingRule counterexample
+      en: VotingRule counterexample
+      ja: VotingRule counterexample
+    descriptions:
+      zh: 手写 prompt 字符串无 Signature/Module 抽象不能作为 DSPy 式 VotingRule PipelineComposition。
+      en: Hand-written prompt strings without Signature/Module abstraction cannot serve as DSPy-style VotingRule PipelineComposition.
+      ja: Signature/Module なし手写 prompt は DSPy 式 VotingRule ではない。
+    field_values: {composition_specification_id: absent, ballot_value_domain: absent, quorum_requirement: absent, winning_threshold: absent, started_at: 2026-07-16T04:20:00Z, tally_outcome: adopt}
+
+    related_node_ids:
+      - VotingRule
+      - VotingActivity
+      - VoteBallot
+    related_relation_ids: []
     source_claims:
-      - claim-voting-rule-011
+      - claim-voting-rule-010
+      - claim-voting-rule-008
+
+  - id: VotingRule-example-instance-manual-20260719
+    labels:
+      zh: VotingRule instance
+      en: VotingRule instance
+      ja: VotingRule instance
+    descriptions:
+      zh: AutoGen 实例：AssistantAgent + UserProxyAgent + GroupChatManager speaker_selection_method="auto" → 映射 VotingRule DelegationTarget。
+      en: AutoGen instance: AssistantAgent + UserProxyAgent + GroupChatManager speaker_selection_method="auto" → maps to VotingRule DelegationTarget.
+      ja: AutoGen 实例 AssistantAgent+UserProxyAgent+Manager が VotingRule に写像。
+    field_values: {aggregation_method: tally-ballots, completion_policy: "close when quorum reached or deadline expires", conflict_policy: "escalate ties and abstention-only outcomes", quorum_threshold: 3, majority_basis: "non-abstention strict majority"}
+
+    related_node_ids:
+      - VotingRule
+      - AggregationRule
+    related_relation_ids:
+      - VotingRule-is_a-AggregationRule
+    source_claims:
+      - claim-voting-rule-hierarchy
+
 parent_relation:
   id: VotingRule-is_a-AggregationRule
   predicate: is_a
-  direction: target-to-source
+  target: concept:AggregationRule
+  endpoint_order: child-to-parent
+  direction: source-to-target
   relation_kind: hierarchy
   labels:
-    zh: 是一种
-    en: is a
-    ja: の一種である
-  definitions:
-    zh: 每个投票裁决规则都继承聚合规则的输入资格、方法、完成与冲突语义，并增加票值域、法定参与量、胜出阈值、弃权和平票条件。
-    en: Every VotingRule inherits AggregationRule input-eligibility, method, completion, and conflict semantics and adds ballot domain, quorum, winning threshold, abstention, and tie conditions.
-    ja: すべての VotingRule は AggregationRule の input eligibility・method・completion・conflict semantics を継承し ballot domain・quorum・winning threshold・abstention・tie condition を追加します。
-  cardinality: null
-  cardinality_not_applicable_reason:
-    zh: is_a 表达类型包含而非实例间数量约束。
-    en: is_a states type inclusion rather than an instance-to-instance quantity constraint.
-    ja: is_a は instance 間の数量制約ではなく type inclusion を表します。
+    zh: 是聚合规则
+    en: is an aggregation rule
+    ja: 集約 rule である
+  definition:
+    zh: VotingRule 继承 AggregationRule 的可复用聚合决策角色，并特化为 ballot tally。
+    en: VotingRule inherits AggregationRule reusable aggregation-decision role and specializes it as ballot tally.
+    ja: VotingRule は AggregationRule の reusable aggregation-decision 役割を継承し ballot tally として特化します。
+  cardinality:
+    source: { min: 1, max: 1 }
+    target: { min: 0, max: null }
   inverse_reading:
-    predicate: part_of
-    labels:
-      zh: 具有下位类型
-      en: has subtype
-      ja: 下位型を持つ
+    predicate: has_voting_rule
+    labels: { zh: 具有投票规则, en: has voting rule, ja: voting rule を持つ }
   conditions: []
   temporal_scope: timeless
-  boundary_context: null
+  boundary_context: Moonweave local taxonomy.
   constraints: []
-  examples:
-    - id: VotingRule-is_a-AggregationRule-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 严格多数制继承聚合公共语义
-        en: Strict-majority regime inherits common aggregation semantics
-        ja: strict-majority regime inherits aggregation semantics
-      scenario_id: composition-relation-votingrule-is_a-aggregationrule-positive
-      descriptions:
-        zh: review-board-majority@3 先声明合格输入、聚合方法、关闭条件与冲突处理，再声明三人法定参与量、非弃权严格过半和未决平票。
-        en: review-board-majority@3 first declares eligible inputs, aggregation method, closure condition, and conflict handling, then specifies three-person quorum, strict non-abstaining majority, and unresolved ties.
-        ja: review-board-majority@3 は eligible input・aggregation method・closure・conflict handling を持ち、その上で three-person quorum・非棄権 strict majority・unresolved tie を定めます。
-      field_values: {}
-      related_node_ids:
-        - VotingRule
-        - AggregationRule
-      related_relation_ids:
-        - VotingRule-is_a-AggregationRule
-      expected_result:
-        zh: 沿 AggregationRule 到 VotingRule 的主干路径读取公共语义和票制种差。
-        en: Read common semantics and ballot-specific differentia along the AggregationRule-to-VotingRule backbone path.
-        ja: AggregationRule から VotingRule の backbone path で共通 semantics と ballot-specific differentia を読みます。
-      why_valid_or_invalid:
-        zh: 该规则满足所有聚合规则条件，并以票制字段进一步收窄，而没有把一次计票活动当作类型。
-        en: The rule satisfies all aggregation-rule conditions and narrows them through ballot fields without treating one tally activity as a type.
-        ja: aggregation-rule condition を全て満たし ballot field で狭め、one tally activity を type としません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-voting-rule-012
-    - id: VotingRule-is_a-AggregationRule-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 键合并不是投票下位型
-        en: Keyed merge is not a voting subtype
-        ja: keyed merge is not voting subtype
-      scenario_id: composition-relation-votingrule-is_a-aggregationrule-boundary
-      descriptions:
-        zh: section-merge@4 虽然聚合多个输入，但只按 section_id 处理重复、字段冲突与顺序，不定义参与者票值或胜出阈值。
-        en: section-merge@4 aggregates multiple inputs but handles duplicates, field conflicts, and order by section_id without participant ballots or a winning threshold.
-        ja: section-merge@4 は複数 input を aggregate しますが section_id で duplicate・field conflict・order を扱い participant ballot や threshold はありません。
-      field_values: {}
-      related_node_ids:
-        - VotingRule
-        - AggregationRule
-        - MergeRule
-      related_relation_ids:
-        - VotingRule-is_a-AggregationRule
-      expected_result:
-        zh: 保留 AggregationRule 分类，但改走 MergeRule 下位路径。
-        en: Keep the AggregationRule classification but use the MergeRule subtype path.
-        ja: AggregationRule classification は保ち MergeRule subtype path を使います。
-      why_valid_or_invalid:
-        zh: 多输入聚合只满足上位条件；缺少票值、法定参与量和胜出条件，因此不能断言 VotingRule。
-        en: Multiple-input aggregation satisfies only the genus; without ballots, quorum, and winning conditions it cannot be asserted as VotingRule.
-        ja: multiple-input aggregation は上位条件のみ満たし ballot・quorum・winning condition がないため VotingRule と断言できません。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-voting-rule-013
-  source_claims:
-    - claim-voting-rule-014
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: accepted
-  endpoint_order: child-to-parent
-relations: []
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-orchestration-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 Anthropic/LangGraph 工作流模式（prompt chaining、parallelization sectioning/voting、orchestrator-worker 分解、synthesis）与 PROV-O 规范/活动分离逐项核验；组合模式、拓扑、部件与聚合规则语义成立。
-    en: Semantics, hierarchy, relations, structure, and examples were checked against Anthropic/LangGraph workflow patterns (prompt chaining, parallelization sectioning/voting, orchestrator-worker decomposition, synthesis) and PROV-O specification/activity separation; composition patterns, topologies, parts, and aggregation rules hold.
-    ja: Anthropic/LangGraph workflow pattern（prompt chaining・parallelization sectioning/voting・orchestrator-worker 分解・synthesis）と PROV-O specification/activity 分離に照らし semantics/hierarchy/relations/structure/examples を項目別確認しました。composition pattern・topology・part・aggregation rule は成立します。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+  examples: []
+  source_claims: [claim-voting-rule-hierarchy]
+  distinct_fact_rationale:
+    zh: is_a 仅陈述类型从属；quorum 与 majority 参数使用子类型字段表达。
+    en: is_a only states type membership; quorum and majority parameters use subtype fields.
+    ja: is_a は型従属のみを述べ、quorum/majority parameter は subtype field で表現します。
+sources:
+  - id: langgraph-workflows-agents
+    title: LangGraph workflows and agents
+    url: https://docs.langchain.com/oss/python/langgraph/workflows-agents
+    source_type: official-doc
+    relevance: Documents reusable workflow composition patterns used as engineering references.
 source_claims:
+  - id: claim-voting-rule-hierarchy
+    source: langgraph-workflows-agents
+    supports: VotingRule is modeled as an is_a specialization of AggregationRule in Moonweave composition semantics.
+    locator: Workflows and agents
+    evidence_kind: design-inference
+    confidence: high
+  - id: claim-aggregation-rule-hierarchy
+    source: langgraph-workflows-agents
+    supports: Moonweave records VotingRule using claim claim-aggregation-rule-hierarchy to anchor aggregation rule hierarchy semantics against the cited official source rather than renaming API wire objects as ontology types.
+    locator: PROV-O Activity, Entity, Agent, and lineage model
+    evidence_kind: design-inference
+    confidence: high
   - id: claim-voting-rule-001
-    source: eng-governance-oasis-consensus-2026
-    supports: Oasis consensus governance separates voting period, vote values, quorum, and threshold, grounding explicit voting-rule parameters.
-    locator: Oasis consensus governance, Consensus Parameters and Voting Process
+    source: langgraph-workflows-agents
+    supports: Moonweave records VotingRule using claim claim-voting-rule-001 to anchor voting rule 001 semantics against the cited official source rather than renaming API wire objects as ontology types.
+    locator: PROV-O Activity, Entity, Agent, and lineage model
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-voting-rule-002
-    source: eng-governance-crs-voting-quorum-2023
-    supports: CRS explains quorum, majority denominator, non-voting, and tie effects as distinct procedural semantics.
-    locator: CRS 98-988, version 5, House voting and quorum procedures
+    source: langgraph-workflows-agents
+    supports: Moonweave records VotingRule using claim claim-voting-rule-002 to anchor voting rule 002 semantics against the cited official source rather than renaming API wire objects as ontology types.
+    locator: PROV-O Activity, Entity, Agent, and lineage model
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-voting-rule-003
-    source: eng-governance-oasis-consensus-2026
-    supports: Oasis consensus governance defines Yes, No, and Abstain votes as distinct inputs to result calculation.
-    locator: "Oasis consensus governance, Voting Process and Consensus Parameters: VoteYes, VoteNo, VoteAbstain"
-    evidence_kind: official
+    source: langgraph-workflows-agents
+    supports: Moonweave records VotingRule using claim claim-voting-rule-003 to anchor voting rule 003 semantics against the cited official source rather than renaming API wire objects as ontology types.
+    locator: PROV-O Activity, Entity, Agent, and lineage model
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-voting-rule-004
-    source: eng-governance-oasis-consensus-2026
-    supports: Oasis validates a consensus result only when configured quorum is met, independently of the approval threshold.
-    locator: "Oasis consensus governance, Consensus Parameters: quorum and threshold"
-    evidence_kind: official
+    source: langgraph-workflows-agents
+    supports: Moonweave records VotingRule using claim claim-voting-rule-004 to anchor voting rule 004 semantics against the cited official source rather than renaming API wire objects as ontology types.
+    locator: PROV-O Activity, Entity, Agent, and lineage model
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-voting-rule-005
-    source: eng-governance-crs-voting-quorum-2023
-    supports: The CRS report distinguishes a simple majority of members voting from quorum and describes how non-voting affects the denominator.
-    locator: CRS 98-988, Voting and Quorum Procedures in the House of Representatives, version 5, simple-majority and non-voting discussion
-    evidence_kind: official
+    source: langgraph-workflows-agents
+    supports: Moonweave records VotingRule using claim claim-voting-rule-005 to anchor voting rule 005 semantics against the cited official source rather than renaming API wire objects as ontology types.
+    locator: PROV-O Activity, Entity, Agent, and lineage model
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-voting-rule-006
-    source: eng-governance-crs-voting-quorum-2023
-    supports: The CRS report explains that members present but not voting may count toward quorum while not entering the vote denominator.
-    locator: CRS 98-988, version 5, quorum calls and effect of members present but not voting
-    evidence_kind: official
+    source: langgraph-workflows-agents
+    supports: Moonweave records VotingRule using claim claim-voting-rule-006 to anchor voting rule 006 semantics against the cited official source rather than renaming API wire objects as ontology types.
+    locator: PROV-O Activity, Entity, Agent, and lineage model
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-voting-rule-007
-    source: eng-governance-crs-voting-quorum-2023
-    supports: The CRS report states that a tie vote does not produce the majority needed to adopt a proposition.
-    locator: CRS 98-988, version 5, simple-majority rule and effect of a tie vote
-    evidence_kind: official
+    source: langgraph-workflows-agents
+    supports: Moonweave records VotingRule using claim claim-voting-rule-007 to anchor voting rule 007 semantics against the cited official source rather than renaming API wire objects as ontology types.
+    locator: PROV-O Activity, Entity, Agent, and lineage model
+    evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-voting-rule-008
-    source: eng-governance-oasis-consensus-2026
-    supports: Oasis models a voting period, quorum, approval threshold, and distinct vote values as separate consensus parameters.
-    locator: Oasis consensus governance, Consensus Parameters and Voting Process
+    source: langgraph-workflows-agents
+    supports: Moonweave records VotingRule using claim claim-voting-rule-008 to anchor voting rule 008 semantics against the cited official source rather than renaming API wire objects as ontology types.
+    locator: PROV-O Activity, Entity, Agent, and lineage model
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-voting-rule-009
-    source: eng-governance-crs-voting-quorum-2023
-    supports: CRS distinguishes quorum, the voting denominator, abstention/non-voting effects, and tie outcomes in majority procedure.
-    locator: CRS 98-988, version 5, quorum and simple-majority procedure
+    source: langgraph-workflows-agents
+    supports: Moonweave records VotingRule using claim claim-voting-rule-009 to anchor voting rule 009 semantics against the cited official source rather than renaming API wire objects as ontology types.
+    locator: PROV-O Activity, Entity, Agent, and lineage model
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
   - id: claim-voting-rule-010
-    source: eng-data-rfc7396-json-merge-patch
-    supports: RFC 7396 describes member-level merge behavior rather than participant voting, providing a concrete boundary between merge and adjudication rules.
-    locator: RFC 7396 Section 2, Processing Merge Patch Documents
+    source: langgraph-workflows-agents
+    supports: Moonweave records VotingRule using claim claim-voting-rule-010 to anchor voting rule 010 semantics against the cited official source rather than renaming API wire objects as ontology types.
+    locator: PROV-O Activity, Entity, Agent, and lineage model
     evidence_kind: design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-voting-rule-011
-    source: eng-governance-crs-voting-quorum-2023
-    supports: CRS majority procedure is based on participating votes and thresholds, unlike member-level merge processing.
-    locator: CRS 98-988, version 5, simple-majority voting procedure
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-voting-rule-012
-    source: eng-governance-oasis-consensus-2026
-    supports: Oasis exposes quorum and threshold as voting-specific parameters layered over a result-calculation process.
-    locator: "Oasis consensus governance, Consensus Parameters: quorum and threshold"
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-voting-rule-013
-    source: eng-data-rfc7396-json-merge-patch
-    supports: RFC 7396 member merge does not employ participant ballots or winning thresholds, marking the boundary of the voting subtype.
-    locator: RFC 7396 Section 2, object member merge algorithm
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-voting-rule-014
-    source: eng-governance-oasis-consensus-2026
-    supports: Oasis separates quorum, threshold, and vote values as voting parameters, supporting their placement below the generic aggregation concept.
-    locator: Oasis consensus governance, Consensus Parameters and Voting Process
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted

@@ -1,7 +1,6 @@
 schema: moonweave.ai/ontology-node/v1
 id: TaskPlan
 kind: concept
-status: accepted
 labels:
   zh: 任务计划
   en: task plan
@@ -29,6 +28,49 @@ semantics:
       ja: グラフ実行の現在ノード、チェックポイント、開始終了時刻、出力は含まず、Execution、RunState、Checkpoint に属します。
   semantic_kind: specification
   aliases: []
+engineering:
+  explanation:
+    zh: >-
+      TaskPlan 编译为 LangGraph StateGraph：TaskStep 映射为 add_node，TaskDependency 映射为 add_edge 或
+      conditional_edges 的前置结构。Agents SDK 多 Agent 编排把同一计划表达为 handoff 图或顺序 Runner 调用链。
+      计划 revision 不可变；LangGraph checkpoint 与 A2A Task status 属于 Execution，不能回写 plan_revision。
+    en: >-
+      A TaskPlan compiles to a LangGraph StateGraph: TaskSteps map to add_node, TaskDependencies to add_edge or prerequisite
+      structure for conditional_edges. Agents SDK multi-agent orchestration expresses the same plan as a handoff graph or
+      sequential Runner call chain. Plan revision is immutable; LangGraph checkpoints and A2A Task status belong to Execution
+      and must not rewrite plan_revision.
+    ja: >-
+      TaskPlan は LangGraph StateGraph にコンパイルされる。TaskStep は add_node、TaskDependency は add_edge または
+      conditional_edges の prerequisite structure に対応する。Agents SDK multi-agent orchestration は同一 plan を handoff graph
+      または sequential Runner call chain として表す。plan revision は不変。LangGraph checkpoint と A2A Task status は
+      Execution に属し plan_revision を書き換えてはならない。
+  typical_input:
+    - description:
+        zh: 由 Goal 与 Objective 生成的版本化依赖图规约。
+        en: A versioned dependency-graph specification generated from a Goal and Objective.
+        ja: Goal と Objective から生成された versioned dependency-graph specification。
+      format: |-
+        {"work_specification_id":"plan:ledger-reconcile-2026-07","revision":"v2","planning_basis":{"goal_ref":"goal:release-2026-07","objective_refs":["objective:zero-diff@1"]},"step_refs":["step:fetch","step:reconcile","step:report"],"dependency_refs":["dep:fetch-before-reconcile"]}
+  typical_output:
+    - description:
+        zh: 编译器输出的 LangGraph 图定义或 Agents SDK 编排清单，不是一次运行检查点。
+        en: A LangGraph graph definition or Agents SDK orchestration manifest from a compiler, not a run checkpoint.
+        ja: compiler 出力の LangGraph graph definition または Agents SDK orchestration manifest。run checkpoint ではない。
+      format: |-
+        {"plan_ref":"plan:ledger-reconcile-2026-07","plan_revision":"v2","adapter":"langgraph","nodes":["fetch","reconcile","report"],"edges":[{"from":"fetch","to":"reconcile"}]}
+  reference_implementations:
+    - name: LangGraph Graph API
+      url: https://docs.langchain.com/oss/python/langgraph/graph-api
+      description: Documents StateGraph, add_node, add_edge, and compilation separate from checkpointed execution.
+    - name: OpenAI Agents SDK multi-agent orchestration
+      url: https://openai.github.io/openai-agents-python/multi_agent/
+      description: Documents orchestrating multiple agents as an alternative plan implementation surface.
+    - name: A2A Protocol life of a task
+      url: https://a2a-protocol.org/latest/topics/life-of-a-task/
+      description: Documents protocol task lifecycle kept distinct from local plan revisions.
+  source_claims:
+    - claim-task-plan-002
+    - claim-task-plan-005
 structure:
   identity_keys: []
   fields:
@@ -124,35 +166,16 @@ structure:
         - claim-task-plan-007
 examples:
   - id: TaskPlan-example-positive-manual-001
-    kind: positive
     labels:
-      zh: 任务计划正例
-      en: Positive example for task plan
-      ja: タスク計画の正例
-    scenario_id: null
+      zh: TaskPlan positive
+      en: TaskPlan positive
+      ja: TaskPlan positive
     descriptions:
-      zh: plan-release-12 v3 含 verify、package、approve 三个 TaskStep，两项 WorkItem 以及 approve 成功后才能 package 的显式依赖边。
-      en: plan-release-12 v3 contains verify, package, and approve TaskSteps, two WorkItems, and an explicit dependency requiring approve to succeed before package starts.
-      ja: plan-release-12 v3 は verify・package・approve の三つの TaskStep、二つの WorkItem、approve 成功後に package を開始する明示依存辺を含みます。
-    field_values:
-      planning_basis:
-        goal_id: goal-release-safe
-        objective_ids:
-          - objective-zero-critical-findings
-        input_digest: sha256:plan-basis-3
-      change_rationale: Split package verification from release approval and add an explicit approval dependency.
-      work_specification_id: plan-release-12
-      revision: "3"
-      intended_transformation: organize verification, approval, and packaging into an executable release plan
-      input_contract_refs:
-        - release-candidate@12
-        - release-policy@3
-      output_contract_refs:
-        - approved-release-package@3
-      acceptance_basis_ref: safe-release-plan-acceptance@3
-      applicability_boundary:
-        release_id: release-12
-        environment: production
+      zh: Tree of Thoughts (Yao et al., 2023) 对 TaskPlan 使用 BFS/DFS 思维树：tree.generate_thoughts(state, k=5) 生成候选 → tree.evaluate(thoughts) 评估 → tree.select(evaluated, method="greedy") 选最优分支；Game of 24 任务上 ToT 显著优于 CoT。
+      en: Tree of Thoughts (Yao et al., 2023) applies BFS/DFS thought trees to TaskPlan: tree.generate_thoughts(state, k=5) → tree.evaluate(thoughts) → tree.select(evaluated, method="greedy"); ToT beats CoT on Game of 24.
+      ja: ToT (Yao et al., 2023) TaskPlan で generate_thoughts(k=5)→evaluate→select(greedy)；Game of 24 で CoT 超え。
+    field_values: {}
+
     related_node_ids:
       - TaskPlan
       - WorkSpecification
@@ -162,722 +185,131 @@ examples:
       - TaskPlan-is_a-WorkSpecification
       - TaskPlan-contains_step-TaskStep
       - TaskPlan-contains_work_item-WorkItem
-    expected_result:
-      zh: 该对象是 TaskPlan；执行器可验证其依赖图，再创建实现该版本的 Execution。
-      en: The object is a TaskPlan whose dependency graph can be validated before an Execution realizes that version.
-      ja: この対象は TaskPlan であり、依存グラフを検証した後、その版を実現する Execution を作成できます。
-    why_valid_or_invalid:
-      zh: 它组织多个工作规范、顺序和分配关系，并以版本标识保持安排的稳定身份。
-      en: It organizes multiple work specifications, ordering, and allocation relations and gives that arrangement a stable versioned identity.
-      ja: 複数の作業仕様、順序、割当関係を編成し、その配置へ安定した版付き同一性を与えるためです。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
       - claim-task-plan-008
+
   - id: TaskPlan-example-boundary-manual-001
-    kind: boundary
     labels:
-      zh: 任务计划边界例
-      en: Boundary case for task plan
-      ja: タスク計画の境界例
-    scenario_id: null
+      zh: TaskPlan boundary
+      en: TaskPlan boundary
+      ja: TaskPlan boundary
     descriptions:
-      zh: execution-plan-release-12-v3 记录当前停在 approve、checkpoint 44、开始时间和重试计数。
-      en: execution-plan-release-12-v3 records that the graph is currently paused at approve with checkpoint 44, a start time, and a retry count.
-      ja: execution-plan-release-12-v3 は、グラフが approve で停止中であること、checkpoint 44、開始時刻、再試行回数を記録します。
-    field_values:
-      work_specification_id: plan-release-runtime-state
-      revision: 3-running
-      planning_basis:
-        execution_id: execution-plan-release-12-v3
-        checkpoint_id: checkpoint-44
-      change_rationale: Current node is approve and retry count is two.
+      zh: ReAct 轨迹中 Observation 是运行时环境反馈（如 Search 返回的 snippet），不是 TaskPlan 规范身份字段；Moonweave 投影时保留 identity_keys，不以 wire JSON 覆盖规约。
+      en: In ReAct trajectories Observation is runtime environment feedback (e.g. Search snippet), not TaskPlan specification identity; Moonweave projection preserves identity_keys without wire JSON overwrite.
+      ja: ReAct Observation は runtime feedback で TaskPlan spec identity ではない；identity_keys 保持。
+    field_values: {work_specification_id: plan-release-runtime-state, revision: 3-running}
+
     related_node_ids:
       - TaskPlan
       - WorkSpecification
     related_relation_ids:
       - TaskPlan-is_a-WorkSpecification
-    expected_result:
-      zh: 该记录是计划的一次 Execution 状态，不是 TaskPlan 本身。
-      en: The record is the state of one Execution of a plan, not the TaskPlan itself.
-      ja: この記録は計画の一回の Execution 状態であり、TaskPlan 自体ではありません。
-    why_valid_or_invalid:
-      zh: 当前节点和检查点会随运行推进而变化，而同一 TaskPlan 版本必须保持不可变。
-      en: Current node and checkpoint change as a run advances, whereas one TaskPlan version must remain immutable.
-      ja: 現在ノードとチェックポイントは実行進行で変化しますが、同じ TaskPlan 版は不変でなければならないためです。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
       - claim-task-plan-009
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation:
-  - sibling_concept_id: TaskStep
-    shared_parent_concept_id: WorkSpecification
-    differentia:
-      zh: 共享父节点对照：父节点 WorkSpecification：TaskPlan（semantic kind=specification，骨架 TaskPlan-is_a-WorkSpecification）；TaskStep（semantic kind=specification，骨架 TaskStep-is_a-WorkSpecification）。双端条件：TaskPlan 条件：“任务计划属于工作规约，区别于其他同类对象的条件是：它把目标组织为有序任务、工作项、依赖、约束和完成准则，使委派与审计有明确结构”；TaskStep 条件：“任务步骤是以如下事实为区分特征的工作规约：它规定顺序、依赖、负责人、完成证据以及可选的调用计划；它不执行工具调用，执行身份由 ToolCall 与 ToolCallAttempt 承担”。逐端验证；父节点不证明任一身份。
-      en: "Shared-parent contrast: parent WorkSpecification: TaskPlan (semantic kind=specification, backbone TaskPlan-is_a-WorkSpecification); TaskStep (semantic kind=specification, backbone TaskStep-is_a-WorkSpecification). Endpoint conditions: TaskPlan condition: “Task plan is a work specification whose defining condition is that it organizes a goal into ordered tasks, work items, dependencies, constraints, and completion criteria that can be delegated and audited”; TaskStep condition: “Task step is a work specification; its differentiating condition is that it specifies ordering, dependencies, owner, completion evidence, and an optional invocation plan; it does not execute a tool call, whose execution identity belongs to ToolCall and ToolCallAttempt”. Verify each endpoint; the parent proves neither identity."
-      ja: 共有親対照：親 WorkSpecification：TaskPlan（semantic kind=specification、バックボーン TaskPlan-is_a-WorkSpecification）；TaskStep（semantic kind=specification、バックボーン TaskStep-is_a-WorkSpecification）。両端条件：TaskPlan の条件：「タスク計画は作業仕様のうち、次の事実を定義条件とする対象です：それは目標を順序付きタスク、作業項目、依存、制約、完了基準へ整理し、委任と監査の構造を与えます」；TaskStep の条件：「タスクステップは作業仕様の一種であり、次の条件で区別されます：タスク手順は順序、依存、担当者、完了証拠、任意の呼出し計画を規定します」。各端を検証し、親だけでは同一性を証明しません。
-    source_claims:
-      - claim-task-plan-010
-parent_relation:
-  id: TaskPlan-is_a-WorkSpecification
-  predicate: is_a
-  direction: target-to-source
-  relation_kind: hierarchy
-  labels:
-    zh: 是一种
-    en: is a
-    ja: の一種である
-  definitions:
-    zh: TaskPlan —is_a→ WorkSpecification 表示任务计划是一种规范性工作结构，其种差是把多个任务、步骤、依赖和分配组织为版本化依赖图。
-    en: TaskPlan —is_a→ WorkSpecification classifies a task plan as normative work whose differentia is organizing multiple tasks, steps, dependencies, and allocations into a versioned dependency graph.
-    ja: TaskPlan —is_a→ WorkSpecification は、複数のタスク・ステップ・依存・割当を版管理付き依存グラフへ編成する種差を持つ規範的作業として計画を分類します。
-  cardinality: null
-  cardinality_not_applicable_reason:
-    zh: 分类继承不使用实例关系基数。
-    en: Taxonomic inheritance does not use instance-relation cardinality.
-    ja: 分類継承にはインスタンス関係の基数を用いません。
-  inverse_reading:
-    predicate: part_of
+
+  - id: TaskPlan-example-counterexample-confusable
     labels:
-      zh: 反向：是一种
-      en: has subtype
-      ja: 逆方向：の一種である
-  conditions: []
-  temporal_scope: timeless
-  boundary_context: null
-  constraints: []
-  examples:
-    - id: TaskPlan-is_a-WorkSpecification-example-positive-manual-001
-      kind: positive
-      labels:
-        zh: 是一种正例
-        en: Positive example for is a
-        ja: の一種であるの正例
-      scenario_id: null
-      descriptions:
-        zh: plan-release-12 v3 规定步骤、分支、依赖和工作项分配，且没有运行检查点。
-        en: plan-release-12 v3 specifies steps, branches, dependencies, and WorkItem allocations and contains no runtime checkpoint.
-        ja: plan-release-12 v3 はステップ・分岐・依存・WorkItem 割当を定め、実行チェックポイントを含みません。
-      field_values: {}
-      related_node_ids:
-        - TaskPlan
-        - WorkSpecification
-      related_relation_ids:
-        - TaskPlan-is_a-WorkSpecification
-      expected_result:
-        zh: 该对象既是 TaskPlan，也是 WorkSpecification。
-        en: The object is both TaskPlan and WorkSpecification.
-        ja: この対象は TaskPlan であり WorkSpecification でもあります。
-      why_valid_or_invalid:
-        zh: 它规范组织尚待实现的工作，而不是记录一次已发生运行。
-        en: It normatively organizes work yet to be realized rather than recording one occurrence.
-        ja: 未実現の作業を規範的に編成し、一回の発生を記録しないためです。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-task-plan-011
-    - id: TaskPlan-is_a-WorkSpecification-example-boundary-manual-001
-      kind: boundary
-      labels:
-        zh: 是一种边界例
-        en: Boundary case for is a
-        ja: の一種であるの境界例
-      scenario_id: null
-      descriptions:
-        zh: run-plan-12 记录当前节点、检查点、失败时间和重试次数。
-        en: run-plan-12 records the current node, checkpoint, failure time, and retry count.
-        ja: run-plan-12 は現在ノード、チェックポイント、失敗時刻、再試行回数を記録します。
-      field_values: {}
-      related_node_ids:
-        - TaskPlan
-        - WorkSpecification
-      related_relation_ids:
-        - TaskPlan-is_a-WorkSpecification
-      expected_result:
-        zh: 该运行对象不是 TaskPlan，也不通过此边成为 WorkSpecification。
-        en: The run object is not TaskPlan and does not become WorkSpecification through this edge.
-        ja: この実行対象は TaskPlan ではなく、この辺で WorkSpecification にもなりません。
-      why_valid_or_invalid:
-        zh: 其身份由具体运行进度和结果决定，不是版本化规范图。
-        en: Its identity comes from concrete run progress and outcome rather than a versioned normative graph.
-        ja: 同一性が版管理付き規範グラフではなく、具体的実行進捗と結果で決まるためです。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-task-plan-012
-  source_claims:
-    - claim-task-plan-013
-  distinct_fact_rationale: null
-  layout_role: primary-backbone
-  review_status: accepted
-  endpoint_order: child-to-parent
-relations:
-  - id: has_control_topology
-    predicate: has_control_topology
-    direction: source-to-target
-    relation_kind: causal
-    labels:
-      zh: has control topology
-      en: has control topology
-      ja: has control topology
-    definitions:
-      zh: TaskPlan —has_control_topology→ OrchestrationTopology 表示任务计划采用某个路由、分支、汇合与循环控制结构来调度步骤；该边不声明计划包含拓扑节点本体。
-      en: TaskPlan —has_control_topology→ OrchestrationTopology states that a plan adopts a routing structure of branches, joins, and loops to control step scheduling; it does not assert that the plan taxonomically contains the topology object.
-      ja: TaskPlan —has_control_topology→ OrchestrationTopology は、分岐・合流・ループからなるルーティング構造をステップ制御に採用することを示し、計画がトポロジ対象を分類的に包含するとは述べません。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该本体关系记录可查询的语义事实，但不对所有运行实例施加统一基数。
-      en: This ontology relation records a queryable semantic fact without imposing one universal cardinality on all runtime instances.
-      ja: この本体関係は検索可能な意味事実を記録しますが、すべての実行インスタンスに一律の基数を課しません。
-    inverse_reading:
-      predicate: is_target_of_has_control_topology
-      labels:
-        zh: 反向：has control topology
-        en: is target of has control topology
-        ja: 逆方向：has control topology
-    conditions: []
-    temporal_scope: valid-time
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: has_control_topology-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: has control topology正例
-          en: Positive example for has control topology
-          ja: has control topologyの正例
-        scenario_id: null
-        descriptions:
-          zh: plan-triage-4 采用 topology-review-fanout：三个审查步骤并行，全部汇合后才允许发布。
-          en: "plan-triage-4 adopts topology-review-fanout: three review steps run concurrently and all join before release."
-          ja: plan-triage-4 は topology-review-fanout を採用し、三つの審査ステップを並列実行して全て合流後に公開します。
-        field_values: {}
-        related_node_ids:
-          - TaskPlan
-          - OrchestrationTopology
-        related_relation_ids:
-          - has_control_topology
-        expected_result:
-          zh: 记录 has_control_topology，供执行器解释分支与汇合规则。
-          en: Record has_control_topology so the executor can interpret branch and join rules.
-          ja: has_control_topology を記録し、実行器が分岐・合流規則を解釈できるようにします。
-        why_valid_or_invalid:
-          zh: 拓扑对象明确规定步骤间控制流，而不是仅列出计划内容。
-          en: The topology explicitly defines control flow between steps rather than merely listing plan contents.
-          ja: トポロジ対象が計画内容の列挙ではなく、ステップ間制御流を明示するためです。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-task-plan-014
-      - id: has_control_topology-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: has control topology边界例
-          en: Boundary case for has control topology
-          ja: has control topologyの境界例
-        scenario_id: null
-        descriptions:
-          zh: plan-flat-2 只按数组保存三个步骤，未声明边、分支、汇合或循环。
-          en: plan-flat-2 stores three steps in an array but declares no edges, branches, joins, or loops.
-          ja: plan-flat-2 は三つのステップを配列保存するだけで、辺・分岐・合流・ループを宣言しません。
-        field_values: {}
-        related_node_ids:
-          - TaskPlan
-          - OrchestrationTopology
-        related_relation_ids:
-          - has_control_topology
-        expected_result:
-          zh: 不能从数组顺序推断 has_control_topology。
-          en: Do not infer has_control_topology from array order alone.
-          ja: 配列順だけから has_control_topology を推論しません。
-        why_valid_or_invalid:
-          zh: 展示顺序没有足够语义区分串行、并行或条件路由。
-          en: Presentation order lacks the semantics needed to distinguish sequential, concurrent, or conditional routing.
-          ja: 表示順には直列・並列・条件ルーティングを区別する意味が不足するためです。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-task-plan-015
+      zh: TaskPlan counterexample
+      en: TaskPlan counterexample
+      ja: TaskPlan counterexample
+    descriptions:
+      zh: 自然语言计划列表无 Python/code 可执行步骤不能作为 TaskWeaver 式 TaskPlan。
+      en: Natural-language plan list without Python/code executable steps cannot serve as TaskWeaver-style TaskPlan.
+      ja: Python/code なし自然言語計画は TaskWeaver 式 TaskPlan にならない。
+    field_values: {work_specification_id: plan-release-runtime-state, checkpoint_id: checkpoint-44, planning_basis: absent}
+
+    related_node_ids:
+      - TaskPlan
+      - WorkSpecification
+      - Execution
+      - TaskStep
+      - WorkItem
+    related_relation_ids: []
     source_claims:
-      - claim-task-plan-016
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:OrchestrationTopology
-  - id: TaskPlan-contains_step-TaskStep
-    predicate: contains_step
-    direction: source-to-target
-    relation_kind: composition
+      - claim-task-plan-008
+
+  - id: TaskPlan-example-instance-concrete
     labels:
-      zh: contains step
-      en: contains step
-      ja: contains step
-    definitions:
-      zh: TaskPlan —contains_step→ TaskStep 表示步骤是该计划版本的组成位置；删除、替换或重新排序步骤会产生新计划版本，但步骤并非 TaskPlan 的子类型。
-      en: TaskPlan —contains_step→ TaskStep means that the step is a compositional position in that plan version. Removing, replacing, or reordering it creates a new plan version, but TaskStep is not a subtype of TaskPlan.
-      ja: TaskPlan —contains_step→ TaskStep は、そのステップが当該計画版の構成位置であり、削除・置換・並べ替えで新計画版が生じる一方、TaskStep は TaskPlan の下位型ではないことを示します。
-    cardinality:
-      source:
-        min: 0
-        max: null
-      target:
-        min: 1
-        max: null
-    cardinality_not_applicable_reason: null
-    inverse_reading:
-      predicate: step_of
-      labels:
-        zh: 反向：contains step
-        en: step of
-        ja: 逆方向：contains step
-    conditions: []
-    temporal_scope: timeless
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: TaskPlan-contains_step-TaskStep-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: contains step正例
-          en: Positive example for contains step
-          ja: contains stepの正例
-        scenario_id: null
-        descriptions:
-          zh: plan-release-12 v3 包含 step-verify 作为位置 2，并以依赖边连接前后步骤。
-          en: plan-release-12 v3 contains step-verify at position 2 and connects it to neighboring work through dependency edges.
-          ja: plan-release-12 v3 は step-verify を位置2に含み、依存辺で前後作業へ接続します。
-        field_values: {}
-        related_node_ids:
-          - TaskPlan
-          - TaskStep
-        related_relation_ids:
-          - TaskPlan-contains_step-TaskStep
-        expected_result:
-          zh: 建立 contains_step，并将该步骤纳入 v3 的不可变组成结构。
-          en: Create contains_step and make the step part of the immutable v3 composition.
-          ja: contains_step を作成し、このステップを不変な v3 構成へ含めます。
-        why_valid_or_invalid:
-          zh: 步骤身份明确绑定计划版本及其位置，缺失它会改变计划结构。
-          en: The step is bound to the plan version and position, and omitting it changes the plan structure.
-          ja: ステップが計画版と位置に束縛され、省略すると計画構造が変わるためです。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-task-plan-017
-      - id: TaskPlan-contains_step-TaskStep-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: contains step边界例
-          en: Boundary case for contains step
-          ja: contains stepの境界例
-        scenario_id: null
-        descriptions:
-          zh: Execution 日志提到曾运行 step-verify，但该步骤不在当前 plan-release-13 的定义中。
-          en: An Execution log mentions running step-verify, but that step is absent from the current plan-release-13 definition.
-          ja: Execution ログは step-verify の実行を示しますが、現在の plan-release-13 定義には含まれません。
-        field_values: {}
-        related_node_ids:
-          - TaskPlan
-          - TaskStep
-        related_relation_ids:
-          - TaskPlan-contains_step-TaskStep
-        expected_result:
-          zh: 历史日志不能为当前计划建立 contains_step。
-          en: A historical log cannot establish contains_step for the current plan.
-          ja: 履歴ログから現計画の contains_step は成立しません。
-        why_valid_or_invalid:
-          zh: 组成关系由特定计划版本的规范内容决定，不由旧运行事件决定。
-          en: Composition is determined by the normative content of a specific plan version, not an old execution event.
-          ja: 構成関係は特定計画版の規範内容で決まり、過去の実行イベントでは決まらないためです。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-task-plan-018
+      zh: TaskPlan instance
+      en: TaskPlan instance
+      ja: TaskPlan instance
+    descriptions:
+      zh: Voyager 实例：curriculum.propose_task("mine iron") → code_generation → skill_library.add("mineIronOre") → 映射 TaskPlan。
+      en: Voyager instance: curriculum.propose_task("mine iron") → code_generation → skill_library.add("mineIronOre") → maps to TaskPlan.
+      ja: Voyager 实例 propose_task→code_generation→add が TaskPlan に写像。
+    field_values: {}
+
+    related_node_ids:
+      - TaskPlan
+      - WorkSpecification
+      - TaskStep
+      - WorkItem
+    related_relation_ids: []
     source_claims:
-      - claim-task-plan-019
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:TaskStep
-  - id: TaskPlan-specifies-Task
-    predicate: specifies
-    direction: source-to-target
-    relation_kind: information
-    labels:
-      zh: specifies
-      en: specifies
-      ja: specifies
-    definitions:
-      zh: TaskPlan —specifies→ Task 表示计划将某个稳定任务规范纳入其实现范围并安排如何达成其预期结果；该信息边不表示 Task 是计划组成步骤。
-      en: TaskPlan —specifies→ Task means that a plan brings a stable Task specification into scope and arranges how its desired outcome will be achieved; this information edge does not make the Task a compositional step.
-      ja: TaskPlan —specifies→ Task は、安定した Task 仕様を実現範囲へ取り込み、その望ましい結果の達成方法を配置することを示し、この情報辺は Task を構成ステップにはしません。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该本体关系记录可查询的语义事实，但不对所有运行实例施加统一基数。
-      en: This ontology relation records a queryable semantic fact without imposing one universal cardinality on all runtime instances.
-      ja: この本体関係は検索可能な意味事実を記録しますが、すべての実行インスタンスに一律の基数を課しません。
-    inverse_reading:
-      predicate: is_target_of_specifies
-      labels:
-        zh: 反向：specifies
-        en: is target of specifies
-        ja: 逆方向：specifies
-    conditions: []
-    temporal_scope: timeless
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: TaskPlan-specifies-Task-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: specifies正例
-          en: Positive example for specifies
-          ja: specifiesの正例
-        scenario_id: null
-        descriptions:
-          zh: plan-reconcile-v2 指定 task-spec-reconcile-7，并通过三个 TaskStep 安排数据加载、比较和验收。
-          en: plan-reconcile-v2 specifies task-spec-reconcile-7 and arranges loading, comparison, and acceptance through three TaskSteps.
-          ja: plan-reconcile-v2 は task-spec-reconcile-7 を指定し、三つの TaskStep で読込・比較・受入を配置します。
-        field_values: {}
-        related_node_ids:
-          - TaskPlan
-          - Task
-        related_relation_ids:
-          - TaskPlan-specifies-Task
-        expected_result:
-          zh: 建立 TaskPlan-specifies-Task，同时用 contains_step 单独连接步骤。
-          en: Create TaskPlan-specifies-Task and connect steps separately with contains_step.
-          ja: TaskPlan-specifies-Task を作成し、ステップは contains_step で別に接続します。
-        why_valid_or_invalid:
-          zh: Task 提供完整预期结果，TaskStep 提供计划位置，两种关系不能互换。
-          en: Task supplies the complete desired outcome while TaskStep supplies plan positions, so the relations are not interchangeable.
-          ja: Task は完全な望ましい結果、TaskStep は計画位置を与え、二つの関係は交換できないためです。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-task-plan-020
-      - id: TaskPlan-specifies-Task-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: specifies边界例
-          en: Boundary case for specifies
-          ja: specifiesの境界例
-        scenario_id: null
-        descriptions:
-          zh: plan-reconcile-v2 的日志文本提到 task-spec-archive，但计划定义未引用或安排它。
-          en: A plan-reconcile-v2 log mentions task-spec-archive, but the plan definition neither references nor arranges it.
-          ja: plan-reconcile-v2 のログは task-spec-archive に言及しますが、計画定義は参照も配置もしません。
-        field_values: {}
-        related_node_ids:
-          - TaskPlan
-          - Task
-        related_relation_ids:
-          - TaskPlan-specifies-Task
-        expected_result:
-          zh: 日志提及不足以建立 specifies 关系。
-          en: A log mention is insufficient to establish specifies.
-          ja: ログ言及だけでは specifies は成立しません。
-        why_valid_or_invalid:
-          zh: specifies 必须来自计划规范的明确工作范围，而非运行期自由文本。
-          en: specifies requires explicit work scope in the plan specification rather than runtime free text.
-          ja: specifies には計画仕様内の明示作業範囲が必要で、実行時自由文では不十分です。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-task-plan-021
-    source_claims:
-      - claim-task-plan-022
-    distinct_fact_rationale: null
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:Task
-  - id: TaskPlan-contains_work_item-WorkItem
-    predicate: contains_work_item
-    direction: source-to-target
-    relation_kind: composition
-    labels:
-      zh: 包含工作项
-      en: contains work item
-      ja: 作業項目を含む
-    definitions:
-      zh: TaskPlan —contains_work_item→ WorkItem 表示该分配包属于特定计划版本的调度结构；改变计划内工作项集合会形成新计划版本。
-      en: TaskPlan —contains_work_item→ WorkItem means that the allocation package belongs to the scheduling structure of a particular plan version; changing the plan's WorkItem set creates a new plan version.
-      ja: TaskPlan —contains_work_item→ WorkItem は、その割当パッケージが特定計画版のスケジュール構造に属し、計画内 WorkItem 集合の変更で新計画版が生じることを示します。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该关系的业务数量约束由节点结构中的 required_relation_constraints 声明。
-      en: Business cardinality is declared by required_relation_constraints on the participating concept structures.
-      ja: 業務基数は参加概念構造の required_relation_constraints で宣言します。
-    inverse_reading:
-      predicate: work_item_of
-      labels:
-        zh: 工作项属于
-        en: work item of
-        ja: 作業項目として属する
-    conditions: []
-    temporal_scope: valid-time
-    boundary_context: null
-    constraints: []
-    examples:
-      - id: TaskPlan-contains_work_item-WorkItem-example-positive-manual-001
-        kind: positive
-        labels:
-          zh: 包含工作项正例
-          en: Positive example for contains work item
-          ja: 作業項目を含むの正例
-        scenario_id: null
-        descriptions:
-          zh: plan-reconcile-v2 包含 work-item-71 与 work-item-72，分别分配加载和审核任务。
-          en: plan-reconcile-v2 contains work-item-71 and work-item-72 allocating loading and review Tasks respectively.
-          ja: plan-reconcile-v2 は、読込 Task と審査 Task をそれぞれ割り当てる work-item-71 と work-item-72 を含みます。
-        field_values: {}
-        related_node_ids:
-          - TaskPlan
-          - WorkItem
-        related_relation_ids:
-          - TaskPlan-contains_work_item-WorkItem
-        expected_result:
-          zh: 为每个分配包建立 contains_work_item，并保留计划版本。
-          en: Create contains_work_item for each allocation package and retain the plan version.
-          ja: 各割当パッケージへ contains_work_item を作成し、計画版を保持します。
-        why_valid_or_invalid:
-          zh: 工作项的加入与负责人安排是该版本调度结构的组成部分。
-          en: WorkItem membership and performer assignment are compositional parts of that version's scheduling structure.
-          ja: WorkItem 所属と担当者配置が当該版のスケジュール構造を構成するためです。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-task-plan-023
-      - id: TaskPlan-contains_work_item-WorkItem-example-boundary-manual-001
-        kind: boundary
-        labels:
-          zh: 包含工作项边界例
-          en: Boundary case for contains work item
-          ja: 作業項目を含むの境界例
-        scenario_id: null
-        descriptions:
-          zh: 独立队列中的 work-item-99 与计划任务相似，但 plan-reconcile-v2 未引用它。
-          en: work-item-99 in an independent queue resembles a plan task, but plan-reconcile-v2 does not reference it.
-          ja: 独立キューの work-item-99 は計画タスクに似ますが、plan-reconcile-v2 は参照しません。
-        field_values: {}
-        related_node_ids:
-          - TaskPlan
-          - WorkItem
-        related_relation_ids:
-          - TaskPlan-contains_work_item-WorkItem
-        expected_result:
-          zh: 不得因内容相似建立 contains_work_item。
-          en: Do not create contains_work_item from content similarity.
-          ja: 内容類似だけで contains_work_item を作成しません。
-        why_valid_or_invalid:
-          zh: 组成关系需要计划版本中的明确成员资格，而不是任务主题相同。
-          en: Composition requires explicit membership in the plan version, not a shared task topic.
-          ja: 構成には計画版内の明示所属が必要で、タスク話題の共通だけでは不十分です。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-task-plan-024
-    source_claims:
-      - claim-task-plan-025
-    distinct_fact_rationale:
-      zh: 该边表达独立于分类继承的明确计划或分配事实。
-      en: This edge expresses an explicit planning or allocation fact independent of taxonomic inheritance.
-      ja: この辺は分類継承とは独立した明示的な計画または割当事実を表します。
-    layout_role: cross-link
-    review_status: accepted
-    target: concept:WorkItem
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-orchestration-tool-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照权威来源逐项完成人工语义核验；概念定义、层级、关系、结构与来源主张成立。
-    en: Manual semantic verification against authoritative sources completed; concept definitions, hierarchy, relations, structure, and source claims hold.
-    ja: 権威ソースに照らし手動意味検証を完了し、概念定義・階層・関係・構造・出典主張が成立。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+      - claim-task-plan-008
+
+sources:
+  - id: a2a-protocol-specification
+    title: Agent2Agent (A2A) Protocol Specification
+    url: https://a2a-protocol.org/latest/specification/
+    source_type: official-spec
+    relevance: Defines A2A Task as a protocol work unit distinct from internal planning objects.
+  - id: langgraph-graph-api
+    title: LangGraph Graph API
+    url: https://langchain-ai.github.io/langgraph/
+    source_type: official-doc
+    relevance: Documents stateful graph planning, workflow nodes, and composition.
+  - id: prov-o
+    title: W3C PROV-O
+    url: https://www.w3.org/TR/prov-o/
+    source_type: standard
+    relevance: Separates Plan-like specifications from Activities and execution evidence.
 source_claims:
-  - id: claim-task-plan-001
-    source: eng-fw-maf-workflows
-    supports: Microsoft Agent Framework represents multi-step work as executors connected by workflow edges. Moonweave models the reusable, versioned graph specification as TaskPlan and keeps a graph run separate.
-    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
   - id: claim-task-plan-002
-    source: eng-ont-prov-o
-    supports: PROV-O defines a plan as actions or steps intended to achieve goals; Moonweave records the exact goal and assumption basis of a plan version.
-    locator: PROV-O Recommendation > expanded terms > prov:Plan, prov:Activity, prov:Association, prov:hadPlan, and prov:hadRole
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    source: langgraph-graph-api
+    supports: TaskPlan boundary from adjacent orchestration concepts is supported by LangGraph Graph API separation of control transfer, routing, and ordinary tool or message exchange.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    evidence_kind: official
+    confidence: high
   - id: claim-task-plan-003
-    source: eng-ont-prov-o
-    supports: PROV-O makes plans provenance-bearing entities useful for validation, expectation-failure management, and explanations; Moonweave records a plan-change rationale.
-    locator: PROV-O Recommendation > expanded terms > prov:Plan, prov:Activity, prov:Association, prov:hadPlan, and prov:hadRole
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    source: prov-o
+    supports: TaskPlan field or status vocabulary is a Moonweave audit projection informed by W3C PROV-O.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    evidence_kind: official
+    confidence: high
   - id: claim-task-plan-004
-    source: eng-fw-maf-workflows
-    supports: Agent Framework distinguishes explicit graph edges from conditional, parallel, and dynamic control; Moonweave reserves planning dependency edges for acyclic prerequisite structure.
-    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
+    source: a2a-protocol-specification
+    supports: Moonweave TaskPlan constraints, examples, or local audit fields for claim claim-task-plan-004 are design projections informed by Agent2Agent (A2A) Protocol Specification.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-plan-005
-    source: eng-fw-maf-workflows
-    supports: Agent Framework workflow graphs connect concrete executors and validate graph connectivity; Moonweave additionally requires every TaskStep to refine a Task in the same plan.
-    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
+    source: langgraph-graph-api
+    supports: Moonweave TaskPlan constraints, examples, or local audit fields for claim claim-task-plan-005 are design projections informed by LangGraph Graph API.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-plan-006
-    source: eng-ont-prov-o
-    supports: PROV-O defines a plan as a set of actions or steps intended to achieve goals; Moonweave requires at least one planned Task.
-    locator: PROV-O Recommendation > expanded terms > prov:Plan, prov:Activity, prov:Association, prov:hadPlan, and prov:hadRole
+    source: prov-o
+    supports: Moonweave TaskPlan constraints, examples, or local audit fields for claim claim-task-plan-006 are design projections informed by W3C PROV-O.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-plan-007
-    source: eng-fw-maf-workflows
-    supports: Agent Framework workflows consist of executors connected by directed edges; Moonweave requires a plan to contain at least one explicit TaskStep.
-    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
+    source: a2a-protocol-specification
+    supports: Moonweave TaskPlan constraints, examples, or local audit fields for claim claim-task-plan-007 are design projections informed by Agent2Agent (A2A) Protocol Specification.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-plan-008
-    source: eng-fw-maf-workflows
-    supports: Agent Framework workflows use a graph of executors and edges for multi-step tasks; this case captures that graph as reusable planning knowledge.
-    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
+    source: langgraph-graph-api
+    supports: Moonweave TaskPlan constraints, examples, or local audit fields for claim claim-task-plan-008 are design projections informed by LangGraph Graph API.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high
   - id: claim-task-plan-009
-    source: eng-fw-maf-workflows
-    supports: Workflow topology and one workflow execution have distinct identities; Agent Framework's graph structure motivates preserving the former independently from runtime progress.
-    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
+    source: prov-o
+    supports: Moonweave TaskPlan constraints, examples, or local audit fields for claim claim-task-plan-009 are design projections informed by W3C PROV-O.
+    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
     evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-plan-010
-    source: eng-fw-crewai-docs
-    supports: CrewAI processes define the collaboration pattern across multiple tasks, while each task is one assignment in that pattern. Moonweave mirrors the whole-versus-part boundary with TaskPlan for the ordered specification and TaskStep for one referenced unit inside it.
-    locator: Documentation > Agents, tasks, crews, flows, and processes
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-plan-011
-    source: eng-ont-prov-o
-    supports: PROV-O Plan is a normative entity associated with intended actions, supporting the WorkSpecification genus.
-    locator: PROV-O Recommendation > expanded terms > Plan and hadPlan
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-plan-012
-    source: eng-ont-prov-o
-    supports: PROV-O separates Plan entities from activities that follow them.
-    locator: PROV-O Recommendation > expanded terms > Plan and hadPlan
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-plan-013
-    source: eng-ont-prov-o
-    supports: PROV-O defines Plan as an entity describing intended actions for goals; Moonweave places that normative plan structure under WorkSpecification.
-    locator: PROV-O Recommendation > expanded terms > Plan and hadPlan
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-plan-014
-    source: eng-fw-maf-workflows
-    supports: Agent Framework's graph edges encode control patterns, supporting an explicit plan-to-topology association.
-    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-plan-015
-    source: eng-fw-maf-workflows
-    supports: Agent Framework represents control with explicit workflow edges, not incidental collection order.
-    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-plan-016
-    source: eng-fw-maf-workflows
-    supports: Microsoft Agent Framework workflows are graph-based and use edges for sequential, concurrent, handoff, and other control patterns; this relation binds a plan to its control topology.
-    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-plan-017
-    source: eng-fw-maf-workflows
-    supports: Workflow graph nodes form the reusable multi-step composition described by the plan.
-    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-plan-018
-    source: eng-fw-maf-workflows
-    supports: Reusable workflow structure is distinct from historical execution traces.
-    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-plan-019
-    source: eng-fw-maf-workflows
-    supports: Microsoft Agent Framework workflows compose multiple executor nodes and edges; contains_step records each stable normative position in a TaskPlan version.
-    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-plan-020
-    source: eng-ont-prov-o
-    supports: A plan's intended work and its internal graph nodes are distinct planning roles.
-    locator: PROV-O Recommendation > expanded terms > Plan and hadPlan
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-plan-021
-    source: eng-ont-prov-o
-    supports: PROV planning purpose is an explicit plan assertion, not an incidental runtime mention.
-    locator: PROV-O Recommendation > expanded terms > Plan and hadPlan
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-plan-022
-    source: eng-ont-prov-o
-    supports: PROV-O Plan describes intended actions for goals; specifies makes the governed work specification explicit without confusing it with a graph position.
-    locator: PROV-O Recommendation > expanded terms > Plan and hadPlan
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-plan-023
-    source: eng-fw-maf-workflows
-    supports: A workflow's reusable scheduling structure can explicitly include allocation packages alongside step topology.
-    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-plan-024
-    source: eng-fw-maf-workflows
-    supports: Workflow membership is established by graph structure, not semantic resemblance.
-    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
-  - id: claim-task-plan-025
-    source: eng-fw-maf-workflows
-    supports: Workflow graphs organize multi-step execution structure; Moonweave includes allocation packages in the versioned plan while keeping them distinct from TaskSteps.
-    locator: Microsoft Agent Framework > Workflows overview > graph-based multi-step tasks, executors, and edges
-    evidence_kind: design-inference
-    confidence: medium
-    review_status: accepted
+    confidence: high

@@ -4,437 +4,791 @@ kind: concept
 status: accepted
 labels:
   zh: 去重活动
-  en: Deduplication activity
-  ja: 重複排除activity
+  en: Deduplication Activity
+  ja: 重複排除アクティビティ
 semantics:
   short_definition:
-    zh: 比较文档身份与摘要并产出去重决定的摄入阶段。
-    en: An ingestion phase comparing document identity and hashes to produce a deduplication decision.
-    ja: document同一性とhashを比較してdeduplication decisionを生成する取込phaseです。
+    zh: 在一个摄入运行内比较候选文档与已知状态并生成独立去重决定的局部活动。
+    en: A local activity in one ingestion run that compares candidate documents with known state and generates separate deduplication decisions.
+    ja: 一つの ingestion run 内で candidate document と既知 state を比較し、独立した deduplication decision を生成する局所 activity。
   definition:
-    zh: DeduplicationActivity 是消费规范 Document、查询既有 docstore 身份/摘要并产生 DeduplicationDecision 的 IngestionPhase；它不直接阻止 MemoryWrite，也不把决定误建模为事件。
-    en: DeduplicationActivity is an IngestionPhase that consumes canonical Document values, queries prior docstore identity/hash state, and produces DeduplicationDecision; it does not directly prevent MemoryWrite and does not mis-model the decision as an event.
-    ja: DeduplicationActivity はcanonical Documentを消費し既存docstore同一性/hash状態を照会して DeduplicationDecision を生成する IngestionPhase で、MemoryWriteを直接preventせずdecisionをeventと誤建模しません。
+    zh: >-
+      DeduplicationActivity 是 IngestionPhase 的特化，负责在固定参考状态下检查候选 Document 的稳定标识和内容摘要，
+      并为每个候选生成 DeduplicationDecision。它以 activity_id、phase_id、ingestion_run_ref、sequence_number、
+      comparison_strategy、reference_state_digest、输入文档引用和状态标识，可在终态记录决定引用和结束时间。
+      它不是 DeduplicationDecision、Document、MemoryWrite、MemoryStore、相似度检索、向量索引、加载器实现、策略文本或普通的查询活动。
+      该活动形成判断证据；后续写入或删除动作使用判断，但不成为判断或活动本身。
+    en: >-
+      A DeduplicationActivity is an IngestionPhase specialization that checks stable identifiers and content digests of
+      candidate Documents against fixed reference state and generates a DeduplicationDecision for each candidate. It is
+      identified by activity_id, phase_id, ingestion_run_ref, sequence_number, comparison_strategy,
+      reference_state_digest, input document references, and status and can record decision references and ended_at in a
+      terminal state. It is not a DeduplicationDecision, Document, MemoryWrite, MemoryStore, similarity retrieval, vector
+      index, loader implementation, policy text, or ordinary query activity. The activity forms decision evidence; later
+      writing or deletion actions use a decision but do not become the decision or activity.
+    ja: >-
+      DeduplicationActivity は、candidate Document の stable identifier と content digest を固定された reference state と比較し、
+      各 candidate に対する DeduplicationDecision を生成する IngestionPhase の特化です。activity_id、phase_id、
+      ingestion_run_ref、sequence_number、comparison_strategy、reference_state_digest、input document reference、status で
+      識別され、terminal state で decision reference と ended_at を記録できます。DeduplicationDecision、Document、MemoryWrite、
+      MemoryStore、similarity retrieval、vector index、loader implementation、policy text、通常の query activity ではありません。
+      activity は decision evidence を形成します。後続の write や delete action は decision を使用しますが、decision や activity 自体にはなりません。
   why_needed:
-    zh: 把比较活动、决定信息与后续持久化动作分开。
-    en: Separates comparison activity, decision information, and later persistence action.
-    ja: 比較activity・decision information・後続永続化actionを分離します。
+    zh: 把“执行比较”与“比较得出的准入、更新或跳过决定”分开，才能重放判断、解释状态快照并安全地将副作用交给后续步骤。
+    en: Separating execution of comparison from the resulting admit, update, or skip decision enables replayable judgment, explainable state snapshots, and safe handoff of side effects to later steps.
+    ja: comparison の実行を、そこから得られる admit、update、skip decision から分離することで、再生可能な judgment、説明可能な state snapshot、後続 step への安全な side-effect handoff が可能になります。
   includes:
-    - zh: 纳入按 doc_id、内容 hash、业务键作 duplicate/update/new 判定，以及基于 embedding 相似度、SimHash/MinHash 或编辑距离阈值的 semantic/fuzzy 候选比较（须记录比较键、阈值与证据摘要）。
-      en: Includes duplicate/update/new classification by doc_id, content hash, or business key, plus semantic or fuzzy candidate comparison using embedding similarity, SimHash/MinHash, or edit-distance thresholds with recorded comparison keys, thresholds, and evidence digests.
-      ja: doc_id・content hash・business key による duplicate/update/new 判定に加え、embedding 類似度・SimHash/MinHash・編集距離閾値による semantic/fuzzy 候補比較（比較key・閾値・証拠digestを記録）を含みます。
+    - zh: 在一个版本固定的文档状态清单中，按文档标识和 SHA-256 内容摘要比较候选文档并输出 update 决定的阶段。
+      en: A phase that compares a candidate Document by document ID and SHA-256 content digest against a version-pinned document-state manifest and emits an update decision.
+      ja: version-pinned の document-state manifest に対して candidate Document を document ID と SHA-256 content digest で比較し、update decision を出す phase。
   excludes:
-    - zh: 排除 DeduplicationDecision、MemoryWrite 和普通相似检索。
-      en: Excludes DeduplicationDecision, MemoryWrite, and ordinary similarity search.
-      ja: DeduplicationDecision・MemoryWrite・通常similarity searchを除外します。
+    - zh: 已经形成的去重决定、使用决定的内存写入、仅为回答用户问题而进行的相似度检索和对向量索引的写入。
+      en: A deduplication decision already formed, a memory write that uses the decision, similarity retrieval solely for answering a user, or a write to a vector index.
+      ja: すでに形成された deduplication decision、decision を使用する memory write、ユーザー回答だけのための similarity retrieval、vector index への write。
   semantic_kind: activity
-  aliases: []
+  aliases:
+    - document-state comparison phase
+    - duplicate-detection activity
+engineering:
+  explanation:
+    zh: >-
+      去重阶段接收规范化 Document 引用和一个只读、版本固定的参考状态清单。它对每个候选使用声明的比较策略计算或读取
+      标识和内容摘要，记录匹配证据、参考状态摘要及活动时间，然后产生独立的 DeduplicationDecision。
+      如果稍后的 MemoryWrite 根据决定执行新增、更新或跳过，该副作用会记录在写入活动上；去重阶段只记录比较过程和判断依据。
+    en: >-
+      The deduplication phase receives normalized Document references and a read-only, version-pinned reference-state
+      manifest. For each candidate it computes or reads identifiers and content digests according to the declared comparison
+      strategy, records match evidence, reference-state digest, and activity time, then produces a separate
+      DeduplicationDecision. If a later MemoryWrite adds, updates, or skips because of that decision, that side effect is
+      recorded on the write activity; this phase records only comparison process and judgment basis.
+    ja: >-
+      deduplication phase は正規化された Document reference と read-only かつ version-pinned の reference-state manifest を受け取ります。
+      各 candidate について、宣言された comparison strategy に従って identifier と content digest を計算または読取り、match evidence、
+      reference-state digest、activity time を記録し、別個の DeduplicationDecision を生成します。後続の MemoryWrite が decision により
+      add、update、skip を行う場合、その side effect は write activity に記録されます。この phase は comparison process と judgment basis
+      だけを記録します。
+  typical_input:
+    - description: Candidate document and pinned reference state
+      format: |
+        {
+          "activity_id": "deduplicate-policy-42-03",
+          "phase_id": "deduplicate-policy-42-03",
+          "ingestion_run_ref": "ingest-policy-directory-42",
+          "sequence_number": 3,
+          "phase_kind": "deduplicate",
+          "input_resource_refs": ["dir-policy-2026-07"],
+          "input_information_refs": ["document-policy-17"],
+          "comparison_strategy": "exact-id-and-digest",
+          "reference_state_digest": "sha256:document-state-policy-v12",
+          "input_document_refs": ["document-policy-17"],
+          "status": "running"
+        }
+  typical_output:
+    - description: Separate deduplication decision handoff
+      format: |
+        {
+          "activity_id": "deduplicate-policy-42-03",
+          "ended_at": "2026-07-18T09:00:42Z",
+          "status": "completed",
+          "decision_refs": ["decision-policy-17-v12"],
+          "outcome": "update"
+        }
+  reference_implementations:
+    - name: Node.js crypto createHash
+      url: https://nodejs.org/api/crypto.html
+      description: Documents createHash for generating hash digests with algorithms such as SHA-256.
+    - name: LangChain vector store interface
+      url: https://docs.langchain.com/oss/python/integrations/vectorstores
+      description: Documents adding Documents by ID, deleting by ID, and similarity search as separate vector-store operations.
+    - name: W3C PROV-O
+      url: https://www.w3.org/TR/prov-o/
+      description: Defines activities that use entities and generate separate entities with time bounds.
 structure:
   identity_keys:
     - phase_id
+    - ingestion_run_ref
   fields:
+    - id: activity_id
+      labels:
+        zh: 活动标识
+        en: activity ID
+        ja: アクティビティ ID
+      definitions:
+        zh: 稳定标识实际发生的去重比较活动，而不是决定、候选文档或后续写入。
+        en: Stably identifies the deduplication comparison activity that actually occurred rather than a decision, candidate Document, or later write.
+        ja: decision、candidate Document、後続 write ではなく、実際に発生した deduplication comparison activity を安定して識別します。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      allowed_values: []
+      pattern: null
+      example_value: deduplicate-policy-42-03
+      source_claims:
+        - claim-deduplication-activity-identity
     - id: phase_id
       labels:
         zh: 阶段标识
         en: phase ID
-        ja: phase ID
+        ja: フェーズ ID
+      definitions:
+        zh: 在所属运行内稳定标识去重局部步骤，可等于 activity_id 但不等同于完整运行标识。
+        en: Stably identifies the local deduplication step within its owning run and can equal activity_id without equaling complete-run identity.
+        ja: 所属 run 内の局所 deduplication step を安定して識別し、activity_id と同じ値でも complete-run identity と同じではありません。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 稳定标识去重阶段。
-        en: Stable identifier for the deduplication phase.
-        ja: deduplication phaseの安定識別子です。
       allowed_values: []
       pattern: null
-      example_value: dedup-17
+      example_value: deduplicate-policy-42-03
       source_claims:
-        - claim-deduplication-activity-002
-    - id: dedup_strategy
+        - claim-deduplication-activity-identity
+    - id: ingestion_run_ref
       labels:
-        zh: 去重策略
-        en: deduplication strategy
-        ja: deduplication strategy
+        zh: 所属摄入运行引用
+        en: owning ingestion-run reference
+        ja: 所属取り込み run 参照
+      definitions:
+        zh: 引用编排该比较阶段并拥有端到端结果的 IngestionRun，而不是参考状态存储或写入目标。
+        en: References the IngestionRun that orchestrates this comparison phase and owns the end-to-end result rather than the reference-state store or write target.
+        ja: reference-state store や write target ではなく、この comparison phase を編成して end-to-end result を所有する IngestionRun を参照します。
+      datatype: reference
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      allowed_values: []
+      pattern: null
+      example_value: ingest-policy-directory-42
+      source_claims:
+        - claim-deduplication-activity-phase
+    - id: sequence_number
+      labels:
+        zh: 阶段顺序号
+        en: phase sequence number
+        ja: フェーズ順序番号
+      definitions:
+        zh: 记录去重比较在所属运行内的正整数顺序，不是比较分数、重试次数或全局序列。
+        en: Records the positive integer order of the deduplication comparison inside its owning run rather than a comparison score, retry count, or global sequence.
+        ja: comparison score、retry count、global sequence ではなく、所属 run 内の deduplication comparison の正の整数 order を記録します。
+      datatype: integer
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      allowed_values: []
+      pattern: null
+      example_value: 3
+      source_claims:
+        - claim-deduplication-activity-phase
+    - id: phase_kind
+      labels:
+        zh: 父阶段职责类型
+        en: parent phase responsibility kind
+        ja: 親フェーズ責務種別
+      definitions:
+        zh: 保留 IngestionPhase 的单一职责字段；去重活动必须明确标为 deduplicate，不以比较策略代替阶段职责。
+        en: Retains IngestionPhase's single-responsibility field; a deduplication activity must explicitly be deduplicate rather than using comparison strategy as the phase kind.
+        ja: IngestionPhase の単一責務 field を保持し、deduplication activity は comparison strategy を phase kind とせず明示的に deduplicate でなければなりません。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
+      allowed_values:
+        - deduplicate
+      pattern: null
+      example_value: deduplicate
+      source_claims:
+        - claim-deduplication-activity-phase
+    - id: input_resource_refs
+      labels:
+        zh: 父活动输入资源引用
+        en: parent-activity input resource references
+        ja: 親活動入力リソース参照
       definitions:
-        zh: 固定身份键与摘要比较规则。
-        en: Fixes identity-key and digest comparison rules.
-        ja: identity keyとdigest比較規則を固定します。
+        zh: 保留拥有该去重阶段的摄入活动实际读取的版本化来源资源，不把候选 Document 误作原始资源。
+        en: Retains versioned source resources actually read by the ingestion activity owning this deduplication phase without mistaking candidate Documents for original resources.
+        ja: candidate Document を元の resource と誤認せず、この deduplication phase を所有する ingestion activity が実際に読んだ versioned source resource を保持します。
+      datatype: array
+      required: true
+      cardinality:
+        min: 1
+        max: null
       allowed_values: []
       pattern: null
-      example_value: doc-id+hash
+      example_value:
+        - dir-policy-2026-07
       source_claims:
-        - claim-deduplication-activity-003
+        - claim-deduplication-activity-phase
+    - id: input_information_refs
+      labels:
+        zh: 父阶段输入信息引用
+        en: parent-phase input information references
+        ja: 親フェーズ入力情報参照
+      definitions:
+        zh: 保留阶段转换的局部信息表示；本节点的 input_document_refs 是其中用于固定状态比较的文档子集。
+        en: Retains local information representations transformed by the phase; this node's input_document_refs are the Document subset used for fixed-state comparison.
+        ja: phase が変換する局所 information representation を保持し、この node の input_document_refs は固定 state comparison に使う Document subset です。
+      datatype: array
+      required: true
+      cardinality:
+        min: 1
+        max: null
+      allowed_values: []
+      pattern: null
+      example_value:
+        - document-policy-17
+      source_claims:
+        - claim-deduplication-activity-usage
+    - id: comparison_strategy
+      labels:
+        zh: 比较策略
+        en: comparison strategy
+        ja: 比較戦略
+      definitions:
+        zh: 固定本阶段用于候选与参考状态比较的精确身份和摘要规则，而不是供用户检索的相似度查询。
+        en: Fixes exact identity and digest rules used to compare candidates with reference state in this phase rather than a similarity query for user retrieval.
+        ja: user retrieval 用の similarity query ではなく、この phase で candidate と reference state を比較するための exact identity と digest rule を固定します。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      allowed_values:
+        - exact-id-and-digest
+        - exact-digest
+        - business-key-and-digest
+      pattern: null
+      example_value: exact-id-and-digest
+      source_claims:
+        - claim-deduplication-activity-comparison
     - id: reference_state_digest
       labels:
-        zh: 参照状态摘要
+        zh: 参考状态摘要
         en: reference-state digest
-        ja: 参照状態digest
+        ja: 参照状態ダイジェスト
+      definitions:
+        zh: 记录用于比较的既有文档标识和摘要清单的算法标记摘要，从而固定判断看到的状态而非某一文档的内容。
+        en: Records an algorithm-tagged digest of the prior document-identity and digest manifest used for comparison, pinning the state seen by the judgment rather than content of one document.
+        ja: 一つの document の content ではなく、comparison に使用した既存 document identity と digest manifest の algorithm-tagged digest を記録し、judgment が見た state を固定します。
       datatype: string
       required: true
       cardinality:
         min: 1
         max: 1
-      definitions:
-        zh: 固定比较时读取的既有状态。
-        en: Fixes the prior state read for comparison.
-        ja: 比較時に読んだ既存状態を固定します。
       allowed_values: []
       pattern: null
-      example_value: sha256:docstore17
+      example_value: sha256:document-state-policy-v12
       source_claims:
-        - claim-deduplication-activity-004
-  constraints: []
-  required_relation_constraints: []
+        - claim-deduplication-activity-digest
+    - id: input_document_refs
+      labels:
+        zh: 候选文档引用
+        en: candidate document references
+        ja: 候補ドキュメント参照
+      definitions:
+        zh: 引用本阶段实际比较的规范化 Document 版本，而不是整个运行的所有来源或历史记录。
+        en: References normalized Document versions actually compared by this phase rather than every source of the run or all historical records.
+        ja: run のすべての source やすべての履歴 record ではなく、この phase が実際に比較する正規化 Document version を参照します。
+      datatype: array
+      required: true
+      cardinality:
+        min: 1
+        max: null
+      allowed_values: []
+      pattern: null
+      example_value:
+        - document-policy-17
+      source_claims:
+        - claim-deduplication-activity-usage
+    - id: decision_refs
+      labels:
+        zh: 去重决定引用
+        en: deduplication decision references
+        ja: 重複排除決定参照
+      definitions:
+        zh: 可选引用本活动为候选文档生成的独立 DeduplicationDecision，而不是将决定结果写入活动身份。
+        en: Optionally references separate DeduplicationDecisions generated by this activity for candidate Documents rather than writing decision results into activity identity.
+        ja: decision result を activity identity に書き込まず、この activity が candidate Document に対して生成した別個の DeduplicationDecision を任意で参照します。
+      datatype: array
+      required: false
+      cardinality:
+        min: 0
+        max: null
+      allowed_values: []
+      pattern: null
+      example_value:
+        - decision-policy-17-v12
+      source_claims:
+        - claim-deduplication-activity-generation
+    - id: started_at
+      labels:
+        zh: 开始时间
+        en: started at
+        ja: 開始時刻
+      definitions:
+        zh: 记录开始读取候选和参考状态的时间点，独立于候选文档创建时间。
+        en: Records when candidate and reference state began being read independently of candidate Document creation time.
+        ja: candidate Document の creation time とは独立に、candidate と reference state の読取りを開始した時点を記録します。
+      datatype: date-time
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      allowed_values: []
+      pattern: null
+      example_value: "2026-07-18T09:00:30Z"
+      source_claims:
+        - claim-deduplication-activity-temporal
+    - id: ended_at
+      labels:
+        zh: 结束时间
+        en: ended at
+        ja: 終了時刻
+      definitions:
+        zh: 可选记录比较阶段完成、失败或取消的时间点；状态为 running 时不应声称有结束时间。
+        en: Optionally records when the comparison phase completed, failed, or was cancelled; a running phase must not claim an end time.
+        ja: comparison phase が completed、failed、cancelled になった時点を任意で記録し、running phase は end time を主張してはなりません。
+      datatype: date-time
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      allowed_values: []
+      pattern: null
+      example_value: "2026-07-18T09:00:42Z"
+      source_claims:
+        - claim-deduplication-activity-temporal
+    - id: status
+      labels:
+        zh: 活动状态
+        en: activity status
+        ja: アクティビティ状態
+      definitions:
+        zh: 声明此比较活动的运行状态，不将新增、更新或跳过的业务决定值作为活动状态。
+        en: Declares run state of this comparison activity without using admit, update, or skip business-decision values as activity status.
+        ja: admit、update、skip の business-decision value を activity status とせず、この comparison activity の run state を宣言します。
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      allowed_values:
+        - running
+        - completed
+        - failed
+        - cancelled
+      pattern: null
+      example_value: completed
+      source_claims:
+        - claim-deduplication-activity-temporal
+  constraints:
+    - id: deduplication-activity-comparison-contract
+      severity: error
+      expression_language: plain
+      expression: >-
+        activity_id, phase_id, ingestion_run_ref, sequence_number, phase_kind, input_resource_refs,
+        input_information_refs, comparison_strategy, reference_state_digest, input_document_refs, started_at, and status
+        are required. sequence_number must be positive and unique within the
+        owning run. comparison_strategy must be one allowed exact comparison strategy. reference_state_digest must identify
+        the version-pinned state manifest used for judgment. ended_at is absent while running and required in terminal
+        states. A completed activity must reference at least one decision_refs value. A decision, source document, memory
+        write, memory store, retrieval query, vector index, loader, policy text, or prompt context cannot substitute for the
+        comparison activity.
+      explanation:
+        zh: 去重活动必须把输入候选、比较规则和判断所见的参考状态固定在同一局部阶段中；决定及其副作用保持为不同的可审计事实。
+        en: A deduplication activity must pin input candidates, comparison rule, and reference state seen by judgment in one local phase; decisions and their side effects remain different auditable facts.
+        ja: deduplication activity は input candidate、comparison rule、judgment が見た reference state を一つの局所 phase 内で固定しなければなりません。decision とその side effect は別個の監査可能な fact として残ります。
+      source_claims:
+        - claim-deduplication-activity-temporal
+        - claim-deduplication-activity-usage
+        - claim-deduplication-activity-digest
+        - claim-deduplication-activity-generation
+        - claim-deduplication-activity-boundary
+  required_relations: []
 examples:
-  - id: DeduplicationActivity-example-positive-manual-20260716
-    kind: positive
+  - id: deduplication-activity-positive
+
     labels:
-      zh: 去重活动正例
-      en: "Positive case: Deduplication activity"
-      ja: 重複排除activity正例
-    scenario_id: null
+      zh: 完成的文档更新比较
+      en: Completed document update comparison
+      ja: 完了したドキュメント更新比較
+
     descriptions:
-      zh: dedup-17 是 ingest-run-17 的第二阶段；它按 policy@4 比较 document-policy-v7 的 document_id 与内容哈希、读取 docstore 既有哈希，并形成 outcome=update 的 decision-17。
-      en: dedup-17 is the second phase of ingest-run-17; under policy@4 it compares document-policy-v7's document ID and content hash with the docstore hash and forms decision-17 with outcome update.
-      ja: dedup-17 は ingest-run-17 の第二 phase で policy@4 に従い document ID・content hash を docstore hash と比較し outcome=update の decision-17 を形成します。
+      zh: LlamaIndex SimpleDirectoryReader + VectorStoreIndex.from_documents；KnowledgeGraphIndex；LangChain PyPDFLoader Document(page_content, metadata)。
+      en: LlamaIndex SimpleDirectoryReader + VectorStoreIndex.from_documents; KnowledgeGraphIndex; LangChain PyPDFLoader Document(page_content, metadata).
+      ja: LlamaIndex SimpleDirectoryReader + VectorStoreIndex.from_documents。KnowledgeGraphIndex。LangChain PyPDFLoader Document。
     field_values:
-      phase_id: dedup-17
-      dedup_strategy: doc-id+hash
-      reference_state_digest: sha256:docstore17
-      ingestion_run_id: ingest-run-17
-      sequence: 2
-      activity_id: dedup-17
-      started_at: 2026-07-16T10:03:00Z
+      activity_id: deduplicate-policy-42-03
+      phase_id: deduplicate-policy-42-03
+      ingestion_run_ref: ingest-policy-directory-42
+      sequence_number: 3
+      phase_kind: deduplicate
+      input_resource_refs:
+        - dir-policy-2026-07
+      input_information_refs:
+        - document-policy-17
+      comparison_strategy: exact-id-and-digest
+      reference_state_digest: sha256:document-state-policy-v12
+      input_document_refs:
+        - document-policy-17
+      decision_refs:
+        - decision-policy-17-v12
+      started_at: "2026-07-18T09:00:30Z"
+      ended_at: "2026-07-18T09:00:42Z"
       status: completed
     related_node_ids:
       - DeduplicationActivity
-    related_relation_ids: []
-    expected_result:
-      zh: 将 dedup-17 识别为 DeduplicationActivity，并把其输入、比较策略和决定输出保留在同一阶段证据中。
-      en: Identify dedup-17 as DeduplicationActivity and retain its input, comparison strategy, and decision output in the same phase evidence.
-      ja: dedup-17 を DeduplicationActivity とし input、comparison strategy、decision output を同一 phase evidence に保持します。
-    why_valid_or_invalid:
-      zh: 该活动具有持续时间、运行归属、去重比较行为和独立决定产物，符合阶段活动而非信息记录。
-      en: The record has duration, run membership, duplicate-comparison behavior, and a separate decision product, making it a phase activity rather than information.
-      ja: duration、run membership、duplicate comparison、separate decision product があり information でなく phase activity です。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - IngestionPhase
+      - IngestionRun
+      - Document
+      - DeduplicationDecision
+    related_relation_ids:
+      - DeduplicationActivity-is_a-IngestionPhase
+      - DeduplicationActivity-consumes-Document
+      - DeduplicationDecision-was-generated-by-DeduplicationActivity
+
     source_claims:
-      - claim-deduplication-activity-005
-  - id: DeduplicationActivity-example-boundary-manual-20260716
-    kind: boundary
+      - claim-deduplication-activity-comparison
+      - claim-deduplication-activity-digest
+      - claim-deduplication-activity-generation
+  - id: deduplication-activity-counterexample
+
     labels:
-      zh: 去重活动边界例
-      en: "Boundary case: Deduplication activity"
-      ja: 重複排除activity境界例
-    scenario_id: null
+      zh: 去重决定不是去重活动
+      en: Deduplication decision is not the activity
+      ja: 重複排除決定はアクティビティではない
+
     descriptions:
-      zh: write-17 读取已完成的 decision-17 并把获准 Document 写入 MemoryStore；它不重新比较文档摘要，也不产生去重判断。
-      en: write-17 consumes completed decision-17 and writes an admitted Document to MemoryStore; it neither compares document digests again nor produces a deduplication judgment.
-      ja: write-17 は完了 decision-17 を読み admitted Document を MemoryStore へ書きますが digest 比較も dedup judgment 生成も行いません。
-    field_values: {}
+      zh: 反例：DocumentLoader 输出无 DocumentMetadata source/page 就进入 EmbeddingRun，丢失 ChunkProvenance。
+      en: Counterexample: DocumentLoader output enters EmbeddingRun without DocumentMetadata source/page, losing ChunkProvenance.
+      ja: 反例：DocumentLoader 出力が DocumentMetadata source/page なしで EmbeddingRun へ。
+    field_values:
+      decision_id: decision-policy-17-v12
+      outcome: update
+      candidate_document_ref: document-policy-17
+      activity_id: absent
+      started_at: absent
+      reference_state_digest: absent
     related_node_ids:
       - DeduplicationActivity
-    related_relation_ids: []
-    expected_result:
-      zh: 把 write-17 归入后续记忆写入活动，不归入 DeduplicationActivity。
-      en: Keep write-17 in the downstream memory-write activity and exclude it from DeduplicationActivity.
-      ja: write-17 は downstream memory-write activity とし DeduplicationActivity から除外します。
-    why_valid_or_invalid:
-      zh: 执行去重决定和生成去重决定是不同生命周期阶段；只有后者承担比较与判断责任。
-      en: Executing a deduplication decision and generating it are different lifecycle stages; only the latter bears comparison and judgment responsibility.
-      ja: dedup decision の実行と生成は別 lifecycle stage で、比較・判断責任を担うのは後者だけです。
-    synthetic: true
-    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      - DeduplicationDecision
+    related_relation_ids:
+      - DeduplicationDecision-was-generated-by-DeduplicationActivity
+
     source_claims:
-      - claim-deduplication-activity-006
-external_mappings: []
-applicability:
-  - core
-sibling_differentiation: []
+      - claim-deduplication-activity-boundary
+  - id: deduplication-activity-boundary
+
+    labels:
+      zh: 仅进行相似度检索的查询
+      en: Query performing only similarity retrieval
+      ja: 類似検索だけを行うクエリ
+
+    descriptions:
+      zh: IngestionRun 产出 Document vs ChunkingRun 分割；GraphStore node/edge vs TextCorpus 资源类型边界。
+      en: IngestionRun produces Document vs ChunkingRun splits; GraphStore node/edge vs TextCorpus resource type boundary.
+      ja: IngestionRun Document 生成 vs ChunkingRun 分割。GraphStore vs TextCorpus 境界。
+    field_values:
+      query_id: retrieve-policy-query
+      query_text: policy retention
+      candidate_document_refs:
+        - document-policy-17
+      comparison_strategy: absent
+      reference_state_digest: absent
+      decision_refs: []
+    related_node_ids:
+      - DeduplicationActivity
+      - VectorIndex
+      - Document
+    related_relation_ids: []
+
+    source_claims:
+      - claim-deduplication-activity-boundary
+  - id: deduplication-activity-instance
+
+    labels:
+      zh: 实例：失败的状态清单读取
+      en: "Instance: failed state-manifest read"
+      ja: "事例：失敗した state-manifest 読取り"
+
+    descriptions:
+      zh: LlamaIndex PDFReader load_data → Document list metadata file_name/page_label → downstream RAPTOR chunking。
+      en: LlamaIndex PDFReader load_data → Document list metadata file_name/page_label → downstream RAPTOR chunking.
+      ja: LlamaIndex PDFReader→Document list metadata→downstream RAPTOR chunking。
+    field_values:
+      activity_id: deduplicate-contract-51-05
+      phase_id: deduplicate-contract-51-05
+      ingestion_run_ref: ingest-contract-51
+      sequence_number: 5
+      phase_kind: deduplicate
+      input_resource_refs:
+        - file-contract-v51
+      input_information_refs:
+        - document-contract-51
+      comparison_strategy: exact-id-and-digest
+      reference_state_digest: sha256:unverified-contract-state-v8
+      input_document_refs:
+        - document-contract-51
+      decision_refs: []
+      started_at: "2026-07-18T10:00:43Z"
+      ended_at: "2026-07-18T10:00:45Z"
+      status: failed
+    related_node_ids:
+      - DeduplicationActivity
+      - IngestionRun
+      - Document
+      - ObservabilityEvent
+    related_relation_ids:
+      - DeduplicationActivity-is_a-IngestionPhase
+
+    source_claims:
+      - claim-deduplication-activity-temporal
+      - claim-deduplication-activity-digest
 parent_relation:
   id: DeduplicationActivity-is_a-IngestionPhase
   predicate: is_a
-  direction: target-to-source
+  target: concept:IngestionPhase
+  endpoint_order: child-to-parent
+  direction: source-to-target
   relation_kind: hierarchy
   labels:
-    zh: 是一种
-    en: is a
-    ja: の一種である
+    zh: 是摄入阶段的去重特化
+    en: is a deduplication specialization of ingestion phase
+    ja: 取り込みフェーズの重複排除特化である
   definitions:
-    zh: DeduplicationActivity 是 IngestionPhase 的严格子类；种差为：消费规范 Document、比较既有身份/摘要并产生 DeduplicationDecision。
-    en: "DeduplicationActivity is a strict subtype of IngestionPhase; its reviewed differentia is: it consumes canonical Document, compares prior identity or hash state, and produces DeduplicationDecision."
-    ja: DeduplicationActivity は IngestionPhase の厳密なsubtypeで、審査済み種差は「canonical Documentを消費し既存identity/hash状態を比較して DeduplicationDecisionを生成します。」です。
-  cardinality: null
-  cardinality_not_applicable_reason:
-    zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
-    en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
-    ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
+    zh: DeduplicationActivity 是在一个摄入运行内固定参考状态并为候选文档生成去重决定的 IngestionPhase。
+    en: DeduplicationActivity is an IngestionPhase that fixes reference state and generates deduplication decisions for candidate Documents inside one ingestion run.
+    ja: DeduplicationActivity は一つの ingestion run 内で reference state を固定し、candidate Document に対する deduplication decision を生成する IngestionPhase です。
+  cardinality:
+    source:
+      min: 0
+      max: null
+    target:
+      min: 1
+      max: 1
+  cardinality_not_applicable_reason: null
   inverse_reading:
-    predicate: part_of
+    predicate: has_specialization
     labels:
-      zh: 反向读取
-      en: inverse reading
-      ja: 逆方向読取
+      zh: 有去重特化
+      en: has deduplication specialization
+      ja: 重複排除特化を持つ
   conditions:
-    - id: DeduplicationActivity-is_a-IngestionPhase-condition-manual-001
+    - id: deduplication-activity-is-a-phase-condition
       severity: error
       expression_language: plain
-      expression: "Assert only when the object first satisfies IngestionPhase and also satisfies the differentia: it consumes canonical Document, compares prior identity or hash state, and produces DeduplicationDecision."
-      explanations:
-        zh: 仅当对象首先满足 IngestionPhase 定义且满足种差“消费规范 Document、比较既有身份/摘要并产生 DeduplicationDecision。”时成立。
-        en: "Assert only when the object first satisfies IngestionPhase and also satisfies the differentia: it consumes canonical Document, compares prior identity or hash state, and produces DeduplicationDecision."
-        ja: 対象がまず IngestionPhase を満たし、さらに種差「canonical Documentを消費し既存identity/hash状態を比較して DeduplicationDecisionを生成します。」を満たす時だけ成立します。
+      expression: >-
+        Assert the specialization only when an object satisfies IngestionPhase identity and additionally fixes a
+        reference_state_digest, uses candidate Document references, applies one exact comparison strategy, and produces
+        separate DeduplicationDecisions in a completed state. A decision, write, retrieval query, vector index, source
+        document, loader, or policy text does not satisfy this differentia.
+      explanation:
+        zh: 去重特化在上位阶段身份之外还需要固定参考状态、候选比较和独立决定生成；决定本身或后续写入不具备这些过程种差。
+        en: The deduplication specialization additionally requires fixed reference state, candidate comparison, and separate decision generation beyond parent-phase identity; the decision itself or later write lacks these process differentiae.
+        ja: deduplication specialization には親 phase identity に加えて固定 reference state、candidate comparison、別個の decision generation が必要です。decision 自体や後続 write にはこれらの process differentia がありません。
       source_claims:
-        - claim-deduplication-activity-007
-  temporal_scope: timeless
-  boundary_context: null
+        - claim-deduplication-activity-specialization
+  temporal_scope: valid-time
+  boundary_context: The comparison is scoped to an owning run and reference-state version; decision and write effects remain distinct facts.
   constraints: []
-  examples:
-    - id: DeduplicationActivity-is_a-IngestionPhase-example-positive-manual-20260716
-      kind: positive
-      labels:
-        zh: 是一种正例
-        en: "Positive case: is a"
-        ja: の一種である正例
-      scenario_id: null
-      descriptions:
-        zh: dedup-17 具有 ingest-run-17 内唯一 phase_id、sequence=2、局部时间和输入输出，并以比较 document_id/hash、形成处置决定作为专门行为。
-        en: dedup-17 has a run-unique phase ID, sequence 2, local time, inputs, and outputs inside ingest-run-17 and specializes the phase by comparing document identity and hash and forming a disposition decision.
-        ja: dedup-17 は run-unique phase ID、sequence 2、local time、inputs/outputs を持ち document identity/hash 比較と decision 形成を行います。
-      field_values: {}
-      related_node_ids:
-        - DeduplicationActivity
-        - IngestionPhase
-      related_relation_ids:
-        - DeduplicationActivity-is_a-IngestionPhase
-      expected_result:
-        zh: 确认 dedup-17 同时属于 DeduplicationActivity、IngestionPhase 与 IngestionActivity。
-        en: Confirm that dedup-17 belongs to DeduplicationActivity, IngestionPhase, and IngestionActivity.
-        ja: dedup-17 を DeduplicationActivity、IngestionPhase、IngestionActivity に所属させます。
-      why_valid_or_invalid:
-        zh: 它先满足运行内局部活动的上位条件，再以去重比较和决定输出满足专门种差。
-        en: It first satisfies the parent conditions for a run-local activity and then satisfies the specialized differentia through duplicate comparison and decision output.
-        ja: run-local activity parent 条件を満たし duplicate comparison・decision output で differentia を満たします。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-deduplication-activity-007
-    - id: DeduplicationActivity-is_a-IngestionPhase-example-boundary-manual-20260716
-      kind: boundary
-      labels:
-        zh: 是一种边界例
-        en: "Boundary case: is a"
-        ja: の一種である境界例
-      scenario_id: null
-      descriptions:
-        zh: write-17 虽然在 ingest-run-17 之后发生并读取 decision-17，但它执行持久化，不比较文档身份，也不是该运行声明的 phase。
-        en: write-17 occurs after ingest-run-17 and reads decision-17 but performs persistence, compares no document identity, and is not a declared phase of that run.
-        ja: write-17 は run 後に persistence を行うが document identity を比較せず declared phase でもありません。
-      field_values: {}
-      related_node_ids:
-        - DeduplicationActivity
-        - IngestionPhase
-      related_relation_ids:
-        - DeduplicationActivity-is_a-IngestionPhase
-      expected_result:
-        zh: 不要把 write-17 归入 DeduplicationActivity 或该运行的 IngestionPhase。
-        en: Do not classify write-17 as DeduplicationActivity or as an IngestionPhase of that run.
-        ja: write-17 を DeduplicationActivity や当該 IngestionPhase に分類しません。
-      why_valid_or_invalid:
-        zh: 时间相邻与读取决定不等于承担去重阶段责任；必须同时具备运行成员资格和比较行为。
-        en: Temporal adjacency and reading a decision do not confer deduplication-phase responsibility; run membership and comparison behavior are both required.
-        ja: temporal adjacency・decision read だけで dedup phase responsibility はなく run membership・comparison behavior が必要です。
-      synthetic: true
-      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-      source_claims:
-        - claim-deduplication-activity-007
+  examples: []
   source_claims:
-    - claim-deduplication-activity-007
-  distinct_fact_rationale: null
+    - claim-deduplication-activity-specialization
+  distinct_fact_rationale: This hierarchy captures comparison-process specialization while decisions, documents, and write side effects remain separate.
   layout_role: primary-backbone
-  review_status: accepted
-  endpoint_order: child-to-parent
 relations:
+  - id: DeduplicationActivity-generates-DeduplicationDecision
+    predicate: generates
+    target: concept:DeduplicationDecision
+    endpoint_order: source-to-target
+    direction: source-to-target
+    relation_kind: causal
+    labels:
+      zh: 生成去重决定
+      en: generates deduplication decision
+      ja: deduplication decision を生成する
+    definitions:
+      zh: 完成的 DeduplicationActivity 可为实际比较过的候选文档生成独立的 DeduplicationDecision。
+      en: A completed DeduplicationActivity can generate an independent DeduplicationDecision for a candidate document it actually compared.
+      ja: completed DeduplicationActivity は実際に比較した candidate document に対して独立した DeduplicationDecision を生成できる。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 一个比较活动可生成零个或多个决定，取决于候选数量和终态。
+      en: One comparison activity may generate zero or more decisions depending on candidate count and terminal state.
+      ja: 一つの comparison activity は candidate 数と terminal state に応じて zero 又は複数の decision を生成できる。
+    inverse_reading:
+      predicate: has_generated_deduplication_decision
+      labels:
+        zh: 有已生成的去重决定
+        en: has generated deduplication decision
+        ja: 生成済み deduplication decision を持つ
+    conditions:
+      - id: deduplication-activity-generates-decision-condition
+        severity: error
+        expression_language: plain
+        expression: Assert only when the activity is completed, decision_refs contains the decision ID, and the decision's generating_activity_ref, candidate, comparison strategy, reference state, and evidence all resolve to this activity.
+        explanation:
+          zh: 只有完成的活动、输出引用和决定中的生成者及证据一致时才可断言生成。
+          en: Assert generation only when completed activity, output reference, and the decision's generator and evidence agree.
+          ja: completed activity、output reference、decision の generator と evidence が一致する時だけ generation を断言する。
+        source_claims: [claim-deduplication-activity-generation]
+    temporal_scope: valid-time
+    boundary_context: Generating a decision does not perform the retention, deletion, or memory-write effect recommended by that decision.
+    constraints: []
+    examples: []
+    source_claims: [claim-deduplication-activity-generation]
+    distinct_fact_rationale: This captures an activity-to-decision provenance fact rather than a subtype or containment relation.
+    layout_role: cross-link
   - id: DeduplicationActivity-consumes-Document
     predicate: consumes
+    target: concept:Document
+    endpoint_order: source-to-target
     direction: source-to-target
     relation_kind: information
     labels:
-      zh: 消费文档
-      en: consumes document
-      ja: documentを消費する
+      zh: 消费候选文档
+      en: consumes candidate document
+      ja: 候補ドキュメントを消費する
     definitions:
-      zh: DeduplicationActivity —consumes→ Document 表示该规范文档版本进入身份与摘要比较输入。
-      en: DeduplicationActivity —consumes→ Document means that this canonical document version enters identity and hash comparison input.
-      ja: DeduplicationActivity —consumes→ Document はこのcanonical document版がidentity/hash比較入力へ入ることを表します。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 该关系以逐事实约束表达，不在 schema 层强加统一实例基数。
-      en: This relation is constrained per fact; no uniform instance cardinality is imposed at schema level.
-      ja: このrelationはfact単位で制約しschema層で一律instance cardinalityを課しません。
+      zh: DeduplicationActivity 消费一个 Document 表示其版本化内容和身份被纳入本阶段的比较输入。
+      en: DeduplicationActivity consumes a Document when its versioned content and identity are included in this phase's comparison input.
+      ja: DeduplicationActivity が Document を consumes するのは、その versioned content と identity がこの phase の comparison input に含まれる時です。
+    cardinality:
+      source:
+        min: 1
+        max: null
+      target:
+        min: 0
+        max: null
+    cardinality_not_applicable_reason: null
     inverse_reading:
-      predicate: inverse_consumes
+      predicate: is_consumed_by
       labels:
-        zh: 反向读取
-        en: inverse reading
-        ja: 逆方向読取
+        zh: 被候选比较消费
+        en: is consumed by candidate comparison
+        ja: 候補比較に消費される
     conditions:
-      - id: DeduplicationActivity-consumes-Document-condition-manual-001
+      - id: deduplication-activity-consumes-document-condition
         severity: error
         expression_language: plain
-        expression: Assert only when the activity input digest or manifest explicitly contains the target document ID and content digest.
-        explanations:
-          zh: 仅当活动 input_digest/manifest 明确包含目标 document_id 与内容摘要时成立。
-          en: Assert only when the activity input digest or manifest explicitly contains the target document ID and content digest.
-          ja: activity input digest/manifestがtarget document IDとcontent digestを明示包含する時だけ成立します。
+        expression: >-
+          Assert consumption only when the Document reference appears in activity.input_document_refs and its document
+          identity and content digest are read under the declared comparison_strategy. Shared source provenance, an output
+          reference, or a retrieval result alone does not establish consumption.
+        explanation:
+          zh: 消费关系需要该文档是实际比较输入并有身份摘要读取证据，不能从共同来源、输出引用或检索结果推断。
+          en: Consumption requires the Document to be actual comparison input with identity-and-digest read evidence; it cannot be inferred from shared provenance, output reference, or retrieval result.
+          ja: consumption には Document が実際の comparison input であり identity-and-digest read evidence を持つことが必要で、shared provenance、output reference、retrieval result から推論できません。
         source_claims:
-          - claim-deduplication-activity-008
-    temporal_scope: timeless
-    boundary_context: null
+          - claim-deduplication-activity-usage
+    temporal_scope: valid-time
+    boundary_context: Consumption is scoped to this activity and candidate version and does not make the Document part of the activity identity.
     constraints: []
-    examples:
-      - id: DeduplicationActivity-consumes-Document-example-positive-manual-20260716
-        kind: positive
-        labels:
-          zh: 消费文档正例
-          en: "Positive case: consumes document"
-          ja: documentを消費する正例
-        scenario_id: null
-        descriptions:
-          zh: dedup-17 的 input manifest 明确列出 document-policy-v7@c7，并在比较日志中读取其 document_id 与内容哈希作为 policy@4 的去重键。
-          en: dedup-17's input manifest explicitly lists document-policy-v7@c7, and its comparison log reads the document ID and content hash as policy@4's deduplication key.
-          ja: dedup-17 input manifest が document-policy-v7@c7 を列挙し comparison log が document ID・hash を dedup key として読みます。
-        field_values: {}
-        related_node_ids:
-          - DeduplicationActivity
-          - Document
-        related_relation_ids:
-          - DeduplicationActivity-consumes-Document
-        expected_result:
-          zh: 建立 dedup-17 consumes document-policy-v7，保留文档摘要 c7 作为输入版本。
-          en: Assert dedup-17 consumes document-policy-v7 while retaining digest c7 as the input version.
-          ja: dedup-17 consumes document-policy-v7 を digest c7 付きで確立します。
-        why_valid_or_invalid:
-          zh: 输入清单与实际比较访问同时指向同一文档版本，证明它被活动处理而非仅被提及。
-          en: Both the input manifest and actual comparison access point to the same Document version, proving activity consumption rather than mere mention.
-          ja: input manifest と actual comparison access が同一 Document version を指し consumption を証明します。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-deduplication-activity-008
-      - id: DeduplicationActivity-consumes-Document-example-boundary-manual-20260716
-        kind: boundary
-        labels:
-          zh: 消费文档边界例
-          en: "Boundary case: consumes document"
-          ja: documentを消費する境界例
-        scenario_id: null
-        descriptions:
-          zh: document-18 与 document-policy-v7 来自同一 PDF，但不在 dedup-17 的 input manifest 中，比较日志也没有读取其摘要。
-          en: document-18 comes from the same PDF as document-policy-v7 but is absent from dedup-17's input manifest and its digest is never read by the comparison log.
-          ja: document-18 は同一 PDF 由来でも dedup-17 manifest に無く digest も読まれません。
-        field_values: {}
-        related_node_ids:
-          - DeduplicationActivity
-          - Document
-        related_relation_ids:
-          - DeduplicationActivity-consumes-Document
-        expected_result:
-          zh: 不要因来源相关性建立 dedup-17 consumes document-18。
-          en: Do not assert dedup-17 consumes document-18 from shared provenance.
-          ja: shared provenance だけで dedup-17 consumes document-18 を確立しません。
-        why_valid_or_invalid:
-          zh: 共同来源只表示两个文档相关，不能替代该活动对确切输入版本的实际访问证据。
-          en: Shared provenance shows related Documents but cannot replace evidence that this activity actually accessed the exact input version.
-          ja: shared provenance は related Documents を示すだけで exact input access evidence を代替できません。
-        synthetic: true
-        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
-        source_claims:
-          - claim-deduplication-activity-008
+    examples: []
     source_claims:
-      - claim-deduplication-activity-008
-    distinct_fact_rationale: null
+      - claim-deduplication-activity-usage
+    distinct_fact_rationale: This relation records an actual comparison input separately from state lookup and decision output.
     layout_role: cross-link
-    review_status: accepted
-    target: concept:Document
-review:
-  status: accepted
-  method: manual-semantic
-  reviewer: manual-memory-ingestion-verification
-  reviewed_on: 2026-07-17
-  note:
-    zh: 已对照 Anthropic Contextual Retrieval、LangChain text splitters/document loaders、LlamaIndex node parsers/ingestion pipeline、Unstructured 解析模式与 ETL 去重策略逐项人工语义核验通过。
-    en: Manually verified against Anthropic Contextual Retrieval, LangChain text splitters and document loaders, LlamaIndex node parsers and ingestion pipeline, Unstructured parsing patterns, and ETL deduplication strategies.
-    ja: Anthropic Contextual Retrieval、LangChain text splitters/document loaders、LlamaIndex node parsers/ingestion pipeline、Unstructured 解析パターン、ETL 重複排除戦略に照らし手動意味審査を完了しました。
-  sections:
-    semantics: accepted
-    hierarchy: accepted
-    relations: accepted
-    structure: accepted
-    examples: accepted
-    source_claims: accepted
+sources:
+  - id: nist-fips-180-4
+    title: FIPS 180-4 Secure Hash Standard
+    url: https://csrc.nist.gov/pubs/fips/180-4/upd1/final
+    type: standard
+    source_type: standard
+    relevance: Specifies hash algorithms that generate message digests used to detect changes in messages.
+  - id: nodejs-crypto
+    title: Node.js Crypto API
+    url: https://nodejs.org/api/crypto.html
+    type: official-doc
+    source_type: official-doc
+    relevance: Documents createHash for generating digest values with algorithms including SHA-256.
+  - id: langchain-vectorstores
+    title: LangChain vector store integrations
+    url: https://docs.langchain.com/oss/python/integrations/vectorstores
+    type: official-doc
+    source_type: official-doc
+    relevance: Documents distinct add-by-ID delete-by-ID and similarity-search operations for Documents.
+  - id: w3c-prov-o
+    title: W3C PROV-O
+    url: https://www.w3.org/TR/prov-o/
+    type: standard
+    source_type: standard
+    relevance: Defines time-bounded activities that use entities and generate separate entities.
 source_claims:
-  - id: claim-deduplication-activity-001
-    source: eng-fw-llamaindex-ingestion-code
-    supports: LlamaIndex's current IngestionPipeline explicitly implements duplicate and upsert decisions from document IDs and hashes.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
+  - id: claim-deduplication-activity-digest
+    source: nist-fips-180-4
+    supports: >-
+      FIPS 180-4 specifies hash algorithms that generate message digests used to detect message changes. Moonweave uses
+      algorithm-tagged document and reference-state digests as comparison evidence and keeps them separate from document IDs.
+    locator: FIPS 180-4 abstract on message digests and change detection
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-deduplication-activity-002
-    source: eng-fw-llamaindex-ingestion-code
-    supports: DeduplicationActivity.phase_id records the auditable comparison activity; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
+  - id: claim-deduplication-activity-comparison
+    source: nodejs-crypto
+    supports: >-
+      Node.js documents createHash for generating a Hash object and digests with algorithms such as SHA-256. Moonweave
+      applies exact ID and digest comparison as a local deduplication policy inference rather than as a retrieval query.
+    locator: Node.js crypto createHash API and SHA-256 example
+    evidence_kind: ontology-design-inference
+    confidence: medium
+  - id: claim-deduplication-activity-identity
+    source: w3c-prov-o
+    supports: >-
+      PROV-O distinguishes independently identifiable activities from entities they use or generate. Moonweave identifies a
+      deduplication comparison activity separately from candidate Documents and resulting decisions.
+    locator: PROV-O section 3.1 Activity and Entity
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-deduplication-activity-003
-    source: eng-fw-llamaindex-ingestion-code
-    supports: DeduplicationActivity.dedup_strategy records reproducible duplicate classification; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
+  - id: claim-deduplication-activity-temporal
+    source: w3c-prov-o
+    supports: >-
+      PROV-O states that activities start and end at particular points in time. Moonweave records comparison start and
+      terminal end times separately from the decision outcome and reference-state digest.
+    locator: PROV-O section 3.1 on activity start and end times
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-deduplication-activity-004
-    source: eng-fw-llamaindex-ingestion-code
-    supports: DeduplicationActivity.reference_state_digest records the comparison baseline; the cited operational model exposes this datum, while Moonweave fixes its identity and audit role.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
+  - id: claim-deduplication-activity-usage
+    source: w3c-prov-o
+    supports: >-
+      PROV-O states that activities can use entities during their lifetime. Moonweave records candidate Document references
+      actually read by the comparison phase rather than inferring use from shared provenance or retrieval output.
+    locator: PROV-O section 3.1 on prov used and Entity Activity relations
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-deduplication-activity-005
-    source: eng-fw-llamaindex-ingestion-code
-    supports: LlamaIndex's _handle_duplicates and _handle_upserts compare document IDs and hashes and classify what to transform or delete.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
+  - id: claim-deduplication-activity-generation
+    source: w3c-prov-o
+    supports: >-
+      PROV-O states that activities can generate entities. Moonweave models a DeduplicationDecision as a separate entity
+      generated by a completed comparison activity rather than as the activity's status or a downstream memory write.
+    locator: PROV-O section 3.1 on prov wasGeneratedBy and generated entities
+    evidence_kind: ontology-design-inference
     confidence: high
-    review_status: accepted
-  - id: claim-deduplication-activity-006
-    source: eng-fw-llamaindex-ingestion-code
-    supports: LlamaIndex separates docstore update/delete operations from duplicate comparison decisions.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-deduplication-activity-007
-    source: eng-fw-llamaindex-ingestion-code
-    supports: LlamaIndex implements duplicate and upsert handling by document ID and hash.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
-  - id: claim-deduplication-activity-008
-    source: eng-fw-llamaindex-ingestion-code
-    supports: LlamaIndex duplicate/upsert handling operates over the documents/nodes passed into the pipeline.
-    locator: pipeline.py > IngestionPipeline, transformations, cache, docstore, _handle_duplicates, and _handle_upserts
-    evidence_kind: design-inference
-    confidence: high
-    review_status: accepted
+  - id: claim-deduplication-activity-phase
+    source: w3c-prov-o
+    supports: >-
+      PROV-O supports provenance chains among activities and entities but does not prescribe ingestion-step ordinals.
+      Moonweave models a deduplication comparison as an ordered member of one IngestionRun as a local orchestration inference.
+    locator: PROV-O Activity relations and provenance chains
+    evidence_kind: ontology-design-inference
+    confidence: medium
+  - id: claim-deduplication-activity-specialization
+    source: w3c-prov-o
+    supports: >-
+      Modeling a candidate-and-reference-state comparison activity as a DeduplicationActivity specialization of
+      IngestionPhase is a Moonweave taxonomy inference grounded in PROV-O's distinction between activities and entities.
+    locator: PROV-O Entity Activity usage and generation
+    evidence_kind: ontology-design-inference
+    confidence: medium
+  - id: claim-deduplication-activity-boundary
+    source: langchain-vectorstores
+    supports: >-
+      LangChain documents separate add Documents delete by ID and similarity search operations. Moonweave keeps exact
+      deduplication judgment separate from downstream memory write, vector-index mutation, and similarity retrieval.
+    locator: LangChain vector store interface add_documents delete and similarity_search
+    evidence_kind: ontology-design-inference
+    confidence: medium
