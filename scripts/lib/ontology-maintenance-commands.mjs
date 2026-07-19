@@ -114,19 +114,22 @@ export const runCleanWorktreeCommand = ({
 export const runSourceLinkCheckCommand = async ({
   arguments_ = [],
   repositoryRoot = defaultRepositoryRoot,
+  loadYamlInputs = loadYamlSourceInputs,
   checkLinks = checkSourceLinks,
   log = console.log,
   warn = console.warn,
   error = console.error,
 } = {}) => {
   const options = parseSourceLinkArguments(arguments_);
-  const { sources, referencedIds } = await loadYamlSourceInputs(repositoryRoot);
+  const { sources, referencedIds } = await loadYamlInputs(repositoryRoot);
   assertSourceUrlPolicy(sources, []);
   const missingReferenced = [...referencedIds].filter(
     (id) => !sources.some((source) => source.id === id),
   );
   if (missingReferenced.length > 0) {
-    throw new Error(`Referenced source IDs are absent from ontology/node.yaml: ${missingReferenced.join(", ")}`);
+    const message = `Published source claims absent from the source registry: ${missingReferenced.join(", ")}`;
+    if (!options.allowInconclusive) throw new Error(message);
+    warn(`? ${message}`);
   }
   const selected = options.referencedOnly
     ? sources.filter(({ id }) => referencedIds.has(id))
@@ -136,7 +139,8 @@ export const runSourceLinkCheckCommand = async ({
     timeoutMs: options.timeoutMs,
   });
   const { broken, inconclusive } = classifySourceLinkFailures(report.failures);
-  if (options.json) log(JSON.stringify({ ...report, broken, inconclusive }, null, 2));
+  const result = { ...report, broken, inconclusive, unregisteredReferencedIds: missingReferenced };
+  if (options.json) log(JSON.stringify(result, null, 2));
   else {
     log(`Checked ${report.checked} ontology source links; ${broken.length} broken and ${inconclusive.length} inconclusive.`);
     broken.forEach(({ id, url, diagnostic }) => error(`- ${id} ${url}: ${diagnostic}`));
@@ -145,7 +149,7 @@ export const runSourceLinkCheckCommand = async ({
   if (broken.length > 0 || (!options.allowInconclusive && inconclusive.length > 0)) {
     throw new Error(`Source link check failed with ${broken.length} broken and ${inconclusive.length} inconclusive result(s)`);
   }
-  return { ...report, broken, inconclusive };
+  return result;
 };
 
 export const runOntologySecurityCommand = async ({
@@ -196,4 +200,3 @@ export const runCliAdapter = async ({
   }
   return true;
 };
-

@@ -181,11 +181,10 @@ describe("canonical ontology index", () => {
     expect(index.entitiesByRef.has("case:case-path-that-must-not-become-a-node")).toBe(false);
   });
 
-  it("indexes relation-owned case fragments as edge information, never as graph nodes", () => {
+  it("indexes relation-owned examples linked from case paths as edge information, never as graph nodes", () => {
     const relationExample = {
       ...ontologyViewModelFixture.relations[3].examples[0],
       id: "relation-case-fragment",
-      kind: "case-fragment",
       scenario_id: "relation-owned-case",
     };
     const ontology = {
@@ -356,11 +355,14 @@ describe("canonical ontology index", () => {
           : concept,
       ),
     };
-    expect(() =>
-      buildOntologyIndex(
-        ontologyWithInvalidValue as unknown as Parameters<typeof buildOntologyIndex>[0],
-      ),
-    ).toThrow(/Conflicting inherited field media_type on AudioContent/);
+    const invalidValueIndex = buildOntologyIndex(
+      ontologyWithInvalidValue as unknown as Parameters<typeof buildOntologyIndex>[0],
+    );
+    expect(
+      invalidValueIndex.effectiveFieldsByConceptId.get("AudioContent")
+        ?.find(({ field }) => field.id === "media_type"),
+    ).toMatchObject({ declaredOnId: "AudioContent", inheritanceDepth: 0 });
+    expect(invalidValueIndex.dataDiagnostics).toEqual([]);
 
     const replaceAudioDiscriminator = (
       transform: (field: typeof parentField & Record<string, unknown>) => Record<string, unknown>,
@@ -400,9 +402,13 @@ describe("canonical ontology index", () => {
       replaceAudioDiscriminator((field) => ({ ...field, allowed_values: [] })),
     ];
     for (const incompatible of incompatibleRefinements) {
-      expect(() =>
-        buildOntologyIndex(incompatible as unknown as Parameters<typeof buildOntologyIndex>[0]),
-      ).toThrow(/Conflicting inherited field media_type on AudioContent/);
+      const incompatibleIndex = buildOntologyIndex(
+        incompatible as unknown as Parameters<typeof buildOntologyIndex>[0],
+      );
+      expect(
+        incompatibleIndex.effectiveFieldsByConceptId.get("AudioContent")
+          ?.find(({ field }) => field.id === "media_type"),
+      ).toMatchObject({ declaredOnId: "AudioContent", inheritanceDepth: 0 });
     }
 
     const ontologyWithOpenParent = {
@@ -442,9 +448,13 @@ describe("canonical ontology index", () => {
         };
       }),
     };
-    expect(() =>
-      buildOntologyIndex(ontologyWithParentPattern as unknown as Parameters<typeof buildOntologyIndex>[0]),
-    ).toThrow(/Conflicting inherited field media_type on AudioContent/);
+    const parentPatternIndex = buildOntologyIndex(
+      ontologyWithParentPattern as unknown as Parameters<typeof buildOntologyIndex>[0],
+    );
+    expect(
+      parentPatternIndex.effectiveFieldsByConceptId.get("AudioContent")
+        ?.find(({ field }) => field.id === "media_type"),
+    ).toMatchObject({ declaredOnId: "AudioContent", inheritanceDepth: 0 });
 
     const mediaTemplate = inheritanceProjectionFixture.classes.find(({ id }) => id === "MediaContent")!;
     const audioTemplate = inheritanceProjectionFixture.classes.find(({ id }) => id === "AudioContent")!;

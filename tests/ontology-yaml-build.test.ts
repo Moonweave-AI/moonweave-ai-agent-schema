@@ -604,7 +604,6 @@ describe("YAML ontology bundle compiler", () => {
       },
       examples: [expect.objectContaining({
         id: "context-window-instance-call-842",
-        kind: "instance",
       })],
       source_claims: [expect.objectContaining({
         source_id: "mcp-specification",

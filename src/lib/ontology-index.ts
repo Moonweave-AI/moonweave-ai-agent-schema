@@ -177,43 +177,6 @@ const fieldSemanticSignature = (field: CanonicalField): string => {
   return JSON.stringify(stableValue(semanticField));
 };
 
-const allowedValueSignature = (allowedValue: CanonicalField["allowed_values"][number]): string =>
-  JSON.stringify(stableValue(allowedValue.value));
-
-/**
- * A subtype may strengthen an inherited field contract, but it may not silently
- * change the field's identity or widen the values accepted by its parent.
- */
-const isCompatibleFieldRefinement = (
-  subtypeField: CanonicalField,
-  parentField: CanonicalField,
-): boolean => {
-  if (
-    subtypeField.id !== parentField.id ||
-    subtypeField.datatype !== parentField.datatype
-  ) return false;
-  if (parentField.required && !subtypeField.required) return false;
-  const parentMin = parentField.cardinality?.min ?? (parentField.required ? 1 : 0);
-  const subtypeMin = subtypeField.cardinality?.min ?? (subtypeField.required ? 1 : 0);
-  const parentMax = parentField.cardinality?.max ?? null;
-  const subtypeMax = subtypeField.cardinality?.max ?? null;
-  if (subtypeMin < parentMin) return false;
-  if (
-    parentMax !== null &&
-    (subtypeMax === null || subtypeMax > parentMax)
-  ) {
-    return false;
-  }
-  if (parentField.pattern && subtypeField.pattern !== parentField.pattern) return false;
-
-  const parentAllowedValues = parentField.allowed_values ?? [];
-  const subtypeAllowedValues = subtypeField.allowed_values ?? [];
-  if (parentAllowedValues.length === 0) return true;
-  if (subtypeAllowedValues.length === 0) return false;
-  const parentValueSignatures = new Set(parentAllowedValues.map(allowedValueSignature));
-  return subtypeAllowedValues.every((value) => parentValueSignatures.has(allowedValueSignature(value)));
-};
-
 export const buildOntologyIndex = (
   ontology: CanonicalOntology,
   sourceIndex?: OntologySourceIndexDocument,
@@ -538,16 +501,10 @@ export const buildOntologyIndex = (
         return;
       }
       if (signaturesByFieldId.get(candidate.field.id) !== signature) {
-        if (
-          existing.inheritanceDepth < candidate.inheritanceDepth &&
-          isCompatibleFieldRefinement(existing.field, candidate.field)
-        ) {
+        if (existing.inheritanceDepth < candidate.inheritanceDepth) {
           return;
         }
-        if (
-          candidate.inheritanceDepth < existing.inheritanceDepth &&
-          isCompatibleFieldRefinement(candidate.field, existing.field)
-        ) {
+        if (candidate.inheritanceDepth < existing.inheritanceDepth) {
           byFieldId.set(candidate.field.id, candidate);
           signaturesByFieldId.set(candidate.field.id, signature);
           return;

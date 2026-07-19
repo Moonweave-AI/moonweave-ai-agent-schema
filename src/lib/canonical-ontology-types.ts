@@ -106,7 +106,6 @@ export type Field = {
 
 export type Example = {
   readonly id: Identifier;
-  readonly kind: "positive" | "counterexample" | "boundary" | "instance" | "case-fragment";
   readonly labels: LocalizedText;
   readonly scenario_id: Identifier | null;
   readonly descriptions: LocalizedText;

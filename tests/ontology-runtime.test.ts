@@ -84,6 +84,14 @@ describe("ontology application runtime boundary", () => {
     expect(runtime.index.modulesById.size).toBe(canonical.modules.length);
     expect(runtime.index.planesById.size).toBe(canonical.planes.length);
     expect(runtime.index.sourcesById.size).toBe(generatedSourceIndex.sources.length);
+    expect(
+      runtime.index.effectiveFieldsByConceptId.get("EvaluationCostMetric")
+        ?.find(({ field }) => field.id === "unit"),
+    ).toMatchObject({
+      declaredOnId: "EvaluationCostMetric",
+      inheritanceDepth: 0,
+    });
+    expect(runtime.index.dataDiagnostics).toEqual([]);
   });
 
   it("validates both generated inputs and derives runtime-only indexes", () => {
