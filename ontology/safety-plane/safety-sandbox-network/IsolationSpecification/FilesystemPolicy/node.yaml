@@ -1,0 +1,331 @@
+schema: moonweave.ai/ontology-node/v1
+id: FilesystemPolicy
+kind: concept
+status: accepted
+labels:
+  zh: 文件系统策略
+  en: filesystem policy
+  ja: ファイルシステム方針
+semantics:
+  short_definition:
+    zh: 按路径、挂载与操作限定沙箱文件系统访问的隔离规范。
+    en: An isolation specification limiting sandbox filesystem access by path, mount, and operation.
+    ja: path・mount・operation で sandbox filesystem access を制限する isolation specification。
+  definition:
+    zh: 文件系统策略是一种 IsolationSpecification，以规范化路径规则、挂载映射和读取/写入/执行/创建/删除权限为区分特征。它在沙箱路径空间内计算有效访问，并明确处理只读、遮蔽、符号链接、bind mount 与 OverlayFS 边界；它不是网络目的地策略或单次文件操作。
+    en: A FilesystemPolicy is an IsolationSpecification distinguished by normalized path rules, mount mappings, and read/write/execute/create/delete rights. It computes effective access in sandbox path space and explicitly handles read-only, masked, symbolic-link, bind-mount, and OverlayFS boundaries; it is not a network-destination policy or one file operation.
+    ja: FilesystemPolicy は normalized path rule・mount mapping・read/write/execute/create/delete right で区別する IsolationSpecification です。sandbox path 空間の effective access を計算し readonly・masked・symbolic link・bind mount・OverlayFS 境界を明示処理し、network destination policy や一 file operation ではありません。
+  why_needed:
+    zh: 把路径可见性和挂载解析放在同一可执行规范中，才能回答一个沙箱实际能读写哪些本地资源。
+    en: It joins path visibility and mount resolution in one executable specification so effective local-resource access can be decided.
+    ja: path visibility と mount resolution を一 executable specification に統合し effective local-resource access を判定できます。
+  includes:
+    - zh: 绝对沙箱路径规则、操作权限、挂载源/目标、只读与遮蔽设置、链接解析策略。
+      en: Absolute sandbox-path rules, operation rights, mount source/target, read-only and masked settings, and link-resolution policy.
+      ja: absolute sandbox path rule・operation right・mount source/target・readonly/masked 設定・link resolution policy。
+  excludes:
+    - zh: 网络主机与端口规则、进程能力、业务层 AuthorizationGrant、单个文件或 SourceReference。
+      en: Network host/port rules, process capabilities, business-layer AuthorizationGrant, and individual files or SourceReference objects.
+      ja: network host/port rule・process capability・business AuthorizationGrant・個別 file/SourceReference。
+  semantic_kind: specification
+  aliases: []
+structure:
+  identity_keys:
+    - isolation_spec_id
+    - version
+  fields:
+    - id: path_rule_set
+      labels:
+        zh: 路径规则集
+        en: path rule set
+        ja: path rule set
+      datatype: object
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 按规范化沙箱路径声明允许或拒绝的文件系统操作。
+        en: Declares allowed or denied filesystem operations over normalized sandbox paths.
+        ja: normalized sandbox path ごとの allowed/denied filesystem operation を宣言します。
+      allowed_values: []
+      pattern: null
+      example_value:
+        /workspace:
+          - read
+          - write
+        /secrets: []
+      source_claims:
+        - claim-filesystem-policy-002
+    - id: mount_mapping_set
+      labels:
+        zh: 挂载映射集
+        en: mount mapping set
+        ja: mount mapping set
+      datatype: object
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      definitions:
+        zh: 把宿主源路径映射到沙箱目标路径并声明只读、读写、递归与传播模式。
+        en: Maps host source paths to sandbox destination paths with read-only/read-write, recursion, and propagation modes.
+        ja: host source path を sandbox destination path へ map し readonly/readwrite・recursion・propagation mode を宣言します。
+      allowed_values: []
+      pattern: null
+      example_value:
+        - source: /repo
+          target: /workspace/repo
+          mode: ro
+      source_claims:
+        - claim-filesystem-policy-001
+        - claim-filesystem-policy-002
+    - id: link_resolution_policy
+      labels:
+        zh: 链接解析策略
+        en: link-resolution policy
+        ja: link-resolution policy
+      datatype: string
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 规定符号链接、硬链接与路径遍历在授权判断前如何规范化和限制。
+        en: Specifies how symbolic links, hard links, and traversal are normalized and constrained before authorization.
+        ja: authorization 前の symbolic link・hard link・path traversal の normalize/constraint 方法を定めます。
+      allowed_values: []
+      pattern: null
+      example_value: resolve-beneath-no-escape
+      source_claims:
+        - claim-filesystem-policy-002
+  constraints:
+    - id: filesystem-policy-normalized-paths
+      severity: error
+      expression_language: plain
+      expression: every requested path must be normalized in sandbox path space before longest-match rule and mount resolution
+      explanations:
+        zh: 授权判断先在沙箱路径空间规范化，再解析最长匹配规则与挂载；不得用 .. 或链接越出边界。
+        en: Normalize in sandbox path space before longest-match and mount resolution; traversal or links cannot escape the boundary.
+        ja: sandbox path 空間で normalize 後 longest-match/mount resolution を行い traversal/link で境界外へ出ません。
+      source_claims:
+        - claim-filesystem-policy-002
+        - claim-filesystem-policy-001
+  required_relation_constraints: []
+examples:
+  - id: FilesystemPolicy-example-positive-manual-20260716
+    kind: positive
+    labels:
+      zh: 只读仓库与遮蔽密钥
+      en: Read-only repository and masked secrets
+      ja: readonly repository と masked secrets
+    scenario_id: null
+    descriptions:
+      zh: fs-code@4 将 /repo 只读挂载到 /workspace/repo，允许读取，拒绝写入，并遮蔽 /secrets；链接策略禁止越出挂载根。
+      en: fs-code@4 mounts /repo read-only at /workspace/repo, allows reads, denies writes, masks /secrets, and prevents links from escaping the mount root.
+      ja: fs-code@4 は /repo を /workspace/repo に readonly mount し read を許可、write を拒否、/secrets を mask し link escape を禁止します。
+    field_values:
+      isolation_spec_id: fs-code
+      version: "4"
+      applicable_environment_ref: sandbox/code-execution
+      enforcer: sandbox-filesystem-enforcer
+      path_rule_set:
+        /workspace/repo:
+          - read
+      mount_mapping_set:
+        - source: /repo
+          target: /workspace/repo
+          mode: ro
+      link_resolution_policy: resolve-beneath-no-escape
+    related_node_ids:
+      - FilesystemPolicy
+      - IsolationSpecification
+    related_relation_ids:
+      - FilesystemPolicy-is_a-IsolationSpecification
+    expected_result:
+      zh: 分类为 FilesystemPolicy，并可判定目标路径只读。
+      en: Classify as FilesystemPolicy and decide that the destination path is read-only.
+      ja: FilesystemPolicy と分類し target path は readonly と判定します。
+    why_valid_or_invalid:
+      zh: 规则明确给出路径空间、操作、挂载方向和链接边界。
+      en: Rules explicitly give path space, operations, mount direction, and link boundary.
+      ja: path space・operation・mount direction・link boundary が明示されています。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-filesystem-policy-001
+      - claim-filesystem-policy-002
+  - id: FilesystemPolicy-example-boundary-manual-20260716
+    kind: boundary
+    labels:
+      zh: 仅列文件位置的清单
+      en: File-location inventory only
+      ja: file location inventory のみ
+    scenario_id: sandbox-review-filesystempolicy-boundary
+    descriptions:
+      zh: 清单列出 /repo 与 /secrets，但没有允许/拒绝操作、挂载映射、执行器或版本。
+      en: An inventory lists /repo and /secrets but has no allow/deny operations, mount mapping, enforcer, or version.
+      ja: inventory は /repo と /secrets を列挙しますが allow/deny operation・mount mapping・enforcer・version がありません。
+    field_values: {}
+    related_node_ids:
+      - FilesystemPolicy
+    related_relation_ids: []
+    expected_result:
+      zh: 保留为资源清单，不建立 FilesystemPolicy。
+      en: Keep it as a resource inventory and do not assert FilesystemPolicy.
+      ja: resource inventory とし FilesystemPolicy を主張しません。
+    why_valid_or_invalid:
+      zh: 路径出现不等于具备可执行访问约束。
+      en: Mentioning paths is not an enforceable access constraint.
+      ja: path 言及は enforceable access constraint ではありません。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-filesystem-policy-002
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation:
+  - sibling_concept_id: ProcessPolicy
+    shared_parent_concept_id: IsolationSpecification
+    differentia:
+      zh: FilesystemPolicy 决定路径和挂载上的文件操作；ProcessPolicy 决定可启动程序、命名空间、能力、系统调用与资源上限。同一沙箱通常同时应用二者，但任一不能替代另一方。
+      en: FilesystemPolicy decides file operations over paths and mounts; ProcessPolicy decides executable launch, namespaces, capabilities, syscalls, and resource limits. A sandbox normally applies both, but neither substitutes for the other.
+      ja: FilesystemPolicy は path/mount の file operation、ProcessPolicy は executable・namespace・capability・syscall・resource limit を決め、同一 sandbox に併用しても相互代替しません。
+    source_claims:
+      - claim-filesystem-policy-001
+      - claim-filesystem-policy-002
+parent_relation:
+  id: FilesystemPolicy-is_a-IsolationSpecification
+  predicate: is_a
+  direction: target-to-source
+  relation_kind: hierarchy
+  labels:
+    zh: 是一种隔离规范
+    en: is an isolation specification
+    ja: isolation specification の一種
+  definitions:
+    zh: FilesystemPolicy 通过此分类边继承 IsolationSpecification 的版本、适用环境和执行器要求，并增加路径、挂载及文件操作种差。
+    en: FilesystemPolicy inherits IsolationSpecification's version, applicable-environment, and enforcer requirements and adds path, mount, and file-operation differentia.
+    ja: FilesystemPolicy は IsolationSpecification の version・applicable environment・enforcer 要件を継承し path・mount・file-operation 種差を追加します。
+  cardinality: null
+  cardinality_not_applicable_reason:
+    zh: 分类继承不使用实例关系基数。
+    en: Taxonomic inheritance does not use instance-relation cardinality.
+    ja: 分類継承にはインスタンス関係の基数を用いません。
+  inverse_reading:
+    predicate: part_of
+    labels:
+      zh: 反向：是一种
+      en: has subtype
+      ja: 逆方向：の一種である
+  conditions: []
+  temporal_scope: timeless
+  boundary_context: null
+  constraints: []
+  examples:
+    - id: FilesystemPolicy-is_a-IsolationSpecification-example-positive-manual-20260716
+      kind: positive
+      labels:
+        zh: 可执行路径策略继承隔离规范
+        en: Enforceable path policy inherits isolation specification
+        ja: enforceable path policy の継承
+      scenario_id: sandbox-review-filesystempolicy-is_a-isolationspecification-positive
+      descriptions:
+        zh: fs-code@4 具有规范 ID、版本、环境和执行器，并增加路径与挂载规则。
+        en: fs-code@4 has specification ID, version, environment, and enforcer plus path and mount rules.
+        ja: fs-code@4 は specification ID・version・environment・enforcer と path/mount rule を持ちます。
+      field_values: {}
+      related_node_ids:
+        - FilesystemPolicy
+        - IsolationSpecification
+      related_relation_ids:
+        - FilesystemPolicy-is_a-IsolationSpecification
+      expected_result:
+        zh: 建立 FilesystemPolicy→IsolationSpecification 的 is_a 边。
+        en: Assert the FilesystemPolicy-to-IsolationSpecification is_a edge.
+        ja: FilesystemPolicy→IsolationSpecification is_a 辺を主張します。
+      why_valid_or_invalid:
+        zh: 对象完整满足父类条件并具有更窄文件系统种差。
+        en: The object satisfies the parent and adds narrower filesystem differentia.
+        ja: parent 条件を満たし narrower filesystem 種差を追加します。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-filesystem-policy-001
+        - claim-filesystem-policy-002
+    - id: FilesystemPolicy-is_a-IsolationSpecification-example-boundary-manual-20260716
+      kind: boundary
+      labels:
+        zh: 路径清单不是规范
+        en: Path inventory is not a specification
+        ja: path inventory は specification でない
+      scenario_id: sandbox-review-filesystempolicy-is_a-isolationspecification-boundary
+      descriptions:
+        zh: source-list 只有若干路径和校验和，没有版本化约束或执行器。
+        en: source-list has paths and checksums but no versioned constraints or enforcer.
+        ja: source-list は path/checksum だけで versioned constraint/enforcer がありません。
+      field_values: {}
+      related_node_ids:
+        - FilesystemPolicy
+        - IsolationSpecification
+      related_relation_ids:
+        - FilesystemPolicy-is_a-IsolationSpecification
+      expected_result:
+        zh: 不得把普通应用偏好通过该分类边认定为隔离规范。
+        en: Do not assert the classification edge.
+        ja: classification 辺を主張しません。
+      why_valid_or_invalid:
+        zh: 资源信息没有满足 IsolationSpecification 的强制条件。
+        en: Resource information does not satisfy IsolationSpecification enforcement conditions.
+        ja: resource information は IsolationSpecification enforcement 条件を満たしません。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-filesystem-policy-002
+  source_claims:
+    - claim-filesystem-policy-001
+    - claim-filesystem-policy-002
+  distinct_fact_rationale: null
+  layout_role: primary-backbone
+  review_status: accepted
+  endpoint_order: child-to-parent
+relations: []
+review:
+  status: accepted
+  method: manual-semantic
+  reviewer: manual-safety-verification
+  reviewed_on: 2026-07-17
+  note:
+    zh: Verified against OCI/Docker isolation, Linux namespaces, seccomp, AppArmor/LSM, and Landlock; specification vs Sandbox instance separation holds.
+    en: Verified against OCI/Docker isolation, Linux namespaces, seccomp, AppArmor/LSM, and Landlock; specification vs Sandbox instance separation holds.
+    ja: Verified against OCI/Docker isolation, Linux namespaces, seccomp, AppArmor/LSM, and Landlock; specification vs Sandbox instance separation holds.
+  sections:
+    semantics: accepted
+    hierarchy: accepted
+    relations: accepted
+    structure: accepted
+    examples: accepted
+    source_claims: accepted
+source_claims:
+  - id: claim-filesystem-policy-001
+    source: eng-runtime-oci-linux-config
+    supports: The OCI Linux runtime specification defines namespaces, devices, cgroups, mounts, masked paths, read-only paths, seccomp integration, and runtime errors that ground enforceable process and filesystem isolation settings.
+    locator: OCI Runtime Specification > Linux Container Configuration > Namespaces, Devices, Control groups, Masked Paths, Readonly Paths
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-filesystem-policy-002
+    source: eng-security-linux-landlock
+    supports: Linux Landlock defines stackable path-hierarchy access rules, read/write/execute rights, rule inheritance, bind-mount and OverlayFS behavior, and explicit limitations relevant to filesystem sandbox evaluation.
+    locator: Linux Kernel documentation > Landlock rules, Layers of file path access rights, Bind mounts and OverlayFS, Current limitations
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-filesystem-policy-003
+    source: eng-security-mcp-nsa-2026
+    supports: NSA's May 2026 MCP guidance recommends strict resource and permission boundaries, operating-system isolation such as seccomp/AppArmor/SELinux, sandboxing against lateral movement and privilege escalation, and explicit runtime denial of unneeded filesystem and network paths.
+    locator: NSA MCP Security Design Considerations > pp. 10-11 > Constrain and sandbox tool execution
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted

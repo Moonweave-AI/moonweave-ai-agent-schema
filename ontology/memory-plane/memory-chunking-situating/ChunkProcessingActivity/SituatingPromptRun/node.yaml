@@ -3,415 +3,525 @@ id: SituatingPromptRun
 kind: concept
 status: accepted
 labels:
-  zh: 情境化提示运行
-  en: Situating Prompt Run
-  ja: 文脈化プロンプト実行
+  zh: 分块定位提示运行
+  en: situating prompt run
+  ja: 位置付けプロンプト実行
 semantics:
   short_definition:
-    zh: 读取一个源分块及更广来源上下文、生成可分离检索说明和新 SituatedChunk 的 ChunkProcessingActivity 子类。
-    en: A ChunkProcessingActivity subtype that reads a source chunk and broader source context to generate separable retrieval explanation and a new SituatedChunk.
-    ja: source chunk とより広い source context を読み取り、分離可能な retrieval explanation と新しい SituatedChunk を生成する ChunkProcessingActivity の下位型。
+    zh: 读取原 Chunk 及其更大来源语境并生成可分离 context_note 的 ChunkProcessingActivity。
+    en: A ChunkProcessingActivity that reads a Chunk with broader source context and generates a separable context_note.
+    ja: 元Chunkとより広い出典文脈を読み、分離可能なcontext_noteを生成する ChunkProcessingActivity です。
   definition:
-    zh: >
-      SituatingPromptRun 是一次实际的模型提示处理活动。它向模型提供确定的目标 Chunk 版本及足以解释其文档角色的
-      来源上下文，使用版本化提示和模型生成短 context_note，并生成独立的 SituatedChunk 版本。该运行不会切分
-      来源文档、生成嵌入、返回检索候选，也不能把生成说明写回源块正文或长期记忆。它不是生成的说明或输出工件本身。
-    en: >
-      SituatingPromptRun is one actual model-prompt processing activity. It provides a determinate target Chunk
-      revision and enough source context to explain its document role to a model, uses a versioned prompt and model
-      to generate a short context_note, and generates an independent SituatedChunk revision. The run does not split
-      source documents, generate embeddings, return retrieval candidates, or write generated explanation back into
-      source-chunk body or long-term memory. It is not the generated note or output artifact itself.
-    ja: >
-      SituatingPromptRun は一回の実際の model-prompt processing activity です。確定済み target Chunk revision と
-      文書内の役割を説明するのに十分な source context を model に与え、版管理された prompt と model を使って
-      短い context_note を生成し、独立した SituatedChunk revision を生成します。この run は source document を
-      split せず、embedding を生成せず、retrieval candidate を返さず、生成説明を source-chunk body や
-      long-term memory に書き戻しません。生成 note や output artifact 自体ではありません。
+    zh: SituatingPromptRun 是一种 ChunkProcessingActivity；其种差是：一次运行同时消耗目标 Chunk 与完整 Document（Anthropic Contextual Retrieval 的 WHOLE_DOCUMENT+CHUNK_CONTENT 提示形），以已版本化提示与模型生成通常 50–100 token 的可分离 context_note，验证注记没有改写原文或引入无来源事实，并产生可 prepend 到 chunk 后再嵌入/索引的 SituatedChunk。它不切分 Document，也不以删除内容为目标。
+    en: A SituatingPromptRun is a ChunkProcessingActivity that jointly consumes a target Chunk and whole Document (Anthropic Contextual Retrieval WHOLE_DOCUMENT+CHUNK_CONTENT prompt shape); uses a versioned prompt and model to generate a separable context_note, typically 50–100 tokens; verifies that the note neither rewrites source text nor introduces unsupported facts; and emits a SituatedChunk suitable for prepending before embedding or BM25 indexing. It does not split the Document and does not aim to remove content.
+    ja: SituatingPromptRun は ChunkProcessingActivity の一種で、対象Chunk、そのDocument／節近傍、任意task文脈を同時に消費し、版管理promptとmodelで短いcontext_noteを生成し、原文改変や無出典事実追加がないことを検証して SituatedChunk を生成します。Documentを分割せず、内容削除を目的としません。
   why_needed:
-    zh: 孤立分块可能缺少章节主题、实体和时间信息。记录生成运行、输入证据和可分离输出使系统能改善检索歧义而不伪造原始来源。
-    en: An isolated chunk can lack section topic, entity, and time information. Recording generating run, input evidence, and separable output lets a system improve retrieval disambiguation without fabricating original source.
-    ja: 孤立した chunk には section topic、entity、time 情報が欠けることがあります。generating run、input evidence、分離可能な output を記録することで、元の source を捏造せず retrieval の曖昧性解消を改善できます。
+    zh: 把定位说明的生成过程显式化，才能复核提示/模型版本、发现语境幻觉，并在不触碰原 Chunk 的情况下重新生成或撤销附加语境。
+    en: Making context-note generation explicit permits prompt and model-version review, detection of contextual hallucination, and regeneration or removal of added context without altering the original Chunk.
+    ja: context note生成を明示活動にすると、prompt／model版を審査し、文脈hallucinationを検知し、元Chunkを変えず追加文脈を再生成・撤回できます。
   includes:
-    - zh: 已执行运行、源分块版本、用于说明的来源上下文、提示与模型版本、生成说明和新的 SituatedChunk 版本。
-      en: Completed run, source chunk revision, source context used for explanation, prompt and model revisions, generated note, and new SituatedChunk revision.
-      ja: 完了した run、source chunk revision、説明に使った source context、prompt と model revision、生成 note、新しい SituatedChunk revision。
+    - zh: 纳入 situate-run-84 这类读取 chunk-policy-7-003、政策第 4 章和检索任务，使用 prompt-situate-v2/model-ctx-4 生成并验证 context_note 的运行。
+      en: Includes executions such as situate-run-84 that read chunk-policy-7-003, policy chapter 4, and retrieval-task context and use prompt-situate-v2/model-ctx-4 to generate and validate a context_note.
+      ja: chunk-policy-7-003、方針4章、検索task文脈を読み、prompt-situate-v2/model-ctx-4でcontext_noteを生成・検証する situate-run-84 のような実行を含みます。
   excludes:
-    - zh: 源块正文、未执行 prompt 配置、首次来源切分、已有块压缩、嵌入、索引、检索候选和将生成说明永久写入来源文本。
-      en: Source-chunk body, unexecuted prompt configuration, initial source splitting, existing-chunk compression, embedding, indexing, retrieval candidate, or permanently writing generated explanation into source text.
-      ja: source-chunk body、未実行 prompt configuration、初期 source splitting、既存 chunk compression、embedding、indexing、retrieval candidate、生成説明を source text に恒久的に書き込むこと。
+    - zh: 排除 ChunkingRun、ChunkCompression、普通 PromptRun、人工写好的 ChunkMetadata、只有文件名拼接的确定性模板，以及没有读取更大来源语境的标题生成。
+      en: Excludes ChunkingRun, ChunkCompression, ordinary PromptRun, manually authored ChunkMetadata, deterministic filename concatenation, and title generation that reads no broader source context.
+      ja: ChunkingRun、ChunkCompression、通常PromptRun、手書きChunkMetadata、filename連結だけの決定的template、より広い出典文脈を読まないtitle生成を除外します。
   semantic_kind: activity
-  aliases: [contextualization run, contextual retrieval preprocessing run, 情境增强运行]
-engineering:
-  explanation:
-    zh: Contextual Retrieval 将整个文档和目标分块提供给模型，以生成在嵌入和 BM25 前使用的说明。Moonweave 将这一调用记录为活动，避免把模型生成说明与来源文本混为一体。
-    en: Contextual Retrieval provides whole document and target chunk to a model to generate explanation used before embedding and BM25. Moonweave records that call as an activity to avoid conflating model-generated explanation with source text.
-    ja: Contextual Retrieval は whole document と target chunk を model に与え、embedding と BM25 の前に使う説明を生成します。Moonweave はこの call を activity として記録し、model-generated explanation と source text の混同を避けます。
-  typical_input:
-    - description: Target chunk and source context
-      format: |
-        {
-          "source_chunk_ref": "chunk-policy-4-2-03@v1",
-          "source_context_ref": "docs/policy.md@v7#section-4-2",
-          "prompt_version_ref": "contextualize-v2",
-          "model_ref": "context-model-v1"
-        }
-  typical_output:
-    - description: Situated-chunk generation record
-      format: |
-        {
-          "situating_run_id": "situate-84",
-          "context_note": "Section 4.2 describes deletion after user withdrawal.",
-          "output_situated_chunk_ref": "situated-policy-4-2-03@v1"
-        }
-  reference_implementations:
-    - name: Anthropic Contextual Retrieval
-      url: https://www.anthropic.com/engineering/contextual-retrieval
-      description: Documents providing whole document and target chunk to a model to generate contextual text before contextual embeddings and contextual BM25.
+  aliases: []
 structure:
-  identity_keys: [situating_run_id]
-  fields:
-    - id: situating_run_id
-      labels: {zh: 情境化运行标识, en: situating run ID, ja: situating run ID}
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      definitions:
-        zh: 标识一次实际执行的模型情境化活动，不能复用为输出工件、提示或模型标识。
-        en: Identifies one actually executed model situating activity and is not reused as output artifact, prompt, or model ID.
-        ja: 一回の実際に実行された model situating activity を識別し、output artifact、prompt、model ID として再利用しません。
-      allowed_values: []
-      pattern: "^situate-[A-Za-z0-9._-]+$"
-      example_value: situate-84
-      source_claims: [claim-situating-run-contextualization]
-    - id: source_chunk_ref
-      labels: {zh: 源分块版本引用, en: source chunk revision reference, ja: source chunk revision 参照}
-      datatype: reference
-      required: true
-      cardinality: {min: 1, max: 1}
-      definitions:
-        zh: 指向该运行实际提供给模型的确定源 Chunk 版本，而非后续修订或输出 SituatedChunk。
-        en: Points to the determinate source Chunk revision actually supplied to the model, not a later revision or output SituatedChunk.
-        ja: model に実際に与えた確定済み source Chunk revision を指し、後の revision や output SituatedChunk は指しません。
-      allowed_values: []
-      pattern: "^chunk-[A-Za-z0-9._-]+@v[0-9]+(?:[A-Za-z0-9._-]*)$"
-      example_value: chunk-policy-4-2-03@v1
-      source_claims: [claim-situating-run-contextualization]
-    - id: source_context_ref
-      labels: {zh: 来源上下文引用, en: source context reference, ja: 情報源コンテキスト参照}
-      datatype: reference
-      required: true
-      cardinality: {min: 1, max: 1}
-      definitions:
-        zh: 指向本次说明生成时实际读取的更广来源范围，不能用模型自身生成的文字替代。
-        en: Points to broader source extent actually read when generating the note and cannot be replaced with model-generated text.
-        ja: note 生成時に実際に読み取ったより広い source extent を指し、model-generated text に置き換えることはできません。
-      allowed_values: []
-      pattern: "^[^\\s]+$"
-      example_value: docs/policy.md@v7#section-4-2
-      source_claims: [claim-situating-run-contextualization]
-    - id: prompt_version_ref
-      labels: {zh: 提示版本引用, en: prompt version reference, ja: プロンプト版参照}
-      datatype: reference
-      required: true
-      cardinality: {min: 1, max: 1}
-      definitions:
-        zh: 指向指导本次模型调用的可审计提示版本。
-        en: Points to the auditable prompt revision governing this model call.
-        ja: この model call を統制する audit 可能な prompt revision を指します。
-      allowed_values: []
-      pattern: "^[A-Za-z][A-Za-z0-9._-]+$"
-      example_value: contextualize-v2
-      source_claims: [claim-situating-run-auditability]
-    - id: model_ref
-      labels: {zh: 模型引用, en: model reference, ja: モデル参照}
-      datatype: reference
-      required: true
-      cardinality: {min: 1, max: 1}
-      definitions:
-        zh: 指向生成说明所用模型或部署版本，而非检索器或嵌入模型。
-        en: Points to model or deployment revision used to generate the note rather than a retriever or embedding model.
-        ja: note 生成に使った model または deployment revision を指し、retriever や embedding model ではありません。
-      allowed_values: []
-      pattern: "^[A-Za-z][A-Za-z0-9._-]+$"
-      example_value: context-model-v1
-      source_claims: [claim-situating-run-auditability]
-    - id: context_note
-      labels: {zh: 生成上下文说明, en: generated context note, ja: 生成コンテキスト注記}
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      definitions:
-        zh: 本次运行生成的、可与源块正文分离的说明文本，不具有原始来源文本地位。
-        en: Explanation text generated by this run that remains separable from the source-chunk body and does not have original-source-text status.
-        ja: この run が生成した説明 text であり、source-chunk body から分離可能で、original-source-text の地位を持ちません。
-      allowed_values: []
-      pattern: null
-      example_value: Section 4.2 describes deletion after user withdrawal.
-      source_claims: [claim-situating-run-source-boundary]
-    - id: output_situated_chunk_ref
-      labels: {zh: 输出情境化分块版本引用, en: output situated chunk revision reference, ja: output situated chunk revision 参照}
-      datatype: reference
-      required: true
-      cardinality: {min: 1, max: 1}
-      definitions:
-        zh: 指向本次运行新生成的独立 SituatedChunk 版本，不能指向输入 Chunk 或仅存储的 note。
-        en: Points to independent SituatedChunk revision newly generated by this run and cannot point to input Chunk or a note stored alone.
-        ja: この run が新しく生成した独立 SituatedChunk revision を指し、input Chunk や単独保存 note を指すことはできません。
-      allowed_values: []
-      pattern: "^situated-[A-Za-z0-9._-]+@v[0-9]+(?:[A-Za-z0-9._-]*)$"
-      example_value: situated-policy-4-2-03@v1
-      source_claims: [claim-situating-run-provenance]
-    - id: generated_at
-      labels: {zh: 生成时间, en: generated at, ja: 生成時刻}
-      datatype: datetime
-      required: true
-      cardinality: {min: 1, max: 1}
-      definitions:
-        zh: 记录输出情境化工件开始存在的时间，而非来源文本的最后修改时间。
-        en: Records when the output situated artifact began to exist, not when source text was last modified.
-        ja: output situated artifact が存在し始めた時刻を記録し、source text の最終変更時刻ではありません。
-      allowed_values: []
-      pattern: null
-      example_value: "2026-07-18T10:15:00Z"
-      source_claims: [claim-situating-run-provenance]
-  constraints:
-    - id: situating-run-source-separation
-      severity: error
-      expression_language: plain
-      expression: context_note must remain separable and marked as generated; source_chunk_ref and source_context_ref must continue to identify original evidence, and the run must not replace source body, source version, or source span with generated text.
-      explanation:
-        zh: 生成说明可辅助检索，但不是新的来源证据，也不能静默改写或扩大源文本。
-        en: Generated explanation may assist retrieval but is not new source evidence and cannot silently rewrite or enlarge source text.
-        ja: generated explanation は retrieval を支援できますが、新しい source evidence ではなく、source text を黙って書き換えたり拡大したりできません。
-      source_claims: [claim-situating-run-source-boundary]
-    - id: situating-run-output-provenance
-      severity: error
-      expression_language: plain
-      expression: source_chunk_ref, source_context_ref, prompt_version_ref, model_ref, context_note, output_situated_chunk_ref, and generated_at are required. output_situated_chunk_ref must be a new revision generated by this run rather than an existing source Chunk.
-      explanation:
-        zh: 可审计情境化需要明确输入、模型调用和独立输出；读取已有工件不等同于生成它。
-        en: Auditable situating requires explicit inputs, model call, and independent output; reading an existing artifact is not generating it.
-        ja: audit 可能な situating には明示的 input、model call、独立 output が必要で、既存 artifact の読み取りはその生成ではありません。
-      source_claims: [claim-situating-run-provenance]
-    - id: situating-run-role-boundary
-      severity: error
-      expression_language: plain
-      expression: SituatingPromptRun must not assert source segmentation, compression, embedding-vector creation, index membership, retrieval rank, context-package inclusion, or long-term memory write. Those claims require separate activities or artifacts.
-      explanation:
-        zh: 本活动只生成可分离说明和情境化工件；其他处理阶段拥有独立责任。
-        en: This activity generates separable explanation and situated artifact only; other processing stages have separate responsibilities.
-        ja: この activity は分離可能な説明と situated artifact だけを生成し、他の処理段階は別の responsibility を持ちます。
-      source_claims: [claim-situating-run-pipeline-boundary]
-  required_relations: []
+  identity_keys: []
+  fields: []
+  constraints: []
+  required_relation_constraints: []
 examples:
-  - id: situating-run-example-positive-policy
-
-    labels: {zh: 策略分块情境化运行, en: Policy-chunk situating run, ja: policy chunk 文脈化実行}
-
+  - id: SituatingPromptRun-example-positive-001
+    kind: positive
+    labels:
+      zh: 分块定位提示运行正例
+      en: Positive example of situating prompt run
+      ja: 位置付けプロンプト実行の正例
+    scenario_id: null
     descriptions:
-      zh: Anthropic Contextual Retrieval：50-100 token 语境前缀 + Contextual BM25；RAPTOR 叶节点分块；LlamaIndex SentenceSplitter node parser。
-      en: Anthropic Contextual Retrieval: 50-100 token context prefix + Contextual BM25; RAPTOR leaf chunking; LlamaIndex SentenceSplitter node parser.
-      ja: Anthropic Contextual Retrieval 50-100 token prefix + Contextual BM25。RAPTOR leaf chunking。LlamaIndex SentenceSplitter。
+      zh: situate-run-84 读取 chunk-policy-7-003/v1、doc-policy/v7 第 4 章以及任务“检索用户撤回后的处置”，以 prompt-situate-v2/model-ctx-4 生成一条可分离 context_note；运行校验注记没有无来源事实，并输出 situated-policy-7-003/v2。
+      en: situate-run-84 reads chunk-policy-7-003/v1, chapter 4 of doc-policy/v7, and the task “retrieve disposition after user withdrawal.” It uses prompt-situate-v2/model-ctx-4 to generate one separable context_note, checks the note for unsupported facts, and emits situated-policy-7-003/v2.
+      ja: situate-run-84 は chunk-policy-7-003/v1、doc-policy/v7 第4章、task「利用者撤回後の処置を検索」を読み、prompt-situate-v2/model-ctx-4で分離可能なcontext_noteを1件生成します。無出典事実がないことを検証し situated-policy-7-003/v2 を出力します。
     field_values:
-      situating_run_id: situate-84
-      source_chunk_ref: chunk-policy-4-2-03@v1
-      source_context_ref: docs/policy.md@v7#section-4-2
-      prompt_version_ref: contextualize-v2
-      model_ref: context-model-v1
-      context_note: Section 4.2 describes deletion after user withdrawal.
-      output_situated_chunk_ref: situated-policy-4-2-03@v1
-      generated_at: "2026-07-18T10:15:00Z"
-    related_node_ids: [SituatingPromptRun, ChunkProcessingActivity, Chunk, SituatedChunk]
-    related_relation_ids: [SituatingPromptRun-is_a-ChunkProcessingActivity, SituatingPromptRun-uses-Chunk, SituatingPromptRun-generates-SituatedChunk]
-
-    source_claims: [claim-situating-run-contextualization, claim-situating-run-provenance]
-  - id: situating-run-example-counterexample-mixed-body
-
-    labels: {zh: 说明写回来源正文, en: Explanation written back into source body, ja: source body に書き戻された説明}
-
+      processing_run_id: situate-run-84
+      input_ref:
+        - chunk-policy-7-003
+      input_version: v1
+      processor_spec_ref: prompt-situate-v2+model-ctx-4
+      started_at: 2026-07-15T09:02:00.000Z
+      ended_at: 2026-07-15T09:02:01.240Z
+      outcome: success
+    related_node_ids:
+      - SituatingPromptRun
+      - Chunk
+      - SituatedChunk
+    related_relation_ids:
+      - SituatingPromptRun-consumes-Chunk
+      - SituatingPromptRun-produces-SituatedChunk
+    expected_result:
+      zh: 该运行可查询 SituatingPromptRun 以及方向保持不变的事实 SituatingPromptRun-consumes-Chunk。
+      en: The run can query SituatingPromptRun together with direction-preserving fact SituatingPromptRun-consumes-Chunk.
+      ja: この実行では SituatingPromptRun と方向を保持した事実 SituatingPromptRun-consumes-Chunk を共に照会できます。
+    why_valid_or_invalid:
+      zh: 该记录同时具有运行身份、目标 Chunk、较大来源语境、任务、提示/模型版本、验证结果和输出；其变换是增加可分离语境而非切分或删减正文，因而满足 SituatingPromptRun 的活动种差。
+      en: The record has a run identity, target Chunk, broader source context, task, prompt and model versions, validation result, and output. Its transformation adds separable context rather than splitting or deleting body text, satisfying the SituatingPromptRun activity differentia.
+      ja: run同一性・対象Chunk・広い出典文脈・task・prompt/model版・検証結果・出力を持ち、本文の分割／削減ではなく分離可能文脈を追加するためSituatingPromptRunの活動種差を満たします。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-situating-prompt-run-003
+      - claim-situating-prompt-run-004
+  - id: SituatingPromptRun-example-boundary-001
+    kind: boundary
+    labels:
+      zh: 分块定位提示运行边界例
+      en: Boundary case for situating prompt run
+      ja: 位置付けプロンプト実行の境界例
+    scenario_id: null
     descriptions:
-      zh: 反例：语境前缀覆盖 Chunk 正文且无 ChunkProvenance 与独立 SituatedChunk ID。
-      en: Counterexample: context prefix overwrites Chunk body without ChunkProvenance or distinct SituatedChunk ID.
-      ja: 反例：文脈 prefix が Chunk body 上書き。ChunkProvenance/SituatedChunk ID なし。
-    field_values:
-      source_chunk_ref: chunk-policy-4-2-03@v1
-      context_note: null
-      source_body_mutated: true
-      output_situated_chunk_ref: null
-    related_node_ids: [SituatingPromptRun, Chunk]
-    related_relation_ids: []
-
-    source_claims: [claim-situating-run-source-boundary]
-  - id: situating-run-example-boundary-chunking
-
-    labels: {zh: 首次来源切分运行, en: Initial source-splitting run, ja: 初期 source-splitting run}
-
-    descriptions:
-      zh: ChunkingRun 产出 Chunk vs EmbeddingRun 读取 Chunk 生成向量（memory-embedding-indexes 模块）。
-      en: ChunkingRun produces Chunk vs EmbeddingRun reads Chunk for vectors (memory-embedding-indexes module).
-      ja: ChunkingRun Chunk 生成 vs EmbeddingRun vector 生成（memory-embedding-indexes）。
-    field_values:
-      chunking_run_id: chunk-81
-      source_resource_ref: docs/policy.md@v7
-      source_chunk_ref: null
-      output_chunk_refs: [chunk-policy-01@v1, chunk-policy-02@v1]
-    related_node_ids: [SituatingPromptRun, ChunkingRun]
-    related_relation_ids: []
-
-    source_claims: [claim-situating-run-pipeline-boundary]
-  - id: situating-run-example-instance-auth
-
-    labels: {zh: 实例：OAuth 回调说明生成, en: "Instance: OAuth callback explanation", ja: "事例：OAuth callback 説明生成"}
-
-    descriptions:
-      zh: Anthropic cookbook contextualize_prompt → prepend → text-embedding-3-small → Pinecone upsert situated vector。
-      en: Anthropic cookbook contextualize_prompt → prepend → text-embedding-3-small → Pinecone upsert situated vector.
-      ja: Anthropic cookbook contextualize_prompt→prepend→embed→Pinecone upsert situated vector。
-    field_values:
-      situating_run_id: situate-auth-07
-      source_chunk_ref: chunk-api-auth-07@v1
-      source_context_ref: docs/auth.md@v3#callbacks
-      prompt_version_ref: contextualize-v2
-      model_ref: context-model-v1
-      context_note: OAuth callback URI configuration.
-      output_situated_chunk_ref: situated-api-auth-07@v1
-      generated_at: "2026-07-18T11:30:00Z"
-    related_node_ids: [SituatingPromptRun, Chunk, SituatedChunk]
-    related_relation_ids: [SituatingPromptRun-is_a-ChunkProcessingActivity, SituatingPromptRun-uses-Chunk, SituatingPromptRun-generates-SituatedChunk]
-    source_claims: [claim-situating-run-contextualization, claim-situating-run-provenance]
+      zh: compress-run-22 读取三个 Chunk 并把正文缩短 42%，同时保留来源锚点；它没有读取更大的 Document/任务语境，也没有生成与原文分离的 context_note，因此是 ChunkCompression，不是 SituatingPromptRun。
+      en: compress-run-22 reads three Chunks and shortens their body text by 42% while preserving source anchors. It reads no broader Document or task context and generates no context_note separable from source text, so it is ChunkCompression rather than SituatingPromptRun.
+      ja: compress-run-22 は3つのChunkを読み本文を42%短縮し出典anchorを保持します。広いDocument／task文脈を読まず、原文から分離したcontext_noteも生成しないため ChunkCompression で SituatingPromptRun ではありません。
+    field_values: {}
+    related_node_ids:
+      - SituatingPromptRun
+      - Chunk
+      - ChunkCompression
+    related_relation_ids:
+      - SituatingPromptRun-consumes-Chunk
+    expected_result:
+      zh: ChunkCompression 保持其原有类型，验证器不得凭关系共现把它提升为 SituatingPromptRun。
+      en: ChunkCompression retains its own type; validation must not promote it to SituatingPromptRun from relation co-occurrence.
+      ja: ChunkCompression は元の型を維持し、関係の共起だけで SituatingPromptRun へ昇格してはなりません。
+    why_valid_or_invalid:
+      zh: 两者虽同属 ChunkProcessingActivity，输入范围和变换目标不同：压缩运行删减或重述内容，定位运行保留原文并增加可分离说明。共享父类不能覆盖这一种差。
+      en: "Both are ChunkProcessingActivity, but their input scope and transformation goals differ: compression removes or restates content, whereas situating preserves source text and adds a separable explanation. A shared parent does not erase that differentia."
+      ja: 両者はChunkProcessingActivityですが入力範囲と変換目的が異なります。圧縮runは内容を削減／言換えし、位置付けrunは原文を保持して分離可能説明を加えます。共通親でこの種差は消えません。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-situating-prompt-run-005
+      - claim-situating-prompt-run-006
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation:
+  - sibling_concept_id: ChunkCompression
+    shared_parent_concept_id: ChunkProcessingActivity
+    differentia:
+      zh: 共享父节点对照：父节点 ChunkProcessingActivity：SituatingPromptRun（semantic kind=activity，骨架 SituatingPromptRun-is_a-ChunkProcessingActivity）；ChunkCompression（semantic kind=activity，骨架 ChunkCompression-is_a-ChunkProcessingActivity）。双端条件：SituatingPromptRun 条件：“分块定位提示运行是以如下事实为区分特征的分块处理活动：定位提示运行是为分块补充文档局部或任务局部上下文的可观测事件，使检索保留章节含义、来源目的和周边证据”；ChunkCompression 条件：“分块压缩活动是一种分块处理活动（ChunkProcessingActivity），在保留来源锚点的前提下压缩一个或多个分块并产生新的 Chunk；压缩输出仍是分块，不是活动本身”。逐端验证；父节点不证明任一身份。
+      en: "Shared-parent contrast: parent ChunkProcessingActivity: SituatingPromptRun (semantic kind=activity, backbone SituatingPromptRun-is_a-ChunkProcessingActivity); ChunkCompression (semantic kind=activity, backbone ChunkCompression-is_a-ChunkProcessingActivity). Endpoint conditions: SituatingPromptRun condition: “Situating prompt run is a chunk processing activity; its differentiating condition is that it is an observable event that adds document-local or task-local context to a chunk so retrieval can preserve section meaning, source purpose, and surrounding evidence”; ChunkCompression condition: “Chunk compression activity is a chunk processing activity; its differentiating condition is that it is a ChunkProcessingActivity that compresses one or more chunks while preserving source anchors and produces a new Chunk; the compressed output remains a chunk rather than the activity itself”. Verify each endpoint; the parent proves neither identity."
+      ja: 共有親対照：親 ChunkProcessingActivity：SituatingPromptRun（semantic kind=activity、バックボーン SituatingPromptRun-is_a-ChunkProcessingActivity）；ChunkCompression（semantic kind=activity、バックボーン ChunkCompression-is_a-ChunkProcessingActivity）。両端条件：SituatingPromptRun の条件：「位置付けプロンプト実行はチャンク処理活動の一種であり、次の条件で区別されます：それは、検索が節の意味、出典の目的、周辺証拠を保てるように、チャンクへ文書内またはタスク内の文脈を加える観測可能なイベントです」；ChunkCompression の条件：「チャンク圧縮活動はチャンク処理活動（ChunkProcessingActivity）の一種で、出典アンカーを保持しながら一つ以上のチャンクを圧縮して新しい Chunk を生成します」。各端を検証し、親だけでは同一性を証明しません。
+    source_claims:
+      - claim-situating-prompt-run-007
 parent_relation:
   id: SituatingPromptRun-is_a-ChunkProcessingActivity
   predicate: is_a
-  target: concept:ChunkProcessingActivity
-  endpoint_order: child-to-parent
-  direction: source-to-target
+  direction: target-to-source
   relation_kind: hierarchy
   labels:
-    zh: 是分块处理活动的情境化子类
-    en: is a contextualization subtype of chunk processing activity
-    ja: ChunkProcessingActivity の文脈化下位型である
+    zh: 是一种
+    en: is a
+    ja: の一種である
   definitions:
-    zh: SituatingPromptRun is_a ChunkProcessingActivity，表示每次生成分离上下文说明的模型运行都是处理活动；其种差是使用已有源块和文档上下文生成 SituatedChunk。
-    en: SituatingPromptRun is_a ChunkProcessingActivity means every model run generating separable context is a processing activity whose differentia is using an existing source chunk and document context to generate SituatedChunk.
-    ja: SituatingPromptRun is_a ChunkProcessingActivity は、分離可能な context を生成する各 model run が processing activity であり、既存 source chunk と document context を使って SituatedChunk を生成することが種差であると表します。
+    zh: 每个 SituatingPromptRun 都是 ChunkProcessingActivity；其种差是结合目标 Chunk 与更广文档生成可分离、分块专属的检索语境。
+    en: Every SituatingPromptRun is a ChunkProcessingActivity distinguished by combining a target Chunk with broader document context to generate separable, chunk-specific retrieval context.
+    ja: すべての SituatingPromptRun は ChunkProcessingActivity で、対象Chunkと広い文書文脈から分離可能なチャンク固有検索文脈を生成する種差を持ちます。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 分类关系不规定系统可执行多少次情境化调用。
-    en: Classification does not prescribe how many situating calls a system may execute.
-    ja: 分類関係は system が実行できる situating call 数を規定しません。
+    zh: 分类继承不使用实例关系基数。
+    en: Taxonomic inheritance does not use instance-relation cardinality.
+    ja: 分類継承にはインスタンス関係の基数を用いません。
   inverse_reading:
-    predicate: has_situating_prompt_run_subtype
-    labels: {zh: 具有情境化提示运行子类, en: has situating-prompt-run subtype, ja: 文脈化プロンプト実行下位型を持つ}
+    predicate: part_of
+    labels:
+      zh: 反向：是一种
+      en: has subtype
+      ja: 逆方向：の一種である
   conditions: []
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples: []
-  source_claims: [claim-situating-run-subtype]
-  distinct_fact_rationale:
-    zh: 此关系表达活动类型归属，不表达具体输入块使用、具体说明生成、输出工件或嵌入检索操作。
-    en: This relation expresses activity type membership, not concrete input-chunk use, note generation, output artifact, or embedding/retrieval operation.
-    ja: この関係は activity type membership を表し、具体的 input-chunk use、note generation、output artifact、embedding/retrieval operation は表しません。
+  examples:
+    - id: SituatingPromptRun-is_a-ChunkProcessingActivity-example-positive-001
+      kind: positive
+      labels:
+        zh: 是一种正例
+        en: "Positive case: is a"
+        ja: の一種であるの正例
+      scenario_id: null
+      descriptions:
+        zh: situate-84 记录 prompt-v2、model、输入文档、目标分块和输出。
+        en: situate-84 records prompt-v2, model, source document, target Chunk, and output.
+        ja: situate-84 は prompt-v2・model・出典文書・対象Chunk・出力を記録します。
+      field_values: {}
+      related_node_ids:
+        - SituatingPromptRun
+        - ChunkProcessingActivity
+      related_relation_ids:
+        - SituatingPromptRun-is_a-ChunkProcessingActivity
+      expected_result:
+        zh: 分类上溯到 ChunkProcessingActivity。
+        en: Classification ascends to ChunkProcessingActivity.
+        ja: 分類は ChunkProcessingActivity へ上がります。
+      why_valid_or_invalid:
+        zh: 它是有输入、时间与输出的实际转换活动。
+        en: It is an actual transformation with inputs, interval, and output.
+        ja: 入力・時間・出力を持つ実変換活動です。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-situating-prompt-run-008
+    - id: SituatingPromptRun-is_a-ChunkProcessingActivity-example-boundary-001
+      kind: boundary
+      labels:
+        zh: 是一种边界例
+        en: "Boundary case: is a"
+        ja: の一種であるの境界例
+      scenario_id: null
+      descriptions:
+        zh: context-note-84 是生成的短说明，没有运行身份。
+        en: context-note-84 is the generated short explanation and has no run identity.
+        ja: context-note-84 は生成された短い説明で実行同一性がありません。
+      field_values: {}
+      related_node_ids:
+        - SituatingPromptRun
+        - ChunkProcessingActivity
+      related_relation_ids:
+        - SituatingPromptRun-is_a-ChunkProcessingActivity
+      expected_result:
+        zh: 说明文本不归入处理活动。
+        en: The explanation text is not classified as processing activity.
+        ja: 説明文を処理活動に分類しません。
+      why_valid_or_invalid:
+        zh: 具有时间与执行者的活动和可持久化的信息输出不是同一对象。
+        en: An activity and its information output are different objects.
+        ja: 時間とexecutorを持つactivityと永続化可能な情報outputは同一対象ではありません。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-situating-prompt-run-009
+  source_claims:
+    - claim-situating-prompt-run-010
+  distinct_fact_rationale: null
   layout_role: primary-backbone
+  review_status: accepted
+  endpoint_order: child-to-parent
 relations:
-  - id: SituatingPromptRun-uses-Chunk
-    predicate: uses
+  - id: SituatingPromptRun-consumes-Chunk
+    predicate: consumes
+    direction: source-to-target
+    relation_kind: information
+    labels:
+      zh: 消费
+      en: consumes
+      ja: 消費する
+    definitions:
+      zh: SituatingPromptRun-consumes-Chunk 表示语境化运行实际读取一个目标 Chunk 及其更广文档上下文；该边只标识待语境化原分块，不能指向已添加前缀的输出。
+      en: SituatingPromptRun-consumes-Chunk states that a situating run reads one target Chunk together with broader document context. This edge identifies the source Chunk, not the prefixed output.
+      ja: SituatingPromptRun-consumes-Chunk は語境化実行が一つの対象Chunkと広い文書文脈を読むことを表し、接頭辞追加後の出力ではなく元Chunkを識別します。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 该本体关系记录可查询的语义事实，但不对所有运行实例施加统一基数。
+      en: This ontology relation records a queryable semantic fact without imposing one universal cardinality on all runtime instances.
+      ja: この本体関係は検索可能な意味事実を記録しますが、すべての実行インスタンスに一律の基数を課しません。
+    inverse_reading:
+      predicate: consumed_by
+      labels:
+        zh: 反向：消费
+        en: consumed by
+        ja: 逆方向：消費する
+    conditions: []
+    temporal_scope: timeless
+    boundary_context: null
+    constraints: []
+    examples:
+      - id: SituatingPromptRun-consumes-Chunk-example-positive-001
+        kind: positive
+        labels:
+          zh: 消费正例
+          en: "Positive case: consumes"
+          ja: 消費するの正例
+        scenario_id: null
+        descriptions:
+          zh: situate-84 读取 chunk-003 原文和完整 policy/v7 后生成说明。
+          en: situate-84 reads the body of chunk-003 and full policy/v7 before generating context.
+          ja: situate-84 は chunk-003本文と完全policy/v7を読んで文脈を生成します。
+        field_values: {}
+        related_node_ids:
+          - SituatingPromptRun
+          - Chunk
+        related_relation_ids:
+          - SituatingPromptRun-consumes-Chunk
+        expected_result:
+          zh: 输入查询返回未改写的 chunk-003。
+          en: The input query returns the unmodified chunk-003.
+          ja: 入力照会は未改変 chunk-003 を返します。
+        why_valid_or_invalid:
+          zh: 官方方法以目标分块和整篇文档作为提示输入。
+          en: The documented method prompts with the target chunk and whole document.
+          ja: 公式手法は対象チャンクと全文書をprompt入力にします。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-situating-prompt-run-011
+      - id: SituatingPromptRun-consumes-Chunk-example-boundary-001
+        kind: boundary
+        labels:
+          zh: 消费边界例
+          en: "Boundary case: consumes"
+          ja: 消費するの境界例
+        scenario_id: null
+        descriptions:
+          zh: situated-003 是 situate-84 生成的前缀化产物，不是该运行原输入。
+          en: situated-003 is the prefixed artifact generated by situate-84, not its original input.
+          ja: situated-003 は situate-84 が生成した接頭辞付き成果物で元入力ではありません。
+        field_values: {}
+        related_node_ids:
+          - SituatingPromptRun
+          - Chunk
+        related_relation_ids:
+          - SituatingPromptRun-consumes-Chunk
+        expected_result:
+          zh: 方向检查拒绝把输出作为 consumes 目标。
+          en: Direction checking rejects the output as the consumes target.
+          ja: 方向検査は出力を consumes 対象にしません。
+        why_valid_or_invalid:
+          zh: 语境化之前的输入与之后的派生产物具有不同标识和生命周期。
+          en: Pre- and post-contextualization artifacts have separate identities.
+          ja: 語境化前後の成果物同一性は分離されています。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-situating-prompt-run-012
+    source_claims:
+      - claim-situating-prompt-run-013
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: accepted
     target: concept:Chunk
-    endpoint_order: source-to-target
+  - id: SituatingPromptRun-produces-SituatedChunk
+    predicate: produces
     direction: source-to-target
     relation_kind: causal
-    labels: {zh: 使用源分块, en: uses source chunk, ja: source chunk を使用する}
+    labels:
+      zh: 产生
+      en: produces
+      ja: 生成する
     definitions:
-      zh: 仅当 source_chunk_ref 指向目标 Chunk 版本且该版本实际被提供给模型时，SituatingPromptRun 使用该 Chunk。
-      en: A SituatingPromptRun uses a Chunk only when source_chunk_ref identifies that Chunk revision and it was actually supplied to the model.
-      ja: source_chunk_ref がその Chunk revision を識別し、それが実際に model に与えられた場合にだけ、SituatingPromptRun は Chunk を使用します。
-    cardinality:
-      source: {min: 1, max: 1}
-      target: {min: 0, max: null}
-    cardinality_not_applicable_reason: null
+      zh: SituatingPromptRun-produces-SituatedChunk 表示该运行生成一个新 SituatedChunk，后者保留原 Chunk 正文与跨度并把生成语境分离保存；只有一条就地改写文本不能满足该边。
+      en: SituatingPromptRun-produces-SituatedChunk states that the run generates a new SituatedChunk that preserves the source Chunk body and span while storing generated context separately. An in-place rewrite does not satisfy this edge.
+      ja: SituatingPromptRun-produces-SituatedChunk は実行が元Chunk本文・範囲を保持し生成文脈を別保存する新SituatedChunkを生成することを表します。上書き改変では満たしません。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 该本体关系记录可查询的语义事实，但不对所有运行实例施加统一基数。
+      en: This ontology relation records a queryable semantic fact without imposing one universal cardinality on all runtime instances.
+      ja: この本体関係は検索可能な意味事実を記録しますが、すべての実行インスタンスに一律の基数を課しません。
     inverse_reading:
-      predicate: is_used_by_situating_prompt_run
-      labels: {zh: 被情境化提示运行使用, en: is used by situating prompt run, ja: 文脈化プロンプト実行に使用される}
+      predicate: produced_by
+      labels:
+        zh: 反向：产生
+        en: produced by
+        ja: 逆方向：生成する
     conditions: []
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
-    examples: []
-    source_claims: [claim-situating-run-provenance]
-    distinct_fact_rationale: "This is concrete input use, not a parent relation or claim that context note was source text."
+    examples:
+      - id: SituatingPromptRun-produces-SituatedChunk-example-positive-001
+        kind: positive
+        labels:
+          zh: 产生正例
+          en: "Positive case: produces"
+          ja: 生成するの正例
+        scenario_id: null
+        descriptions:
+          zh: situate-84 生成 situated-003@v1，分别保存 source_chunk_id 与 context_prefix。
+          en: situate-84 generates situated-003@v1 with separate source_chunk_id and context_prefix.
+          ja: situate-84 は source_chunk_id と context_prefix を分離した situated-003@v1 を生成します。
+        field_values: {}
+        related_node_ids:
+          - SituatingPromptRun
+          - SituatedChunk
+        related_relation_ids:
+          - SituatingPromptRun-produces-SituatedChunk
+        expected_result:
+          zh: 输出查询返回新产物并能回到原 Chunk。
+          en: The output query returns the new artifact and can return to the source Chunk.
+          ja: 出力照会は新成果物を返し元Chunkへ戻れます。
+        why_valid_or_invalid:
+          zh: 产物具有独立身份且没有混淆来源文本。
+          en: The artifact has independent identity without conflating generated and source text.
+          ja: 成果物は独立同一性を持ち生成文と出典文を混同しません。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-situating-prompt-run-014
+      - id: SituatingPromptRun-produces-SituatedChunk-example-boundary-001
+        kind: boundary
+        labels:
+          zh: 产生边界例
+          en: "Boundary case: produces"
+          ja: 生成するの境界例
+        scenario_id: null
+        descriptions:
+          zh: situate-85 把模型说明直接写入 chunk-003 正文，未保存原文或新 ID。
+          en: situate-85 writes model explanation directly into chunk-003 with no preserved original or new ID.
+          ja: situate-85 は元文保持や新IDなしに説明を chunk-003 本文へ直接書きます。
+        field_values: {}
+        related_node_ids:
+          - SituatingPromptRun
+          - SituatedChunk
+        related_relation_ids:
+          - SituatingPromptRun-produces-SituatedChunk
+        expected_result:
+          zh: 验证器拒绝形成 SituatedChunk 输出事实。
+          en: Validation rejects the SituatedChunk output fact.
+          ja: SituatedChunk 出力事実を拒否します。
+        why_valid_or_invalid:
+          zh: 若不保留分离字段，就无法区分生成语境与可引用的来源证据。
+          en: Generated context cannot be distinguished from source evidence.
+          ja: 生成文脈と出典証拠を区別できません。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-situating-prompt-run-015
+    source_claims:
+      - claim-situating-prompt-run-016
+    distinct_fact_rationale: null
     layout_role: cross-link
-  - id: SituatingPromptRun-generates-SituatedChunk
-    predicate: generates
+    review_status: accepted
     target: concept:SituatedChunk
-    endpoint_order: source-to-target
-    direction: source-to-target
-    relation_kind: causal
-    labels: {zh: 生成情境化分块, en: generates situated chunk, ja: 文脈化チャンクを生成する}
-    definitions:
-      zh: 仅当 output_situated_chunk_ref 指向目标新版本且运行完成时，SituatingPromptRun 生成该 SituatedChunk。
-      en: A SituatingPromptRun generates a SituatedChunk only when output_situated_chunk_ref names that new revision and the run completed.
-      ja: output_situated_chunk_ref がその新しい revision を示し、run が完了した場合にだけ、SituatingPromptRun は SituatedChunk を生成します。
-    cardinality:
-      source: {min: 1, max: 1}
-      target: {min: 0, max: null}
-    cardinality_not_applicable_reason: null
-    inverse_reading:
-      predicate: is_generated_by_situating_prompt_run
-      labels: {zh: 由情境化提示运行生成, en: is generated by situating prompt run, ja: 文脈化プロンプト実行により生成される}
-    conditions: []
-    temporal_scope: valid-time
-    boundary_context: null
-    constraints: []
-    examples: []
-    source_claims: [claim-situating-run-provenance]
-    distinct_fact_rationale: "This is version-specific output generation and does not make an information artifact a subtype or component of the activity."
-    layout_role: cross-link
-sources:
-  - id: anthropic-contextual-retrieval
-    title: Anthropic Contextual Retrieval
-    source_type: official-engineering-article
-    url: https://www.anthropic.com/engineering/contextual-retrieval
-    relevance: Documents providing whole document and target chunk to a model to produce contextual text before contextual embeddings and contextual BM25.
-  - id: w3c-prov-o
-    title: "W3C PROV-O: The PROV Ontology"
-    source_type: standard
-    url: https://www.w3.org/TR/prov-o/
-    relevance: Distinguishes an Activity from entities it uses and generates.
+review:
+  status: accepted
+  method: manual-semantic
+  reviewer: manual-memory-ingestion-verification
+  reviewed_on: 2026-07-17
+  note:
+    zh: 已对照 Anthropic Contextual Retrieval、LangChain text splitters/document loaders、LlamaIndex node parsers/ingestion pipeline、Unstructured 解析模式与 ETL 去重策略逐项人工语义核验通过。
+    en: Manually verified against Anthropic Contextual Retrieval, LangChain text splitters and document loaders, LlamaIndex node parsers and ingestion pipeline, Unstructured parsing patterns, and ETL deduplication strategies.
+    ja: Anthropic Contextual Retrieval、LangChain text splitters/document loaders、LlamaIndex node parsers/ingestion pipeline、Unstructured 解析パターン、ETL 重複排除戦略に照らし手動意味審査を完了しました。
+  sections:
+    semantics: accepted
+    hierarchy: accepted
+    relations: accepted
+    structure: accepted
+    examples: accepted
+    source_claims: accepted
 source_claims:
-  - id: claim-situating-run-contextualization
-    source: anthropic-contextual-retrieval
-    supports: Anthropic documents a preprocessing step that provides a whole document and target chunk to a model to generate chunk-specific explanatory context before contextual embeddings and contextual BM25.
-    locator: "Contextual Retrieval: preprocessing prompt and contextual embeddings/contextual BM25"
-    evidence_kind: official-documentation
-    confidence: high
-  - id: claim-situating-run-source-boundary
-    source: anthropic-contextual-retrieval
-    supports: The method prepends generated context to original chunk text for retrieval. Moonweave retains a separable generated note and a distinct output artifact so source text is not overwritten.
-    locator: "Contextual Retrieval: original chunk and transformed contextual chunk example"
-    evidence_kind: ontology-design-inference
-    confidence: high
-  - id: claim-situating-run-pipeline-boundary
-    source: anthropic-contextual-retrieval
-    supports: Contextualization precedes embedding and BM25 index construction; it is not itself source chunking, embedding, retrieval, or memory persistence.
-    locator: "Contextual Retrieval: contextual embeddings and contextual BM25 creation"
-    evidence_kind: ontology-design-inference
-    confidence: high
-  - id: claim-situating-run-auditability
-    source: anthropic-contextual-retrieval
-    supports: The documented prompt-based model transformation motivates recording prompt and model identifiers as Moonweave audit fields for replay and review.
-    locator: "Contextual Retrieval: prompt and generation workflow"
-    evidence_kind: ontology-design-inference
+  - id: claim-situating-prompt-run-001
+    source: eng-fw-llamaindex-metadata-extraction
+    supports: LlamaIndex documents contextual-information extraction for ambiguous chunks and a pipeline of feature extractors whose results are added to Nodes. This supports the operation behind SituatingPromptRun; event identity, inputs, prompt/model versions, validation, output, owner, semantic kind, and hierarchy are Moonweave design inference.
+    locator: Metadata Extraction > Introduction > contextual extraction; Usage > sequential feature extractors
+    evidence_kind: design-inference
     confidence: medium
-  - id: claim-situating-run-provenance
-    source: w3c-prov-o
-    supports: PROV-O distinguishes an Activity from entities it uses and generates. Moonweave applies that distinction to source Chunk revision, SituatingPromptRun, and generated SituatedChunk revision.
-    locator: "PROV-O: Activity, Entity, prov:used, and prov:wasGeneratedBy"
-    evidence_kind: ontology-design-inference
-    confidence: high
-  - id: claim-situating-run-subtype
-    source: anthropic-contextual-retrieval
-    supports: Modeling an observable contextualization model call as the SituatingPromptRun subtype of ChunkProcessingActivity is a Moonweave taxonomy inference from the documented preprocessing step.
-    locator: "Contextual Retrieval: preprocessing pipeline"
-    evidence_kind: ontology-design-inference
+    review_status: accepted
+  - id: claim-situating-prompt-run-002
+    source: lit-mech-compass
+    supports: COMPASS describes maintaining concise, relevant context for long-horizon reasoning through a Context Manager. It supports the need for task-aware context construction; the exact per-chunk activity model and SituatingPromptRun taxonomy are Moonweave design inferences.
+    locator: Paper > Abstract > Context Manager maintains concise, relevant progress briefs
+    evidence_kind: design-inference
     confidence: medium
+    review_status: accepted
+  - id: claim-situating-prompt-run-003
+    source: eng-fw-llamaindex-metadata-extraction
+    supports: SituatingPromptRun-example-positive-001 corresponds to LlamaIndex's documented sequential feature-extractor pipeline that adds metadata to each Node. Reifying one execution with an input Chunk, broader context, prompt/model versions, validation, output identity, and SituatingPromptRun classification is Moonweave design inference.
+    locator: Metadata Extraction > Usage > sequential feature extractors and metadata added to each Node
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-situating-prompt-run-004
+    source: lit-mech-compass
+    supports: COMPASS describes a Context Manager that maintains concise, relevant progress briefs for long-horizon reasoning. This supports task-relevant context construction; Moonweave's per-chunk prompt-run identity and provenance fields are a narrower design inference.
+    locator: Paper > Abstract > Context Manager maintains concise, relevant progress briefs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-situating-prompt-run-005
+    source: eng-fw-llamaindex-metadata-extraction
+    supports: SituatingPromptRun-example-boundary-001 relies on the documented operation that adds metadata to existing Nodes rather than defining a replacement chunk body. Moonweave turns body preservation plus an added context note into the boundary from ChunkCompression; LlamaIndex does not assert those ontology classes.
+    locator: Metadata Extraction > Usage > node parser adds additional metadata to each Node
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-situating-prompt-run-006
+    source: lit-mech-compass
+    supports: COMPASS's Context Manager maintains relevant briefs to preserve useful task context. That context-maintenance purpose differs from content-length reduction, supporting Moonweave's boundary between a situating run and ChunkCompression.
+    locator: Paper > Abstract > Context Manager maintains concise, relevant progress briefs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-situating-prompt-run-007
+    source: eng-fw-llamaindex-metadata-extraction
+    supports: For SituatingPromptRun's sibling boundary from ChunkCompression, LlamaIndex documents contextual extraction that adds metadata to existing Nodes when chunks lack disambiguating context. It supports the SituatingPromptRun endpoint only; the separate compression endpoint, shared parent, endpoint conditions, and hierarchy are Moonweave design inference.
+    locator: Metadata Extraction > Introduction > contextual information for ambiguous chunks; Usage > metadata added to Nodes
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-situating-prompt-run-008
+    source: eng-fw-anthropic-contextual-retrieval
+    supports: The recorded prompt, model, inputs, and output instantiate the documented contextualization preprocessing activity.
+    locator: Introducing Contextual Retrieval > Implementing Contextual Retrieval
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-situating-prompt-run-009
+    source: eng-fw-anthropic-contextual-retrieval
+    supports: The short contextual text is the generated result described by Anthropic, not the preprocessing execution.
+    locator: Introducing Contextual Retrieval > Implementing Contextual Retrieval
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-situating-prompt-run-010
+    source: eng-fw-anthropic-contextual-retrieval
+    supports: Anthropic describes a preprocessing flow that prompts a model with whole document and chunk to generate chunk-specific context; Moonweave classifies each observed execution under ChunkProcessingActivity.
+    locator: Introducing Contextual Retrieval > Implementing Contextual Retrieval
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-situating-prompt-run-011
+    source: eng-fw-anthropic-contextual-retrieval
+    supports: The case follows Anthropic's documented prompt shape by reading the target chunk and its whole document.
+    locator: Introducing Contextual Retrieval > Implementing Contextual Retrieval
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-situating-prompt-run-012
+    source: eng-fw-anthropic-contextual-retrieval
+    supports: Anthropic describes contextualized text as the result prepended after generation, so that result is not the original chunk input.
+    locator: Introducing Contextual Retrieval > Implementing Contextual Retrieval
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-situating-prompt-run-013
+    source: eng-fw-anthropic-contextual-retrieval
+    supports: Anthropic's implementation prompt includes both WHOLE_DOCUMENT and CHUNK_CONTENT; Moonweave records the identified Chunk actually consumed by each situating run.
+    locator: Introducing Contextual Retrieval > Implementing Contextual Retrieval
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-situating-prompt-run-014
+    source: eng-fw-anthropic-contextual-retrieval
+    supports: Separate source_chunk_id and context_prefix implement the documented contextualized-chunk construction while preserving evidence identity.
+    locator: Introducing Contextual Retrieval > Implementing Contextual Retrieval
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-situating-prompt-run-015
+    source: eng-fw-anthropic-contextual-retrieval
+    supports: An in-place rewrite erases the distinction between Anthropic's original_chunk and contextualized_chunk and therefore cannot support auditable output identity.
+    locator: Introducing Contextual Retrieval > Implementing Contextual Retrieval
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-situating-prompt-run-016
+    source: eng-fw-anthropic-contextual-retrieval
+    supports: Anthropic prepends generated chunk-specific context before embedding; Moonweave preserves that transformation as a separately identified SituatedChunk with source and generated regions distinguishable.
+    locator: Introducing Contextual Retrieval > Implementing Contextual Retrieval
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted

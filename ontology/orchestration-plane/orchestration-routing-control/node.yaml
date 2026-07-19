@@ -1,213 +1,1417 @@
 schema: moonweave.ai/ontology-node/v1
 id: orchestration-routing-control
 kind: module
+status: accepted
 labels:
   zh: 路由与门控
   en: Routing and gates
   ja: ルーティングとゲート制御
 semantics:
   short_definition:
-    zh: 描述控制流应当怎样选择（RoutingSpecification），以及一次运行实际选择了什么（Gate、GateOutcome、RoutingDecision、SuccessorDispatch）。
-    en: Describes how control flow should choose (RoutingSpecification) and what one run actually chose (Gate, GateOutcome, RoutingDecision, SuccessorDispatch).
-    ja: 制御フローがどう選ぶべきか（RoutingSpecification）と一回の実行が実際に何を選んだか（Gate、GateOutcome、RoutingDecision、SuccessorDispatch）を表します。
+    zh: 描述控制流应当怎样选择，以及一次运行实际选择了什么。RoutingSpecification 定义路由、策略、重试和条件；Gate 对条件进行控制性求值并产生 GateOutcome；RoutingDecision 记录一次具体求值与选择；RoutingTarget 是可被选择的入口引用。规范、决定、目标和后续执行是四种不同身份，只能通过关系连接。
+    en: Describes how control flow should choose and what one run actually chose. RoutingSpecification defines routes, policies, retry rules, and conditions; Gate performs a control evaluation and produces a GateOutcome; RoutingDecision records one concrete evaluation and selection; RoutingTarget is a selectable entry-point reference. Specification, decision, target, and downstream execution are distinct identities connected only by relations.
+    ja: 制御フローがどのように選ぶべきか、一回の実行で実際に何を選んだかを表します。RoutingSpecification は route・policy・retry・condition、Gate は制御評価と GateOutcome、RoutingDecision は具体的な評価と選択、RoutingTarget は選択可能な entry point 参照を表します。仕様・判断・対象・後続実行は異なる同一性で、関係だけで接続します。
   definition:
-    zh: orchestration-routing-control 包含可复用规范层与发生事实层。RoutingSpecification 下的 Route、RoutingPolicy、RetryPolicy、RoutingCondition 规定候选、求值与停止/重试；Gate/ControlGate 执行门控并产生 GateOutcome；RoutingDecision 记录一次具体求值与选择；SuccessorDispatch 记录对 RoutingTarget 的后续派发。LangGraph conditional_edges 与 Command(goto=...) 是工程参考，Moonweave 不把 Edge 或 Command 直接当作 RoutingDecision。RoutingTarget 只是候选入口的类型化引用，RoutingDecision 不是 RoutingTarget 的 is_a 子类。
-    en: orchestration-routing-control has reusable specification and occurrence layers. Route, RoutingPolicy, RetryPolicy, and RoutingCondition under RoutingSpecification govern candidates, evaluation, stopping, and retry; Gate/ControlGate execute gate control and produce GateOutcome; RoutingDecision records one concrete evaluation and selection; SuccessorDispatch records downstream dispatch to a RoutingTarget. LangGraph conditional_edges and Command(goto=...) are engineering references; Moonweave does not treat Edge or Command directly as RoutingDecision. RoutingTarget is only a typed reference to a candidate entry point; RoutingDecision is not an is_a child of RoutingTarget.
-    ja: orchestration-routing-control は再利用仕様層と発生事実層を持ちます。RoutingSpecification 配下が候補・評価・停止／retry、Gate/ControlGate が門制御、RoutingDecision が具体評価と選択、SuccessorDispatch が RoutingTarget への後続 dispatch を表します。LangGraph conditional_edges と Command(goto=...) は工程参照であり、Edge/Command を RoutingDecision そのものとはしません。
+    zh: 本模块包含可复用规范与发生事实两层。RoutingSpecification 下的 Route、RoutingPolicy、RetryPolicy 和 RoutingCondition 规定候选、求值与停止/重试方式；Gate/ControlGate 负责执行门控；GateOutcome 和 RoutingDecision 是一次运行产生的事实；RoutingTarget 只是对候选入口的类型化引用。当前目录把 RoutingDecision 放在 RoutingTarget 下、把 DownstreamOperation 放在 GateOutcome 下，二者都不是 is_a：决定不是一种目标，操作也不是一种结果。后续概念重构应将决定提升为独立发生根，并把后续操作提升为活动根或改为引用运行域活动。
+    en: "This module has reusable specification and occurrence layers. Route, RoutingPolicy, RetryPolicy, and RoutingCondition beneath RoutingSpecification govern candidates, evaluation, stopping, and retry; Gate and ControlGate execute gate control; GateOutcome and RoutingDecision are facts produced by one run; RoutingTarget is only a typed reference to a candidate entry point. The current directory places RoutingDecision beneath RoutingTarget and DownstreamOperation beneath GateOutcome, but neither relation is is_a: a decision is not a target, and an operation is not an outcome. A later concept refactor must lift decision to an independent occurrence root and lift downstream operation to an activity root or reference a runtime-owned activity."
+    ja: 本モジュールは再利用仕様層と発生事実層を持ちます。RoutingSpecification 配下の Route・RoutingPolicy・RetryPolicy・RoutingCondition は候補・評価・停止／再試行方式、Gate／ControlGate は門制御の実行、GateOutcome と RoutingDecision は一回の実行で生成された事実、RoutingTarget は候補 entry point の型付き参照を表します。現ディレクトリは RoutingDecision を RoutingTarget 配下、DownstreamOperation を GateOutcome 配下に置きますが、どちらも is_a ではありません。decision は target ではなく、operation は outcome ではありません。後続概念再構成では decision を独立発生根へ、downstream operation を activity 根へ引き上げるか実行域 activity を参照します。
   why_needed:
-    zh: 每次分支、阻断、重试或停止都需要可追溯的输入状态、规则版本、求值结果与选中目标；把静态路由配置误报为已执行决定会破坏恢复与审计。
-    en: Every branch, block, retry, or stop needs traceable input state, rule revision, evaluation result, and selected target; misreporting static routing configuration as an executed decision breaks recovery and audit.
-    ja: 各 branch/block/retry/stop に追跡可能な入力状態・規則版・評価結果・選択対象が必要です。静的 route 設定を実行済み判断と誤報すると回復と監査が壊れます。
+    zh: 让每次分支、阻断、重试或停止都有可追溯的输入状态、采用的规则版本、求值结果和选中目标，而不是把静态路由配置误报成已经发生的决定。
+    en: Gives every branch, block, retry, or stop traceable input state, rule revision, evaluation result, and selected target without misreporting static routing configuration as an executed decision.
+    ja: 各 branch・block・retry・stop に追跡可能な入力状態・規則版・評価結果・選択対象を与え、静的 route 設定を実行済み判断と誤報しないために必要です。
   includes:
-    - zh: RoutingSpecification、Route、RoutingPolicy、RetryPolicy、RoutingCondition（Branch/Gate/Stop）。
-      en: RoutingSpecification, Route, RoutingPolicy, RetryPolicy, RoutingCondition (Branch/Gate/Stop).
-      ja: RoutingSpecification、Route、RoutingPolicy、RetryPolicy、RoutingCondition。
-    - zh: Gate、ControlGate、GateOutcome、RoutingDecision、RoutingTarget、SuccessorDispatch、DownstreamOperation 引用。
-      en: Gate, ControlGate, GateOutcome, RoutingDecision, RoutingTarget, SuccessorDispatch, and DownstreamOperation references.
-      ja: Gate、ControlGate、GateOutcome、RoutingDecision、RoutingTarget、SuccessorDispatch、DownstreamOperation 参照。
+    - zh: 可复用的路由规范族及其目标模型：规则、策略、类型化目标与停止条件描述应该如何选择，不冒充一次实际决定。
+      en: "Reusable routing specifications and their target model: rules, policies, typed targets, and stop conditions describe how selection should occur without impersonating one actual decision."
+      ja: 再利用可能な routing specification と target model：rule・policy・typed target・stop condition は選択方法を記述し、actual decision を装いません。
+    - zh: 实际控制链：ControlGate 作为 Gate 的编排专化求值条件并产生 GateOutcome；RoutingDecision 记录结果并选择 RoutingTarget，GateOutcome 则在证据可核对时触发真正的 DownstreamOperation。目标引用与执行活动始终是两个节点。
+      en: "The operational control chain: ControlGate specializes Gate for orchestration, evaluates conditions, and produces a GateOutcome. RoutingDecision records that outcome and selects a RoutingTarget, while an evidenced GateOutcome triggers the actual DownstreamOperation. The target reference and execution activity remain separate nodes."
+      ja: 実行 control chain：ControlGate は orchestration 用 Gate specialization として condition を評価し GateOutcome を生成します。RoutingDecision は outcome を記録して RoutingTarget を選択し、証拠で確認できる GateOutcome が actual DownstreamOperation を trigger します。target reference と execution activity は別 node のままです。
   excludes:
-    - zh: LangGraph Edge/Node 本体、RunAttempt、通用日志、静态协作拓扑（composition 域）。
-      en: LangGraph Edge/Node objects themselves, RunAttempt, generic logs, static collaboration topology (composition domain).
-      ja: LangGraph Edge/Node 自体、RunAttempt、generic log、static composition topology。
-  semantic_kind: module
+    - zh: 静态协作拓扑、授权策略与授权决定、运行尝试、来源文献、框架产品和仅用于展示的社区节点。
+      en: Static collaboration topology, authorization policies and decisions, runtime attempts, source literature, framework products, and visualization-only community nodes.
+      ja: static composition topology・authorization policy/decision・runtime attempt・source literature・framework product・visual-only community node。
+  semantic_kind: null
   aliases: []
-engineering:
-  explanation:
-    zh: LangGraph 通过 add_conditional_edges(source, path, path_map) 或节点返回 Command(goto=...) 实现条件路由；适配器在路由边界读取 state snapshot、condition_ref、选中 target 与 binding_ref，写入 RoutingDecision 与 SuccessorDispatch，而不把 conditional edge 函数重命名为 RoutingDecision。
-    en: LangGraph implements conditional routing through add_conditional_edges(source, path, path_map) or nodes returning Command(goto=...); adapters read state snapshot, condition_ref, selected target, and binding_ref at routing boundaries into RoutingDecision and SuccessorDispatch without renaming conditional edge functions as RoutingDecision.
-    ja: LangGraph は add_conditional_edges または Command(goto=...) で条件 routing を実装します。adapter は routing 境界で state snapshot、condition_ref、選択 target、binding_ref を RoutingDecision/SuccessorDispatch に書き、conditional edge 関数を RoutingDecision と改名しません。
-  typical_input:
-    - description: LangGraph conditional edge evaluation
-      format: |-
-        builder.add_conditional_edges("triage", route_by_severity, {"high": "security_review", "low": "auto_close"})
-        result = graph.invoke({"severity": "high"})
-    - description: LangGraph Command goto from a node
-      format: |-
-        def reviewer(state): return Command(goto="revise" if state["needs_revision"] else "publish")
-  typical_output:
-    - description: Local routing decision with selected target
-      format: |-
-        {"routing_decision_id":"rd-184","condition_ref":"route-by-severity@v2","selected_target_ref":"security_review","state_digest":"sha256:...","execution_binding_ref":"langgraph:edge:triage"}
-  reference_implementations:
-    - name: LangGraph Graph API
-      url: https://docs.langchain.com/oss/python/langgraph/graph-api
-      description: Documents conditional edges, Command, and graph routing.
-    - name: LangGraph conditional routing
-      url: https://docs.langchain.com/oss/python/langgraph/graph-api#conditional-edges
-      description: Documents add_conditional_edges and dynamic routing patterns.
-  source_claims:
-    - claim-orchestration-routing-control-module
-    - claim-orchestration-routing-control-boundary
-structure:
-  identity_keys:
-    - module_id
-  fields:
-    - id: module_id
-      labels:
-        zh: 模块标识
-        en: module ID
-        ja: モジュール ID
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      definitions:
-        zh: 稳定标识路由与门控模块。
-        en: Stably identifies the routing and gates module.
-        ja: ルーティングとゲート制御モジュールを安定して識別します。
-      allowed_values: [orchestration-routing-control]
-      example_value: orchestration-routing-control
-      source_claims: [claim-orchestration-routing-control-module]
-    - id: specification_roots
-      labels:
-        zh: 规范根概念
-        en: specification root concepts
-        ja: 仕様根概念
-      datatype: array[string]
-      required: true
-      cardinality: {min: 1, max: null}
-      definitions:
-        zh: 列出可复用路由规范根。
-        en: Lists reusable routing specification roots.
-        ja: 再利用可能な routing 仕様根を列挙します。
-      example_value: '["RoutingSpecification"]'
-      source_claims: [claim-orchestration-routing-control-module]
-    - id: occurrence_roots
-      labels:
-        zh: 发生根概念
-        en: occurrence root concepts
-        ja: 発生根概念
-      datatype: array[string]
-      required: true
-      cardinality: {min: 1, max: null}
-      definitions:
-        zh: 列出记录已发生路由决定与派发的根概念。
-        en: Lists roots recording occurred routing decisions and dispatches.
-        ja: 発生した routing decision と dispatch を記録する根を列挙します。
-      example_value: '["RoutingDecision","SuccessorDispatch"]'
-      source_claims: [claim-orchestration-routing-control-module]
-  constraints:
-    - id: orchestration-routing-control-spec-decision-separation
-      expression: RoutingSpecification and RoutingDecision connect only through evaluates, selects, or applies relations; never through is_a between specification and decision families.
-      explanation:
-        zh: 规范描述应如何选择；决定证明某次运行实际选了什么。混为 is_a 会把设计稿误报为已执行事实。
-        en: Specifications describe how selection should occur; decisions prove what one run actually chose. is_a between them would misreport design as executed fact.
-        ja: 仕様は選択方法を示し、decision は一回の実行が実際に選んだことを証明します。
-      source_claims: [claim-orchestration-routing-control-boundary]
-  required_relations: []
+purpose:
+  zh: 让每次分支、阻断、重试或停止都有可追溯的输入状态、采用的规则版本、求值结果和选中目标，而不是把静态路由配置误报成已经发生的决定。
+  en: Gives every branch, block, retry, or stop traceable input state, rule revision, evaluation result, and selected target without misreporting static routing configuration as an executed decision.
+  ja: 各 branch・block・retry・stop に追跡可能な入力状態・規則版・評価結果・選択対象を与え、静的 route 設定を実行済み判断と誤報しないために必要です。
+structure: null
 examples:
-  - id: routing-langgraph-conditional-edges
+  - id: orchestration-routing-control-cq-route-decision-v3-example-positive
+    kind: positive
     labels:
-      zh: orchestration-routing-control positive
-      en: orchestration-routing-control positive
-      ja: orchestration-routing-control positive
+      zh: 冻结账单意图状态选择专属处理目标
+      en: Frozen billing-intent state selects the dedicated handling target
+      ja: 固定 billing-intent state が専用 handling target を選択
+    scenario_id: orchestration-routing-control-cq-route-decision-v3-example-positive
     descriptions:
-      zh: MRKL Systems (Karpas et al., 2022) 将 LLM 作为 orchestration-routing-control 路由器分派到专家模块：router LLM 解析 query → dispatch 到 calculator/wiki/search 等 neuro-symbolic 模块 → 汇总模块输出；模块化架构解耦推理与外部知识。
-      en: MRKL Systems (Karpas et al., 2022) uses LLM as orchestration-routing-control router dispatching to expert modules: router parses query → dispatch to calculator/wiki/search neuro-symbolic modules → aggregate outputs; modular architecture decouples reasoning from external knowledge.
-      ja: MRKL (Karpas et al., 2022) LLM router が orchestration-routing-control から calculator/wiki/search 等 expert module へ dispatch。
-    field_values: {source: LangGraph, api: add_conditional_edges, router: route_by_severity}
-
+      zh: decision-884 对 state-snapshot-551@1 应用 policy-support@7，求值 branch-billing@3 得到 true，并在三个候选路径中选择 target-billing-worker@5；route-billing@4 静态指向同一目标。
+      en: decision-884 applies policy-support@7 to state-snapshot-551@1, evaluates branch-billing@3 as true, and selects target-billing-worker@5 from three candidates; route-billing@4 statically points to the same target.
+      ja: decision-884 は state-snapshot-551@1 に policy-support@7 を適用し branch-billing@3=true を評価し、三 candidate route から target-billing-worker@5 を選び、route-billing@4 も同じ target を指します。
+    field_values:
+      routing_decision_id: decision-884
+      input_state_ref: state-snapshot-551@1
+      input_state_digest: sha256:state-snapshot-551-1
+      routing_policy_ref: policy-support@7
+      candidate_route_refs:
+        - route-billing@4
+        - route-technical@6
+        - route-general@2
+      evaluated_condition_ref: branch-billing@3
+      condition_observation:
+        intent: billing
+        confidence: 0.94
+      condition_result: true
+      selected_target_ref: target-billing-worker@5
+      static_route_target_ref: target-billing-worker@5
+      evaluated_at: 2026-07-16T14:00:05Z
+      rationale: billing confidence 0.94 exceeds policy threshold 0.85
     related_node_ids:
       - RoutingDecision
+      - RoutingPolicy
       - BranchCondition
       - Route
-    related_relation_ids: []
+      - RoutingTarget
+    related_relation_ids:
+      - RoutingDecision-applies-RoutingPolicy
+      - RoutingDecision-evaluates-RoutingCondition
+      - RoutingDecision-selects-RoutingTarget
+      - Route-points_to-RoutingTarget
+    expected_result:
+      zh: 返回冻结输入摘要、策略版本、全部已求值条件与结果、选中目标和与之对应的静态路径，并保留决定时间。
+      en: Return the frozen input digest, policy revision, every evaluated condition and result, selected target, matching static route, and decision time.
+      ja: 固定 input digest、policy revision、全 evaluated condition/result、selected target、対応 static route、decision time を返します。
+    why_valid_or_invalid:
+      zh: LangGraph 将静态边与条件路由区分开；本例也把 Route 的配置目标与 RoutingDecision 的一次求值选择分开，并以同一版本目标核对。
+      en: LangGraph distinguishes static edges from conditional routing; this case likewise separates a Route's configured target from one RoutingDecision occurrence and reconciles the exact target revision.
+      ja: LangGraph が static edge と conditional routing を区別するように、本例も Route の設定 target と RoutingDecision occurrence を分離し同一 target revision で照合します。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-orchestration-routing-control-module
-
-  - id: routing-semantic-router-layer
+      - claim-orchestration-routing-control-001
+      - claim-orchestration-routing-control-003
+  - id: orchestration-routing-control-cq-route-decision-v3-example-counter
+    kind: boundary
     labels:
-      zh: orchestration-routing-control positive
-      en: orchestration-routing-control positive
-      ja: orchestration-routing-control positive
+      zh: 静态账单路径被误报为已执行选择
+      en: Static billing route is misreported as an executed selection
+      ja: static billing route を実行済み selection と誤報
+    scenario_id: orchestration-routing-control-cq-route-decision-v3-example-counter
     descriptions:
-      zh: Tree of Thoughts (Yao et al., 2023) 对 orchestration-routing-control 使用 BFS/DFS 思维树：tree.generate_thoughts(state, k=5) 生成候选 → tree.evaluate(thoughts) 评估 → tree.select(evaluated, method="greedy") 选最优分支；Game of 24 任务上 ToT 显著优于 CoT。
-      en: Tree of Thoughts (Yao et al., 2023) applies BFS/DFS thought trees to orchestration-routing-control: tree.generate_thoughts(state, k=5) → tree.evaluate(thoughts) → tree.select(evaluated, method="greedy"); ToT beats CoT on Game of 24.
-      ja: ToT (Yao et al., 2023) orchestration-routing-control で generate_thoughts(k=5)→evaluate→select(greedy)；Game of 24 で CoT 超え。
-    field_values: {source: semantic-router, api: SemanticRouter, method: "cosine similarity"}
-
+      zh: policy-support@7 配置了 branch-billing@3，route-billing@4 也指向账单目标，但请求 request-552 没有冻结状态、RoutingDecision、条件观测或 selected_target 记录。
+      en: policy-support@7 configures branch-billing@3 and route-billing@4 points to the billing target, but request-552 has no frozen state, RoutingDecision, condition observation, or selected_target record.
+      ja: policy-support@7 は branch-billing@3 を設定し route-billing@4 も billing target を指しますが、request-552 には fixed state、RoutingDecision、condition observation、selected_target record がありません。
+    field_values:
+      request_id: request-552
+      routing_policy_ref: policy-support@7
+      configured_condition_ref: branch-billing@3
+      static_route_ref: route-billing@4
+      static_target_ref: target-billing-worker@5
+      input_state_ref: null
+      routing_decision_id: null
+      condition_observation: null
+      condition_result: null
+      selected_target_ref: null
     related_node_ids:
       - RoutingPolicy
-      - RoutingCondition
       - Route
-    related_relation_ids: []
+    related_relation_ids:
+      - RoutingPolicy-has_condition-BranchCondition
+    expected_result:
+      zh: 只返回可配置候选路径，不返回任何已选择目标；明确指出缺少一次决定及其输入、求值和时间证据。
+      en: Return only configured candidate reachability and no selected target; state that decision occurrence, input, evaluation, and time evidence are missing.
+      ja: configured candidate reachability のみを返し selected target は返さず、decision occurrence、input、evaluation、time evidence の欠落を示します。
+    why_valid_or_invalid:
+      zh: 策略、条件和路径属于可复用规范，存在它们只说明某目标可达；没有 RoutingDecision 就不能声称条件被求值或目标被实际选择。
+      en: Policies, conditions, and routes are reusable specifications that show reachability only; without RoutingDecision, no evaluation or actual selection occurred.
+      ja: policy、condition、route は再利用 specification で reachability だけを示し、RoutingDecision がなければ condition 評価や実際の target selection はありません。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-orchestration-routing-control-module
-
-  - id: routing-openai-agents-handoff
+      - claim-orchestration-routing-control-001
+  - id: orchestration-routing-control-cq-gate-outcome-v3-example-positive
+    kind: positive
     labels:
-      zh: orchestration-routing-control positive
-      en: orchestration-routing-control positive
-      ja: orchestration-routing-control positive
+      zh: 质量门把低分答复转向人工复核操作
+      en: Quality gate redirects a low-scoring answer to a human-review operation
+      ja: 品質 gate が低 score 回答を human-review operation へ redirect
+    scenario_id: orchestration-routing-control-cq-gate-outcome-v3-example-positive
     descriptions:
-      zh: ReAct (Yao et al., 2023) 在 orchestration-routing-control 场景实现 Thought→Action→Observation 交替循环：agent 输出 Thought（推理当前应做什么），执行 Action（如 Search["query"] 或 Lookup["term"]），获得 Observation（环境反馈），再生成下一个 Thought。HotpotQA 上 ReAct 通过多步推理+搜索达到比 CoT 更高准确率；LangChain create_react_agent() 直接实现此模式。
-      en: ReAct (Yao et al., 2023) implements Thought→Action→Observation loops for orchestration-routing-control: agent outputs Thought (reasoning), executes Action (e.g. Search["query"]), receives Observation (feedback), then next Thought. On HotpotQA ReAct beats CoT via multi-step reasoning+search; LangChain create_react_agent() implements this pattern.
-      ja: ReAct (Yao et al., 2023) が orchestration-routing-control で Thought→Action→Observation ループ：Thought 推論→Action Search["query"]→Observation→次 Thought。HotpotQA で CoT 超え；create_react_agent() 実装。
-    field_values: {source: "OpenAI Agents SDK", api: handoffs, method: "model-driven selection"}
-
+      zh: control-gate-4 使用 eval-score-991=0.62 求值 gate-quality@5 的 0.80 阈值，产生 redirect outcome-884；decision-884 记录该结果并选择 target-human-review@2，随后触发 operation-human-review-884。
+      en: control-gate-4 evaluates gate-quality@5 threshold 0.80 with eval-score-991=0.62 and produces redirect outcome-884; decision-884 records it, selects target-human-review@2, and triggers operation-human-review-884.
+      ja: control-gate-4 は eval-score-991=0.62 で gate-quality@5 の threshold 0.80 を評価し redirect outcome-884 を生成し、decision-884 が target-human-review@2 を選び operation-human-review-884 を trigger します。
+    field_values:
+      control_gate_id: control-gate-4
+      gate_condition_ref: gate-quality@5
+      evidence_ref: eval-score-991
+      observed_score: 0.62
+      threshold: 0.8
+      gate_outcome_id: outcome-884
+      gate_result: redirect
+      routing_decision_id: decision-884
+      selected_target_ref: target-human-review@2
+      downstream_operation_id: operation-human-review-884
+      operation_started_at: 2026-07-16T14:20:03Z
+      trigger_evidence_ref: outcome-884
     related_node_ids:
+      - ControlGate
+      - GateCondition
+      - GateOutcome
       - RoutingDecision
-      - SuccessorDispatch
       - RoutingTarget
-    related_relation_ids: []
+      - DownstreamOperation
+    related_relation_ids:
+      - ControlGate-evaluates-GateCondition
+      - ControlGate-produces-GateOutcome
+      - RoutingDecision-records-GateOutcome
+      - RoutingDecision-selects-RoutingTarget
+      - GateOutcome-triggers-DownstreamOperation
+    expected_result:
+      zh: 分别返回条件版本与证据、门控结果、记录该结果的决定、目标引用，以及具有开始时间和触发证据的实际人工复核操作。
+      en: Return condition revision and evidence, gate outcome, recording decision, target reference, and actual human-review operation with start time and triggering evidence separately.
+      ja: condition revision/evidence、gate outcome、recording decision、target reference、開始時刻と trigger evidence を持つ actual human-review operation を別々に返します。
+    why_valid_or_invalid:
+      zh: RoutingTarget 是可选目的引用，DownstreamOperation 是被结果实际启动的活动；保留两层可防止把“可以去哪里”误作“已经执行什么”。
+      en: RoutingTarget is a selectable destination reference, while DownstreamOperation is the activity actually started; keeping both prevents reachability from becoming execution.
+      ja: RoutingTarget は選択可能 destination ref、DownstreamOperation は実際に開始した activity で、両者を分けると reachability を execution と誤認しません。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-orchestration-routing-control-module
-
-  - id: routing-opa-gate-retry
+      - claim-orchestration-routing-control-001
+      - claim-orchestration-routing-control-004
+  - id: orchestration-routing-control-cq-gate-outcome-v3-example-counter
+    kind: boundary
     labels:
-      zh: orchestration-routing-control positive
-      en: orchestration-routing-control positive
-      ja: orchestration-routing-control positive
+      zh: 支持 allow/block 的门接口被误当作已产生阻断
+      en: Allow-block gate capability is mistaken for a produced block outcome
+      ja: allow/block gate capability を生成済み block outcome と誤認
+    scenario_id: orchestration-routing-control-cq-gate-outcome-v3-example-counter
     descriptions:
-      zh: LiteLLM 映射 orchestration-routing-control LLM 路由：completion(model="gpt-4", messages=[...]) 统一接口；Router(model_list=[...], routing_strategy="least-busy") 负载均衡；ModelRouting 在多 provider 间选择 endpoint。
-      en: LiteLLM maps orchestration-routing-control LLM routing: completion(model="gpt-4", messages) unified interface; Router(model_list, routing_strategy="least-busy") load balancing; ModelRouting selects endpoints across providers.
-      ja: LiteLLM orchestration-routing-control: completion(model="gpt-4")+Router(routing_strategy="least-busy") ModelRouting。
-    field_values: {source: OPA, api: "rego eval", retry: retry_router}
-
+      zh: gate-interface@3 声明支持 allow 与 block，且库中存在 gate-quality@5，但 request-992 没有 ControlGate 实例、输入证据、GateOutcome、RoutingDecision 或下游操作。
+      en: gate-interface@3 declares allow and block and gate-quality@5 exists in the library, but request-992 has no ControlGate occurrence, input evidence, GateOutcome, RoutingDecision, or downstream operation.
+      ja: gate-interface@3 は allow/block を宣言し gate-quality@5 も library にありますが、request-992 に ControlGate occurrence、input evidence、GateOutcome、RoutingDecision、downstream operation はありません。
+    field_values:
+      request_id: request-992
+      gate_interface_ref: gate-interface@3
+      declared_outcomes:
+        - allow
+        - block
+      configured_condition_ref: gate-quality@5
+      control_gate_id: null
+      evidence_ref: null
+      gate_outcome_id: null
+      routing_decision_id: null
+      selected_target_ref: null
+      downstream_operation_id: null
     related_node_ids:
       - Gate
+      - ControlGate
+      - GateCondition
       - GateOutcome
-      - RetryPolicy
-      - SuccessorDispatch
-    related_relation_ids: []
+      - RoutingDecision
+      - RoutingTarget
+      - DownstreamOperation
+    related_relation_ids:
+      - ControlGate-is_a-Gate
+      - ControlGate-evaluates-GateCondition
+      - ControlGate-produces-GateOutcome
+      - RoutingDecision-records-GateOutcome
+      - RoutingDecision-selects-RoutingTarget
+      - GateOutcome-triggers-DownstreamOperation
+    expected_result:
+      zh: 只返回门能力与可用条件，不创建结果、决定、目标选择或下游触发事实，并报告缺少发生证据。
+      en: Return only gate capability and available condition; create no outcome, decision, target selection, or downstream trigger and report missing occurrence evidence.
+      ja: gate capability と available condition のみを返し、outcome、decision、target selection、downstream trigger を作らず occurrence evidence 欠落を報告します。
+    why_valid_or_invalid:
+      zh: Gate 是一般能力类型，ControlGate 才是编排控制专门化；即使类型和条件都存在，也不能替代一次求值活动及其结果。
+      en: Gate is a general capability and ControlGate its orchestration specialization; the type and a condition cannot substitute for an evaluation occurrence and result.
+      ja: Gate は一般 capability、ControlGate は orchestration specialization であり、type と condition の存在だけで evaluation occurrence と result を代替できません。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-orchestration-routing-control-boundary
-
-sources:
-  - id: langgraph-graph-api
-    title: LangGraph Graph API
-    url: https://docs.langchain.com/oss/python/langgraph/graph-api
-    source_type: official-doc
-    relevance: Documents conditional edges, Command, nodes, and routing control flow.
+      - claim-orchestration-routing-control-001
+      - claim-orchestration-routing-control-004
+  - id: orchestration-routing-control-cq-retry-stop-v3-example-positive
+    kind: positive
+    labels:
+      zh: 第三次受治理尝试耗尽后转向人工升级
+      en: Third governed attempt exhausts the policy and redirects to human escalation
+      ja: 第三 governed attempt で policy を使い切り human escalation へ redirect
+    scenario_id: orchestration-routing-control-cq-retry-stop-v3-example-positive
+    descriptions:
+      zh: decision-failure-9 应用 retry-api@2；retry-activity-2 与 retry-activity-3 均明确受该版本治理，第三次 RunAttempt 失败后 remaining=0，stop-exhausted@3 求值为 true，决定转向 target-human-escalation@2。
+      en: decision-failure-9 applies retry-api@2; retry-activity-2 and retry-activity-3 are explicitly governed by that revision, and after the third RunAttempt fails with remaining=0, stop-exhausted@3 evaluates true and target-human-escalation@2 is selected.
+      ja: decision-failure-9 は retry-api@2 を適用し、retry-activity-2/3 は同 revision に govern され、第三 RunAttempt failure で remaining=0、stop-exhausted@3=true となり target-human-escalation@2 を選びます。
+    field_values:
+      routing_decision_id: decision-failure-9
+      retry_policy_ref: retry-api@2
+      maximum_attempts: 3
+      run_attempt_refs:
+        - run-attempt-901
+        - run-attempt-902
+        - run-attempt-903
+      retry_activity_refs:
+        - retry-activity-2
+        - retry-activity-3
+      governing_policy_refs:
+        - retry-api@2
+        - retry-api@2
+      last_failure_class: upstream-timeout
+      remaining_attempts: 0
+      stop_condition_ref: stop-exhausted@3
+      stop_condition_result: true
+      selected_target_ref: target-human-escalation@2
+      decided_at: 2026-07-16T14:40:18Z
+    related_node_ids:
+      - RoutingDecision
+      - RetryPolicy
+      - StopCondition
+      - RoutingTarget
+      - RetryActivity
+    related_relation_ids:
+      - RoutingDecision-applies-RetryPolicy
+      - RoutingDecision-satisfies-StopCondition
+      - RoutingDecision-selects-RoutingTarget
+      - RetryActivity-governed_by-RetryPolicy
+    expected_result:
+      zh: 返回策略版本、三次尝试历史、两个实际重试活动、剩余次数计算、停止条件求值和最终人工升级目标。
+      en: Return the policy revision, three-attempt history, two actual retry activities, remaining-attempt calculation, stop-condition evaluation, and final human-escalation target.
+      ja: policy revision、三 attempt history、二 actual retry activity、remaining 計算、stop-condition evaluation、final human-escalation target を返します。
+    why_valid_or_invalid:
+      zh: 内部路由事实解释为何停止，跨模块 RetryActivity-governed_by-RetryPolicy 则证明实际重试确实遵守同一有界策略，两者职责不混合。
+      en: Internal routing facts explain why control stops, while cross-module RetryActivity governance proves actual retries followed the same bounded policy without merging responsibilities.
+      ja: 内部 routing fact は停止理由を説明し、cross-module RetryActivity governance は実際の retry が同じ bounded policy に従ったことを証明し、責務を混同しません。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-orchestration-routing-control-002
+      - claim-orchestration-routing-control-003
+      - claim-orchestration-routing-control-004
+  - id: orchestration-routing-control-cq-retry-stop-v3-example-counter
+    kind: boundary
+    labels:
+      zh: “失败就再试”文本被误建模为无限策略
+      en: Try-again-on-failure text is mis-modeled as an unbounded policy
+      ja: failure 時 retry という文を unbounded policy と誤モデル化
+    scenario_id: orchestration-routing-control-cq-retry-stop-v3-example-counter
+    descriptions:
+      zh: instruction-note-4 只写“失败就再试”，runner 据此创建 retry-activity-99；记录没有 RetryPolicy 版本、最大次数、退避、可重试错误集合、剩余次数或 StopCondition。
+      en: instruction-note-4 says only try again on failure, and the runner creates retry-activity-99; the record has no RetryPolicy revision, maximum, backoff, retryable-error set, remaining count, or StopCondition.
+      ja: instruction-note-4 は failure 時 retry とだけ記し runner は retry-activity-99 を作りますが、RetryPolicy revision、max、backoff、retryable error set、remaining count、StopCondition がありません。
+    field_values:
+      instruction_ref: instruction-note-4
+      instruction_text: try again on failure
+      retry_activity_id: retry-activity-99
+      retry_policy_ref: null
+      maximum_attempts: null
+      backoff_schedule: null
+      retryable_failure_classes: []
+      attempt_index: 14
+      remaining_attempts: null
+      stop_condition_ref: null
+      selected_target_ref: null
+    related_node_ids:
+      - RoutingDecision
+      - RetryPolicy
+      - StopCondition
+      - RoutingTarget
+      - RetryActivity
+    related_relation_ids:
+      - RoutingDecision-applies-RetryPolicy
+      - RoutingDecision-satisfies-StopCondition
+      - RoutingDecision-selects-RoutingTarget
+      - RetryActivity-governed_by-RetryPolicy
+    expected_result:
+      zh: 停止 retry-activity-99，不从自然语言补造策略；要求提供有版本的上限、退避、错误分类和停止或转向条件后才能继续。
+      en: Stop retry-activity-99 and infer no policy from prose; require a versioned limit, backoff, failure classes, and stop or redirect condition before continuation.
+      ja: retry-activity-99 を停止し prose から policy を捏造せず、versioned limit、backoff、failure class、stop/redirect condition を要求します。
+    why_valid_or_invalid:
+      zh: RetryPolicy 是可审计规范而非提示短语；没有边界与终止条件时，重试活动既无法证明受治理，也可能形成不可控循环。
+      en: RetryPolicy is an auditable specification, not a prompt phrase; without bounds and termination, the retry activity is ungoverned and may loop indefinitely.
+      ja: RetryPolicy は監査可能 specification で prompt phrase ではなく、boundary と termination がなければ retry activity は ungoverned で無限 loop になり得ます。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-orchestration-routing-control-002
+parent_relation: null
+relations: []
+module_contract:
+  interaction_contract:
+    applicability: operational
+    facets:
+      input:
+        applicable: true
+        description:
+          zh: 输入是 GateCondition、RoutingCondition、RoutingPolicy 与 RetryPolicy；RoutingDecision-applies-RetryPolicy 在本面把允许次数、退避和可重试条件作为作出路由决定前读取的约束，决定或控制门必须引用实际使用的版本。
+          en: Inputs are GateCondition, RoutingCondition, RoutingPolicy, and RetryPolicy; on this facet RoutingDecision-applies-RetryPolicy supplies retry limits, backoff, and retryable conditions to read before choosing a route, and every decision or control gate must cite the revision actually used.
+          ja: 入力は GateCondition・RoutingCondition・RoutingPolicy・RetryPolicy です。この面の RoutingDecision-applies-RetryPolicy は route 選択前に読む retry limit・backoff・retryable condition を供給し、decision/control gate は実際に用いた版を参照します。
+        family_concept_ids:
+          - GateCondition
+          - RoutingCondition
+          - RoutingPolicy
+          - RetryPolicy
+        relation_ids:
+          - ControlGate-evaluates-GateCondition
+          - RoutingDecision-evaluates-RoutingCondition
+          - RoutingDecision-applies-RoutingPolicy
+          - RoutingDecision-applies-RetryPolicy
+        not_applicable_reason: null
+      output:
+        applicable: true
+        description:
+          zh: 输出是一次门控结果、选中目标和被触发的实际下游操作。
+          en: Outputs are an occurrence-specific gate outcome, selected target, and actual downstream operation triggered.
+          ja: output は occurrence-specific GateOutcome・selected target・triggered actual operation です。
+        family_concept_ids:
+          - GateOutcome
+          - RoutingTarget
+          - DownstreamOperation
+        relation_ids:
+          - ControlGate-produces-GateOutcome
+          - RoutingDecision-selects-RoutingTarget
+          - GateOutcome-triggers-DownstreamOperation
+        not_applicable_reason: null
+      failure:
+        applicable: true
+        description:
+          zh: 失败面由决定记录已满足的 StopCondition，而不是让条件直接终止 RuntimeSession。
+          en: The failure facet records a StopCondition satisfied by a decision rather than letting the condition terminate RuntimeSession directly.
+          ja: failure facet は decision が satisfied StopCondition を記録し condition が RuntimeSession を直接 terminate しません。
+        family_concept_ids:
+          - RoutingDecision
+          - StopCondition
+        relation_ids:
+          - RoutingDecision-satisfies-StopCondition
+        not_applicable_reason: null
+      recovery:
+        applicable: true
+        description:
+          zh: 恢复面由 RoutingDecision 应用 RetryPolicy；实际 RetryActivity 仍由运行时尝试域拥有。
+          en: The recovery facet applies RetryPolicy through RoutingDecision; actual RetryActivity remains owned by runtime attempts.
+          ja: recovery facet は RoutingDecision が RetryPolicy を apply し actual RetryActivity は runtime attempts が所有します。
+        family_concept_ids:
+          - RoutingDecision
+          - RetryPolicy
+          - RetryActivity
+        relation_ids:
+          - RoutingDecision-applies-RetryPolicy
+          - RetryActivity-governed_by-RetryPolicy
+        not_applicable_reason: null
+    review:
+      review_status: accepted
+      reviewers:
+        - reviewer_id: moonweave-routing-domain-reviewer
+          reviewer_role: domain
+          reviewer_kind: automated-agent
+          reviewed_on: 2026-07-16
+          decision_note:
+            zh: 模块只拥有路由规范、条件、门控求值、决定、结果和类型化目标；静态组合、授权决定与运行尝试仍由其各自模块拥有。
+            en: The module owns only routing specifications, conditions, gate evaluation, decisions, outcomes, and typed targets; static composition, authorization decisions, and runtime attempts remain with their owners.
+            ja: module は routing specification・condition・gate evaluation・decision・outcome・typed target のみを所有し composition・authorization・runtime attempt は各 owner に残します。
+        - reviewer_id: moonweave-routing-ontology-reviewer
+          reviewer_role: ontology
+          reviewer_kind: automated-agent
+          reviewed_on: 2026-07-16
+          decision_note:
+            zh: 已形成 Gate 与 RoutingSpecification 两棵分类树，并以 RoutingDecision 连接条件、策略、结果和目标；来源、规则和框架不作为图节点。
+            en: Two taxonomy trees, Gate and RoutingSpecification, are closed, while RoutingDecision links conditions, policies, outcomes, and targets; sources, rules, and frameworks are not graph nodes.
+            ja: Gate/RoutingSpecification の two taxonomy trees を閉じ RoutingDecision が condition/policy/outcome/target を接続し source/rule/framework は graph node にしません。
+        - reviewer_id: moonweave-routing-terminology-reviewer
+          reviewer_role: schema
+          reviewer_kind: automated-agent
+          reviewed_on: 2026-07-16
+          decision_note:
+            zh: 模块、概念、关系、问题与案例的中英日表达已逐项核实。
+            en: Trilingual wording for module, concepts, relations, questions, and cases was checked item by item.
+            ja: module・concept・relation・question・case の三言語 wording を item-by-item 確認しました。
+  taxonomy_contract:
+    applicability: mixed-backbone
+    not_applicable_reason: null
+    hierarchy_policy: arbitrary-depth-reviewed-backbone
+    key_root_concept_ids:
+      - Gate
+      - RoutingSpecification
+    allowed_backbone_predicates:
+      - is_a
+      - selects
+      - triggers
+    flat_root_exception_concept_ids:
+      - GateOutcome
+      - RoutingTarget
+    review:
+      review_status: accepted
+      reviewers:
+        - reviewer_id: moonweave-routing-domain-reviewer
+          reviewer_role: domain
+          reviewer_kind: automated-agent
+          reviewed_on: 2026-07-16
+          decision_note:
+            zh: 逐根反例复核：Gate 是可复用求值能力，RoutingSpecification 是可复用控制规范，二者都可在无运行事实时存在；GateOutcome 可来自非 ControlGate 的领域 Gate，不能挂到 ControlGate；RoutingTarget 可作为候选先于任何决定存在。RoutingDecision 则必须选出一个 RoutingTarget，故以 selects 接入目标骨架。
+            en: "Root-by-root counterexample review: Gate is a reusable evaluation capability and RoutingSpecification a reusable control specification, both of which can exist without a run. GateOutcome may be produced by a domain Gate other than ControlGate and therefore cannot be placed under ControlGate; RoutingTarget can exist as an eligible candidate before any decision. RoutingDecision must select one RoutingTarget, so selects places the occurrence in the target backbone."
+            ja: 根ごとの反証確認：Gate は再利用可能な評価能力、RoutingSpecification は再利用可能な制御仕様で、どちらも実行事実なしに存在できます。GateOutcome は ControlGate 以外の domain Gate からも生成され得るため ControlGate 配下に置けず、RoutingTarget は決定前の候補として存在できます。RoutingDecision は一つの RoutingTarget を必ず選ぶため、selects で target 骨格へ接続します。
+        - reviewer_id: moonweave-routing-ontology-reviewer
+          reviewer_role: ontology
+          reviewer_kind: automated-agent
+          reviewed_on: 2026-07-16
+          decision_note:
+            zh: 本体反例保留四个独立根轴：Gate、RoutingSpecification、GateOutcome、RoutingTarget。GateOutcome 的 gate_ref 指向一般 Gate，而当前 accepted 的 produces 只覆盖 ControlGate，不能冒充全称主干；RoutingTarget 的候选身份也不证明已被选择。RoutingDecision-selects-RoutingTarget 只把每次已发生决定挂在其选中目标下，GateOutcome-triggers-DownstreamOperation 继续承载结果到实际活动的因果链。
+            en: "Ontology counterexamples retain four independent root axes: Gate, RoutingSpecification, GateOutcome, and RoutingTarget. GateOutcome's gate_ref names a general Gate while the accepted produces relation covers only ControlGate, so it cannot serve as a universal backbone; candidate status likewise does not prove a RoutingTarget was selected. RoutingDecision-selects-RoutingTarget places only an occurred decision under its selected target, while GateOutcome-triggers-DownstreamOperation continues the outcome-to-activity causal chain."
+            ja: ontology の反証により Gate・RoutingSpecification・GateOutcome・RoutingTarget の四つの独立 root axis を残します。GateOutcome の gate_ref は一般 Gate を指す一方、accepted produces は ControlGate のみを覆うため全称主幹にはできません。候補であることも RoutingTarget の選択を証明しません。RoutingDecision-selects-RoutingTarget は発生済み decision だけを selected target 配下に置き、GateOutcome-triggers-DownstreamOperation は outcome-to-activity の因果鎖を継続します。
+        - reviewer_id: moonweave-routing-terminology-reviewer
+          reviewer_role: schema
+          reviewer_kind: automated-agent
+          reviewed_on: 2026-07-16
+          decision_note:
+            zh: 三语复核逐一保留 Gate、RoutingSpecification、GateOutcome、RoutingTarget 的身份差异，并把“候选列表存在但决定尚未运行”写为 selects 的边界反例；RoutingDecision 与 RoutingTarget 不被表述为 is_a。
+            en: Trilingual review preserves the distinct identities of Gate, RoutingSpecification, GateOutcome, and RoutingTarget and states “the candidate list exists but no decision has run” as the selects boundary counterexample; RoutingDecision and RoutingTarget are never described through is_a.
+            ja: 三言語審査は Gate・RoutingSpecification・GateOutcome・RoutingTarget の identity 差を保持し、「candidate list は存在するが decision は未実行」を selects の境界反証とします。RoutingDecision と RoutingTarget を is_a で表現しません。
+  competency_questions:
+    - id: orchestration-routing-control-cq-route-decision-v3
+      semantic_key: orchestration-routing-control.route-decision
+      primary_owner_module_id: orchestration-routing-control
+      related_module_ids: []
+      questions:
+        zh: 给定冻结状态、策略版本和候选路径，哪些条件被实际求值，最后选择了哪个 RoutingTarget？
+        en: Given frozen state, a policy revision, and candidate paths, which conditions were actually evaluated and which RoutingTarget was selected?
+        ja: frozen state・policy revision・candidate path から actual evaluated conditions と selected RoutingTarget は何ですか。
+      query: Start at RoutingDecision, follow applies and evaluates, resolve the selected target, and compare it with the static Route target.
+      expected_assertion: The selected target is eligible under the exact policy revision and every evaluated condition result is preserved.
+      evidence_binding:
+        applicability: owner-only
+        owner_concept_ids:
+          - RoutingDecision
+          - RoutingPolicy
+          - RoutingCondition
+          - Route
+          - RoutingTarget
+        related_concept_ids: []
+        relation_ids: []
+        not_applicable_reason:
+          zh: 该问题只核验本模块的路由策略、条件、路径、决定与目标；目标可能引用后续部件，但本问题并不沿任何跨模块关系证明其选择。
+          en: This question validates routing policies, conditions, routes, decisions, and targets owned here; a target may reference a later part, but this query does not prove selection through a cross-module relation.
+          ja: この問いは本モジュール所有の routing policy、condition、route、decision、target のみを検証します。target が後続 part を参照しても、選択を跨モジュール関係で証明する問いではありません。
+      positive_example_ids:
+        - orchestration-routing-control-cq-route-decision-v3-example-positive
+      counterexample_ids:
+        - orchestration-routing-control-cq-route-decision-v3-example-counter
+      source_claims:
+        - claim-orchestration-routing-control-001
+        - claim-orchestration-routing-control-003
+        - claim-orchestration-routing-control-004
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-routing-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-16
+            decision_note:
+              zh: orchestration-routing-control-cq-route-decision-v3 已按路由规范、门控能力、决定发生、结果记录或目标引用逐项人工复核。
+              en: orchestration-routing-control-cq-route-decision-v3 was manually reviewed point by point as a routing specification, gate capability, decision occurrence, outcome record, or target reference.
+              ja: orchestration-routing-control-cq-route-decision-v3 は routing specification・gate capability・decision occurrence・outcome record・target reference として項目別に manual review しました。
+          - reviewer_id: moonweave-routing-ontology-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-16
+            decision_note:
+              zh: orchestration-routing-control-cq-route-decision-v3 的 semantic kind=question，主父或根=routing decision chain；规范只能被决定求值，不能冒充执行主体。
+              en: orchestration-routing-control-cq-route-decision-v3 has semantic kind question and primary parent or root routing decision chain; a specification may be evaluated by a decision but cannot masquerade as an executing actor.
+              ja: orchestration-routing-control-cq-route-decision-v3 の semantic kind=question、primary parent/root=routing decision chain で specification は decision に evaluate されても executing actor にはなりません。
+          - reviewer_id: moonweave-routing-terminology-reviewer
+            reviewer_role: schema
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-16
+            decision_note:
+              zh: orchestration-routing-control-cq-route-decision-v3 的三语定义、身份字段、正例和边界反例已分别核实。
+              en: orchestration-routing-control-cq-route-decision-v3's trilingual definition, identity fields, positive case, and boundary countercase were checked separately.
+              ja: orchestration-routing-control-cq-route-decision-v3 の三言語 definition・identity field・positive/boundary case を個別確認しました。
+    - id: orchestration-routing-control-cq-gate-outcome-v3
+      semantic_key: orchestration-routing-control.gate-outcome
+      primary_owner_module_id: orchestration-routing-control
+      related_module_ids: []
+      questions:
+        zh: 哪个 ControlGate 依据哪项 GateCondition 和证据产生了结果，RoutingDecision 选择了哪个 RoutingTarget，该结果又实际触发了哪个 DownstreamOperation？
+        en: Which ControlGate produced an outcome from which GateCondition and evidence, which RoutingTarget did RoutingDecision select, and which DownstreamOperation did the outcome actually trigger?
+        ja: どの ControlGate がどの GateCondition/evidence から outcome を生成し、RoutingDecision はどの RoutingTarget を選び、outcome はどの DownstreamOperation を実際に trigger しましたか。
+      query: Follow ControlGate evaluation to GateOutcome, the recording RoutingDecision and its selected RoutingTarget, then follow the outcome to the triggered DownstreamOperation without treating the target reference as the activity's superclass.
+      expected_assertion: Condition revision, evaluated evidence, outcome, decision, selected target reference, and started operation form one time-consistent chain while retaining distinct identities.
+      evidence_binding:
+        applicability: owner-only
+        owner_concept_ids:
+          - ControlGate
+          - GateCondition
+          - GateOutcome
+          - RoutingDecision
+          - RoutingTarget
+          - DownstreamOperation
+        related_concept_ids: []
+        relation_ids: []
+        not_applicable_reason:
+          zh: 门、条件、结果、路由决定、目标与下游操作均由本模块拥有；权限判定可作为输入证据，但没有被该 CQ 的关系链声明为跨模块端点。
+          en: The gate, condition, outcome, routing decision, target, and downstream operation are all owned here; a policy decision may be input evidence, but this CQ declares no relation to it as a cross-module endpoint.
+          ja: gate、condition、outcome、routing decision、target、downstream operation はすべて本モジュール所有です。権限判断を入力証拠にできても、この CQ は跨モジュール端点への関係を宣言していません。
+      positive_example_ids:
+        - orchestration-routing-control-cq-gate-outcome-v3-example-positive
+      counterexample_ids:
+        - orchestration-routing-control-cq-gate-outcome-v3-example-counter
+      source_claims:
+        - claim-orchestration-routing-control-001
+        - claim-orchestration-routing-control-004
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-routing-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-16
+            decision_note:
+              zh: orchestration-routing-control-cq-gate-outcome-v3 已按路由规范、门控能力、决定发生、结果记录或目标引用逐项人工复核。
+              en: orchestration-routing-control-cq-gate-outcome-v3 was manually reviewed point by point as a routing specification, gate capability, decision occurrence, outcome record, or target reference.
+              ja: orchestration-routing-control-cq-gate-outcome-v3 は routing specification・gate capability・decision occurrence・outcome record・target reference として項目別に manual review しました。
+          - reviewer_id: moonweave-routing-ontology-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-16
+            decision_note:
+              zh: orchestration-routing-control-cq-gate-outcome-v3 的 semantic kind=question，主父或根=gate outcome chain；规范只能被决定求值，不能冒充执行主体。
+              en: orchestration-routing-control-cq-gate-outcome-v3 has semantic kind question and primary parent or root gate outcome chain; a specification may be evaluated by a decision but cannot masquerade as an executing actor.
+              ja: orchestration-routing-control-cq-gate-outcome-v3 の semantic kind=question、primary parent/root=gate outcome chain で specification は decision に evaluate されても executing actor にはなりません。
+          - reviewer_id: moonweave-routing-terminology-reviewer
+            reviewer_role: schema
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-16
+            decision_note:
+              zh: orchestration-routing-control-cq-gate-outcome-v3 的三语定义、身份字段、正例和边界反例已分别核实。
+              en: orchestration-routing-control-cq-gate-outcome-v3's trilingual definition, identity fields, positive case, and boundary countercase were checked separately.
+              ja: orchestration-routing-control-cq-gate-outcome-v3 の三言語 definition・identity field・positive/boundary case を個別確認しました。
+    - id: orchestration-routing-control-cq-retry-stop-v3
+      semantic_key: orchestration-routing-control.retry-stop
+      primary_owner_module_id: orchestration-routing-control
+      related_module_ids:
+        - runtime-execution-attempts
+      questions:
+        zh: 失败后为何重试、转向或停止，策略版本、剩余次数、停止证据和实际 RetryActivity 如何核对？
+        en: After failure, why did control retry, redirect, or stop, and how do policy revision, remaining attempts, stop evidence, and actual RetryActivity reconcile?
+        ja: failure 後 retry/redirect/stop の理由と policy revision・remaining attempts・stop evidence・RetryActivity はどう整合しますか。
+      query: Apply the cited RetryPolicy to attempt history, test StopCondition, resolve the selected target, and inspect RetryActivity governance.
+      expected_assertion: Retry occurs only within declared bounds; otherwise a decision satisfies a stop condition and selects a non-retry target.
+      evidence_binding:
+        applicability: relation-backed
+        owner_concept_ids:
+          - RoutingDecision
+          - RetryPolicy
+          - StopCondition
+          - RoutingTarget
+        related_concept_ids:
+          - RetryActivity
+        relation_ids:
+          - RetryActivity-governed_by-RetryPolicy
+        not_applicable_reason: null
+      positive_example_ids:
+        - orchestration-routing-control-cq-retry-stop-v3-example-positive
+      counterexample_ids:
+        - orchestration-routing-control-cq-retry-stop-v3-example-counter
+      source_claims:
+        - claim-orchestration-routing-control-002
+        - claim-orchestration-routing-control-003
+        - claim-orchestration-routing-control-004
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-routing-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-16
+            decision_note:
+              zh: orchestration-routing-control-cq-retry-stop-v3 已按路由规范、门控能力、决定发生、结果记录或目标引用逐项人工复核。
+              en: orchestration-routing-control-cq-retry-stop-v3 was manually reviewed point by point as a routing specification, gate capability, decision occurrence, outcome record, or target reference.
+              ja: orchestration-routing-control-cq-retry-stop-v3 は routing specification・gate capability・decision occurrence・outcome record・target reference として項目別に manual review しました。
+          - reviewer_id: moonweave-routing-ontology-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-16
+            decision_note:
+              zh: orchestration-routing-control-cq-retry-stop-v3 的 semantic kind=question，主父或根=retry and stop chain；规范只能被决定求值，不能冒充执行主体。
+              en: orchestration-routing-control-cq-retry-stop-v3 has semantic kind question and primary parent or root retry and stop chain; a specification may be evaluated by a decision but cannot masquerade as an executing actor.
+              ja: orchestration-routing-control-cq-retry-stop-v3 の semantic kind=question、primary parent/root=retry and stop chain で specification は decision に evaluate されても executing actor にはなりません。
+          - reviewer_id: moonweave-routing-terminology-reviewer
+            reviewer_role: schema
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-16
+            decision_note:
+              zh: orchestration-routing-control-cq-retry-stop-v3 的三语定义、身份字段、正例和边界反例已分别核实。
+              en: orchestration-routing-control-cq-retry-stop-v3's trilingual definition, identity fields, positive case, and boundary countercase were checked separately.
+              ja: orchestration-routing-control-cq-retry-stop-v3 の三言語 definition・identity field・positive/boundary case を個別確認しました。
+  key_notion:
+    zh: 受规则约束的控制流选择
+    en: policy-governed control-flow selection
+    ja: 規則に統制された制御フロー選択
+  owns_when:
+    zh: 当对象是可复用的路由、条件、重试或门控规范，或其身份由一次具体的门控求值、路由决定、选中目标事实或门控结果决定时，由本模块拥有。
+    en: Own an object when it is a reusable routing, condition, retry, or gate specification, or when its identity is determined by one concrete gate evaluation, routing decision, selected-target fact, or gate outcome.
+    ja: 対象が再利用可能な routing・condition・retry・gate 仕様、または一回の具体的な gate 評価・routing decision・選択対象事実・gate outcome に同一性を依存する場合に所有します。
+  references_when:
+    zh: 静态组合拓扑、授权决定、执行尝试、worker、tool、adapter 和真正启动的下游活动均引用各自所有者；本模块只记录它们作为候选、证据、选中目标或被门控结果触发的关系。
+    en: Reference canonical owners for static composition topology, authorization decisions, execution attempts, workers, tools, adapters, and the downstream activity that actually starts. This module records only their roles as candidates, evidence, selected targets, or activities triggered by a gate outcome.
+    ja: 静的 composition topology・authorization decision・execution attempt・worker・tool・adapter・実際に開始した downstream activity は各所有者を参照します。本モジュールは候補・証拠・選択対象・gate outcome が起動した活動としての関係だけを記録します。
+  boundary_decisions:
+    - other_module_id: orchestration-composition
+      subject_concept_ids:
+        - OrchestrationTopology
+        - ParallelBranch
+      decision: references
+      owner_module_id: orchestration-composition
+      rationale:
+        zh: 路由与门控拥有运行时条件评估、路径决定和门结果；协作组合拥有可选择路径所在的模式、组件和拓扑。 本条仅记录 OrchestrationTopology、ParallelBranch；其 canonical owner 是协作组合（orchestration-composition），因此 orchestration-routing-control 在此引用这些概念。
+        en: Routing and gates own runtime condition evaluation, path decisions, and gate outcomes; collaboration composition owns the patterns, components, and topology containing selectable paths. This record is limited to OrchestrationTopology, ParallelBranch; their canonical owner is Collaboration composition (orchestration-composition), so orchestration-routing-control references these concepts here.
+        ja: 経路制御とゲートは実行時条件評価、経路判断、ゲート結果を所有し、協働構成は選択可能経路を含むパターン、構成要素、トポロジーを所有します。 この記録は OrchestrationTopology、ParallelBranch だけを対象とし、canonical owner は協働構成（orchestration-composition）です。したがって orchestration-routing-control はここでこれらを参照します。
+      relation_ids: []
+      relation_not_applicable_reason:
+        zh: “路由与门控”与“协作组合”之间没有适用于本 owner 概念组的已接受跨模块事实；该决策只比较明确列出的候选概念，不暗示运行时交互。
+        en: There is no accepted cross-module fact applicable to this owner-homogeneous concept group between Routing and gates and Collaboration composition; the decision compares only the named candidates without implying runtime interaction.
+        ja: 「経路制御とゲート」と「協働構成」の間には、この owner 単一概念群に適用できる承認済みモジュール間事実がありません。明示候補だけを比較し、実行時相互作用を示唆しません。
+      source_claims:
+        - claim-orchestration-routing-control-005
+        - claim-orchestration-routing-control-006
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-orchestration-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 路由与门控拥有运行时条件评估、路径决定和门结果；协作组合拥有可选择路径所在的模式、组件和拓扑。 本条仅记录 OrchestrationTopology、ParallelBranch；其 canonical owner 是协作组合（orchestration-composition），因此 orchestration-routing-control 在此引用这些概念。
+              en: Routing and gates own runtime condition evaluation, path decisions, and gate outcomes; collaboration composition owns the patterns, components, and topology containing selectable paths. This record is limited to OrchestrationTopology, ParallelBranch; their canonical owner is Collaboration composition (orchestration-composition), so orchestration-routing-control references these concepts here.
+              ja: 経路制御とゲートは実行時条件評価、経路判断、ゲート結果を所有し、協働構成は選択可能経路を含むパターン、構成要素、トポロジーを所有します。 この記録は OrchestrationTopology、ParallelBranch だけを対象とし、canonical owner は協働構成（orchestration-composition）です。したがって orchestration-routing-control はここでこれらを参照します。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 路由与门控拥有运行时条件评估、路径决定和门结果；协作组合拥有可选择路径所在的模式、组件和拓扑。 本条仅记录 OrchestrationTopology、ParallelBranch；其 canonical owner 是协作组合（orchestration-composition），因此 orchestration-routing-control 在此引用这些概念。
+              en: Routing and gates own runtime condition evaluation, path decisions, and gate outcomes; collaboration composition owns the patterns, components, and topology containing selectable paths. This record is limited to OrchestrationTopology, ParallelBranch; their canonical owner is Collaboration composition (orchestration-composition), so orchestration-routing-control references these concepts here.
+              ja: 経路制御とゲートは実行時条件評価、経路判断、ゲート結果を所有し、協働構成は選択可能経路を含むパターン、構成要素、トポロジーを所有します。 この記録は OrchestrationTopology、ParallelBranch だけを対象とし、canonical owner は協働構成（orchestration-composition）です。したがって orchestration-routing-control はここでこれらを参照します。
+    - other_module_id: orchestration-composition
+      subject_concept_ids:
+        - Route
+        - RoutingDecision
+      decision: owns
+      owner_module_id: orchestration-routing-control
+      rationale:
+        zh: 路由与门控拥有运行时条件评估、路径决定和门结果；协作组合拥有可选择路径所在的模式、组件和拓扑。 本条仅记录 Route、RoutingDecision；其 canonical owner 是路由与门控（orchestration-routing-control），因此 orchestration-routing-control 在此拥有这些概念。
+        en: Routing and gates own runtime condition evaluation, path decisions, and gate outcomes; collaboration composition owns the patterns, components, and topology containing selectable paths. This record is limited to Route, RoutingDecision; their canonical owner is Routing and gates (orchestration-routing-control), so orchestration-routing-control owns these concepts here.
+        ja: 経路制御とゲートは実行時条件評価、経路判断、ゲート結果を所有し、協働構成は選択可能経路を含むパターン、構成要素、トポロジーを所有します。 この記録は Route、RoutingDecision だけを対象とし、canonical owner は経路制御とゲート（orchestration-routing-control）です。したがって orchestration-routing-control はここでこれらを所有します。
+      relation_ids: []
+      relation_not_applicable_reason:
+        zh: “路由与门控”与“协作组合”之间没有适用于本 owner 概念组的已接受跨模块事实；该决策只比较明确列出的候选概念，不暗示运行时交互。
+        en: There is no accepted cross-module fact applicable to this owner-homogeneous concept group between Routing and gates and Collaboration composition; the decision compares only the named candidates without implying runtime interaction.
+        ja: 「経路制御とゲート」と「協働構成」の間には、この owner 単一概念群に適用できる承認済みモジュール間事実がありません。明示候補だけを比較し、実行時相互作用を示唆しません。
+      source_claims:
+        - claim-orchestration-routing-control-007
+        - claim-orchestration-routing-control-008
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-orchestration-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 路由与门控拥有运行时条件评估、路径决定和门结果；协作组合拥有可选择路径所在的模式、组件和拓扑。 本条仅记录 Route、RoutingDecision；其 canonical owner 是路由与门控（orchestration-routing-control），因此 orchestration-routing-control 在此拥有这些概念。
+              en: Routing and gates own runtime condition evaluation, path decisions, and gate outcomes; collaboration composition owns the patterns, components, and topology containing selectable paths. This record is limited to Route, RoutingDecision; their canonical owner is Routing and gates (orchestration-routing-control), so orchestration-routing-control owns these concepts here.
+              ja: 経路制御とゲートは実行時条件評価、経路判断、ゲート結果を所有し、協働構成は選択可能経路を含むパターン、構成要素、トポロジーを所有します。 この記録は Route、RoutingDecision だけを対象とし、canonical owner は経路制御とゲート（orchestration-routing-control）です。したがって orchestration-routing-control はここでこれらを所有します。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 路由与门控拥有运行时条件评估、路径决定和门结果；协作组合拥有可选择路径所在的模式、组件和拓扑。 本条仅记录 Route、RoutingDecision；其 canonical owner 是路由与门控（orchestration-routing-control），因此 orchestration-routing-control 在此拥有这些概念。
+              en: Routing and gates own runtime condition evaluation, path decisions, and gate outcomes; collaboration composition owns the patterns, components, and topology containing selectable paths. This record is limited to Route, RoutingDecision; their canonical owner is Routing and gates (orchestration-routing-control), so orchestration-routing-control owns these concepts here.
+              ja: 経路制御とゲートは実行時条件評価、経路判断、ゲート結果を所有し、協働構成は選択可能経路を含むパターン、構成要素、トポロジーを所有します。 この記録は Route、RoutingDecision だけを対象とし、canonical owner は経路制御とゲート（orchestration-routing-control）です。したがって orchestration-routing-control はここでこれらを所有します。
+    - other_module_id: safety-commit-redaction
+      subject_concept_ids:
+        - Gate
+        - GateOutcome
+      decision: owns
+      owner_module_id: orchestration-routing-control
+      rationale:
+        zh: 路由与门控拥有通用 Gate 能力和其一次求值产生的 GateOutcome 信息上位概念；提交与脱敏安全域拥有 CommitGate 以及 result=allow/deny 的 CommitApproval、CommitDenial。三条 accepted is_a 边把安全特化接入通用层级，不转移端点 owner。
+        en: Routing and gates own the generic Gate capability and GateOutcome information superclass produced by one evaluation; commit and redaction safety own CommitGate and the result=allow/deny specializations CommitApproval and CommitDenial. The three accepted is_a edges attach the safety specializations to the generic hierarchy without transferring endpoint ownership.
+        ja: routing/gates は generic Gate capability と一回の評価が生む GateOutcome 情報上位概念を所有し、commit/redaction safety は CommitGate と result=allow/deny の CommitApproval・CommitDenial を所有します。三つの accepted is_a edge は safety 特化を generic hierarchy へ接続し、endpoint ownership を移しません。
+      relation_ids:
+        - CommitApproval-is_a-GateOutcome
+        - CommitDenial-is_a-GateOutcome
+        - CommitGate-is_a-Gate
+      relation_not_applicable_reason: null
+      overlap_not_applicable_reason:
+        zh: 这里投影的是已接受 is_a 层级的端点，不是两个模块争夺同一概念的重叠候选；通用 Gate/GateOutcome 与带提交安全种差的下位类型具有不同身份条件，类定义已唯一确定各自 owner。
+        en: This projects endpoints of accepted is_a hierarchy edges rather than overlapping candidates claimed by both modules; generic Gate or GateOutcome and commit-safety subtypes have different identity conditions, and their class definitions already determine unique owners.
+        ja: ここでは accepted is_a hierarchy の endpoint を投影し、両 module が同一概念を競合所有する overlap candidate ではありません。generic Gate/GateOutcome と commit-safety subtype は identity condition が異なり class definition が unique owner を確定します。
+      source_claims:
+        - claim-orchestration-routing-control-009
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-routing-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-17
+            decision_note:
+              zh: 逐条核对三条 is_a 关系后，确认 routing 侧端点并集恰为 Gate 与 GateOutcome。
+              en: After checking all three is_a relations individually, their routing-side endpoint union is exactly Gate and GateOutcome.
+              ja: 三つの is_a relation を個別確認し、routing 側 endpoint 集合が Gate と GateOutcome に正確に一致することを確認しました。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-17
+            decision_note:
+              zh: CommitGate 与 CommitApproval/Denial 分别继承能力和结果上位概念；请求、人工回答或策略决定不是这些 is_a 边端点。
+              en: CommitGate and CommitApproval or CommitDenial inherit capability and outcome superclasses respectively; requests, human answers, and policy decisions are not endpoints of these is_a edges.
+              ja: CommitGate と CommitApproval/Denial はそれぞれ capability と outcome 上位概念を継承し、request・human answer・policy decision は is_a edge の endpoint ではありません。
+    - other_module_id: safety-commit-redaction
+      subject_concept_ids:
+        - CommitApproval
+        - CommitDenial
+        - CommitGate
+      decision: references
+      owner_module_id: safety-commit-redaction
+      rationale:
+        zh: CommitGate、CommitApproval 与 CommitDenial 的身份依赖具体 CommitRequest、安全求值、调用摘要和结果，因此由提交与脱敏安全域拥有；路由与门控只把它们作为 Gate/GateOutcome 下位概念引用。
+        en: CommitGate, CommitApproval, and CommitDenial depend for their identity on a concrete CommitRequest, safety evaluation, call digest, and result, so commit and redaction safety own them; routing and gates reference them only as Gate or GateOutcome subtypes.
+        ja: CommitGate・CommitApproval・CommitDenial の identity は具体 CommitRequest・safety evaluation・call digest・result に依存するため commit/redaction safety が所有し、routing/gates は Gate/GateOutcome subtype としてだけ参照します。
+      relation_ids:
+        - CommitApproval-is_a-GateOutcome
+        - CommitDenial-is_a-GateOutcome
+        - CommitGate-is_a-Gate
+      relation_not_applicable_reason: null
+      overlap_not_applicable_reason:
+        zh: 这里投影的是已接受 is_a 层级的端点，不是两个模块争夺同一概念的重叠候选；通用 Gate/GateOutcome 与带提交安全种差的下位类型具有不同身份条件，类定义已唯一确定各自 owner。
+        en: This projects endpoints of accepted is_a hierarchy edges rather than overlapping candidates claimed by both modules; generic Gate or GateOutcome and commit-safety subtypes have different identity conditions, and their class definitions already determine unique owners.
+        ja: ここでは accepted is_a hierarchy の endpoint を投影し、両 module が同一概念を競合所有する overlap candidate ではありません。generic Gate/GateOutcome と commit-safety subtype は identity condition が異なり class definition が unique owner を確定します。
+      source_claims:
+        - claim-orchestration-routing-control-010
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-routing-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-17
+            decision_note:
+              zh: 逐项核对安全侧种差后，确认三个下位端点由 safety-commit-redaction 拥有，routing 只引用其通用分类。
+              en: After checking the safety-side differentia individually, all three subtype endpoints remain safety-commit-redaction-owned and routing references only their generic classification.
+              ja: safety 側の種差を個別確認し、三つの subtype endpoint は safety-commit-redaction 所有で routing は generic classification のみ参照すると確認しました。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-17
+            decision_note:
+              zh: 三条 accepted is_a 边的 safety 侧端点并集恰为 CommitApproval、CommitDenial 与 CommitGate。
+              en: The safety-side endpoint union of the three accepted is_a edges is exactly CommitApproval, CommitDenial, and CommitGate.
+              ja: 三つの accepted is_a edge の safety 側 endpoint 集合が CommitApproval・CommitDenial・CommitGate に正確に一致します。
+    - other_module_id: safety-permission-policy
+      subject_concept_ids:
+        - Gate
+      decision: owns
+      owner_module_id: orchestration-routing-control
+      rationale:
+        zh: Gate 是路由与门控拥有的可复用门控能力上位概念；ToolApprovalGate 是安全域拥有的工具授权专用 Gate。ToolApprovalGate-is_a-Gate 只建立领域子类到通用能力的分类，不把 ControlGate、PolicyDecision 或授权结果混入端点。
+        en: Gate is the reusable gate-capability superclass owned by routing and gates; ToolApprovalGate is the safety-owned tool-authorization specialization. ToolApprovalGate-is_a-Gate classifies the domain subtype under the generic capability without adding ControlGate, PolicyDecision, or authorization outcomes as endpoints.
+        ja: Gate は routing/gates が所有する再利用可能 gate capability 上位概念で、ToolApprovalGate は safety 所有の tool authorization 特化です。ToolApprovalGate-is_a-Gate は domain subtype を generic capability の下へ分類するだけで、ControlGate・PolicyDecision・authorization outcome を endpoint に加えません。
+      relation_ids:
+        - ToolApprovalGate-is_a-Gate
+      relation_not_applicable_reason: null
+      source_claims:
+        - claim-orchestration-routing-control-011
+        - claim-orchestration-routing-control-012
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-orchestration-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 逐项核对确认 Gate 是 ToolApprovalGate-is_a-Gate 在本模块的唯一端点；ControlGate 是另一个同域下位类，不参与该边。
+              en: Point-by-point review confirms Gate as this module's only endpoint of ToolApprovalGate-is_a-Gate; ControlGate is another in-domain subtype and does not participate in the edge.
+              ja: ToolApprovalGate-is_a-Gate の本 module endpoint が Gate のみで、ControlGate は別の domain 内 subtype としてこの edge に参加しないことを確認しました。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 结构复核确认该 accepted hierarchy 边从 safety 的 ToolApprovalGate 指向 routing 的 Gate，owner-side subject 集合必须恰为 Gate。
+              en: Structural review confirms that the accepted hierarchy edge runs from safety's ToolApprovalGate to routing's Gate, so the owner-side subject set must be exactly Gate.
+              ja: accepted hierarchy edge が safety の ToolApprovalGate から routing の Gate へ向かうため、owner-side subject 集合は Gate のみであることを確認しました。
+    - other_module_id: safety-permission-policy
+      subject_concept_ids:
+        - ToolApprovalGate
+      decision: references
+      owner_module_id: safety-permission-policy
+      rationale:
+        zh: ToolApprovalGate 是 safety-permission-policy 拥有的 Gate 领域子类，以工具调用尝试、PolicyDecision、AuthorizationGrant 和参数摘要的严格绑定为种差；本条只投影该子类端点，PolicyDecision 仍是其内部 enforcement 关系的对象。
+        en: ToolApprovalGate is the Gate domain subtype owned by safety-permission-policy and distinguished by strict binding of a tool-call attempt to PolicyDecision, AuthorizationGrant, and argument digest. This row projects only the subtype endpoint; PolicyDecision remains the object of its internal enforcement relation.
+        ja: ToolApprovalGate は safety-permission-policy 所有の Gate domain subtype で、tool-call attempt と PolicyDecision・AuthorizationGrant・argument digest の厳密 binding を種差とします。この row は subtype endpoint だけを投影し、PolicyDecision は内部 enforcement relation の object のままです。
+      relation_ids:
+        - ToolApprovalGate-is_a-Gate
+      relation_not_applicable_reason: null
+      source_claims:
+        - claim-orchestration-routing-control-013
+        - claim-orchestration-routing-control-014
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-orchestration-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 逐项核对确认安全侧直接端点只有 ToolApprovalGate；PolicyDecision 被 ToolApprovalGate 内部执行，但不是 is_a 边端点。
+              en: Point-by-point review confirms ToolApprovalGate as the only direct safety-side endpoint; ToolApprovalGate internally enforces PolicyDecision, but PolicyDecision is not an endpoint of the is_a edge.
+              ja: safety 側の直接 endpoint が ToolApprovalGate のみで、PolicyDecision は ToolApprovalGate が内部で enforce しますが is_a edge の endpoint ではないことを確認しました。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 结构复核确认 relation source=ToolApprovalGate、target=Gate，故 references row 只保留 ToolApprovalGate。
+              en: Structural review confirms relation source=ToolApprovalGate and target=Gate, so the references row retains ToolApprovalGate alone.
+              ja: relation source=ToolApprovalGate、target=Gate を確認し、references row には ToolApprovalGate だけを残します。
+    - other_module_id: runtime-execution-attempts
+      subject_concept_ids:
+        - RetryPolicy
+      decision: owns
+      owner_module_id: orchestration-routing-control
+      rationale:
+        zh: 路由与门拥有 RetryPolicy、RoutingCondition、Route、StopCondition 和基于证据作出的控制决定；执行尝试拥有这些决定实际创建或终止的 RunAttempt 及其结果。 本条仅记录 RetryPolicy；其 canonical owner 是路由与门控（orchestration-routing-control），因此 orchestration-routing-control 在此拥有这些概念。
+        en: Routing and gates own RetryPolicy, RoutingCondition, Route, StopCondition, and evidence-based control decisions; execution attempts own the RunAttempt actually created or terminated by those decisions and its result. This record is limited to RetryPolicy; their canonical owner is Routing and gates (orchestration-routing-control), so orchestration-routing-control owns these concepts here.
+        ja: routing/gate は RetryPolicy、RoutingCondition、Route、StopCondition と evidence-based control decision を所有し、execution attempt はその decision が実際に作成・終了した RunAttempt と result を所有します。 この記録は RetryPolicy だけを対象とし、canonical owner は経路制御とゲート（orchestration-routing-control）です。したがって orchestration-routing-control はここでこれらを所有します。
+      relation_ids:
+        - RetryActivity-governed_by-RetryPolicy
+      relation_not_applicable_reason: null
+      source_claims:
+        - claim-orchestration-routing-control-015
+        - claim-orchestration-routing-control-016
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-orchestration-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 路由与门拥有 RetryPolicy、RoutingCondition、Route、StopCondition 和基于证据作出的控制决定；执行尝试拥有这些决定实际创建或终止的 RunAttempt 及其结果。 本条仅记录 RetryPolicy；其 canonical owner 是路由与门控（orchestration-routing-control），因此 orchestration-routing-control 在此拥有这些概念。
+              en: Routing and gates own RetryPolicy, RoutingCondition, Route, StopCondition, and evidence-based control decisions; execution attempts own the RunAttempt actually created or terminated by those decisions and its result. This record is limited to RetryPolicy; their canonical owner is Routing and gates (orchestration-routing-control), so orchestration-routing-control owns these concepts here.
+              ja: routing/gate は RetryPolicy、RoutingCondition、Route、StopCondition と evidence-based control decision を所有し、execution attempt はその decision が実際に作成・終了した RunAttempt と result を所有します。 この記録は RetryPolicy だけを対象とし、canonical owner は経路制御とゲート（orchestration-routing-control）です。したがって orchestration-routing-control はここでこれらを所有します。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 路由与门拥有 RetryPolicy、RoutingCondition、Route、StopCondition 和基于证据作出的控制决定；执行尝试拥有这些决定实际创建或终止的 RunAttempt 及其结果。 本条仅记录 RetryPolicy；其 canonical owner 是路由与门控（orchestration-routing-control），因此 orchestration-routing-control 在此拥有这些概念。
+              en: Routing and gates own RetryPolicy, RoutingCondition, Route, StopCondition, and evidence-based control decisions; execution attempts own the RunAttempt actually created or terminated by those decisions and its result. This record is limited to RetryPolicy; their canonical owner is Routing and gates (orchestration-routing-control), so orchestration-routing-control owns these concepts here.
+              ja: routing/gate は RetryPolicy、RoutingCondition、Route、StopCondition と evidence-based control decision を所有し、execution attempt はその decision が実際に作成・終了した RunAttempt と result を所有します。 この記録は RetryPolicy だけを対象とし、canonical owner は経路制御とゲート（orchestration-routing-control）です。したがって orchestration-routing-control はここでこれらを所有します。
+    - other_module_id: runtime-execution-attempts
+      subject_concept_ids:
+        - RetryActivity
+      decision: references
+      owner_module_id: runtime-execution-attempts
+      rationale:
+        zh: 路由与门拥有 RetryPolicy、RoutingCondition、Route、StopCondition 和基于证据作出的控制决定；执行尝试拥有这些决定实际创建或终止的 RunAttempt 及其结果。 本条仅记录 RetryActivity；其 canonical owner 是执行尝试与结果（runtime-execution-attempts），因此 orchestration-routing-control 在此引用这些概念。
+        en: Routing and gates own RetryPolicy, RoutingCondition, Route, StopCondition, and evidence-based control decisions; execution attempts own the RunAttempt actually created or terminated by those decisions and its result. This record is limited to RetryActivity; their canonical owner is Execution attempts and outcomes (runtime-execution-attempts), so orchestration-routing-control references these concepts here.
+        ja: routing/gate は RetryPolicy、RoutingCondition、Route、StopCondition と evidence-based control decision を所有し、execution attempt はその decision が実際に作成・終了した RunAttempt と result を所有します。 この記録は RetryActivity だけを対象とし、canonical owner は実行試行と結果（runtime-execution-attempts）です。したがって orchestration-routing-control はここでこれらを参照します。
+      relation_ids:
+        - RetryActivity-governed_by-RetryPolicy
+      relation_not_applicable_reason: null
+      source_claims:
+        - claim-orchestration-routing-control-017
+        - claim-orchestration-routing-control-018
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-orchestration-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 路由与门拥有 RetryPolicy、RoutingCondition、Route、StopCondition 和基于证据作出的控制决定；执行尝试拥有这些决定实际创建或终止的 RunAttempt 及其结果。 本条仅记录 RetryActivity；其 canonical owner 是执行尝试与结果（runtime-execution-attempts），因此 orchestration-routing-control 在此引用这些概念。
+              en: Routing and gates own RetryPolicy, RoutingCondition, Route, StopCondition, and evidence-based control decisions; execution attempts own the RunAttempt actually created or terminated by those decisions and its result. This record is limited to RetryActivity; their canonical owner is Execution attempts and outcomes (runtime-execution-attempts), so orchestration-routing-control references these concepts here.
+              ja: routing/gate は RetryPolicy、RoutingCondition、Route、StopCondition と evidence-based control decision を所有し、execution attempt はその decision が実際に作成・終了した RunAttempt と result を所有します。 この記録は RetryActivity だけを対象とし、canonical owner は実行試行と結果（runtime-execution-attempts）です。したがって orchestration-routing-control はここでこれらを参照します。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 路由与门拥有 RetryPolicy、RoutingCondition、Route、StopCondition 和基于证据作出的控制决定；执行尝试拥有这些决定实际创建或终止的 RunAttempt 及其结果。 本条仅记录 RetryActivity；其 canonical owner 是执行尝试与结果（runtime-execution-attempts），因此 orchestration-routing-control 在此引用这些概念。
+              en: Routing and gates own RetryPolicy, RoutingCondition, Route, StopCondition, and evidence-based control decisions; execution attempts own the RunAttempt actually created or terminated by those decisions and its result. This record is limited to RetryActivity; their canonical owner is Execution attempts and outcomes (runtime-execution-attempts), so orchestration-routing-control references these concepts here.
+              ja: routing/gate は RetryPolicy、RoutingCondition、Route、StopCondition と evidence-based control decision を所有し、execution attempt はその decision が実際に作成・終了した RunAttempt と result を所有します。 この記録は RetryActivity だけを対象とし、canonical owner は実行試行と結果（runtime-execution-attempts）です。したがって orchestration-routing-control はここでこれらを参照します。
+  overlap_checks:
+    - other_module_id: orchestration-composition
+      semantic_area:
+        zh: 路由选择与组合拓扑
+        en: Route selection versus composition topology
+        ja: 経路選択と構成トポロジー
+      candidate_concept_ids:
+        - OrchestrationTopology
+        - ParallelBranch
+      overlap_reason:
+        zh: 两者都连接步骤，但拓扑定义可能路径结构，路由决定在特定状态下实际走哪一条。 本条仅记录 OrchestrationTopology、ParallelBranch；其 canonical owner 是协作组合（orchestration-composition），因此 orchestration-routing-control 在此引用这些概念。
+        en: Both connect steps, but topology defines possible path structure while a routing decision chooses the actual path for a particular state. This record is limited to OrchestrationTopology, ParallelBranch; their canonical owner is Collaboration composition (orchestration-composition), so orchestration-routing-control references these concepts here.
+        ja: どちらも手順を接続しますが、トポロジーは可能経路構造、経路判断は特定状態で実際に進む経路を決めます。 この記録は OrchestrationTopology、ParallelBranch だけを対象とし、canonical owner は協働構成（orchestration-composition）です。したがって orchestration-routing-control はここでこれらを参照します。
+      disambiguation_test:
+        zh: 若删除运行状态和条件值后边仍作为协作结构存在，则归协作组合；若边的成立依赖一次条件评估，则归路由与门控。
+        en: If an edge remains collaboration structure after removing runtime state and condition values, it belongs to collaboration composition; if existence depends on one condition evaluation, it belongs to routing and gates.
+        ja: 実行状態と条件値を除いても辺が協働構造として残るなら協働構成、一回の条件評価に成立が依存するなら経路制御とゲートに属します。
+      result: distinct
+      owner_module_id: orchestration-composition
+      source_claims:
+        - claim-orchestration-routing-control-019
+        - claim-orchestration-routing-control-020
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-orchestration-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 若删除运行状态和条件值后边仍作为协作结构存在，则归协作组合；若边的成立依赖一次条件评估，则归路由与门控。
+              en: If an edge remains collaboration structure after removing runtime state and condition values, it belongs to collaboration composition; if existence depends on one condition evaluation, it belongs to routing and gates.
+              ja: 実行状態と条件値を除いても辺が協働構造として残るなら協働構成、一回の条件評価に成立が依存するなら経路制御とゲートに属します。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 若删除运行状态和条件值后边仍作为协作结构存在，则归协作组合；若边的成立依赖一次条件评估，则归路由与门控。
+              en: If an edge remains collaboration structure after removing runtime state and condition values, it belongs to collaboration composition; if existence depends on one condition evaluation, it belongs to routing and gates.
+              ja: 実行状態と条件値を除いても辺が協働構造として残るなら協働構成、一回の条件評価に成立が依存するなら経路制御とゲートに属します。
+    - other_module_id: orchestration-composition
+      semantic_area:
+        zh: 路由选择与组合拓扑
+        en: Route selection versus composition topology
+        ja: 経路選択と構成トポロジー
+      candidate_concept_ids:
+        - Route
+        - RoutingDecision
+      overlap_reason:
+        zh: 两者都连接步骤，但拓扑定义可能路径结构，路由决定在特定状态下实际走哪一条。 本条仅记录 Route、RoutingDecision；其 canonical owner 是路由与门控（orchestration-routing-control），因此 orchestration-routing-control 在此拥有这些概念。
+        en: Both connect steps, but topology defines possible path structure while a routing decision chooses the actual path for a particular state. This record is limited to Route, RoutingDecision; their canonical owner is Routing and gates (orchestration-routing-control), so orchestration-routing-control owns these concepts here.
+        ja: どちらも手順を接続しますが、トポロジーは可能経路構造、経路判断は特定状態で実際に進む経路を決めます。 この記録は Route、RoutingDecision だけを対象とし、canonical owner は経路制御とゲート（orchestration-routing-control）です。したがって orchestration-routing-control はここでこれらを所有します。
+      disambiguation_test:
+        zh: 若删除运行状态和条件值后边仍作为协作结构存在，则归协作组合；若边的成立依赖一次条件评估，则归路由与门控。
+        en: If an edge remains collaboration structure after removing runtime state and condition values, it belongs to collaboration composition; if existence depends on one condition evaluation, it belongs to routing and gates.
+        ja: 実行状態と条件値を除いても辺が協働構造として残るなら協働構成、一回の条件評価に成立が依存するなら経路制御とゲートに属します。
+      result: distinct
+      owner_module_id: orchestration-routing-control
+      source_claims:
+        - claim-orchestration-routing-control-021
+        - claim-orchestration-routing-control-022
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-orchestration-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 若删除运行状态和条件值后边仍作为协作结构存在，则归协作组合；若边的成立依赖一次条件评估，则归路由与门控。
+              en: If an edge remains collaboration structure after removing runtime state and condition values, it belongs to collaboration composition; if existence depends on one condition evaluation, it belongs to routing and gates.
+              ja: 実行状態と条件値を除いても辺が協働構造として残るなら協働構成、一回の条件評価に成立が依存するなら経路制御とゲートに属します。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 若删除运行状态和条件值后边仍作为协作结构存在，则归协作组合；若边的成立依赖一次条件评估，则归路由与门控。
+              en: If an edge remains collaboration structure after removing runtime state and condition values, it belongs to collaboration composition; if existence depends on one condition evaluation, it belongs to routing and gates.
+              ja: 実行状態と条件値を除いても辺が協働構造として残るなら協働構成、一回の条件評価に成立が依存するなら経路制御とゲートに属します。
+    - other_module_id: safety-permission-policy
+      semantic_area:
+        zh: 流程控制决定与授权决定
+        en: Flow-control decision versus authorization decision
+        ja: flow-control decision と authorization decision
+      candidate_concept_ids:
+        - ControlGate
+        - Gate
+      overlap_reason:
+        zh: PolicyDecision 可作为 GateCondition 的证据，但安全允许并不决定应走哪条业务分支，路由选择也不能授予权限。
+        en: PolicyDecision can evidence a GateCondition, but safety allowance does not choose the business branch and routing cannot grant authority.
+        ja: PolicyDecision は GateCondition の evidence になりますが、安全 allow は business branch を選ばず routing は authority を grant できません。
+      disambiguation_test:
+        zh: 若问题是主体是否被允许执行动作，归权限与策略；若问题是在已知条件下下一步去哪里、重试还是停止，归路由与门。
+        en: If the question is whether a subject may perform an action, it belongs to permission and policy; if it is where execution goes next, retries, or stops under known conditions, it belongs to routing and gates.
+        ja: subject が action を許可されるかは permission/policy、既知 condition 下で次へどこに進み retry/stop するかは routing/gate に属します。
+      result: distinct
+      owner_module_id: orchestration-routing-control
+      source_claims:
+        - claim-orchestration-routing-control-023
+        - claim-orchestration-routing-control-024
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-orchestration-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 若问题是主体是否被允许执行动作，归权限与策略；若问题是在已知条件下下一步去哪里、重试还是停止，归路由与门。
+              en: If the question is whether a subject may perform an action, it belongs to permission and policy; if it is where execution goes next, retries, or stops under known conditions, it belongs to routing and gates.
+              ja: subject が action を許可されるかは permission/policy、既知 condition 下で次へどこに進み retry/stop するかは routing/gate に属します。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 若问题是主体是否被允许执行动作，归权限与策略；若问题是在已知条件下下一步去哪里、重试还是停止，归路由与门。
+              en: If the question is whether a subject may perform an action, it belongs to permission and policy; if it is where execution goes next, retries, or stops under known conditions, it belongs to routing and gates.
+              ja: subject が action を許可されるかは permission/policy、既知 condition 下で次へどこに進み retry/stop するかは routing/gate に属します。
+    - other_module_id: safety-permission-policy
+      semantic_area:
+        zh: 流程控制决定与授权决定
+        en: Flow-control decision versus authorization decision
+        ja: flow-control decision と authorization decision
+      candidate_concept_ids:
+        - ToolApprovalGate
+        - PolicyDecision
+      overlap_reason:
+        zh: PolicyDecision 可作为 GateCondition 的证据，但安全允许并不决定应走哪条业务分支，路由选择也不能授予权限。
+        en: PolicyDecision can evidence a GateCondition, but safety allowance does not choose the business branch and routing cannot grant authority.
+        ja: PolicyDecision は GateCondition の evidence になりますが、安全 allow は business branch を選ばず routing は authority を grant できません。
+      disambiguation_test:
+        zh: 若问题是主体是否被允许执行动作，归权限与策略；若问题是在已知条件下下一步去哪里、重试还是停止，归路由与门。
+        en: If the question is whether a subject may perform an action, it belongs to permission and policy; if it is where execution goes next, retries, or stops under known conditions, it belongs to routing and gates.
+        ja: subject が action を許可されるかは permission/policy、既知 condition 下で次へどこに進み retry/stop するかは routing/gate に属します。
+      result: distinct
+      owner_module_id: safety-permission-policy
+      source_claims:
+        - claim-orchestration-routing-control-025
+        - claim-orchestration-routing-control-026
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-orchestration-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 若问题是主体是否被允许执行动作，归权限与策略；若问题是在已知条件下下一步去哪里、重试还是停止，归路由与门。
+              en: If the question is whether a subject may perform an action, it belongs to permission and policy; if it is where execution goes next, retries, or stops under known conditions, it belongs to routing and gates.
+              ja: subject が action を許可されるかは permission/policy、既知 condition 下で次へどこに進み retry/stop するかは routing/gate に属します。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 若问题是主体是否被允许执行动作，归权限与策略；若问题是在已知条件下下一步去哪里、重试还是停止，归路由与门。
+              en: If the question is whether a subject may perform an action, it belongs to permission and policy; if it is where execution goes next, retries, or stops under known conditions, it belongs to routing and gates.
+              ja: subject が action を許可されるかは permission/policy、既知 condition 下で次へどこに進み retry/stop するかは routing/gate に属します。
+    - other_module_id: runtime-execution-attempts
+      semantic_area:
+        zh: 重试控制策略与重试尝试发生
+        en: Retry-control policy versus retry-attempt occurrence
+        ja: retry control policy と retry attempt occurrence
+      candidate_concept_ids:
+        - RetryPolicy
+        - RoutingCondition
+      overlap_reason:
+        zh: 一个 RetryPolicy 可治理多次执行且某次决定可能不创建重试；RunAttempt 则有独立 attempt number、时间和预算消费。 本条仅记录 RetryPolicy、RoutingCondition；其 canonical owner 是路由与门控（orchestration-routing-control），因此 orchestration-routing-control 在此拥有这些概念。
+        en: One RetryPolicy can govern many executions and a decision may create no retry; RunAttempt has independent attempt number, time, and budget consumption. This record is limited to RetryPolicy, RoutingCondition; their canonical owner is Routing and gates (orchestration-routing-control), so orchestration-routing-control owns these concepts here.
+        ja: 一 RetryPolicy は複数 execution を govern し decision が retry を作らない場合もあり、RunAttempt は独自 attempt number・time・budget consumption を持ちます。 この記録は RetryPolicy、RoutingCondition だけを対象とし、canonical owner は経路制御とゲート（orchestration-routing-control）です。したがって orchestration-routing-control はここでこれらを所有します。
+      disambiguation_test:
+        zh: 由 condition、policy version 和 decision evidence 识别的对象归路由与门；由 execution id、attempt number、retry lineage 和 result 识别的对象归执行尝试。
+        en: An object identified by condition, policy version, and decision evidence belongs to routing and gates; one identified by execution ID, attempt number, retry lineage, and result belongs to execution attempts.
+        ja: condition・policy version・decision evidence で識別されれば routing/gate、execution id・attempt number・retry lineage・result で識別されれば execution attempt に属します。
+      result: distinct
+      owner_module_id: orchestration-routing-control
+      source_claims:
+        - claim-orchestration-routing-control-027
+        - claim-orchestration-routing-control-028
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-orchestration-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 由 condition、policy version 和 decision evidence 识别的对象归路由与门；由 execution id、attempt number、retry lineage 和 result 识别的对象归执行尝试。
+              en: An object identified by condition, policy version, and decision evidence belongs to routing and gates; one identified by execution ID, attempt number, retry lineage, and result belongs to execution attempts.
+              ja: condition・policy version・decision evidence で識別されれば routing/gate、execution id・attempt number・retry lineage・result で識別されれば execution attempt に属します。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 由 condition、policy version 和 decision evidence 识别的对象归路由与门；由 execution id、attempt number、retry lineage 和 result 识别的对象归执行尝试。
+              en: An object identified by condition, policy version, and decision evidence belongs to routing and gates; one identified by execution ID, attempt number, retry lineage, and result belongs to execution attempts.
+              ja: condition・policy version・decision evidence で識別されれば routing/gate、execution id・attempt number・retry lineage・result で識別されれば execution attempt に属します。
+    - other_module_id: runtime-execution-attempts
+      semantic_area:
+        zh: 重试控制策略与重试尝试发生
+        en: Retry-control policy versus retry-attempt occurrence
+        ja: retry control policy と retry attempt occurrence
+      candidate_concept_ids:
+        - RetryActivity
+        - RunAttempt
+      overlap_reason:
+        zh: 一个 RetryPolicy 可治理多次执行且某次决定可能不创建重试；RunAttempt 则有独立 attempt number、时间和预算消费。 本条仅记录 RetryActivity、RunAttempt；其 canonical owner 是执行尝试与结果（runtime-execution-attempts），因此 orchestration-routing-control 在此引用这些概念。
+        en: One RetryPolicy can govern many executions and a decision may create no retry; RunAttempt has independent attempt number, time, and budget consumption. This record is limited to RetryActivity, RunAttempt; their canonical owner is Execution attempts and outcomes (runtime-execution-attempts), so orchestration-routing-control references these concepts here.
+        ja: 一 RetryPolicy は複数 execution を govern し decision が retry を作らない場合もあり、RunAttempt は独自 attempt number・time・budget consumption を持ちます。 この記録は RetryActivity、RunAttempt だけを対象とし、canonical owner は実行試行と結果（runtime-execution-attempts）です。したがって orchestration-routing-control はここでこれらを参照します。
+      disambiguation_test:
+        zh: 由 condition、policy version 和 decision evidence 识别的对象归路由与门；由 execution id、attempt number、retry lineage 和 result 识别的对象归执行尝试。
+        en: An object identified by condition, policy version, and decision evidence belongs to routing and gates; one identified by execution ID, attempt number, retry lineage, and result belongs to execution attempts.
+        ja: condition・policy version・decision evidence で識別されれば routing/gate、execution id・attempt number・retry lineage・result で識別されれば execution attempt に属します。
+      result: distinct
+      owner_module_id: runtime-execution-attempts
+      source_claims:
+        - claim-orchestration-routing-control-029
+        - claim-orchestration-routing-control-030
+      review:
+        review_status: accepted
+        reviewers:
+          - reviewer_id: moonweave-orchestration-domain-reviewer
+            reviewer_role: domain
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 由 condition、policy version 和 decision evidence 识别的对象归路由与门；由 execution id、attempt number、retry lineage 和 result 识别的对象归执行尝试。
+              en: An object identified by condition, policy version, and decision evidence belongs to routing and gates; one identified by execution ID, attempt number, retry lineage, and result belongs to execution attempts.
+              ja: condition・policy version・decision evidence で識別されれば routing/gate、execution id・attempt number・retry lineage・result で識別されれば execution attempt に属します。
+          - reviewer_id: moonweave-ontology-structure-reviewer
+            reviewer_role: ontology
+            reviewer_kind: automated-agent
+            reviewed_on: 2026-07-14
+            decision_note:
+              zh: 由 condition、policy version 和 decision evidence 识别的对象归路由与门；由 execution id、attempt number、retry lineage 和 result 识别的对象归执行尝试。
+              en: An object identified by condition, policy version, and decision evidence belongs to routing and gates; one identified by execution ID, attempt number, retry lineage, and result belongs to execution attempts.
+              ja: condition・policy version・decision evidence で識別されれば routing/gate、execution id・attempt number・retry lineage・result で識別されれば execution attempt に属します。
+review:
+  status: accepted
+  method: manual-semantic
+  reviewer: manual-orchestration-tool-verification
+  reviewed_on: 2026-07-17
+  note:
+    zh: 已对照 LangGraph 条件边、interrupt/checkpoint 与 CI/CD gate 模式逐项完成 15 个概念节点的人工语义核验。语义层级正确：RoutingDecision selects RoutingTarget、DownstreamOperation 由 GateOutcome 触发，均非 is_a；目录嵌套仅为布局债务。
+    en: Manual semantic verification of all 15 concept nodes against LangGraph conditional edges, interrupt/checkpoint, and CI/CD gate patterns completed. Semantic taxonomy is correct—RoutingDecision selects RoutingTarget and DownstreamOperation is triggered by GateOutcome, neither is is_a; directory nesting is layout debt only.
+    ja: LangGraph conditional edge・interrupt/checkpoint・CI/CD gate パターンに照らし 15 概念ノードの手動意味検証を完了。RoutingDecision→selects、GateOutcome→triggers で is_a ではなく、ディレクトリネストは layout debt のみです。
+  sections:
+    semantics: accepted
+    hierarchy: accepted
+    relations: accepted
+    structure: accepted
+    examples: accepted
+    source_claims: accepted
 source_claims:
-  - id: claim-orchestration-routing-control-module
-    source: langgraph-graph-api
-    supports: LangGraph documents conditional_edges and Command(goto=...) as graph routing mechanisms distinct from one immutable decision record.
-    locator: Graph API, conditional edges and Command
+  - id: claim-orchestration-routing-control-001
+    source: eng-fw-langgraph-graph-api
+    supports: LangGraph's Graph API distinguishes workflow state, executable nodes, static edges, conditional routing functions, termination targets, and Command values that combine state updates with a selected destination. Moonweave uses this to separate reusable routing specifications and targets from one RoutingDecision occurrence.
+    locator: LangGraph Graph API documentation, Graphs, Edges, Conditional edges, and Command sections
     evidence_kind: design-inference
     confidence: high
-  - id: claim-orchestration-routing-control-boundary
-    source: langgraph-graph-api
-    supports: Routing specifications describe possible paths while a decision record must seal the evaluated state and selected target for one run.
-    locator: Graph API, edges versus invocation results
+    review_status: accepted
+  - id: claim-orchestration-routing-control-002
+    source: eng-fw-langgraph-fault-tolerance
+    supports: LangGraph fault-tolerance documentation defines retry policy parameters such as maximum attempts, backoff, jitter, retryable errors, timeouts, exhaustion, and subsequent error handling. Moonweave uses these as fields of RetryPolicy while keeping each retry decision and attempt as separate occurrences.
+    locator: LangGraph Fault tolerance documentation, Retries, Parameters, Timeouts, and Error handling sections
     evidence_kind: design-inference
     confidence: high
+    review_status: accepted
+  - id: claim-orchestration-routing-control-003
+    source: eng-fw-autogen-agentchat
+    supports: AutoGen SelectorGroupChat selects a next participant from described candidates using current conversation context and stops when an explicit termination condition is satisfied. Moonweave uses this as evidence for typed routing targets, selection decisions, and separately evaluated stop conditions.
+    locator: AutoGen AgentChat documentation, Selector Group Chat workflow and Termination Conditions
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-orchestration-routing-control-004
+    source: eng-ont-prov-o
+    supports: W3C PROV-O distinguishes plans and other Entities from time-bounded Activities that use or generate Entities. Moonweave therefore treats routing policy and conditions as reusable specifications, RoutingDecision as an occurrence, and GateOutcome as information produced by gate evaluation.
+    locator: W3C PROV-O Recommendation Sections 3.1 and 3.2, Entity, Activity, generation, and Plan
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-orchestration-routing-control-005
+    source: eng-fw-crewai-docs
+    supports: Source eng-fw-crewai-docs at Documentation > Agents, tasks, crews, flows, and processes supports operational notions used to compare orchestration-routing-control with orchestration-composition, including OrchestrationTopology, ParallelBranch. The source does not define Moonweave Modules orchestration-routing-control or orchestration-composition, their class or relation placement, or their ownership split. Under orchestration-routing-control's owns_when "Own an object when its identity is determined by a routing specification, condition evaluation, path selection, gate judgment, retry, or stop control.", Moonweave applies the disambiguation test "If an edge remains collaboration structure after removing runtime state and condition values, it belongs to collaboration composition; if existence depends on one condition evaluation, it belongs to routing and gates."; result=references and owner=orchestration-composition are a Moonweave design inference over the registered evidence.
+    locator: Documentation > Agents, tasks, crews, flows, and processes
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-orchestration-routing-control-006
+    source: eng-fw-langgraph-docs
+    supports: Source eng-fw-langgraph-docs at Overview > Durable execution, human-in-the-loop, memory, and subgraphs supports operational notions used to compare orchestration-routing-control with orchestration-composition, including OrchestrationTopology, ParallelBranch. The source does not define Moonweave Modules orchestration-routing-control or orchestration-composition, their class or relation placement, or their ownership split. Under orchestration-routing-control's owns_when "Own an object when its identity is determined by a routing specification, condition evaluation, path selection, gate judgment, retry, or stop control.", Moonweave applies the disambiguation test "If an edge remains collaboration structure after removing runtime state and condition values, it belongs to collaboration composition; if existence depends on one condition evaluation, it belongs to routing and gates."; result=references and owner=orchestration-composition are a Moonweave design inference over the registered evidence.
+    locator: Overview > Durable execution, human-in-the-loop, memory, and subgraphs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-orchestration-routing-control-007
+    source: eng-fw-crewai-docs
+    supports: Source eng-fw-crewai-docs at Documentation > Agents, tasks, crews, flows, and processes supports operational notions used to compare orchestration-routing-control with orchestration-composition, including Route, RoutingDecision. The source does not define Moonweave Modules orchestration-routing-control or orchestration-composition, their class or relation placement, or their ownership split. Under orchestration-routing-control's owns_when "Own an object when its identity is determined by a routing specification, condition evaluation, path selection, gate judgment, retry, or stop control.", Moonweave applies the disambiguation test "If an edge remains collaboration structure after removing runtime state and condition values, it belongs to collaboration composition; if existence depends on one condition evaluation, it belongs to routing and gates."; result=owns and owner=orchestration-routing-control are a Moonweave design inference over the registered evidence.
+    locator: Documentation > Agents, tasks, crews, flows, and processes
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-orchestration-routing-control-008
+    source: eng-fw-langgraph-docs
+    supports: Source eng-fw-langgraph-docs at Overview > Durable execution, human-in-the-loop, memory, and subgraphs supports operational notions used to compare orchestration-routing-control with orchestration-composition, including Route, RoutingDecision. The source does not define Moonweave Modules orchestration-routing-control or orchestration-composition, their class or relation placement, or their ownership split. Under orchestration-routing-control's owns_when "Own an object when its identity is determined by a routing specification, condition evaluation, path selection, gate judgment, retry, or stop control.", Moonweave applies the disambiguation test "If an edge remains collaboration structure after removing runtime state and condition values, it belongs to collaboration composition; if existence depends on one condition evaluation, it belongs to routing and gates."; result=owns and owner=orchestration-routing-control are a Moonweave design inference over the registered evidence.
+    locator: Overview > Durable execution, human-in-the-loop, memory, and subgraphs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-orchestration-routing-control-009
+    source: eng-fw-openai-hitl
+    supports: OpenAI's human-in-the-loop flow pauses a sensitive tool call and resolves it with an explicit approve or reject decision before execution resumes. Moonweave models the reusable mechanism as CommitGate and the auditable allow or deny records as GateOutcome specializations.
+    locator: Human-in-the-loop > How the approval flow works, steps 1–5
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-orchestration-routing-control-010
+    source: eng-fw-openai-hitl
+    supports: OpenAI's human-in-the-loop flow identifies a pending sensitive call and resolves it with an approve or reject decision. Moonweave keeps those commit-specific gate and outcome identities in safety while preserving their generic Gate hierarchy.
+    locator: Human-in-the-loop > How the approval flow works, steps 1–5
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-orchestration-routing-control-011
+    source: eng-policy-opa
+    supports: OPA separates structured policy evaluation and its decision output from the caller that enforces the result. Moonweave uses that separation to distinguish the generic Gate capability from the authorization-specific ToolApprovalGate specialization.
+    locator: Open Policy Agent documentation > What is OPA? > policy input, evaluation, decision output, and separation from enforcement
+    evidence_kind: official
+    confidence: high
+    review_status: accepted
+  - id: claim-orchestration-routing-control-012
+    source: eng-fw-langgraph-interrupts
+    supports: LangGraph interrupts pause execution, persist state, and resume only with an explicit value. Moonweave treats such control-point behavior as evidence for a generic Gate capability while keeping tool authorization checks in ToolApprovalGate.
+    locator: LangGraph documentation > Interrupts > pause using interrupt and resume using Command with persisted state
+    evidence_kind: official
+    confidence: high
+    review_status: accepted
+  - id: claim-orchestration-routing-control-013
+    source: eng-policy-opa
+    supports: OPA separates policy-decision production from enforcement by the caller. Moonweave assigns the authorization-enforcement specialization ToolApprovalGate to safety while retaining its generic Gate superclass in routing and gates.
+    locator: Open Policy Agent documentation > What is OPA? > policy input, evaluation, decision output, and separation from enforcement
+    evidence_kind: official
+    confidence: high
+    review_status: accepted
+  - id: claim-orchestration-routing-control-014
+    source: eng-fw-langgraph-interrupts
+    supports: LangGraph interrupts provide an explicit pause-and-resume control point. Moonweave uses this control-point evidence together with authorization evidence to define ToolApprovalGate as a specialized Gate rather than a PolicyDecision.
+    locator: LangGraph documentation > Interrupts > pause using interrupt and resume using Command with persisted state
+    evidence_kind: official
+    confidence: high
+    review_status: accepted
+  - id: claim-orchestration-routing-control-015
+    source: eng-fw-crewai-docs
+    supports: Source eng-fw-crewai-docs at Documentation > Agents, tasks, crews, flows, and processes supports operational notions used to compare orchestration-routing-control with runtime-execution-attempts, including RetryPolicy. The source does not define Moonweave Modules orchestration-routing-control or runtime-execution-attempts, their class or relation placement, or their ownership split. Under orchestration-routing-control's owns_when "Own an object when its identity is determined by a routing specification, condition evaluation, path selection, gate judgment, retry, or stop control.", Moonweave applies the disambiguation test "An object identified by condition, policy version, and decision evidence belongs to routing and gates; one identified by execution ID, attempt number, retry lineage, and result belongs to execution attempts."; result=owns and owner=orchestration-routing-control are a Moonweave design inference over the registered evidence.
+    locator: Documentation > Agents, tasks, crews, flows, and processes
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-orchestration-routing-control-016
+    source: eng-fw-langgraph-docs
+    supports: Source eng-fw-langgraph-docs at Overview > Durable execution, human-in-the-loop, memory, and subgraphs supports operational notions used to compare orchestration-routing-control with runtime-execution-attempts, including RetryPolicy. The source does not define Moonweave Modules orchestration-routing-control or runtime-execution-attempts, their class or relation placement, or their ownership split. Under orchestration-routing-control's owns_when "Own an object when its identity is determined by a routing specification, condition evaluation, path selection, gate judgment, retry, or stop control.", Moonweave applies the disambiguation test "An object identified by condition, policy version, and decision evidence belongs to routing and gates; one identified by execution ID, attempt number, retry lineage, and result belongs to execution attempts."; result=owns and owner=orchestration-routing-control are a Moonweave design inference over the registered evidence.
+    locator: Overview > Durable execution, human-in-the-loop, memory, and subgraphs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-orchestration-routing-control-017
+    source: eng-fw-crewai-docs
+    supports: Source eng-fw-crewai-docs at Documentation > Agents, tasks, crews, flows, and processes supports operational notions used to compare orchestration-routing-control with runtime-execution-attempts, including RetryActivity. The source does not define Moonweave Modules orchestration-routing-control or runtime-execution-attempts, their class or relation placement, or their ownership split. Under orchestration-routing-control's owns_when "Own an object when its identity is determined by a routing specification, condition evaluation, path selection, gate judgment, retry, or stop control.", Moonweave applies the disambiguation test "An object identified by condition, policy version, and decision evidence belongs to routing and gates; one identified by execution ID, attempt number, retry lineage, and result belongs to execution attempts."; result=references and owner=runtime-execution-attempts are a Moonweave design inference over the registered evidence.
+    locator: Documentation > Agents, tasks, crews, flows, and processes
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-orchestration-routing-control-018
+    source: eng-fw-langgraph-docs
+    supports: Source eng-fw-langgraph-docs at Overview > Durable execution, human-in-the-loop, memory, and subgraphs supports operational notions used to compare orchestration-routing-control with runtime-execution-attempts, including RetryActivity. The source does not define Moonweave Modules orchestration-routing-control or runtime-execution-attempts, their class or relation placement, or their ownership split. Under orchestration-routing-control's owns_when "Own an object when its identity is determined by a routing specification, condition evaluation, path selection, gate judgment, retry, or stop control.", Moonweave applies the disambiguation test "An object identified by condition, policy version, and decision evidence belongs to routing and gates; one identified by execution ID, attempt number, retry lineage, and result belongs to execution attempts."; result=references and owner=runtime-execution-attempts are a Moonweave design inference over the registered evidence.
+    locator: Overview > Durable execution, human-in-the-loop, memory, and subgraphs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-orchestration-routing-control-019
+    source: eng-fw-crewai-docs
+    supports: Source eng-fw-crewai-docs at Documentation > Agents, tasks, crews, flows, and processes supports operational notions used to compare orchestration-routing-control with orchestration-composition, including OrchestrationTopology, ParallelBranch. The source does not define Moonweave Modules orchestration-routing-control or orchestration-composition, their class or relation placement, or their ownership split. Under orchestration-routing-control's owns_when "Own an object when its identity is determined by a routing specification, condition evaluation, path selection, gate judgment, retry, or stop control.", Moonweave applies the disambiguation test "If an edge remains collaboration structure after removing runtime state and condition values, it belongs to collaboration composition; if existence depends on one condition evaluation, it belongs to routing and gates."; result=distinct and owner=orchestration-composition are a Moonweave design inference over the registered evidence.
+    locator: Documentation > Agents, tasks, crews, flows, and processes
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-orchestration-routing-control-020
+    source: eng-fw-langgraph-docs
+    supports: Source eng-fw-langgraph-docs at Overview > Durable execution, human-in-the-loop, memory, and subgraphs supports operational notions used to compare orchestration-routing-control with orchestration-composition, including OrchestrationTopology, ParallelBranch. The source does not define Moonweave Modules orchestration-routing-control or orchestration-composition, their class or relation placement, or their ownership split. Under orchestration-routing-control's owns_when "Own an object when its identity is determined by a routing specification, condition evaluation, path selection, gate judgment, retry, or stop control.", Moonweave applies the disambiguation test "If an edge remains collaboration structure after removing runtime state and condition values, it belongs to collaboration composition; if existence depends on one condition evaluation, it belongs to routing and gates."; result=distinct and owner=orchestration-composition are a Moonweave design inference over the registered evidence.
+    locator: Overview > Durable execution, human-in-the-loop, memory, and subgraphs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-orchestration-routing-control-021
+    source: eng-fw-crewai-docs
+    supports: Source eng-fw-crewai-docs at Documentation > Agents, tasks, crews, flows, and processes supports operational notions used to compare orchestration-routing-control with orchestration-composition, including Route, RoutingDecision. The source does not define Moonweave Modules orchestration-routing-control or orchestration-composition, their class or relation placement, or their ownership split. Under orchestration-routing-control's owns_when "Own an object when its identity is determined by a routing specification, condition evaluation, path selection, gate judgment, retry, or stop control.", Moonweave applies the disambiguation test "If an edge remains collaboration structure after removing runtime state and condition values, it belongs to collaboration composition; if existence depends on one condition evaluation, it belongs to routing and gates."; result=distinct and owner=orchestration-routing-control are a Moonweave design inference over the registered evidence.
+    locator: Documentation > Agents, tasks, crews, flows, and processes
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-orchestration-routing-control-022
+    source: eng-fw-langgraph-docs
+    supports: Source eng-fw-langgraph-docs at Overview > Durable execution, human-in-the-loop, memory, and subgraphs supports operational notions used to compare orchestration-routing-control with orchestration-composition, including Route, RoutingDecision. The source does not define Moonweave Modules orchestration-routing-control or orchestration-composition, their class or relation placement, or their ownership split. Under orchestration-routing-control's owns_when "Own an object when its identity is determined by a routing specification, condition evaluation, path selection, gate judgment, retry, or stop control.", Moonweave applies the disambiguation test "If an edge remains collaboration structure after removing runtime state and condition values, it belongs to collaboration composition; if existence depends on one condition evaluation, it belongs to routing and gates."; result=distinct and owner=orchestration-routing-control are a Moonweave design inference over the registered evidence.
+    locator: Overview > Durable execution, human-in-the-loop, memory, and subgraphs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-orchestration-routing-control-023
+    source: eng-fw-crewai-docs
+    supports: Source eng-fw-crewai-docs at Documentation > Agents, tasks, crews, flows, and processes supports operational notions used to compare orchestration-routing-control with safety-permission-policy, including ControlGate, Gate. The source does not define Moonweave Modules orchestration-routing-control or safety-permission-policy, their class or relation placement, or their ownership split. Under orchestration-routing-control's owns_when "Own an object when its identity is determined by a routing specification, condition evaluation, path selection, gate judgment, retry, or stop control.", Moonweave applies the disambiguation test "If the question is whether a subject may perform an action, it belongs to permission and policy; if it is where execution goes next, retries, or stops under known conditions, it belongs to routing and gates."; result=distinct and owner=orchestration-routing-control are a Moonweave design inference over the registered evidence.
+    locator: Documentation > Agents, tasks, crews, flows, and processes
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-orchestration-routing-control-024
+    source: eng-fw-langgraph-docs
+    supports: Source eng-fw-langgraph-docs at Overview > Durable execution, human-in-the-loop, memory, and subgraphs supports operational notions used to compare orchestration-routing-control with safety-permission-policy, including ControlGate, Gate. The source does not define Moonweave Modules orchestration-routing-control or safety-permission-policy, their class or relation placement, or their ownership split. Under orchestration-routing-control's owns_when "Own an object when its identity is determined by a routing specification, condition evaluation, path selection, gate judgment, retry, or stop control.", Moonweave applies the disambiguation test "If the question is whether a subject may perform an action, it belongs to permission and policy; if it is where execution goes next, retries, or stops under known conditions, it belongs to routing and gates."; result=distinct and owner=orchestration-routing-control are a Moonweave design inference over the registered evidence.
+    locator: Overview > Durable execution, human-in-the-loop, memory, and subgraphs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-orchestration-routing-control-025
+    source: eng-fw-crewai-docs
+    supports: Source eng-fw-crewai-docs at Documentation > Agents, tasks, crews, flows, and processes supports operational notions used to compare orchestration-routing-control with safety-permission-policy, including ToolApprovalGate, PolicyDecision. The source does not define Moonweave Modules orchestration-routing-control or safety-permission-policy, their class or relation placement, or their ownership split. Under orchestration-routing-control's owns_when "Own an object when its identity is determined by a routing specification, condition evaluation, path selection, gate judgment, retry, or stop control.", Moonweave applies the disambiguation test "If the question is whether a subject may perform an action, it belongs to permission and policy; if it is where execution goes next, retries, or stops under known conditions, it belongs to routing and gates."; result=distinct and owner=safety-permission-policy are a Moonweave design inference over the registered evidence.
+    locator: Documentation > Agents, tasks, crews, flows, and processes
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-orchestration-routing-control-026
+    source: eng-fw-langgraph-docs
+    supports: Source eng-fw-langgraph-docs at Overview > Durable execution, human-in-the-loop, memory, and subgraphs supports operational notions used to compare orchestration-routing-control with safety-permission-policy, including ToolApprovalGate, PolicyDecision. The source does not define Moonweave Modules orchestration-routing-control or safety-permission-policy, their class or relation placement, or their ownership split. Under orchestration-routing-control's owns_when "Own an object when its identity is determined by a routing specification, condition evaluation, path selection, gate judgment, retry, or stop control.", Moonweave applies the disambiguation test "If the question is whether a subject may perform an action, it belongs to permission and policy; if it is where execution goes next, retries, or stops under known conditions, it belongs to routing and gates."; result=distinct and owner=safety-permission-policy are a Moonweave design inference over the registered evidence.
+    locator: Overview > Durable execution, human-in-the-loop, memory, and subgraphs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-orchestration-routing-control-027
+    source: eng-fw-crewai-docs
+    supports: Source eng-fw-crewai-docs at Documentation > Agents, tasks, crews, flows, and processes supports operational notions used to compare orchestration-routing-control with runtime-execution-attempts, including RetryPolicy, RoutingCondition. The source does not define Moonweave Modules orchestration-routing-control or runtime-execution-attempts, their class or relation placement, or their ownership split. Under orchestration-routing-control's owns_when "Own an object when its identity is determined by a routing specification, condition evaluation, path selection, gate judgment, retry, or stop control.", Moonweave applies the disambiguation test "An object identified by condition, policy version, and decision evidence belongs to routing and gates; one identified by execution ID, attempt number, retry lineage, and result belongs to execution attempts."; result=distinct and owner=orchestration-routing-control are a Moonweave design inference over the registered evidence.
+    locator: Documentation > Agents, tasks, crews, flows, and processes
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-orchestration-routing-control-028
+    source: eng-fw-langgraph-docs
+    supports: Source eng-fw-langgraph-docs at Overview > Durable execution, human-in-the-loop, memory, and subgraphs supports operational notions used to compare orchestration-routing-control with runtime-execution-attempts, including RetryPolicy, RoutingCondition. The source does not define Moonweave Modules orchestration-routing-control or runtime-execution-attempts, their class or relation placement, or their ownership split. Under orchestration-routing-control's owns_when "Own an object when its identity is determined by a routing specification, condition evaluation, path selection, gate judgment, retry, or stop control.", Moonweave applies the disambiguation test "An object identified by condition, policy version, and decision evidence belongs to routing and gates; one identified by execution ID, attempt number, retry lineage, and result belongs to execution attempts."; result=distinct and owner=orchestration-routing-control are a Moonweave design inference over the registered evidence.
+    locator: Overview > Durable execution, human-in-the-loop, memory, and subgraphs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-orchestration-routing-control-029
+    source: eng-fw-crewai-docs
+    supports: Source eng-fw-crewai-docs at Documentation > Agents, tasks, crews, flows, and processes supports operational notions used to compare orchestration-routing-control with runtime-execution-attempts, including RetryActivity, RunAttempt. The source does not define Moonweave Modules orchestration-routing-control or runtime-execution-attempts, their class or relation placement, or their ownership split. Under orchestration-routing-control's owns_when "Own an object when its identity is determined by a routing specification, condition evaluation, path selection, gate judgment, retry, or stop control.", Moonweave applies the disambiguation test "An object identified by condition, policy version, and decision evidence belongs to routing and gates; one identified by execution ID, attempt number, retry lineage, and result belongs to execution attempts."; result=distinct and owner=runtime-execution-attempts are a Moonweave design inference over the registered evidence.
+    locator: Documentation > Agents, tasks, crews, flows, and processes
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-orchestration-routing-control-030
+    source: eng-fw-langgraph-docs
+    supports: Source eng-fw-langgraph-docs at Overview > Durable execution, human-in-the-loop, memory, and subgraphs supports operational notions used to compare orchestration-routing-control with runtime-execution-attempts, including RetryActivity, RunAttempt. The source does not define Moonweave Modules orchestration-routing-control or runtime-execution-attempts, their class or relation placement, or their ownership split. Under orchestration-routing-control's owns_when "Own an object when its identity is determined by a routing specification, condition evaluation, path selection, gate judgment, retry, or stop control.", Moonweave applies the disambiguation test "An object identified by condition, policy version, and decision evidence belongs to routing and gates; one identified by execution ID, attempt number, retry lineage, and result belongs to execution attempts."; result=distinct and owner=runtime-execution-attempts are a Moonweave design inference over the registered evidence.
+    locator: Overview > Durable execution, human-in-the-loop, memory, and subgraphs
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted

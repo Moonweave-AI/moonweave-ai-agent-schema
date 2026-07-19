@@ -3,563 +3,437 @@ id: TopKSelection
 kind: concept
 status: accepted
 labels:
-  zh: 前 K 选择活动
-  en: Top-K Selection
-  ja: Top-K 選択活動
+  zh: 前 K 项选择
+  en: Top-K selection
+  ja: 上位K件選択
 semantics:
   short_definition:
-    zh: 从一个已确定排序中保留前 k 个候选并产生有界结果的 RankingOperation 子类。
-    en: A RankingOperation subtype that retains the first k candidates from a determinate ordering and produces a bounded result.
-    ja: 確定済み ordering から最初の k candidate を保持し、有界 result を生成する RankingOperation の下位型。
+    zh: 从一个已排序候选集合中按声明的 K 和并列策略保留前项的排序活动。
+    en: A ranking activity that retains the first K items from an ordered candidate set under a declared tie policy.
+    ja: ordered candidate setから指定Kとtie policyで上位項目を保持するranking activityです。
   definition:
-    zh: >
-      TopKSelection 是对已有排序结果执行前缀选择的活动。它读取明确的输入排序、正整数 k 和选择规则，并产生一个
-      最多含 k 个候选的新 RetrievalResult。它不计算候选分数、不改变输入排序、不融合多列表、不执行模型重排、
-      不保证选中项相关或被允许进入 ContextPackage。top-k 是排序后的选择边界，而不是初始检索的候选上限。
-    en: >
-      TopKSelection is activity that performs prefix selection over an existing ranked result. It reads explicit input
-      ordering, positive integer k, and selection rule and produces a new RetrievalResult containing at most k
-      candidates. It does not compute candidate scores, change input order, fuse multiple lists, execute model rerank,
-      or guarantee selected items are relevant or allowed into ContextPackage. Top-k is a post-ranking selection
-      boundary, not candidate limit for initial retrieval.
-    ja: >
-      TopKSelection は既存 ranked result に対して prefix selection を行う activity です。明示的 input ordering、正の
-      integer k、selection rule を読み取り、最大 k candidate を含む新しい RetrievalResult を生成します。candidate
-      score を計算せず、input order を変えず、複数 list を fusion せず、model rerank を実行せず、選択 item が
-      relevant または ContextPackage に許可されることも保証しません。top-k は post-ranking selection boundary
-      であり、初期 retrieval の candidate limit ではありません。
+    zh: TopKSelection 消费已有顺序的 CandidateSet，并依据 k、并列处理与稳定排序规则选出保留范围；它不计算相关性、不融合列表，也不决定候选是否进入最终上下文。
+    en: TopKSelection consumes an already ordered CandidateSet and determines the retained range from k, tie handling, and stable-order rules. It does not compute relevance, fuse lists, or decide admission to final context.
+    ja: TopKSelection は既にorderedなCandidateSetをconsumeしk・tie handling・stable order ruleから保持範囲を決めます。relevance計算・list fusion・final context admissionは行いません。
   why_needed:
-    zh: 系统常需把长排序列表裁成明确数量供后续步骤消费；独立记录 k 和输入顺序可防止把截断误读为重排或召回。
-    en: Systems often need to bound long ranked lists for later consumption; recording k and input order separately prevents truncation from being read as rerank or recall.
-    ja: system は後続消費のため長い ranked list を明確な数に制限する必要があり、k と input order を別に記録すると truncation を rerank や recall と誤読することを防げます。
+    zh: 让候选截断策略可重放，并与分数计算、融合、重排和上下文预算明确分开。
+    en: Makes candidate truncation replayable and distinct from scoring, fusion, reranking, and context budgeting.
+    ja: candidate truncationを再生可能にしscoring・fusion・reranking・context budgetから分離します。
   includes:
-    - zh: 已执行的前缀选择、明确输入结果、正整数 k、稳定的顺序规则和有界输出。
-      en: Executed prefix selection with explicit input result, positive integer k, stable ordering rule, and bounded output.
-      ja: 明示的 input result、正の integer k、安定した ordering rule、有界 output を持つ実行済み prefix selection。
+    - zh: 纳入基于已确定顺序和显式 k 值的候选保留活动。
+      en: Includes candidate-retention activities based on an established order and explicit k value.
+      ja: 確定済み順序と明示kに基づくcandidate retention activityを含みます。
   excludes:
-    - zh: 初始候选上限、候选评分、RRF 融合、模型重排、上下文预算装配和答案生成。
-      en: Initial candidate limit, candidate scoring, RRF fusion, model rerank, context-budget assembly, or answer generation.
-      ja: 初期 candidate limit、candidate scoring、RRF fusion、model rerank、context-budget assembly、answer generation。
+    - zh: 排除产生分数、改变相关性顺序、按 token 预算装配上下文或删除存储记录的操作。
+      en: Excludes producing scores, changing relevance order, assembling context under a token budget, and deleting stored records.
+      ja: score生成・relevance順序変更・token budgetによるcontext assembly・stored record削除を除外します。
   semantic_kind: activity
-  aliases: [rank truncation, bounded result selection, 排名截断]
-engineering:
-  explanation:
-    zh: FAISS Index.search 接受 k 并返回该数量的最近邻标签和距离。Moonweave 将“对已有排序取前 k 项”单独记录为选择活动，而不混淆为搜索调用本身。
-    en: FAISS Index.search accepts k and returns labels and distances for that number of nearest neighbors. Moonweave records taking first k from an already ranked result as selection activity rather than confusing it with search call itself.
-    ja: FAISS Index.search は k を受け取り、その数の nearest neighbor の label と distance を返します。Moonweave は既存 ranked result から最初の k を取ることを search call 自体と混同せず selection activity として記録します。
-  typical_input:
-    - description: Ranked result and selection bound
-      format: |
-        {
-          "input_result_ref": "retrieval-result-reranked-18",
-          "k": 5,
-          "ordering_basis_ref": "rerank-score-desc-v1"
-        }
-  typical_output:
-    - description: Bounded result
-      format: |
-        {
-          "top_k_selection_id": "top-k-18",
-          "ranking_operation_id": "ranking-top-k-18",
-          "retrieval_activity_id": "retrieval-activity-support-18",
-          "request_ref": "retrieval-request-support-18",
-          "input_result_ref": "retrieval-result-reranked-18",
-          "input_candidate_set_ref": "candidate-set-support-18",
-          "ranking_method_ref": "top-k-by-rerank-v1",
-          "implementation_ref": "faiss-search-top-k-v1",
-          "ordering_basis_ref": "rerank-score-desc-v1",
-          "k": 5,
-          "output_result_ref": "retrieval-result-top5-18",
-          "started_at": "2026-07-19T01:00:04Z",
-          "selected_count": 5,
-          "selection_status": "completed",
-          "ranking_status": "completed",
-          "execution_status": "completed"
-        }
-  reference_implementations:
-    - name: FAISS Index API
-      url: https://faiss.ai/cpp_api/struct/structfaiss_1_1Index.html
-      description: Documents nearest-neighbor search with k and distance and label output arrays.
+  aliases: []
 structure:
-  identity_keys: [top_k_selection_id]
+  identity_keys:
+    - selection_activity_id
   fields:
-    - id: top_k_selection_id
-      labels: {zh: 前 K 选择标识, en: top-k selection ID, ja: Top-K 選択 ID}
+    - id: selection_activity_id
+      labels:
+        zh: 选择活动标识
+        en: selection activity ID
+        ja: selection activity ID
       datatype: string
       required: true
-      cardinality: {min: 1, max: 1}
+      cardinality:
+        min: 1
+        max: 1
       definitions:
-        zh: 标识一次实际排序前缀选择，不能复用为候选、结果或 k 值。
-        en: Identifies one actual ranked-prefix selection and is not reused as candidate, result, or k value.
-        ja: 一回の実際の ranked-prefix selection を識別し、candidate、result、k value として再利用しません。
+        zh: 稳定标识一次 TopK 截断执行。
+        en: Stable identifier for one Top-K truncation execution.
+        ja: 一つのTop-K truncation executionを安定識別します。
       allowed_values: []
-      pattern: "^top-k-[A-Za-z0-9._-]+$"
-      example_value: top-k-18
-      source_claims: [claim-topk-faiss]
-    - id: input_result_ref
-      labels: {zh: 输入排序结果引用, en: input ranked result reference, ja: input ranked result 参照}
-      datatype: reference
-      required: true
-      cardinality: {min: 1, max: 1}
-      definitions:
-        zh: 指向选择前已有明确顺序的 RetrievalResult，不能从无序候选或输出倒推。
-        en: Points to RetrievalResult with determinate order before selection and cannot be inferred from unordered candidates or output.
-        ja: selection 前に確定済み order を持つ RetrievalResult を指し、unordered candidate や output から推論できません。
-      allowed_values: []
-      pattern: "^retrieval-result-[A-Za-z0-9._-]+$"
-      example_value: retrieval-result-reranked-18
-      source_claims: [claim-topk-provenance]
+      pattern: null
+      example_value: topk-417
+      source_claims:
+        - claim-top-k-selection-002
     - id: k
-      labels: {zh: 选择数量, en: selection count k, ja: 選択数 k}
+      labels:
+        zh: 保留数量 K
+        en: retained K
+        ja: 保持K
       datatype: integer
       required: true
-      cardinality: {min: 1, max: 1}
+      cardinality:
+        min: 1
+        max: 1
       definitions:
-        zh: 从输入排序保留的最大候选数，必须为正数，不保证实际候选数达到此值。
-        en: Maximum candidates retained from input ordering; it must be positive and does not guarantee actual count reaches it.
-        ja: input ordering から保持する最大 candidate 数で、正でなければならず、actual count がこの値に達することは保証しません。
+        zh: 声明最多保留的候选数量。
+        en: Declares the maximum number of candidates retained.
+        ja: 保持する最大candidate数を宣言します。
       allowed_values: []
       pattern: null
-      example_value: 5
-      source_claims: [claim-topk-faiss]
-    - id: ordering_basis_ref
-      labels: {zh: 排序依据引用, en: ordering basis reference, ja: ordering basis 参照}
-      datatype: reference
-      required: true
-      cardinality: {min: 1, max: 1}
-      definitions:
-        zh: 指向输入结果所用顺序依据，如 rerank 分数降序或融合排序，而非重新计算该依据。
-        en: Points to ordering basis used by input result, such as descending rerank score or fused rank, without recomputing it.
-        ja: descending rerank score や fused rank など input result が使う ordering basis を指し、それを再計算しません。
-      allowed_values: []
-      pattern: "^[A-Za-z][A-Za-z0-9._-]+$"
-      example_value: rerank-score-desc-v1
-      source_claims: [claim-topk-provenance]
-    - id: output_result_ref
-      labels: {zh: 输出有界结果引用, en: output bounded result reference, ja: output bounded result 参照}
-      datatype: reference
-      required: false
-      cardinality: {min: 0, max: 1}
-      definitions:
-        zh: 成功时指向最多 k 项的新 RetrievalResult；失败或运行中不得伪造。
-        en: On success points to new RetrievalResult with at most k items and cannot be fabricated on failure or while running.
-        ja: 成功時に最大 k item の新しい RetrievalResult を指し、failure または running 中に捏造できません。
-      allowed_values: []
-      pattern: "^retrieval-result-[A-Za-z0-9._-]+$"
-      example_value: retrieval-result-top5-18
-      source_claims: [claim-topk-provenance]
-    - id: selected_count
-      labels: {zh: 实际选中数, en: selected count, ja: 実際の選択数}
-      datatype: integer
-      required: false
-      cardinality: {min: 0, max: 1}
-      definitions:
-        zh: 成功时记录输出实际成员数，必须不大于 k，可能因输入不足而更少。
-        en: On success records actual output member count, which must not exceed k and may be smaller when input is short.
-        ja: 成功時に actual output member count を記録し、k を超えず input が少なければ小さくなり得ます。
-      allowed_values: []
-      pattern: null
-      example_value: 5
-      source_claims: [claim-topk-provenance]
-    - id: selection_status
-      labels: {zh: 选择状态, en: selection status, ja: 選択 status}
+      example_value: 12
+      source_claims:
+        - claim-top-k-selection-003
+    - id: tie_break_policy
+      labels:
+        zh: 并列策略
+        en: tie-break policy
+        ja: 同順位処理
       datatype: string
       required: true
-      cardinality: {min: 1, max: 1}
+      cardinality:
+        min: 1
+        max: 1
       definitions:
-        zh: 指示选择完成、失败、取消或部分完成，而非候选相关性结论。
-        en: Indicates selection completed, failed, was cancelled, or partial, not candidate relevance conclusion.
-        ja: selection が completed、failed、cancelled、partial のどれかを示し、candidate relevance conclusion ではありません。
-      allowed_values: [completed, failed, cancelled, partial]
-      pattern: null
-      example_value: completed
-      source_claims: [claim-topk-provenance]
-    - id: ranking_operation_id
-      labels:
-        zh: 排序操作标识
-        en: ranking operation ID
-        ja: ランキング操作 ID
-      definitions:
-        zh: 标识同一 top-k 截取执行的通用排序操作身份，不复用为候选集、结果或分数标识。
-        en: Identifies the same top-k truncation execution as a general ranking operation and is not reused as a candidate-set, result, or score ID.
-        ja: 同じ top-k truncation execution を一般の ranking operation として識別し、candidate-set、result、score ID として再利用しない。
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: []
-      pattern: '^ranking-[A-Za-z0-9._-]+$'
-      example_value: ranking-top-k-18
-      source_claims: [claim-topk-subtype]
-    - id: input_candidate_set_ref
-      labels:
-        zh: 输入候选集引用
-        en: input candidate set reference
-        ja: input candidate set 参照
-      definitions:
-        zh: 指向包含 input_result_ref 所截取候选的 CandidateSet，不由 k 值或输出数量反推。
-        en: Points to the CandidateSet whose candidates are truncated from input_result_ref and is not inferred from k or output count.
-        ja: input_result_ref から切り詰める candidate を含む CandidateSet を指し、k や output count から推論しない。
-      datatype: reference
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: []
-      pattern: '^candidate-set-[A-Za-z0-9._-]+$'
-      example_value: candidate-set-support-ranked-18
-      source_claims: [claim-topk-provenance]
-    - id: ranking_method_ref
-      labels:
-        zh: 排序方法引用
-        en: ranking method reference
-        ja: ranking method 参照
-      definitions:
-        zh: 指向此 top-k 截取依赖的确定排序依据或方法版本，不等同于 k 值或最终上下文顺序。
-        en: Points to the deterministic ordering basis or method revision used for top-k truncation and is not k or final context order.
-        ja: top-k truncation に使う決定的 ordering basis または method revision を指し、k や最終 context order ではない。
-      datatype: reference
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: []
-      pattern: '^[A-Za-z][A-Za-z0-9._-]+$'
-      example_value: bm25-descending-v1
-      source_claims: [claim-topk-provenance]
-    - id: ranking_status
-      labels:
-        zh: 排序状态
-        en: ranking status
-        ja: ranking status
-      definitions:
-        zh: 指示 top-k 排序截取是否完成、失败、取消或部分完成，不等同于候选相关性或上下文选择状态。
-        en: Indicates whether top-k ranking truncation completed, failed, was cancelled, or partially completed and is not candidate relevance or context-selection status.
-        ja: top-k ranking truncation が completed、failed、cancelled、partial のどれかを示し、candidate relevance や context-selection status ではない。
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: [completed, failed, cancelled, partial]
-      pattern: null
-      example_value: completed
-      source_claims: [claim-topk-provenance]
-    - id: retrieval_activity_id
-      labels:
-        zh: 检索活动标识
-        en: retrieval activity ID
-        ja: retrieval activity ID
-      definitions:
-        zh: 标识同一 top-k 截取执行的通用检索活动身份，不复用为请求、候选、分数或结果标识。
-        en: Identifies the same top-k execution as a general retrieval activity and is not reused as a request, candidate, score, or result ID.
-        ja: 同じ top-k execution を一般の retrieval activity として識別し、request、candidate、score、result ID として再利用しない。
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: []
-      pattern: '^retrieval-activity-[A-Za-z0-9._-]+$'
-      example_value: retrieval-activity-top-k-18
-      source_claims: [claim-topk-subtype]
-    - id: request_ref
-      labels:
-        zh: 请求引用
-        en: request reference
-        ja: request 参照
-      definitions:
-        zh: 指向输入结果和输出结果实际服务的 RetrievalRequest，不能由所选数量或候选内容反推。
-        en: Points to the RetrievalRequest actually served by the input and output results and cannot be inferred from selected count or candidate content.
-        ja: input と output result が実際に処理した RetrievalRequest を指し、selected count や candidate content から推論しない。
-      datatype: reference
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: []
-      pattern: '^retrieval-request-[A-Za-z0-9._-]+$'
-      example_value: retrieval-request-support-18
-      source_claims: [claim-topk-provenance]
-    - id: implementation_ref
-      labels:
-        zh: 实现引用
-        en: implementation reference
-        ja: implementation 参照
-      definitions:
-        zh: 指向执行该确定排序和截取的检索或排序实现版本，不等同于 k 或已选数量。
-        en: Points to the retrieval or ranking implementation revision executing deterministic ordering and truncation, not k or selected count.
-        ja: 決定的 ordering と truncation を実行する retrieval または ranking implementation revision を指し、k や selected count ではない。
-      datatype: reference
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: []
-      pattern: '^retrieval-impl-[A-Za-z0-9._-]+$'
-      example_value: retrieval-impl-top-k-v1
-      source_claims: [claim-topk-faiss]
-    - id: started_at
-      labels:
-        zh: 开始时间
-        en: started at
-        ja: 開始時刻
-      definitions:
-        zh: 记录 top-k 检索活动开始的时间，不能由输入结果或输出结果的创建时间替代。
-        en: Records when this top-k retrieval activity began and cannot be substituted by input-result or output-result creation time.
-        ja: この top-k retrieval activity の開始時刻を記録し、input-result または output-result の作成時刻では代替できない。
-      datatype: datetime
-      required: true
-      cardinality: {min: 1, max: 1}
+        zh: 声明边界分数并列时如何保持确定顺序。
+        en: Declares how deterministic order is preserved when scores tie at the cutoff.
+        ja: cutoffでscore同値の場合の決定的順序を宣言します。
       allowed_values: []
       pattern: null
-      example_value: '2026-07-19T03:20:00Z'
-      source_claims: [claim-topk-provenance]
-    - id: execution_status
-      labels:
-        zh: 执行状态
-        en: execution status
-        ja: execution status
-      definitions:
-        zh: 提供 top-k 活动的粗粒度运行、完成或失败状态；详细取消和部分完成由 ranking_status 与 selection_status 保留。
-        en: Provides coarse running, completed, or failed status for top-k while ranking_status and selection_status retain cancellation and partial-completion detail.
-        ja: top-k の coarse な running、completed、failed 状態を示し、cancelled と partial の詳細は ranking_status と selection_status に保持する。
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: [running, completed, failed]
-      pattern: null
-      example_value: completed
-      source_claims: [claim-topk-provenance]
-  constraints:
-    - id: topk-inherits-ranking-and-retrieval-fields
-      severity: error
-      expression_language: plain
-      expression: TopKSelection is one RankingOperation and RetrievalActivity record. top_k_selection_id, ranking_operation_id, and retrieval_activity_id must resolve to the same execution; input_candidate_set_ref is the set represented by input_result_ref; ranking_method_ref resolves to ordering_basis_ref; request_ref is shared by input_result_ref and output_result_ref; implementation_ref executes that method; and ranking_status plus execution_status are the generic lifecycle projections of selection_status.
-      explanation:
-        zh: top-k 是排序和检索活动的真实特化；截取参数和专用状态细化同一执行记录，不能替代父类的请求、输入、方法、实现和生命周期事实。
-        en: Top-k is a real ranking and retrieval specialization; its truncation parameters and detailed status refine one execution record and cannot replace inherited request, input, method, implementation, or lifecycle facts.
-        ja: top-k は真の ranking および retrieval 特殊化であり、truncation parameter と詳細 status は一つの execution record を細化する。継承した request、input、method、implementation、lifecycle fact を置き換えてはならない。
-      source_claims: [claim-topk-subtype, claim-topk-provenance]
-    - id: topk-order-and-bound
-      severity: error
-      expression_language: plain
-      expression: input_result_ref, positive k, ordering_basis_ref, and selection_status are required. A completed selection requires output_result_ref and selected_count not greater than k; output preserves the input ordering basis and cannot insert unranked candidates.
-      explanation:
-        zh: top-k 是已有顺序的有界前缀；没有顺序或超出 k 的输出不能称为该活动。
-        en: Top-k is a bounded prefix of existing order; output with no order or more than k items cannot be this activity.
-        ja: top-k は既存 order の有界 prefix であり、order のない output や k を超える item を持つ output はこの activity ではありません。
-      source_claims: [claim-topk-provenance]
-    - id: topk-not-rerank-or-context-selection
-      severity: error
-      expression_language: plain
-      expression: TopKSelection must not assert score recomputation, model rerank, multi-list fusion, candidate recall, ContextPackage inclusion, model visibility, or answer correctness.
-      explanation:
-        zh: 选择只截断已有排序；重新评分、重排、融合、召回和上下文装配都是独立阶段。
-        en: Selection truncates existing order only; rescoring, rerank, fusion, recall, and context assembly are independent stages.
-        ja: selection は既存 order を切り詰めるだけで、rescoring、rerank、fusion、recall、context assembly は独立 stage です。
-      source_claims: [claim-topk-boundary]
-  required_relations: []
+      example_value: stable-candidate-id
+      source_claims:
+        - claim-top-k-selection-004
+  constraints: []
+  required_relation_constraints: []
 examples:
-  - id: topk-example-positive
-
-    labels: {zh: 从重排结果选择前五项, en: Select first five from reranked result, ja: reranked result から最初の五を選択}
-
+  - id: TopKSelection-example-positive-manual-001
+    kind: positive
+    labels:
+      zh: 前 K 项选择正例
+      en: "Positive case: Top-K selection"
+      ja: 上位K件選択正例
+    scenario_id: null
     descriptions:
-      zh: Lewis RAG p(y|x)=Σ_z p(z|x)·p(y|x,z)；HyDE 假设文档 embedding；RAPTOR 树检索；Self-RAG [Retrieve] adaptive；Generative Agents score=α·recency+β·importance+γ·relevance。
-      en: Lewis RAG p(y|x)=Σ_z p(z|x)·p(y|x,z); HyDE hypothetical doc embedding; RAPTOR tree retrieval; Self-RAG [Retrieve] adaptive; Generative Agents score=α·recency+β·importance+γ·relevance.
-      ja: Lewis RAG p(y|x,z)。HyDE 仮説 doc embedding。RAPTOR tree retrieval。Self-RAG [Retrieve]。Generative Agents score 公式。
+      zh: topk-417 从已排序的 80 个候选中稳定保留前 12 个。
+      en: topk-417 stably retains the first 12 candidates from an ordered set of 80.
+      ja: topk-417 はordered 80 candidateから安定して上位12件を保持します。
     field_values:
-      top_k_selection_id: top-k-18
-      ranking_operation_id: ranking-top-k-18
-      retrieval_activity_id: retrieval-activity-support-18
-      request_ref: retrieval-request-support-18
-      input_result_ref: retrieval-result-reranked-18
-      input_candidate_set_ref: candidate-set-support-18
-      k: 5
-      ordering_basis_ref: rerank-score-desc-v1
-      ranking_method_ref: top-k-by-rerank-v1
-      implementation_ref: faiss-search-top-k-v1
-      output_result_ref: retrieval-result-top5-18
-      started_at: "2026-07-19T01:00:04Z"
-      selected_count: 5
-      selection_status: completed
-      ranking_status: completed
-      execution_status: completed
-    related_node_ids: [TopKSelection, RankingOperation, RetrievalResult]
-    related_relation_ids: [TopKSelection-is_a-RankingOperation, TopKSelection-uses-RetrievalResult, TopKSelection-generates-RetrievalResult]
-
-    source_claims: [claim-topk-faiss, claim-topk-provenance]
-  - id: topk-example-counterexample-unordered
-
-    labels: {zh: 无序集合任取五项, en: Arbitrarily take five from unordered set, ja: unordered set から任意の五を取る}
-
-    descriptions:
-      zh: 反例：RetrievalResult 候选无 TopKSelection/token budget 直接全量进 ContextPackage。
-      en: Counterexample: RetrievalResult candidates enter ContextPackage without TopKSelection/token budget.
-      ja: 反例：RetrievalResult candidate が TopKSelection/token budget なしで ContextPackage 全量進入。
-    field_values:
-      input_result_ref: null
-      k: 5
-      ordering_basis_ref: null
-      selected_count: 5
-    related_node_ids: [TopKSelection]
+      selection_activity_id: topk-417
+      k: 12
+      tie_break_policy: stable-candidate-id
+      ranking_operation_id: topk-417
+      input_candidate_set_id: candidate-set-reranked-416
+      activity_id: topk-417
+      started_at: 2026-07-16T12:05:00Z
+    related_node_ids:
+      - TopKSelection
     related_relation_ids: []
-
-    source_claims: [claim-topk-boundary]
-  - id: topk-example-boundary-rerank
-
-    labels: {zh: 重新计算并更新排序, en: Recompute and update ranking, ja: 再計算して ranking を更新する}
-
+    expected_result:
+      zh: 归类为 TopKSelection。
+      en: Classify the object as TopKSelection.
+      ja: TopKSelection として分類します。
+    why_valid_or_invalid:
+      zh: 输入顺序已存在，活动只决定保留边界及并列处理。
+      en: The input order already exists; the activity only determines the retained boundary and tie handling.
+      ja: input orderは既にありactivityは保持境界とtie handlingだけを決めます。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-top-k-selection-005
+  - id: TopKSelection-example-boundary-manual-001
+    kind: boundary
+    labels:
+      zh: 前 K 项选择边界例
+      en: "Boundary case: Top-K selection"
+      ja: 上位K件選択境界例
+    scenario_id: null
     descriptions:
-      zh: IndexBuildRun 离线索引 vs RetrievalRun 在线查询；RAG-Sequence vs RAG-Token 变体边界。
-      en: IndexBuildRun offline index vs RetrievalRun online query; RAG-Sequence vs RAG-Token variant boundary.
-      ja: IndexBuildRun offline vs RetrievalRun online。RAG-Sequence vs RAG-Token 境界。
-    field_values:
-      reranker_model_ref: cross-encoder-ms-marco-v1
-      input_candidate_set_ref: candidate-set-support-18
-      k: null
-      output_result_ref: retrieval-result-reranked-18
-    related_node_ids: [TopKSelection, RerankActivity]
+      zh: context-select-417 因 token 预算排除排名第 3 的长文档。
+      en: context-select-417 excludes the third-ranked long document because of a token budget.
+      ja: context-select-417 はtoken budgetでrank 3のlong documentを除外します。
+    field_values: {}
+    related_node_ids:
+      - TopKSelection
     related_relation_ids: []
-
-    source_claims: [claim-topk-boundary]
-  - id: topk-example-instance-faiss
-
-    labels: {zh: 实例：限制最近邻数量, en: "Instance: bound nearest-neighbor count", ja: "事例：nearest-neighbor count を制限"}
-
-    descriptions:
-      zh: pgvector ORDER BY embedding <=> query LIMIT 20；Anthropic Contextual Retrieval top-20 + rerank → top-5 context。
-      en: pgvector ORDER BY embedding <=> query LIMIT 20; Anthropic Contextual Retrieval top-20 + rerank → top-5 context.
-      ja: pgvector <=> LIMIT 20。Anthropic Contextual Retrieval top-20+rerank→top-5 context。
-    field_values:
-      top_k_selection_id: top-k-faiss-21
-      ranking_operation_id: ranking-top-k-21
-      retrieval_activity_id: retrieval-activity-knn-21
-      request_ref: retrieval-request-knn-21
-      input_result_ref: retrieval-result-knn-21
-      input_candidate_set_ref: candidate-set-knn-21
-      k: 20
-      ordering_basis_ref: faiss-distance-asc-v1
-      ranking_method_ref: faiss-distance-top-k-v1
-      implementation_ref: faiss-search-v1
-      output_result_ref: retrieval-result-top20-21
-      started_at: "2026-07-19T02:00:04Z"
-      selected_count: 20
-      selection_status: completed
-      ranking_status: completed
-      execution_status: completed
-    related_node_ids: [TopKSelection, RetrievalResult]
-    related_relation_ids: [TopKSelection-is_a-RankingOperation]
-    source_claims: [claim-topk-faiss]
+    expected_result:
+      zh: 不得归类为 TopKSelection。
+      en: Do not classify the object as TopKSelection.
+      ja: TopKSelection として分類しません。
+    why_valid_or_invalid:
+      zh: 这是上下文采用决策，不是按检索顺序截取 TopK。
+      en: This is context admission, not Top-K truncation by retrieval order.
+      ja: context admissionでretrieval orderによるTop-K truncationではありません。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-top-k-selection-006
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation: []
 parent_relation:
   id: TopKSelection-is_a-RankingOperation
   predicate: is_a
-  target: concept:RankingOperation
-  endpoint_order: child-to-parent
-  direction: source-to-target
+  direction: target-to-source
   relation_kind: hierarchy
   labels:
-    zh: 是排序操作的前 K 选择子类
-    en: is a top-k selection subtype of ranking operation
-    ja: RankingOperation の Top-K 選択下位型である
+    zh: 是一种RankingOperation
+    en: is a RankingOperation
+    ja: RankingOperationの一種
   definitions:
-    zh: TopKSelection is_a RankingOperation，表示每次对已排序候选作有界前缀选择都是一种排序阶段活动。
-    en: TopKSelection is_a RankingOperation means every bounded prefix selection over ranked candidates is ranking-stage activity.
-    ja: TopKSelection is_a RankingOperation は、ranked candidate に対する各 bounded prefix selection が ranking-stage activity であることを表します。
+    zh: TopKSelection —is_a→ RankingOperation 成立，因为它在既有顺序上按 k 与并列策略确定保留范围。
+    en: TopKSelection —is_a→ RankingOperation holds because it determines the retained range from k and tie policy over an existing order.
+    ja: TopKSelection —is_a→ RankingOperation は既存順序上でkとtie policyから保持範囲を決めるため成立します。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 分类关系不规定 k 的具体值，运行字段提供该值。
-    en: Classification does not prescribe a concrete k value; run field provides it.
-    ja: 分類関係は具体的 k value を規定せず、run field がそれを提供します。
+    zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
+    en: The relation is decided per auditable fact; no universal runtime cardinality is imposed at ontology level.
+    ja: このrelationはaudit可能fact単位で判定しontology層で一律runtime cardinalityを課しません。
   inverse_reading:
-    predicate: has_top_k_selection_subtype
-    labels: {zh: 具有前 K 选择子类, en: has top-k selection subtype, ja: Top-K 選択下位型を持つ}
-  conditions: []
+    predicate: part_of
+    labels:
+      zh: 反向读取
+      en: inverse is_a
+      ja: 逆方向読取
+  conditions:
+    - id: TopKSelection-is_a-RankingOperation-condition-manual-001
+      severity: error
+      expression_language: plain
+      expression: "Assert only when the instance satisfies the complete RankingOperation definition and the child differentia: it determines the retained range from k and tie policy over an existing order."
+      explanations:
+        zh: 仅当实例既满足 RankingOperation 的完整定义，又满足子类种差“它在既有顺序上按 k 与并列策略确定保留范围。”时建立该边。
+        en: "Assert only when the instance satisfies the complete RankingOperation definition and the child differentia: it determines the retained range from k and tie policy over an existing order."
+        ja: instanceがRankingOperation完全定義とchild differentia「既存順序上でkとtie policyから保持範囲を決める」を共に満たす時だけassertします。
+      source_claims:
+        - claim-top-k-selection-007
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples: []
-  source_claims: [claim-topk-subtype]
-  distinct_fact_rationale:
-    zh: 此关系表达活动类型归属，不表达评分计算、重排模型、候选召回、融合或上下文装配。
-    en: This relation expresses activity type membership, not score computation, reranker model, candidate recall, fusion, or context assembly.
-    ja: この関係は activity type membership を表し、score computation、reranker model、candidate recall、fusion、context assembly は表しません。
+  examples:
+    - id: TopKSelection-is_a-RankingOperation-example-positive-manual-001
+      kind: positive
+      labels:
+        zh: 是一种RankingOperation正例
+        en: "Positive case: is a RankingOperation"
+        ja: RankingOperationの一種正例
+      scenario_id: null
+      descriptions:
+        zh: topk-417 稳定保留前 12 个候选。
+        en: topk-417 stably retains the first 12 candidates.
+        ja: topk-417が上位12 candidateを安定保持します。
+      field_values: {}
+      related_node_ids:
+        - TopKSelection
+        - RankingOperation
+      related_relation_ids:
+        - TopKSelection-is_a-RankingOperation
+      expected_result:
+        zh: 建立该有向事实，并保留条件与证据。
+        en: Assert the directed fact with its condition and evidence retained.
+        ja: condition/evidenceを保持してdirected factをassertします。
+      why_valid_or_invalid:
+        zh: 实例满足端点定义、方向和该关系的显式成立条件。
+        en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
+        ja: endpoint定義・direction・明示assertion conditionを満たします。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-top-k-selection-007
+    - id: TopKSelection-is_a-RankingOperation-example-boundary-manual-001
+      kind: boundary
+      labels:
+        zh: 是一种RankingOperation边界例
+        en: "Boundary case: is a RankingOperation"
+        ja: RankingOperationの一種境界例
+      scenario_id: null
+      descriptions:
+        zh: context-select-417 因 token 预算排除候选。
+        en: context-select-417 excludes a candidate because of token budget.
+        ja: context-select-417はtoken budgetでcandidateを除外します。
+      field_values: {}
+      related_node_ids:
+        - TopKSelection
+        - RankingOperation
+      related_relation_ids:
+        - TopKSelection-is_a-RankingOperation
+      expected_result:
+        zh: 验证器不得建立该有向关系事实。
+        en: Do not assert the directed fact.
+        ja: directed factをassertしません。
+      why_valid_or_invalid:
+        zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
+        en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
+        ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-top-k-selection-007
+  source_claims:
+    - claim-top-k-selection-007
+  distinct_fact_rationale: null
   layout_role: primary-backbone
+  review_status: pending
+  endpoint_order: child-to-parent
 relations:
-  - id: TopKSelection-uses-RetrievalResult
-    predicate: uses
-    target: concept:RetrievalResult
-    endpoint_order: source-to-target
+  - id: TopKSelection-selects_from-CandidateSet
+    predicate: selects_from
     direction: source-to-target
-    relation_kind: causal
-    labels: {zh: 使用排序结果, en: uses ranked retrieval result, ja: ranked retrieval result を使用する}
+    relation_kind: information
+    labels:
+      zh: selects_from CandidateSet
+      en: selects_from CandidateSet
+      ja: CandidateSetをselects_from
     definitions:
-      zh: 仅当 input_result_ref 指向目标且选择活动实际读取其顺序时，TopKSelection 使用该结果。
-      en: TopKSelection uses RetrievalResult only when input_result_ref identifies it and the selection actually reads its ordering.
-      ja: input_result_ref が対象を識別し、selection がその ordering を実際に読み取った場合にだけ、TopKSelection は RetrievalResult を使用します。
-    cardinality:
-      source: {min: 1, max: 1}
-      target: {min: 0, max: null}
-    cardinality_not_applicable_reason: null
-    inverse_reading:
-      predicate: is_used_by_top_k_selection
-      labels: {zh: 被前 K 选择使用, en: is used by top-k selection, ja: Top-K 選択に使用される}
-    conditions: []
-    temporal_scope: valid-time
-    boundary_context: null
-    constraints: []
-    examples: []
-    source_claims: [claim-topk-provenance]
-    distinct_fact_rationale: "This records actual input-result use, not composition of a result into an activity."
-    layout_role: cross-link
-  - id: TopKSelection-generates-RetrievalResult
-    predicate: generates
-    target: concept:RetrievalResult
-    endpoint_order: source-to-target
-    direction: source-to-target
-    relation_kind: causal
-    labels: {zh: 生成有界检索结果, en: generates bounded retrieval result, ja: 有界 retrieval result を生成する}
-    definitions:
-      zh: 仅当 output_result_ref 指向目标且选择完成时，TopKSelection 生成该有界结果。
-      en: TopKSelection generates RetrievalResult only when output_result_ref identifies it and selection completed.
-      ja: output_result_ref が対象を識別し selection が完了した場合にだけ、TopKSelection は RetrievalResult を生成します。
+      zh: TopKSelection —selects_from→ CandidateSet 表示TopK 活动在此已排序集合上应用 k 与并列策略以确定保留范围。
+      en: TopKSelection —selects_from→ CandidateSet states that the Top-K activity applies k and tie policy to this ordered set to determine the retained range.
+      ja: TopKSelection —selects_from→ CandidateSet はTop-K activityがこのordered setへk/tie policyを適用し保持範囲を決めます。
     cardinality: null
     cardinality_not_applicable_reason:
-      zh: 一个选择通常产生一个有界结果；批处理可记录多个明确输出。
-      en: One selection normally produces one bounded result; batch may record multiple explicit outputs.
-      ja: 一つの selection は通常一つの bounded result を生成し、batch では複数の明示的 output を記録できます。
+      zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
+      en: The relation is decided per auditable fact; no universal runtime cardinality is imposed at ontology level.
+      ja: このrelationはaudit可能fact単位で判定しontology層で一律runtime cardinalityを課しません。
     inverse_reading:
-      predicate: is_generated_by_top_k_selection
-      labels: {zh: 由前 K 选择生成, en: is generated by top-k selection, ja: Top-K 選択により生成される}
-    conditions: []
+      predicate: inverse_selects_from
+      labels:
+        zh: 反向读取
+        en: inverse selects_from
+        ja: 逆方向読取
+    conditions:
+      - id: TopKSelection-selects_from-CandidateSet-condition-manual-001
+        severity: error
+        expression_language: plain
+        expression: Assert only when the set already has deterministic order and selection.k matches the output membership boundary.
+        explanations:
+          zh: 仅当集合已有确定顺序且 selection.k 与输出成员边界一致时建立。
+          en: Assert only when the set already has deterministic order and selection.k matches the output membership boundary.
+          ja: setがdeterministic orderを持ちselection.kがoutput membership boundaryと一致する時だけassertします。
+        source_claims:
+          - claim-top-k-selection-008
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
-    examples: []
-    source_claims: [claim-topk-provenance]
-    distinct_fact_rationale: "This is causal bounded-result generation, not hierarchy or composition with the activity."
+    examples:
+      - id: TopKSelection-selects_from-CandidateSet-example-positive-manual-001
+        kind: positive
+        labels:
+          zh: selects_from CandidateSet正例
+          en: "Positive case: selects_from CandidateSet"
+          ja: CandidateSetをselects_from正例
+        scenario_id: null
+        descriptions:
+          zh: topk-417 selects_from candidate-set-423。
+          en: topk-417 selects from candidate-set-423.
+          ja: topk-417がcandidate-set-423からselectします。
+        field_values: {}
+        related_node_ids:
+          - TopKSelection
+          - CandidateSet
+        related_relation_ids:
+          - TopKSelection-selects_from-CandidateSet
+        expected_result:
+          zh: 建立该有向事实，并保留条件与证据。
+          en: Assert the directed fact with its condition and evidence retained.
+          ja: condition/evidenceを保持してdirected factをassertします。
+        why_valid_or_invalid:
+          zh: 实例满足端点定义、方向和该关系的显式成立条件。
+          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
+          ja: endpoint定義・direction・明示assertion conditionを満たします。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-top-k-selection-008
+      - id: TopKSelection-selects_from-CandidateSet-example-boundary-manual-001
+        kind: boundary
+        labels:
+          zh: selects_from CandidateSet边界例
+          en: "Boundary case: selects_from CandidateSet"
+          ja: CandidateSetをselects_from境界例
+        scenario_id: null
+        descriptions:
+          zh: 按 token 预算跳过高排名候选不是 TopK。
+          en: Skipping a high-ranked candidate for token budget is not Top-K selection.
+          ja: token budgetでhigh-ranked candidateをskipするのはTop-K selectionではありません。
+        field_values: {}
+        related_node_ids:
+          - TopKSelection
+          - CandidateSet
+        related_relation_ids:
+          - TopKSelection-selects_from-CandidateSet
+        expected_result:
+          zh: 验证器不得建立该有向关系事实。
+          en: Do not assert the directed fact.
+          ja: directed factをassertしません。
+        why_valid_or_invalid:
+          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
+          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
+          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-top-k-selection-008
+    source_claims:
+      - claim-top-k-selection-008
+    distinct_fact_rationale: null
     layout_role: cross-link
-sources:
-  - id: faiss-index-api
-    title: FAISS Index API
-    source_type: official-project-documentation
-    url: https://faiss.ai/cpp_api/struct/structfaiss_1_1Index.html
-    relevance: Documents k nearest-neighbor search returning distance and label arrays.
-  - id: w3c-prov-o
-    title: "W3C PROV-O: The PROV Ontology"
-    source_type: standard
-    url: https://www.w3.org/TR/prov-o/
-    relevance: Distinguishes activities from entities they use and generate.
+    review_status: accepted
+    target: concept:CandidateSet
+review:
+  status: accepted
+  method: manual-semantic
+  reviewer: manual-memory-retrieval-verification
+  reviewed_on: 2026-07-17
+  note:
+    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
+    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
+    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
+  sections:
+    semantics: accepted
+    hierarchy: accepted
+    relations: accepted
+    structure: accepted
+    examples: accepted
+    source_claims: accepted
 source_claims:
-  - id: claim-topk-faiss
-    source: faiss-index-api
-    supports: FAISS documents search with a k argument and nearest-neighbor distance and label output. Moonweave treats applying a declared k to an existing ordering as a bounded selection activity.
-    locator: "faiss::Index search method"
-    evidence_kind: ontology-design-inference
+  - id: claim-top-k-selection-001
+    source: eng-search-elastic-rrf
+    supports: Elasticsearch documents rank windows and final result-size truncation after fusion; Moonweave models the auditable truncation execution separately from rank fusion.
+    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-topk-boundary
-    source: faiss-index-api
-    supports: FAISS documents bounded nearest-neighbor output. Moonweave distinguishes top-k truncation from recall, rescoring, reranking, fusion, ContextPackage inclusion, and answer quality.
-    locator: "faiss::Index search method"
-    evidence_kind: ontology-design-inference
+    review_status: accepted
+  - id: claim-top-k-selection-002
+    source: eng-search-elastic-rrf
+    supports: "Elasticsearch documents rank windows and final result-size truncation after fusion; Moonweave models the auditable truncation execution separately from rank fusion. Moonweave records TopKSelection.selection_activity_id as the stated auditable datum: Stable identifier for one Top-K truncation execution."
+    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-topk-provenance
-    source: w3c-prov-o
-    supports: PROV-O distinguishes activities from entities they use and generate. Moonweave applies this to TopKSelection input and bounded output RetrievalResults.
-    locator: "PROV-O: Activity, Entity, prov:used, and prov:wasGeneratedBy"
-    evidence_kind: ontology-design-inference
+    review_status: accepted
+  - id: claim-top-k-selection-003
+    source: eng-search-elastic-rrf
+    supports: "Elasticsearch documents rank windows and final result-size truncation after fusion; Moonweave models the auditable truncation execution separately from rank fusion. Moonweave records TopKSelection.k as the stated auditable datum: Declares the maximum number of candidates retained."
+    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-topk-subtype
-    source: faiss-index-api
-    supports: Modeling bounded prefix selection over ordered candidates as TopKSelection subtype of RankingOperation is a Moonweave taxonomy inference.
-    locator: "faiss::Index search method"
-    evidence_kind: ontology-design-inference
-    confidence: medium
+    review_status: accepted
+  - id: claim-top-k-selection-004
+    source: eng-search-elastic-rrf
+    supports: "Elasticsearch documents rank windows and final result-size truncation after fusion; Moonweave models the auditable truncation execution separately from rank fusion. Moonweave records TopKSelection.tie_break_policy as the stated auditable datum: Declares how deterministic order is preserved when scores tie at the cutoff."
+    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-top-k-selection-005
+    source: eng-search-elastic-rrf
+    supports: Elasticsearch documents rank windows and final result-size truncation after fusion; Moonweave models the auditable truncation execution separately from rank fusion. Elasticsearch documents result-set truncation after RRF using a configured result size and rank window.
+    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-top-k-selection-006
+    source: eng-search-elastic-rrf
+    supports: Elasticsearch documents rank windows and final result-size truncation after fusion; Moonweave models the auditable truncation execution separately from rank fusion. The retrieval source describes result truncation, not downstream context-budget admission.
+    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-top-k-selection-007
+    source: eng-search-elastic-rrf
+    supports: The official documentation supports the operational distinction used in this child differentia; Moonweave's TopKSelection-to-RankingOperation subclass placement is an explicit ontology design decision.
+    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-top-k-selection-008
+    source: eng-search-elastic-rrf
+    supports: The cited official documentation supports the endpoint roles and direction of this retrieval fact; the exact relation identifier and ownership boundary are Moonweave design decisions.
+    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted

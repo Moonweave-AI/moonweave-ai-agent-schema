@@ -1,0 +1,473 @@
+schema: moonweave.ai/ontology-node/v1
+id: ResourceSubscription
+kind: concept
+status: review
+labels:
+  zh: MCP 资源订阅
+  en: MCP resource subscription
+  ja: MCP リソース購読
+semantics:
+  short_definition:
+    zh: 客户端针对一个资源 URI 建立并维持的 MCP 更新订阅状态。
+    en: An MCP update-subscription state established and maintained by a client for one resource URI.
+    ja: client が一つの resource URI に対して確立・維持する MCP update subscription state。
+  definition:
+    zh: MCP 资源订阅是一种 MCPSubscription，在协商出 resources.subscribe 能力且客户端成功发送 `resources/subscribe` 后，以会话内 subscription_id 持续记录一个订阅 URI 的活动范围；服务器可对该 URI 或其文档化子资源发送 `notifications/resources/updated`，订阅由 `resources/unsubscribe` 或会话关闭终止。它不是 ResourceDefinition、请求消息或 list_changed。
+    en: An MCP resource subscription is an MCPSubscription identified by a session-scoped subscription_id after resources.subscribe capability negotiation and a successful resources/subscribe. It keeps an active scope for one subscribed URI; the server may send notifications/resources/updated for that URI or a documented sub-resource, and resources/unsubscribe or session closure ends the state. It is not a ResourceDefinition, request message, or list_changed notification.
+    ja: MCP resource subscription は resources.subscribe capability 交渉と successful resources/subscribe 後、session-scoped subscription_id で識別される MCPSubscription です。一 subscribed URI の active scope を保持し、その URI または文書化 sub-resource への notifications/resources/updated を受け、resources/unsubscribe/session close で終了します。ResourceDefinition・request・list_changed ではありません。
+  why_needed:
+    zh: 它把具体 URI 的持续订阅状态从请求、资源定义和列表失效通知中拆开，使更新通知能回溯到准确目标与有效生命周期。
+    en: It separates durable per-URI state from requests, resource definitions, and list invalidation so each update notification can be traced to the exact target and active lifecycle.
+    ja: URI ごとの durable state を request・resource definition・list invalidation から分け、各 update notification を正確な target と active lifecycle へ追跡できるようにします。
+  includes:
+    - zh: 纳入会话内由成功 `resources/subscribe` 建立、绑定一个 URI、可接收对应 updated 通知并由 unsubscribe 或会话结束终止的状态记录。
+      en: Includes session state established by a successful `resources/subscribe`, bound to one URI, eligible for matching updated notifications, and terminated by unsubscribe or session end.
+      ja: 成功した `resources/subscribe` で確立し、一 URI に束縛され、対応 updated notification を受け、unsubscribe または session end で終了する state record を含みます。
+  excludes:
+    - zh: 排除 subscribe/unsubscribe 请求消息、ResourceDefinition、单次 `resources/read`、resources capability，以及无需逐 URI 建订的 `notifications/resources/list_changed`。
+      en: Excludes subscribe and unsubscribe request messages, ResourceDefinition, one-time `resources/read`, the resources capability, and `notifications/resources/list_changed`, which requires no per-URI subscription.
+      ja: subscribe/unsubscribe request message、ResourceDefinition、単発 `resources/read`、resources capability、URI ごとの subscribe を要しない `notifications/resources/list_changed` を除きます。
+  semantic_kind: information
+  aliases: []
+structure:
+  identity_keys:
+    - subscription_id
+  fields:
+    - id: resource_uri
+      labels:
+        zh: 订阅 URI
+        en: subscribed URI
+        ja: subscribed URI
+      datatype: uri
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 成功 resources/subscribe 的 params.uri；它定义通知覆盖范围的根，但通知 URI 可为服务器文档化的子资源。
+        en: The params.uri from the successful resources/subscribe. It is the root of the notification scope, while a notification URI may identify a server-documented sub-resource.
+        ja: successful resources/subscribe の params.uri で notification scope の root ですが、notification URI は server-documented sub-resource でも構いません。
+      allowed_values: []
+      pattern: null
+      example_value: file:///repo
+      source_claims:
+        - claim-resource-subscription-002
+  constraints:
+    - id: resource-subscription-lifecycle-interval
+      severity: error
+      expression_language: plain
+      expression: status=active REQUIRES ended_at to be absent; status=ended REQUIRES ended_at >= established_at; only active subscriptions may match resource-updated notifications.
+      explanations:
+        zh: active 时 ended_at 必须为空；ended 时 ended_at 必须存在且不早于 established_at；只有 active 订阅可匹配更新通知。
+        en: ended_at is absent while active; ended subscriptions require ended_at at or after established_at; only active subscriptions match update notifications.
+        ja: active では ended_at は absent、ended では established_at 以後の ended_at が required、update notification は active subscription のみ matching します。
+      source_claims:
+        - claim-resource-subscription-003
+  required_relation_constraints:
+    - id: resource-subscription-targets-one-resource-definition
+      direction: outgoing
+      predicate: subscribes_to
+      target_concept_id: ResourceDefinition
+      cardinality:
+        min: 1
+        max: 1
+      explanations:
+        zh: 每个订阅状态必须关联一个其 URI 与 resource_uri 相同的 ResourceDefinition；子资源更新通过通知关系覆盖，不改变订阅目标身份。
+        en: Each subscription state must reference one ResourceDefinition whose URI equals resource_uri; sub-resource updates are covered by the notification relation and do not change target identity.
+        ja: 各 subscription state は resource_uri と同じ URI の ResourceDefinition 一つを参照し、sub-resource update は notification relation が扱い target identity を変えません。
+      source_claims:
+        - claim-resource-subscription-004
+examples:
+  - id: resource-subscription-positive-schema-updates
+    kind: positive
+    labels:
+      zh: 订阅 schema.json 更新
+      en: Subscribe to schema.json updates
+      ja: schema.json update を subscribe
+    scenario_id: null
+    descriptions:
+      zh: 客户端在会话 `s-42` 中订阅 `file:///repo`；服务器声明该 URI 覆盖仓库文件，并随后对其子资源 `file:///repo/schema.json` 发送 updated 通知，直至客户端退订。
+      en: In session `s-42`, a client subscribes to `file:///repo`. The server documents repository files as sub-resources and later emits an updated notification for `file:///repo/schema.json` until the client unsubscribes.
+      ja: session `s-42` で client が `file:///repo` を subscribe し、server は repository file を sub-resource と文書化して `file:///repo/schema.json` の updated notification を送り、client unsubscribe まで続きます。
+    field_values:
+      subscription_id: resource-subscription:s-42:repo
+      session_id: mcp-session-s-42
+      target_ref: resource:file:///repo
+      resource_uri: file:///repo
+      status: active
+      established_at: 2026-07-16T08:00:00Z
+    related_node_ids:
+      - ResourceSubscription
+      - MCPSubscription
+      - ResourceDefinition
+      - MCPResourceUpdatedNotification
+    related_relation_ids:
+      - ResourceSubscription-is_a-MCPSubscription
+      - ResourceSubscription-subscribes_to-ResourceDefinition
+      - MCPResourceUpdatedNotification-updates-ResourceSubscription
+    expected_result:
+      zh: 建立一条 active ResourceSubscription，并把同 URI 的 updated 通知关联到它。
+      en: An active ResourceSubscription is established and the same-URI updated notification is linked to it.
+      ja: active ResourceSubscription を確立し、同 URI の updated notification を関連付けます。
+    why_valid_or_invalid:
+      zh: 具有明确订阅者、单一 URI、建订事件、匹配通知和可终止生命周期。
+      en: It has a specific subscriber, one URI, an establishment event, a matching notification, and a terminable lifecycle.
+      ja: 特定 subscriber、一 URI、establishment event、matching notification、終了可能 lifecycle を持ちます。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-resource-subscription-005
+  - id: resource-subscription-boundary-list-changed
+    kind: boundary
+    labels:
+      zh: 资源列表变化不等于 URI 订阅
+      en: Resource-list change is not a URI subscription
+      ja: resource-list change は URI subscription ではない
+    scenario_id: null
+    descriptions:
+      zh: 服务器因资源目录增加条目而发送 `notifications/resources/list_changed`；客户端此前没有对任何 URI 执行 `resources/subscribe`，所以该通知只使列表缓存失效，不形成 ResourceSubscription。
+      en: A server emits `notifications/resources/list_changed` after adding a directory entry; the client has never issued `resources/subscribe` for any URI, so the notification invalidates the list cache but creates no ResourceSubscription.
+      ja: server が resource directory entry 追加後に `notifications/resources/list_changed` を送りましたが、client はどの URI にも `resources/subscribe` していません。notification は list cache を invalidate するだけで ResourceSubscription を作りません。
+    field_values:
+      notification: notifications/resources/list_changed
+      resource_uri: null
+      subscribe_request_seen: false
+    related_node_ids:
+      - ResourceSubscription
+      - MCPResourceList
+      - MCPNotification
+    related_relation_ids: []
+    expected_result:
+      zh: 刷新资源列表，但订阅状态集合保持为空。
+      en: The resource list is refreshed while the subscription-state set remains empty.
+      ja: resource list を refresh し、subscription-state set は空のままです。
+    why_valid_or_invalid:
+      zh: 列表变化通知没有单一目标 URI，也没有建立资源订阅所需的 subscribe 请求。
+      en: A list-change notification has no single target URI and no subscribe request that could establish resource-subscription state.
+      ja: list-change notification は単一 target URI も subscription state を確立する subscribe request も持ちません。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-resource-subscription-006
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation: []
+parent_relation:
+  id: ResourceSubscription-is_a-MCPSubscription
+  predicate: is_a
+  direction: target-to-source
+  relation_kind: hierarchy
+  labels:
+    zh: ResourceSubscription是一种MCPSubscription
+    en: ResourceSubscription is a MCPSubscription
+    ja: ResourceSubscriptionがMCPSubscriptionを一種である
+  definitions:
+    zh: ResourceSubscription 是 MCPSubscription 的严格子型；其必要身份差异是：MCP 资源订阅是一种信息记录，也是 MCP 订阅（MCPSubscription）的严格子型；它在客户端成功发送 `resources/subscribe` 后针对一个资源 URI 持续存在，接受同 URI 的 `notifications/resources/updated`，并由 `resources/unsubscribe` 或会话关闭终止；它不是 ResourceDefinition、请求消息或 list_changed。
+    en: "ResourceSubscription is a strict subtype of MCPSubscription; its necessary identity differentia is: An MCP resource subscription is an information record and strict MCPSubscription subtype that persists for one resource URI after a successful resources/subscribe, receives notifications/resources/updated for that URI, and ends with resources/unsubscribe or session closure. It is not a ResourceDefinition, request message, or list_changed notification."
+    ja: ResourceSubscription は MCPSubscription の strict subtype であり、必要な identity differentia は次の通りです：MCP resource subscription は MCPSubscription の一種で successful resources/subscribe 後一 URI に存続し同 URI の notifications/resources/updated を受け、resources/unsubscribe/session close で終了します。ResourceDefinition・request・list_changed ではありません。
+  cardinality: null
+  cardinality_not_applicable_reason:
+    zh: 该边记录满足协议前提的可查询事实；规范没有为所有实现规定一项统一本体基数。
+    en: The edge records a queryable fact when its protocol preconditions hold; the specification does not impose one ontology cardinality across all implementations.
+    ja: protocol prerequisite 成立時の照会可能 fact を記録し、specification は全 implementation に単一 ontology cardinality を課しません。
+  inverse_reading:
+    predicate: part_of
+    labels:
+      zh: MCPSubscription反向关联ResourceSubscription
+      en: MCPSubscription is the inverse target of ResourceSubscription
+      ja: MCPSubscriptionからResourceSubscriptionへの逆読解
+  conditions: []
+  temporal_scope: timeless
+  boundary_context: null
+  constraints: []
+  examples:
+    - id: ResourceSubscription-is_a-MCPSubscription-example-positive-001
+      kind: positive
+      labels:
+        zh: ResourceSubscription-is_a-MCPSubscription 正例
+        en: Positive case for ResourceSubscription-is_a-MCPSubscription
+        ja: ResourceSubscription-is_a-MCPSubscription の正例
+      scenario_id: null
+      descriptions:
+        zh: 客户端在会话 `s-42` 中对 `file:///repo/schema.json` 发送 `resources/subscribe`；服务器随后针对同一 URI 发出 `notifications/resources/updated`，直至客户端退订。
+        en: In session `s-42`, a client sends `resources/subscribe` for `file:///repo/schema.json`; the server later emits `notifications/resources/updated` for the same URI until the client unsubscribes.
+        ja: session `s-42` で client が `file:///repo/schema.json` に `resources/subscribe` を送り、client が unsubscribe するまで server が同じ URI へ `notifications/resources/updated` を送ります。
+      field_values: {}
+      related_node_ids:
+        - ResourceSubscription
+        - MCPSubscription
+      related_relation_ids:
+        - ResourceSubscription-is_a-MCPSubscription
+      expected_result:
+        zh: 建立 ResourceSubscription-is_a-MCPSubscription，并保留所述协议方向与条件。
+        en: Assert ResourceSubscription-is_a-MCPSubscription with the stated protocol direction and conditions.
+        ja: ResourceSubscription-is_a-MCPSubscription を stated protocol direction/condition 付きで確立します。
+      why_valid_or_invalid:
+        zh: 仅当对象满足 ResourceSubscription 的全部身份条件时，才能沿 is_a 归入 MCPSubscription。
+        en: Assert the subtype edge only when the object satisfies every identity condition of ResourceSubscription.
+        ja: object が ResourceSubscription の全 identity condition を満たす時だけ is_a edge を確立します。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-resource-subscription-007
+    - id: ResourceSubscription-is_a-MCPSubscription-example-boundary-001
+      kind: boundary
+      labels:
+        zh: ResourceSubscription-is_a-MCPSubscription 边界例
+        en: Boundary case for ResourceSubscription-is_a-MCPSubscription
+        ja: ResourceSubscription-is_a-MCPSubscription の境界例
+      scenario_id: null
+      descriptions:
+        zh: 服务器因资源目录增加条目而发送 `notifications/resources/list_changed`；客户端此前没有对任何 URI 执行 `resources/subscribe`，所以该通知只使列表缓存失效，不形成 ResourceSubscription。
+        en: A server emits `notifications/resources/list_changed` after adding a directory entry; the client has never issued `resources/subscribe` for any URI, so the notification invalidates the list cache but creates no ResourceSubscription.
+        ja: server が resource directory entry 追加後に `notifications/resources/list_changed` を送りましたが、client はどの URI にも `resources/subscribe` していません。notification は list cache を invalidate するだけで ResourceSubscription を作りません。
+      field_values: {}
+      related_node_ids:
+        - ResourceSubscription
+        - MCPSubscription
+      related_relation_ids:
+        - ResourceSubscription-is_a-MCPSubscription
+      expected_result:
+        zh: 不得建立 ResourceSubscription-is_a-MCPSubscription；保留实际出现的较宽或相邻事实。
+        en: Do not assert ResourceSubscription-is_a-MCPSubscription; retain the broader or adjacent fact actually present.
+        ja: ResourceSubscription-is_a-MCPSubscription を確立せず、実際の broader/adjacent fact を保持します。
+      why_valid_or_invalid:
+        zh: ResourceSubscription 的边界例缺少该子型所需的 method、方向、载荷或状态，不能凭共享词汇归入该子型。
+        en: The ResourceSubscription boundary case lacks the method, direction, payload, or state required by the subtype and cannot be classified through shared vocabulary.
+        ja: ResourceSubscription boundary case は subtype に必要な method・direction・payload・state を欠き、shared vocabulary だけで分類できません。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-resource-subscription-007
+  source_claims:
+    - claim-resource-subscription-007
+  distinct_fact_rationale:
+    zh: ResourceSubscription-is_a-MCPSubscription 只在其方法、方向、载荷或类型条件成立时记录；它不等于端点共现、反向捷径或词形相似。
+    en: ResourceSubscription-is_a-MCPSubscription records only the reviewed method, direction, payload, or subtype condition; it is not endpoint co-occurrence, a redundant inverse shortcut, or lexical similarity.
+    ja: ResourceSubscription-is_a-MCPSubscription は reviewed method・direction・payload・subtype condition のみを記録し、endpoint 共起・redundant inverse shortcut・lexical similarity ではありません。
+  layout_role: primary-backbone
+  review_status: accepted
+  endpoint_order: child-to-parent
+relations:
+  - id: ResourceSubscription-subscribes_to-ResourceDefinition
+    predicate: subscribes_to
+    direction: source-to-target
+    relation_kind: information
+    labels:
+      zh: ResourceSubscription订阅ResourceDefinition
+      en: ResourceSubscription subscribes to ResourceDefinition
+      ja: ResourceSubscriptionがResourceDefinitionを購読する
+    definitions:
+      zh: ResourceSubscription 在协商 resources.subscribe 能力且 resources/subscribe 成功后，以 subscription.resource_uri 指向一个 URI 相等的 ResourceDefinition 作为订阅范围根；该关系的有效期持续到 unsubscribe 或会话结束。子资源更新由 updates 关系表达，资源曾被列出或读取不等于已订阅。
+      en: After resources.subscribe capability negotiation and a successful resources/subscribe, ResourceSubscription points from subscription.resource_uri to one ResourceDefinition with the equal URI as the subscription-scope root. The relation remains valid until unsubscribe or session end; sub-resource updates are expressed by the updates relation, and prior listing or reading is not subscription.
+      ja: resources.subscribe capability 交渉と successful resources/subscribe 後、ResourceSubscription は subscription.resource_uri と同じ URI の ResourceDefinition 一つを subscription-scope root として指します。validity は unsubscribe/session end までで、sub-resource update は updates relation が表し、listing/read は subscription ではありません。
+    cardinality:
+      source:
+        min: 1
+        max: null
+      target:
+        min: 1
+        max: 1
+    cardinality_not_applicable_reason: null
+    inverse_reading:
+      predicate: has_subscription
+      labels:
+        zh: ResourceDefinition反向关联ResourceSubscription
+        en: ResourceDefinition is the inverse target of ResourceSubscription
+        ja: ResourceDefinitionからResourceSubscriptionへの逆読解
+    conditions:
+      - id: resource-subscription-successful-establishment
+        severity: error
+        expression_language: plain
+        expression: A resources/subscribe request for subscription.resource_uri MUST have completed successfully after resources.subscribe capability negotiation.
+        explanations:
+          zh: 必须先协商 resources.subscribe 能力，并成功完成针对 resource_uri 的 resources/subscribe。
+          en: The resources.subscribe capability must be negotiated and resources/subscribe for resource_uri must complete successfully.
+          ja: resources.subscribe capability を交渉し resource_uri の resources/subscribe が成功完了しなければなりません。
+        source_claims:
+          - claim-resource-subscription-008
+      - id: resource-subscription-definition-uri-correlation
+        severity: error
+        expression_language: plain
+        expression: subscription.resource_uri MUST equal ResourceDefinition.uri; this relation selects the subscription-scope root, while sub-resource coverage belongs to update notifications.
+        explanations:
+          zh: subscription.resource_uri 必须等于 ResourceDefinition.uri；该边选择订阅范围根，子资源覆盖由更新通知处理。
+          en: subscription.resource_uri must equal ResourceDefinition.uri; this edge selects the scope root while update notifications handle sub-resource coverage.
+          ja: subscription.resource_uri は ResourceDefinition.uri と一致し、この edge は scope root を選び sub-resource coverage は update notification が扱います。
+        source_claims:
+          - claim-resource-subscription-009
+    temporal_scope: valid-time
+    boundary_context:
+      trust_boundary_concept_id: TrustBoundary
+      authority_basis:
+        zh: ResourceSubscription 与 ResourceDefinition 保持各自本体所有权；此边只记录已核验的 MCP 协议事实，不转移定义权或授权。
+        en: ResourceSubscription and ResourceDefinition retain their ontology owners; this edge records only a verified MCP protocol fact and transfers neither definitional ownership nor authorization.
+        ja: ResourceSubscription と ResourceDefinition は各 ontology owner を維持し、この edge は verified MCP protocol fact のみを記録して定義所有権や認可を移転しません。
+      protocol_or_resource_context:
+        zh: 订阅请求成功，URI 解析到该资源定义，且当前时间处于订阅有效期。
+        en: The subscribe request succeeded, URI resolves to the resource definition, and current time lies within the subscription's valid interval.
+        ja: subscribe request 成功、URI が resource definition に解決し current time が subscription valid interval 内です。
+    constraints: []
+    examples:
+      - id: ResourceSubscription-subscribes_to-ResourceDefinition-example-positive-001
+        kind: positive
+        labels:
+          zh: ResourceSubscription-subscribes_to-ResourceDefinition 正例
+          en: Positive case for ResourceSubscription-subscribes_to-ResourceDefinition
+          ja: ResourceSubscription-subscribes_to-ResourceDefinition の正例
+        scenario_id: null
+        descriptions:
+          zh: 对 file:///repo/schema.json 的 subscribe 成功后，订阅链接到同 URI 资源定义。
+          en: After subscribe succeeds for file:///repo/schema.json, the subscription links to the definition with that URI.
+          ja: file:///repo/schema.json subscribe 成功後 subscription が同 URI definition に結び付きます。
+        field_values: {}
+        related_node_ids:
+          - ResourceSubscription
+          - ResourceDefinition
+        related_relation_ids:
+          - ResourceSubscription-subscribes_to-ResourceDefinition
+        expected_result:
+          zh: 建立 ResourceSubscription-subscribes_to-ResourceDefinition，并保留所述协议方向与条件。
+          en: Assert ResourceSubscription-subscribes_to-ResourceDefinition with the stated protocol direction and conditions.
+          ja: ResourceSubscription-subscribes_to-ResourceDefinition を stated protocol direction/condition 付きで確立します。
+        why_valid_or_invalid:
+          zh: 订阅请求成功，URI 解析到该资源定义，且当前时间处于订阅有效期。
+          en: The subscribe request succeeded, URI resolves to the resource definition, and current time lies within the subscription's valid interval.
+          ja: subscribe request 成功、URI が resource definition に解決し current time が subscription valid interval 内です。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-resource-subscription-010
+      - id: ResourceSubscription-subscribes_to-ResourceDefinition-example-boundary-001
+        kind: boundary
+        labels:
+          zh: ResourceSubscription-subscribes_to-ResourceDefinition 边界例
+          en: Boundary case for ResourceSubscription-subscribes_to-ResourceDefinition
+          ja: ResourceSubscription-subscribes_to-ResourceDefinition の境界例
+        scenario_id: null
+        descriptions:
+          zh: resources/list 展示 schema.json，但客户端没有发送 resources/subscribe。
+          en: resources/list shows schema.json, but the client sends no resources/subscribe request.
+          ja: resources/list は schema.json を表示しますが client は resources/subscribe を送りません。
+        field_values: {}
+        related_node_ids:
+          - ResourceSubscription
+          - ResourceDefinition
+        related_relation_ids:
+          - ResourceSubscription-subscribes_to-ResourceDefinition
+        expected_result:
+          zh: 不得建立 ResourceSubscription-subscribes_to-ResourceDefinition；保留实际出现的较宽或相邻事实。
+          en: Do not assert ResourceSubscription-subscribes_to-ResourceDefinition; retain the broader or adjacent fact actually present.
+          ja: ResourceSubscription-subscribes_to-ResourceDefinition を確立せず、実際の broader/adjacent fact を保持します。
+        why_valid_or_invalid:
+          zh: 可发现性不创建订阅状态，必须有成功订阅事务。
+          en: Discoverability creates no subscription state; a successful subscription transaction is required.
+          ja: discoverability は subscription state を作らず successful subscribe transaction が必要です。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-resource-subscription-010
+    source_claims:
+      - claim-resource-subscription-011
+    distinct_fact_rationale:
+      zh: ResourceSubscription-subscribes_to-ResourceDefinition 只在其方法、方向、载荷或类型条件成立时记录；它不等于端点共现、反向捷径或词形相似。
+      en: ResourceSubscription-subscribes_to-ResourceDefinition records only the reviewed method, direction, payload, or subtype condition; it is not endpoint co-occurrence, a redundant inverse shortcut, or lexical similarity.
+      ja: ResourceSubscription-subscribes_to-ResourceDefinition は reviewed method・direction・payload・subtype condition のみを記録し、endpoint 共起・redundant inverse shortcut・lexical similarity ではありません。
+    layout_role: cross-link
+    review_status: accepted
+    target: concept:ResourceDefinition
+review:
+  status: accepted
+  method: manual-mcp-spec-verification
+  reviewer: manual-mcp-spec-verification
+  reviewed_on: 2026-07-17
+  note:
+    zh: 已对照 MCP 2025-11-25 规范（生命周期、传输、授权、能力协商、JSON-RPC 消息、资源订阅）完成人工语义核验。
+    en: Manually verified against MCP 2025-11-25 (lifecycle, transports, authorization, capability negotiation, JSON-RPC messages, resource subscriptions).
+    ja: MCP 2025-11-25 仕様（ライフサイクル、トランスポート、認可、能力協議、JSON-RPC メッセージ、リソース購読）に照らして手動意味審査を完了しました。
+  sections:
+    semantics: accepted
+    hierarchy: accepted
+    relations: accepted
+    structure: accepted
+    examples: accepted
+    source_claims: accepted
+source_claims:
+  - id: claim-resource-subscription-001
+    source: eng-proto-mcp-2025-spec
+    supports: MCP 2025-11-25 defines subscribe and unsubscribe requests by URI, gates them on the resources.subscribe capability, and allows an updated notification URI to identify a sub-resource of the subscribed resource.
+    locator: MCP 2025-11-25 > Server Features > Resources > Capabilities, Subscriptions, and Resource Updated Notification
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-resource-subscription-002
+    source: eng-proto-mcp-2025-spec
+    supports: SubscribeRequest requires params.uri, and an updated notification may identify a sub-resource of the subscribed resource.
+    locator: MCP 2025-11-25 > Server Features > Resources > Subscriptions; Resource Updated Notification
+    evidence_kind: normative
+    confidence: high
+    review_status: accepted
+  - id: claim-resource-subscription-003
+    source: eng-proto-mcp-2025-spec
+    supports: MCP resource subscriptions are established by subscribe and cease after unsubscribe; Moonweave makes the valid-time interval explicit.
+    locator: MCP 2025-11-25 > Server Features > Resources > Subscriptions and Unsubscribing
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-resource-subscription-004
+    source: eng-proto-mcp-2025-spec
+    supports: SubscribeRequest targets one resource URI. Moonweave links the resulting state to the resource definition for that subscribed URI.
+    locator: MCP 2025-11-25 > Schema Reference > SubscribeRequest.params.uri
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-resource-subscription-005
+    source: eng-proto-mcp-2025-spec
+    supports: MCP 2025-11-25 requires prior subscription for updated notifications and explicitly allows the notified URI to be a sub-resource of the subscribed resource.
+    locator: MCP 2025-11-25 > Server Features > Resources > Subscriptions; Resource Updated Notification
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-resource-subscription-006
+    source: eng-proto-mcp-resources-2025-06-18
+    supports: The official MCP Resources specification separates concrete resources, URI templates, reads, list-change notifications, and per-resource subscriptions. Only notifications/resources/updated is tied to a subscribed URI; notifications/resources/list_changed invalidates discovery without creating a subscription.
+    locator: MCP Resources > Listing, Reading, Templates, List Changed, Subscriptions, and Resource Updated Notification
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-resource-subscription-007
+    source: eng-proto-mcp-resources-2025-06-18
+    supports: "The official MCP Resources specification separates concrete resources, URI templates, reads, list-change notifications, and per-resource subscriptions. Only notifications/resources/updated is tied to a subscribed URI; notifications/resources/list_changed invalidates discovery without creating a subscription. For this reviewed edge, the operational reading is: ResourceSubscription is a strict subtype of MCPSubscription; its necessary identity differentia is: An MCP resource subscription is an information record and strict MCPSubscription subtype that persists for one resource URI after a successful resources/subscribe, receives notifications/resources/updated for that URI, and ends with resources/unsubscribe or session closure. It is not a ResourceDefinition, request message, or list_changed notification."
+    locator: MCP Resources > Listing, Reading, Templates, List Changed, Subscriptions, and Resource Updated Notification
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-resource-subscription-008
+    source: eng-proto-mcp-2025-spec
+    supports: MCP exposes resource subscription only when the server declares the subscribe capability and the client sends resources/subscribe.
+    locator: MCP 2025-11-25 > Server Features > Resources > Capabilities and Subscriptions
+    evidence_kind: normative
+    confidence: high
+    review_status: accepted
+  - id: claim-resource-subscription-009
+    source: eng-proto-mcp-2025-spec
+    supports: SubscribeRequest.params.uri identifies the resource being subscribed to. Moonweave correlates that URI to its ResourceDefinition.
+    locator: MCP 2025-11-25 > Schema Reference > SubscribeRequest.params.uri
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-resource-subscription-010
+    source: eng-proto-mcp-resources-2025-06-18
+    supports: "The official MCP Resources specification separates concrete resources, URI templates, reads, list-change notifications, and per-resource subscriptions. Only notifications/resources/updated is tied to a subscribed URI; notifications/resources/list_changed invalidates discovery without creating a subscription. For this reviewed edge, the operational reading is: ResourceSubscription subscribes to one ResourceDefinition identified by the exact same URI after successful resources/subscribe and remains active until unsubscribe or session end; prior listing or reading is not subscription."
+    locator: MCP Resources > Listing, Reading, Templates, List Changed, Subscriptions, and Resource Updated Notification
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-resource-subscription-011
+    source: eng-proto-mcp-2025-spec
+    supports: MCP 2025-11-25 establishes subscription state for one SubscribeRequest.params.uri after capability negotiation. Moonweave links that state to the ResourceDefinition whose URI is the subscribed scope root; sub-resource updates remain notification facts.
+    locator: MCP 2025-11-25 > Schema Reference > SubscribeRequest.params.uri; Server Features > Resources > Subscriptions
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted

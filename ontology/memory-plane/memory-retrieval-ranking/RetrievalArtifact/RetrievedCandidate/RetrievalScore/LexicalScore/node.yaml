@@ -3,389 +3,325 @@ id: LexicalScore
 kind: concept
 status: accepted
 labels:
-  zh: 词法分数
+  zh: 词汇匹配分数
   en: Lexical score
-  ja: 語彙スコア
+  ja: 語彙一致score
 semantics:
   short_definition:
-    zh: 词项或文本匹配方法为一个检索候选产生的数值分数。
-    en: A numeric retrieval score that a term or text-matching method assigns to one candidate.
-    ja: term または text-matching method が一つの retrieval candidate に割り当てる numeric score。
+    zh: 由词项、稀疏表示或文本匹配方法为候选产生的检索分数。
+    en: A retrieval score produced for a candidate by term, sparse-representation, or textual-matching methods.
+    ja: term・sparse representation・text matching methodがcandidateに生成するretrieval scoreです。
   definition:
-    zh: >
-      LexicalScore 是由 BM25、TF-IDF、精确词项匹配或其他声明的词法方法为一个 RetrievedCandidate 产生的 RetrievalScore。
-      它记录产生分数的方法、候选和配置上下文。它不是 TextEmbedding 或向量相似度、交叉编码器重排分数、融合分数、
-      也不是“第 1 名”这样的排序位置。
-    en: >
-      A LexicalScore is the RetrievalScore assigned to one RetrievedCandidate by BM25, TF-IDF,
-      exact term matching, or another declared lexical method. It records the method, candidate, and
-      configuration context that produced the value. It is not a TextEmbedding or vector similarity,
-      a cross-encoder rerank score, a fused score, or an ordinal position such as “rank 1.”
-    ja: >
-      LexicalScore は BM25・TF-IDF・exact term matching・その他の宣言済み lexical method が一つの
-      RetrievedCandidate に付与する RetrievalScore です。value を生成した method・candidate・configuration context を
-      記録します。TextEmbedding・vector similarity・cross-encoder rerank score・fused score・「rank 1」のような
-      ordinal position ではありません。
+    zh: LexicalScore 是 RetrievalScore 的严格子类，其数值语义由 BM25、TF-IDF、稀疏向量或其他词汇匹配方法确定；它不是向量相似度、重排模型分数或排名位置。
+    en: LexicalScore is the strict RetrievalScore subtype whose numeric meaning is defined by BM25, TF-IDF, sparse-vector, or another lexical-matching method. It is not vector similarity, reranker output, or rank position.
+    ja: LexicalScore はBM25・TF-IDF・sparse vector等lexical matching methodが数値意味を決めるstrict RetrievalScore subtypeです。vector similarity・reranker output・rank positionではありません。
   why_needed:
-    zh: 词法证据对标识符和精确术语尤其重要；保存方法和原始量纲可防止与相似度或重排分数无依据混算。
-    en: Lexical evidence is especially important for identifiers and exact terms; retaining method and native scale prevents unjustified mixing with similarity or rerank scores.
-    ja: lexical evidence は identifier・exact term に特に重要で、method と native scale を保持すると similarity・rerank score との根拠なき混算を防げます。
+    zh: 保留词汇评分的量纲和方法，使其在融合前不会与相似度或重排分数直接混算。
+    en: Preserves lexical scoring scale and method so it is not directly mixed with similarity or rerank scores before fusion.
+    ja: lexical scoreのscale/methodを保持しfusion前にsimilarity/rerank scoreと直接混算しません。
   includes:
-    - zh: BM25、TF-IDF、稀疏词项模型和精确文本匹配为候选产生的原始分数及其方法配置引用。
-      en: Native candidate scores from BM25, TF-IDF, sparse term models, and exact text matching with a reference to their method configuration.
-      ja: BM25・TF-IDF・sparse term model・exact text matching が candidate に生成する native score と method configuration reference。
+    - zh: 纳入 BM25、TF-IDF、稀疏文本向量和精确词项匹配产生的候选分数。
+      en: Includes candidate scores from BM25, TF-IDF, sparse text vectors, and exact term matching.
+      ja: BM25・TF-IDF・sparse text vector・exact term matching由来candidate scoreを含みます。
   excludes:
-    - zh: 稠密向量余弦或点积、RerankScore、多个分数融合后的结果、只有位置没有算法分数的排名，以及候选文本本身。
-      en: Dense-vector cosine or dot product, RerankScore, result after multi-score fusion, a rank with no algorithmic score, and candidate text itself.
-      ja: dense-vector cosine・dot product、RerankScore、multi-score fusion の結果、algorithmic score のない rank、candidate text 自体。
+    - zh: 排除稠密向量相似度、交叉编码器输出、融合得分和 ordinal rank。
+      en: Excludes dense-vector similarity, cross-encoder output, fusion scores, and ordinal rank.
+      ja: dense-vector similarity・cross-encoder output・fusion score・ordinal rankを除外します。
   semantic_kind: quality
-  aliases: [BM25 score, keyword score, sparse retrieval score]
-engineering:
-  explanation:
-    zh: >
-      文本搜索引擎可对查询与候选字段应用 BM25 并在搜索响应中返回 _score。该数值需要连同字段、
-      方法和配置保存；将其与向量或重排分数结合属于之后的融合或重排阶段，不修改原始 LexicalScore。
-    en: >
-      A text search engine can apply BM25 to a query and a candidate field and return _score in the
-      search response. Persist the value with its field, method, and configuration; combining it with
-      vector or rerank scores is a later fusion or reranking stage and does not mutate the original LexicalScore.
-    ja: >
-      text search engine は query と candidate field に BM25 を適用し search response に _score を返せる。
-      値は field method configuration と共に保持する。vector または rerank score との結合は後続の fusion または reranking であり
-      元の LexicalScore を変更しない。
-  typical_input:
-    - description: Lexical retrieval query
-      format: |
-        GET /support_docs/_search?explain=true
-        {
-          "query": {
-            "query_string": {
-              "query": "Error code TS-999",
-              "default_field": "body"
-            }
-          }
-        }
-  typical_output:
-    - description: Candidate score returned by a BM25-backed text search
-      format: |
-        {
-          "hits": {
-            "hits": [
-              {"_id":"chunk-ts999","_score":11.42,"_explanation":{"description":"BM25 score"}}
-            ]
-          }
-        }
-        # -> LexicalScore(candidate_id="chunk-ts999", lexical_method="bm25", raw_value=11.42)
-  reference_implementations:
-    - name: Elasticsearch similarity settings
-      url: https://www.elastic.co/docs/reference/elasticsearch/index-settings/similarity
-      description: Official documentation for BM25 similarity and its field-level scoring configuration.
-    - name: Anthropic Contextual Retrieval
-      url: https://www.anthropic.com/engineering/contextual-retrieval
-      description: Documents BM25 exact-match retrieval alongside embedding-based semantic retrieval.
+  aliases: []
 structure:
-  identity_keys: [score_id]
+  identity_keys:
+    - score_id
   fields:
     - id: score_id
-      labels: {zh: 分数标识, en: score ID, ja: score ID}
+      labels:
+        zh: 分数标识
+        en: score ID
+        ja: score ID
       datatype: string
       required: true
-      cardinality: {min: 1, max: 1}
+      cardinality:
+        min: 1
+        max: 1
       definitions:
-        zh: 稳定标识一次候选、方法和配置组合的词法评分记录。
-        en: Stably identifies one lexical-scoring record for a candidate, method, and configuration combination.
-        ja: candidate・method・configuration の組合せに対する一つの lexical-scoring record を安定識別します。
+        zh: 继承并标识一次词汇评分记录。
+        en: Inherited identifier for one lexical-score record.
+        ja: 一lexical-score recordを継承識別します。
       allowed_values: []
       pattern: null
-      example_value: lexical-ts999-01
-      source_claims: [claim-lexical-score-method]
-    - id: candidate_id
-      labels: {zh: 候选标识, en: candidate ID, ja: candidate ID}
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      definitions:
-        zh: 指向收到该词法分数的 RetrievedCandidate，而不是原始 Chunk 或整个索引。
-        en: Points to the RetrievedCandidate that received this lexical score, not to a raw Chunk or the whole index.
-        ja: raw Chunk や index 全体ではなく、この lexical score を受けた RetrievedCandidate を指します。
-      allowed_values: []
-      pattern: null
-      example_value: candidate-ts999
-      source_claims: [claim-lexical-score-method]
+      example_value: lexical-score-428
+      source_claims:
+        - claim-lexical-score-002
     - id: lexical_method
-      labels: {zh: 词法方法, en: lexical method, ja: lexical method}
+      labels:
+        zh: 词汇方法
+        en: lexical method
+        ja: 語彙方式
       datatype: string
       required: true
-      cardinality: {min: 1, max: 1}
+      cardinality:
+        min: 1
+        max: 1
       definitions:
-        zh: 声明产生该值的词法匹配算法，以防止把不同评分语义当作相同量纲。
-        en: Declares the lexical-matching algorithm that produced the value, preventing different scoring semantics from being treated as one scale.
-        ja: value を生成した lexical-matching algorithm を宣言し、異なる scoring semantics を一つの scale と扱うことを防ぎます。
-      allowed_values: [bm25, tf_idf, exact_term_match, sparse_term]
+        zh: 声明产生数值的词汇匹配算法。
+        en: Declares the lexical-matching algorithm producing the value.
+        ja: valueを生成するlexical-matching algorithmを宣言します。
+      allowed_values: []
       pattern: null
       example_value: bm25
-      source_claims: [claim-lexical-score-method]
-    - id: raw_value
-      labels: {zh: 原始分数, en: raw score value, ja: raw score value}
+      source_claims:
+        - claim-lexical-score-003
+    - id: numeric_value
+      labels:
+        zh: 词汇分数值
+        en: lexical score value
+        ja: 語彙score値
       datatype: number
       required: true
-      cardinality: {min: 1, max: 1}
+      cardinality:
+        min: 1
+        max: 1
       definitions:
-        zh: 声明的方法在其原生量纲上为该候选输出的数值，不是归一化融合结果。
-        en: Numeric value emitted for the candidate on the declared method's native scale, not a normalized fusion result.
-        ja: 宣言 method が candidate に出力した native scale の numeric value であり、normalized fusion result ではありません。
+        zh: 保存该词汇方法输出的原始分数。
+        en: Raw score emitted by the declared lexical method.
+        ja: 指定lexical methodが出力したraw scoreです。
       allowed_values: []
       pattern: null
       example_value: 11.42
-      source_claims: [claim-lexical-score-method]
-    - id: scoring_configuration_ref
-      labels: {zh: 评分配置引用, en: scoring configuration reference, ja: scoring configuration reference}
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      definitions:
-        zh: 指向词法方法、字段和参数配置，例如 BM25 的 k1 与 b，以说明原始值的解释范围。
-        en: References the method, field, and parameter configuration, such as BM25 k1 and b, that bounds interpretation of the raw value.
-        ja: raw value の解釈範囲を示す、BM25 k1・b などの method・field・parameter configuration を参照します。
-      allowed_values: []
-      pattern: null
-      example_value: support_docs.body.bm25-v1
-      source_claims: [claim-lexical-score-configuration]
-    - id: retrieval_score_id
-      labels:
-        zh: 评分标识
-        en: retrieval score ID
-        ja: retrieval score ID
-      definitions:
-        zh: 在同一候选和词法评分运行范围内稳定标识一条通用检索评分记录。
-        en: Stably identifies the same lexical score as a general retrieval-score record within one candidate and scoring-run scope.
-        ja: 一つの candidate と scoring-run の範囲内で、同じ lexical score を一般の retrieval-score record として安定識別する。
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: []
-      pattern: '^score-[A-Za-z0-9._-]+$'
-      example_value: score-lexical-ts999-01
-      source_claims: [claim-lexical-score-subtype]
-    - id: candidate_ref
-      labels:
-        zh: 候选引用
-        en: candidate reference
-        ja: candidate 参照
-      definitions:
-        zh: 指向拥有这条词法评分的 RetrievedCandidate，而不是原始 Chunk、查询或回答。
-        en: Points to the RetrievedCandidate owning this lexical score rather than a raw Chunk, query, or answer.
-        ja: raw Chunk、query、answer ではなく、この lexical score を持つ RetrievedCandidate を指す。
-      datatype: reference
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: []
-      pattern: null
-      example_value: candidate-ts999
-      source_claims: [claim-lexical-score-method]
-    - id: score_value
-      labels:
-        zh: 评分数值
-        en: score value
-        ja: score 値
-      definitions:
-        zh: 在声明词法方法和量表下为该候选产生的数值，未声明兼容量表时不可比较绝对大小。
-        en: Numeric value emitted for the candidate under the declared lexical method and scale and not comparable by magnitude without compatible scale.
-        ja: 宣言された lexical method と scale の下で candidate に出力された数値であり、互換 scale なしに絶対値を比較しない。
-      datatype: decimal
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: []
-      pattern: null
-      example_value: 11.42
-      source_claims: [claim-lexical-score-method]
-    - id: score_method
-      labels:
-        zh: 评分方法
-        en: score method
-        ja: score method
-      definitions:
-        zh: 声明产生该值的方法族为 lexical，而不是候选类型或最终融合策略。
-        en: Declares the method family producing this value as lexical rather than a candidate type or final fusion policy.
-        ja: 値を生成する method family を lexical として宣言し、candidate type や最終 fusion policy を表さない。
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: [lexical, similarity, rerank, fusion]
-      pattern: null
-      example_value: lexical
-      source_claims: [claim-lexical-score-method]
-    - id: score_scale
-      labels:
-        zh: 评分量表
-        en: score scale
-        ja: score scale
-      definitions:
-        zh: 声明词法数值的比较语义，例如 BM25 或 TF-IDF 配置，不能由裸数值推断。
-        en: Declares the comparison semantics of the lexical value, such as a BM25 or TF-IDF configuration, and cannot be inferred from a bare number.
-        ja: BM25 または TF-IDF configuration など lexical value の比較 semantics を宣言し、裸の数値から推論しない。
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: []
-      pattern: null
-      example_value: bm25-k1-1.2-b-0.75
-      source_claims: [claim-lexical-score-configuration]
-    - id: scoring_run_ref
-      labels:
-        zh: 评分运行引用
-        en: scoring run reference
-        ja: scoring run 参照
-      definitions:
-        zh: 指向产生词法评分的 CandidateScoringActivity 或运行记录，不表示候选已被采用或模型已使用。
-        en: Points to the CandidateScoringActivity or run that produced this lexical score and does not assert candidate adoption or model use.
-        ja: この lexical score を生成した CandidateScoringActivity または run を指し、candidate の採用や model use を主張しない。
-      datatype: reference
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: []
-      pattern: null
-      example_value: candidate-scoring-lexical-ts999-01
-      source_claims: [claim-lexical-score-configuration]
-  constraints:
-    - id: lexical-score-inherits-retrieval-score-fields
-      severity: error
-      expression_language: plain
-      expression: LexicalScore is one RetrievalScore record. retrieval_score_id and score_id must resolve to the same score; candidate_ref must resolve to candidate_id; score_value equals raw_value under score_scale; score_method must be lexical and resolve to lexical_method; and scoring_run_ref must identify the run using scoring_configuration_ref.
-      explanation:
-        zh: 词法评分是检索评分的真实特化；词法方法、原始数值和配置细化同一评分记录，不能省略候选、量表或计算运行来源。
-        en: A lexical score is a real retrieval-score specialization; its lexical method, raw value, and configuration refine one score record and cannot omit candidate, scale, or scoring-run provenance.
-        ja: LexicalScore は真の RetrievalScore 特殊化であり、lexical method、raw value、configuration は一つの score record を細化する。candidate、scale、scoring-run provenance を省略してはならない。
-      source_claims: [claim-lexical-score-subtype, claim-lexical-score-configuration]
-    - id: lexical-score-provenance-required
-      severity: error
-      expression_language: plain
-      expression: A LexicalScore must name one candidate, one declared lexical_method, and one scoring_configuration_ref; a bare number cannot be classified as a lexical score.
-      explanation:
-        zh: 没有候选、方法和配置，数值无法说明是哪个检索信号或如何产生。
-        en: Without candidate, method, and configuration, a number cannot establish which retrieval signal it is or how it was produced.
-        ja: candidate・method・configuration がなければ、number がどの retrieval signal でどう生成されたかを確定できません。
-      source_claims: [claim-lexical-score-configuration]
-    - id: lexical-score-not-vector-or-rerank
-      severity: error
-      expression_language: plain
-      expression: A score with cosine or dot-product semantics must be SimilarityScore, and a score from a reranker must be RerankScore; converting or fusing such values requires a separately recorded activity and output score.
-      explanation:
-        zh: 词法分数、向量相似度和重排分数使用不同的证据与量纲；融合或重排不能原地覆盖词法分数。
-        en: Lexical, vector-similarity, and rerank scores use different evidence and scales; fusion or reranking cannot overwrite the lexical score in place.
-        ja: lexical・vector-similarity・rerank score は異なる evidence・scale を使うため、fusion・reranking は lexical score を in-place で上書きできません。
-      source_claims: [claim-lexical-score-hybrid-boundary]
-  required_relations: []
+      source_claims:
+        - claim-lexical-score-004
+  constraints: []
+  required_relation_constraints: []
 examples:
-  - id: lexical-score-positive-example
-
-    labels: {zh: BM25 错误码分数, en: BM25 error-code score, ja: BM25 error-code score}
-
+  - id: LexicalScore-example-positive-manual-001
+    kind: positive
+    labels:
+      zh: 词汇匹配分数正例
+      en: "Positive case: Lexical score"
+      ja: 語彙一致score正例
+    scenario_id: null
     descriptions:
-      zh: Lewis RAG p(y|x)=Σ_z p(z|x)·p(y|x,z)；HyDE 假设文档 embedding；RAPTOR 树检索；Self-RAG [Retrieve] adaptive；Generative Agents score=α·recency+β·importance+γ·relevance。
-      en: Lewis RAG p(y|x)=Σ_z p(z|x)·p(y|x,z); HyDE hypothetical doc embedding; RAPTOR tree retrieval; Self-RAG [Retrieve] adaptive; Generative Agents score=α·recency+β·importance+γ·relevance.
-      ja: Lewis RAG p(y|x,z)。HyDE 仮説 doc embedding。RAPTOR tree retrieval。Self-RAG [Retrieve]。Generative Agents score 公式。
-    field_values: {score_id: lexical-ts999-01, retrieval_score_id: score-lexical-ts999-01, candidate_id: candidate-ts999, candidate_ref: candidate-ts999, lexical_method: bm25, raw_value: 11.42, score_value: 11.42, score_method: lexical, score_scale: bm25, scoring_configuration_ref: support_docs.body.bm25-v1, scoring_run_ref: lexical-scoring-run-ts999}
-    related_node_ids: [LexicalScore, RetrievedCandidate, RetrievalScore]
+      zh: lexical-score-428 记录 BM25 为 candidate-424 产生的 11.42。
+      en: lexical-score-428 records BM25 value 11.42 for candidate-424.
+      ja: lexical-score-428 はcandidate-424のBM25値11.42を記録します。
+    field_values:
+      score_id: lexical-score-428
+      lexical_method: bm25
+      numeric_value: 11.42
+      scoring_stage: lexical-recall
+    related_node_ids:
+      - LexicalScore
     related_relation_ids: []
-
-    source_claims: [claim-lexical-score-method]
-  - id: lexical-score-boundary-example
-
-    labels: {zh: 向量余弦相似度, en: Vector cosine similarity, ja: Vector cosine similarity}
-
+    expected_result:
+      zh: 归类为 LexicalScore。
+      en: Classify the object as LexicalScore.
+      ja: LexicalScore として分類します。
+    why_valid_or_invalid:
+      zh: 数值由明确词汇方法产生并保留原始量纲。
+      en: The value is produced by an explicit lexical method and retains its native scale.
+      ja: 明示lexical method由来でnative scaleを保持します。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-lexical-score-005
+  - id: LexicalScore-example-boundary-manual-001
+    kind: boundary
+    labels:
+      zh: 词汇匹配分数边界例
+      en: "Boundary case: Lexical score"
+      ja: 語彙一致score境界例
+    scenario_id: null
     descriptions:
-      zh: IndexBuildRun 离线索引 vs RetrievalRun 在线查询；RAG-Sequence vs RAG-Token 变体边界。
-      en: IndexBuildRun offline index vs RetrievalRun online query; RAG-Sequence vs RAG-Token variant boundary.
-      ja: IndexBuildRun offline vs RetrievalRun online。RAG-Sequence vs RAG-Token 境界。
-    field_values: {score_id: similarity-ts999-01, candidate_id: candidate-ts999, similarity_metric: cosine, raw_value: 0.77}
-    related_node_ids: [LexicalScore, SimilarityScore, TextEmbedding]
+      zh: similarity-score-428 保存 cosine similarity 0.77。
+      en: similarity-score-428 stores cosine similarity 0.77.
+      ja: similarity-score-428 はcosine similarity 0.77を保存します。
+    field_values: {}
+    related_node_ids:
+      - LexicalScore
     related_relation_ids: []
-
-    source_claims: [claim-lexical-score-hybrid-boundary]
-  - id: lexical-score-counterexample-example
-
-    labels: {zh: 只有排名位置, en: Ordinal rank only, ja: Ordinal rank only}
-
-    descriptions:
-      zh: 反例：RetrievalResult 候选无 TopKSelection/token budget 直接全量进 ContextPackage。
-      en: Counterexample: RetrievalResult candidates enter ContextPackage without TopKSelection/token budget.
-      ja: 反例：RetrievalResult candidate が TopKSelection/token budget なしで ContextPackage 全量進入。
-    field_values: {candidate_id: candidate-ts999, final_rank: 1, ranking_policy_ref: fusion-policy-v1}
-    related_node_ids: [LexicalScore, RetrievedCandidate, RetrievalScore]
-    related_relation_ids: []
-
-    source_claims: [claim-lexical-score-configuration]
-  - id: lexical-score-instance-example
-
-    labels: {zh: 实例：支持文档 BM25 分数, en: "Instance: support-document BM25 score", ja: "Instance: support-document BM25 score"}
-
-    descriptions:
-      zh: pgvector ORDER BY embedding <=> query LIMIT 20；Anthropic Contextual Retrieval top-20 + rerank → top-5 context。
-      en: pgvector ORDER BY embedding <=> query LIMIT 20; Anthropic Contextual Retrieval top-20 + rerank → top-5 context.
-      ja: pgvector <=> LIMIT 20。Anthropic Contextual Retrieval top-20+rerank→top-5 context。
-    field_values: {score_id: lexical-support-20260718-01, retrieval_score_id: score-lexical-support-20260718-01, candidate_id: candidate-reset-token, candidate_ref: candidate-reset-token, lexical_method: bm25, raw_value: 8.61, score_value: 8.61, score_method: lexical, score_scale: bm25, scoring_configuration_ref: support_docs.body.bm25-v1, scoring_run_ref: lexical-scoring-run-support-20260718-01}
-    related_node_ids: [LexicalScore, RetrievedCandidate, RetrievalQuery]
-    related_relation_ids: [LexicalScore-is_a-RetrievalScore]
-
-    source_claims: [claim-lexical-score-method]
+    expected_result:
+      zh: 不得归类为 LexicalScore。
+      en: Do not classify the object as LexicalScore.
+      ja: LexicalScore として分類しません。
+    why_valid_or_invalid:
+      zh: 它是 SimilarityScore，不是词汇匹配分数。
+      en: It is SimilarityScore, not a lexical score.
+      ja: SimilarityScoreでlexical scoreではありません。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-lexical-score-006
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation: []
 parent_relation:
   id: LexicalScore-is_a-RetrievalScore
   predicate: is_a
-  target: concept:RetrievalScore
-  endpoint_order: child-to-parent
-  direction: source-to-target
+  direction: target-to-source
   relation_kind: hierarchy
-  labels: {zh: 是检索分数的词法子类, en: is a lexical subtype of retrieval score, ja: lexical としての RetrievalScore 下位型である}
+  labels:
+    zh: 是一种RetrievalScore
+    en: is a RetrievalScore
+    ja: RetrievalScoreの一種
   definitions:
-    zh: LexicalScore 是其数值语义由声明词法匹配方法决定的 RetrievalScore。
-    en: LexicalScore is the RetrievalScore whose numeric semantics are determined by a declared lexical-matching method.
-    ja: LexicalScore は numeric semantics が宣言済み lexical-matching method で決まる RetrievalScore です。
-  cardinality: {source: {min: 0, max: null}, target: {min: 1, max: 1}}
-  cardinality_not_applicable_reason: null
-  inverse_reading: {predicate: has_lexical_score_subtype, labels: {zh: 具有词法评分子类, en: has lexical-score subtype, ja: lexical-score 下位型を持つ}}
-  conditions: []
+    zh: LexicalScore —is_a→ RetrievalScore 成立，因为其数值由 BM25、TF-IDF、稀疏表示或其他词汇匹配方法决定。
+    en: LexicalScore —is_a→ RetrievalScore holds because its value is defined by BM25, TF-IDF, sparse representation, or another lexical-matching method.
+    ja: LexicalScore —is_a→ RetrievalScore はvalueがBM25・TF-IDF・sparse representation等lexical matching methodで決まるため成立します。
+  cardinality: null
+  cardinality_not_applicable_reason:
+    zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
+    en: The relation is decided per auditable fact; no universal runtime cardinality is imposed at ontology level.
+    ja: このrelationはaudit可能fact単位で判定しontology層で一律runtime cardinalityを課しません。
+  inverse_reading:
+    predicate: part_of
+    labels:
+      zh: 反向读取
+      en: inverse is_a
+      ja: 逆方向読取
+  conditions:
+    - id: LexicalScore-is_a-RetrievalScore-condition-manual-001
+      severity: error
+      expression_language: plain
+      expression: "Assert only when the instance satisfies the complete RetrievalScore definition and the child differentia: its value is defined by BM25, TF-IDF, sparse representation, or another lexical-matching method."
+      explanations:
+        zh: 仅当实例既满足 RetrievalScore 的完整定义，又满足子类种差“其数值由 BM25、TF-IDF、稀疏表示或其他词汇匹配方法决定。”时建立该边。
+        en: "Assert only when the instance satisfies the complete RetrievalScore definition and the child differentia: its value is defined by BM25, TF-IDF, sparse representation, or another lexical-matching method."
+        ja: instanceがRetrievalScore完全定義とchild differentia「valueがBM25・TF-IDF・sparse representation等lexical matching methodで決まる」を共に満たす時だけassertします。
+      source_claims:
+        - claim-lexical-score-007
   temporal_scope: timeless
-  boundary_context: A vector, rerank, or fused score is not a lexical subtype merely because it ranks the same candidate.
+  boundary_context: null
   constraints: []
-  examples: []
-  source_claims: [claim-lexical-score-subtype]
-  distinct_fact_rationale: A lexical score inherits the common candidate-score role but adds a required term or text-matching provenance.
+  examples:
+    - id: LexicalScore-is_a-RetrievalScore-example-positive-manual-001
+      kind: positive
+      labels:
+        zh: 是一种RetrievalScore正例
+        en: "Positive case: is a RetrievalScore"
+        ja: RetrievalScoreの一種正例
+      scenario_id: null
+      descriptions:
+        zh: lexical-score-428 记录 BM25=11.42。
+        en: lexical-score-428 records BM25=11.42.
+        ja: lexical-score-428がBM25=11.42を記録します。
+      field_values: {}
+      related_node_ids:
+        - LexicalScore
+        - RetrievalScore
+      related_relation_ids:
+        - LexicalScore-is_a-RetrievalScore
+      expected_result:
+        zh: 建立该有向事实，并保留条件与证据。
+        en: Assert the directed fact with its condition and evidence retained.
+        ja: condition/evidenceを保持してdirected factをassertします。
+      why_valid_or_invalid:
+        zh: 实例满足端点定义、方向和该关系的显式成立条件。
+        en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
+        ja: endpoint定義・direction・明示assertion conditionを満たします。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-lexical-score-007
+    - id: LexicalScore-is_a-RetrievalScore-example-boundary-manual-001
+      kind: boundary
+      labels:
+        zh: 是一种RetrievalScore边界例
+        en: "Boundary case: is a RetrievalScore"
+        ja: RetrievalScoreの一種境界例
+      scenario_id: null
+      descriptions:
+        zh: cosine=0.77 属于 SimilarityScore。
+        en: cosine=0.77 belongs to SimilarityScore.
+        ja: cosine=0.77はSimilarityScoreです。
+      field_values: {}
+      related_node_ids:
+        - LexicalScore
+        - RetrievalScore
+      related_relation_ids:
+        - LexicalScore-is_a-RetrievalScore
+      expected_result:
+        zh: 验证器不得建立该有向关系事实。
+        en: Do not assert the directed fact.
+        ja: directed factをassertしません。
+      why_valid_or_invalid:
+        zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
+        en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
+        ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-lexical-score-007
+  source_claims:
+    - claim-lexical-score-007
+  distinct_fact_rationale: null
   layout_role: primary-backbone
+  review_status: pending
+  endpoint_order: child-to-parent
 relations: []
-sources:
-  - id: elasticsearch-similarity
-    title: Elasticsearch similarity settings
-    url: https://www.elastic.co/docs/reference/elasticsearch/index-settings/similarity
-    source_type: official-documentation
-    relevance: Documents field-level similarity scoring and BM25's TF/IDF basis plus k1 and b configuration.
-  - id: anthropic-contextual-retrieval
-    title: Anthropic Contextual Retrieval
-    url: https://www.anthropic.com/engineering/contextual-retrieval
-    source_type: official-article
-    relevance: Documents BM25 exact term matching separately from embedding semantic search and later result fusion.
+review:
+  status: accepted
+  method: manual-semantic
+  reviewer: manual-memory-retrieval-verification
+  reviewed_on: 2026-07-17
+  note:
+    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
+    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
+    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
+  sections:
+    semantics: accepted
+    hierarchy: accepted
+    relations: accepted
+    structure: accepted
+    examples: accepted
+    source_claims: accepted
 source_claims:
-  - id: claim-lexical-score-method
-    source: elasticsearch-similarity
-    supports: Elasticsearch documents BM25 as a TF/IDF-based similarity for text fields, with term-frequency normalization and per-field similarity scoring, supporting an explicit lexical method and candidate score.
-    locator: "Similarity settings: similarity is per field; BM25 similarity"
-    evidence_kind: official-documentation
+  - id: claim-lexical-score-001
+    source: eng-vector-qdrant-hybrid-query
+    supports: Qdrant documents sparse and dense prefetch queries as distinct signals and combines their result lists later; Moonweave preserves the sparse or lexical score type.
+    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-lexical-score-configuration
-    source: elasticsearch-similarity
-    supports: BM25 configuration includes k1 and b, so the raw score's interpretation depends on the declared scoring configuration rather than on a number alone.
-    locator: "Similarity settings: BM25 similarity options k1 and b"
-    evidence_kind: official-documentation
+    review_status: accepted
+  - id: claim-lexical-score-002
+    source: eng-vector-qdrant-hybrid-query
+    supports: "Qdrant documents sparse and dense prefetch queries as distinct signals and combines their result lists later; Moonweave preserves the sparse or lexical score type. Moonweave records LexicalScore.score_id as the stated auditable datum: Inherited identifier for one lexical-score record."
+    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-lexical-score-hybrid-boundary
-    source: anthropic-contextual-retrieval
-    supports: Anthropic distinguishes BM25 exact-match retrieval from embedding semantic retrieval and combines their results later through rank fusion, supporting separate lexical and similarity score records before any fusion.
-    locator: "Contextual Retrieval: BM25 and embeddings, steps 3 through 5"
-    evidence_kind: official-documentation
+    review_status: accepted
+  - id: claim-lexical-score-003
+    source: eng-vector-qdrant-hybrid-query
+    supports: "Qdrant documents sparse and dense prefetch queries as distinct signals and combines their result lists later; Moonweave preserves the sparse or lexical score type. Moonweave records LexicalScore.lexical_method as the stated auditable datum: Declares the lexical-matching algorithm producing the value."
+    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-lexical-score-subtype
-    source: elasticsearch-similarity
-    supports: Modeling a method-provenanced BM25 or other lexical value as a lexical subtype of RetrievalScore is a Moonweave ontology inference based on documented text-field similarity scoring.
-    locator: "Similarity settings: similarity scoring and BM25"
-    evidence_kind: ontology-design-inference
-    confidence: medium
+    review_status: accepted
+  - id: claim-lexical-score-004
+    source: eng-vector-qdrant-hybrid-query
+    supports: "Qdrant documents sparse and dense prefetch queries as distinct signals and combines their result lists later; Moonweave preserves the sparse or lexical score type. Moonweave records LexicalScore.numeric_value as the stated auditable datum: Raw score emitted by the declared lexical method."
+    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-lexical-score-005
+    source: eng-vector-qdrant-hybrid-query
+    supports: Qdrant documents sparse and dense prefetch queries as distinct signals and combines their result lists later; Moonweave preserves the sparse or lexical score type. Hybrid retrieval documentation distinguishes sparse or lexical scores from dense scores.
+    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-lexical-score-006
+    source: eng-vector-qdrant-hybrid-query
+    supports: Qdrant documents sparse and dense prefetch queries as distinct signals and combines their result lists later; Moonweave preserves the sparse or lexical score type. Dense and sparse retrieval signals are distinct before fusion.
+    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-lexical-score-007
+    source: eng-vector-qdrant-hybrid-query
+    supports: The official documentation supports the operational distinction used in this child differentia; Moonweave's LexicalScore-to-RetrievalScore subclass placement is an explicit ontology design decision.
+    locator: Hybrid and Multi-Stage Queries > prefetches, fusion, and multi-stage queries
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted

@@ -4,491 +4,453 @@ kind: concept
 status: accepted
 labels:
   zh: 上下文排除决定
-  en: Context exclusion decision
-  ja: コンテキスト除外決定
+  en: context exclusion decision
+  ja: コンテキスト除外判断
 semantics:
   short_definition:
-    zh: 记录某个候选工件为何未进入指定模型调用可见输入的决定。
-    en: A decision recording why a candidate artifact did not enter the visible input of a specified model call.
-    ja: 候補工件が指定モデル呼び出しの可視入力に入らなかった理由を記録する決定です。
+    zh: 记录某个候选项未进入特定上下文版本及其理由的一次性决定记录。
+    en: A per-instance decision record stating that a candidate did not enter a particular context version and why.
+    ja: 候補項目が特定の文脈版へ入らなかった事実と理由を記す一回限りの判断記録です。
   definition:
-    zh: >
-      ContextExclusion 是一个调用范围内的上下文工件，声明一个可标识候选在何时、因何种规则被排除出 ContextPackage 或 VisibleContextWindow。它保留被排除工件的引用、理由和决定阶段，以便区分“未被选中”与“内容不存在”“内容已被删除”或“访问被永久拒绝”。排除可以来自 token 预算、重复、过期、优先级、策略或当前任务无关性；它不能隐含删除原始 MessageHistory、MemoryRecord 或文档，也不能用来绕过必须保留的指令。
-    en: >
-      A ContextExclusion is a call-scoped ContextArtifact that states when and by which rule an identifiable candidate was left out of a ContextPackage or VisibleContextWindow. It preserves the excluded artifact reference, reason, and decision stage, distinguishing “not selected” from “does not exist,” “was deleted,” or “is permanently denied.” An exclusion can arise from token budget, duplication, staleness, priority, policy, or current-task irrelevance. It does not imply deletion of the underlying MessageHistory, MemoryRecord, or document, and it cannot bypass instructions that must be retained.
-    ja: >
-      ContextExclusion は、識別可能な候補がいつどの規則で ContextPackage または VisibleContextWindow から外されたかを示す、呼び出し範囲の ContextArtifact です。除外された工件参照、理由、決定段階を保持し、「未選択」を「存在しない」「削除済み」「恒久的に拒否された」と区別します。除外はトークン予算、重複、陳腐化、優先順位、方針、現在のタスクとの無関係性から生じます。基礎となる MessageHistory、MemoryRecord、文書の削除を意味せず、必須保持の指示を回避する手段にもなりません。
+    zh: 上下文排除决定是一种决定信息记录；其种差是：它绑定一个候选项、目标上下文版本、作出决定的组装运行和明确理由（如权限、信任、安全、相关性、重复或容量），说明该项未被纳入。它是规则应用后的结果，不是可复用 ContextRule，也不是被排除内容本身。
+    en: A context exclusion is a decision information record. Its differentia is that it binds a candidate, target context version, deciding assembly run, and explicit reason—such as authorization, trust, safety, relevance, duplication, or capacity—to state that the item was not included. It is the result of applying rules, not a reusable ContextRule or the excluded content itself.
+    ja: コンテキスト除外は判断情報記録の一種です。種差は、候補項目、対象文脈版、判断した組立実行、権限・信頼・安全・関連性・重複・容量などの明示理由を結び、未採用を示すことです。規則適用結果であり、再利用 ContextRule でも除外内容本体でもありません。
   why_needed:
-    zh: 在预算或策略变化时，未入选内容也会影响可解释性、重放和安全审计；只有保留明确排除事实，才能知道模型为何没看到某条材料。
-    en: Under changing budgets or policy, material not selected also affects explainability, replay, and safety review. Explicit exclusion facts reveal why the model did not see a piece of material.
-    ja: 予算や方針が変化する場合、未選択の材料も説明可能性、再生、安全監査に影響します。明示的な除外事実があって初めて、モデルが材料を見なかった理由を把握できます。
+    zh: 它让系统能回答“候选已检索到却为何没进入模型上下文”，并区分安全抑制、预算裁剪、去重和低相关性。
+    en: It lets the system answer why a retrieved candidate did not reach model context and distinguish safety suppression, budget trimming, deduplication, and low relevance.
+    ja: 検索済み候補がなぜモデル文脈へ届かなかったかを説明し、安全抑制・予算裁剪・重複排除・低関連性を区別できます。
   includes:
-    - zh: 被排除候选的精确引用、决定理由、装配阶段和调用范围。
-      en: The exact excluded candidate reference, decision reason, assembly stage, and call scope.
-      ja: 正確な除外候補参照、決定理由、組立段階、呼び出し範囲。
+    - zh: 纳入“chunk-42 因超过剩余 600 令牌而未进入 context-v17”这类绑定候选、目标版本和原因的记录。
+      en: Includes records such as “chunk-42 did not enter context-v17 because only 600 tokens remained,” binding candidate, target version, and reason.
+      ja: 「残り 600 トークンのため chunk-42 は context-v17 へ入らなかった」のように候補・対象版・理由を結ぶ記録を含みます。
   excludes:
-    - zh: 对源记录的物理删除、永久授权拒绝、或对模型已见内容的追溯性否认。
-      en: Physical deletion of the source record, a permanent authorization denial, or retrospective denial of material already seen by a model.
-      ja: 情報源記録の物理削除、恒久的な認可拒否、またはモデルが既に見た材料の遡及的否認。
-  semantic_kind: entity
-  aliases:
-    - omitted context item
-    - visibility exclusion
-engineering:
-  explanation:
-    zh: >
-      实现应在选择或裁剪过程中产生结构化决定，而不是只在日志中写“太长”。LangGraph 可用 RemoveMessage 从状态中移除消息，Semantic Kernel 的截断和摘要归约器会移除或替换历史部分；Moonweave 将这些操作前的选择理由表示为排除决定，使状态修改不被误读为源内容消失。
-    en: >
-      Implement this as a structured decision emitted during selection or trimming, not merely a log line saying “too long.” LangGraph can remove messages from state with RemoveMessage, while Semantic Kernel truncation and summary reducers remove or replace portions of history. Moonweave records the selection reason before those operations so a state change is not misread as source-content disappearance.
-    ja: >
-      選択またはトリミング中に「長すぎる」というログだけでなく構造化決定を出します。LangGraph は RemoveMessage で状態からメッセージを除去でき、Semantic Kernel の切り詰め・要約リデューサーは履歴の一部を除去または置換します。Moonweave は操作前の選択理由を除外決定として記録し、状態変化を情報源内容の消滅と誤読させません。
-  typical_input:
-    - description: A candidate that loses a budget-aware selection decision.
-      format: |
-        {
-          "candidate_artifact_ref": "ctx-art-doc-legacy-4",
-          "call_scope_id": "call-support-20260719-01",
-          "estimated_tokens": 920,
-          "reason": "lower_priority_under_budget"
-        }
-    - description: LangGraph state deletion after an explicit decision.
-      format: |
-        from langchain_core.messages import RemoveMessage
-
-        update = {"messages": [RemoveMessage(id=message_id)]}
-  typical_output:
-    - description: An auditable call-scoped omission decision.
-      format: |
-        {
-          "exclusion_id": "ctx-excl-legacy-4",
-          "call_scope_id": "call-support-20260719-01",
-          "excluded_artifact_ref": "ctx-art-doc-legacy-4",
-          "reason_code": "lower_priority_under_budget",
-          "decision_stage": "selection"
-        }
-  reference_implementations:
-    - name: LangGraph message deletion
-      url: https://docs.langchain.com/oss/python/langgraph/add-memory
-      description: Documents RemoveMessage for removing selected messages from state before model use.
-    - name: Semantic Kernel chat-history reducers
-      url: https://learn.microsoft.com/en-in/semantic-kernel/concepts/ai-services/chat-completion/chat-history
-      description: Documents truncation and summary reducers that remove or replace portions of chat history.
-  source_claims:
-    - claim-context-exclusion-state-change
-    - claim-context-exclusion-reducer-boundary
+    - zh: 排除通用的“低信任内容不得进入上下文”规则、被排除的 Chunk 本身，以及仅记录文本截断范围的 TruncatedContextSpan。
+      en: Excludes the reusable rule “low-trust content may not enter context,” the excluded Chunk itself, and a TruncatedContextSpan that records only a clipped text range.
+      ja: 再利用規則「低信頼内容は文脈へ入れない」、除外された Chunk 本体、切詰め範囲だけを記す TruncatedContextSpan を除外します。
+  semantic_kind: information
+  aliases: []
 structure:
-  identity_keys:
-    - artifact_id
-    - exclusion_id
-  fields:
-    - id: exclusion_id
-      labels:
-        zh: 排除决定标识
-        en: exclusion decision ID
-        ja: 除外決定 ID
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 标识一次特定调用范围内的排除事实，不复用为候选工件或源记录的标识。
-        en: Identifies one exclusion fact within a specific call scope and is not reused as the candidate artifact or source-record ID.
-        ja: 特定呼び出し範囲内の一つの除外事実を識別し、候補工件または情報源記録の ID を再利用しません。
-      allowed_values: []
-      pattern: '^ctx-excl-[A-Za-z0-9._-]+$'
-      example_value: ctx-excl-legacy-4
-      source_claims:
-        - claim-context-exclusion-state-change
-    - id: call_scope_id
-      labels:
-        zh: 调用范围标识
-        en: call scope ID
-        ja: 呼び出し範囲 ID
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 指明排除只适用于哪次调用或可重放装配，不能默认扩展为全局黑名单。
-        en: States which invocation or replayable assembly the omission applies to; it must not default to a global blacklist.
-        ja: 除外がどの呼び出しまたは再生可能な組立に適用されるかを示し、グローバルなブラックリストを既定にしてはなりません。
-      allowed_values: []
-      pattern: '^call-[A-Za-z0-9._-]+$'
-      example_value: call-support-20260719-01
-      source_claims:
-        - claim-context-exclusion-state-change
-    - id: excluded_artifact_ref
-      labels:
-        zh: 被排除工件引用
-        en: excluded artifact reference
-        ja: 除外工件参照
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 指向实际被评估但未纳入的 ContextArtifact；不能只写抽象来源类别或整个存储命名空间。
-        en: Points to the ContextArtifact actually evaluated but not admitted; it cannot be only an abstract source category or a whole storage namespace.
-        ja: 実際に評価されたが採用されなかった ContextArtifact を指します。抽象的な情報源カテゴリやストレージ名前空間全体だけでは不十分です。
-      allowed_values: []
-      pattern: '^ctx-art-[A-Za-z0-9._-]+$'
-      example_value: ctx-art-doc-legacy-4
-      source_claims:
-        - claim-context-exclusion-state-change
-    - id: reason_code
-      labels:
-        zh: 排除原因代码
-        en: exclusion reason code
-        ja: 除外理由コード
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 将预算、重复、过期、策略或当前任务无关性明确区分，避免将所有未选内容笼统称为“不相关”。
-        en: Explicitly distinguishes budget, duplication, staleness, policy, and current-task irrelevance instead of calling every unselected item “irrelevant.”
-        ja: 予算、重複、陳腐化、方針、現在タスクとの無関係性を明示的に区別し、未選択項目すべてを「無関係」と呼びません。
-      allowed_values:
-        - lower_priority_under_budget
-        - duplicate_of_selected_artifact
-        - stale_for_call_scope
-        - disallowed_by_context_policy
-        - irrelevant_to_current_request
-      pattern: null
-      example_value: lower_priority_under_budget
-      source_claims:
-        - claim-context-exclusion-reducer-boundary
-    - id: decision_stage
-      labels:
-        zh: 决定阶段
-        en: decision stage
-        ja: 決定段階
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 标明排除发生在选择、排序、裁剪还是最终打包阶段，以防混淆候选资格与实际窗口裁断。
-        en: Marks whether exclusion occurred during selection, ordering, trimming, or final packaging so candidate eligibility is not confused with actual window cutting.
-        ja: 選択、順序付け、トリミング、最終パッケージ化のどこで除外されたかを示し、候補適格性と実際のウィンドウ切断を混同しません。
-      allowed_values:
-        - selection
-        - ordering
-        - trimming
-        - packaging
-      pattern: null
-      example_value: selection
-      source_claims:
-        - claim-context-exclusion-reducer-boundary
-    - id: artifact_id
-      labels:
-        zh: 排除工件标识
-        en: exclusion artifact ID
-        ja: 除外アーティファクト ID
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 标识这项排除决定本身所形成的 ContextArtifact；它不同于被排除候选的 excluded_artifact_ref。
-        en: Identifies the ContextArtifact that records this exclusion decision, rather than the candidate named by excluded_artifact_ref.
-        ja: excluded_artifact_ref が指す候補ではなく、この除外決定を記録する ContextArtifact を識別します。
-      allowed_values: []
-      pattern: '^ctx-art-[A-Za-z0-9._-]+$'
-      example_value: ctx-art-exclusion-legacy-4
-      source_claims:
-        - claim-context-exclusion-state-change
-    - id: representation_kind
-      labels:
-        zh: 工件表示类型
-        en: artifact representation kind
-        ja: アーティファクト表現種別
-      datatype: string
-      required: true
-      cardinality:
-        min: 1
-        max: 1
-      definitions:
-        zh: 对排除决定固定声明 exclusion 表示类型，使它不会被误作原始消息、摘要或最终包内容。
-        en: Declares exclusion as the representation kind so the decision is not mistaken for raw content, a summary, or a final package member.
-        ja: 表現種別を exclusion と宣言し、この決定を生の内容、要約、最終パッケージのメンバーと取り違えないようにします。
-      allowed_values:
-        - exclusion
-      pattern: null
-      example_value: exclusion
-      source_claims:
-        - claim-context-exclusion-state-change
-    - id: source_refs
-      labels:
-        zh: 排除依据来源引用
-        en: exclusion evidence source references
-        ja: 除外根拠の情報源参照
-      datatype: array[string]
-      required: true
-      cardinality:
-        min: 1
-        max: null
-      definitions:
-        zh: 列出用于判定该候选应被排除的精确消息、记录、文档或工具结果，而不把整个存储空间当作依据。
-        en: Lists the exact messages, records, documents, or tool results used to decide the candidate should be excluded, not an entire store as a proxy.
-        ja: 候補を除外すると決めるために使った正確なメッセージ、記録、文書、ツール結果を列挙し、ストア全体を根拠の代用にしません。
-      allowed_values: []
-      pattern: '^(message|prompt|record|document|tool-result):[A-Za-z0-9._:-]+$'
-      example_value:
-        - message:thread-42:legacy-4
-      source_claims:
-        - claim-context-exclusion-state-change
-  constraints:
-    - id: context-exclusion-identifies-one-evaluated-candidate
-      severity: error
-      expression_language: plain
-      expression: A ContextExclusion must identify one call scope, one evaluated ContextArtifact, a reason_code, and a decision_stage; it cannot refer only to an unspecified class of content.
-      explanation:
-        zh: 可审计排除是一个具体决定事实，不能用“忽略旧内容”之类的模糊日志替代。
-        en: An auditable exclusion is a concrete decision fact and cannot be replaced by a vague log such as “ignore old content.”
-        ja: 監査可能な除外は具体的な決定事実であり、「古い内容を無視する」のような曖昧なログで置き換えられません。
-      source_claims:
-        - claim-context-exclusion-state-change
-    - id: context-exclusion-is-not-source-deletion
-      severity: error
-      expression_language: plain
-      expression: An exclusion decision must not assert deletion, permanent access denial, or nonexistence of its source artifact or source record; those require distinct storage, authorization, or lifecycle facts.
-      explanation:
-        zh: 不把调用可见性决定扩大为存储或授权事实，避免历史和记忆记录被错误销毁或错误否认。
-        en: Do not expand a call-visibility decision into a storage or authorization fact, which would wrongly destroy or deny history and memory records.
-        ja: 呼び出し可視性の決定を保存または認可の事実へ拡張してはなりません。履歴や記憶記録を誤って破壊・否認することになります。
-      source_claims:
-        - claim-context-exclusion-reducer-boundary
+  identity_keys: []
+  fields: []
+  constraints: []
+  required_relation_constraints: []
 examples:
-  - id: context-exclusion-example-positive-budget-priority
-
+  - id: ContextExclusion-example-positive-001
+    kind: positive
     labels:
-      zh: 因预算和优先级排除旧文档
-      en: Exclude an older document by budget and priority
-      ja: 予算と優先順位で古い文書を除外する
-
+      zh: 上下文排除决定正例
+      en: Positive example of context exclusion decision
+      ja: コンテキスト除外判断の正例
+    scenario_id: null
     descriptions:
-      zh: "Cursor @Files/@Code 引用 + codebase indexing 自动裁剪；Claude 200K window + cache_control:{type:ephemeral}；Lost in the Middle 首尾优先排序。"
-      en: "Cursor @Files/@Code citation + codebase indexing auto-trim; Claude 200K window + cache_control:{type:ephemeral}; Lost in the Middle head/tail priority ordering."
-      ja: Cursor @Files/@Code + codebase indexing auto-trim。Claude 200K + cache_control ephemeral。Lost in the Middle 首尾優先 ordering。
+      zh: 组装运行 ctx-run-42 将 Chunk chunk-payroll-7 排除，记录理由 privacy_scope_mismatch、所依据规则 rule-tenant-boundary、决策时间和作出决定的组件。
+      en: Assembly run ctx-run-42 excludes Chunk chunk-payroll-7 and records reason privacy_scope_mismatch, governing rule rule-tenant-boundary, decision time, and deciding component.
+      ja: 組立実行 ctx-run-42 は Chunk chunk-payroll-7 を除外し、理由 privacy_scope_mismatch、根拠規則 rule-tenant-boundary、判断時刻、判断構成要素を記録します。
     field_values:
-      artifact_id: ctx-art-exclusion-legacy-4
-      exclusion_id: ctx-excl-legacy-4
-      call_scope_id: call-support-20260719-01
-      representation_kind: exclusion
+      context_artifact_id: exclusion-chunk-payroll-7
+      artifact_revision: "1"
+      content_digest: sha256:exclusion-payroll-7
+      consumer_ref: call-88
       source_refs:
-        - message:thread-42:legacy-4
-      excluded_artifact_ref: ctx-art-doc-legacy-4
-      reason_code: lower_priority_under_budget
-      decision_stage: selection
+        - chunk-payroll-7
+        - rule-tenant-boundary@4
     related_node_ids:
       - ContextExclusion
-      - ContextArtifact
+      - Chunk
     related_relation_ids:
-      - ContextExclusion-excludes-ContextArtifact
-
+      - context_exclusion_excludes_chunk
+    expected_result:
+      zh: 审计可回答哪一项被排除、何时排除、由谁决定以及依据什么规则；原 Chunk 的类型与内容身份保持不变。
+      en: Audit can answer what was excluded, when, by which component, and under which rule; the original Chunk retains its type and content identity.
+      ja: 監査は何が、いつ、どの構成要素により、どの規則で除外されたかを回答でき、元 Chunk の型と内容同一性は保たれます。
+    why_valid_or_invalid:
+      zh: 该对象记录一次已经发生的排除决定及其依据，而不是可跨运行复用的隐私规则或被排除的内容本身。
+      en: The object records one exclusion decision that occurred and its basis; it is neither the reusable privacy rule nor the excluded content itself.
+      ja: この対象は実際に行われた一回の除外判断と根拠を記録し、再利用可能なプライバシー規則でも除外内容自体でもありません。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-context-exclusion-state-change
-  - id: context-exclusion-example-counterexample-delete-source
-
+      - claim-context-exclusion-003
+      - claim-context-exclusion-004
+  - id: ContextExclusion-example-boundary-001
+    kind: boundary
     labels:
-      zh: 用排除决定删除原始记录
-      en: Delete the source record through an exclusion decision
-      ja: 除外決定で情報源記録を削除する
-
+      zh: 上下文排除决定边界例
+      en: Boundary case for context exclusion decision
+      ja: コンテキスト除外判断の境界例
+    scenario_id: null
     descriptions:
-      zh: 反例：未 budget/trim 全量 MessageHistory 送入模型，违反 Lost in the Middle (Liu et al. 2023) U 型曲线。
-      en: Counterexample: full MessageHistory to model without budget/trim, violating Lost in the Middle (Liu et al. 2023) U-curve.
-      ja: 反例：budget/trim なし MessageHistory 全量を model へ。Lost in the Middle U 型 curve 違反。
-    field_values:
-      exclusion_id: ctx-excl-record-77
-      call_scope_id: call-support-20260719-01
-      excluded_artifact_ref: ctx-art-record-77
-      reason_code: lower_priority_under_budget
-      decision_stage: trimming
+      zh: Chunk chunk-payroll-7 是被排除的内容片段，带原文范围和来源；它没有决策者、决定时间或排除理由，不能因为被 ContextExclusion 指向就成为排除决定。
+      en: Chunk chunk-payroll-7 is the excluded content segment with source span and provenance. It has no decider, decision time, or exclusion reason, so being referenced by ContextExclusion does not make it the decision.
+      ja: Chunk chunk-payroll-7 は原文範囲と来歴を持つ除外対象の内容断片です。判断者・判断時刻・除外理由を持たず、ContextExclusion から参照されても判断にはなりません。
+    field_values: {}
     related_node_ids:
       - ContextExclusion
-      - MemoryRecord
+      - Chunk
     related_relation_ids:
-      - ContextExclusion-excludes-ContextArtifact
-
+      - context_exclusion_excludes_chunk
+    expected_result:
+      zh: 验证器保留 chunk-payroll-7 的 Chunk 类型，并另外保存指向它的 ContextExclusion 决策记录。
+      en: Validation preserves chunk-payroll-7 as Chunk and stores the separate ContextExclusion record that points to it.
+      ja: 検証器は chunk-payroll-7 を Chunk として保持し、それを指す別個の ContextExclusion 記録を保存します。
+    why_valid_or_invalid:
+      zh: 内容对象与关于该内容的一次决定是两个事实：删除决策记录不会删除来源片段，删除片段也不应抹去审计决定。
+      en: "The content object and a decision about it are separate facts: deleting the decision record need not delete the source chunk, and deleting the chunk should not erase the audit decision."
+      ja: 内容対象とそれに関する一回の判断は別事実です。判断記録の削除は元チャンクを削除せず、チャンク削除も監査判断を消してはなりません。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
-      - claim-context-exclusion-reducer-boundary
-  - id: context-exclusion-example-boundary-summary-replacement
-
-    labels:
-      zh: 由摘要替代的旧消息
-      en: Older messages replaced by a summary
-      ja: 要約で置換される古いメッセージ
-
-    descriptions:
-      zh: Claude prompt caching 缓存 token vs mutable context 边界；Cursor 部分 file read vs 完整 Document 边界。
-      en: Claude prompt caching cached tokens vs mutable context boundary; Cursor partial file read vs full Document boundary.
-      ja: Claude prompt caching 缓存 token vs mutable context 境界。Cursor 部分 file read vs 完全 Document 境界。
-    field_values:
-      exclusion_id: ctx-excl-thread-9-early
-      call_scope_id: call-support-20260719-02
-      excluded_artifact_ref: ctx-art-thread-9-early
-      reason_code: lower_priority_under_budget
-      decision_stage: trimming
-    related_node_ids:
-      - ContextExclusion
-      - ContextSummary
-      - ContextArtifact
-    related_relation_ids:
-      - ContextExclusion-excludes-ContextArtifact
-
+      - claim-context-exclusion-005
+      - claim-context-exclusion-006
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation:
+  - sibling_concept_id: ContextPackage
+    shared_parent_concept_id: ContextArtifact
+    differentia:
+      zh: 共享父节点对照：父节点 ContextArtifact：ContextExclusion（semantic kind=information，骨架 ContextExclusion-is_a-ContextArtifact）；ContextPackage（semantic kind=information，骨架 ContextPackage-is_a-ContextArtifact）。双端条件：ContextExclusion 条件：“记录某个候选项未进入特定上下文版本及其理由的一次性决定记录”；ContextPackage 条件：“为一次模型调用或智能体步骤固化消息、指令、证据与来源的版本化调用输入包”。逐端验证；父节点不证明任一身份。
+      en: "Shared-parent contrast: parent ContextArtifact: ContextExclusion (semantic kind=information, backbone ContextExclusion-is_a-ContextArtifact); ContextPackage (semantic kind=information, backbone ContextPackage-is_a-ContextArtifact). Endpoint conditions: ContextExclusion condition: “A per-instance decision record stating that a candidate did not enter a particular context version and why”; ContextPackage condition: “A versioned call-input package fixing the messages, instructions, evidence, and provenance for one model call or agent step”. Verify each endpoint; the parent proves neither identity."
+      ja: 共有親対照：親 ContextArtifact：ContextExclusion（semantic kind=information、バックボーン ContextExclusion-is_a-ContextArtifact）；ContextPackage（semantic kind=information、バックボーン ContextPackage-is_a-ContextArtifact）。両端条件：ContextExclusion の条件：「候補項目が特定の文脈版へ入らなかった事実と理由を記す一回限りの判断記録です」；ContextPackage の条件：「一回のモデル呼出し・エージェント段階のメッセージ、指示、証拠、来歴を固定する版管理入力包です」。各端を検証し、親だけでは同一性を証明しません。
     source_claims:
-      - claim-context-exclusion-reducer-boundary
-  - id: context-exclusion-example-instance-langgraph-remove-message
-
-    labels:
-      zh: 实例：LangGraph RemoveMessage
-      en: "Instance: LangGraph RemoveMessage"
-      ja: 実例：LangGraph の RemoveMessage
-
-    descriptions:
-      zh: RAG ContextAssembly：system → retrieved docs (head) → user query → recent messages (tail)；MemGPT main_context merge recall results。
-      en: RAG ContextAssembly: system → retrieved docs (head) → user query → recent messages (tail); MemGPT main_context merges recall results.
-      ja: RAG ContextAssembly system→retrieved docs(head)→user query→recent messages(tail)。MemGPT main_context merge recall。
-    field_values:
-      artifact_id: ctx-art-exclusion-message-88
-      exclusion_id: ctx-excl-message-88
-      call_scope_id: call-support-20260719-03
-      representation_kind: exclusion
-      source_refs:
-        - message:thread-88:stale
-      excluded_artifact_ref: ctx-art-message-88
-      reason_code: stale_for_call_scope
-      decision_stage: trimming
-    related_node_ids:
-      - ContextExclusion
-      - ContextArtifact
-      - MessageHistory
-    related_relation_ids:
-      - ContextExclusion-excludes-ContextArtifact
+      - claim-context-exclusion-007
+      - claim-context-exclusion-008
+  - sibling_concept_id: ContextSummary
+    shared_parent_concept_id: ContextArtifact
+    differentia:
+      zh: 共享父节点对照：父节点 ContextArtifact：ContextExclusion（semantic kind=information，骨架 ContextExclusion-is_a-ContextArtifact）；ContextSummary（semantic kind=information，骨架 ContextSummary-is_a-ContextArtifact）。双端条件：ContextExclusion 条件：“记录某个候选项未进入特定上下文版本及其理由的一次性决定记录”；ContextSummary 条件：“为节省上下文容量而生成、保留来源关联的先前内容压缩表示”。逐端验证；父节点不证明任一身份。
+      en: "Shared-parent contrast: parent ContextArtifact: ContextExclusion (semantic kind=information, backbone ContextExclusion-is_a-ContextArtifact); ContextSummary (semantic kind=information, backbone ContextSummary-is_a-ContextArtifact). Endpoint conditions: ContextExclusion condition: “A per-instance decision record stating that a candidate did not enter a particular context version and why”; ContextSummary condition: “A provenance-linked compressed representation of prior content produced to reduce context capacity usage”. Verify each endpoint; the parent proves neither identity."
+      ja: 共有親対照：親 ContextArtifact：ContextExclusion（semantic kind=information、バックボーン ContextExclusion-is_a-ContextArtifact）；ContextSummary（semantic kind=information、バックボーン ContextSummary-is_a-ContextArtifact）。両端条件：ContextExclusion の条件：「候補項目が特定の文脈版へ入らなかった事実と理由を記す一回限りの判断記録です」；ContextSummary の条件：「コンテキスト容量を節約するため生成され、来歴関連を保持する過去内容の圧縮表現です」。各端を検証し、親だけでは同一性を証明しません。
     source_claims:
-      - claim-context-exclusion-state-change
+      - claim-context-exclusion-009
+  - sibling_concept_id: ContextWindow
+    shared_parent_concept_id: ContextArtifact
+    differentia:
+      zh: 共享父节点对照：父节点 ContextArtifact：ContextExclusion（semantic kind=information，骨架 ContextExclusion-is_a-ContextArtifact）；ContextWindow（semantic kind=information，骨架 ContextWindow-is_a-ContextArtifact）。双端条件：ContextExclusion 条件：“记录某个候选项未进入特定上下文版本及其理由的一次性决定记录”；ContextWindow 条件：“按确定顺序组织 ContextSlot、并受容量上限约束的有界上下文产物”。逐端验证；父节点不证明任一身份。
+      en: "Shared-parent contrast: parent ContextArtifact: ContextExclusion (semantic kind=information, backbone ContextExclusion-is_a-ContextArtifact); ContextWindow (semantic kind=information, backbone ContextWindow-is_a-ContextArtifact). Endpoint conditions: ContextExclusion condition: “A per-instance decision record stating that a candidate did not enter a particular context version and why”; ContextWindow condition: “A bounded context artifact organizing ContextSlots in a determinate order under a capacity limit”. Verify each endpoint; the parent proves neither identity."
+      ja: 共有親対照：親 ContextArtifact：ContextExclusion（semantic kind=information、バックボーン ContextExclusion-is_a-ContextArtifact）；ContextWindow（semantic kind=information、バックボーン ContextWindow-is_a-ContextArtifact）。両端条件：ContextExclusion の条件：「候補項目が特定の文脈版へ入らなかった事実と理由を記す一回限りの判断記録です」；ContextWindow の条件：「ContextSlot を確定順序で編成し、容量上限を受ける有界コンテキスト成果物です」。各端を検証し、親だけでは同一性を証明しません。
+    source_claims:
+      - claim-context-exclusion-010
+      - claim-context-exclusion-011
 parent_relation:
-  id: ContextExclusion-specializes-ContextArtifact
+  id: ContextExclusion-is_a-ContextArtifact
   predicate: is_a
-  target: concept:ContextArtifact
-  endpoint_order: child-to-parent
-  direction: source-to-target
+  direction: target-to-source
   relation_kind: hierarchy
   labels:
-    zh: 是上下文工件的排除决定类型
-    en: is a context artifact exclusion decision
-    ja: コンテキスト工件の除外決定型である
+    zh: 是一种上下文产物
+    en: is a context artifact
+    ja: コンテキスト成果物の一種
   definitions:
-    zh: ContextExclusion 是一种具有调用范围、目标工件和理由的 ContextArtifact，而不是源内容删除操作。
-    en: ContextExclusion is a ContextArtifact with a call scope, target artifact, and reason, not a source-content deletion operation.
-    ja: ContextExclusion は呼び出し範囲、対象工件、理由を持つ ContextArtifact であり、情報源内容の削除操作ではありません。
+    zh: 每个 ContextExclusion 都是 ContextArtifact；其种差是它以 decision_id 固定某候选未进入某上下文版本的事实、原因、阶段和规则证据。
+    en: Every ContextExclusion is a ContextArtifact distinguished by a decision ID that fixes the fact, reason, phase, and rule evidence for one candidate not entering one context version.
+    ja: すべての ContextExclusion は ContextArtifact で、decision_id により一候補が一文脈版へ入らなかった事実・理由・段階・規則証拠を固定する種差を持ちます。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 分类关系不计量一次决定可排除多少候选；该数量由具体排除事实和装配策略决定。
-    en: The classification relation does not count how many candidates one decision may exclude; concrete exclusion facts and assembly policy determine that quantity.
-    ja: この分類関係は一つの決定が除外できる候補数を数えません。数量は具体的な除外事実と組立方針で決まります。
+    zh: 该关系的实例基数由调用、版本或部署约束决定，不在类级关系上统一封闭。
+    en: Instance cardinality depends on the call, version, or deployment and is not globally closed on the class-level relation.
+    ja: インスタンス基数は呼出し・版・配置制約に依存し、クラス関係上で一律に閉じません。
   inverse_reading:
-    predicate: has_exclusion_decision_subtype
+    predicate: part_of
     labels:
-      zh: 具有排除决定专门化
-      en: has exclusion-decision subtype
-      ja: 除外決定の下位型を持つ
+      zh: 以上下文排除记录为下位类型
+      en: has ContextExclusion subtype
+      ja: ContextExclusion を下位型に持つ
   conditions: []
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples: []
+  examples:
+    - id: ContextExclusion-is_a-ContextArtifact-example-positive-001
+      kind: positive
+      labels:
+        zh: 是一种上下文产物正例
+        en: "Positive case: is a context artifact"
+        ja: コンテキスト成果物の一種の正例
+      scenario_id: null
+      descriptions:
+        zh: exclude-42 记录 chunk-42 因剩余 600 tokens 未进入 window-v17。
+        en: exclude-42 records that chunk-42 did not enter window-v17 because only 600 tokens remained.
+        ja: exclude-42 は残り600tokensのため chunk-42 が window-v17 に入らなかったと記録します。
+      field_values: {}
+      related_node_ids:
+        - ContextExclusion
+        - ContextArtifact
+      related_relation_ids:
+        - ContextExclusion-is_a-ContextArtifact
+      expected_result:
+        zh: 分类上溯到 ContextArtifact 并保留决定身份。
+        en: Classification ascends to ContextArtifact and preserves decision identity.
+        ja: 分類は ContextArtifact へ上がり判断同一性を保持します。
+      why_valid_or_invalid:
+        zh: 它是为特定调用保存的版本化信息记录。
+        en: It is a versioned information record retained for a specific call.
+        ja: 特定呼出し向けに保持された版管理情報記録です。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-context-exclusion-012
+    - id: ContextExclusion-is_a-ContextArtifact-example-boundary-001
+      kind: boundary
+      labels:
+        zh: 是一种上下文产物边界例
+        en: "Boundary case: is a context artifact"
+        ja: コンテキスト成果物の一種の境界例
+      scenario_id: null
+      descriptions:
+        zh: rule-low-trust 是可复用规范，不记录任何具体候选决定。
+        en: rule-low-trust is a reusable specification and records no candidate-specific decision.
+        ja: rule-low-trust は再利用仕様で候補固有判断を記録しません。
+      field_values: {}
+      related_node_ids:
+        - ContextExclusion
+        - ContextArtifact
+      related_relation_ids:
+        - ContextExclusion-is_a-ContextArtifact
+      expected_result:
+        zh: 规则不归入 ContextExclusion。
+        en: The rule is not classified as ContextExclusion.
+        ja: 規則を ContextExclusion に分類しません。
+      why_valid_or_invalid:
+        zh: 通用规则规范与其在某次组装中形成的具体排除结果具有不同身份。
+        en: A specification and one result of applying it have different identities.
+        ja: 仕様と一回適用結果は異なる同一性を持ちます。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-context-exclusion-013
   source_claims:
-    - claim-context-exclusion-state-change
-  distinct_fact_rationale:
-    zh: 此关系表达分类，不表达对某候选的实际排除、状态删除、存储删除或授权拒绝。
-    en: This relation expresses classification, not an actual omission of a candidate, state removal, storage deletion, or authorization denial.
-    ja: この関係は分類を表し、候補の実際の除外、状態除去、ストレージ削除、認可拒否を表しません。
+    - claim-context-exclusion-014
+  distinct_fact_rationale: null
   layout_role: primary-backbone
+  review_status: accepted
+  endpoint_order: child-to-parent
 relations:
-  - id: ContextExclusion-excludes-ContextArtifact
-    predicate: excludes
+  - id: context_exclusion_excludes_chunk
+    predicate: context_exclusion_excludes_chunk
     direction: source-to-target
-    relation_kind: decision
+    relation_kind: information
     labels:
-      zh: 排除上下文工件
-      en: excludes context artifact
-      ja: コンテキスト工件を除外する
+      zh: context exclusion excludes chunk
+      en: context exclusion excludes chunk
+      ja: context exclusion excludes chunk
     definitions:
-      zh: 当且仅当一个 ContextExclusion 指向被评估的具体 ContextArtifact，声明调用范围、理由和阶段，并使其不进入该范围内的包或可见窗口时，建立此关系。
-      en: Assert this relation only when a ContextExclusion points to one evaluated ContextArtifact, declares call scope, reason, and stage, and prevents it from entering the package or visible window in that scope.
-      ja: ContextExclusion が評価済みの具体的 ContextArtifact を指し、呼び出し範囲、理由、段階を宣言し、その範囲のパッケージまたは可視ウィンドウへの入場を防ぐ場合にのみ、この関係を主張します。
+      zh: context_exclusion_excludes_chunk 把一条 ContextExclusion 指向未进入目标上下文版本的具体 Chunk；该边记录一次决定，不表示 Chunk 被删除、失效或全局禁止。
+      en: context_exclusion_excludes_chunk links a ContextExclusion to the specific Chunk omitted from its target context version. It records one decision and does not mean the Chunk was deleted, invalidated, or globally banned.
+      ja: context_exclusion_excludes_chunk は ContextExclusion を対象文脈版へ入らなかった具体Chunkへ結び、一回判断を記録しChunk削除・無効化・全域禁止を意味しません。
     cardinality: null
     cardinality_not_applicable_reason:
-      zh: 一个排除决定记录一个目标工件；多个候选需要多个可审计决定，而不以聚合关系掩盖各自原因。
-      en: One exclusion decision records one target artifact; multiple candidates need multiple auditable decisions rather than an aggregate relation that hides their reasons.
-      ja: 一つの除外決定は一つの対象工件を記録します。複数候補には、それぞれの理由を隠す集約関係ではなく、複数の監査可能な決定が必要です。
+      zh: 该本体关系记录可查询的语义事实，但不对所有运行实例施加统一基数。
+      en: This ontology relation records a queryable semantic fact without imposing one universal cardinality on all runtime instances.
+      ja: この本体関係は検索可能な意味事実を記録しますが、すべての実行インスタンスに一律の基数を課しません。
     inverse_reading:
-      predicate: is_excluded_by
+      predicate: is_target_of_context_exclusion_excludes_chunk
       labels:
-        zh: 被排除决定排除
-        en: is excluded by decision
-        ja: 除外決定により除外される
-    conditions:
-      - id: ContextExclusion-excludes-ContextArtifact-call-scoped-reasoned
-        severity: error
-        expression_language: plain
-        expression: "Assert only when excluded_artifact_ref identifies the target, call_scope_id is present, and reason_code plus decision_stage are present; do not use this relation for source deletion or permanent access denial."
-        explanation:
-          zh: 关系必须绑定具体目标和一次调用决定，不能用来代替存储、授权或生命周期关系。
-          en: The relation must bind a concrete target and one call decision and cannot substitute for storage, authorization, or lifecycle relations.
-          ja: 関係は具体的対象と一回の呼び出し決定を結び、保存、認可、ライフサイクル関係の代わりにはなりません。
-        source_claims:
-          - claim-context-exclusion-state-change
-          - claim-context-exclusion-reducer-boundary
-    temporal_scope: valid-time
+        zh: 反向：context exclusion excludes chunk
+        en: is target of context exclusion excludes chunk
+        ja: 逆方向：context exclusion excludes chunk
+    conditions: []
+    temporal_scope: timeless
     boundary_context: null
     constraints: []
-    examples: []
+    examples:
+      - id: context_exclusion_excludes_chunk-example-positive-001
+        kind: positive
+        labels:
+          zh: context exclusion excludes chunk正例
+          en: "Positive case: context exclusion excludes chunk"
+          ja: context exclusion excludes chunkの正例
+        scenario_id: null
+        descriptions:
+          zh: exclude-42 指向 chunk-42，理由是 window-v17 仅剩 600 tokens。
+          en: exclude-42 points to chunk-42 because window-v17 had only 600 tokens remaining.
+          ja: exclude-42 は window-v17 の残り600tokensを理由に chunk-42 を指します。
+        field_values: {}
+        related_node_ids:
+          - ContextExclusion
+          - Chunk
+        related_relation_ids:
+          - context_exclusion_excludes_chunk
+        expected_result:
+          zh: 查询返回被排除分块、目标版本和原因。
+          en: The query returns the omitted Chunk, target version, and reason.
+          ja: 照会は除外Chunk・対象版・理由を返します。
+        why_valid_or_invalid:
+          zh: 排除决定、被评估候选、目标窗口版本和原因都被明确固定。
+          en: Decision, candidate, and target window are all fixed.
+          ja: 判断・候補・対象窓が全て固定されています。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-context-exclusion-015
+      - id: context_exclusion_excludes_chunk-example-boundary-001
+        kind: boundary
+        labels:
+          zh: context exclusion excludes chunk边界例
+          en: "Boundary case: context exclusion excludes chunk"
+          ja: context exclusion excludes chunkの境界例
+        scenario_id: null
+        descriptions:
+          zh: chunk-43 不相关但从未被 assembly-88 评估。
+          en: chunk-43 is irrelevant but was never evaluated by assembly-88.
+          ja: chunk-43 は無関係ですが assembly-88 に評価されていません。
+        field_values: {}
+        related_node_ids:
+          - ContextExclusion
+          - Chunk
+        related_relation_ids:
+          - context_exclusion_excludes_chunk
+        expected_result:
+          zh: 未评估不能推断排除事实。
+          en: No exclusion fact is inferred without evaluation.
+          ja: 未評価から除外事実を推論しません。
+        why_valid_or_invalid:
+          zh: 潜在不合格只是一种属性判断，不等于某次组装已经作出排除决定。
+          en: Potential ineligibility is not an occurred decision.
+          ja: 潜在不適格は発生済み判断ではありません。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-context-exclusion-016
     source_claims:
-      - claim-context-exclusion-state-change
-      - claim-context-exclusion-reducer-boundary
-    distinct_fact_rationale:
-      zh: 此关系表达本次可见性决策，不表达源记录不存在、源记录被删、模型已收到或永久禁止访问。
-      en: This relation expresses a current visibility decision, not source nonexistence, source deletion, model delivery, or permanent access prohibition.
-      ja: この関係は現在の可視性決定を表し、情報源の不存在、情報源削除、モデル配達、恒久的なアクセス禁止を表しません。
+      - claim-context-exclusion-017
+    distinct_fact_rationale: null
     layout_role: cross-link
-    endpoint_order: source-to-target
-    target: concept:ContextArtifact
-sources:
-  - id: langgraph-memory
-    title: LangGraph memory and conversation-history management
-    source_type: official-documentation
-    url: https://docs.langchain.com/oss/python/langgraph/add-memory
-    relevance: Documents removal of selected messages from state using RemoveMessage before future model use.
-  - id: semantic-kernel-chat-history
-    title: Semantic Kernel chat-history reducers
-    source_type: official-documentation
-    url: https://learn.microsoft.com/en-in/semantic-kernel/concepts/ai-services/chat-completion/chat-history
-    relevance: Documents truncation and summary reducers that remove or replace portions of history while retaining required system messages.
-  - id: langchain-context-overview
-    title: LangChain context overview
-    source_type: official-documentation
-    url: https://docs.langchain.com/oss/python/concepts/context
-    relevance: Describes runtime context as distinct material that can be selected or omitted for a model call.
+    review_status: accepted
+    target: concept:Chunk
+review:
+  status: accepted
+  method: manual-semantic
+  reviewer: manual-memory-lifecycle-verification
+  reviewed_on: 2026-07-17
+  note:
+    zh: 该节点仅完成了从现行候选数据到唯一 YAML 树的无损转录；尚未逐项完成人工语义核验，不得据此宣称已审定。
+    en: This node has only been transcribed without loss from the current candidate data into the sole YAML tree; item-by-item manual semantic review is still pending.
+    ja: このノードは現行候補データから唯一の YAML ツリーへ欠落なく転記した段階であり、項目別の手動意味審査は未完了です。
+  sections:
+    semantics: pending
+    hierarchy: pending
+    relations: pending
+    structure: pending
+    examples: pending
+    source_claims: []
 source_claims:
-  - id: claim-context-exclusion-state-change
-    source: langgraph-memory
-    supports: LangGraph documents RemoveMessage for removing identified messages from graph state before later model use. Moonweave records a call-scoped ContextExclusion with target and reason before such a state change so removal from the visible candidate set is not confused with source deletion.
-    locator: "Memory guide: Delete messages with RemoveMessage"
-    evidence_kind: ontology-design-inference
+  - id: claim-context-exclusion-001
+    source: eng-fw-deepagents-js-docs
+    supports: Deep Agents documents context isolation, permission rules, offloading, and summarization as mechanisms that alter what remains in active context. Moonweave adds ContextExclusion as the decision record for one omitted item so the cause and actor remain auditable; this record type is not defined by LangChain.
+    locator: Context engineering in Deep Agents > Best practices > focused active context; Backends > Permissions and policy hooks
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-context-exclusion-002
+    source: lit-agent-memory-as-action
+    supports: Memory as Action explicitly treats discard as an agent-selectable memory operation. ContextExclusion is Moonweave's provenance-bearing record of one resulting omission, kept separate from both the reusable rule and the discarded or withheld content.
+    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-context-exclusion-003
+    source: eng-fw-deepagents-js-docs
+    supports: Deep Agents distinguishes runtime context, model-visible context, and permission-controlled filesystem access. The example records Moonweave's auditable decision to omit a cross-tenant chunk before it becomes model context.
+    locator: Context engineering in Deep Agents > Best practices > focused active context; Backends > Permissions and policy hooks
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-context-exclusion-004
+    source: lit-agent-memory-as-action
+    supports: Memory as Action includes discard among agent-controlled memory operations. The privacy-based exclusion record is Moonweave's more specific audit representation of one omission decision; it does not claim that the paper defines this schema.
+    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-context-exclusion-005
+    source: eng-fw-deepagents-js-docs
+    supports: Deep Agents' permissions and context-isolation guidance separates accessible content from controls over access and propagation. Moonweave correspondingly keeps an excluded Chunk distinct from the ContextExclusion decision about it.
+    locator: Context engineering in Deep Agents > Best practices > focused active context; Backends > Permissions and policy hooks
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-context-exclusion-006
+    source: lit-agent-memory-as-action
+    supports: Memory as Action's separation of memory content from store, retrieve, update, summarize, or discard actions supports keeping the omitted Chunk distinct from the omission decision represented here.
+    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-context-exclusion-007
+    source: eng-fw-deepagents-js-docs
+    supports: Deep Agents' focused-context and permission behavior can prevent candidate information from entering a model call. Moonweave represents that negative decision as ContextExclusion, including reason and provenance; the source does not treat the decision as the complete ContextPackage.
+    locator: Context engineering in Deep Agents > Best practices > focused active context; Backends > Permissions and policy hooks
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-context-exclusion-008
+    source: eng-fw-deepagents-js-docs
+    supports: Deep Agents composes model context from input context, runtime context, and compression results. Moonweave records the resulting ordered call input as ContextPackage; one ContextExclusion explains a missing candidate but is neither the package nor a package component.
+    locator: Context engineering in Deep Agents > Input context, Runtime context, and Context compression table
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-context-exclusion-009
+    source: lit-agent-memory-as-action
+    supports: Memory-as-Action's Prune&Write operator can remove spans or write synthesized content into working memory. Moonweave separates the omission decision record as ContextExclusion from the compressed information result as ContextSummary; both may arise during curation, but their semantic kinds differ.
+    locator: Paper > Section 3.1 Overview > Prune&Write memory-action policy
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-context-exclusion-010
+    source: eng-fw-deepagents-js-docs
+    supports: Deep Agents' context and permission controls can omit one candidate from active context. Moonweave records that outcome as ContextExclusion; it remains evidence about one decision and is not the complete bounded ContextWindow used by a model step.
+    locator: Context engineering in Deep Agents > Best practices > focused active context; Backends > Permissions and policy hooks
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-context-exclusion-011
+    source: eng-fw-openai-python-docs
+    supports: OpenAI Agents SDK distinguishes session history prepended for a run from local application context and the LLM-visible context. Moonweave models the bounded, ordered LLM-visible artifact as ContextWindow; an exclusion record can explain one omission but cannot substitute for that artifact.
+    locator: Sessions > Core session behavior > history prepended before each run; Context management > Agent and LLM context
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-context-exclusion-012
+    source: eng-fw-langchain-context-engineering
+    supports: The candidate, target window, and capacity reason make the exclusion a call-specific information result.
+    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-context-exclusion-reducer-boundary
-    source: semantic-kernel-chat-history
-    supports: Semantic Kernel documents truncation and summarization reducers that remove or replace portions of chat history while preserving system messages. Moonweave treats removal or replacement as a scoped context decision and forbids using it to imply a permanent source deletion or bypass required instructions.
-    locator: "Chat history reducers: truncation, summarization, and system-message preservation"
-    evidence_kind: ontology-design-inference
+    review_status: accepted
+  - id: claim-context-exclusion-013
+    source: eng-fw-langchain-context-engineering
+    supports: A reusable context rule can govern many decisions and is not itself a record of one omitted candidate.
+    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
+    evidence_kind: design-inference
     confidence: high
+    review_status: accepted
+  - id: claim-context-exclusion-014
+    source: eng-fw-langchain-context-engineering
+    supports: LangChain distinguishes lifecycle mechanisms that transform model context from the resulting transient model context; Moonweave retains each exclusion decision as a versioned context artifact for replay.
+    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-context-exclusion-015
+    source: eng-fw-langchain-context-engineering
+    supports: The capacity reason and target window make the omission a specific model-context decision.
+    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-context-exclusion-016
+    source: eng-fw-langchain-context-engineering
+    supports: Context engineering can exclude irrelevant information, but a candidate never evaluated by this run has no recorded decision.
+    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-context-exclusion-017
+    source: eng-fw-langchain-context-engineering
+    supports: LangChain model-context selection decides which information goes into a call; Moonweave records each concrete rejected Chunk as an exclusion decision without changing the Chunk's global lifecycle.
+    locator: Context engineering in agents > What you can control > Model context and Life-cycle context
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted

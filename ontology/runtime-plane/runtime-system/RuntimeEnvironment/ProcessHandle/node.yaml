@@ -2,133 +2,620 @@ schema: moonweave.ai/ontology-node/v1
 id: ProcessHandle
 kind: concept
 status: accepted
-labels: {zh: 进程句柄, en: Process handle, ja: プロセスハンドル}
+labels:
+  zh: 进程句柄
+  en: process handle
+  ja: プロセスハンドル
 semantics:
-  short_definition: {zh: 标识并管理一个已生成操作系统进程生命周期的 RuntimeEnvironment 组件。, en: A RuntimeEnvironment component that identifies and manages one spawned operating-system process lifecycle., ja: 1 つの生成されたオペレーティングシステムプロセスのライフサイクルを識別および管理する RuntimeEnvironment コンポーネント。}
-  definition: {zh: ProcessHandle 是特定子进程或受管理进程的运行时记录，包括其进程标识符、命令指纹、状态和受控 I/O 引用。它不是请求命令的 Execution Activity、托管它的容器、原始进程输出或该进程生成的持久 Artifact。, en: "A ProcessHandle is a runtime record for a specific child or managed process, including its process identifier, command fingerprint, status, and controlled I/O references. It is not the Execution Activity that requested a command, the container that hosts it, raw process output, or a durable Artifact produced by the process.", ja: ProcessHandle は特定の子プロセスまたは管理対象プロセスのランタイム記録であり、プロセス識別子、コマンドフィンガープリント、状態、制御された I/O 参照を含む。コマンドを要求した Execution Activity、それをホストするコンテナ、生のプロセス出力、またはプロセスが生成した永続 Artifact ではない。}
-  why_needed: {zh: 智能体运行时需要受控引用来支持取消、超时、退出状态收集和诊断关联，同时不将进程管理与进程执行的语义工作混淆。, en: "Agent runtimes need a controlled reference for cancellation, timeout, exit-status collection, and diagnostic correlation without conflating process management with the semantic work the process performs.", ja: エージェントランタイムには、プロセス管理をプロセスが実行する意味上の作業と混同せずに、キャンセル、タイムアウト、終了状態収集、診断相関を行うための制御された参照が必要である。}
+  short_definition:
+    zh: 进程句柄是把一次运行尝试关联到具体操作系统进程的可验证标识记录。
+    en: A ProcessHandle is a verifiable identifier record that correlates a run attempt with a concrete operating-system process.
+    ja: ProcessHandle は、実行試行を具体的な OS プロセスへ対応付ける検証可能な識別記録である。
+  definition:
+    zh: 进程句柄是一类信息记录；它以进程标识、主机或容器范围以及可防止 PID 复用歧义的启动标记来指称一个已创建进程，并可附带终止、标准流和清理控制信息。它不是进程活动本身，也不是 RunAttempt 的结果或状态。
+    en: A ProcessHandle is an information record that denotes one spawned process using a process identifier, host or container scope, and a start marker that avoids PID-reuse ambiguity; it may also carry termination, standard-stream, and cleanup controls. It is neither the process activity itself nor the result or state of a RunAttempt.
+    ja: ProcessHandle は、プロセス ID、ホストまたはコンテナ範囲、PID 再利用の曖昧さを避ける開始標識で一つの生成済みプロセスを指す情報記録であり、終了、標準ストリーム、後始末の制御を持ち得る。プロセス活動そのものでも RunAttempt の結果・状態でもない。
+  why_needed:
+    zh: 该记录使取消、超时清理、标准输出归属和孤儿进程排查能够指向实际进程，而不把易复用的裸 PID 当作永久身份。
+    en: The record lets cancellation, timeout cleanup, stream attribution, and orphan-process diagnosis address the actual process without treating a reusable bare PID as permanent identity.
+    ja: この記録により、取消、タイムアウト後処理、ストリーム帰属、孤児プロセス診断が実プロセスを対象にでき、再利用可能な裸 PID を恒久識別子として扱わずに済む。
   includes:
-    - {zh: 句柄 ID、进程 ID、命令指纹、生命周期状态、超时策略和经脱敏的流引用。, en: "Handle ID, process ID, command fingerprint, lifecycle status, timeout policy, and redacted stream references.", ja: ハンドル ID、プロセス ID、コマンドフィンガープリント、ライフサイクル状態、タイムアウトポリシー、マスキング済みストリーム参照。}
-    - {zh: 属于一个 RuntimeEnvironment 且可选由 Execution 启动的受管理进程。, en: A managed process belonging to one RuntimeEnvironment and optionally launched by an Execution., ja: 1 つの RuntimeEnvironment に属し、任意で Execution が起動する管理対象プロセス。}
+    - zh: 纳入由命令或工具调用创建、带 PID、执行环境范围和启动标记并可用于控制或关联的进程引用。
+      en: Includes a process reference created by a command or tool call with PID, execution-environment scope, start marker, and enough information for control or correlation.
+      ja: コマンドまたはツール呼び出しで生成され、PID、実行環境範囲、開始標識、制御または対応付けに十分な情報を持つプロセス参照を含む。
   excludes:
-    - {zh: 包含机密的完整命令参数、原始 stdout/stderr 载荷或可执行 Artifact。, en: "Full command arguments containing secrets, raw stdout/stderr payloads, or an executable Artifact.", ja: 秘密を含む完全なコマンド引数、生の stdout/stderr ペイロード、または実行可能 Artifact。}
-    - {zh: 容器身份、shell 工作区或业务级执行结果。, en: "A container identity, shell workspace, or business-level execution result.", ja: コンテナ識別性、シェルワークスペース、またはビジネスレベルの実行結果。}
-  semantic_kind: entity
-  aliases: [child process reference, managed subprocess]
-engineering:
-  explanation: {zh: 运行时生成子进程，为其分配句柄，将有界输出流向可观测性记录或工件，执行超时与取消策略，并记录最终退出状态。即使调用执行或工作器终止，该句柄仍保留进程生命周期元数据。, en: "A runtime spawns a subprocess, assigns it a handle, streams bounded output to observability or artifacts, enforces timeout/cancellation policy, and records final exit state. The handle preserves process lifecycle metadata even when the invoking execution or worker terminates.", ja: ランタイムはサブプロセスを生成してハンドルを割り当て、制限付き出力を可観測性または Artifact へストリーミングし、タイムアウトとキャンセルポリシーを適用して最終終了状態を記録する。呼び出し元の実行またはワーカーが終了しても、ハンドルはプロセスライフサイクルメタデータを保持する。}
-  typical_input:
-    - description: {zh: 进程生成请求, en: Process spawn request, ja: プロセス生成要求}
-      format: |-
-        {"environment_id":"env-prod-a","command_digest":"sha256:8b1a...","timeout_ms":30000,"working_directory_id":"workdir-5"}
-  typical_output:
-    - description: {zh: 进程句柄记录, en: Process handle record, ja: プロセスハンドル記録}
-      format: |-
-        {"process_handle_id":"proc-27","pid":4421,"status":"exited","exit_code":0,"output_ref":"artifact-process-output-27"}
-  reference_implementations:
-    - {name: Node.js child_process, url: https://nodejs.org/api/child_process.html, description: "Documents spawning child processes, stream I/O, exit events, and termination."}
+    - zh: 不纳入脱离主机与启动时间的裸整数 PID、描述预期命令的 InvocationSpecification 或业务运行结果。
+      en: Excludes a bare integer PID without host and start context, an InvocationSpecification describing an intended command, and a business run result.
+      ja: ホストと開始文脈を欠く裸の整数 PID、予定コマンドを記述する InvocationSpecification、業務実行結果は含まない。
+  semantic_kind: information
+  aliases: []
 structure:
-  identity_keys: [process_handle_id]
+  identity_keys:
+    - runtime_environment_ref
+    - process_id
+    - started_at
   fields:
-    - id: process_handle_id
-      labels: {zh: 进程句柄 ID, en: Process handle ID, ja: プロセスハンドル ID}
-      definitions: {zh: 一个受管理进程记录的稳定运行时标识符。, en: Stable runtime identifier for one managed process record., ja: 1 つの管理対象プロセス記録の安定したランタイム識別子。}
+    - id: runtime_environment_ref
+      labels:
+        zh: 运行环境引用
+        en: runtime-environment reference
+        ja: runtime environment 参照
+      datatype: reference
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 限定进程标识有效的主机、容器或沙箱环境。
+        en: Scopes the process identifier to its host, container, or sandbox environment.
+        ja: process identifier が有効な host/container/sandbox environment を限定します。
+      allowed_values: []
+      pattern: null
+      example_value: runtime-environment:sandbox-17
+      source_claims:
+        - claim-process-handle-002
+    - id: process_id
+      labels:
+        zh: 进程标识
+        en: process ID
+        ja: process ID
+      datatype: string-or-integer
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 由运行环境分配的进程标识；不能脱离环境与启动时间单独作为永久身份。
+        en: The process identifier assigned by the runtime; it is not a durable identity without scope and start time.
+        ja: runtime が割り当てる process identifier。scope と start time なしでは durable identity ではありません。
+      allowed_values: []
+      pattern: null
+      example_value: 4821
+      source_claims:
+        - claim-process-handle-002
+    - id: started_at
+      labels:
+        zh: 进程启动时间
+        en: process started at
+        ja: process start time
+      datatype: datetime
+      required: true
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 实际子进程创建的时间，用于区分被复用的进程标识。
+        en: The actual child-process creation time used to disambiguate reused process IDs.
+        ja: 再利用された process ID を区別する actual child-process creation time。
+      allowed_values: []
+      pattern: null
+      example_value: 2026-07-17T09:31:04Z
+      source_claims:
+        - claim-process-handle-002
+    - id: lifecycle_state
+      labels:
+        zh: 进程生命周期状态
+        en: process lifecycle state
+        ja: process lifecycle state
       datatype: string
       required: true
-      cardinality: {min: 1, max: 1}
-      pattern: '^[a-z][a-z0-9-]{2,127}$'
-      example_value: proc-27
-      source_claims: [claim-process-handle-lifecycle]
-    - id: pid
-      labels: {zh: 进程 ID, en: Process ID, ja: プロセス ID}
-      definitions: {zh: 在进程生命周期内有效的操作系统进程标识符。, en: Operating-system process identifier valid during the process lifetime., ja: プロセスの存続期間中に有効なオペレーティングシステムのプロセス識別子。}
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 记录句柄所指进程当前为运行、已退出、已终止或已强制结束。
+        en: Records whether the denoted process is running, exited, terminated, or killed.
+        ja: 対象 process が running/exited/terminated/killed のどれかを記録します。
+      allowed_values: []
+      pattern: null
+      example_value: running
+      source_claims:
+        - claim-process-handle-002
+    - id: standard_input_ref
+      labels:
+        zh: 标准输入控制引用
+        en: standard-input control reference
+        ja: standard input control 参照
+      datatype: reference
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      definitions:
+        zh: 引用可关闭或写入子进程标准输入的控制通道。
+        en: References the control channel used to write or close the child process's standard input.
+        ja: child process の standard input を write/close する control channel を参照します。
+      allowed_values: []
+      pattern: null
+      example_value: stream-control:stdin-4821
+      source_claims:
+        - claim-process-handle-002
+    - id: standard_output_ref
+      labels:
+        zh: 标准输出流引用
+        en: standard-output stream reference
+        ja: standard output stream 参照
+      datatype: reference
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      definitions:
+        zh: 引用该进程的标准输出流。
+        en: References the process's standard-output stream.
+        ja: process の standard-output stream を参照します。
+      allowed_values: []
+      pattern: null
+      example_value: output-stream:stdout-4821
+      source_claims:
+        - claim-process-handle-002
+    - id: standard_error_ref
+      labels:
+        zh: 标准错误流引用
+        en: standard-error stream reference
+        ja: standard error stream 参照
+      datatype: reference
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      definitions:
+        zh: 引用该进程的标准错误流。
+        en: References the process's standard-error stream.
+        ja: process の standard-error stream を参照します。
+      allowed_values: []
+      pattern: null
+      example_value: output-stream:stderr-4821
+      source_claims:
+        - claim-process-handle-002
+    - id: termination_control_ref
+      labels:
+        zh: 终止控制引用
+        en: termination-control reference
+        ja: termination control 参照
+      datatype: reference
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      definitions:
+        zh: 引用可执行有序关闭、终止与强制结束的受控能力。
+        en: References the controlled capability for orderly close, terminate, and kill escalation.
+        ja: orderly close/terminate/kill escalation を実行する controlled capability を参照します。
+      allowed_values: []
+      pattern: null
+      example_value: process-control:sandbox-17/4821
+      source_claims:
+        - claim-process-handle-002
+    - id: exited_at
+      labels:
+        zh: 进程退出时间
+        en: process exited at
+        ja: process exit time
+      datatype: datetime
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      definitions:
+        zh: 记录运行环境观察到进程结束的时间。
+        en: Records when the runtime environment observed the process end.
+        ja: runtime environment が process end を観測した時刻。
+      allowed_values: []
+      pattern: null
+      example_value: 2026-07-17T09:34:12Z
+      source_claims:
+        - claim-process-handle-002
+    - id: exit_code
+      labels:
+        zh: 退出码
+        en: exit code
+        ja: exit code
       datatype: integer
-      required: true
-      cardinality: {min: 1, max: 1}
-      minimum: 1
-      example_value: 4421
-      source_claims: [claim-process-handle-lifecycle]
-    - id: command_digest
-      labels: {zh: 命令摘要, en: Command digest, ja: コマンドダイジェスト}
-      definitions: {zh: 已解析命令规范的摘要或批准标识符，而非包含机密的原始参数。, en: "Digest or approved identifier for the resolved command specification, not raw secret-bearing arguments.", ja: 解決済みコマンド仕様のダイジェストまたは承認済み識別子であり、秘密を含む生の引数ではない。}
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      pattern: '^sha256:[a-f0-9]{64}$'
-      example_value: sha256:8b1a9953c4611296a827abf8c47804d78efc4f3c6b4b5c621c6efc72e6c4b0c6
-      source_claims: [claim-process-handle-lifecycle]
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      definitions:
+        zh: 在运行环境提供时保存进程的数值退出状态。
+        en: Stores the process's numeric exit status when supplied by the runtime.
+        ja: runtime が提供する場合の numeric exit status。
+      allowed_values: []
+      pattern: null
+      example_value: 0
+      source_claims:
+        - claim-process-handle-002
   constraints:
-    - id: process-handle-lifecycle-safety
+    - id: process-handle-pid-reuse-safe
       severity: error
-      language: plain
-      expression: A handle must record one current lifecycle status and may expose redacted output references, but must not store raw credentials or unrestricted command arguments.
-      explanation: {zh: 进程控制需要足够数据用于问责，但不能通过进程元数据泄露机密。, en: Process control needs enough data for accountability without leaking secrets through process metadata., ja: プロセス制御には説明責任のための十分なデータが必要だが、プロセスメタデータ経由で秘密を漏らしてはならない。}
-      source_claims: [claim-process-handle-lifecycle]
-  required_relations: [ProcessHandle-part-of-RuntimeEnvironment]
+      expression_language: plain
+      expression: runtime_environment_ref, process_id, and started_at remain immutable and jointly denote one spawned process
+      explanations:
+        zh: 裸 PID 不能单独构成稳定句柄。
+        en: A bare PID cannot constitute a stable handle by itself.
+        ja: bare PID 単独では stable handle を構成しません。
+      source_claims:
+        - claim-process-handle-002
+    - id: process-handle-terminal-evidence-coherent
+      severity: error
+      expression_language: plain
+      expression: exited_at and exit_code describe this process incarnation only; lifecycle_state is terminal when exited_at is present
+      explanations:
+        zh: 退出证据不得误配到同 PID 的其他进程实例。
+        en: Exit evidence must not be attached to another process incarnation that reused the PID.
+        ja: exit evidence を同じ PID を再利用した別 process incarnation に付けません。
+      source_claims:
+        - claim-process-handle-002
+  required_relation_constraints:
+    - id: process-handle-valid-in-one-runtime-environment
+      direction: outgoing
+      predicate: valid_in
+      target_concept_id: RuntimeEnvironment
+      cardinality:
+        min: 1
+        max: 1
+      explanations:
+        zh: 句柄仅在一个明确运行环境内有效。
+        en: The handle is valid in exactly one explicit runtime environment.
+        ja: handle は一つの明示 runtime environment 内でのみ有効です。
+      source_claims:
+        - claim-process-handle-002
 examples:
-  - id: process-handle-positive
-    labels: {zh: "Docker exec worker PID", en: "Docker exec worker PID", ja: "Docker exec worker PID"}
-    descriptions: {zh: "vLLM python -m vllm.entrypoints.openai.api_server --model meta-llama/Llama-3-8B; PagedAttention+continuous batching; ProcessHandle maps RuntimeEnvironment/Execution/GenerativeModel.", en: "vLLM api_server --model meta-llama/Llama-3-8B; PagedAttention+continuous batching; ProcessHandle maps RuntimeEnvironment/Execution/GenerativeModel.", ja: "vLLM api_server PagedAttention; ProcessHandle serving env."}
-    field_values: {process_handle_id: proc-27, pid: 4421, command_digest: sha256:8b1a9953c4611296a827abf8c47804d78efc4f3c6b4b5c621c6efc72e6c4b0c6}
-    related_node_ids: [ProcessHandle, RuntimeEnvironment, Artifact]
-    related_relation_ids: [ProcessHandle-part-of-RuntimeEnvironment]
-    source_claims: [claim-process-handle-lifecycle]
-  - id: process-handle-counterexample
-    labels: {zh: "OpenAI run_id 非 ProcessHandle", en: "OpenAI run_id not ProcessHandle", ja: "OpenAI run_id は ProcessHandle ではない"}
-    descriptions: {zh: "ID without PROV relations cannot serve as PROV-O-style ProcessHandle.", en: "ID without PROV relations cannot serve as PROV-O-style ProcessHandle.", ja: "Missing PROV relations rejects ProcessHandle."}
-    field_values: {artifact_id: artifact-process-output-27}
-    related_node_ids: [Artifact]
-    related_relation_ids: []
-    source_claims: [claim-process-handle-lifecycle]
-  - id: process-handle-boundary
-    labels: {zh: "ProcessHandle 与 Execution 边界", en: "ProcessHandle versus Execution boundary", ja: "ProcessHandle と Execution 境界"}
-    descriptions: {zh: "model manifest is env config; chat completion is Execution; ProcessHandle must not treat Modelfile path as Execution result.", en: "model manifest is env config; chat completion is Execution; ProcessHandle must not treat Modelfile path as Execution result.", ja: "manifest env; chat completion Execution."}
-    field_values: {process_handle_id: proc-27}
-    related_node_ids: [ProcessHandle, Execution]
-    related_relation_ids: []
-    source_claims: [claim-process-handle-lifecycle]
-  - id: process-handle-instance-proc-27
-    labels: {zh: "PID 4820 实例", en: "PID 4820 instance", ja: "PID 4820 事例"}
-    descriptions: {zh: "OTel instance: trace_id=4bf92f3577b34da6 span_id=00f067aa kind=CLIENT name=llm.call->ProcessHandle.", en: "OTel instance: trace_id+span_id kind=CLIENT name=llm.call->ProcessHandle.", ja: "OTel instance maps to ProcessHandle."}
-    field_values: {process_handle_id: proc-27, pid: 4421, command_digest: sha256:8b1a9953c4611296a827abf8c47804d78efc4f3c6b4b5c621c6efc72e6c4b0c6}
-    related_node_ids: [ProcessHandle, RuntimeEnvironment, WorkingDirectory]
-    related_relation_ids: [ProcessHandle-part-of-RuntimeEnvironment]
-    source_claims: [claim-process-handle-lifecycle]
+  - id: ProcessHandle-example-positive-001
+    kind: positive
+    labels:
+      zh: 进程句柄正例
+      en: Positive example of process handle
+      ja: プロセスハンドルの正例
+    scenario_id: null
+    descriptions:
+      zh: Shell 工具在 container sandbox-17 中于 09:31:04Z 启动 PID 4821，并保存容器 ID、启动标记、标准输出通道和终止令牌。
+      en: A shell tool starts PID 4821 in container sandbox-17 at 09:31:04Z and stores the container ID, start marker, stdout channel, and termination token.
+      ja: Shell ツールが container sandbox-17 で 09:31:04Z に PID 4821 を開始し、コンテナ ID、開始標識、stdout チャネル、終了トークンを保存する。
+    field_values:
+      runtime_environment_ref: runtime-environment:sandbox-17
+      process_id: 4821
+      started_at: 2026-07-17T09:31:04Z
+      lifecycle_state: running
+      standard_input_ref: stream-control:stdin-4821
+      standard_output_ref: output-stream:stdout-4821
+      standard_error_ref: output-stream:stderr-4821
+      termination_control_ref: process-control:sandbox-17/4821
+    related_node_ids:
+      - ProcessHandle
+      - RunAttempt
+    related_relation_ids:
+      - ProcessHandle-correlates-RunAttempt
+    expected_result:
+      zh: 该信息记录归类为 ProcessHandle，并可与产生它的 RunAttempt 关联。
+      en: The information record is classified as ProcessHandle and can be correlated with the RunAttempt that created it.
+      ja: この情報記録は ProcessHandle に分類され、生成元 RunAttempt と対応付けられる。
+    why_valid_or_invalid:
+      zh: 进程身份由 PID、执行范围和启动时刻共同限定，并提供真实控制信息。
+      en: Process identity is jointly bounded by PID, execution scope, and start time, and the record provides actual control information.
+      ja: プロセス識別は PID、実行範囲、開始時刻で共同限定され、実際の制御情報もある。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-process-handle-003
+  - id: ProcessHandle-example-boundary-001
+    kind: boundary
+    labels:
+      zh: 进程句柄边界例
+      en: Boundary case for process handle
+      ja: プロセスハンドルの境界例
+    scenario_id: null
+    descriptions:
+      zh: 日志只打印 pid=4821，却没有主机或容器标识、启动标记与存活证据；同一 PID 之后可能被操作系统复用。
+      en: A log prints only pid=4821, with no host or container identity, start marker, or liveness evidence; the operating system can later reuse that PID.
+      ja: ログに pid=4821 だけがあり、ホストまたはコンテナ識別子、開始標識、生存証拠がない。同じ PID は後で OS に再利用され得る。
+    field_values: {}
+    related_node_ids:
+      - ProcessHandle
+      - RunAttempt
+    related_relation_ids:
+      - ProcessHandle-correlates-RunAttempt
+    expected_result:
+      zh: 该数值只能作为诊断线索，不能单独构成 ProcessHandle。
+      en: The number is only a diagnostic clue and cannot by itself constitute a ProcessHandle.
+      ja: この数値は診断手掛かりにすぎず、それだけでは ProcessHandle を構成しない。
+    why_valid_or_invalid:
+      zh: 缺少执行范围和启动身份时，记录无法稳定指称唯一进程或安全执行控制操作。
+      en: Without execution scope and start identity, the record cannot stably denote one process or safely support control operations.
+      ja: 実行範囲と開始識別を欠くため、一つのプロセスを安定して指せず、安全な制御操作にも使えない。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-process-handle-004
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation: []
 parent_relation:
-  id: ProcessHandle-part-of-RuntimeEnvironment
+  id: ProcessHandle-valid_in-RuntimeEnvironment
   predicate: part_of
-  target: concept:RuntimeEnvironment
-  endpoint_order: child-to-parent
-  direction: source-to-target
+  direction: target-to-source
   relation_kind: composition
-  labels: {zh: 是运行环境的一部分, en: is part of runtime environment, ja: 実行環境の一部である}
-  definitions: {zh: ProcessHandle 在一个 RuntimeEnvironment 的执行边界内受管理。, en: A ProcessHandle is managed within one RuntimeEnvironment's execution boundary., ja: ProcessHandle は 1 つの RuntimeEnvironment の実行境界内で管理される。}
-  cardinality: {source: {min: 0, max: null}, target: {min: 1, max: 1}}
-  cardinality_not_applicable_reason: null
-  inverse_reading: {predicate: has_process_handle, labels: {zh: 具有进程句柄, en: has process handle, ja: プロセスハンドルを持つ}}
+  labels:
+    zh: 在运行环境内有效
+    en: is valid in runtime environment
+    ja: 実行環境内で有効である
+  definitions:
+    zh: ProcessHandle-valid_in-RuntimeEnvironment 表示进程句柄的 PID 或等价标识、启动标记、主机或容器范围与目标 RuntimeEnvironment 的同一实例相匹配，因此该句柄只在该环境及其进程生命周期内可解析。相同 PID 出现在另一容器、主机或重启后的生命周期中，不得沿用这条关系。
+    en: ProcessHandle-valid_in-RuntimeEnvironment states that the handle's PID or equivalent identifier, start marker, and host or container scope match the same RuntimeEnvironment instance, so the handle is resolvable only within that environment and process lifetime. The same PID in another container, host, or post-restart lifetime does not preserve the relation.
+    ja: ProcessHandle-valid_in-RuntimeEnvironment は、handle の PID 等識別子・開始 marker・host/container scope が同じ RuntimeEnvironment instance と一致し、その環境と process lifetime 内だけで解決可能であることを表します。別 container・host・再起動後の同一 PID には関係を引き継ぎません。
+  cardinality: null
+  cardinality_not_applicable_reason:
+    zh: 句柄在一个有效时间点应解析到一个环境实例，但迁移或导入记录可能形成分段有效期；本体以带时间范围的事实表达，不强制静态全局基数。
+    en: A handle should resolve to one environment instance at a valid-time point, but migration or imported records may create segmented validity; the ontology represents time-scoped facts rather than a static global cardinality.
+    ja: handle は一時点で一環境 instance に解決すべきですが、移行・取込記録では有効期間が分割され得るため、静的全局基数でなく時間範囲付き事実で表します。
+  inverse_reading:
+    predicate: part_of
+    labels:
+      zh: 限定进程句柄范围
+      en: scopes process handle
+      ja: プロセスハンドルを範囲化する
   conditions:
-    - id: process-handle-parent-condition
+    - id: process-handle-environment-scope-condition
       severity: error
-      expression: The handle must resolve to the environment responsible for process creation, cancellation, and output policy.
-      explanations: {zh: 脱离上下文的 PID 不能建立治理运行时边界。, en: A detached PID does not establish the governing runtime boundary., ja: 文脈から切り離された PID では統治するランタイム境界を確立できない。}
-      source_claims: [claim-process-handle-lifecycle]
+      expression_language: plain
+      expression: ProcessHandle process identifier, start marker, and host_or_container_scope match the target RuntimeEnvironment instance for the asserted valid-time interval.
+      explanations:
+        zh: 只有进程标识、启动标记和主机或容器范围全部匹配目标环境实例时，句柄才在该环境内有效。
+        en: The handle is valid in the environment only when process identifier, start marker, and host or container scope all match the target environment instance.
+        ja: process ID・開始 marker・host/container scope がすべて対象環境 instance と一致する場合だけ handle はその環境内で有効です。
+      source_claims:
+        - claim-process-handle-005
   temporal_scope: valid-time
   boundary_context: null
   constraints: []
-  examples: []
-  source_claims: [claim-process-handle-lifecycle]
-relations: []
-sources:
-  - id: nodejs-child-process
-    title: "Node.js child_process API"
-    url: https://nodejs.org/api/child_process.html
-    source_type: documentation
-    relevance: Documents child-process spawning, lifecycle events, I/O streams, exit codes, and termination controls.
+  examples:
+    - id: ProcessHandle-valid_in-RuntimeEnvironment-example-positive-manual-20260716
+      kind: positive
+      labels:
+        zh: 容器内 MCP 服务进程句柄
+        en: MCP server process handle inside a container
+        ja: コンテナ内 MCP server process handle
+      scenario_id: null
+      descriptions:
+        zh: handle-mcp-7 记录 pid=314、start_marker=boot-8:9912、container_id=c9；container-c9 的进程记录具有相同三元组，并在该有效期内管理 MCP stdio 的 stdin/stdout。
+        en: handle-mcp-7 records pid=314, start_marker=boot-8:9912, and container_id=c9; container-c9's process record has the same tuple and manages MCP stdio stdin/stdout during that lifetime.
+        ja: handle-mcp-7 は pid=314・start_marker=boot-8:9912・container_id=c9 を記録し、container-c9 の process 記録も同じ組を持ち、その有効期間に MCP stdio の stdin/stdout を管理します。
+      field_values: {}
+      related_node_ids:
+        - ProcessHandle
+        - RuntimeEnvironment
+      related_relation_ids:
+        - ProcessHandle-valid_in-RuntimeEnvironment
+      expected_result:
+        zh: 句柄解析到 container-c9，终止或读取标准流时必须使用该环境的进程命名空间。
+        en: Resolve the handle to container-c9 and use that environment's process namespace for termination or standard-stream access.
+        ja: handle を container-c9 に解決し、終了・標準 stream 読取にはその環境の process namespace を使います。
+      why_valid_or_invalid:
+        zh: 进程标识、启动身份与环境范围全部一致，消除了 PID 复用与跨容器歧义。
+        en: Process identifier, start identity, and environment scope all agree, eliminating PID reuse and cross-container ambiguity.
+        ja: process ID・開始 identity・環境 scope が全て一致し、PID 再利用と跨 container 曖昧性を除きます。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-process-handle-006
+    - id: ProcessHandle-valid_in-RuntimeEnvironment-example-boundary-manual-20260716
+      kind: boundary
+      labels:
+        zh: 另一容器复用了 PID
+        en: PID reused in another container
+        ja: 別コンテナで PID が再利用される
+      scenario_id: null
+      descriptions:
+        zh: 旧 handle-old 只保存 pid=314；container-c9 已停止，container-d4 中随后出现新的 pid=314，且启动标记与容器标识均不同。
+        en: old handle-old stores only pid=314; container-c9 has stopped and a new pid=314 later appears in container-d4 with a different start marker and container identifier.
+        ja: 旧 handle-old は pid=314 だけを保存し、container-c9 終了後に container-d4 で新しい pid=314 が別 start marker・container ID と共に現れます。
+      field_values: {}
+      related_node_ids:
+        - ProcessHandle
+        - RuntimeEnvironment
+      related_relation_ids:
+        - ProcessHandle-valid_in-RuntimeEnvironment
+      expected_result:
+        zh: 不得把旧句柄解析到 container-d4；报告句柄身份不足或已过期。
+        en: Do not resolve the old handle to container-d4; report insufficient or expired handle identity.
+        ja: 旧 handle を container-d4 へ解決せず、identity 不足または期限切れを報告します。
+      why_valid_or_invalid:
+        zh: 裸 PID 不跨环境或进程生命周期保持身份，错误解析可能终止无关进程。
+        en: A bare PID does not preserve identity across environments or process lifetimes, and misresolution could terminate an unrelated process.
+        ja: 裸 PID は環境・process lifetime を越えて同一性を保たず、誤解決は無関係 process を終了し得ます。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-process-handle-007
+  source_claims:
+    - claim-process-handle-008
+    - claim-process-handle-009
+  distinct_fact_rationale:
+    zh: ProcessHandle-correlates-RunAttempt 说明进程与哪次业务尝试相关；valid_in 说明该句柄在哪个进程命名空间内可安全解析，业务关联与身份作用域不可合并。
+    en: ProcessHandle-correlates-RunAttempt links a process to a business attempt, while valid_in identifies the process namespace in which the handle can be safely resolved; business correlation and identity scope are distinct facts.
+    ja: ProcessHandle-correlates-RunAttempt は process と業務試行の関連、valid_in は handle を安全に解決できる process namespace を表し、業務相関と identity scope は別事実です。
+  layout_role: primary-backbone
+  review_status: accepted
+  endpoint_order: child-to-parent
+relations:
+  - id: ProcessHandle-correlates-RunAttempt
+    predicate: correlates
+    direction: source-to-target
+    relation_kind: information
+    labels:
+      zh: 关联执行尝试
+      en: correlates run attempt
+      ja: 実行試行を対応付ける
+    definitions:
+      zh: 把包含进程标识、宿主或容器范围及启动标记的 ProcessHandle 关联到实际由该进程承载的 RunAttempt；仅有相同 PID 文本或相邻时间戳不足以建立关联。
+      en: Correlates a ProcessHandle carrying process identity, host or container scope, and a start marker with the RunAttempt actually hosted by that process; matching PID text or nearby timestamps alone are insufficient.
+      ja: process identity・host/container scope・start markerを持つProcessHandleを、そのprocessが実際にhostしたRunAttemptへ対応付けます。同じPID文字列や近いtimestampだけでは不十分です。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 该本体关系记录可查询的语义事实，但不对所有运行实例施加统一基数。
+      en: This ontology relation records a queryable semantic fact without imposing one universal cardinality on all runtime instances.
+      ja: この本体関係は検索可能な意味事実を記録しますが、すべての実行インスタンスに一律の基数を課しません。
+    inverse_reading:
+      predicate: correlated_by_process_handle
+      labels:
+        zh: 由进程句柄关联
+        en: correlated by process handle
+        ja: process handleで対応付けられる
+    conditions: []
+    temporal_scope: timeless
+    boundary_context: null
+    constraints: []
+    examples:
+      - id: ProcessHandle-correlates-RunAttempt-example-positive-manual-001
+        kind: positive
+        labels:
+          zh: 关联执行尝试正例
+          en: "Positive case: correlates run attempt"
+          ja: 実行試行を対応付けるの正例
+        scenario_id: null
+        descriptions:
+          zh: attempt-52 启动 MCP stdio 子进程 PID 4821；句柄记录 container sandbox-17、启动时间与该 attempt_id，并捕获其 stdout/stderr。
+          en: attempt-52 launches MCP stdio subprocess PID 4821; its handle records container sandbox-17, start time, the attempt_id, and captured stdout/stderr.
+          ja: attempt-52がMCP stdio subprocess PID 4821を起動し、handleはcontainer sandbox-17・start time・attempt_id・stdout/stderrを記録します。
+        field_values: {}
+        related_node_ids:
+          - ProcessHandle
+          - RunAttempt
+        related_relation_ids:
+          - ProcessHandle-correlates-RunAttempt
+        expected_result:
+          zh: 断言该 ProcessHandle correlates attempt-52。
+          en: Assert that the ProcessHandle correlates attempt-52.
+          ja: そのProcessHandle correlates attempt-52をassertします。
+        why_valid_or_invalid:
+          zh: 进程范围、启动标记和尝试标识共同消除了 PID 重用歧义。
+          en: Process scope, start marker, and attempt identity jointly remove PID-reuse ambiguity.
+          ja: process scope・start marker・attempt identityがPID reuse ambiguityを除去します。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-process-handle-010
+      - id: ProcessHandle-correlates-RunAttempt-example-boundary-manual-001
+        kind: boundary
+        labels:
+          zh: 关联执行尝试边界例
+          en: "Boundary case: correlates run attempt"
+          ja: 実行試行を対応付けるの境界例
+        scenario_id: null
+        descriptions:
+          zh: 一周后的系统日志再次出现 PID 4821，但来自 host-main，且没有 attempt_id 或原启动标记。
+          en: A system log one week later mentions PID 4821 again, but on host-main and without the original start marker or attempt_id.
+          ja: 一週間後のsystem logにPID 4821が再出現しますがhost-main由来で、元start markerもattempt_idもありません。
+        field_values: {}
+        related_node_ids:
+          - ProcessHandle
+          - RunAttempt
+        related_relation_ids:
+          - ProcessHandle-correlates-RunAttempt
+        expected_result:
+          zh: 不得把后来的 PID 记录关联到 attempt-52。
+          en: Do not correlate the later PID record with attempt-52.
+          ja: 後のPID recordをattempt-52へcorrelateしません。
+        why_valid_or_invalid:
+          zh: PID 可被重用；缺少范围与启动身份时不能证明同一进程。
+          en: PIDs can be reused, and identity cannot be established without scope and a start marker.
+          ja: PIDはreuseされ得るため、scopeとstart markerなしでは同一processを証明できません。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-process-handle-010
+    source_claims:
+      - claim-process-handle-010
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: accepted
+    target: concept:RunAttempt
+review:
+  status: accepted
+  method: manual-semantic
+  reviewer: manual-runtime-verification
+  reviewed_on: 2026-07-17
+  note:
+    zh: 已对照 OpenAI Agents Sessions、LangGraph thread 与 POSIX 进程环境逐项核验，RuntimeSession 生命周期语义成立。
+    en: Verified against OpenAI Agents Sessions, LangGraph thread persistence, and POSIX process environment. RuntimeSession lifecycle holds.
+    ja: OpenAI Agents Sessions、LangGraph thread、POSIX process environment に照らし RuntimeSession lifecycle を確認しました。
+  sections:
+    semantics: accepted
+    hierarchy: accepted
+    relations: accepted
+    structure: accepted
+    examples: accepted
+    source_claims: accepted
 source_claims:
-  - id: claim-process-handle-lifecycle
-    source: nodejs-child-process
-    supports: Node.js child process APIs create and manage subprocesses with process identifiers, streams, exit events, and termination behavior.
-    locator: Child process module overview, spawn, and event lifecycle
-    evidence_kind: documentation
+  - id: claim-process-handle-001
+    source: eng-proto-mcp-spec
+    supports: The MCP stdio transport requires lifecycle management of a server subprocess and its standard streams. Moonweave's ProcessHandle records the scoped process identity needed to correlate and control that subprocess.
+    locator: MCP Specification > Basic transports > stdio
+    evidence_kind: design-inference
     confidence: high
+    review_status: accepted
+  - id: claim-process-handle-002
+    source: eng-proto-mcp-spec
+    supports: "Direct source premise: MCP stdio communication uses a child server process and its standard streams; shutdown closes input, waits for exit, then may send termination and kill signals. Moonweave design inference: runtime scope, process ID, and start time form a PID-reuse-safe handle, while stream and termination references retain the concrete controls needed for cleanup."
+    locator: MCP Specification > Basic > Lifecycle > Shutdown > stdio; Transports > stdio
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-process-handle-003
+    source: eng-proto-mcp-spec
+    supports: The MCP stdio transport defines a client launching and communicating with a server subprocess over standard streams. The example adds Moonweave correlation and cleanup fields for that spawned-process situation.
+    locator: MCP Specification > Basic transports > stdio
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-process-handle-004
+    source: eng-proto-mcp-spec
+    supports: The MCP transport context involves a concrete subprocess and its streams, not an unscoped number. Moonweave therefore rejects an isolated PID as a complete handle.
+    locator: MCP Specification > Basic transports > stdio
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-process-handle-005
+    source: eng-runtime-oci-linux-config
+    supports: OCI scopes a configured process to a concrete container runtime and namespace boundary. Moonweave uses that scope together with a start marker to prevent cross-environment PID ambiguity.
+    locator: OCI Runtime Specification > Configuration > Process and Linux namespaces
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-process-handle-006
+    source: eng-proto-mcp-spec
+    supports: MCP stdio requires the client to launch and manage a server subprocess and its standard streams; Moonweave records the environment-scoped process identity needed to do so safely.
+    locator: MCP Specification > Basic transports > stdio
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-process-handle-007
+    source: eng-runtime-oci-linux-config
+    supports: OCI process configuration is interpreted inside a particular runtime and namespace boundary; Moonweave therefore rejects a bare PID as evidence across container instances.
+    locator: OCI Runtime Specification > Configuration > Process and Linux namespaces
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-process-handle-008
+    source: eng-proto-mcp-spec
+    supports: The MCP stdio transport requires lifecycle management of a server subprocess and its standard streams, motivating a resolvable process handle rather than an unscoped integer PID.
+    locator: MCP Specification > Basic transports > stdio
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-process-handle-009
+    source: eng-runtime-oci-linux-config
+    supports: OCI binds process configuration to a concrete runtime and namespace boundary; Moonweave uses that boundary as the RuntimeEnvironment scope of a ProcessHandle.
+    locator: OCI Runtime Specification > Configuration > Process and Linux namespaces
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-process-handle-010
+    source: eng-proto-mcp-spec
+    supports: The MCP stdio transport specifies that the client launches the server as a subprocess and exchanges protocol messages over stdin and stdout. Moonweave adds a ProcessHandle-to-RunAttempt correlation so the subprocess occurrence is not confused with a reusable PID value.
+    locator: Base Protocol > Transports > stdio > client launches server as subprocess
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
 

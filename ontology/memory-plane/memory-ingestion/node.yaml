@@ -3,188 +3,280 @@ id: memory-ingestion
 kind: module
 status: accepted
 labels:
-  zh: 记忆摄入
-  en: Memory Ingestion
-  ja: 記憶取り込み
+  zh: 外部资源接入
+  en: External-resource ingestion
+  ja: 外部資源の取り込み
 semantics:
   short_definition:
-    en: Defines how external content is loaded, parsed, and prepared for the memory pipeline.
-    zh: 定义外部内容如何被加载、解析并准备进入记忆管线。
-    ja: 外部コンテンツをメモリパイプラインに取り込み・解析・準備する方法を定義します。
+    zh: 外部资源接入描述如何在已声明的接入政策下，用加载器读取文件、数据库或图存储等外部资源，经规范化与去重后产生可交给分块阶段的 Document 与附件信息。它分开资源实体、接入活动和可复用政策，不把来源引用或持久记忆写入并入本树。
+    en: External-resource ingestion describes how a declared ingestion policy and loader read a file, database, graph store, or other outside resource and turn it, through normalization and deduplication, into a Document and attachment information ready for chunking. It keeps the resource entity, ingestion activity, and reusable policy distinct from source-reference records and persistent-memory writes.
+    ja: memory ingestion は reusable specification・resource type・一 execution fact を分離します。IngestionPolicy は reusable specification root、IngestibleResource は FileSystem・DirectoryResource・FileResource・Database・GraphStore へ特化し、IngestionRun は reads・governed_by・hosts/contains cross-link で具体 resource state を参照します。NormalizationActivity/DeduplicationActivity は Document・version-pinned SourceAttachment・DocumentMetadata・DeduplicationDecision を形成します。
   definition:
-    en: >
-      Memory Ingestion covers the acquisition of raw content from external sources and its
-      transformation into a normalized document representation ready for downstream processing
-      (chunking, embedding, indexing). This includes: document loaders (PDF, HTML, Markdown,
-      code files, databases, APIs, web scraping), format detection and parsing (extracting
-      text and structure from heterogeneous formats), content normalization (encoding handling,
-      whitespace normalization, boilerplate removal), metadata extraction from source
-      (title, author, URL, last_modified), and pipeline orchestration (scheduling, deduplication,
-      incremental vs full re-ingestion). This maps to LangChain's DocumentLoader interface,
-      LlamaIndex's data connectors (SimpleDirectoryReader, web loaders), and Unstructured.io's
-      document parsing capabilities.
-    zh: >
-      记忆摄入覆盖从外部源获取原始内容并将其转换为规范化文档表示，准备供下游处理（分块、嵌入、
-      索引）。包括：文档加载器（PDF、HTML、Markdown、代码文件、数据库、API、网页抓取）、格式
-      检测与解析（从异构格式提取文本和结构）、内容规范化（编码处理、空白规范化、样板移除）、
-      从源提取元数据（标题、作者、URL、最后修改时间）、以及管线编排（调度、去重、增量 vs 全量
-      重新摄入）。映射到 LangChain 的 DocumentLoader 接口、LlamaIndex 的数据连接器和
-      Unstructured.io 的文档解析能力。
-    ja: >
-      記憶取り込みは、外部ソースから生コンテンツを取得し、下流処理（チャンク化、埋め込み、
-      インデックス化）に備えた正規化 Document 表現へ変換する工程を扱います。DocumentLoader
-      （PDF、HTML、Markdown、コード、データベース、API、Web スクレイピング）、形式検出と解析
-      （異種フォーマットからのテキストと構造抽出）、内容正規化（エンコーディング、空白、
-      ボイラープレート除去）、ソースメタデータ抽出（title、author、URL、last_modified）、
-      パイプライン编排（スケジューリング、重複排除、増分 vs 全量再取り込み）を含みます。
-      LangChain の DocumentLoader、LlamaIndex の data connector、Unstructured.io の解析能力に
-      対応する境界です。
+    zh: 记忆接入分开表达可复用规范、资源类型和一次执行事实：IngestionPolicy 是跨运行复用的规范根；IngestibleResource 以类型骨架展开 FileSystem、DirectoryResource、FileResource、Database 与 GraphStore；IngestionRun 通过 reads、governed_by、hosts/contains 等横向事实引用具体资源状态，并由 NormalizationActivity 与 DeduplicationActivity 形成 Document、版本固定的 SourceAttachment、DocumentMetadata 与 DeduplicationDecision。
+    en: IngestionActivity owns the run and its loading, normalization, and deduplication phases; IngestibleResource owns the external entity being read; IngestionPolicy owns the reusable operational specification. A SourceReference only points to a resource and therefore remains in source references and evidence location. Chunking, embedding, index construction, and persistent-memory writes are later activities owned by their respective modules.
+    ja: memory ingestion は reusable specification・resource type・一 execution fact を分離します。IngestionPolicy は reusable specification root、IngestibleResource は FileSystem・DirectoryResource・FileResource・Database・GraphStore へ特化し、IngestionRun は reads・governed_by・hosts/contains cross-link で具体 resource state を参照します。NormalizationActivity/DeduplicationActivity は Document・version-pinned SourceAttachment・DocumentMetadata・DeduplicationDecision を形成します。
   why_needed:
-    en: >
-      Agents need access to knowledge from diverse sources—PDFs, web pages, code repositories,
-      databases, conversations. Each source has a different format, encoding, and structure.
-      Without a proper ingestion layer, you'd have to write custom parsing for every source.
-      LangChain has 100+ document loaders precisely because this variety is real and unavoidable.
-      Ingestion is the entry point of the RAG pipeline: garbage in = garbage out.
-    zh: >
-      智能体需要访问来自多样来源的知识——PDF、网页、代码仓库、数据库、对话。每个来源有不同的
-      格式、编码和结构。没有适当的摄入层，就必须为每个来源写自定义解析。LangChain 有 100 多个
-      文档加载器正是因为这种多样性是真实且不可避免的。摄入是 RAG 管线的入口：垃圾进=垃圾出。
-    ja: >
-      エージェントは PDF、Web ページ、コードリポジトリ、データベース、会話など多様なソースの
-      知識にアクセスする必要があり、各ソースは形式・エンコーディング・構造が異なります。
-      適切な取り込み層がなければソースごとに独自パーサーを書く必要があります。LangChain が
-      100 以上の document loader を持つのは、この多様性が現実的かつ避けられないためです。
-      取り込みは RAG パイプラインの入口であり、garbage in = garbage out です。
+    zh: 把文件、数据库和图等外部资源，经可追踪的读取、规范化与去重决定，转为可供后续分块、表示和存储使用的文档信息。
+    en: Turn external resources such as files, databases, and graphs into document information for later chunking, representation, and storage through traceable reading, normalization, and deduplication decisions.
+    ja: ファイル、データベース、グラフなどの外部資源を、追跡可能な読取り、正規化、重複排除判断によって、後続の分割、表現、保存に利用できる文書情報へ変換します。
   includes:
-    - en: "Document loaders: PDF (PyPDF, pdfplumber), HTML (Beautiful Soup, Playwright), Markdown, code files, database connectors, API data sources, web scrapers (Firecrawl, Crawl4AI)"
-      zh: "文档加载器：PDF（PyPDF、pdfplumber）、HTML（Beautiful Soup、Playwright）、Markdown、代码文件、数据库连接器、API 数据源、网页抓取器（Firecrawl、Crawl4AI）"
-      ja: PDF、HTML、Markdown、code file、database connector、API data source、web scraper を扱う document loader。
-    - en: "Format parsing: text extraction with structure preservation, table detection, image extraction, code block identification, metadata parsing from document headers"
-      zh: "格式解析：保持结构的文本提取、表格检测、图片提取、代码块识别、从文档头部的元数据解析"
-      ja: structure を保持した text extraction、table・image・code block の識別、document header からの metadata parsing。
-    - en: "Content normalization: encoding detection/conversion, whitespace normalization, boilerplate removal (ads, navigation), deduplication"
-      zh: "内容规范化：编码检测/转换、空白规范化、样板移除（广告、导航）、去重"
-      ja: encoding detection と conversion、whitespace normalization、boilerplate removal、deduplication。
-    - en: "Source metadata: title, author, URL/path, last_modified, content_type, word_count, language detection"
-      zh: "源元数据：标题、作者、URL/路径、最后修改时间、内容类型、词计数、语言检测"
-      ja: title、author、URL 又は path、last_modified、content_type、word_count、language detection を含む source metadata。
-    - en: "Pipeline orchestration: scheduling (cron, event-driven), incremental ingestion (only new/changed), full re-ingestion, retry on failure"
-      zh: "管线编排：调度（cron、事件驱动）、增量摄入（仅新增/变化）、全量重新摄入、失败重试"
-      ja: scheduling、incremental ingestion、full re-ingestion、failure retry を含む pipeline orchestration。
+    - zh: IngestibleResource 下并列的 FileSystem、DirectoryResource、FileResource、Database 与 GraphStore 等资源类型，以及另由 hosts、contains、has_table 表达的实例结构；Document 与语料集合保持在信息和集合分支。
+      en: Sibling resource types under IngestibleResource—FileSystem, DirectoryResource, FileResource, Database, GraphStore, and peers—plus instance structure expressed separately through hosts, contains, and has_table; Document and corpora remain on information and collection branches.
+      ja: IngestibleResource 配下の sibling resource type（FileSystem・DirectoryResource・FileResource・Database・GraphStore 等）と、hosts・contains・has_table で別に表す instance structure。Document/corpus は information/collection branch に保ちます。
+    - zh: 独立可复用的 IngestionPolicy 与 DocumentLoader，完整 IngestionRun 及其 NormalizationActivity、DeduplicationActivity，以及 Document、DocumentMetadata、DeduplicationDecision 和由 Document 组成并固定资源版本与摘要的 SourceAttachment。
+      en: Independent reusable IngestionPolicy and DocumentLoader, a complete IngestionRun and its NormalizationActivity and DeduplicationActivity phases, plus Document, DocumentMetadata, DeduplicationDecision, and SourceAttachment records composed by a Document and pinned to a resource version and digest.
+      ja: independent reusable IngestionPolicy・DocumentLoader、complete IngestionRun と NormalizationActivity/DeduplicationActivity、Document・DocumentMetadata・DeduplicationDecision、および Document が構成し resource version/digest を固定する SourceAttachment。
   excludes:
-    - en: "Chunking the loaded documents (belongs to Chunking & Situating—ingestion produces whole documents, chunking splits them)"
-      zh: "对加载文档进行分块（属于分块与定位模块——摄入产生完整文档，分块分割它们）"
-      ja: memory-chunking-situating に属する loaded Document の chunking。ingestion は whole Document を生成し、chunking はそれを分割する。
-    - en: "Embedding and indexing (belongs to Embeddings & Indexes—ingestion provides normalized text, not vectors)"
-      zh: "嵌入和索引（属于嵌入与索引模块——摄入提供规范化文本，不是向量）"
-      ja: memory-embedding-indexes に属する embedding と indexing。ingestion は normalized text を提供し、vector を生成しない。
-    - en: "Memory object creation in stores (belongs to Memory Stores & Scopes—ingestion feeds documents into the pipeline, stores persist the final results)"
-      zh: "在存储中创建记忆对象（属于记忆存储与作用域——摄入将文档送入管线，存储持久化最终结果）"
-      ja: memory-stores-scopes に属する memory object creation。ingestion は Document を pipeline に渡し、store が最終結果を persist する。
-  semantic_kind: module
-  aliases: [document ingestion pipeline, RAG ingestion layer]
-engineering:
-  explanation:
-    en: >
-      The ingestion layer follows the adapter pattern: each source type has a loader that
-      implements a common interface (LangChain's BaseLoader.load() -> list[Document]).
-      In LangChain, a Document has page_content (str) and metadata (dict). LlamaIndex uses
-      a similar pattern with its Reader interface producing Document nodes. For production
-      scale, Unstructured.io provides robust parsing that handles complex layouts (tables,
-      multi-column, headers/footers) across 20+ file formats. The ingestion pipeline typically
-      runs as a background job: detect new/changed files -> load -> parse -> normalize ->
-      emit Document objects for the chunking stage.
-    zh: >
-      摄入层遵循适配器模式：每个源类型有一个加载器实现公共接口（LangChain 的
-      BaseLoader.load() -> list[Document]）。在 LangChain 中，Document 有 page_content (str)
-      和 metadata (dict)。LlamaIndex 使用类似模式。对于生产规模，Unstructured.io 提供
-      跨 20+ 文件格式处理复杂布局的健壮解析。
-    ja: >-
-      ingestion layer は adapter pattern を用い、各 source type の loader が共通 interface を実装します。loader は
-      versioned resource を read し、format parsing と normalization を経て source metadata 付きの Document を出力します。
-      production parser は layout を扱えますが、loader execution、source resource、生成 Document は別々に記録します。
-  typical_input:
-    - description: "LangChain PyPDFLoader - Load PDF"
-      format: |
-        loader = PyPDFLoader("path/to/document.pdf")
-        documents = loader.load()
-    - description: "LangChain WebBaseLoader - Load web page"
-      format: |
-        loader = WebBaseLoader("https://example.com/article")
-        documents = loader.load()
-    - description: "Firecrawl API - Crawl and extract"
-      format: |
-        app.scrape_url(
-          url="https://docs.example.com/guide",
-          params={"formats": ["markdown"]}
-        )
-  typical_output:
-    - description: "LangChain Document object"
-      format: |
-        Document(
-          page_content="# Introduction\n\nThis guide covers...",
-          metadata={
-            "source": "https://docs.example.com/guide",
-            "title": "Getting Started Guide",
-            "content_type": "text/markdown",
-            "last_modified": "2026-07-15T10:00:00Z",
-            "word_count": 2847
-          }
-        )
-  reference_implementations:
-    - name: LangChain Document Loaders
-      url: https://docs.langchain.com/oss/python/langchain/document_loaders
-      description: 100+ loaders for PDF, HTML, CSV, JSON, databases, cloud storage, APIs
-    - name: LlamaIndex Data Connectors
-      url: https://docs.llamaindex.ai/en/stable/module_guides/loading/
-      description: SimpleDirectoryReader, web readers, database readers, and custom connectors
-    - name: Unstructured.io
-      url: https://docs.unstructured.io/
-      description: Production document parsing for complex layouts across 20+ file formats
-    - name: Firecrawl
-      url: https://docs.firecrawl.dev/
-      description: Web crawling and scraping optimized for LLM consumption with markdown output
-structure:
-  identity_keys: [module_id]
-  fields:
-    - id: module_id
-      labels: {zh: 模块标识, en: module ID, ja: モジュール ID}
-      definitions:
-        zh: 稳定标识本模块的外部来源读取和文档规范化边界，而不是其中的一个资源、运行或文档。
-        en: Stably identifies this module's external-source read and document-normalization boundary, not an individual resource, run, or document inside it.
-        ja: この module の external-source read と document-normalization boundary を安定して識別し、内部の個別 resource、run、Document ではない。
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: [memory-ingestion]
-      pattern: null
-      example_value: memory-ingestion
-      source_claims: [claim-ingestion-loader-boundary]
-    - id: ingestion_boundary
-      labels: {zh: 摄入边界, en: ingestion boundary, ja: ingestion 境界}
-      definitions:
-        zh: 声明版本化外部资源如何通过加载、解析和规范化成为 Document，同时将分块、嵌入、索引和存储写入排除在外。
-        en: Declares how a versioned external resource becomes a Document through loading, parsing, and normalization while excluding chunking, embedding, indexing, and store writes.
-        ja: versioned external resource が loading、parsing、normalization を通じて Document になる方法と、chunking、embedding、indexing、store write を除外することを宣言する。
-      datatype: json
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: []
-      pattern: null
-      example_value: '{"resource":"file-policy-v7","run":"ingest-policy-17","document":"document-policy-v7"}'
-      source_claims: [claim-ingestion-loader-boundary, claim-ingestion-source-lineage]
-  constraints:
-    - id: memory-ingestion-module-boundary
-      severity: error
-      expression_language: plain
-      expression: Ingestion must read a versioned IngestibleResource through an explicit loader or ingestion activity and produce a separately identified Document or IngestibleInformation artifact with source metadata. It must not silently treat a raw locator, loader configuration, Chunk, embedding vector, index entry, retrieval result, or persistent memory record as the ingested document.
-      explanation:
-        zh: 来源资源、加载或规范化活动、生成文档以及下游块或向量由不同证据产生；保留这些边界使重读、去重和来源审计成为可能。
-        en: Source resources, loading or normalization activities, generated documents, and downstream chunks or vectors arise from different evidence. Keeping those boundaries makes replay, deduplication, and provenance audit possible.
-        ja: source resource、loading 又は normalization activity、生成 Document、後続 Chunk 又は vector は異なる evidence から生じます。これらの boundary を保つことで replay、deduplication、provenance audit が可能になります。
-      source_claims: [claim-ingestion-loader-boundary, claim-ingestion-normalization, claim-ingestion-source-lineage]
-  required_relations: []
+    - zh: SourceReference、Location 和版本核验身份归来源与定位；接入只引用它们记录来源。
+      en: SourceReference, Location, and version-verification identity belong to sources and locations; ingestion references them to record provenance.
+      ja: SourceReference、Location、版検証同一性は出典と位置に属し、取込は来歴記録のため参照します。
+    - zh: FileSystem 在此是可读取的 IngestibleResource；持久 MemoryStore、MemoryWrite、分块和嵌入分别属于存储、生命周期、分块与索引模块，不能混入接入活动。
+      en: FileSystem is a readable IngestibleResource here; persistent MemoryStore, MemoryWrite, chunking, and embedding belong to the stores, lifecycle, chunking, and indexing modules respectively and must not be folded into ingestion activity.
+      ja: FileSystem はここで読取り可能な IngestibleResource です。永続 MemoryStore、MemoryWrite、分割、埋込みはそれぞれ保存、ライフサイクル、分割、索引モジュールに属します。
+  semantic_kind: null
+  aliases: []
+purpose:
+  zh: 把文件、数据库和图等外部资源，经可追踪的读取、规范化与去重决定，转为可供后续分块、表示和存储使用的文档信息。
+  en: Turn external resources such as files, databases, and graphs into document information for later chunking, representation, and storage through traceable reading, normalization, and deduplication decisions.
+  ja: ファイル、データベース、グラフなどの外部資源を、追跡可能な読取り、正規化、重複排除判断によって、後続の分割、表現、保存に利用できる文書情報へ変換します。
+structure: null
+examples:
+  - id: memory-ingestion-cq-loader-selection-v3-example-positive
+    kind: positive
+    labels:
+      zh: 来源—加载器—文档链正例
+      en: Positive source-loader-document chain
+      ja: source-loader-document chain正例
+    scenario_id: ingestion-loader-17
+    descriptions:
+      zh: ingest-run-17 的清单读取 file-policy-v7@digest，调用支持 PDF 的 loader-pdf-v3@3.2.1，并把 normalize-17 作为 sequence=1 阶段产生 document-policy-v7。
+      en: ingest-run-17's manifest reads file-policy-v7@digest, invokes PDF-capable loader-pdf-v3@3.2.1, and includes normalize-17 as sequence 1 producing document-policy-v7.
+      ja: ingest-run-17 のmanifestは file-policy-v7@digest を読み、PDF対応 loader-pdf-v3@3.2.1 を呼び、sequence=1 の normalize-17 が document-policy-v7 を生成します。
+    field_values:
+      run_id: ingest-run-17
+      resource: file-policy-v7@digest
+      loader: loader-pdf-v3@3.2.1
+      phase: normalize-17
+      document: document-policy-v7
+    related_node_ids:
+      - IngestionRun
+      - IngestibleResource
+      - DocumentLoader
+      - NormalizationActivity
+      - Document
+    related_relation_ids:
+      - IngestionRun-reads-IngestibleResource
+      - IngestionRun-uses-DocumentLoader
+      - IngestionRun-has_phase-NormalizationActivity
+      - NormalizationActivity-produces-Document
+    expected_result:
+      zh: 返回同一运行范围内的来源版本、实际加载器、阶段归属和新文档四段链。
+      en: Return the source version, actually invoked loader, phase membership, and new document within one run scope.
+      ja: 同一run scope内のsource版、実際にinvokeしたloader、phase所属、新documentの四段chainを返します。
+    why_valid_or_invalid:
+      zh: 资源摘要、媒体能力、run_id、阶段顺序与 generating_phase_id 能逐项对齐。
+      en: Resource digest, media capability, run ID, phase order, and generating_phase_id align item by item.
+      ja: resource digest、media capability、run ID、phase順序、generating_phase_idを個別照合できます。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-memory-ingestion-005
+  - id: memory-ingestion-cq-loader-selection-v3-example-counter
+    kind: counterexample
+    labels:
+      zh: 来源—加载器—文档链反例
+      en: "Counterexample: uninvoked loader"
+      ja: source-loader-document chain反例
+    scenario_id: ingestion-loader-uninvoked
+    descriptions:
+      zh: loader-html 已安装且 file-policy-v7 与目标文件同目录，但 ingest-run-17 没有读取该资源也没有调用该加载器；安装和可发现性不能形成 uses/reads。
+      en: loader-html is installed and file-policy-v7 shares a directory with the target, but ingest-run-17 neither reads that resource nor invokes the loader; installation and discoverability do not establish uses or reads.
+      ja: loader-html はinstall済みで file-policy-v7 もtargetと同directoryですが、ingest-run-17 はresourceをreadせずloaderもinvokeしません。installとdiscoverabilityから uses／reads は成立しません。
+    field_values:
+      run_id: ingest-run-17
+      installed_loader: loader-html
+      discovered_resource: file-policy-v7
+      invoked: false
+    related_node_ids:
+      - IngestionRun
+      - IngestibleResource
+      - DocumentLoader
+    related_relation_ids:
+      - IngestionRun-reads-IngestibleResource
+      - IngestionRun-uses-DocumentLoader
+    expected_result:
+      zh: 不得返回来源读取或加载器使用关系，也不能把无归属的文档归因于该运行。
+      en: Do not return source-read or loader-use relations and do not attribute an unbound document to the run.
+      ja: source-read・loader-use relationを返さず、未binding documentをrunへ帰属させません。
+    why_valid_or_invalid:
+      zh: 可用能力、目录邻接与实际运行事实是三类不同信息。
+      en: Available capability, directory adjacency, and actual run facts are three distinct kinds of information.
+      ja: available capability、directory隣接、actual run factは三種の異なるinformationです。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-memory-ingestion-006
+  - id: memory-ingestion-cq-deduplication-decision-v3-example-positive
+    kind: positive
+    labels:
+      zh: 去重决定链正例
+      en: Positive deduplication-decision chain
+      ja: deduplication decision chain正例
+    scenario_id: deduplication-decision-17
+    descriptions:
+      zh: normalize-17 先产生 document-policy-v7；同一 ingest-run-17 中 dedup-17 随后消费该确切摘要，比较 prior-v6，并产生 outcome=update 的 decision-17，决定明确 about document-policy-v7。
+      en: normalize-17 first produces document-policy-v7; in the same ingest-run-17, dedup-17 then consumes that exact digest, compares prior-v6, and produces decision-17 with outcome=update explicitly about document-policy-v7.
+      ja: normalize-17 が document-policy-v7 を生成し、同じ ingest-run-17 の dedup-17 がそのexact digestを消費して prior-v6 と比較し、document-policy-v7 について outcome=update の decision-17 を生成します。
+    field_values:
+      normalization_phase: normalize-17
+      document: document-policy-v7
+      dedup_phase: dedup-17
+      prior_digest: prior-v6
+      decision: decision-17
+      outcome: update
+    related_node_ids:
+      - NormalizationActivity
+      - Document
+      - DeduplicationActivity
+      - DeduplicationDecision
+    related_relation_ids:
+      - NormalizationActivity-produces-Document
+      - NormalizationActivity-precedes-DeduplicationActivity
+      - DeduplicationActivity-consumes-Document
+      - DeduplicationActivity-produces-DeduplicationDecision
+      - DeduplicationDecision-about-Document
+    expected_result:
+      zh: 返回规范化输出、同运行阶段顺序、去重输入、决定生成和决定对象的完整链。
+      en: Return the complete chain of normalization output, same-run phase order, deduplication input, decision generation, and decision subject.
+      ja: normalization output、同run phase順序、dedup input、decision生成、decision対象の完全chainを返します。
+    why_valid_or_invalid:
+      zh: 文档 ID 与摘要在产生、消费和 about 三处一致，决定是信息记录而不是伪事件或 MemoryWrite。
+      en: Document ID and digest agree across production, consumption, and about; the decision is an information record, not a pseudo-event or MemoryWrite.
+      ja: document IDとdigestがproduce・consume・aboutで一致し、decisionはpseudo-eventや MemoryWrite でなくinformation recordです。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-memory-ingestion-007
+  - id: memory-ingestion-cq-deduplication-decision-v3-example-counter
+    kind: counterexample
+    labels:
+      zh: 去重决定链反例
+      en: "Counterexample: stale deduplication decision"
+      ja: deduplication decision chain反例
+    scenario_id: deduplication-decision-stale
+    descriptions:
+      zh: decision-16 关于 document-policy-v6，只有 document_id 相同但 content_digest 与 v7 不同；把它复用于 v7 会丢失版本边界。
+      en: decision-16 is about document-policy-v6; only the document_id matches while content_digest differs from v7, so reusing it for v7 loses the version boundary.
+      ja: decision-16 は document-policy-v6 についての判断で、document_idだけ同じで content_digest は v7 と異なります。v7へ再利用すると版境界を失います。
+    field_values:
+      decision: decision-16
+      actual_document: document-policy-v6
+      proposed_document: document-policy-v7
+      digest_match: false
+    related_node_ids:
+      - DeduplicationDecision
+      - Document
+      - DeduplicationActivity
+    related_relation_ids:
+      - DeduplicationActivity-produces-DeduplicationDecision
+      - DeduplicationDecision-about-Document
+    expected_result:
+      zh: 拒绝 decision-16 → document-policy-v7 的 about 关系，并要求对 v7 重新比较。
+      en: Reject decision-16 about document-policy-v7 and require a new comparison for v7.
+      ja: decision-16 → document-policy-v7 の about relationを拒否し、v7への再比較を要求します。
+    why_valid_or_invalid:
+      zh: 相同业务 ID 不等于相同文档版本；去重判断必须绑定比较时的内容摘要。
+      en: Equal business ID is not equal document version; a deduplication decision must bind the compared content digest.
+      ja: 同business IDは同document版ではなく、deduplication decisionは比較時content digestへbindingする必要があります。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-memory-ingestion-008
+  - id: memory-ingestion-cq-provenance-chain-v3-example-positive
+    kind: positive
+    labels:
+      zh: 文档来源证据链正例
+      en: Positive document-provenance chain
+      ja: document来歴evidence chain正例
+    scenario_id: document-provenance-17
+    descriptions:
+      zh: document-policy-v7 组成 attachment-17；附件固定 file-policy-v7 的 object-version:7 与内容摘要，ingest-run-17 的读取清单也含同一版本和摘要，并由 normalize-17 产生该文档。
+      en: document-policy-v7 composes attachment-17, which pins file-policy-v7 object-version:7 and its content digest; ingest-run-17's read manifest contains that same version and digest, and normalize-17 produces the Document.
+      ja: document-policy-v7 は attachment-17 を構成し、attachment は file-policy-v7 object-version:7/content digest を固定します。ingest-run-17 read manifest も同じ version/digest を持ち normalize-17 が Document を生成します。
+    field_values:
+      document: document-policy-v7
+      attachment: attachment-17
+      resource_id: file-policy-v7
+      resource_version_ref: object-version:7
+      resource_content_digest: "sha-256=:ZGlnZXN0LWE=:"
+      run: ingest-run-17
+      phase: normalize-17
+    related_node_ids:
+      - Document
+      - SourceAttachment
+      - IngestibleResource
+      - IngestionRun
+      - NormalizationActivity
+    related_relation_ids:
+      - Document-has_source_attachment-SourceAttachment
+      - SourceAttachment-describes-IngestibleResource
+      - IngestionRun-reads-IngestibleResource
+      - NormalizationActivity-produces-Document
+    expected_result:
+      zh: 返回文档—附件—资源与运行—规范化输出两条相互校验的路径，资源 ID、逻辑版本引用和内容摘要必须分别相同。
+      en: Return the Document–attachment–resource and run–normalization-output paths as mutual checks, requiring separate agreement on resource ID, logical version reference, and content digest.
+      ja: Document-attachment-resource path と run-normalization-output path を相互検証し resource ID・logical version reference・content digest の個別一致を要求します。
+    why_valid_or_invalid:
+      zh: 附件证据、运行输入与生成阶段三处都指向同一不可歧义来源版本。
+      en: Attachment evidence, run input, and generating phase all point to one unambiguous source version.
+      ja: attachment evidence、run input、generating phaseの三箇所が同一の曖昧でないsource版を指します。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-memory-ingestion-009
+  - id: memory-ingestion-cq-provenance-chain-v3-example-counter
+    kind: counterexample
+    labels:
+      zh: 文档来源证据链反例
+      en: "Counterexample: source-version mismatch"
+      ja: document来歴evidence chain反例
+    scenario_id: document-provenance-digest-mismatch
+    descriptions:
+      zh: attachment-17 仍描述 file-policy-v7@digest-a，但运行读取的是同路径 file-policy-v8@digest-b；URI 相同不能把 v7 附件当成 v8 文档的来源证据。
+      en: attachment-17 still describes file-policy-v7@digest-a, while the run reads same-path file-policy-v8@digest-b; equal URI cannot make the v7 attachment provenance for a v8 document.
+      ja: attachment-17 は file-policy-v7@digest-a を記述しますが、runは同pathの file-policy-v8@digest-b を読みます。同URIでもv7 attachmentをv8 documentの来歴根拠にはできません。
+    field_values:
+      attachment_resource_id: file-policy-v7
+      attachment_version_ref: object-version:7
+      attachment_content_digest: "sha-256=:ZGlnZXN0LWE=:"
+      run_resource_id: file-policy-v8
+      run_version_ref: object-version:8
+      run_content_digest: "sha-256=:ZGlnZXN0LWI=:"
+      same_uri: true
+      same_digest: false
+    related_node_ids:
+      - Document
+      - SourceAttachment
+      - IngestibleResource
+      - IngestionRun
+    related_relation_ids:
+      - Document-has_source_attachment-SourceAttachment
+      - SourceAttachment-describes-IngestibleResource
+      - IngestionRun-reads-IngestibleResource
+    expected_result:
+      zh: 报告来源版本冲突，拒绝闭合 provenance chain，直到附件与运行清单摘要一致。
+      en: Report the source-version conflict and refuse to close the provenance chain until attachment and run-manifest digests agree.
+      ja: source版conflictを報告し、attachmentとrun manifestのdigest一致までprovenance chainを閉じません。
+    why_valid_or_invalid:
+      zh: 定位符用于寻找资源，内容摘要才区分同路径的不同版本。
+      en: A locator finds a resource, while the content digest distinguishes versions at the same path.
+      ja: locatorはresourceを見つけますが、同pathの別版を区別するのはcontent digestです。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-memory-ingestion-010
+parent_relation: null
+relations: []
 module_contract:
   interaction_contract:
     applicability: operational

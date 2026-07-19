@@ -2,19 +2,368 @@ schema: moonweave.ai/ontology-node/v1
 id: runtime-observability
 kind: module
 status: accepted
-labels: {zh: 运行时可观测性, en: Runtime observability, ja: ランタイム可観測性}
+labels:
+  zh: 运行追踪、状态与恢复
+  en: Runtime tracing, state, and recovery
+  ja: 実行トレース・状態・回復
 semantics:
-  short_definition: {zh: 描述运行时行为而不取代该行为本身的遥测记录和恢复证据。, en: Telemetry records and recovery evidence describing runtime behavior without replacing the behavior itself., ja: ランタイム動作を記述するが、動作自体を置き換えないテレメトリー記録と復旧証拠。}
-  definition: {zh: Runtime observability 包含使执行可检查的记录和事件，包括符合 OpenTelemetry 的追踪、span、span event、面向日志的记录、指标派生摘要、状态快照和检查点生命周期活动。遥测信号是有关 Activity 或 Entity 的证据，不会自动成为它所描述的 Activity 或 Entity。, en: "Runtime observability contains records and events that make an execution inspectable, including OpenTelemetry-aligned traces, spans, span events, log-oriented records, metric-derived summaries, state snapshots, and checkpoint lifecycle activities. A telemetry signal is evidence about an Activity or Entity, not automatically the Activity or Entity it describes.", ja: Runtime observability には、OpenTelemetry 準拠のトレース、Span、Span Event、ログ指向記録、メトリック由来要約、状態スナップショット、チェックポイントライフサイクル活動など、実行を検査可能にする記録とイベントが含まれる。テレメトリーシグナルは Activity または Entity に関する証拠であり、記述する Activity や Entity 自体になるわけではない。}
-  why_needed: {zh: 仅凭文本日志或聚合仪表板无法可靠调查失败、延迟和状态转换。明确的信号边界保留因果关系，并防止把追踪或计数器误当作业务操作。, en: "Failures, latency, and state transitions cannot be investigated reliably from prose logs or aggregate dashboards alone. Explicit signal boundaries preserve causality and prevent a trace or counter from being mistaken for the business operation.", ja: 失敗、レイテンシー、状態遷移は、文章ログや集約ダッシュボードだけからは信頼して調査できない。明示的なシグナル境界は因果を保持し、トレースやカウンターを業務操作と誤認することを防ぐ。}
+  short_definition:
+    zh: 描述运行中被观测到的跨度、事件和状态版本，以及检查点如何被捕获、用于恢复或用于回放。
+    en: Describes observed spans, events, and state revisions during runtime, together with how checkpoints are captured, restored, or replayed.
+    ja: 実行中に観測された span・event・状態 revision と、checkpoint の capture・restore・replay を記述します。
+  definition:
+    zh: ObservabilityRecord 保存可查询的观测信息；TraceRecord 与 TraceSpan 用标识、父链、上下文和链接表达有时长的操作及因果；ObservabilityEvent 表达具有明确时点的发生；StateRecord、StateSnapshot、StateDiff 与 Checkpoint 表达状态内容和可恢复边界；CheckpointLifecycleActivity 表达捕获、恢复和回放这些边界的实际活动。它记录“观察到了什么”，不替代被观察的 Execution、会话或诊断结论。
+    en: ObservabilityRecord preserves queryable observations. TraceRecord and TraceSpan use identity, parentage, context, and links to represent duration-bearing operations and causality; ObservabilityEvent represents a point-in-time occurrence; StateRecord, StateSnapshot, StateDiff, and Checkpoint represent state content and recoverable boundaries; CheckpointLifecycleActivity represents actual capture, restore, and replay. The module records what was observed without replacing the observed Execution, session, or diagnostic conclusion.
+    ja: ObservabilityRecord は照会可能な観測情報を保持します。TraceRecord と TraceSpan は識別子・親子関係・context・link で継続時間を持つ操作と因果を、ObservabilityEvent は時点を持つ発生を、StateRecord・StateSnapshot・StateDiff・Checkpoint は状態内容と回復可能境界を、CheckpointLifecycleActivity は capture・restore・replay の実活動を表します。本モジュールは観測内容を記録し、観測対象の Execution・session・診断結論を置き換えません。
+  why_needed:
+    zh: 让工程师沿跨度因果链定位一次运行如何展开，并沿状态版本链确认恢复从哪一份确切快照开始。
+    en: Lets engineers follow span causality to see how a run unfolded and follow state lineage to identify the exact snapshot from which recovery starts.
+    ja: span 因果連鎖から実行の展開を追い、状態 version 系譜から回復開始点となる正確な snapshot を確認できるようにします。
   includes:
-    - {zh: 追踪记录、span、span context、链接、类日志审计记录、转录和摘要。, en: "Trace records, spans, span context, links, log-like audit records, transcripts, and summaries.", ja: トレース記録、Span、Span context、リンク、ログ風監査記録、転記、要約。}
-    - {zh: 状态记录、检查点捕获、恢复、重放活动以及描述这些转换的事件。, en: "State records, checkpoint capture, restore, replay activities, and events describing those transitions.", ja: 状態記録、チェックポイントキャプチャ、復元、リプレイ Activity、およびそれらの遷移を記述するイベント。}
+    - zh: TraceRecord、TraceSpan、TraceContext、TraceLink、SpanStatus、TraceEvent 及其父链、时间和关联键。
+      en: TraceRecord, TraceSpan, TraceContext, TraceLink, SpanStatus, TraceEvent, and their parentage, timing, and correlation keys.
+      ja: TraceRecord・TraceSpan・TraceContext・TraceLink・SpanStatus・TraceEvent と、その親子関係・時刻・correlation key。
+    - zh: StateRecord、StateSnapshot、StateDiff、Checkpoint，以及实际发生的捕获、恢复与回放活动和对应事件。
+      en: StateRecord, StateSnapshot, StateDiff, Checkpoint, and actual capture, restore, and replay activities with their corresponding events.
+      ja: StateRecord・StateSnapshot・StateDiff・Checkpoint、および実際に発生した capture・restore・replay activity と対応 event。
+    - zh: 仅直接决定追踪采样或捕获范围的观测策略；长期留存、删除与脱敏职责必须由日志或安全边界另行承担。
+      en: Only observability policies that directly determine trace sampling or capture scope; long-term retention, deletion, and redaction must be owned separately by logging or safety boundaries.
+      ja: trace sampling または capture scope を直接決める観測方針のみ。長期保存・削除・redaction は logging または safety 境界が別途担います。
   excludes:
-    - {zh: 主要执行 Activity、模型资产、工件字节或持久跨会话记忆对象。, en: "The primary execution Activity, model asset, artifact bytes, or durable cross-session memory object.", ja: 主たる実行 Activity、モデル資産、成果物バイト、耐久的なセッション横断メモリオブジェクト。}
-    - {zh: 将每个应用事件都视为 OpenTelemetry Event，或将每个摘要都视为 OpenTelemetry Metric。, en: Treating every application event as an OpenTelemetry Event or every summary as an OpenTelemetry Metric., ja: すべてのアプリケーションイベントを OpenTelemetry Event、すべての要約を OpenTelemetry Metric として扱うこと。}
+    - zh: CommandExecution、RunAttempt、RunResult、RunOutcome 与 RuntimeSession；它们是被观测的执行或会话事实，不是追踪记录的子类。
+      en: CommandExecution, RunAttempt, RunResult, RunOutcome, and RuntimeSession; they are observed execution or session facts, not trace-record subtypes.
+      ja: CommandExecution・RunAttempt・RunResult・RunOutcome・RuntimeSession。これらは観測対象の実行または session fact で、trace record の subtype ではありません。
+    - zh: LogRecord、LogStream、订阅、Sink、TelemetryExportActivity 与导出批次；它们负责运输和留存，不重建跨度或状态身份。
+      en: LogRecord, LogStream, subscriptions, sinks, TelemetryExportActivity, and export batches; they transport and retain evidence without rebuilding span or state identity.
+      ja: LogRecord・LogStream・subscription・Sink・TelemetryExportActivity・export batch。これらは証拠を輸送・保存しますが span/state identity を再構築しません。
+    - zh: ErrorEvent、FailureMode、ReviewFinding 与评价结论；它们是对观测证据的解释，不属于原始运行追踪。
+      en: ErrorEvent, FailureMode, ReviewFinding, and evaluation conclusions; they interpret observations and do not belong to raw runtime tracing.
+      ja: ErrorEvent・FailureMode・ReviewFinding・評価結論。これらは観測証拠の解釈で、raw runtime tracing には属しません。
   semantic_kind: null
-  aliases: [telemetry, traces, runtime evidence]
+  aliases: []
+purpose:
+  zh: 建立可查询的运行因果记录与状态恢复依据，同时保持观测证据、执行事实和解释性反馈三层分离。
+  en: Establishes queryable runtime causality and state-recovery evidence while keeping observation, execution facts, and interpretive feedback separate.
+  ja: 照会可能な実行因果と状態回復証拠を確立し、観測証拠・実行事実・解釈的 feedback の三層を分離します。
+structure: null
+examples:
+  - id: runtime-observability-cq-trace-causality-v3-example-positive
+    kind: positive
+    labels:
+      zh: 某次 RunAttempt 的追踪结构是否一致，哪些 TraceEvent 以可核验键记录已生成 Artifact 或 BoundaryCrossing？：正例
+      en: "Is a RunAttempt's trace structure consistent, and which TraceEvents record a generated Artifact or BoundaryCrossing with verifiable keys?: positive case"
+      ja: RunAttempt の trace structure は整合し、どの TraceEvent が検証可能 key で generated Artifact または BoundaryCrossing を記録しますか。：正例
+    scenario_id: null
+    descriptions:
+      zh: attempt-7 由 span-agent-7 观察；trace-44 包含该跨度，span-agent-7 具有唯一父跨度、自己的 TraceContext 与异步 Link。其两个有序 TraceEvent 分别以 artifact_id/version/digest/generation correlation key 记录 report@2，以 crossing_id/object digest/occurred_at 记录 crossing-7。
+      en: attempt-7 is observed by span-agent-7; trace-44 contains the span, which has one parent, its own TraceContext, and an asynchronous Link. Two ordered TraceEvents record report@2 with artifact_id, version, digest, and generation correlation key, and crossing-7 with crossing_id, object digest, and occurred_at.
+      ja: attempt-7 を span-agent-7 が観測し trace-44 がその Span を含み、Span は一 parent・固有 TraceContext・async Link を持ちます。二 ordered TraceEvent は artifact_id/version/digest/generation correlation key で report@2 を、crossing_id/object digest/occurred_at で crossing-7 を記録します。
+    field_values:
+      attempt_id: attempt-7
+      trace_id: trace-44
+      observing_span_id: span-agent-7
+      parent_span_id: span-root-44
+      trace_context:
+        trace_id: 4bf92f3577b34da6a3ce929d0e0e4736
+        span_id: 00f067aa0ba902b7
+        trace_flags: "01"
+      linked_span_context:
+        trace_id: 7bfe2d19d2aa4d13bf2f1131a7ea6d91
+        span_id: 15c16b3f1d771a2c
+      artifact_event:
+        event_id: event-artifact-44-1
+        sequence: 1
+        artifact_id: report
+        version: "2"
+        content_digest: sha256:report-2
+        generation_correlation_key: attempt-7/report@2
+      boundary_event:
+        event_id: event-crossing-44-2
+        sequence: 2
+        crossing_id: crossing-7
+        object_digest: sha256:payload-7
+        occurred_at: 2026-07-16T11:42:18.531Z
+    related_node_ids:
+      - RunAttempt
+      - TraceSpan
+      - TraceRecord
+      - TraceEvent
+      - TraceContext
+      - TraceLink
+      - Artifact
+      - BoundaryCrossing
+    related_relation_ids:
+      - TraceSpan-observes-RunAttempt
+      - TraceRecord-contains_span-TraceSpan
+      - TraceSpan-has_parent-TraceSpan
+      - TraceSpan-records_event-TraceEvent
+      - TraceEvent-records_generated_artifact-Artifact
+      - TraceEvent-records-BoundaryCrossing
+      - TraceSpan-has_context-TraceContext
+      - TraceSpan-has_link-TraceLink
+      - TraceLink-references-TraceContext
+    expected_result:
+      zh: 查询返回唯一观察跨度与所属追踪，验证父级、事件、上下文和链接端点，并只返回具有完整关联键的产物生成记录与边界跨越记录。
+      en: The query returns one observing span and containing trace, validates parent, event, context, and Link endpoints, and returns only artifact-generation and boundary-crossing records with complete correlation keys.
+      ja: 照会は一 observing Span と containing Trace を返し parent・event・context・Link endpoint を検証し、完全な correlation key を持つ artifact-generation record と boundary-crossing record だけを返します。
+    why_valid_or_invalid:
+      zh: 每一步都使用显式关系；TraceEvent 的记录边只表达有键观测，不冒充产物生成活动或边界跨越授权，SpanContext 与 Link 也保持各自结构职责。
+      en: Every step uses an explicit relation; TraceEvent recording edges express keyed observation without impersonating artifact generation activity or boundary authorization, while SpanContext and Link retain their distinct structural roles.
+      ja: 全 step が明示関係を使い、TraceEvent recording edge は keyed observation だけを表して artifact generation activity や boundary authorization を代行せず、SpanContext と Link も別々の構造責務を保ちます。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-runtime-observability-009
+  - id: runtime-observability-cq-trace-causality-v3-example-counter
+    kind: counterexample
+    labels:
+      zh: 某次 RunAttempt 的追踪结构是否一致，哪些 TraceEvent 以可核验键记录已生成 Artifact 或 BoundaryCrossing？：反例
+      en: "Is a RunAttempt's trace structure consistent, and which TraceEvents record a generated Artifact or BoundaryCrossing with verifiable keys?: counterexample"
+      ja: RunAttempt の trace structure は整合し、どの TraceEvent が検証可能 key で generated Artifact または BoundaryCrossing を記録しますか。：反例
+    scenario_id: null
+    descriptions:
+      zh: attempt-8 与 trace-44 只在同一页面出现；事件没有所属跨度，只提到 report.json 和相近时间的 crossing，却缺少 artifact ID/version/digest/generation key 与 crossing_id/object digest；所谓 Link 也只是自然语言标签。
+      en: attempt-8 merely appears beside trace-44; an event has no owning span and only mentions report.json and a temporally nearby crossing, without artifact ID, version, digest, generation key, crossing_id, or object digest; the alleged Link is only a text label.
+      ja: attempt-8 は trace-44 と同じ画面に出るだけで event に owner Span がなく、report.json と時間の近い crossing に言及するだけです。artifact ID/version/digest/generation key・crossing_id/object digest がなく、Link も文字 label にすぎません。
+    field_values:
+      attempt_id: attempt-8
+      co_displayed_trace_id: trace-44
+      observing_span_id: null
+      event_owner_span_id: null
+      mentioned_filename: report.json
+      artifact_id: null
+      artifact_version: null
+      artifact_digest: null
+      generation_correlation_key: null
+      crossing_id: null
+      crossing_object_digest: null
+      link_context_trace_id: null
+      link_context_span_id: null
+    related_node_ids:
+      - RunAttempt
+      - TraceSpan
+      - TraceRecord
+      - TraceEvent
+      - TraceContext
+      - TraceLink
+      - Artifact
+      - BoundaryCrossing
+    related_relation_ids:
+      - TraceSpan-observes-RunAttempt
+      - TraceRecord-contains_span-TraceSpan
+      - TraceSpan-has_parent-TraceSpan
+      - TraceSpan-records_event-TraceEvent
+      - TraceEvent-records_generated_artifact-Artifact
+      - TraceEvent-records-BoundaryCrossing
+      - TraceSpan-has_context-TraceContext
+      - TraceSpan-has_link-TraceLink
+      - TraceLink-references-TraceContext
+    expected_result:
+      zh: 查询拒绝该候选，报告缺少观察跨度、事件归属、可解析链接上下文以及两类记录关系所需的关联键。
+      en: The query rejects the candidate and reports missing observing span, event ownership, resolvable Link context, and the correlation keys required by both recording relations.
+      ja: 照会は候補を拒否し observing Span・event owner・解決可能 Link context・二 recording relation に必要な correlation key の欠落を報告します。
+    why_valid_or_invalid:
+      zh: 界面共现、文件名与时间接近既不能替代 OpenTelemetry 的跨度结构，也不能建立对具体 Artifact 版本或 BoundaryCrossing 的记录事实。
+      en: UI co-occurrence, a filename, and temporal proximity can replace neither OpenTelemetry span structure nor a recording fact about a specific Artifact revision or BoundaryCrossing.
+      ja: UI 共起・file 名・時間的近接は OpenTelemetry の Span 構造も、特定 Artifact revision または BoundaryCrossing の recording fact も代替しません。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-runtime-observability-009
+  - id: runtime-observability-cq-checkpoint-recovery-v3-example-positive
+    kind: positive
+    labels:
+      zh: 一个 Checkpoint 捕获了哪个状态快照，恢复或回放从何处开始并产生了什么差异？：正例
+      en: "Which state snapshot did a Checkpoint capture, where did restore or replay begin, and what state difference resulted?: positive case"
+      ja: Checkpoint はどの状態スナップショットを捕捉し、回復・再生はどこから始まり、どの差分を生成しましたか。：正例
+    scenario_id: null
+    descriptions:
+      zh: capture-12 在 session-t-7 中捕获 s-12 并创建引用它且归属该会话的 cp-12；restore-44 消费 cp-12，产生 s-restored-44 与 d-current-restored，差异明确指向前后快照。
+      en: In session-t-7, capture-12 captures s-12 and creates cp-12, which references the snapshot and belongs to that session; restore-44 consumes cp-12 and produces s-restored-44 plus d-current-restored with explicit before and after snapshots.
+      ja: session-t-7 で capture-12 が s-12 を capture し、その snapshot を参照して同 session に属する cp-12 を作り、restore-44 が cp-12 を consume して s-restored-44 と前後 snapshot 明示の d-current-restored を生成します。
+    field_values:
+      capture_activity_id: capture-12
+      source_snapshot_id: s-12
+      source_snapshot_digest: sha256:state-s-12
+      checkpoint_id: cp-12
+      runtime_session_id: session-t-7
+      checkpoint_snapshot_ref: s-12
+      restore_activity_id: restore-44
+      consumed_checkpoint_id: cp-12
+      successor_snapshot_id: s-restored-44
+      successor_snapshot_digest: sha256:state-restored-44
+      state_diff_id: d-current-restored
+      state_diff_from_snapshot_id: s-12
+      state_diff_to_snapshot_id: s-restored-44
+      source_checkpoint_mutated: false
+    related_node_ids:
+      - CheckpointCaptureActivity
+      - StateSnapshot
+      - Checkpoint
+      - RestoreActivity
+      - StateDiff
+      - RuntimeSession
+    related_relation_ids:
+      - CheckpointCaptureActivity-captures-StateSnapshot
+      - CheckpointCaptureActivity-produces-Checkpoint
+      - checkpoint_belongs_to_session
+      - Checkpoint-references-StateSnapshot
+      - RestoreActivity-consumes-Checkpoint
+      - RestoreActivity-produces-StateSnapshot
+      - RestoreActivity-produces-StateDiff
+      - state_diff_from_snapshot
+      - state_diff_to_snapshot
+    expected_result:
+      zh: 查询返回捕获、检查点、原快照、恢复后快照与差异的完整链，且原检查点不变。
+      en: The query returns the complete capture, checkpoint, source snapshot, successor snapshot, and diff chain while the original checkpoint remains unchanged.
+      ja: 照会は capture・Checkpoint・source snapshot・successor snapshot・diff の全 chain を返し元 Checkpoint は不変です。
+    why_valid_or_invalid:
+      zh: 活动、会话、信息记录与前后状态各有独立身份；检查点的会话归属固定恢复范围，其余关系方向与 LangGraph 的持久化、回放语义一致。
+      en: Activities, the session, information records, and before-after state have separate identities; checkpoint session membership fixes recovery scope, and the remaining directions follow LangGraph persistence and replay semantics.
+      ja: activity・session・information record・前後 state が独立 identity を持ち、Checkpoint の session 所属が recovery scope を固定し、他の方向は LangGraph persistence/replay 意味に一致します。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-runtime-observability-010
+  - id: runtime-observability-cq-checkpoint-recovery-v3-example-counter
+    kind: counterexample
+    labels:
+      zh: 一个 Checkpoint 捕获了哪个状态快照，恢复或回放从何处开始并产生了什么差异？：反例
+      en: "Which state snapshot did a Checkpoint capture, where did restore or replay begin, and what state difference resulted?: counterexample"
+      ja: Checkpoint はどの状態スナップショットを捕捉し、回復・再生はどこから始まり、どの差分を生成しましたか。：反例
+    scenario_id: null
+    descriptions:
+      zh: 恢复过程直接修改 cp-12 所引用的 s-12，并把同一对象同时称为检查点、快照和差异；没有新 successor identity 或 from/to 边。
+      en: A restore process mutates s-12 referenced by cp-12 and calls the same object checkpoint, snapshot, and diff, with no successor identity or from/to edges.
+      ja: restore 処理が cp-12 参照 s-12 を変更し、同一 object を Checkpoint・snapshot・diff と呼び、新 successor identity も from/to 辺もありません。
+    field_values:
+      checkpoint_id: cp-12
+      referenced_snapshot_id: s-12
+      restore_activity_id: restore-45
+      mutated_in_place: true
+      reused_object_id_for_checkpoint_snapshot_and_diff: s-12
+      successor_snapshot_id: null
+      state_diff_id: null
+      state_diff_from_snapshot_id: null
+      state_diff_to_snapshot_id: null
+    related_node_ids:
+      - CheckpointCaptureActivity
+      - StateSnapshot
+      - Checkpoint
+      - RestoreActivity
+      - StateDiff
+    related_relation_ids:
+      - CheckpointCaptureActivity-captures-StateSnapshot
+      - CheckpointCaptureActivity-produces-Checkpoint
+      - Checkpoint-references-StateSnapshot
+      - RestoreActivity-consumes-Checkpoint
+      - RestoreActivity-produces-StateSnapshot
+      - RestoreActivity-produces-StateDiff
+      - state_diff_from_snapshot
+      - state_diff_to_snapshot
+    expected_result:
+      zh: 查询拒绝原地修改，要求恢复后快照和差异拥有独立身份与明确边界。
+      en: The query rejects in-place mutation and requires separately identified successor snapshot and diff with explicit boundaries.
+      ja: 照会は in-place mutation を拒否し、独立 successor snapshot・diff と明示境界を要求します。
+    why_valid_or_invalid:
+      zh: 检查点固定恢复边界；覆盖原快照会破坏历史、回放与故障恢复的可复核性。
+      en: A checkpoint fixes a recovery boundary; overwriting its snapshot destroys verifiable history, replay, and fault recovery.
+      ja: Checkpoint は回復境界を固定し snapshot 上書きは history・replay・fault recovery の検証性を壊します。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-runtime-observability-010
+  - id: runtime-observability-cq-trace-versus-log-v3-example-positive
+    kind: positive
+    labels:
+      zh: 一个对象是原始 TraceEvent、记录该事件的 LogRecord，还是将其导出的 TraceExport？：正例
+      en: "Is an object an original TraceEvent, a LogRecord recording it, or a TraceExport exporting it?: positive case"
+      ja: 対象は元の TraceEvent、それを記録する LogRecord、それを出力する TraceExport のどれですか。：正例
+    scenario_id: null
+    descriptions:
+      zh: span-tool-7 的 cache.miss TraceEvent 派生出 TelemetryEvent ev-44，ev-44 实际写入 LogStream；同一发生还被结构化为带相同 TraceId/SpanId 的 LogRecord lr-88。
+      en: span-tool-7's cache.miss TraceEvent derives TelemetryEvent ev-44, which is written to a LogStream; the occurrence is also recorded as LogRecord lr-88 with matching TraceId and SpanId.
+      ja: span-tool-7 の cache.miss TraceEvent から TelemetryEvent ev-44 が派生して LogStream へ書かれ、同発生は同じ TraceId/SpanId の LogRecord lr-88 にも記録されます。
+    field_values:
+      trace_event_id: trace-event-cache-miss-7
+      trace_event_name: cache.miss
+      owning_span_id: span-tool-7
+      trace_id: 4bf92f3577b34da6a3ce929d0e0e4736
+      span_id: 00f067aa0ba902b7
+      telemetry_event_id: ev-44
+      log_stream_id: log-stream-agent-runtime
+      log_record_id: lr-88
+      log_record_trace_id: 4bf92f3577b34da6a3ce929d0e0e4736
+      log_record_span_id: 00f067aa0ba902b7
+      telemetry_write_confirmed: true
+      recording_correlation_matched: true
+    related_node_ids:
+      - TraceEvent
+      - TelemetryEvent
+      - LogRecord
+      - LogStream
+    related_relation_ids:
+      - telemetry_event_derived_from_trace_event
+      - telemetry_event_emitted_to_log_stream
+      - trace_event_recorded_as_log_record
+    expected_result:
+      zh: 查询返回三个不同身份及其派生、发送和记录关系，不把任一对象当作另一对象的别名。
+      en: The query returns three distinct identities and their derivation, emission, and recording relations without treating any object as an alias.
+      ja: 照会は三つの別 identity と derivation・emission・recording 関係を返し alias として扱いません。
+    why_valid_or_invalid:
+      zh: 运行发生、遥测发出与日志记录回答不同问题，显式血缘在不复制所有权的前提下关联它们。
+      en: Runtime occurrence, telemetry emission, and log recording answer different questions; explicit lineage connects them without duplicating ownership.
+      ja: runtime occurrence・telemetry emission・log recording は別問に答え、明示 lineage が owner を複製せず接続します。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-runtime-observability-011
+  - id: runtime-observability-cq-trace-versus-log-v3-example-counter
+    kind: counterexample
+    labels:
+      zh: 一个对象是原始 TraceEvent、记录该事件的 LogRecord，还是将其导出的 TraceExport？：反例
+      en: "Is an object an original TraceEvent, a LogRecord recording it, or a TraceExport exporting it?: counterexample"
+      ja: 対象は元の TraceEvent、それを記録する LogRecord、それを出力する TraceExport のどれですか。：反例
+    scenario_id: null
+    descriptions:
+      zh: 一个无 TraceId/SpanId 的 cpu.high 日志与 cache.miss TraceEvent 时间接近，路由配置也列出同一 LogStream，但事件发送前被丢弃。
+      en: A cpu.high log with no TraceId or SpanId is close in time to cache.miss, and routing names the same LogStream, but the event is dropped before emission.
+      ja: TraceId/SpanId のない cpu.high log が cache.miss と近時刻で routing も同じ LogStream を示しますが event は emission 前に drop されます。
+    field_values:
+      trace_event_id: trace-event-cache-miss-8
+      trace_event_name: cache.miss
+      candidate_log_record_id: log-cpu-high-8
+      candidate_log_body: cpu.high
+      candidate_log_trace_id: null
+      candidate_log_span_id: null
+      temporal_proximity_milliseconds: 83
+      configured_log_stream_id: log-stream-agent-runtime
+      telemetry_event_dropped_before_emission: true
+      actual_stream_position: null
+      derivation_evidence_present: false
+    related_node_ids:
+      - TraceEvent
+      - TelemetryEvent
+      - LogRecord
+      - LogStream
+    related_relation_ids:
+      - telemetry_event_derived_from_trace_event
+      - telemetry_event_emitted_to_log_stream
+      - trace_event_recorded_as_log_record
+    expected_result:
+      zh: 查询拒绝派生、记录与已发送关系，只保留各自独立对象。
+      en: The query rejects derivation, recording, and emitted-to facts and retains the objects independently.
+      ja: 照会は derivation・recording・emitted-to fact を拒否し各 object を独立保持します。
+    why_valid_or_invalid:
+      zh: 时间邻近与候选路由不构成血缘或实际流位置，必须有上下文匹配和写入证据。
+      en: Temporal proximity and a candidate route do not establish lineage or actual stream position; context match and write evidence are required.
+      ja: 時刻近接と候補 route は lineage や実 stream position を示さず context match と write evidence が必要です。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-runtime-observability-011
+parent_relation: null
+relations: []
 module_contract:
   interaction_contract:
     applicability: operational

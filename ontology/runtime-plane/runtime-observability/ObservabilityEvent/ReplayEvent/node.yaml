@@ -2,183 +2,341 @@ schema: moonweave.ai/ontology-node/v1
 id: ReplayEvent
 kind: concept
 status: accepted
-labels: {zh: 重放事件, en: Replay event, ja: 再生イベント}
+labels:
+  en: replay event
+  zh: 回放事件
+  ja: 再生イベント
 semantics:
-  short_definition: {zh: 报告 ReplayActivity 结果或状态的自定义 ObservabilityEvent。, en: "A custom ObservabilityEvent that reports the outcome or state of a ReplayActivity.", ja: ReplayActivity の結果または状態を報告するカスタム ObservabilityEvent。}
-  definition: {zh: ReplayEvent 是关于基于检查点重新执行的领域通知，包含重放范围和结果。它不是 ReplayActivity 本身、历史 TraceRecord、未附着于 span 的 OTel Span Event，也不是缺少基于检查点重新执行证据的重试事件。, en: "A ReplayEvent is a domain notification about checkpoint-based re-execution, including replay scope and outcome. It is not the ReplayActivity itself, a historic TraceRecord, an OTel Span Event without attachment to a span, or a retry event that lacks checkpoint-based re-execution evidence.", ja: ReplayEvent は、再生範囲と結果を含むチェックポイントベースの再実行に関する領域通知である。ReplayActivity 自体、履歴 TraceRecord、span に付着しない OTel Span Event、チェックポイントベースの再実行証拠を欠く再試行イベントではない。}
-  why_needed: {zh: 操作人员和用户界面需要紧凑的重放状态信号，同时为审计和调试保留底层状态边界与活动谱系。, en: "Operators and user interfaces need a compact replay status signal while preserving the underlying state boundary and activity lineage for audit and debugging.", ja: 運用者とユーザーインターフェースは、監査とデバッグのため基礎状態境界と Activity 系譜を保ちながら、コンパクトな再生状態シグナルを必要とする。}
+  short_definition:
+    zh: 请求从指定检查点重新执行后续步骤的运行事件。
+    en: A runtime event requesting re-execution after a selected checkpoint.
+    ja: 指定チェックポイント後の再実行を要求する実行イベント。
+  definition:
+    zh: 回放事件是一种 ObservabilityEvent，记录某主体在特定时刻请求从指定检查点或轨迹位置开始重新执行后续步骤。它携带回放目的、输入复用策略与允许分支范围，并可触发 ReplayActivity；实际步骤重演属于活动，事件只表示触发。
+    en: A ReplayEvent is an ObservabilityEvent recording that an actor requested re-execution of subsequent steps from a named checkpoint or trace position at a particular time. It carries replay purpose, input-reuse policy, and allowed branching scope and may trigger ReplayActivity; the step re-execution is the activity, while this event is its trigger.
+    ja: ReplayEvent は、主体が指定チェックポイントまたはトレース位置から後続ステップの再実行を特定時刻に要求したことを記録する ObservabilityEvent です。目的、入力再利用方針、分岐許容範囲を持ち ReplayActivity を起動できます。再実行は活動で、イベントは起動事実です。
+  why_needed:
+    zh: 独立的回放触发记录解释是谁为何启动调试、复现或时间旅行，以及要求复用哪些输入；这使回放结果能与普通故障恢复和正常重试区分。
+    en: A separate replay trigger records who initiated debugging, reproduction, or time travel, why, and which inputs should be reused, distinguishing replay outcomes from ordinary recovery and normal retries.
+    ja: 独立した再生トリガーは、誰がなぜデバッグ・再現・時間移動を開始し、どの入力を再利用したかを残し、通常復旧や通常再試行と区別します。
   includes:
-    - {zh: 事件 ID、重放活动 ID、源检查点 ID、重放范围、结果和分叉指示。, en: "Event ID, replay activity ID, source checkpoint ID, replay scope, outcome, and divergence indication.", ja: イベント ID、再生アクティビティ ID、ソースチェックポイント ID、再生範囲、結果、分岐指示。}
-    - {zh: 正式重放操作的已开始、已完成、失败和分叉通知。, en: "Started, completed, failed, and divergence notifications for formal replay operations.", ja: 正式な再生操作の開始、完了、失敗、分岐通知。}
+    - zh: 包括开发者选择失败前检查点并要求复用原始输入重演工具调用，以及评估器从同一点注入替代输入形成比较分支的事件。
+      en: Includes a developer selecting the checkpoint before a failure to replay a tool call with original inputs, and an evaluator requesting a comparison branch with substituted inputs.
+      ja: 開発者が障害前チェックポイントを選び元入力でツール呼出しを再生する要求、評価器が代替入力の比較分岐を要求する事象を含みます。
   excludes:
-    - {zh: 追踪查看器的回放状态、缓存结果获取或通用重试通知。, en: "A trace viewer's playback state, a cached result fetch, or a generic retry notification.", ja: トレースビューアの再生状態、キャッシュ結果取得、一般的な再試行通知。}
-    - {zh: 重放插桩期间发出的 OpenTelemetry Metric data point 或 Log Record。, en: "An OpenTelemetry Metric data point or Log Record emitted during replay instrumentation.", ja: 再生計装中に発行される OpenTelemetry Metric data point または Log Record。}
+    - zh: 不包括只要求装载状态而不重演步骤的 CheckpointRestoreEvent、实际重演过程 ReplayActivity，以及运行策略自动执行的普通 RetryAttempt。
+      en: Excludes CheckpointRestoreEvent requests that only load state, the ReplayActivity performing re-execution, and an ordinary RetryAttempt automatically scheduled by runtime policy.
+      ja: 状態読込だけを求める CheckpointRestoreEvent、再実行処理の ReplayActivity、方針で自動実行される通常 RetryAttempt は含みません。
   semantic_kind: event
-  aliases: [replay notification, time-travel outcome]
-engineering:
-  explanation: {zh: 重放控制在开始或完成基于检查点的重新执行后发出领域事件，并包含实际 ReplayActivity 引用。追踪和日志导出器可为诊断发出自身数据，但不定义重放成功或分叉。, en: "Replay control emits a domain event after beginning or completing checkpoint-based re-execution and includes the actual ReplayActivity reference. Trace and log exporters can emit their own data for diagnosis but do not define replay success or divergence.", ja: 再生制御はチェックポイントベースの再実行を開始または完了した後に実際の ReplayActivity 参照を含む領域イベントを発行する。トレースおよびログエクスポーターは診断用データを発行できるが、再生成功や分岐を定義しない。}
-  typical_input:
-    - description: {zh: 重放结果, en: Replay outcome, ja: 再生結果}
-      format: |-
-        {"replay_activity_id":"replay-op-45","checkpoint_id":"checkpoint-4","scope":"steps_after_checkpoint","outcome":"succeeded","diverged":false}
-  typical_output:
-    - description: {zh: 重放事件记录, en: Replay event record, ja: 再生イベント記録}
-      format: |-
-        {"event_id":"obs-event-65","event_name":"execution.replayed","replay_activity_id":"replay-op-45","outcome":"succeeded"}
-  reference_implementations:
-    - {name: LangGraph time travel, url: https://docs.langchain.com/oss/python/langgraph/use-time-travel, description: Documents replaying from checkpoints and re-executing downstream nodes.}
+  aliases: []
 structure:
-  identity_keys: [event_id]
-  fields:
-    - id: event_id
-      labels: {zh: 重放事件 ID, en: Replay event ID, ja: 再生イベント ID}
-      definitions: {zh: 一次重放状态通知的稳定标识符。, en: Stable identifier of one replay status notification., ja: 1件の再生状態通知の安定識別子。}
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      pattern: '^[a-z][a-z0-9-]{2,127}$'
-      example_value: obs-event-65
-      source_claims: [claim-replay-event]
-    - id: event_name
-      labels: {zh: 领域事件名称, en: Domain event name, ja: 領域イベント名}
-      definitions: {zh: 从 ObservabilityEvent 继承并固定为检查点重放的命名空间事件名称。, en: Namespaced event name inherited from ObservabilityEvent and fixed to checkpoint replay., ja: ObservabilityEvent から継承しチェックポイント再生に固定される名前空間付きイベント名。}
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: [checkpoint.replayed]
-      example_value: checkpoint.replayed
-      source_claims: [claim-replay-event]
-    - id: occurred_at
-      labels: {zh: 发生时间, en: Occurrence time, ja: 発生時刻}
-      definitions: {zh: 从 ObservabilityEvent 继承的重放结果被运行时断言的时间。, en: Time inherited from ObservabilityEvent at which the runtime asserted the replay outcome., ja: ObservabilityEvent から継承する、ランタイムが再生結果を表明した時刻。}
-      datatype: datetime
-      required: true
-      cardinality: {min: 1, max: 1}
-      example_value: '2026-07-18T09:21:00Z'
-      source_claims: [claim-replay-event]
-    - id: subject_ref
-      labels: {zh: 主体引用, en: Subject reference, ja: 主体参照}
-      definitions: {zh: 从 ObservabilityEvent 继承的受影响重放操作引用。, en: Reference inherited from ObservabilityEvent to the affected replay operation., ja: ObservabilityEvent から継承する、影響を受けた再生操作への参照。}
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      example_value: replay-op-45
-      source_claims: [claim-replay-event]
-    - id: replay_scope
-      labels: {zh: 重放范围, en: Replay scope, ja: 再生範囲}
-      definitions: {zh: 所引用 ReplayActivity 报告的下游工作范围。, en: Scope of downstream work reported by the referenced ReplayActivity., ja: 参照した ReplayActivity が報告する下流作業の範囲。}
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: [steps_after_checkpoint, selected_branch]
-      example_value: steps_after_checkpoint
-      source_claims: [claim-replay-event]
-    - id: diverged
-      labels: {zh: 是否分叉, en: Diverged, ja: 分岐したか}
-      definitions: {zh: 重放结果是否与记录的执行谱系有实质不同。, en: Whether the replayed result differs materially from recorded execution lineage., ja: 再生結果が記録済み実行系譜と実質的に異なるか。}
-      datatype: boolean
-      required: true
-      cardinality: {min: 1, max: 1}
-      example_value: false
-      source_claims: [claim-replay-event]
-  constraints:
-    - id: replay-event-activity-agreement
-      severity: error
-      language: plain
-      expression: A ReplayEvent must name one ReplayActivity and agree with its checkpoint, replay scope, terminal outcome, and divergence evidence.
-      explanation: {zh: 该事件总结现有重新执行操作，不能自行创建重放语义。, en: The event summarizes an existing re-execution operation and cannot create replay semantics by itself., ja: このイベントは既存の再実行操作を要約し、それ自体で再生意味を作れない。}
-      source_claims: [claim-replay-event]
-  required_relations: [ReplayEvent-specializes-ObservabilityEvent, ReplayEvent-describes-ReplayActivity]
+  identity_keys: []
+  fields: []
+  constraints: []
+  required_relation_constraints: []
 examples:
-  - id: replay-event-positive
-    labels: {zh: "LangGraph time-travel replay", en: "LangGraph time-travel replay", ja: "LangGraph time-travel replay"}
-    descriptions: {zh: "OpenTelemetry TracerProvider->Tracer->Span; tracer.start_span('llm.call', attributes={model:gpt-4,tokens:1500}); SpanKind CLIENT/SERVER/INTERNAL; ReplayEvent maps TraceSpan/TraceRecord/ObservabilityEvent.", en: "OpenTelemetry Tracer->Span; tracer.start_span('llm.call', attributes={model:gpt-4,tokens:1500}); SpanKind CLIENT/SERVER/INTERNAL; ReplayEvent maps TraceSpan/TraceRecord/ObservabilityEvent.", ja: "OTel Tracer->Span llm.call; ReplayEvent TraceSpan/Record."}
-    field_values: {event_id: obs-event-65, event_name: checkpoint.replayed, occurred_at: '2026-07-18T09:21:00Z', subject_ref: replay-op-45, replay_scope: steps_after_checkpoint, diverged: false}
-    related_node_ids: [ReplayEvent, ReplayActivity, Checkpoint]
-    related_relation_ids: [ReplayEvent-describes-ReplayActivity]
-    source_claims: [claim-replay-event]
-  - id: replay-event-counterexample
-    labels: {zh: "LangSmith playground 非 ReplayEvent", en: "LangSmith playground not ReplayEvent", ja: "LangSmith playground は ReplayEvent ではない"}
-    descriptions: {zh: "Generation without trace container cannot serve as Langfuse-style ReplayEvent TraceRecord.", en: "Generation without trace container cannot serve as Langfuse-style ReplayEvent TraceRecord.", ja: "Missing trace rejects Langfuse-style ReplayEvent."}
-    field_values: {trace_id: trace-900}
-    related_node_ids: [TraceRecord]
-    related_relation_ids: []
-    source_claims: [claim-replay-event]
-  - id: replay-event-boundary
-    labels: {zh: "ReplayEvent 与 ReplayActivity 边界", en: "ReplayEvent versus ReplayActivity", ja: "ReplayEvent と ReplayActivity 境界"}
-    descriptions: {zh: "run.outputs is trace preview not PROV Entity; ReplayEvent must not treat run JSON as Artifact digest.", en: "run.outputs is trace preview not PROV Entity; ReplayEvent must not treat run JSON as Artifact digest.", ja: "run.outputs not Artifact."}
-    field_values: {event_id: obs-event-65}
-    related_node_ids: [ReplayEvent, RetryActivity, ReplayActivity]
-    related_relation_ids: [ReplayEvent-describes-ReplayActivity]
-    source_claims: [claim-replay-event]
-  - id: replay-event-instance-65
-    labels: {zh: "checkpoint 历史 replay 实例", en: "checkpoint history replay instance", ja: "checkpoint 履歴 replay 事例"}
-    descriptions: {zh: "Phoenix instance: embedding_drift_score=0.18 prompt_quality=0.91->ReplayEvent ObservabilityEvent.", en: "Phoenix instance: drift+quality->ReplayEvent ObservabilityEvent.", ja: "Phoenix instance maps to ReplayEvent Event."}
-    field_values: {event_id: obs-event-65, event_name: checkpoint.replayed, occurred_at: '2026-07-18T09:21:00Z', subject_ref: replay-op-45, replay_scope: steps_after_checkpoint, diverged: false}
-    related_node_ids: [ReplayEvent, ReplayActivity, Checkpoint, RunAttempt]
-    related_relation_ids: [ReplayEvent-describes-ReplayActivity]
-    source_claims: [claim-replay-event]
+  - id: ReplayEvent-example-positive-001
+    kind: positive
+    labels:
+      zh: 调查者发起指定位置重放
+      en: Investigator initiates replay from a named position
+      ja: 調査者が指定位置からリプレイを開始
+    scenario_id: null
+    descriptions:
+      zh: 调查者在追踪查看器中选择 cp-17 和“复用已记录输入”策略，并注明目的是复现第三次工具调用的分歧；系统在 11:08:04 记录发起者、起点、策略和原因，然后启动重放活动。
+      en: An investigator selects cp-17 in the trace viewer, chooses “reuse recorded inputs,” and states the purpose is to reproduce divergence at the third tool call. At 11:08:04 the system records initiator, starting point, policy, and reason, then starts replay work.
+      ja: 調査者がトレース画面でcp-17を選び、「記録入力を再利用」を指定し、3回目のツール呼出しの差異再現を目的とする。11:08:04に開始者、起点、方針、理由を記録し、リプレイ活動を開始する。
+    field_values:
+      event_id: replay-request-cp17
+      event_kind: replay
+      event_name: checkpoint.replay.requested
+      timestamp: 2026-07-16T11:08:04.000Z
+      attributes:
+        initiator: investigator-5
+        policy: reuse-recorded-inputs
+        reason: reproduce-third-tool-divergence
+    related_node_ids:
+      - ReplayEvent
+      - ReplayActivity
+      - ObservabilityEvent
+    related_relation_ids:
+      - ReplayEvent-is_a-ObservabilityEvent
+      - ReplayEvent-triggers-ReplayActivity
+    expected_result:
+      zh: 发起事实被识别为重放事件；实际重执行由后续重放活动表示。
+      en: The initiation fact is classified as ReplayEvent; actual re-execution is represented by the subsequent ReplayActivity.
+      ja: 開始事実はReplayEventに分類され、実際の再実行は後続のReplayActivityで表される。
+    why_valid_or_invalid:
+      zh: 该对象具有单一发生时点并明确重放起点、目的和输入策略，而非一段持续执行。
+      en: The object has one occurrence time and states replay origin, purpose, and input policy rather than representing duration-bearing execution.
+      ja: 一つの発生時刻とリプレイ起点・目的・入力方針を持ち、継続する実行自体ではない。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-replay-event-001
+  - id: ReplayEvent-example-boundary-001
+    kind: boundary
+    labels:
+      zh: 普通自动重试不是重放请求
+      en: An ordinary automatic retry is not a replay request
+      ja: 通常の自動再試行はリプレイ要求ではない
+    scenario_id: null
+    descriptions:
+      zh: 工具超时后，运行时按重试策略立即再次执行同一调用；没有选定历史检查点、复现目的、输入复用策略或独立发起者。该事实属于运行尝试控制，不是重放事件。
+      en: After a tool timeout, runtime retry policy immediately executes the same call again. No historical checkpoint, reproduction purpose, input-reuse policy, or independent initiator is selected, so this is attempt control rather than ReplayEvent.
+      ja: ツールタイムアウト後、実行時再試行方針が同じ呼出しを直ちに再実行する。過去チェックポイント、再現目的、入力再利用方針、独立した開始者がなく、これは試行制御であってReplayEventではない。
+    field_values: {}
+    related_node_ids:
+      - ReplayEvent
+      - ReplayActivity
+    related_relation_ids:
+      - ReplayEvent-triggers-ReplayActivity
+    expected_result:
+      zh: 自动重试保持运行尝试语义，不被图谱归入重放事件。
+      en: The automatic retry retains run-attempt semantics and is not classified as ReplayEvent.
+      ja: 自動再試行は実行試行の意味を保ち、ReplayEventに分類されない。
+    why_valid_or_invalid:
+      zh: 重放面向已记录历史路径的显式复现；失败后的同尝试重试不满足这一身份条件。
+      en: Replay is explicit reproduction of a recorded historical path; an in-policy retry after failure does not satisfy that identity condition.
+      ja: リプレイは記録済み過去経路の明示的再現であり、失敗後の通常再試行はその同一性条件を満たさない。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-replay-event-001
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation:
+  - sibling_concept_id: TraceEvent
+    shared_parent_concept_id: ObservabilityEvent
+    differentia:
+      zh: 正向身份比较：父节点 ObservabilityEvent：ReplayEvent（semantic kind=event，骨架 ReplayEvent-is_a-ObservabilityEvent）；TraceEvent（semantic kind=event，骨架 TraceEvent-is_a-ObservabilityEvent）。双端条件：ReplayEvent 条件：“回放事件是以如下事实为区分特征的可观测运行事件：它记录为了调试、评估、复现或审查而回放追踪、跨度、会话片段、检查点或产物谱系的可观测事件”；TraceEvent 条件：“作为可观测运行事件，追踪事件由这一事实区分：它是可观测的运行发生项，例如消息、动作、工具调用、状态更新、警告、策略决策、产物更新或检查点事件”。仅依据各自定义与骨架逐端验证。
+      en: "Positive identity comparison: parent ObservabilityEvent: ReplayEvent (semantic kind=event, backbone ReplayEvent-is_a-ObservabilityEvent); TraceEvent (semantic kind=event, backbone TraceEvent-is_a-ObservabilityEvent). Endpoint conditions: ReplayEvent condition: “Replay event is an observability event; its differentiating condition is that it is an observable event that replays a trace, span, session segment, checkpoint, or artifact lineage for debugging, evaluation, reproduction, or review”; TraceEvent condition: “Trace event belongs to the observability event category and differs from broader members in that it is an observable runtime occurrence such as a message, action, tool call, state update, warning, policy decision, artifact update, or checkpoint event”. Verify each endpoint from its own definition and backbone."
+      ja: 正の同一性比較：親 ObservabilityEvent：ReplayEvent（semantic kind=event、バックボーン ReplayEvent-is_a-ObservabilityEvent）；TraceEvent（semantic kind=event、バックボーン TraceEvent-is_a-ObservabilityEvent）。両端条件：ReplayEvent の条件：「再生イベントは観測可能実行イベントの一種であり、次の条件で区別されます：それは、デバッグ、評価、再現、レビューのためにトレース、スパン、セッション区間、チェックポイント、成果物系譜を再生する観測可能イベントを記録します」；TraceEvent の条件：「トレースイベントは観測可能実行イベントとして、次の条件により他の対象と区別されます：それは、メッセージ、行動、ツール呼び出し、状態更新、警告、ポリシー判断、成果物更新、チェックポイントイベントなどの観測可能な実行上の出来事です」。各端を固有の定義とバックボーンで検証します。
+    source_claims:
+      - claim-replay-event-001
 parent_relation:
-  id: ReplayEvent-specializes-ObservabilityEvent
+  id: ReplayEvent-is_a-ObservabilityEvent
   predicate: is_a
-  target: concept:ObservabilityEvent
-  endpoint_order: child-to-parent
-  direction: source-to-target
+  direction: target-to-source
   relation_kind: hierarchy
-  labels: {zh: 是重放事件, en: is a replay event, ja: 再生イベントである}
-  definitions: {zh: 每个 ReplayEvent 都是描述基于检查点 ReplayActivity 的 ObservabilityEvent。, en: Every ReplayEvent is an ObservabilityEvent describing a checkpoint-based ReplayActivity., ja: すべての ReplayEvent はチェックポイントベース ReplayActivity を記述する ObservabilityEvent である。}
-  cardinality: {source: {min: 0, max: null}, target: {min: 1, max: 1}}
-  cardinality_not_applicable_reason: null
-  inverse_reading: {predicate: has_replay_event, labels: {zh: 具有重放事件, en: has replay event, ja: 再生イベントを持つ}}
-  conditions:
-    - id: replay-event-parent-condition
-      severity: error
-      expression: Require event_name execution.replayed, a checkpoint-based replay activity reference, and outcome evidence.
-      explanations: {zh: 通用重试或追踪检查事件不满足重放语义。, en: A generic retry or trace inspection event does not meet replay semantics., ja: 一般的な再試行またはトレース検査イベントは再生意味を満たさない。}
-      source_claims: [claim-replay-event]
-  temporal_scope: valid-time
+  labels:
+    zh: 是一种
+    en: is a
+    ja: の一種である
+  definitions:
+    zh: 每个 ReplayEvent 都是 ObservabilityEvent，其种差是在确定时刻记录从某检查点重演后续步骤的请求或启动。
+    en: Every ReplayEvent is an ObservabilityEvent distinguished by recording, at a determinate time, a request or start to re-execute steps after a selected checkpoint.
+    ja: すべての ReplayEvent は ObservabilityEvent で、選択 Checkpoint 後の step を再実行する要求または開始を確定時刻に記録する点が種差です。
+  cardinality: null
+  cardinality_not_applicable_reason:
+    zh: 分类继承不使用实例关系基数。
+    en: Taxonomic inheritance does not use instance-relation cardinality.
+    ja: 分類継承にはインスタンス関係の基数を用いません。
+  inverse_reading:
+    predicate: part_of
+    labels:
+      zh: 反向：是一种
+      en: has subtype
+      ja: 逆方向：の一種である
+  conditions: []
+  temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples: []
-  source_claims: [claim-replay-event]
+  examples:
+    - id: ReplayEvent-is_a-ObservabilityEvent-example-positive-manual-20260716
+      kind: positive
+      labels:
+        zh: 逐项核实正例
+        en: Point-reviewed positive case
+        ja: 項目別審査の正例
+      scenario_id: null
+      descriptions:
+        zh: 调试器记录 replay-44：从 cp-12 使用原输入重跑步骤 13–18，并允许产生新分支。
+        en: "The debugger records replay-44: re-run steps 13–18 from cp-12 with original inputs and allow a new branch."
+        ja: debugger が replay-44 を記録し、cp-12 から元入力で step 13–18 を再実行して新分岐を許可します。
+      field_values: {}
+      related_node_ids:
+        - ReplayEvent
+        - ObservabilityEvent
+      related_relation_ids:
+        - ReplayEvent-is_a-ObservabilityEvent
+      expected_result:
+        zh: 仅在所述证据存在时返回这条有向事实。
+        en: Return this directed fact only when the described evidence exists.
+        ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
+      why_valid_or_invalid:
+        zh: 每个 ReplayEvent 都是 ObservabilityEvent，其种差是在确定时刻记录从某检查点重演后续步骤的请求或启动。
+        en: Every ReplayEvent is an ObservabilityEvent distinguished by recording, at a determinate time, a request or start to re-execute steps after a selected checkpoint.
+        ja: すべての ReplayEvent は ObservabilityEvent で、選択 Checkpoint 後の step を再実行する要求または開始を確定時刻に記録する点が種差です。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-replay-event-002
+    - id: ReplayEvent-is_a-ObservabilityEvent-example-boundary-manual-20260716
+      kind: boundary
+      labels:
+        zh: 逐项核实边界例
+        en: Point-reviewed boundary case
+        ja: 項目別審査の境界例
+      scenario_id: null
+      descriptions:
+        zh: 系统自动保存步骤 18 的新检查点，但没有请求重跑任何旧步骤。
+        en: The system automatically saves a new checkpoint at step 18 without requesting any prior step to be re-run.
+        ja: system が step 18 で新 Checkpoint を自動保存しますが、旧 step の再実行要求はありません。
+      field_values: {}
+      related_node_ids:
+        - ReplayEvent
+        - ObservabilityEvent
+      related_relation_ids:
+        - ReplayEvent-is_a-ObservabilityEvent
+      expected_result:
+        zh: 不得从该边界情形推断这条关系。
+        en: Do not infer this relation from the boundary case.
+        ja: この境界事例から当該関係を推論しません。
+      why_valid_or_invalid:
+        zh: 自动检查点捕获不是回放触发，缺少所选起点与重执行意图。
+        en: Automatic checkpoint capture is not a replay trigger because it lacks a selected origin and re-execution intent.
+        ja: 自動 checkpoint capture は選択起点と再実行意図を欠くため replay trigger ではありません。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-replay-event-002
+  source_claims:
+    - claim-replay-event-002
+  distinct_fact_rationale: null
+  layout_role: primary-backbone
+  review_status: accepted
+  endpoint_order: child-to-parent
 relations:
-  - id: ReplayEvent-describes-ReplayActivity
-    predicate: describes
-    target: concept:ReplayActivity
+  - id: ReplayEvent-triggers-ReplayActivity
+    predicate: triggers
     direction: source-to-target
-    relation_kind: observation
-    labels: {zh: 描述重放活动, en: describes replay activity, ja: 再生アクティビティを記述する}
-    definitions: {zh: ReplayEvent 报告该活动的检查点、范围、结果和分叉结果时描述 ReplayActivity。, en: "ReplayEvent describes ReplayActivity when it reports that activity's checkpoint, scope, outcome, and divergence result.", ja: ReplayEvent はその Activity のチェックポイント、範囲、結果、分岐結果を報告するとき ReplayActivity を記述する。}
-    cardinality: {source: {min: 1, max: 1}, target: {min: 0, max: null}}
-    cardinality_not_applicable_reason: null
-    inverse_reading: {predicate: was_described_by, labels: {zh: 由重放事件描述, en: was described by replay event, ja: 再生イベントに記述された}}
-    conditions:
-      - id: replay-event-description-condition
-        severity: error
-        expression: The event must agree with the target activity's checkpoint provenance and replay result.
-        explanations: {zh: 状态事件不能描述无关或仅计划的重放。, en: Status events cannot describe unrelated or merely planned replays., ja: 状態イベントは無関係または計画だけの再生を記述できない。}
-        source_claims: [claim-replay-event]
-    temporal_scope: valid-time
+    relation_kind: causal
+    labels:
+      zh: triggers
+      en: triggers
+      ja: triggers
+    definitions:
+      zh: ReplayEvent 通过 triggers 指向由该回放请求实际启动的 ReplayActivity，从而区分请求时刻与后续重执行区间。
+      en: ReplayEvent triggers the ReplayActivity actually started by that replay request, separating the request instant from the subsequent re-execution interval.
+      ja: ReplayEvent は replay request が実際に開始した ReplayActivity を triggers し、要求時点と後続再実行区間を分離します。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 该语义事实不对所有运行实例施加统一基数。
+      en: This semantic fact does not impose one universal cardinality on every runtime instance.
+      ja: この意味事実はすべての実行インスタンスに一律の基数を課しません。
+    inverse_reading:
+      predicate: inverse_of_triggers
+      labels:
+        zh: 反向 triggers
+        en: inverse triggers
+        ja: 逆 triggers
+    conditions: []
+    temporal_scope: timeless
     boundary_context: null
     constraints: []
-    examples: []
-    source_claims: [claim-replay-event]
-sources:
-  - id: langgraph-time-travel
-    title: "LangGraph time travel"
-    url: https://docs.langchain.com/oss/python/langgraph/use-time-travel
-    source_type: documentation
-    relevance: Documents checkpoint-based replay and downstream node re-execution.
-  - id: otel-trace-api
-    title: "OpenTelemetry Trace API"
-    url: https://opentelemetry.io/docs/specs/otel/trace/api/
-    source_type: standard
-    relevance: Defines OTel Span Events as distinct span-attached telemetry, not generic replay notifications.
+    examples:
+      - id: ReplayEvent-triggers-ReplayActivity-example-positive-manual-20260716
+        kind: positive
+        labels:
+          zh: 逐项核实正例
+          en: Point-reviewed positive case
+          ja: 項目別審査の正例
+        scenario_id: null
+        descriptions:
+          zh: replay-request-44 指定 cp-12 后启动 replay-44；后者记录新跨度与分支结果。
+          en: replay-request-44 selects cp-12 and starts replay-44, which records new spans and branch results.
+          ja: replay-request-44 が cp-12 を選び replay-44 を開始し、後者が新 Span と branch result を記録します。
+        field_values: {}
+        related_node_ids:
+          - ReplayEvent
+          - ReplayActivity
+        related_relation_ids:
+          - ReplayEvent-triggers-ReplayActivity
+        expected_result:
+          zh: 仅在所述证据存在时返回这条有向事实。
+          en: Return this directed fact only when the described evidence exists.
+          ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
+        why_valid_or_invalid:
+          zh: ReplayEvent 通过 triggers 指向由该回放请求实际启动的 ReplayActivity，从而区分请求时刻与后续重执行区间。
+          en: ReplayEvent triggers the ReplayActivity actually started by that replay request, separating the request instant from the subsequent re-execution interval.
+          ja: ReplayEvent は replay request が実際に開始した ReplayActivity を triggers し、要求時点と後続再実行区間を分離します。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-replay-event-003
+      - id: ReplayEvent-triggers-ReplayActivity-example-boundary-manual-20260716
+        kind: boundary
+        labels:
+          zh: 逐项核实边界例
+          en: Point-reviewed boundary case
+          ja: 項目別審査の境界例
+        scenario_id: null
+        descriptions:
+          zh: 用户预览可回放检查点列表后关闭面板，没有提交请求，也没有启动活动。
+          en: A user previews a list of replayable checkpoints and closes the panel without submitting a request or starting an activity.
+          ja: user が replayable Checkpoint 一覧を preview して panel を閉じ、request submit も活動開始もしません。
+        field_values: {}
+        related_node_ids:
+          - ReplayEvent
+          - ReplayActivity
+        related_relation_ids:
+          - ReplayEvent-triggers-ReplayActivity
+        expected_result:
+          zh: 不得从该边界情形推断这条关系。
+          en: Do not infer this relation from the boundary case.
+          ja: この境界事例から当該関係を推論しません。
+        why_valid_or_invalid:
+          zh: 浏览候选起点不构成回放触发；必须有已接受请求与实际活动身份。
+          en: Browsing candidate origins is not a replay trigger; an accepted request and an actual activity identity are required.
+          ja: 候補起点の閲覧は replay trigger ではなく、accepted request と実 activity identity が必要です。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-replay-event-003
+    source_claims:
+      - claim-replay-event-003
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: accepted
+    target: concept:ReplayActivity
+review:
+  status: accepted
+  method: manual-semantic
+  reviewer: manual-runtime-verification
+  reviewed_on: 2026-07-17
+  note:
+    zh: 已对照 OpenTelemetry、W3C Trace Context 与 LangGraph checkpoint/replay 逐项核验，TraceSpan 与 Checkpoint 语义成立。
+    en: Verified against OpenTelemetry, W3C Trace Context, and LangGraph checkpoint/replay. TraceSpan and Checkpoint semantics hold.
+    ja: OpenTelemetry、W3C Trace Context、LangGraph checkpoint/replay に照らし TraceSpan と Checkpoint semantics を確認しました。
+  sections:
+    semantics: accepted
+    hierarchy: accepted
+    relations: accepted
+    structure: accepted
+    examples: accepted
+    source_claims: accepted
 source_claims:
-  - id: claim-replay-event
-    source: langgraph-time-travel
-    supports: LangGraph replay resumes from a prior checkpoint and re-executes nodes after that checkpoint, which can yield different results.
-    locator: Overview and Replay
-    evidence_kind: documentation
+  - id: claim-replay-event-001
+    source: eng-fw-langgraph-persistence
+    supports: LangGraph accepts a prior checkpoint identifier to initiate replay; Moonweave records that initiation as an event separate from the subsequent re-execution activity.
+    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
+    evidence_kind: design-inference
     confidence: high
+    review_status: accepted
+  - id: claim-replay-event-002
+    source: eng-fw-langgraph-persistence
+    supports: Every ReplayEvent is an ObservabilityEvent distinguished by recording, at a determinate time, a request or start to re-execute steps after a selected checkpoint. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
+    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-replay-event-003
+    source: eng-fw-langgraph-persistence
+    supports: ReplayEvent triggers the ReplayActivity actually started by that replay request, separating the request instant from the subsequent re-execution interval. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
+    locator: Persistence > Checkpoints, StateSnapshot fields, state history, Replay, and fault tolerance
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
 

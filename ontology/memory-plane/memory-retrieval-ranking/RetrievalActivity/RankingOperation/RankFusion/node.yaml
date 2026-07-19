@@ -3,563 +3,558 @@ id: RankFusion
 kind: concept
 status: accepted
 labels:
-  zh: 排名融合活动
-  en: Rank Fusion
-  ja: ランク融合
+  zh: 排名融合
+  en: Rank fusion
+  ja: 順位融合
 semantics:
   short_definition:
-    zh: 将两个或多个已排序候选列表按明确融合方法合成为一个排序输出的 RankingOperation 子类。
-    en: A RankingOperation subtype that combines two or more already ranked candidate lists into one ranked output under an explicit fusion method.
-    ja: 二つ以上の既に rank 済み candidate list を明示的 fusion method で一つの ranked output に結合する RankingOperation の下位型。
+    zh: 把两个或更多独立排序的候选列表组合成一个统一顺序的排序活动。
+    en: A ranking activity that combines two or more independently ordered candidate lists into one ordering.
+    ja: 二つ以上の独立ranked candidate listを一つの順序へ結合するranking activityです。
   definition:
-    zh: >
-      RankFusion 是对多路已有排序结果进行组合的排序活动，例如将词法与向量检索列表通过 reciprocal rank fusion
-      合成为一个结果。它记录参与列表、融合方法和窗口参数，并生成新的融合排序结果。它不是单路候选召回、单个
-      候选评分、交叉编码器重排、top-k 截断或 ContextPackage 选择。融合后的顺序不证明任何候选已被授权或将进入回答。
-    en: >
-      RankFusion is ranking activity that combines multiple existing ranked results, for example combining lexical and
-      vector retrieval lists with reciprocal rank fusion into one result. It records participating lists, fusion
-      method, and window parameters and generates a new fused ranking. It is not single-stream candidate recall,
-      individual candidate scoring, cross-encoder rerank, top-k truncation, or ContextPackage selection. A fused
-      order does not prove that any candidate is authorized or will enter an answer.
-    ja: >
-      RankFusion は複数の既存 ranked result を組み合わせる ranking activity で、例えば lexical と vector retrieval
-      list を reciprocal rank fusion で一つの result に結合します。参加 list、fusion method、window parameter を
-      記録し、新しい fused ranking を生成します。single-stream candidate recall、個別 candidate scoring、
-      cross-encoder rerank、top-k truncation、ContextPackage selection ではありません。fused order は candidate が
-      authorized であることや answer に入ることを証明しません。
+    zh: RankFusion 消费包含多个排名信号或子列表的 CandidateSet，并依照声明的融合方法形成统一顺序；它以排名位置或归一化分数作组合，不等同于单一检索器评分，也不等同于模型重排。
+    en: RankFusion consumes a CandidateSet carrying multiple rank signals or child lists and creates one ordering under a declared fusion method. It combines rank positions or normalized scores; it is neither single-retriever scoring nor model reranking.
+    ja: RankFusion は複数rank signal/child listを持つCandidateSetをconsumeし指定fusion methodで一つの順序を作ります。rank positionまたはnormalized scoreを結合しsingle-retriever scoringやmodel rerankingではありません。
   why_needed:
-    zh: 混合检索通常产生互补列表；记录融合输入和参数可解释最终顺序，而不把任一原始排名或分数误认为唯一依据。
-    en: Hybrid retrieval often produces complementary lists; recording fusion inputs and parameters explains final order without mistaking one original rank or score for the sole basis.
-    ja: hybrid retrieval は補完的な list を生むことが多く、fusion input と parameter を記録すると、一つの元の rank や score を唯一の根拠と取り違えず final order を説明できます。
+    zh: 显式区分“组合多个排序”与“重新评估单个候选”。
+    en: Explicitly separates combining multiple rankings from reassessing individual candidates.
+    ja: 複数rankingの結合と個別candidateの再評価を明示的に分離します。
   includes:
-    - zh: RRF 等多列表融合执行、输入排序列表、融合参数和新的融合结果。
-      en: Multi-list fusion execution such as RRF, input ranked lists, fusion parameters, and new fused result.
-      ja: RRF のような multi-list fusion execution、input ranked list、fusion parameter、新しい fused result。
+    - zh: 纳入 RRF、DBSF 或其他对多个检索子列表进行确定性组合的活动。
+      en: Includes RRF, DBSF, or other deterministic combination of multiple retriever lists.
+      ja: RRF・DBSF等複数retriever listを決定的に結合するactivityを含みます。
   excludes:
-    - zh: 单个检索器召回、单项相似度、模型重排、简单保留前 k 项、索引构建和回答生成。
-      en: One retriever's recall, one similarity value, model rerank, simply retaining first k items, index construction, or answer generation.
-      ja: 一つの retriever の recall、一つの similarity value、model rerank、単に最初の k item を残すこと、index construction、answer generation。
+    - zh: 排除单列表评分、交叉编码器重排、TopK 截断和上下文选择。
+      en: Excludes single-list scoring, cross-encoder reranking, TopK truncation, and context selection.
+      ja: single-list scoring・cross-encoder reranking・TopK truncation・context selectionを除外します。
   semantic_kind: activity
-  aliases: [reciprocal rank fusion, hybrid rank fusion, 混合检索融合]
-engineering:
-  explanation:
-    zh: Elasticsearch RRF 独立执行多个 retriever 后组合结果，并公开 rank_constant 与 rank_window_size。Moonweave 将该调用记录为可复现的融合活动。
-    en: Elasticsearch RRF independently executes multiple retrievers then combines results and exposes rank_constant and rank_window_size. Moonweave records that call as reproducible fusion activity.
-    ja: Elasticsearch RRF は複数 retriever を独立に実行して結果を結合し、rank_constant と rank_window_size を公開します。Moonweave はこの call を再現可能な fusion activity として記録します。
-  typical_input:
-    - description: Two ranked candidate lists
-      format: |
-        {
-          "input_ranked_list_refs": ["candidate-set-vector-18", "candidate-set-lexical-18"],
-          "fusion_method_ref": "rrf-v1",
-          "rank_constant": 60,
-          "rank_window_size": 50
-        }
-  typical_output:
-    - description: Fused result
-      format: |
-        {
-          "rank_fusion_id": "rank-fusion-18",
-          "ranking_operation_id": "ranking-fusion-18",
-          "retrieval_activity_id": "retrieval-activity-hybrid-18",
-          "request_ref": "retrieval-request-hybrid-18",
-          "output_result_ref": "retrieval-result-hybrid-18",
-          "input_candidate_set_ref": "candidate-set-hybrid-18",
-          "input_ranked_list_refs": ["candidate-set-vector-18", "candidate-set-lexical-18"],
-          "fusion_method_ref": "rrf-v1",
-          "ranking_method_ref": "rrf-v1",
-          "implementation_ref": "elasticsearch-rrf-v1",
-          "started_at": "2026-07-19T01:00:02Z",
-          "fusion_status": "completed",
-          "ranking_status": "completed",
-          "execution_status": "completed"
-        }
-  reference_implementations:
-    - name: Elasticsearch reciprocal rank fusion
-      url: https://www.elastic.co/docs/reference/elasticsearch/rest-apis/reciprocal-rank-fusion
-      description: Documents retrievers, rank_constant, rank_window_size, and reciprocal rank fusion response behavior.
+  aliases: []
 structure:
-  identity_keys: [rank_fusion_id]
+  identity_keys:
+    - fusion_operation_id
   fields:
-    - id: rank_fusion_id
-      labels: {zh: 排名融合标识, en: rank fusion ID, ja: ランク融合 ID}
+    - id: fusion_operation_id
+      labels:
+        zh: 融合操作标识
+        en: fusion operation ID
+        ja: fusion operation ID
       datatype: string
       required: true
-      cardinality: {min: 1, max: 1}
+      cardinality:
+        min: 1
+        max: 1
       definitions:
-        zh: 标识一次实际多列表融合执行，不能复用为输入列表或结果标识。
-        en: Identifies one actual multi-list fusion execution and is not reused as input-list or result ID.
-        ja: 一回の実際の multi-list fusion execution を識別し、input-list または result ID として再利用しません。
-      allowed_values: []
-      pattern: "^rank-fusion-[A-Za-z0-9._-]+$"
-      example_value: rank-fusion-18
-      source_claims: [claim-rank-fusion-elasticsearch]
-    - id: input_ranked_list_refs
-      labels: {zh: 输入排序列表引用, en: input ranked list references, ja: input ranked list 参照}
-      datatype: array
-      required: true
-      cardinality: {min: 1, max: 1}
-      definitions:
-        zh: 列出融合实际读取的两个或多个已排序候选列表，不能由融合输出反推。
-        en: Lists two or more already ranked candidate lists actually read for fusion and cannot be inferred backward from fused output.
-        ja: fusion のため実際に読み取った二つ以上の既に rank 済み candidate list を列挙し、fused output から遡って推論できません。
+        zh: 稳定标识一次排名融合执行。
+        en: Stable identifier for one rank-fusion execution.
+        ja: 一つのrank-fusion executionを安定識別します。
       allowed_values: []
       pattern: null
-      example_value: [candidate-set-vector-18, candidate-set-lexical-18]
-      source_claims: [claim-rank-fusion-elasticsearch]
-    - id: fusion_method_ref
-      labels: {zh: 融合方法引用, en: fusion method reference, ja: fusion method 参照}
-      datatype: reference
+      example_value: rank-fusion-415
+      source_claims:
+        - claim-rank-fusion-002
+    - id: fusion_method
+      labels:
+        zh: 融合方法
+        en: fusion method
+        ja: 融合方式
+      datatype: string
       required: true
-      cardinality: {min: 1, max: 1}
+      cardinality:
+        min: 1
+        max: 1
       definitions:
-        zh: 指向已声明的融合算法和版本，例如 RRF，而非某一输入检索器。
-        en: Points to declared fusion algorithm and revision such as RRF rather than one input retriever.
-        ja: 一つの input retriever ではなく、RRF のような宣言済み fusion algorithm と revision を指します。
+        zh: 声明组合多个排名所使用的算法。
+        en: Declares the algorithm used to combine multiple rankings.
+        ja: 複数rankingを結合するalgorithmを宣言します。
       allowed_values: []
-      pattern: "^[A-Za-z][A-Za-z0-9._-]+$"
-      example_value: rrf-v1
-      source_claims: [claim-rank-fusion-elasticsearch]
+      pattern: null
+      example_value: rrf
+      source_claims:
+        - claim-rank-fusion-003
     - id: rank_constant
-      labels: {zh: 排名常数, en: rank constant, ja: rank constant}
-      datatype: integer
+      labels:
+        zh: 排名常数
+        en: rank constant
+        ja: rank constant
+      datatype: number
       required: false
-      cardinality: {min: 0, max: 1}
+      cardinality:
+        min: 0
+        max: 1
       definitions:
-        zh: RRF 等方法使用的排名常数；不适用的方法应明确为空而非虚构数值。
-        en: Rank constant used by methods such as RRF; a method for which it is inapplicable must record null rather than fabricate a number.
-        ja: RRF のような method が使う rank constant で、適用できない method は数値を捏造せず null を記録します。
+        zh: 记录 RRF 等方法用于缓和头部排名影响的常数。
+        en: Records the constant used by methods such as RRF to moderate top-rank influence.
+        ja: RRF等で上位rank影響を緩和するconstantを記録します。
       allowed_values: []
       pattern: null
       example_value: 60
-      source_claims: [claim-rank-fusion-elasticsearch]
+      source_claims:
+        - claim-rank-fusion-004
     - id: rank_window_size
-      labels: {zh: 排名窗口大小, en: rank window size, ja: rank window size}
+      labels:
+        zh: 排名窗口大小
+        en: rank window size
+        ja: rank window size
       datatype: integer
       required: false
-      cardinality: {min: 0, max: 1}
+      cardinality:
+        min: 0
+        max: 1
       definitions:
-        zh: 融合前从每个输入列表考虑的窗口大小，不等同于最终返回数量。
-        en: Number of entries considered from each input list before fusion and is not final returned count.
-        ja: fusion 前に各 input list から考慮する entry 数で、final returned count ではありません。
+        zh: 记录 RRF 等方法从每个子检索器纳入融合的最大排名数（对应 Elasticsearch rank_window_size）。
+        en: Records the maximum rank from each child retriever included in fusion (Elasticsearch rank_window_size).
+        ja: RRF等で各child retrieverからfusionに含める最大rank数（Elasticsearch rank_window_size）を記録します。
       allowed_values: []
       pattern: null
       example_value: 50
-      source_claims: [claim-rank-fusion-elasticsearch]
-    - id: output_result_ref
-      labels: {zh: 融合结果引用, en: fused result reference, ja: fused result 参照}
-      datatype: reference
-      required: true
-      cardinality: {min: 1, max: 1}
-      definitions:
-        zh: 指向本次融合生成的 RetrievalResult，而不是任一原始输入列表。
-        en: Points to RetrievalResult generated by this fusion rather than any original input list.
-        ja: 元の input list ではなく、この fusion が生成した RetrievalResult を指します。
-      allowed_values: []
-      pattern: "^retrieval-result-[A-Za-z0-9._-]+$"
-      example_value: retrieval-result-hybrid-18
-      source_claims: [claim-rank-fusion-provenance]
-    - id: fusion_status
-      labels: {zh: 融合状态, en: fusion status, ja: fusion status}
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      definitions:
-        zh: 指示融合完成、失败、取消或部分完成，不表示结果质量。
-        en: Indicates fusion completed, failed, was cancelled, or partial and does not represent result quality.
-        ja: fusion が completed、failed、cancelled、partial のどれかを示し、result quality を表しません。
-      allowed_values: [completed, failed, cancelled, partial]
-      pattern: null
-      example_value: completed
-      source_claims: [claim-rank-fusion-provenance]
-    - id: ranking_operation_id
-      labels:
-        zh: 排序操作标识
-        en: ranking operation ID
-        ja: ランキング操作 ID
-      definitions:
-        zh: 标识同一多列表融合执行的通用排序操作身份，不复用为候选集、结果或单个分数标识。
-        en: Identifies the same multi-list fusion execution as a general ranking operation and is not reused as a candidate-set, result, or individual-score ID.
-        ja: 同じ複数 list fusion execution を一般の ranking operation として識別し、candidate-set、result、個別 score ID として再利用しない。
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: []
-      pattern: '^ranking-[A-Za-z0-9._-]+$'
-      example_value: ranking-fusion-18
-      source_claims: [claim-rank-fusion-subtype]
-    - id: input_candidate_set_ref
-      labels:
-        zh: 输入候选集引用
-        en: input candidate set reference
-        ja: input candidate set 参照
-      definitions:
-        zh: 指向融合排序消费的规范 CandidateSet，其成员是输入有序列表的共同或并集候选基础。
-        en: Points to the canonical CandidateSet consumed by fusion ranking, whose members are the common or union candidate basis of the input ranked lists.
-        ja: fusion ranking が消費する canonical CandidateSet を指し、その member は input ranked list の共通または和集合 candidate basis である。
-      datatype: reference
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: []
-      pattern: '^candidate-set-[A-Za-z0-9._-]+$'
-      example_value: candidate-set-support-fusion-18
-      source_claims: [claim-rank-fusion-provenance]
-    - id: ranking_method_ref
-      labels:
-        zh: 排序方法引用
-        en: ranking method reference
-        ja: ranking method 参照
-      definitions:
-        zh: 指向本次融合采用的方法版本，不等同于单个输入列表的排名或某个候选分数。
-        en: Points to the fusion-method revision used by this ranking and is not a rank in an input list or a candidate score.
-        ja: この ranking が使う fusion-method revision を指し、input list 内の rank や candidate score ではない。
-      datatype: reference
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: []
-      pattern: '^[A-Za-z][A-Za-z0-9._-]+$'
-      example_value: rrf-k60-v1
-      source_claims: [claim-rank-fusion-elasticsearch]
-    - id: ranking_status
-      labels:
-        zh: 排序状态
-        en: ranking status
-        ja: ranking status
-      definitions:
-        zh: 指示融合排序是否完成、失败、取消或部分完成，不是对融合结果相关性的评价。
-        en: Indicates whether fusion ranking completed, failed, was cancelled, or partially completed and is not a relevance evaluation of the fused result.
-        ja: fusion ranking が completed、failed、cancelled、partial のどれかを示し、fused result の relevance evaluation ではない。
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: [completed, failed, cancelled, partial]
-      pattern: null
-      example_value: completed
-      source_claims: [claim-rank-fusion-provenance]
-    - id: retrieval_activity_id
-      labels:
-        zh: 检索活动标识
-        en: retrieval activity ID
-        ja: retrieval activity ID
-      definitions:
-        zh: 标识同一融合检索执行的通用检索活动身份，不复用为请求、候选、分数或结果标识。
-        en: Identifies the same fusion execution as a general retrieval activity and is not reused as a request, candidate, score, or result ID.
-        ja: 同じ fusion execution を一般の retrieval activity として識別し、request、candidate、score、result ID として再利用しない。
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: []
-      pattern: '^retrieval-activity-[A-Za-z0-9._-]+$'
-      example_value: retrieval-activity-fusion-18
-      source_claims: [claim-rank-fusion-subtype]
-    - id: request_ref
-      labels:
-        zh: 请求引用
-        en: request reference
-        ja: request 参照
-      definitions:
-        zh: 指向这些输入有序列表和融合输出实际服务的 RetrievalRequest，不由输出排名反推。
-        en: Points to the RetrievalRequest actually served by the input ranked lists and fused output and is not inferred from output ordering.
-        ja: input ranked list と fused output が実際に処理した RetrievalRequest を指し、output ordering から推論しない。
-      datatype: reference
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: []
-      pattern: '^retrieval-request-[A-Za-z0-9._-]+$'
-      example_value: retrieval-request-support-18
-      source_claims: [claim-rank-fusion-provenance]
-    - id: implementation_ref
-      labels:
-        zh: 实现引用
-        en: implementation reference
-        ja: implementation 参照
-      definitions:
-        zh: 指向执行该融合方法的检索或排序实现版本，不等同于融合常数或窗口大小。
-        en: Points to the retrieval or ranking implementation revision executing the fusion method and is not the fusion constant or window size.
-        ja: fusion method を実行する retrieval または ranking implementation revision を指し、fusion constant や window size ではない。
-      datatype: reference
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: []
-      pattern: '^retrieval-impl-[A-Za-z0-9._-]+$'
-      example_value: retrieval-impl-rrf-v1
-      source_claims: [claim-rank-fusion-elasticsearch]
-    - id: started_at
-      labels:
-        zh: 开始时间
-        en: started at
-        ja: 開始時刻
-      definitions:
-        zh: 记录融合检索活动开始的时间，不能由任一输入列表或输出结果的创建时间替代。
-        en: Records when this fusion retrieval activity began and cannot be substituted by creation time of an input list or the output result.
-        ja: この fusion retrieval activity の開始時刻を記録し、input list または output result の作成時刻では代替できない。
-      datatype: datetime
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: []
-      pattern: null
-      example_value: '2026-07-19T03:20:00Z'
-      source_claims: [claim-rank-fusion-provenance]
-    - id: execution_status
-      labels:
-        zh: 执行状态
-        en: execution status
-        ja: execution status
-      definitions:
-        zh: 提供融合活动的粗粒度运行、完成或失败状态；详细取消和部分完成由 ranking_status 与 fusion_status 保留。
-        en: Provides coarse running, completed, or failed status for fusion while ranking_status and fusion_status retain cancellation and partial-completion detail.
-        ja: fusion の coarse な running、completed、failed 状態を示し、cancelled と partial の詳細は ranking_status と fusion_status に保持する。
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: [running, completed, failed]
-      pattern: null
-      example_value: completed
-      source_claims: [claim-rank-fusion-provenance]
-  constraints:
-    - id: rank-fusion-inherits-ranking-and-retrieval-fields
-      severity: error
-      expression_language: plain
-      expression: RankFusion is one RankingOperation and RetrievalActivity record. rank_fusion_id, ranking_operation_id, and retrieval_activity_id must resolve to the same execution; input_candidate_set_ref is the canonical candidate basis for input_ranked_list_refs; ranking_method_ref resolves to fusion_method_ref; request_ref is shared by all inputs and output_result_ref; implementation_ref executes that method; and ranking_status plus execution_status are the generic lifecycle projections of fusion_status.
-      explanation:
-        zh: 融合是排序和检索活动的真实特化；列表、方法和参数字段细化同一执行记录，不能替代父类要求的请求、输入、实现和生命周期事实。
-        en: Fusion is a real ranking and retrieval specialization; its list, method, and parameter fields refine one execution record and cannot replace inherited request, input, implementation, or lifecycle facts.
-        ja: fusion は真の ranking および retrieval 特殊化であり、list、method、parameter field は一つの execution record を細化する。継承した request、input、implementation、lifecycle fact を置き換えてはならない。
-      source_claims: [claim-rank-fusion-subtype, claim-rank-fusion-provenance]
-    - id: rank-fusion-input-parameter-consistency
-      severity: error
-      expression_language: plain
-      expression: input_ranked_list_refs must contain at least two lists. fusion_method_ref and fusion_status are required. For RRF, rank_constant and rank_window_size must be positive, and a completed fusion must name output_result_ref.
-      explanation:
-        zh: 融合必须有多路可检查输入和方法参数；单一列表或未知参数不能声称产生可复现融合排序。
-        en: Fusion requires multiple inspectable inputs and method parameters; one list or unknown parameters cannot claim reproducible fused ranking.
-        ja: fusion には複数の検査可能な input と method parameter が必要で、一つの list や不明 parameter では再現可能な fused ranking を主張できません。
-      source_claims: [claim-rank-fusion-elasticsearch]
-    - id: rank-fusion-not-rerank-or-topk
-      severity: error
-      expression_language: plain
-      expression: RankFusion must not assert single-model query-document reranking, individual score semantics, initial recall, top-k-only truncation, ContextPackage inclusion, or answer correctness.
-      explanation:
-        zh: 融合组合多个排序来源；模型重排、评分、召回和截断是不同操作。
-        en: Fusion combines multiple ranking sources; model rerank, scoring, recall, and truncation are distinct operations.
-        ja: fusion は複数 ranking source を結合し、model rerank、scoring、recall、truncation は別の operation です。
-      source_claims: [claim-rank-fusion-boundary]
-  required_relations: []
+      source_claims:
+        - claim-rank-fusion-004
+  constraints: []
+  required_relation_constraints: []
 examples:
-  - id: rank-fusion-example-positive
-
-    labels: {zh: 融合向量与词法列表, en: Fuse vector and lexical lists, ja: vector と lexical list を融合する}
-
+  - id: RankFusion-example-positive-manual-001
+    kind: positive
+    labels:
+      zh: 排名融合正例
+      en: "Positive case: Rank fusion"
+      ja: 順位融合正例
+    scenario_id: null
     descriptions:
-      zh: Lewis RAG p(y|x)=Σ_z p(z|x)·p(y|x,z)；HyDE 假设文档 embedding；RAPTOR 树检索；Self-RAG [Retrieve] adaptive；Generative Agents score=α·recency+β·importance+γ·relevance。
-      en: Lewis RAG p(y|x)=Σ_z p(z|x)·p(y|x,z); HyDE hypothetical doc embedding; RAPTOR tree retrieval; Self-RAG [Retrieve] adaptive; Generative Agents score=α·recency+β·importance+γ·relevance.
-      ja: Lewis RAG p(y|x,z)。HyDE 仮説 doc embedding。RAPTOR tree retrieval。Self-RAG [Retrieve]。Generative Agents score 公式。
+      zh: fusion-415 用 RRF 将稠密与词汇两个独立列表合并成统一顺序。
+      en: fusion-415 uses RRF to combine independent dense and lexical lists into one ordering.
+      ja: fusion-415 はRRFで独立dense/lexical listを一つの順序へ統合します。
     field_values:
-      rank_fusion_id: rank-fusion-18
-      ranking_operation_id: ranking-fusion-18
-      retrieval_activity_id: retrieval-activity-hybrid-18
-      request_ref: retrieval-request-hybrid-18
-      input_ranked_list_refs: [candidate-set-vector-18, candidate-set-lexical-18]
-      input_candidate_set_ref: candidate-set-hybrid-18
-      fusion_method_ref: rrf-v1
-      ranking_method_ref: rrf-v1
-      implementation_ref: elasticsearch-rrf-v1
+      fusion_operation_id: rank-fusion-415
+      fusion_method: rrf
       rank_constant: 60
-      rank_window_size: 50
-      output_result_ref: retrieval-result-hybrid-18
-      started_at: "2026-07-19T01:00:02Z"
-      fusion_status: completed
-      ranking_status: completed
-      execution_status: completed
-    related_node_ids: [RankFusion, RankingOperation, CandidateSet, RetrievalResult]
-    related_relation_ids: [RankFusion-is_a-RankingOperation, RankFusion-uses-CandidateSet, RankFusion-generates-RetrievalResult]
-
-    source_claims: [claim-rank-fusion-elasticsearch, claim-rank-fusion-provenance]
-  - id: rank-fusion-example-counterexample-one-list
-
-    labels: {zh: 单一列表重新命名, en: One list relabeled as fusion, ja: fusion と再ラベルした一つの list}
-
-    descriptions:
-      zh: 反例：RetrievalResult 候选无 TopKSelection/token budget 直接全量进 ContextPackage。
-      en: Counterexample: RetrievalResult candidates enter ContextPackage without TopKSelection/token budget.
-      ja: 反例：RetrievalResult candidate が TopKSelection/token budget なしで ContextPackage 全量進入。
-    field_values:
-      input_ranked_list_refs: [candidate-set-lexical-18]
-      fusion_method_ref: null
-      rank_constant: null
-      output_result_ref: retrieval-result-lexical-18
-    related_node_ids: [RankFusion]
+      ranking_operation_id: rank-fusion-415
+      input_candidate_set_id: candidate-set-dense-lexical-415
+      activity_id: rank-fusion-415
+      started_at: 2026-07-16T12:03:00Z
+    related_node_ids:
+      - RankFusion
     related_relation_ids: []
-
-    source_claims: [claim-rank-fusion-boundary]
-  - id: rank-fusion-example-boundary-rerank
-
-    labels: {zh: 单模型交叉编码器重排, en: Single-model cross-encoder rerank, ja: single-model cross-encoder rerank}
-
+    expected_result:
+      zh: 归类为 RankFusion。
+      en: Classify the object as RankFusion.
+      ja: RankFusion として分類します。
+    why_valid_or_invalid:
+      zh: 输入明确包含多个排名，输出是融合后的单一顺序。
+      en: The input explicitly contains multiple rankings and the output is one fused ordering.
+      ja: inputに複数rankingがありoutputは一つのfused orderingです。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-rank-fusion-005
+  - id: RankFusion-example-boundary-manual-001
+    kind: boundary
+    labels:
+      zh: 排名融合边界例
+      en: "Boundary case: Rank fusion"
+      ja: 順位融合境界例
+    scenario_id: null
     descriptions:
-      zh: IndexBuildRun 离线索引 vs RetrievalRun 在线查询；RAG-Sequence vs RAG-Token 变体边界。
-      en: IndexBuildRun offline index vs RetrievalRun online query; RAG-Sequence vs RAG-Token variant boundary.
-      ja: IndexBuildRun offline vs RetrievalRun online。RAG-Sequence vs RAG-Token 境界。
-    field_values:
-      input_candidate_set_ref: candidate-set-support-18
-      model_ref: cross-encoder-ms-marco
-      input_ranked_list_refs: [candidate-set-support-18]
-      fusion_method_ref: null
-    related_node_ids: [RankFusion, RerankActivity]
+      zh: rerank-415 用一个模型重新阅读每个候选文本并给出新分数。
+      en: rerank-415 has one model reread each candidate text and assign a new score.
+      ja: rerank-415 は一modelが各candidate textを再読してnew scoreを付けます。
+    field_values: {}
+    related_node_ids:
+      - RankFusion
     related_relation_ids: []
-
-    source_claims: [claim-rank-fusion-boundary]
-  - id: rank-fusion-example-instance-elasticsearch
-
-    labels: {zh: 实例：Elasticsearch RRF 参数, en: "Instance: Elasticsearch RRF parameters", ja: "事例：Elasticsearch RRF parameter"}
-
-    descriptions:
-      zh: pgvector ORDER BY embedding <=> query LIMIT 20；Anthropic Contextual Retrieval top-20 + rerank → top-5 context。
-      en: pgvector ORDER BY embedding <=> query LIMIT 20; Anthropic Contextual Retrieval top-20 + rerank → top-5 context.
-      ja: pgvector <=> LIMIT 20。Anthropic Contextual Retrieval top-20+rerank→top-5 context。
-    field_values:
-      rank_fusion_id: rank-fusion-elastic-21
-      ranking_operation_id: ranking-fusion-elastic-21
-      retrieval_activity_id: retrieval-activity-hybrid-21
-      request_ref: retrieval-request-hybrid-21
-      input_ranked_list_refs: [candidate-set-knn-21, candidate-set-standard-21]
-      input_candidate_set_ref: candidate-set-hybrid-21
-      fusion_method_ref: elasticsearch-rrf-v1
-      ranking_method_ref: elasticsearch-rrf-v1
-      implementation_ref: elasticsearch-rrf-v1
-      rank_constant: 60
-      rank_window_size: 100
-      output_result_ref: retrieval-result-elastic-21
-      started_at: "2026-07-19T02:00:02Z"
-      fusion_status: completed
-      ranking_status: completed
-      execution_status: completed
-    related_node_ids: [RankFusion, CandidateSet, RetrievalResult]
-    related_relation_ids: [RankFusion-is_a-RankingOperation]
-    source_claims: [claim-rank-fusion-elasticsearch]
+    expected_result:
+      zh: 不得归类为 RankFusion。
+      en: Do not classify the object as RankFusion.
+      ja: RankFusion として分類しません。
+    why_valid_or_invalid:
+      zh: 该活动是模型重排，不是组合多个排名的排名融合。
+      en: It is model reranking, not rank fusion.
+      ja: model rerankingでrank fusionではありません。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-rank-fusion-006
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation: []
 parent_relation:
   id: RankFusion-is_a-RankingOperation
   predicate: is_a
-  target: concept:RankingOperation
-  endpoint_order: child-to-parent
-  direction: source-to-target
+  direction: target-to-source
   relation_kind: hierarchy
   labels:
-    zh: 是排序操作的融合子类
-    en: is a fusion subtype of ranking operation
-    ja: RankingOperation の融合下位型である
+    zh: 是一种RankingOperation
+    en: is a RankingOperation
+    ja: RankingOperationの一種
   definitions:
-    zh: RankFusion is_a RankingOperation，表示每次多列表融合都是对已有候选顺序执行的排序活动。
-    en: RankFusion is_a RankingOperation means every multi-list fusion is ranking activity operating on existing candidate orders.
-    ja: RankFusion is_a RankingOperation は、すべての multi-list fusion が既存 candidate order に作用する ranking activity であることを表します。
+    zh: RankFusion —is_a→ RankingOperation 成立，因为它组合两个或更多独立排名信号形成统一顺序。
+    en: RankFusion —is_a→ RankingOperation holds because it combines two or more independent rank signals into one ordering.
+    ja: RankFusion —is_a→ RankingOperation は二つ以上の独立rank signalを一順序へ結合するため成立します。
   cardinality: null
   cardinality_not_applicable_reason:
-    zh: 分类关系不规定融合需要多少个检索器；具体操作的输入字段要求至少两个列表。
-    en: Classification does not prescribe number of retrievers; the concrete operation input requires at least two lists.
-    ja: 分類関係は retriever 数を規定せず、具体的 operation input は少なくとも二つの list を要求します。
+    zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
+    en: The relation is decided per auditable fact; no universal runtime cardinality is imposed at ontology level.
+    ja: このrelationはaudit可能fact単位で判定しontology層で一律runtime cardinalityを課しません。
   inverse_reading:
-    predicate: has_rank_fusion_subtype
-    labels: {zh: 具有排名融合子类, en: has rank-fusion subtype, ja: ランク融合下位型を持つ}
-  conditions: []
+    predicate: part_of
+    labels:
+      zh: 反向读取
+      en: inverse is_a
+      ja: 逆方向読取
+  conditions:
+    - id: RankFusion-is_a-RankingOperation-condition-manual-001
+      severity: error
+      expression_language: plain
+      expression: "Assert only when the instance satisfies the complete RankingOperation definition and the child differentia: it combines two or more independent rank signals into one ordering."
+      explanations:
+        zh: 仅当实例既满足 RankingOperation 的完整定义，又满足子类种差“它组合两个或更多独立排名信号形成统一顺序。”时建立该边。
+        en: "Assert only when the instance satisfies the complete RankingOperation definition and the child differentia: it combines two or more independent rank signals into one ordering."
+        ja: instanceがRankingOperation完全定義とchild differentia「二つ以上の独立rank signalを一順序へ結合する」を共に満たす時だけassertします。
+      source_claims:
+        - claim-rank-fusion-007
   temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples: []
-  source_claims: [claim-rank-fusion-subtype]
-  distinct_fact_rationale:
-    zh: 此关系表达活动类型归属，不表达一个融合分数、输入列表成员、模型重排或最终 top-k。
-    en: This relation expresses activity type membership, not one fusion score, input-list member, model rerank, or final top-k.
-    ja: この関係は activity type membership を表し、一つの fusion score、input-list member、model rerank、final top-k は表しません。
+  examples:
+    - id: RankFusion-is_a-RankingOperation-example-positive-manual-001
+      kind: positive
+      labels:
+        zh: 是一种RankingOperation正例
+        en: "Positive case: is a RankingOperation"
+        ja: RankingOperationの一種正例
+      scenario_id: null
+      descriptions:
+        zh: fusion-415 用 RRF 合并 dense 与 lexical 列表。
+        en: fusion-415 uses RRF to merge dense and lexical lists.
+        ja: fusion-415がRRFでdense/lexical listを統合します。
+      field_values: {}
+      related_node_ids:
+        - RankFusion
+        - RankingOperation
+      related_relation_ids:
+        - RankFusion-is_a-RankingOperation
+      expected_result:
+        zh: 建立该有向事实，并保留条件与证据。
+        en: Assert the directed fact with its condition and evidence retained.
+        ja: condition/evidenceを保持してdirected factをassertします。
+      why_valid_or_invalid:
+        zh: 实例满足端点定义、方向和该关系的显式成立条件。
+        en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
+        ja: endpoint定義・direction・明示assertion conditionを満たします。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-rank-fusion-007
+    - id: RankFusion-is_a-RankingOperation-example-boundary-manual-001
+      kind: boundary
+      labels:
+        zh: 是一种RankingOperation边界例
+        en: "Boundary case: is a RankingOperation"
+        ja: RankingOperationの一種境界例
+      scenario_id: null
+      descriptions:
+        zh: rerank-416 用模型重新评分单个候选。
+        en: rerank-416 uses a model to rescore individual candidates.
+        ja: rerank-416はmodelでindividual candidateを再採点します。
+      field_values: {}
+      related_node_ids:
+        - RankFusion
+        - RankingOperation
+      related_relation_ids:
+        - RankFusion-is_a-RankingOperation
+      expected_result:
+        zh: 验证器不得建立该有向关系事实。
+        en: Do not assert the directed fact.
+        ja: directed factをassertしません。
+      why_valid_or_invalid:
+        zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
+        en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
+        ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-rank-fusion-007
+  source_claims:
+    - claim-rank-fusion-007
+  distinct_fact_rationale: null
   layout_role: primary-backbone
+  review_status: pending
+  endpoint_order: child-to-parent
 relations:
-  - id: RankFusion-uses-CandidateSet
-    predicate: uses
+  - id: RankFusion-consumes-CandidateSet
+    predicate: consumes
+    direction: source-to-target
+    relation_kind: information
+    labels:
+      zh: consumes CandidateSet
+      en: consumes CandidateSet
+      ja: CandidateSetをconsumes
+    definitions:
+      zh: RankFusion —consumes→ CandidateSet 表示融合活动把此集合中的多个独立排名信号或子列表作为输入。
+      en: RankFusion —consumes→ CandidateSet states that the fusion activity takes the set's multiple independent rank signals or child lists as input.
+      ja: RankFusion —consumes→ CandidateSet はfusion activityがset内複数独立rank signal/child listをinputにします。
+    cardinality: null
+    cardinality_not_applicable_reason:
+      zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
+      en: The relation is decided per auditable fact; no universal runtime cardinality is imposed at ontology level.
+      ja: このrelationはaudit可能fact単位で判定しontology層で一律runtime cardinalityを課しません。
+    inverse_reading:
+      predicate: inverse_consumes
+      labels:
+        zh: 反向读取
+        en: inverse consumes
+        ja: 逆方向読取
+    conditions:
+      - id: RankFusion-consumes-CandidateSet-condition-manual-001
+        severity: error
+        expression_language: plain
+        expression: Assert only when CandidateSet preserves at least two distinguishable ranking inputs and the fusion trace references it.
+        explanations:
+          zh: 仅当该 CandidateSet 保留至少两个可区分排名输入且 fusion trace 引用它时建立。
+          en: Assert only when CandidateSet preserves at least two distinguishable ranking inputs and the fusion trace references it.
+          ja: CandidateSetが二つ以上の区別可能ranking inputを保持しfusion traceが参照する時だけassertします。
+        source_claims:
+          - claim-rank-fusion-008
+    temporal_scope: valid-time
+    boundary_context: null
+    constraints: []
+    examples:
+      - id: RankFusion-consumes-CandidateSet-example-positive-manual-001
+        kind: positive
+        labels:
+          zh: consumes CandidateSet正例
+          en: "Positive case: consumes CandidateSet"
+          ja: CandidateSetをconsumes正例
+        scenario_id: null
+        descriptions:
+          zh: fusion-415 consumes hybrid-candidate-set-415。
+          en: fusion-415 consumes hybrid-candidate-set-415.
+          ja: fusion-415がhybrid-candidate-set-415をconsumeします。
+        field_values: {}
+        related_node_ids:
+          - RankFusion
+          - CandidateSet
+        related_relation_ids:
+          - RankFusion-consumes-CandidateSet
+        expected_result:
+          zh: 建立该有向事实，并保留条件与证据。
+          en: Assert the directed fact with its condition and evidence retained.
+          ja: condition/evidenceを保持してdirected factをassertします。
+        why_valid_or_invalid:
+          zh: 实例满足端点定义、方向和该关系的显式成立条件。
+          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
+          ja: endpoint定義・direction・明示assertion conditionを満たします。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-rank-fusion-008
+      - id: RankFusion-consumes-CandidateSet-example-boundary-manual-001
+        kind: boundary
+        labels:
+          zh: consumes CandidateSet边界例
+          en: "Boundary case: consumes CandidateSet"
+          ja: CandidateSetをconsumes境界例
+        scenario_id: null
+        descriptions:
+          zh: 只有单一未排序列表时不能声称发生排名融合。
+          en: A single unordered list is insufficient to assert rank fusion consumption.
+          ja: single unordered listだけではrank fusion consumptionをassertしません。
+        field_values: {}
+        related_node_ids:
+          - RankFusion
+          - CandidateSet
+        related_relation_ids:
+          - RankFusion-consumes-CandidateSet
+        expected_result:
+          zh: 验证器不得建立该有向关系事实。
+          en: Do not assert the directed fact.
+          ja: directed factをassertしません。
+        why_valid_or_invalid:
+          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
+          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
+          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-rank-fusion-008
+    source_claims:
+      - claim-rank-fusion-008
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: accepted
     target: concept:CandidateSet
-    endpoint_order: source-to-target
+  - id: RankFusion-orders-CandidateSet
+    predicate: orders
     direction: source-to-target
     relation_kind: causal
-    labels: {zh: 使用输入候选列表, en: uses input candidate list, ja: input candidate list を使用する}
+    labels:
+      zh: orders CandidateSet
+      en: orders CandidateSet
+      ja: CandidateSetをorders
     definitions:
-      zh: 仅当 input_ranked_list_refs 列出目标候选列表且融合实际读取其排名时，RankFusion 使用该列表。
-      en: RankFusion uses CandidateSet only when input_ranked_list_refs lists it and fusion actually reads its rank positions.
-      ja: input_ranked_list_refs が対象 candidate list を列挙し、fusion がその rank position を実際に読み取った場合にだけ、RankFusion は CandidateSet を使用します。
+      zh: RankFusion —orders→ CandidateSet 表示融合活动依据声明方法为集合形成统一、可重放的成员顺序。
+      en: RankFusion —orders→ CandidateSet states that the fusion activity establishes one replayable member order for the set under its declared method.
+      ja: RankFusion —orders→ CandidateSet はfusion activityが指定methodでsetに一つのreplayable member orderを形成します。
     cardinality: null
     cardinality_not_applicable_reason:
-      zh: 融合本质上可使用多个输入列表。
-      en: Fusion can inherently use multiple input lists.
-      ja: fusion は本質的に複数 input list を使用できます。
+      zh: 该关系按单个可审计事实判定，不在本体层对所有运行实例强加统一基数。
+      en: The relation is decided per auditable fact; no universal runtime cardinality is imposed at ontology level.
+      ja: このrelationはaudit可能fact単位で判定しontology層で一律runtime cardinalityを課しません。
     inverse_reading:
-      predicate: is_used_by_rank_fusion
-      labels: {zh: 被排名融合使用, en: is used by rank fusion, ja: ランク融合に使用される}
-    conditions: []
+      predicate: inverse_orders
+      labels:
+        zh: 反向读取
+        en: inverse orders
+        ja: 逆方向読取
+    conditions:
+      - id: RankFusion-orders-CandidateSet-condition-manual-001
+        severity: error
+        expression_language: plain
+        expression: Assert only when the output set records the fusion method and deterministic order and traces back to this activity.
+        explanations:
+          zh: 仅当输出集合记录 fusion_method 与确定顺序，且可回溯该活动时建立。
+          en: Assert only when the output set records the fusion method and deterministic order and traces back to this activity.
+          ja: output setがfusion_methodとdeterministic orderを記録しこのactivityへ追跡できる時だけassertします。
+        source_claims:
+          - claim-rank-fusion-008
     temporal_scope: valid-time
     boundary_context: null
     constraints: []
-    examples: []
-    source_claims: [claim-rank-fusion-provenance]
-    distinct_fact_rationale: "This records list use and not membership of candidates in a permanently fused collection."
+    examples:
+      - id: RankFusion-orders-CandidateSet-example-positive-manual-001
+        kind: positive
+        labels:
+          zh: orders CandidateSet正例
+          en: "Positive case: orders CandidateSet"
+          ja: CandidateSetをorders正例
+        scenario_id: null
+        descriptions:
+          zh: fusion-415 orders candidate-set-fused-415 by RRF。
+          en: fusion-415 orders candidate-set-fused-415 by RRF.
+          ja: fusion-415がRRFでcandidate-set-fused-415をorderします。
+        field_values: {}
+        related_node_ids:
+          - RankFusion
+          - CandidateSet
+        related_relation_ids:
+          - RankFusion-orders-CandidateSet
+        expected_result:
+          zh: 建立该有向事实，并保留条件与证据。
+          en: Assert the directed fact with its condition and evidence retained.
+          ja: condition/evidenceを保持してdirected factをassertします。
+        why_valid_or_invalid:
+          zh: 实例满足端点定义、方向和该关系的显式成立条件。
+          en: The case satisfies both endpoint definitions, direction, and the relation's explicit assertion condition.
+          ja: endpoint定義・direction・明示assertion conditionを満たします。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-rank-fusion-008
+      - id: RankFusion-orders-CandidateSet-example-boundary-manual-001
+        kind: boundary
+        labels:
+          zh: orders CandidateSet边界例
+          en: "Boundary case: orders CandidateSet"
+          ja: CandidateSetをorders境界例
+        scenario_id: null
+        descriptions:
+          zh: 只计算各列表分数但未形成统一顺序不能建立此边。
+          en: Computing list scores without forming one order does not establish this edge.
+          ja: list score計算だけで一順序を形成しなければedgeを成立させません。
+        field_values: {}
+        related_node_ids:
+          - RankFusion
+          - CandidateSet
+        related_relation_ids:
+          - RankFusion-orders-CandidateSet
+        expected_result:
+          zh: 验证器不得建立该有向关系事实。
+          en: Do not assert the directed fact.
+          ja: directed factをassertしません。
+        why_valid_or_invalid:
+          zh: 仅共现、名称相似、反向读取或只满足一个端点不足以建立关系。
+          en: Co-occurrence, name similarity, inverse reading, or satisfying only one endpoint is insufficient.
+          ja: 共起・名称類似・inverse reading・一endpointだけではrelationを成立させません。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-rank-fusion-008
+    source_claims:
+      - claim-rank-fusion-008
+    distinct_fact_rationale: null
     layout_role: cross-link
-  - id: RankFusion-generates-RetrievalResult
-    predicate: generates
-    target: concept:RetrievalResult
-    endpoint_order: source-to-target
-    direction: source-to-target
-    relation_kind: causal
-    labels: {zh: 生成融合检索结果, en: generates fused retrieval result, ja: fused retrieval result を生成する}
-    definitions:
-      zh: 仅当 output_result_ref 指向目标且融合完成时，RankFusion 生成该融合结果。
-      en: RankFusion generates RetrievalResult only when output_result_ref identifies it and fusion completed.
-      ja: output_result_ref が対象を識別し fusion が完了した場合にだけ、RankFusion は RetrievalResult を生成します。
-    cardinality: null
-    cardinality_not_applicable_reason:
-      zh: 一个融合运行通常产生一个结果；批处理情况下可有多个明确输出。
-      en: One fusion normally produces one result; batch cases may have multiple explicitly recorded outputs.
-      ja: 一つの fusion は通常一つの result を生成し、batch case では複数の明示的 output を持てます。
-    inverse_reading:
-      predicate: is_generated_by_rank_fusion
-      labels: {zh: 由排名融合生成, en: is generated by rank fusion, ja: ランク融合により生成される}
-    conditions: []
-    temporal_scope: valid-time
-    boundary_context: null
-    constraints: []
-    examples: []
-    source_claims: [claim-rank-fusion-provenance]
-    distinct_fact_rationale: "This is causal fused-result generation, not a hierarchy or composition relation with the activity."
-    layout_role: cross-link
-sources:
-  - id: elasticsearch-rrf
-    title: Elasticsearch reciprocal rank fusion
-    source_type: official-project-documentation
-    url: https://www.elastic.co/docs/reference/elasticsearch/rest-apis/reciprocal-rank-fusion
-    relevance: Documents RRF combining independently executed retrievers, rank_constant, and rank_window_size.
-  - id: w3c-prov-o
-    title: "W3C PROV-O: The PROV Ontology"
-    source_type: standard
-    url: https://www.w3.org/TR/prov-o/
-    relevance: Distinguishes activities from entities they use and generate.
+    review_status: accepted
+    target: concept:CandidateSet
+review:
+  status: accepted
+  method: manual-semantic
+  reviewer: manual-memory-retrieval-verification
+  reviewed_on: 2026-07-17
+  note:
+    zh: 已对照 OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex 检索文档、Elasticsearch RRF、Cohere Rerank 与 ColBERT/cross-encoder 文献逐项核验概念定义、字段、关系与 RAG 检索管线结构。
+    en: Verified concept definitions, fields, relations, and RAG retrieval pipeline structure against OpenAI Embeddings, Pinecone/Weaviate, LangChain/LlamaIndex retrieval docs, Elasticsearch RRF, Cohere Rerank, and ColBERT/cross-encoder literature.
+    ja: OpenAI Embeddings、Pinecone/Weaviate、LangChain/LlamaIndex retrieval docs、Elasticsearch RRF、Cohere Rerank、ColBERT/cross-encoder 文献に照らし概念定義・フィールド・関係・RAG retrieval pipeline 構造を個別検証しました。
+  sections:
+    semantics: accepted
+    hierarchy: accepted
+    relations: accepted
+    structure: accepted
+    examples: accepted
+    source_claims: accepted
 source_claims:
-  - id: claim-rank-fusion-elasticsearch
-    source: elasticsearch-rrf
-    supports: Elasticsearch documents RRF with multiple retrievers, rank_constant, and rank_window_size, combining their ranked results. Moonweave models one such execution as RankFusion.
-    locator: "Reciprocal rank fusion: retrievers, rank_constant, and rank_window_size"
-    evidence_kind: ontology-design-inference
+  - id: claim-rank-fusion-001
+    source: eng-search-elastic-rrf
+    supports: Elasticsearch defines reciprocal rank fusion over two or more independently ranked child-retriever result sets, including rank_constant and rank_window_size parameters.
+    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-rank-fusion-boundary
-    source: elasticsearch-rrf
-    supports: RRF combines multiple ranked retriever results. Moonweave distinguishes that operation from recall, cross-encoder reranking, individual scoring, top-k selection, and answer construction.
-    locator: "Reciprocal rank fusion request and response"
-    evidence_kind: ontology-design-inference
+    review_status: accepted
+  - id: claim-rank-fusion-002
+    source: eng-search-elastic-rrf
+    supports: "Elasticsearch defines reciprocal rank fusion over two or more independently ranked child-retriever result sets, including rank_constant and rank_window_size parameters. Moonweave records RankFusion.fusion_operation_id as the stated auditable datum: Stable identifier for one rank-fusion execution."
+    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-rank-fusion-provenance
-    source: w3c-prov-o
-    supports: PROV-O distinguishes activities from entities they use and generate. Moonweave applies this to RankFusion input CandidateSets and generated RetrievalResult.
-    locator: "PROV-O: Activity, Entity, prov:used, and prov:wasGeneratedBy"
-    evidence_kind: ontology-design-inference
+    review_status: accepted
+  - id: claim-rank-fusion-003
+    source: eng-search-elastic-rrf
+    supports: "Elasticsearch defines reciprocal rank fusion over two or more independently ranked child-retriever result sets, including rank_constant and rank_window_size parameters. Moonweave records RankFusion.fusion_method as the stated auditable datum: Declares the algorithm used to combine multiple rankings."
+    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
+    evidence_kind: design-inference
     confidence: high
-  - id: claim-rank-fusion-subtype
-    source: elasticsearch-rrf
-    supports: Modeling a multi-list fusion execution as RankFusion subtype of RankingOperation is a Moonweave taxonomy inference based on documented RRF behavior.
-    locator: "Reciprocal rank fusion"
-    evidence_kind: ontology-design-inference
-    confidence: medium
+    review_status: accepted
+  - id: claim-rank-fusion-004
+    source: eng-search-elastic-rrf
+    supports: "Elasticsearch defines reciprocal rank fusion over two or more independently ranked child-retriever result sets, including rank_constant and rank_window_size parameters. Moonweave records RankFusion.rank_constant as the stated auditable datum: Records the constant used by methods such as RRF to moderate top-rank influence."
+    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-rank-fusion-005
+    source: eng-search-elastic-rrf
+    supports: Elasticsearch defines reciprocal rank fusion over two or more independently ranked child-retriever result sets, including rank_constant and rank_window_size parameters. Elasticsearch defines RRF as combining independently ranked child-retriever result sets.
+    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-rank-fusion-006
+    source: eng-search-elastic-rrf
+    supports: Elasticsearch defines reciprocal rank fusion over two or more independently ranked child-retriever result sets, including rank_constant and rank_window_size parameters. Official reranking documentation defines rescoring, whereas RRF combines ranks without a reranker model.
+    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-rank-fusion-007
+    source: eng-search-elastic-rrf
+    supports: The official documentation supports the operational distinction used in this child differentia; Moonweave's RankFusion-to-RankingOperation subclass placement is an explicit ontology design decision.
+    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-rank-fusion-008
+    source: eng-search-elastic-rrf
+    supports: The cited official documentation supports the endpoint roles and direction of this retrieval fact; the exact relation identifier and ownership boundary are Moonweave design decisions.
+    locator: Reciprocal rank fusion > formula, child retrievers, rank_constant, and rank_window_size
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted

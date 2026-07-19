@@ -2,168 +2,443 @@ schema: moonweave.ai/ontology-node/v1
 id: TraceRecord
 kind: concept
 status: accepted
-labels: {zh: 追踪记录, en: Trace record, ja: トレース記録}
+labels:
+  en: trace record
+  zh: 追踪记录
+  ja: トレース記録
 semantics:
-  short_definition: {zh: 一个持久化的 ObservabilityRecord，记录由共享 trace ID 标识的分布式追踪导出表示。, en: An ObservabilityRecord that persists an exported representation of one distributed trace identified by a shared trace ID., ja: 共有 trace ID で識別される 1 つの分散トレースのエクスポート表現を永続化する ObservabilityRecord。}
-  definition: {zh: TraceRecord 是一个持久化导出或保留投影，表示由同一 trace ID 的相关 OTel Span 表示组成的分布式追踪。它不是正在执行的追踪、单个 TraceSpan、Log Record、OpenTelemetry Metric，或仅携带 trace ID 的自定义领域事件。, en: "A TraceRecord is a durable export or retained projection of a distributed trace composed of related OTel Span representations with one trace ID. It is not the live trace execution, an individual TraceSpan, a Log Record, an OpenTelemetry Metric, or a custom domain event that merely carries a trace ID.", ja: TraceRecord は、1 つの trace ID を共有する関連 OTel Span 表現から成る分散トレースの永続的なエクスポートまたは保持投影である。実行中のトレース、個別の TraceSpan、Log Record、OpenTelemetry Metric、または trace ID だけを持つカスタム領域イベントではない。}
-  why_needed: {zh: 跨服务调查需要可寻址的追踪级证据对象，以便在实时插桩结束后保留追踪范围、导出时间、采样信息和组件 span 记录链接。, en: "Cross-service investigation needs an addressable trace-level evidence object that can retain trace scope, export time, sampling information, and links to component span records after live instrumentation ends.", ja: サービス横断の調査には、ライブ計装終了後もトレース範囲、エクスポート時刻、サンプリング情報、構成 Span 記録へのリンクを保持できる、参照可能なトレースレベル証拠オブジェクトが必要である。}
+  short_definition:
+    zh: 由共享追踪标识关联的一组跨度记录。
+    en: A set of span records correlated by a shared trace identifier.
+    ja: 共通のトレース識別子で関連付けられたスパン記録の集合。
+  definition:
+    zh: 追踪记录是一种 ObservabilityRecord，继承 record_id 作为本体记录身份；trace_id 是连接外部遥测跨度的相关键，而不是附加身份键。该记录由相关跨度构成，用来表达一次请求、工作流或会话片段跨组件展开的因果路径。
+    en: A TraceRecord is an ObservabilityRecord and inherits record_id as its ontology record identity. trace_id is the shared trace identifier used as a correlation key joining external telemetry spans, not an additional identity key. The correlated spans represent the causal path of one request, workflow, or session segment across components.
+    ja: TraceRecord は ObservabilityRecord の一種で、本体上の記録同一性として record_id を継承します。trace_id は外部テレメトリのスパンを結ぶ相関キーで、追加同一性キーではありません。関連スパンは要求やワークフローの因果経路を表します。
+  why_needed:
+    zh: 追踪级身份使查询能够跨多个跨度还原端到端路径、采样决定和上下文传播；若只保留跨度或消息转录，就无法稳定回答哪些操作属于同一次分布式执行。
+    en: Trace-level identity supports end-to-end path reconstruction, sampling decisions, and context propagation across multiple spans. Spans or transcripts alone cannot reliably identify which operations belong to the same distributed execution.
+    ja: トレース単位の同一性により、複数スパンをまたぐ経路、サンプリング判断、文脈伝播を復元できます。スパンや転写だけでは、どの操作が同じ分散実行に属するかを安定して判断できません。
   includes:
-    - {zh: Trace record ID、trace ID、导出范围、span 数量、采样或完整性元数据以及保留引用。, en: "Trace record ID, trace ID, export scope, span count, sampling or completeness metadata, and retention reference.", ja: Trace record ID、trace ID、エクスポート範囲、Span 数、サンプリングまたは完全性メタデータ、保持参照。}
-    - {zh: 由共享 trace ID 的 OTel span 构成的完整或明确声明为部分的持久化追踪投影。, en: A complete or explicitly declared partial persisted trace projection made from OTel spans sharing a trace ID., ja: 共通の trace ID を共有する OTel Span から作られた、完全または明示的に部分と宣言された永続トレース投影。}
+    - zh: 包括具有同一 trace_id 的根跨度与后继跨度集合，以及跨异步边界或不同追踪建立的显式跨度链接。
+      en: Includes root and descendant spans sharing one trace_id, together with explicit span links used across asynchronous boundaries or separate traces.
+      ja: 同一 trace_id を共有するルートスパンと子孫スパン、および非同期境界や別トレースをまたぐ明示的スパンリンクを含みます。
   excludes:
-    - {zh: 单个 span、仪表板摘要、会话转录以及带可选追踪上下文的独立日志。, en: "A single span, a dashboard summary, a session transcript, and a standalone log with optional trace context.", ja: 単一の Span、ダッシュボード要約、セッション転記、任意のトレースコンテキストを持つ単独ログ。}
-    - {zh: 声称每条带 trace ID 的记录都包含完整的追踪树。, en: Claiming that every record with a trace ID contains a complete trace tree., ja: trace ID を持つすべての記録が完全なトレースツリーを含むと主張すること。}
-  semantic_kind: entity
-  aliases: [trace export, distributed trace record]
-engineering:
-  explanation: {zh: 导出器按 trace ID 对已结束或已采样的 span 投影分组，声明保留集是完整还是部分，持久化追踪级元数据，并让各个 TraceSpan 记录指向结果 TraceRecord。插桩仍使用原生 OTel trace API，而不把此存储实体当作插桩对象。, en: "An exporter groups finished or sampled span projections by trace ID, declares whether the retained set is complete or partial, persists trace-level metadata, and lets individual TraceSpan records point to the resulting TraceRecord. Instrumentation continues to use native OTel trace APIs rather than this storage entity.", ja: エクスポーターは完了またはサンプリング済みの Span 投影を trace ID ごとにグループ化し、保持集合が完全か部分かを宣言してトレースレベルのメタデータを永続化し、各 TraceSpan 記録を結果の TraceRecord に向ける。計装はこのストレージエンティティではなくネイティブの OTel trace API を使い続ける。}
-  typical_input:
-    - description: {zh: 导出的 span 集合, en: Exported span set, ja: エクスポート済み Span 集合}
-      format: |-
-        {"trace_id":"4bf92f3577b34da6a3ce929d0e0e4736","span_count":3,"export_scope":"sampled_complete","exported_at":"2026-07-18T09:30:00Z"}
-  typical_output:
-    - description: {zh: 追踪记录, en: Trace record, ja: トレース記録}
-      format: |-
-        {"trace_record_id":"trace-900","trace_id":"4bf92f3577b34da6a3ce929d0e0e4736","span_count":3,"export_scope":"sampled_complete"}
-  reference_implementations:
-    - {name: OpenTelemetry Trace API, url: https://opentelemetry.io/docs/specs/otel/trace/api/, description: "Documents traces as nested spans with shared trace identity."}
+    - zh: 不包括只按界面可见顺序排列消息和动作的 AgentTranscript，也不包括只描述一次操作的单个 TraceSpan。
+      en: Excludes AgentTranscript records ordered only by user-visible messages and actions, and a single TraceSpan describing one operation.
+      ja: 画面上のメッセージと操作だけを順に並べる AgentTranscript、および一つの操作だけを記録する単一 TraceSpan は含みません。
+  semantic_kind: information
+  aliases: []
 structure:
-  identity_keys: [record_id, trace_record_id, trace_id]
+  identity_keys: []
   fields:
-    - id: record_id
-      labels: {zh: 记录 ID, en: Record ID, ja: 記録 ID}
-      definitions: {zh: 从 ObservabilityRecord 继承并与追踪导出属于同一持久记录的稳定标识符。, en: Stable identifier inherited from ObservabilityRecord for the same persisted record as this trace export., ja: このトレースエクスポートと同じ永続記録に対する ObservabilityRecord から継承した安定識別子。}
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      pattern: '^[a-z][a-z0-9-]{2,127}$'
-      example_value: trace-900
-      source_claims: [claim-otel-trace-record]
-    - id: record_kind
-      labels: {zh: 记录类型, en: Record kind, ja: 記録種別}
-      definitions: {zh: 从 ObservabilityRecord 继承并固定为追踪的保留证据类别。, en: Retained-evidence category inherited from ObservabilityRecord and fixed to trace., ja: ObservabilityRecord から継承し trace に固定される保持証拠カテゴリ。}
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: [trace]
-      example_value: trace
-      source_claims: [claim-otel-trace-record]
-    - id: recorded_at
-      labels: {zh: 持久化时间, en: Persistence time, ja: 永続化時刻}
-      definitions: {zh: 从 ObservabilityRecord 继承的追踪导出完成持久化时间。, en: Persistence time inherited from ObservabilityRecord for the finalized trace export., ja: 確定したトレースエクスポートに対する ObservabilityRecord から継承した永続化時刻。}
-      datatype: datetime
-      required: true
-      cardinality: {min: 1, max: 1}
-      example_value: '2026-07-18T09:22:00Z'
-      source_claims: [claim-otel-trace-record]
-    - id: trace_record_id
-      labels: {zh: 追踪记录 ID, en: Trace record ID, ja: トレース記録 ID}
-      definitions: {zh: 一条保留追踪导出记录的稳定标识符。, en: Stable identifier of one retained trace export record., ja: 1 件の保持トレースエクスポート記録の安定した識別子。}
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      pattern: '^[a-z][a-z0-9-]{2,127}$'
-      example_value: trace-900
-      source_claims: [claim-otel-trace-record]
     - id: trace_id
-      labels: {zh: OTel Trace ID, en: OTel Trace ID, ja: OTel Trace ID}
-      definitions: {zh: 本追踪记录中的 Span 表示所共享的小写十六进制标识符。, en: Lowercase hexadecimal identifier shared by the Span representations in this trace record., ja: このトレース記録内の Span 表現が共有する小文字の16進識別子。}
+      labels:
+        zh: 追踪标识
+        en: trace ID
+        ja: トレース ID
       datatype: string
       required: true
-      cardinality: {min: 1, max: 1}
-      pattern: '^[a-f0-9]{32}$'
-      example_value: 4bf92f3577b34da6a3ce929d0e0e4736
-      source_claims: [claim-otel-trace-record]
-    - id: span_count
-      labels: {zh: 保留 span 数量, en: Retained span count, ja: 保持 Span 数}
-      definitions: {zh: 声明导出范围内包含的 TraceSpan 投影数量。, en: Number of TraceSpan projections included in the declared export scope., ja: 宣言されたエクスポート範囲に含まれる TraceSpan 投影の数。}
-      datatype: integer
-      required: true
-      cardinality: {min: 1, max: 1}
-      minimum: 1
-      example_value: 3
-      source_claims: [claim-otel-trace-record]
-    - id: export_scope
-      labels: {zh: 导出范围, en: Export scope, ja: エクスポート範囲}
-      definitions: {zh: 对已保留 span 表示完整性的说明。, en: Completeness statement for retained span representations., ja: 保持された Span 表現の完全性に関する宣言。}
-      datatype: string
-      required: true
-      cardinality: {min: 1, max: 1}
-      allowed_values: [sampled_complete, partial_export, root_span_only]
-      example_value: sampled_complete
-      source_claims: [claim-otel-trace-record]
+      cardinality:
+        min: 1
+        max: 1
+      definitions:
+        zh: 跨全部组成跨度稳定标识同一次端到端追踪；根跨度生成后不得改变。
+        en: Stably identifies one end-to-end trace across every component span and does not change after the root span creates it.
+        ja: 構成する全 Span にまたがる一つの end-to-end trace を安定識別し、root span 生成後は変更しません。
+      allowed_values: []
+      pattern: null
+      example_value: trace-8f2c1
+      source_claims:
+        - claim-trace-record-002
+    - id: sampled
+      labels:
+        zh: 是否采样
+        en: sampled
+        ja: サンプリング済み
+      datatype: boolean
+      required: false
+      cardinality:
+        min: 0
+        max: 1
+      definitions:
+        zh: 当采样决定可知时，记录该追踪是否被选入导出；缺失不等于 false，也不等同于 Span 的 IsRecording。
+        en: Records whether the trace was selected for export when the sampling decision is known; absence is not false and is distinct from a Span's IsRecording state.
+        ja: sampling 判断が既知の場合に export 選択を記録し、欠落は false ではなく Span の IsRecording とも別です。
+      allowed_values: []
+      pattern: null
+      example_value: true
+      source_claims:
+        - claim-trace-record-003
   constraints:
-    - id: trace-record-shared-identity
+    - id: trace-record-id-stable
       severity: error
-      language: plain
-      expression: All included TraceSpan projections must share this trace_id, and span_count plus export_scope must accurately state retained completeness; a partial export must not claim complete trace coverage.
-      explanation: {zh: 追踪级调查依赖清晰的标识符和采样边界。, en: Trace-level investigation depends on clear identifier and sampling boundaries., ja: トレースレベルの調査は明確な識別子とサンプリング境界に依存する。}
-      source_claims: [claim-otel-trace-record]
-  required_relations: []
+      expression_language: plain
+      expression: trace_id is immutable after the first span is recorded
+      explanations:
+        zh: 首个跨度记录后，追踪标识不可改变。
+        en: trace_id is immutable after the first span is recorded.
+        ja: 最初のスパン記録後、trace_id は変更できません。
+      source_claims:
+        - claim-trace-record-004
+  required_relation_constraints:
+    - id: trace-record-contains-span
+      direction: outgoing
+      predicate: contains_span
+      target_concept_id: TraceSpan
+      cardinality:
+        min: 1
+        max: null
+      explanations:
+        zh: 追踪记录至少包含一个跨度。
+        en: A trace record contains at least one span.
+        ja: トレース記録には少なくとも一つのスパンが含まれます。
+      source_claims:
+        - claim-trace-record-005
 examples:
-  - id: trace-record-positive
-    labels: {zh: "LangSmith trace 树", en: "LangSmith trace tree", ja: "LangSmith trace ツリー"}
-    descriptions: {zh: "LangSmith RunTree parent_run_id, run_type chain/llm/tool; tracing_v2_enabled(project_name) chain.invoke(); TraceRecord maps TraceRecord/TraceSpan/Execution.", en: "LangSmith RunTree parent_run_id, run_type chain/llm/tool; tracing_v2_enabled chain.invoke(); TraceRecord maps TraceRecord/TraceSpan/Execution.", ja: "LangSmith RunTree parent_run_id run_type; TraceRecord run tree."}
-    field_values: {trace_id: 4bf92f3577b34da6a3ce929d0e0e4736, record_id: langsmith-trace-root}
-    related_node_ids: [TraceRecord, TraceSpan]
-    related_relation_ids: []
-    source_claims: [claim-otel-trace-record]
-  - id: trace-record-counterexample
-    labels: {zh: "单个 span 无 trace 容器", en: "Single span without trace container", ja: "単一 span に trace 容器なし"}
-    descriptions: {zh: "Mock bypassing Helicone gateway cannot serve as Helicone-style TraceRecord.", en: "Mock bypassing Helicone gateway cannot serve as Helicone-style TraceRecord.", ja: "Gateway bypass rejects Helicone-style TraceRecord."}
-    field_values: {span_id: 00f067aa0ba902b7}
-    related_node_ids: [TraceSpan]
-    related_relation_ids: []
-    source_claims: [claim-otel-trace-record]
-  - id: trace-record-boundary
-    labels: {zh: "TraceRecord 与 Execution 边界", en: "TraceRecord versus Execution", ja: "TraceRecord と Execution 境界"}
-    descriptions: {zh: "Langfuse score is eval signal not Execution; TraceRecord preserves trace/span/score distinction.", en: "Langfuse score is eval signal not Execution; TraceRecord preserves trace/span/score distinction.", ja: "score not Execution."}
-    field_values: {trace_id: 4bf92f3577b34da6a3ce929d0e0e4736}
-    related_node_ids: [TraceRecord, Execution]
-    related_relation_ids: []
-    source_claims: [claim-otel-trace-record]
-  - id: trace-record-instance-trace-900
-    labels: {zh: "Langfuse trace 导出", en: "Langfuse trace export", ja: "Langfuse trace エクスポート"}
-    descriptions: {zh: "OTel instance: trace_id=4bf92f3577b34da6 span_id=00f067aa kind=CLIENT name=llm.call->TraceRecord.", en: "OTel instance: trace_id+span_id kind=CLIENT name=llm.call->TraceRecord.", ja: "OTel instance maps to TraceRecord."}
-    field_values: {trace_id: langfuse-trace-0192a3b4, record_id: langfuse-trace-root}
-    related_node_ids: [TraceRecord, TraceSpan, AgentTranscript]
-    related_relation_ids: []
-    source_claims: [claim-otel-trace-record]
+  - id: TraceRecord-example-positive-001
+    kind: positive
+    labels:
+      zh: 共享追踪标识的端到端执行路径
+      en: End-to-end path sharing one trace identifier
+      ja: 単一トレース識別子を共有する端到端経路
+    scenario_id: null
+    descriptions:
+      zh: 订单处理运行包含根智能体跨度、模型生成跨度、两个并行工具跨度和一个交接跨度；它们共享 trace_id=trace-8f2c1，以父子边及一个批次 TraceLink 形成可重建的因果图。
+      en: An order-processing run contains a root agent span, a generation span, two parallel tool spans, and a handoff span. They share trace_id=trace-8f2c1 and form a reconstructable causal graph through parent-child edges plus one batch TraceLink.
+      ja: 注文処理実行はルートエージェント、生成、並列ツール2本、引継ぎの各スパンを含む。trace_id=trace-8f2c1を共有し、親子辺とバッチTraceLinkで再構成可能な因果グラフを作る。
+    field_values:
+      record_id: trace-record-8f2c1
+      record_kind: trace
+      observed_at: 2026-07-16T12:00:01.000Z
+      provenance_ref: otel-collector-traces
+      runtime_correlation_ref: trace-8f2c1
+      trace_id: trace-8f2c1
+      sampled: true
+    related_node_ids:
+      - TraceRecord
+      - TraceSpan
+      - TraceLink
+      - ObservabilityRecord
+      - TraceContext
+    related_relation_ids:
+      - TraceRecord-is_a-ObservabilityRecord
+      - TraceRecord-contains_span-TraceSpan
+      - trace_has_context
+    expected_result:
+      zh: 这些跨度被聚合为一个 TraceRecord，可按同一追踪标识重建跨组件路径。
+      en: The spans are grouped into one TraceRecord and the cross-component path can be reconstructed by the shared trace identifier.
+      ja: 各スパンは一つのTraceRecordにまとめられ、共有トレース識別子でコンポーネント横断経路を再構成できる。
+    why_valid_or_invalid:
+      zh: 记录身份来自共享 trace_id 下的跨度集合和因果结构，而不是显示消息顺序或单一跨度。
+      en: Record identity comes from the span set and causal structure under one trace_id, not display-message order or any single span.
+      ja: 記録の同一性は一つのtrace_id下のスパン集合と因果構造で決まり、表示メッセージ順や単一スパンではない。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-trace-record-006
+  - id: TraceRecord-example-boundary-001
+    kind: boundary
+    labels:
+      zh: 一条消息转录不是追踪记录
+      en: One message transcript is not a trace record
+      ja: 一件のメッセージ転写はトレース記録ではない
+    scenario_id: null
+    descriptions:
+      zh: 转录只保存用户问题、工具摘要和最终答复的显示顺序，既没有 trace_id，也没有跨度起止时间、父子关系或链接。它可回答参与者看到什么，却不能回答跨组件执行路径。
+      en: A transcript preserves only the display order of a user question, tool summary, and final reply, with no trace_id, span timing, parentage, or links. It answers what participants saw but not the cross-component execution path.
+      ja: 転写は利用者質問、ツール要約、最終回答の表示順だけを保存し、trace_id、スパン時刻、親子関係、リンクがない。参加者の表示内容は答えられるが、コンポーネント横断経路は答えられない。
+    field_values: {}
+    related_node_ids:
+      - TraceRecord
+      - AgentTranscript
+      - ObservabilityRecord
+    related_relation_ids:
+      - TraceRecord-is_a-ObservabilityRecord
+    expected_result:
+      zh: 该对象保持 AgentTranscript 身份，不被归入 TraceRecord。
+      en: The object remains AgentTranscript and is not classified as TraceRecord.
+      ja: 対象はAgentTranscriptの同一性を保ち、TraceRecordには分類されない。
+    why_valid_or_invalid:
+      zh: 转录按外显顺序组织，追踪记录按共享标识和因果跨度图组织。
+      en: A transcript is organized by externalized order; a trace record is organized by shared identity and a causal span graph.
+      ja: 転写は外部化順序、トレース記録は共有識別子と因果スパングラフで組織される。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+    source_claims:
+      - claim-trace-record-006
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation:
+  - sibling_concept_id: TraceSpan
+    shared_parent_concept_id: ObservabilityRecord
+    differentia:
+      zh: 正向身份比较：父节点 ObservabilityRecord：TraceRecord（semantic kind=information，骨架 TraceRecord-is_a-ObservabilityRecord）；TraceSpan（semantic kind=information，骨架 TraceSpan-is_a-ObservabilityRecord）。双端条件：TraceRecord 条件：“追踪记录属于可观测记录，区别于其他同类对象的条件是：它是一次运行工作流或会话片段的追踪容器，汇集跨度、追踪上下文、链接、有序事件、保留策略和根跨度身份”；TraceSpan 条件：“作为可观测记录，追踪跨度由这一事实区分：它是追踪中的操作区间或工作单元，记录父跨度、时间、状态、属性、所含事件以及与相关跨度的链接”。仅依据各自定义与骨架逐端验证。
+      en: "Positive identity comparison: parent ObservabilityRecord: TraceRecord (semantic kind=information, backbone TraceRecord-is_a-ObservabilityRecord); TraceSpan (semantic kind=information, backbone TraceSpan-is_a-ObservabilityRecord). Endpoint conditions: TraceRecord condition: “Trace record is an observability record whose defining condition is that it is a trace container for one runtime workflow or session segment, grouping spans, trace context, links, ordered events, retention policy, and root-span identity”; TraceSpan condition: “Trace span belongs to the observability record category and differs from broader members in that it is an operation interval or unit of work inside a trace, with parent span, timing, status, attributes, contained events, and links to related spans”. Verify each endpoint from its own definition and backbone."
+      ja: 正の同一性比較：親 ObservabilityRecord：TraceRecord（semantic kind=information、バックボーン TraceRecord-is_a-ObservabilityRecord）；TraceSpan（semantic kind=information、バックボーン TraceSpan-is_a-ObservabilityRecord）。両端条件：TraceRecord の条件：「トレース記録は観測記録のうち、次の事実を定義条件とする対象です：それは、一つの実行ワークフローまたはセッション区間のトレースコンテナであり、スパン、トレース文脈、リンク、順序付きイベント、保持ポリシー、ルートスパン識別をまとめます」；TraceSpan の条件：「トレーススパンは観測記録として、次の条件により他の対象と区別されます：それは、トレース内の操作区間または作業単位であり、親スパン、時刻、状態、属性、含まれるイベント、関連スパンへのリンクを記録します」。各端を固有の定義とバックボーンで検証します。
+    source_claims:
+      - claim-trace-record-006
 parent_relation:
-  id: TraceRecord-specializes-ObservabilityRecord
+  id: TraceRecord-is_a-ObservabilityRecord
   predicate: is_a
-  target: concept:ObservabilityRecord
-  endpoint_order: child-to-parent
-  direction: source-to-target
+  direction: target-to-source
   relation_kind: hierarchy
-  labels: {zh: 是追踪记录, en: is a trace record, ja: トレース記録である}
-  definitions: {zh: 每个 TraceRecord 都是保留相关 OTel span 的声明追踪级导出的 ObservabilityRecord。, en: Every TraceRecord is an ObservabilityRecord that retains a declared trace-level export of related OTel spans., ja: すべての TraceRecord は、関連 OTel Span の宣言済みトレースレベルエクスポートを保持する ObservabilityRecord である。}
-  cardinality: {source: {min: 0, max: null}, target: {min: 1, max: 1}}
-  cardinality_not_applicable_reason: null
-  inverse_reading: {predicate: has_trace_record, labels: {zh: 具有追踪记录, en: has trace record, ja: トレース記録を持つ}}
-  conditions:
-    - id: trace-record-parent-condition
-      severity: error
-      expression: Require one OTel trace ID, one or more retained span projections, and an explicit export completeness scope.
-      explanations: {zh: 单个关联诊断记录不能提升为追踪导出。, en: A single correlated diagnostic record cannot be promoted to a trace export., ja: 単一の相関診断記録をトレースエクスポートに昇格させることはできない。}
-      source_claims: [claim-otel-trace-record]
-  temporal_scope: valid-time
+  labels:
+    zh: 是一种
+    en: is a
+    ja: の一種である
+  definitions:
+    zh: 每个 TraceRecord 都是 ObservabilityRecord，其种差是用共享 trace_id 聚合一个端到端操作的跨度，并保留父子与链接因果结构。
+    en: Every TraceRecord is an ObservabilityRecord distinguished by grouping the spans of one end-to-end operation under a shared trace_id while preserving parent-child and Link causality.
+    ja: すべての TraceRecord は ObservabilityRecord で、共有 trace_id の下に end-to-end 操作の Span を集約し parent-child と Link 因果を保持する点が種差です。
+  cardinality: null
+  cardinality_not_applicable_reason:
+    zh: 分类继承不使用实例关系基数。
+    en: Taxonomic inheritance does not use instance-relation cardinality.
+    ja: 分類継承にはインスタンス関係の基数を用いません。
+  inverse_reading:
+    predicate: part_of
+    labels:
+      zh: 反向：是一种
+      en: has subtype
+      ja: 逆方向：の一種である
+  conditions: []
+  temporal_scope: timeless
   boundary_context: null
   constraints: []
-  examples: []
-  source_claims: [claim-otel-trace-record]
-relations: []
-sources:
-  - id: otel-trace-api
-    title: "OpenTelemetry Trace API"
-    url: https://opentelemetry.io/docs/specs/otel/trace/api/
-    source_type: standard
-    relevance: Defines a trace as nested spans and defines the span identities and operations represented by this persistent export.
+  examples:
+    - id: TraceRecord-is_a-ObservabilityRecord-example-positive-manual-20260716
+      kind: positive
+      labels:
+        zh: 逐项核实正例
+        en: Point-reviewed positive case
+        ja: 項目別審査の正例
+      scenario_id: null
+      descriptions:
+        zh: trace-8f2c1 包含根智能体跨度、模型跨度、两个并行工具跨度和交接跨度，全部共享 trace_id。
+        en: trace-8f2c1 contains a root-agent span, a model span, two parallel tool spans, and a handoff span that all share trace_id.
+        ja: trace-8f2c1 が root-agent・model・並列 tool 二件・handoff の各 Span を含み、全て同じ trace_id を共有します。
+      field_values: {}
+      related_node_ids:
+        - TraceRecord
+        - ObservabilityRecord
+      related_relation_ids:
+        - TraceRecord-is_a-ObservabilityRecord
+      expected_result:
+        zh: 仅在所述证据存在时返回这条有向事实。
+        en: Return this directed fact only when the described evidence exists.
+        ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
+      why_valid_or_invalid:
+        zh: 每个 TraceRecord 都是 ObservabilityRecord，其种差是用共享 trace_id 聚合一个端到端操作的跨度，并保留父子与链接因果结构。
+        en: Every TraceRecord is an ObservabilityRecord distinguished by grouping the spans of one end-to-end operation under a shared trace_id while preserving parent-child and Link causality.
+        ja: すべての TraceRecord は ObservabilityRecord で、共有 trace_id の下に end-to-end 操作の Span を集約し parent-child と Link 因果を保持する点が種差です。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-trace-record-007
+    - id: TraceRecord-is_a-ObservabilityRecord-example-boundary-manual-20260716
+      kind: boundary
+      labels:
+        zh: 逐项核实边界例
+        en: Point-reviewed boundary case
+        ja: 項目別審査の境界例
+      scenario_id: null
+      descriptions:
+        zh: 会话线程把三个独立 trace_id 的多轮请求串在一起，只共享 thread_id。
+        en: A conversation thread links three requests with separate trace_ids and shares only thread_id.
+        ja: conversation thread が別々の trace_id を持つ三 request を結び、thread_id だけを共有します。
+      field_values: {}
+      related_node_ids:
+        - TraceRecord
+        - ObservabilityRecord
+      related_relation_ids:
+        - TraceRecord-is_a-ObservabilityRecord
+      expected_result:
+        zh: 不得从该边界情形推断这条关系。
+        en: Do not infer this relation from the boundary case.
+        ja: この境界事例から当該関係を推論しません。
+      why_valid_or_invalid:
+        zh: 共享 thread_id 的多轮线程不是一个 TraceRecord；每个端到端操作仍保留独立追踪身份。
+        en: A multi-turn thread sharing thread_id is not one TraceRecord; each end-to-end operation retains separate trace identity.
+        ja: thread_id 共有の multi-turn thread は一つの TraceRecord ではなく、各 end-to-end 操作は別 trace identity を持ちます。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-trace-record-007
+  source_claims:
+    - claim-trace-record-007
+  distinct_fact_rationale: null
+  layout_role: primary-backbone
+  review_status: accepted
+  endpoint_order: child-to-parent
+relations:
+  - id: TraceRecord-contains_span-TraceSpan
+    predicate: contains_span
+    direction: source-to-target
+    relation_kind: composition
+    labels:
+      zh: contains span
+      en: contains span
+      ja: contains span
+    definitions:
+      zh: TraceRecord 通过 contains_span 聚合共享其 trace_id 的 TraceSpan；跨度是追踪的组成记录，不是 TraceRecord 的分类子类。
+      en: TraceRecord contains_span each TraceSpan sharing its trace_id; a span is a component record of the trace, not a taxonomy subtype of TraceRecord.
+      ja: TraceRecord は共有 trace_id の TraceSpan を contains_span で集約し、Span は Trace の構成 record であって TraceRecord の taxonomy subtype ではありません。
+    cardinality:
+      source:
+        min: 0
+        max: null
+      target:
+        min: 1
+        max: null
+    cardinality_not_applicable_reason: null
+    inverse_reading:
+      predicate: span_of
+      labels:
+        zh: 反向：contains span
+        en: span of
+        ja: 逆方向：contains span
+    conditions: []
+    temporal_scope: timeless
+    boundary_context: null
+    constraints: []
+    examples:
+      - id: TraceRecord-contains_span-TraceSpan-example-positive-manual-20260716
+        kind: positive
+        labels:
+          zh: 逐项核实正例
+          en: Point-reviewed positive case
+          ja: 項目別審査の正例
+        scenario_id: null
+        descriptions:
+          zh: trace-8f2c1 包含 span-root、span-model 与 span-tool-7，三者 trace_id 均为 8f2c1。
+          en: trace-8f2c1 contains span-root, span-model, and span-tool-7, all with trace_id 8f2c1.
+          ja: trace-8f2c1 が trace_id 8f2c1 の span-root・span-model・span-tool-7 を含みます。
+        field_values: {}
+        related_node_ids:
+          - TraceRecord
+          - TraceSpan
+        related_relation_ids:
+          - TraceRecord-contains_span-TraceSpan
+        expected_result:
+          zh: 仅在所述证据存在时返回这条有向事实。
+          en: Return this directed fact only when the described evidence exists.
+          ja: 記載された証拠が存在する場合だけ、この有向事実を返します。
+        why_valid_or_invalid:
+          zh: TraceRecord 通过 contains_span 聚合共享其 trace_id 的 TraceSpan；跨度是追踪的组成记录，不是 TraceRecord 的分类子类。
+          en: TraceRecord contains_span each TraceSpan sharing its trace_id; a span is a component record of the trace, not a taxonomy subtype of TraceRecord.
+          ja: TraceRecord は共有 trace_id の TraceSpan を contains_span で集約し、Span は Trace の構成 record であって TraceRecord の taxonomy subtype ではありません。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-trace-record-008
+      - id: TraceRecord-contains_span-TraceSpan-example-boundary-manual-20260716
+        kind: boundary
+        labels:
+          zh: 逐项核实边界例
+          en: Point-reviewed boundary case
+          ja: 項目別審査の境界例
+        scenario_id: null
+        descriptions:
+          zh: span-tool-9 与 trace-8f2c1 同时出现在仪表板，但它携带另一个 trace_id。
+          en: span-tool-9 appears beside trace-8f2c1 in a dashboard but carries a different trace_id.
+          ja: span-tool-9 は dashboard で trace-8f2c1 の隣に表示されますが別 trace_id を持ちます。
+        field_values: {}
+        related_node_ids:
+          - TraceRecord
+          - TraceSpan
+        related_relation_ids:
+          - TraceRecord-contains_span-TraceSpan
+        expected_result:
+          zh: 不得从该边界情形推断这条关系。
+          en: Do not infer this relation from the boundary case.
+          ja: この境界事例から当該関係を推論しません。
+        why_valid_or_invalid:
+          zh: 界面邻近不形成组成关系；只有共享追踪身份并被该追踪收录的跨度才能被包含。
+          en: Dashboard adjacency does not create composition; the span must share trace identity and be recorded in that trace.
+          ja: 画面隣接は構成関係を作らず、Span は trace identity を共有し当該 Trace に収録される必要があります。
+        synthetic: true
+        verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+        source_claims:
+          - claim-trace-record-008
+    source_claims:
+      - claim-trace-record-008
+    distinct_fact_rationale: null
+    layout_role: cross-link
+    review_status: accepted
+    target: concept:TraceSpan
+review:
+  status: accepted
+  method: manual-semantic
+  reviewer: manual-runtime-verification
+  reviewed_on: 2026-07-17
+  note:
+    zh: 已对照 OpenTelemetry、W3C Trace Context 与 LangGraph checkpoint/replay 逐项核验，TraceSpan 与 Checkpoint 语义成立。
+    en: Verified against OpenTelemetry, W3C Trace Context, and LangGraph checkpoint/replay. TraceSpan and Checkpoint semantics hold.
+    ja: OpenTelemetry、W3C Trace Context、LangGraph checkpoint/replay に照らし TraceSpan と Checkpoint semantics を確認しました。
+  sections:
+    semantics: accepted
+    hierarchy: accepted
+    relations: accepted
+    structure: accepted
+    examples: accepted
+    source_claims: accepted
 source_claims:
-  - id: claim-otel-trace-record
-    source: otel-trace-api
-    supports: OpenTelemetry defines a Span as one operation within a trace and allows spans to be nested to form a trace tree with shared trace identity.
-    locator: Span and SpanContext
-    evidence_kind: standard
+  - id: claim-trace-record-001
+    source: eng-std-opentelemetry-spec
+    supports: OpenTelemetry defines a trace through Spans correlated by one TraceId, with parent-child structure and Links. Moonweave therefore models TraceRecord as the information container for that correlated span graph, distinct from each TraceSpan and from a user-visible transcript.
+    locator: Overview > OpenTelemetry Client Architecture > signals, traces, spans, and context propagation
+    evidence_kind: design-inference
     confidence: high
+    review_status: accepted
+  - id: claim-trace-record-002
+    source: eng-std-opentelemetry-trace-api
+    supports: OpenTelemetry SpanContext contains an immutable 16-byte TraceId shared by parent and child spans; Moonweave serializes that identifier as TraceRecord.trace_id.
+    locator: Tracing API > SpanContext, Span creation, Span operations, Events, Status, and Link
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-trace-record-003
+    source: eng-std-opentelemetry-trace-sdk
+    supports: OpenTelemetry distinguishes a Span's IsRecording state from the SpanContext Sampled flag and exporter eligibility; Moonweave makes the trace-level projection optional rather than mandatory.
+    locator: Tracing SDK > Additional Span Interfaces, Sampling, Span Limits, and Span Exporter
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-trace-record-004
+    source: eng-std-opentelemetry-trace-api
+    supports: OpenTelemetry makes SpanContext immutable and requires every child span in a trace to retain its parent's TraceId; this supports immutable TraceRecord.trace_id.
+    locator: Tracing API > SpanContext, Span creation, Span operations, Events, Status, and Link
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-trace-record-005
+    source: eng-std-opentelemetry-trace-api
+    supports: OpenTelemetry defines a trace as the tree or graph formed by related spans and requires a root span; Moonweave therefore requires at least one contained TraceSpan.
+    locator: Tracing API > SpanContext, Span creation, Span operations, Events, Status, and Link
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-trace-record-006
+    source: eng-std-opentelemetry-spec
+    supports: OpenTelemetry defines a trace as a graph of spans sharing a TraceId, with parent-child structure and additional Links; Moonweave models the trace container separately from every component span.
+    locator: Overview > OpenTelemetry Client Architecture > signals and context propagation
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-trace-record-007
+    source: eng-std-opentelemetry-spec
+    supports: Every TraceRecord is an ObservabilityRecord distinguished by grouping the spans of one end-to-end operation under a shared trace_id while preserving parent-child and Link causality. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
+    locator: Overview > OpenTelemetry Client Architecture > signals and context propagation
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
+  - id: claim-trace-record-008
+    source: eng-std-opentelemetry-spec
+    supports: TraceRecord contains_span each TraceSpan sharing its trace_id; a span is a component record of the trace, not a taxonomy subtype of TraceRecord. The cited section establishes the endpoint semantics; relation ownership, identifier, and graph direction are Moonweave's reviewed ontology decisions.
+    locator: Overview > OpenTelemetry Client Architecture > signals and context propagation
+    evidence_kind: design-inference
+    confidence: high
+    review_status: accepted
 

@@ -1,6 +1,7 @@
 schema: moonweave.ai/ontology-node/v1
 id: TaskConstraint
 kind: concept
+status: accepted
 labels:
   zh: 任务约束
   en: task constraint
@@ -28,49 +29,6 @@ semantics:
       ja: 先行作業を要求する TaskDependency、出力証拠から完了を判定する TaskCompletionCriterion。
   semantic_kind: specification
   aliases: []
-engineering:
-  explanation:
-    zh: >-
-      TaskConstraint 在规划阶段由可行性检查器读取，在运行阶段由 OPA 或 LangGraph 入口 gate 执行：例如 budget ceiling、
-      allowed_tools 列表写入 Rego 或节点前置校验。Agents SDK Runner 可在调用前检查 tool 权限。违反后果映射为路由拒绝或
-      Execution 失败，但不修改 constraint revision；A2A canceled 状态是协议终态，不是约束规约本身。
-    en: >-
-      TaskConstraint is read by a feasibility checker at plan time and enforced at runtime by OPA or LangGraph entry gates:
-      for example, budget ceilings and allowed_tools lists compile to Rego or pre-node validation. Agents SDK Runner may check
-      tool permissions before invocation. Violation consequences map to routing rejection or Execution failure without
-      rewriting constraint revision; A2A canceled status is a protocol terminal state, not the constraint specification.
-    ja: >-
-      TaskConstraint は plan time に feasibility checker が読み、runtime では OPA または LangGraph entry gate が適用する。
-      例として budget ceiling と allowed_tools list は Rego または pre-node validation にコンパイルされる。Agents SDK Runner
-      は invocation 前に tool 権限を検査できる。違反結果は routing rejection または Execution failure に対応し constraint
-      revision は変更しない。A2A canceled status は protocol terminal state であり constraint specification ではない。
-  typical_input:
-    - description:
-        zh: 限制任务执行方式或资源的约束规约。
-        en: A constraint specification limiting task execution methods or resources.
-        ja: task execution method または resource を制限する constraint specification。
-      format: |-
-        {"condition_specification_id":"constraint:audit-budget@1","version":"1","constraint_kind":"budget","limit":{"max_cost_usd":25},"allowed_tools":["ledger.read","ledger.reconcile"],"violation_consequence":"reject_dispatch"}
-  typical_output:
-    - description:
-        zh: 编译到策略引擎或 Runner 前置校验的约束绑定。
-        en: A constraint binding compiled to a policy engine or Runner pre-check.
-        ja: policy engine または Runner pre-check にコンパイルされた constraint binding。
-      format: |-
-        {"constraint_ref":"constraint:audit-budget@1","policy_package":"task/constraints","rego_module":"audit_budget","runner_precheck":{"max_cost_usd":25,"allowed_tools":["ledger.read","ledger.reconcile"]}}
-  reference_implementations:
-    - name: Open Policy Agent
-      url: https://www.openpolicyagent.org/docs/latest/policy-language/
-      description: Documents evaluating structured constraints as policy decisions at dispatch and runtime.
-    - name: LangGraph Graph API
-      url: https://docs.langchain.com/oss/python/langgraph/graph-api
-      description: Documents entry validation and conditional routing before node execution.
-    - name: OpenAI Agents SDK Running agents
-      url: https://openai.github.io/openai-agents-python/running_agents/
-      description: Documents Runner invocation boundaries including tool allowlists.
-  source_claims:
-    - claim-task-constraint-014
-    - claim-task-constraint-015
 structure:
   identity_keys: []
   fields:
@@ -273,16 +231,33 @@ structure:
         - claim-task-constraint-014
 examples:
   - id: TaskConstraint-example-positive-manual-001
+    kind: positive
     labels:
-      zh: TaskConstraint positive
-      en: TaskConstraint positive
-      ja: TaskConstraint positive
+      zh: 任务约束正例
+      en: Positive example for task constraint
+      ja: タスク制約の正例
+    scenario_id: null
     descriptions:
-      zh: Temporal 持久化工作流映射 TaskConstraint：@workflow.defn class OrderWorkflow: @workflow.run async def run(self, order): await workflow.execute_activity(process_payment, order)；@activity.defn async def process_payment(order): ...；DurableExecution 支持 crash 后 resume。
-      en: Temporal durable workflow maps TaskConstraint: @workflow.defn OrderWorkflow with @workflow.run executing process_payment activity; @activity.defn process_payment; DurableExecution supports resume after crash.
-      ja: Temporal TaskConstraint: @workflow.defn+execute_activity(process_payment)+@activity.defn；DurableExecution resume。
-    field_values: {condition_specification_id: task-condition-release-sandbox, evaluation_phase: readiness}
-
+      zh: constraint-release-sandbox@1 规定发布任务及其全部步骤只能在 sandbox-release 环境中运行，并且网络出口必须关闭；启动前证据不足时阻止任务开始。
+      en: constraint-release-sandbox@1 requires the release task and all of its steps to run only in sandbox-release with network egress disabled; missing readiness evidence blocks task start.
+      ja: constraint-release-sandbox@1 は release task と全 step を sandbox-release だけで実行し、network egress を無効にします。readiness evidence が不足する場合は task 開始を阻止します。
+    field_values:
+      condition_specification_id: task-condition-release-sandbox
+      evaluation_phase: readiness
+      required_evidence_contract:
+        required:
+          - RuntimeEnvironment:sandbox-release
+          - NetworkPolicy:no-egress
+        bind_to: execution_environment_digest
+      unsatisfied_effect: block_start
+      version: "1"
+      constraint_kind: environment
+      expression_language: rego
+      predicate_expression: runtime.environment == 'sandbox-release' && network.egress == false
+      violation_effect: block_start
+      applicability_scope:
+        scope: task-and-all-steps
+        environment_class: sandbox
     related_node_ids:
       - TaskConstraint
       - TaskCondition
@@ -290,171 +265,314 @@ examples:
     related_relation_ids:
       - TaskConstraint-is_a-TaskCondition
       - Task-constrained_by-TaskConstraint
+    expected_result:
+      zh: constraint-release-sandbox@1 是 TaskConstraint；就绪检查根据环境摘要和无出口策略证据决定是否允许开始。
+      en: constraint-release-sandbox@1 is a TaskConstraint whose readiness check uses the environment digest and no-egress policy evidence to decide whether start is permitted.
+      ja: constraint-release-sandbox@1 は TaskConstraint であり、readiness check が environment digest と no-egress policy evidence から開始可否を決めます。
+    why_valid_or_invalid:
+      zh: 环境身份、无网络出口要求、适用范围、就绪证据和阻止启动的效果均与谓词一致。
+      en: Environment identity, no-egress requirement, applicability scope, readiness evidence, and block-start effect all agree with the predicate.
+      ja: environment identity、no-egress requirement、applicability scope、readiness evidence、block-start effect が predicate と一致します。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
       - claim-task-constraint-015
-
   - id: TaskConstraint-example-boundary-manual-001
+    kind: boundary
     labels:
-      zh: TaskConstraint boundary
-      en: TaskConstraint boundary
-      ja: TaskConstraint boundary
+      zh: 任务约束边界例
+      en: Boundary case for task constraint
+      ja: タスク制約の境界例
+    scenario_id: null
     descriptions:
-      zh: Prefect flow run state 是运行时 orchestration 状态，不是 TaskConstraint 静态 RetryPolicy 规约；FlowControl 事件与规约应分离。
-      en: Prefect flow run state is runtime orchestration state, not TaskConstraint static RetryPolicy spec; separate FlowControl events from specification.
-      ja: Prefect flow run state は runtime で TaskConstraint 静的 RetryPolicy ではない。
-    field_values: {condition_specification_id: constraint-ui-comment, version: 1, constraint_kind: method, expression_language: plain-text, predicate_expression: "please be careful with production", violation_effect: none, applicability_scope: {}
-
+      zh: 任务 B 只有在任务 A 产生 approved_schema 后才能开始。
+      en: Task B may start only after Task A produces approved_schema.
+      ja: Task B は Task A が approved_schema を生成した後だけ開始できます。
+    field_values:
+      condition_specification_id: constraint-ui-comment
+      version: "1"
+      constraint_kind: method
+      expression_language: plain-text
+      predicate_expression: please be careful with production
+      violation_effect: none
+      applicability_scope: {}
     related_node_ids:
       - TaskConstraint
       - TaskCondition
     related_relation_ids:
       - TaskConstraint-is_a-TaskCondition
+    expected_result:
+      zh: 该条件应建模为 TaskDependency，而非一般 TaskConstraint。
+      en: Model the condition as TaskDependency rather than a general TaskConstraint.
+      ja: この条件は一般 TaskConstraint ではなく TaskDependency として表します。
+    why_valid_or_invalid:
+      zh: 其身份由特定前置工作和产物决定，而非对 B 的资源或执行方式施加限制。
+      en: Its identity depends on specific predecessor work and an artifact, not on limiting B's resources or execution method.
+      ja: 特定の先行作業と成果物で決まり、B の資源や実行方法の制限ではありません。
+    synthetic: true
+    verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
     source_claims:
       - claim-task-constraint-016
-
-  - id: TaskConstraint-example-counterexample-confusable
-    labels:
-      zh: TaskConstraint counterexample
-      en: TaskConstraint counterexample
-      ja: TaskConstraint counterexample
-    descriptions:
-      zh: 自然语言计划列表无 Python/code 可执行步骤不能作为 TaskWeaver 式 TaskConstraint。
-      en: Natural-language plan list without Python/code executable steps cannot serve as TaskWeaver-style TaskConstraint.
-      ja: Python/code なし自然言語計画は TaskWeaver 式 TaskConstraint にならない。
-    field_values: {constraint_id: absent, constrained_work_ref: absent, infra_quota: k8s-cpu-limit}
-
-    related_node_ids:
-      - TaskConstraint
-      - TaskCondition
-      - WorkSpecification
-      - Task
-    related_relation_ids: []
+external_mappings: []
+applicability:
+  - core
+sibling_differentiation:
+  - sibling_concept_id: TaskDependency
+    shared_parent_concept_id: TaskCondition
+    differentia:
+      zh: 已审查兄弟区分：父节点 TaskCondition：TaskConstraint（semantic kind=specification，骨架 TaskConstraint-is_a-TaskCondition）；TaskDependency（semantic kind=specification，骨架 TaskDependency-is_a-TaskCondition）。双端条件：TaskConstraint 条件：“任务约束是一种任务条件；其区分条件是：它记录影响任务执行的规划限制，例如期限、预算、权限、能力、上下文、安全或依赖限制”；TaskDependency 条件：“任务依赖属于任务条件，区别于其他同类对象的条件是：它说明某个任务、步骤或工作项必须等待另一结果、条件、资源或批准后才能继续”。任一条件成立不推出另一端。
+      en: "Reviewed sibling distinction: parent TaskCondition: TaskConstraint (semantic kind=specification, backbone TaskConstraint-is_a-TaskCondition); TaskDependency (semantic kind=specification, backbone TaskDependency-is_a-TaskCondition). Endpoint conditions: TaskConstraint condition: “As a task condition, Task constraint is distinguished by the fact that it records a planning constraint such as deadline, budget, authority, capability, context, safety, or dependency limit that shapes task execution”; TaskDependency condition: “Task dependency is a task condition whose defining condition is that it states that one task, step, or work item depends on another result, condition, resource, or approval before it can proceed”. Either condition leaves the other unproven."
+      ja: 審査済み兄弟区別：親 TaskCondition：TaskConstraint（semantic kind=specification、バックボーン TaskConstraint-is_a-TaskCondition）；TaskDependency（semantic kind=specification、バックボーン TaskDependency-is_a-TaskCondition）。両端条件：TaskConstraint の条件：「タスク条件に属するタスク制約は、次の事実を種差とします：それは、期限、予算、権限、能力、文脈、安全、依存制限など、実行を形づくる計画上の制約を記録します」；TaskDependency の条件：「タスク依存関係はタスク条件のうち、次の事実を定義条件とする対象です：それは、あるタスク、手順、作業項目が、別の結果、条件、資源、承認を待たなければ進めないことを示します」。一方の成立は他方を証明しません。
     source_claims:
-      - claim-task-constraint-015
-
-  - id: TaskConstraint-example-instance-concrete
+      - claim-task-constraint-017
+parent_relation:
+  id: TaskConstraint-is_a-TaskCondition
+  predicate: is_a
+  direction: target-to-source
+  relation_kind: hierarchy
+  labels:
+    zh: 是一种
+    en: is a
+    ja: の一種である
+  definitions:
+    zh: TaskConstraint —is_a→ TaskCondition 表示约束是一种可判定任务条件，其种差是限制允许的资源、权限、环境、期限或方法，而不决定完成。
+    en: TaskConstraint —is_a→ TaskCondition classifies a constraint as an evaluable task condition whose differentia is limiting permitted resources, authority, environment, deadline, or method rather than deciding completion.
+    ja: TaskConstraint —is_a→ TaskCondition は、完了判定ではなく、許可資源・権限・環境・期限・方法を制限する種差を持つ評価可能なタスク条件として制約を分類します。
+  cardinality: null
+  cardinality_not_applicable_reason:
+    zh: 分类继承不使用实例关系基数。
+    en: Taxonomic inheritance does not use instance-relation cardinality.
+    ja: 分類継承にはインスタンス関係の基数を用いません。
+  inverse_reading:
+    predicate: part_of
     labels:
-      zh: TaskConstraint instance
-      en: TaskConstraint instance
-      ja: TaskConstraint instance
-    descriptions:
-      zh: CoT 实例 prompt："Q: Roger has 5 tennis balls... A: Let's think step by step." → 逐步算术推理 → 映射 TaskConstraint。
-      en: CoT instance: "Q: Roger has 5 tennis balls... A: Let's think step by step." → stepwise arithmetic → maps to TaskConstraint.
-      ja: CoT 实例 step-by-step 算術推論が TaskConstraint に写像。
-    field_values: {condition_specification_id: task-condition-release-sandbox, evaluation_phase: readiness}
-
-    related_node_ids:
-      - TaskConstraint
-      - TaskCondition
-      - Task
-    related_relation_ids: []
-    source_claims:
-      - claim-task-constraint-015
-
-sources:
-  - id: a2a-protocol-specification
-    title: Agent2Agent (A2A) Protocol Specification
-    url: https://a2a-protocol.org/latest/specification/
-    source_type: official-spec
-    relevance: Defines A2A Task as a protocol work unit distinct from internal planning objects.
-  - id: langgraph-graph-api
-    title: LangGraph Graph API
-    url: https://langchain-ai.github.io/langgraph/
-    source_type: official-doc
-    relevance: Documents stateful graph planning, workflow nodes, and composition.
-  - id: prov-o
-    title: W3C PROV-O
-    url: https://www.w3.org/TR/prov-o/
-    source_type: standard
-    relevance: Separates Plan-like specifications from Activities and execution evidence.
+      zh: 反向：是一种
+      en: has subtype
+      ja: 逆方向：の一種である
+  conditions: []
+  temporal_scope: timeless
+  boundary_context: null
+  constraints: []
+  examples:
+    - id: TaskConstraint-is_a-TaskCondition-example-positive-manual-001
+      kind: positive
+      labels:
+        zh: 是一种正例
+        en: Positive example for is a
+        ja: の一種であるの正例
+      scenario_id: null
+      descriptions:
+        zh: constraint-no-write 禁止任务使用任何外部写入工具，并规定违反时立即终止。
+        en: constraint-no-write forbids any external write tool and requires immediate termination on violation.
+        ja: constraint-no-write は外部書込みツールを禁止し、違反時の即時終了を要求します。
+      field_values: {}
+      related_node_ids:
+        - TaskConstraint
+        - TaskCondition
+      related_relation_ids:
+        - TaskConstraint-is_a-TaskCondition
+      expected_result:
+        zh: 该对象通过 is_a 同时属于 TaskConstraint 和 TaskCondition。
+        en: Through is_a, the object is both TaskConstraint and TaskCondition.
+        ja: is_a により、この対象は TaskConstraint かつ TaskCondition です。
+      why_valid_or_invalid:
+        zh: 它具有可验证限制与违规后果，并专门约束允许的执行方式。
+        en: It supplies an evaluable limit and violation consequence and specifically restricts permitted execution.
+        ja: 評価可能な制限と違反結果を持ち、許可実行方法を特に制約するためです。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-task-constraint-018
+    - id: TaskConstraint-is_a-TaskCondition-example-boundary-manual-001
+      kind: boundary
+      labels:
+        zh: 是一种边界例
+        en: Boundary case for is a
+        ja: の一種であるの境界例
+      scenario_id: null
+      descriptions:
+        zh: dependency-schema 要求 schema-draft 成功后才执行审查。
+        en: dependency-schema requires schema-draft to succeed before review starts.
+        ja: dependency-schema は schema-draft 成功後に審査を開始するよう要求します。
+      field_values: {}
+      related_node_ids:
+        - TaskConstraint
+        - TaskCondition
+      related_relation_ids:
+        - TaskConstraint-is_a-TaskCondition
+      expected_result:
+        zh: 该条件是 TaskDependency，不是 TaskConstraint。
+        en: The condition is TaskDependency rather than TaskConstraint.
+        ja: この条件は TaskConstraint ではなく TaskDependency です。
+      why_valid_or_invalid:
+        zh: 它由具名的前置工作决定，而非限制资源、权限或方法。
+        en: It is identified by named predecessor work rather than a restriction on resource, authority, or method.
+        ja: 具名の前置作業で識別され、資源・権限・方法の制限ではないためです。
+      synthetic: true
+      verified_version: https://moonweave.ai/ontology/agent-system/2.0.0/
+      source_claims:
+        - claim-task-constraint-019
+  source_claims:
+    - claim-task-constraint-020
+  distinct_fact_rationale: null
+  layout_role: primary-backbone
+  review_status: accepted
+  endpoint_order: child-to-parent
+relations: []
+review:
+  status: accepted
+  method: manual-semantic
+  reviewer: manual-orchestration-tool-verification
+  reviewed_on: 2026-07-17
+  note:
+    zh: 已对照权威来源逐项完成人工语义核验；概念定义、层级、关系、结构与来源主张成立。
+    en: Manual semantic verification against authoritative sources completed; concept definitions, hierarchy, relations, structure, and source claims hold.
+    ja: 権威ソースに照らし手動意味検証を完了し、概念定義・階層・関係・構造・出典主張が成立。
+  sections:
+    semantics: accepted
+    hierarchy: accepted
+    relations: accepted
+    structure: accepted
+    examples: accepted
+    source_claims: accepted
 source_claims:
+  - id: claim-task-constraint-001
+    source: lit-planning-ontology-2023
+    supports: The planning ontology represents constraints over actions and plans as explicit planning knowledge. Moonweave specializes such limits as TaskConstraint and separates them from ordering dependencies and success criteria.
+    locator: Planning Ontology paper > goals, actions, ordering constraints, and plan structure
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
   - id: claim-task-constraint-002
-    source: langgraph-graph-api
-    supports: TaskConstraint boundary from adjacent orchestration concepts is supported by LangGraph Graph API separation of control transfer, routing, and ordinary tool or message exchange.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
-    evidence_kind: official
-    confidence: high
+    source: eng-fw-crewai-tasks
+    supports: CrewAI task attributes constrain available tools and resources; Moonweave records this as constraint kind resource.
+    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
   - id: claim-task-constraint-003
-    source: prov-o
-    supports: TaskConstraint field or status vocabulary is a Moonweave audit projection informed by W3C PROV-O.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
-    evidence_kind: official
-    confidence: high
+    source: eng-fw-crewai-tasks
+    supports: CrewAI task attributes constrain the responsible agent; Moonweave records this as constraint kind authority.
+    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
   - id: claim-task-constraint-004
-    source: a2a-protocol-specification
-    supports: Moonweave TaskConstraint constraints, examples, or local audit fields for claim claim-task-constraint-004 are design projections informed by Agent2Agent (A2A) Protocol Specification.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    source: eng-fw-crewai-tasks
+    supports: CrewAI task attributes constrain task-specific execution settings; Moonweave records this as constraint kind environment.
+    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
     evidence_kind: design-inference
-    confidence: high
+    confidence: medium
+    review_status: accepted
   - id: claim-task-constraint-005
-    source: langgraph-graph-api
-    supports: Moonweave TaskConstraint constraints, examples, or local audit fields for claim claim-task-constraint-005 are design projections informed by LangGraph Graph API.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    source: eng-fw-crewai-tasks
+    supports: CrewAI task attributes constrain task-specific execution settings; Moonweave records this as constraint kind deadline.
+    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
     evidence_kind: design-inference
-    confidence: high
+    confidence: medium
+    review_status: accepted
   - id: claim-task-constraint-006
-    source: prov-o
-    supports: Moonweave TaskConstraint constraints, examples, or local audit fields for claim claim-task-constraint-006 are design projections informed by W3C PROV-O.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    source: eng-fw-crewai-tasks
+    supports: CrewAI task attributes constrain task-specific execution settings; Moonweave records this as constraint kind method.
+    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
     evidence_kind: design-inference
-    confidence: high
+    confidence: medium
+    review_status: accepted
   - id: claim-task-constraint-007
-    source: a2a-protocol-specification
-    supports: Moonweave TaskConstraint constraints, examples, or local audit fields for claim claim-task-constraint-007 are design projections informed by Agent2Agent (A2A) Protocol Specification.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    source: eng-fw-crewai-tasks
+    supports: CrewAI separates agent assignment, tool limits, task configuration, and human review; Moonweave uses explicit constraint kinds to keep those bounds distinguishable.
+    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
     evidence_kind: design-inference
-    confidence: high
+    confidence: medium
+    review_status: accepted
   - id: claim-task-constraint-008
-    source: langgraph-graph-api
-    supports: Moonweave TaskConstraint constraints, examples, or local audit fields for claim claim-task-constraint-008 are design projections informed by LangGraph Graph API.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    source: eng-fw-maf-workflows
+    supports: Agent Framework graph control evaluates explicit routing functions; Moonweave records the rule language needed to evaluate a task bound deterministically.
+    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
     evidence_kind: design-inference
-    confidence: high
+    confidence: medium
+    review_status: accepted
   - id: claim-task-constraint-009
-    source: prov-o
-    supports: Moonweave TaskConstraint constraints, examples, or local audit fields for claim claim-task-constraint-009 are design projections informed by W3C PROV-O.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    source: eng-fw-crewai-tasks
+    supports: CrewAI task attributes can limit tools and task-specific configuration; Moonweave turns such limits into an explicit evaluable predicate.
+    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
     evidence_kind: design-inference
-    confidence: high
+    confidence: medium
+    review_status: accepted
   - id: claim-task-constraint-010
-    source: a2a-protocol-specification
-    supports: Moonweave TaskConstraint constraints, examples, or local audit fields for claim claim-task-constraint-010 are design projections informed by Agent2Agent (A2A) Protocol Specification.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    source: eng-fw-crewai-tasks
+    supports: CrewAI task guardrails and human-input settings distinguish rejection from human review; Moonweave records the selected governance effect on violation.
+    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
     evidence_kind: design-inference
-    confidence: high
+    confidence: medium
+    review_status: accepted
   - id: claim-task-constraint-011
-    source: langgraph-graph-api
-    supports: Moonweave TaskConstraint constraints, examples, or local audit fields for claim claim-task-constraint-011 are design projections informed by LangGraph Graph API.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    source: lit-oasis-process-planning
+    supports: OASIS 2 represents how agents should carry out actions in processes and procedures; Moonweave records the exact planning scope of each execution constraint.
+    locator: OASIS 2 process-planning paper > process and procedure descriptions, task descriptions, roles, and plan executions
     evidence_kind: design-inference
-    confidence: high
+    confidence: medium
+    review_status: accepted
   - id: claim-task-constraint-012
-    source: prov-o
-    supports: Moonweave TaskConstraint constraints, examples, or local audit fields for claim claim-task-constraint-012 are design projections informed by W3C PROV-O.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    source: eng-fw-maf-workflows
+    supports: Agent Framework conditions control explicit graph flow; Moonweave requires task constraints to be executable predicates rather than comments.
+    locator: Microsoft Agent Framework Workflows > Key Features and Core Concepts > typed executors and directed edges
     evidence_kind: design-inference
-    confidence: high
+    confidence: medium
+    review_status: accepted
   - id: claim-task-constraint-013
-    source: a2a-protocol-specification
-    supports: Moonweave TaskConstraint constraints, examples, or local audit fields for claim claim-task-constraint-013 are design projections informed by Agent2Agent (A2A) Protocol Specification.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    source: eng-fw-crewai-tasks
+    supports: CrewAI separates context dependencies, tool limits, and output guardrails; Moonweave preserves those as TaskDependency, TaskConstraint, and TaskCompletionCriterion.
+    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
     evidence_kind: design-inference
-    confidence: high
+    confidence: medium
+    review_status: accepted
   - id: claim-task-constraint-014
-    source: langgraph-graph-api
-    supports: Moonweave TaskConstraint constraints, examples, or local audit fields for claim claim-task-constraint-014 are design projections informed by LangGraph Graph API.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    source: eng-fw-crewai-tasks
+    supports: CrewAI tools and configuration limits are attached to a task; Moonweave requires a corresponding Task-to-constraint relation.
+    locator: CrewAI Tasks > Task Attributes; Task Dependencies and Context; Task Guardrails
     evidence_kind: design-inference
-    confidence: high
+    confidence: medium
+    review_status: accepted
   - id: claim-task-constraint-015
-    source: prov-o
-    supports: Moonweave TaskConstraint constraints, examples, or local audit fields for claim claim-task-constraint-015 are design projections informed by W3C PROV-O.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    source: lit-planning-ontology-2023
+    supports: Planning constraints restrict admissible actions and plans; the environment and budget limits here are constraints rather than predecessor or success semantics.
+    locator: Planning Ontology paper > goals, actions, ordering constraints, and plan structure
     evidence_kind: design-inference
-    confidence: high
+    confidence: medium
+    review_status: accepted
   - id: claim-task-constraint-016
-    source: a2a-protocol-specification
-    supports: Moonweave TaskConstraint constraints, examples, or local audit fields for claim claim-task-constraint-016 are design projections informed by Agent2Agent (A2A) Protocol Specification.
-    locator: Plan/Entity semantics; graph workflow composition; A2A Task boundary
+    source: lit-planning-ontology-2023
+    supports: Ordering and dependency conditions are distinct planning constructs from resource or policy constraints in planning-ontology models.
+    locator: Planning Ontology paper > goals, actions, ordering constraints, and plan structure
     evidence_kind: design-inference
-    confidence: high
+    confidence: medium
+    review_status: accepted
+  - id: claim-task-constraint-017
+    source: eng-fw-crewai-docs
+    supports: CrewAI task processes support guardrails and explicit task dependencies. Moonweave models a general execution restriction as TaskConstraint and a prerequisite ordering relation as TaskDependency, preventing dependency order from being flattened into an undifferentiated constraint.
+    locator: Documentation > Agents, tasks, crews, flows, and processes
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-task-constraint-018
+    source: lit-planning-ontology-2023
+    supports: Explicit constraints over admissible actions fit the evaluable TaskCondition genus.
+    locator: Planning Ontology paper > goals, actions, ordering constraints, and plan structure
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-task-constraint-019
+    source: lit-planning-ontology-2023
+    supports: Planning ordering relations remain distinct from action constraints.
+    locator: Planning Ontology paper > goals, actions, ordering constraints, and plan structure
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
+  - id: claim-task-constraint-020
+    source: lit-planning-ontology-2023
+    supports: Planning Ontology represents constraints as explicit evaluable knowledge over actions and plans; Moonweave specializes them under TaskCondition.
+    locator: Planning Ontology paper > goals, actions, ordering constraints, and plan structure
+    evidence_kind: design-inference
+    confidence: medium
+    review_status: accepted
